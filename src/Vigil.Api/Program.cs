@@ -11,6 +11,7 @@ using Vigil.Infrastructure.Data;
 using Vigil.Infrastructure.Options;
 using Vigil.Api.Hubs;
 using Vigil.Infrastructure.Repositories;
+using Vigil.Infrastructure.AiProviders;
 using Vigil.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -201,6 +202,12 @@ builder.Services.AddScoped<ITeamRepository, TeamRepository>();
 builder.Services.AddScoped<INotificationService, EmailNotificationService>();
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
+
+// AI Report Providers
+builder.Services.AddScoped<AiReportService>();
+builder.Services.AddScoped<IAiReportProvider, AzureOpenAiProvider>();
+builder.Services.AddScoped<IAiReportProvider, AnthropicProvider>();
+builder.Services.Configure<AiProviderOptions>(builder.Configuration.GetSection("AiProvider"));
 
 // SignalR
 builder.Services.AddSignalR();
