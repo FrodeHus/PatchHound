@@ -90,6 +90,7 @@ builder.Services.AddScoped<RemediationTaskService>();
 builder.Services.AddScoped<AssetService>();
 builder.Services.AddScoped<CampaignService>();
 builder.Services.AddScoped<RiskAcceptanceService>();
+builder.Services.AddScoped<DashboardService>();
 
 // CORS
 builder.Services.AddCors(options =>
