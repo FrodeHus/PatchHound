@@ -7,9 +7,10 @@ public class Result<T>
 
     private readonly T? _value;
 
-    public T Value => IsSuccess
-        ? _value!
-        : throw new InvalidOperationException("Cannot access Value on a failed result.");
+    public T Value =>
+        IsSuccess
+            ? _value!
+            : throw new InvalidOperationException("Cannot access Value on a failed result.");
 
     private Result(T value)
     {
@@ -24,5 +25,6 @@ public class Result<T>
     }
 
     public static Result<T> Success(T value) => new(value);
+
     public static Result<T> Failure(string error) => new(error);
 }

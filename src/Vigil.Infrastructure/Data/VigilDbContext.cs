@@ -40,14 +40,26 @@ public class VigilDbContext : DbContext, IUnitOfWork
         var accessibleTenants = _tenantContext.AccessibleTenantIds;
 
         modelBuilder.Entity<Asset>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
-        modelBuilder.Entity<Vulnerability>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
-        modelBuilder.Entity<RemediationTask>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+        modelBuilder
+            .Entity<Vulnerability>()
+            .HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+        modelBuilder
+            .Entity<RemediationTask>()
+            .HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
         modelBuilder.Entity<Campaign>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
         modelBuilder.Entity<Comment>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
-        modelBuilder.Entity<RiskAcceptance>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
-        modelBuilder.Entity<AuditLogEntry>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
-        modelBuilder.Entity<Notification>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
-        modelBuilder.Entity<OrganizationalSeverity>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+        modelBuilder
+            .Entity<RiskAcceptance>()
+            .HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+        modelBuilder
+            .Entity<AuditLogEntry>()
+            .HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+        modelBuilder
+            .Entity<Notification>()
+            .HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+        modelBuilder
+            .Entity<OrganizationalSeverity>()
+            .HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
         modelBuilder.Entity<AIReport>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
         modelBuilder.Entity<Team>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
     }

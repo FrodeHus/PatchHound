@@ -25,7 +25,8 @@ public class Asset
         AssetType assetType,
         string name,
         Criticality criticality,
-        string? description = null)
+        string? description = null
+    )
     {
         return new Asset
         {
@@ -36,7 +37,7 @@ public class Asset
             Name = name,
             Criticality = criticality,
             Description = description,
-            OwnerType = OwnerType.User
+            OwnerType = OwnerType.User,
         };
     }
 

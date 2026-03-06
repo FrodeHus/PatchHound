@@ -13,11 +13,17 @@ public class Campaign
     public DateTimeOffset CreatedAt { get; private set; }
 
     private readonly List<CampaignVulnerability> _vulnerabilities = [];
-    public IReadOnlyCollection<CampaignVulnerability> Vulnerabilities => _vulnerabilities.AsReadOnly();
+    public IReadOnlyCollection<CampaignVulnerability> Vulnerabilities =>
+        _vulnerabilities.AsReadOnly();
 
     private Campaign() { }
 
-    public static Campaign Create(Guid tenantId, string name, Guid createdBy, string? description = null)
+    public static Campaign Create(
+        Guid tenantId,
+        string name,
+        Guid createdBy,
+        string? description = null
+    )
     {
         return new Campaign
         {
@@ -27,7 +33,7 @@ public class Campaign
             Description = description,
             Status = CampaignStatus.Active,
             CreatedBy = createdBy,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
         };
     }
 

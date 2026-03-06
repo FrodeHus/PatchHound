@@ -16,7 +16,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddVigilInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration
+    )
     {
         // Database
         services.AddDbContext<VigilDbContext>(options =>

@@ -64,7 +64,11 @@ public class AssetServiceTests
         var asset = CreateAsset(Criticality.Low);
         _assetRepo.GetByIdAsync(asset.Id, Arg.Any<CancellationToken>()).Returns(asset);
 
-        var result = await _service.SetCriticalityAsync(asset.Id, Criticality.Critical, CancellationToken.None);
+        var result = await _service.SetCriticalityAsync(
+            asset.Id,
+            Criticality.Critical,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Criticality.Should().Be(Criticality.Critical);
@@ -74,9 +78,15 @@ public class AssetServiceTests
     [Fact]
     public async Task AssignOwner_AssetNotFound_ReturnsFailure()
     {
-        _assetRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Asset?)null);
+        _assetRepo
+            .GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((Asset?)null);
 
-        var result = await _service.AssignOwnerAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+        var result = await _service.AssignOwnerAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("not found");
@@ -85,9 +95,15 @@ public class AssetServiceTests
     [Fact]
     public async Task AssignTeamOwner_AssetNotFound_ReturnsFailure()
     {
-        _assetRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Asset?)null);
+        _assetRepo
+            .GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((Asset?)null);
 
-        var result = await _service.AssignTeamOwnerAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+        var result = await _service.AssignTeamOwnerAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("not found");
@@ -96,9 +112,15 @@ public class AssetServiceTests
     [Fact]
     public async Task SetCriticality_AssetNotFound_ReturnsFailure()
     {
-        _assetRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Asset?)null);
+        _assetRepo
+            .GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((Asset?)null);
 
-        var result = await _service.SetCriticalityAsync(Guid.NewGuid(), Criticality.High, CancellationToken.None);
+        var result = await _service.SetCriticalityAsync(
+            Guid.NewGuid(),
+            Criticality.High,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("not found");
@@ -115,7 +137,12 @@ public class AssetServiceTests
         _assetRepo.GetByIdAsync(asset1.Id, Arg.Any<CancellationToken>()).Returns(asset1);
         _assetRepo.GetByIdAsync(asset2.Id, Arg.Any<CancellationToken>()).Returns(asset2);
 
-        var result = await _service.BulkAssignOwnerAsync(assetIds, userId, OwnerType.User, CancellationToken.None);
+        var result = await _service.BulkAssignOwnerAsync(
+            assetIds,
+            userId,
+            OwnerType.User,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().Be(2);
@@ -133,7 +160,12 @@ public class AssetServiceTests
 
         _assetRepo.GetByIdAsync(asset1.Id, Arg.Any<CancellationToken>()).Returns(asset1);
 
-        var result = await _service.BulkAssignOwnerAsync(assetIds, teamId, OwnerType.Team, CancellationToken.None);
+        var result = await _service.BulkAssignOwnerAsync(
+            assetIds,
+            teamId,
+            OwnerType.Team,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().Be(1);
@@ -153,7 +185,12 @@ public class AssetServiceTests
         _assetRepo.GetByIdAsync(asset1.Id, Arg.Any<CancellationToken>()).Returns(asset1);
         _assetRepo.GetByIdAsync(missingId, Arg.Any<CancellationToken>()).Returns((Asset?)null);
 
-        var result = await _service.BulkAssignOwnerAsync(assetIds, userId, OwnerType.User, CancellationToken.None);
+        var result = await _service.BulkAssignOwnerAsync(
+            assetIds,
+            userId,
+            OwnerType.User,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().Be(1);

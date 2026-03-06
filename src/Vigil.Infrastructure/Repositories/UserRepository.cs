@@ -7,7 +7,8 @@ namespace Vigil.Infrastructure.Repositories;
 
 public class UserRepository : RepositoryBase<User>, IUserRepository
 {
-    public UserRepository(VigilDbContext dbContext) : base(dbContext) { }
+    public UserRepository(VigilDbContext dbContext)
+        : base(dbContext) { }
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
     {
@@ -16,16 +17,14 @@ public class UserRepository : RepositoryBase<User>, IUserRepository
 
     public async Task<User?> GetByIdWithRolesAsync(Guid id, CancellationToken ct = default)
     {
-        return await DbContext.Users
-            .Include(u => u.TenantRoles)
+        return await DbContext
+            .Users.Include(u => u.TenantRoles)
             .FirstOrDefaultAsync(u => u.Id == id, ct);
     }
 
     public async Task<IReadOnlyList<User>> GetAllWithRolesAsync(CancellationToken ct = default)
     {
-        return await DbContext.Users
-            .Include(u => u.TenantRoles)
-            .ToListAsync(ct);
+        return await DbContext.Users.Include(u => u.TenantRoles).ToListAsync(ct);
     }
 
     public async Task AddRoleAsync(UserTenantRole role, CancellationToken ct = default)
@@ -33,10 +32,16 @@ public class UserRepository : RepositoryBase<User>, IUserRepository
         await DbContext.UserTenantRoles.AddAsync(role, ct);
     }
 
-    public async Task<UserTenantRole?> GetRoleAsync(Guid userId, Guid tenantId, CancellationToken ct = default)
+    public async Task<UserTenantRole?> GetRoleAsync(
+        Guid userId,
+        Guid tenantId,
+        CancellationToken ct = default
+    )
     {
-        return await DbContext.UserTenantRoles
-            .FirstOrDefaultAsync(r => r.UserId == userId && r.TenantId == tenantId, ct);
+        return await DbContext.UserTenantRoles.FirstOrDefaultAsync(
+            r => r.UserId == userId && r.TenantId == tenantId,
+            ct
+        );
     }
 
     public void RemoveRole(UserTenantRole role)

@@ -8,7 +8,8 @@ public record DashboardSummaryDto(
     int OverdueTaskCount,
     int TotalTaskCount,
     decimal AverageRemediationDays,
-    List<TopVulnerabilityDto> TopCriticalVulnerabilities);
+    List<TopVulnerabilityDto> TopCriticalVulnerabilities
+);
 
 public record TopVulnerabilityDto(
     Guid Id,
@@ -17,12 +18,9 @@ public record TopVulnerabilityDto(
     string Severity,
     decimal? CvssScore,
     int AffectedAssetCount,
-    int DaysSincePublished);
+    int DaysSincePublished
+);
 
-public record TrendDataDto(
-    List<TrendItem> Items);
+public record TrendDataDto(List<TrendItem> Items);
 
-public record TrendItem(
-    DateOnly Date,
-    string Severity,
-    int Count);
+public record TrendItem(DateOnly Date, string Severity, int Count);

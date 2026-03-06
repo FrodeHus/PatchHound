@@ -7,5 +7,5 @@ public enum NotificationType
     NewCriticalVuln,
     RiskAcceptanceRequired,
     RiskAcceptanceDecision,
-    TaskStatusChanged
+    TaskStatusChanged,
 }

@@ -21,9 +21,18 @@ public class RemediationTaskServiceTests
         _service = new RemediationTaskService(_taskRepo, _unitOfWork);
     }
 
-    private RemediationTask CreateTask(RemediationTaskStatus initialStatus = RemediationTaskStatus.Pending)
+    private RemediationTask CreateTask(
+        RemediationTaskStatus initialStatus = RemediationTaskStatus.Pending
+    )
     {
-        var task = RemediationTask.Create(Guid.NewGuid(), Guid.NewGuid(), _tenantId, Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow.AddDays(7));
+        var task = RemediationTask.Create(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            _tenantId,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            DateTimeOffset.UtcNow.AddDays(7)
+        );
         if (initialStatus != RemediationTaskStatus.Pending)
             task.UpdateStatus(initialStatus);
         return task;
@@ -35,7 +44,12 @@ public class RemediationTaskServiceTests
         var task = CreateTask();
         _taskRepo.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
 
-        var result = await _service.UpdateStatusAsync(task.Id, RemediationTaskStatus.InProgress, null, CancellationToken.None);
+        var result = await _service.UpdateStatusAsync(
+            task.Id,
+            RemediationTaskStatus.InProgress,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be(RemediationTaskStatus.InProgress);
@@ -47,7 +61,12 @@ public class RemediationTaskServiceTests
         var task = CreateTask();
         _taskRepo.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
 
-        var result = await _service.UpdateStatusAsync(task.Id, RemediationTaskStatus.Completed, null, CancellationToken.None);
+        var result = await _service.UpdateStatusAsync(
+            task.Id,
+            RemediationTaskStatus.Completed,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Invalid transition");
@@ -59,7 +78,12 @@ public class RemediationTaskServiceTests
         var task = CreateTask(RemediationTaskStatus.InProgress);
         _taskRepo.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
 
-        var result = await _service.UpdateStatusAsync(task.Id, RemediationTaskStatus.CannotPatch, null, CancellationToken.None);
+        var result = await _service.UpdateStatusAsync(
+            task.Id,
+            RemediationTaskStatus.CannotPatch,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Justification is required");
@@ -71,7 +95,12 @@ public class RemediationTaskServiceTests
         var task = CreateTask(RemediationTaskStatus.InProgress);
         _taskRepo.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
 
-        var result = await _service.UpdateStatusAsync(task.Id, RemediationTaskStatus.CannotPatch, "Legacy system, no patch available", CancellationToken.None);
+        var result = await _service.UpdateStatusAsync(
+            task.Id,
+            RemediationTaskStatus.CannotPatch,
+            "Legacy system, no patch available",
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be(RemediationTaskStatus.CannotPatch);
@@ -83,7 +112,12 @@ public class RemediationTaskServiceTests
         var task = CreateTask(RemediationTaskStatus.InProgress);
         _taskRepo.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
 
-        var result = await _service.UpdateStatusAsync(task.Id, RemediationTaskStatus.RiskAccepted, null, CancellationToken.None);
+        var result = await _service.UpdateStatusAsync(
+            task.Id,
+            RemediationTaskStatus.RiskAccepted,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Justification is required");
@@ -97,7 +131,12 @@ public class RemediationTaskServiceTests
         task.UpdateStatus(RemediationTaskStatus.Completed);
         _taskRepo.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
 
-        var result = await _service.UpdateStatusAsync(task.Id, RemediationTaskStatus.InProgress, null, CancellationToken.None);
+        var result = await _service.UpdateStatusAsync(
+            task.Id,
+            RemediationTaskStatus.InProgress,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Invalid transition");
@@ -106,9 +145,16 @@ public class RemediationTaskServiceTests
     [Fact]
     public async Task TaskNotFound_ReturnsFailure()
     {
-        _taskRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((RemediationTask?)null);
+        _taskRepo
+            .GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((RemediationTask?)null);
 
-        var result = await _service.UpdateStatusAsync(Guid.NewGuid(), RemediationTaskStatus.InProgress, null, CancellationToken.None);
+        var result = await _service.UpdateStatusAsync(
+            Guid.NewGuid(),
+            RemediationTaskStatus.InProgress,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("not found");
@@ -120,7 +166,12 @@ public class RemediationTaskServiceTests
         var task = CreateTask();
         _taskRepo.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
 
-        var result = await _service.UpdateStatusAsync(task.Id, RemediationTaskStatus.RiskAccepted, "Accepted by management", CancellationToken.None);
+        var result = await _service.UpdateStatusAsync(
+            task.Id,
+            RemediationTaskStatus.RiskAccepted,
+            "Accepted by management",
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be(RemediationTaskStatus.RiskAccepted);
@@ -133,7 +184,12 @@ public class RemediationTaskServiceTests
         task.UpdateStatus(RemediationTaskStatus.PatchScheduled);
         _taskRepo.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
 
-        var result = await _service.UpdateStatusAsync(task.Id, RemediationTaskStatus.Completed, null, CancellationToken.None);
+        var result = await _service.UpdateStatusAsync(
+            task.Id,
+            RemediationTaskStatus.Completed,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be(RemediationTaskStatus.Completed);
@@ -146,7 +202,12 @@ public class RemediationTaskServiceTests
         task.UpdateStatus(RemediationTaskStatus.RiskAccepted, "Accepted");
         _taskRepo.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
 
-        var result = await _service.UpdateStatusAsync(task.Id, RemediationTaskStatus.InProgress, null, CancellationToken.None);
+        var result = await _service.UpdateStatusAsync(
+            task.Id,
+            RemediationTaskStatus.InProgress,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Invalid transition");
@@ -159,7 +220,12 @@ public class RemediationTaskServiceTests
         task.UpdateStatus(RemediationTaskStatus.CannotPatch, "No patch yet");
         _taskRepo.GetByIdAsync(task.Id, Arg.Any<CancellationToken>()).Returns(task);
 
-        var result = await _service.UpdateStatusAsync(task.Id, RemediationTaskStatus.InProgress, null, CancellationToken.None);
+        var result = await _service.UpdateStatusAsync(
+            task.Id,
+            RemediationTaskStatus.InProgress,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be(RemediationTaskStatus.InProgress);

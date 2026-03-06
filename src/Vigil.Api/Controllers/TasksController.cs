@@ -26,7 +26,8 @@ public class TasksController : ControllerBase
         VigilDbContext dbContext,
         RemediationTaskService taskService,
         RiskAcceptanceService riskAcceptanceService,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext
+    )
     {
         _dbContext = dbContext;
         _taskService = taskService;
@@ -39,11 +40,15 @@ public class TasksController : ControllerBase
     public async Task<ActionResult<PagedResponse<RemediationTaskDto>>> List(
         [FromQuery] TaskFilterQuery filter,
         [FromQuery] PaginationQuery pagination,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         var query = _dbContext.RemediationTasks.AsNoTracking().AsQueryable();
 
-        if (!string.IsNullOrEmpty(filter.Status) && Enum.TryParse<RemediationTaskStatus>(filter.Status, out var status))
+        if (
+            !string.IsNullOrEmpty(filter.Status)
+            && Enum.TryParse<RemediationTaskStatus>(filter.Status, out var status)
+        )
             query = query.Where(t => t.Status == status);
         if (filter.TenantId.HasValue)
             query = query.Where(t => t.TenantId == filter.TenantId.Value);
@@ -61,13 +66,20 @@ public class TasksController : ControllerBase
                 t.Id,
                 t.VulnerabilityId,
                 t.AssetId,
-                _dbContext.Vulnerabilities.Where(v => v.Id == t.VulnerabilityId).Select(v => v.Title).FirstOrDefault() ?? "",
-                _dbContext.Assets.Where(a => a.Id == t.AssetId).Select(a => a.Name).FirstOrDefault() ?? "",
+                _dbContext
+                    .Vulnerabilities.Where(v => v.Id == t.VulnerabilityId)
+                    .Select(v => v.Title)
+                    .FirstOrDefault() ?? "",
+                _dbContext.Assets.Where(a => a.Id == t.AssetId).Select(a => a.Name).FirstOrDefault()
+                    ?? "",
                 t.Status.ToString(),
                 t.Justification,
                 t.DueDate,
                 t.CreatedAt,
-                t.DueDate < now && t.Status != RemediationTaskStatus.Completed && t.Status != RemediationTaskStatus.RiskAccepted))
+                t.DueDate < now
+                    && t.Status != RemediationTaskStatus.Completed
+                    && t.Status != RemediationTaskStatus.RiskAccepted
+            ))
             .ToListAsync(ct);
 
         return Ok(new PagedResponse<RemediationTaskDto>(items, totalCount));
@@ -77,25 +89,49 @@ public class TasksController : ControllerBase
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<RemediationTaskDto>> Get(Guid id, CancellationToken ct)
     {
-        var task = await _dbContext.RemediationTasks.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
+        var task = await _dbContext
+            .RemediationTasks.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == id, ct);
         if (task is null)
             return NotFound();
 
-        var vulnTitle = await _dbContext.Vulnerabilities.Where(v => v.Id == task.VulnerabilityId).Select(v => v.Title).FirstOrDefaultAsync(ct) ?? "";
-        var assetName = await _dbContext.Assets.Where(a => a.Id == task.AssetId).Select(a => a.Name).FirstOrDefaultAsync(ct) ?? "";
+        var vulnTitle =
+            await _dbContext
+                .Vulnerabilities.Where(v => v.Id == task.VulnerabilityId)
+                .Select(v => v.Title)
+                .FirstOrDefaultAsync(ct) ?? "";
+        var assetName =
+            await _dbContext
+                .Assets.Where(a => a.Id == task.AssetId)
+                .Select(a => a.Name)
+                .FirstOrDefaultAsync(ct) ?? "";
         var now = DateTimeOffset.UtcNow;
 
-        return Ok(new RemediationTaskDto(
-            task.Id, task.VulnerabilityId, task.AssetId,
-            vulnTitle, assetName,
-            task.Status.ToString(), task.Justification,
-            task.DueDate, task.CreatedAt,
-            task.DueDate < now && task.Status != RemediationTaskStatus.Completed && task.Status != RemediationTaskStatus.RiskAccepted));
+        return Ok(
+            new RemediationTaskDto(
+                task.Id,
+                task.VulnerabilityId,
+                task.AssetId,
+                vulnTitle,
+                assetName,
+                task.Status.ToString(),
+                task.Justification,
+                task.DueDate,
+                task.CreatedAt,
+                task.DueDate < now
+                    && task.Status != RemediationTaskStatus.Completed
+                    && task.Status != RemediationTaskStatus.RiskAccepted
+            )
+        );
     }
 
     [HttpPut("{id:guid}/status")]
     [Authorize(Policy = Policies.UpdateTaskStatus)]
-    public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateTaskStatusRequest request, CancellationToken ct)
+    public async Task<IActionResult> UpdateStatus(
+        Guid id,
+        [FromBody] UpdateTaskStatusRequest request,
+        CancellationToken ct
+    )
     {
         if (!Enum.TryParse<RemediationTaskStatus>(request.Status, out var status))
             return BadRequest(new ProblemDetails { Title = "Invalid status value" });
@@ -112,9 +148,12 @@ public class TasksController : ControllerBase
     public async Task<IActionResult> RequestRiskAcceptance(
         Guid id,
         [FromBody] RequestRiskAcceptanceRequest request,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
-        var task = await _dbContext.RemediationTasks.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
+        var task = await _dbContext
+            .RemediationTasks.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == id, ct);
         if (task is null)
             return NotFound(new ProblemDetails { Title = "Task not found" });
 
@@ -127,7 +166,8 @@ public class TasksController : ControllerBase
             request.Conditions,
             request.ExpiryDate,
             request.ReviewFrequency,
-            ct);
+            ct
+        );
 
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
@@ -149,6 +189,8 @@ public class TasksController : ControllerBase
                 acceptance.ApprovedAt,
                 acceptance.Conditions,
                 acceptance.ExpiryDate,
-                acceptance.ReviewFrequency));
+                acceptance.ReviewFrequency
+            )
+        );
     }
 }

@@ -16,7 +16,11 @@ public class AssetService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<Result<Asset>> AssignOwnerAsync(Guid assetId, Guid userId, CancellationToken ct)
+    public async Task<Result<Asset>> AssignOwnerAsync(
+        Guid assetId,
+        Guid userId,
+        CancellationToken ct
+    )
     {
         var asset = await _assetRepository.GetByIdAsync(assetId, ct);
         if (asset is null)
@@ -28,7 +32,11 @@ public class AssetService
         return Result<Asset>.Success(asset);
     }
 
-    public async Task<Result<Asset>> AssignTeamOwnerAsync(Guid assetId, Guid teamId, CancellationToken ct)
+    public async Task<Result<Asset>> AssignTeamOwnerAsync(
+        Guid assetId,
+        Guid teamId,
+        CancellationToken ct
+    )
     {
         var asset = await _assetRepository.GetByIdAsync(assetId, ct);
         if (asset is null)
@@ -40,7 +48,11 @@ public class AssetService
         return Result<Asset>.Success(asset);
     }
 
-    public async Task<Result<Asset>> SetCriticalityAsync(Guid assetId, Criticality criticality, CancellationToken ct)
+    public async Task<Result<Asset>> SetCriticalityAsync(
+        Guid assetId,
+        Criticality criticality,
+        CancellationToken ct
+    )
     {
         var asset = await _assetRepository.GetByIdAsync(assetId, ct);
         if (asset is null)
@@ -52,7 +64,12 @@ public class AssetService
         return Result<Asset>.Success(asset);
     }
 
-    public async Task<Result<int>> BulkAssignOwnerAsync(IReadOnlyList<Guid> assetIds, Guid ownerId, OwnerType ownerType, CancellationToken ct)
+    public async Task<Result<int>> BulkAssignOwnerAsync(
+        IReadOnlyList<Guid> assetIds,
+        Guid ownerId,
+        OwnerType ownerType,
+        CancellationToken ct
+    )
     {
         var updatedCount = 0;
 

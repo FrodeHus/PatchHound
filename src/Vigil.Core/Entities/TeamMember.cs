@@ -17,7 +17,7 @@ public class TeamMember
         {
             Id = Guid.NewGuid(),
             TeamId = teamId,
-            UserId = userId
+            UserId = userId,
         };
     }
 }

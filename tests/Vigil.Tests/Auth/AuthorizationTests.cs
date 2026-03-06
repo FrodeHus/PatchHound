@@ -35,8 +35,16 @@ public class AuthorizationTests : IDisposable
     {
         await SeedUserRole(RoleName.SecurityAnalyst);
         var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
-        var requirement = new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager, RoleName.SecurityAnalyst);
-        var context = new AuthorizationHandlerContext(new[] { requirement }, CreateClaimsPrincipal(), null);
+        var requirement = new RoleRequirement(
+            RoleName.GlobalAdmin,
+            RoleName.SecurityManager,
+            RoleName.SecurityAnalyst
+        );
+        var context = new AuthorizationHandlerContext(
+            new[] { requirement },
+            CreateClaimsPrincipal(),
+            null
+        );
 
         await handler.HandleAsync(context);
 
@@ -48,8 +56,16 @@ public class AuthorizationTests : IDisposable
     {
         await SeedUserRole(RoleName.AssetOwner);
         var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
-        var requirement = new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager, RoleName.SecurityAnalyst);
-        var context = new AuthorizationHandlerContext(new[] { requirement }, CreateClaimsPrincipal(), null);
+        var requirement = new RoleRequirement(
+            RoleName.GlobalAdmin,
+            RoleName.SecurityManager,
+            RoleName.SecurityAnalyst
+        );
+        var context = new AuthorizationHandlerContext(
+            new[] { requirement },
+            CreateClaimsPrincipal(),
+            null
+        );
 
         await handler.HandleAsync(context);
 
@@ -62,9 +78,18 @@ public class AuthorizationTests : IDisposable
         await SeedUserRole(RoleName.Stakeholder);
         var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
         var requirement = new RoleRequirement(
-            RoleName.GlobalAdmin, RoleName.SecurityManager, RoleName.SecurityAnalyst,
-            RoleName.AssetOwner, RoleName.Stakeholder, RoleName.Auditor);
-        var context = new AuthorizationHandlerContext(new[] { requirement }, CreateClaimsPrincipal(), null);
+            RoleName.GlobalAdmin,
+            RoleName.SecurityManager,
+            RoleName.SecurityAnalyst,
+            RoleName.AssetOwner,
+            RoleName.Stakeholder,
+            RoleName.Auditor
+        );
+        var context = new AuthorizationHandlerContext(
+            new[] { requirement },
+            CreateClaimsPrincipal(),
+            null
+        );
 
         await handler.HandleAsync(context);
 
@@ -77,8 +102,16 @@ public class AuthorizationTests : IDisposable
         await SeedUserRole(RoleName.Stakeholder);
         var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
         var requirement = new RoleRequirement(
-            RoleName.GlobalAdmin, RoleName.SecurityManager, RoleName.SecurityAnalyst, RoleName.AssetOwner);
-        var context = new AuthorizationHandlerContext(new[] { requirement }, CreateClaimsPrincipal(), null);
+            RoleName.GlobalAdmin,
+            RoleName.SecurityManager,
+            RoleName.SecurityAnalyst,
+            RoleName.AssetOwner
+        );
+        var context = new AuthorizationHandlerContext(
+            new[] { requirement },
+            CreateClaimsPrincipal(),
+            null
+        );
 
         await handler.HandleAsync(context);
 
@@ -93,7 +126,11 @@ public class AuthorizationTests : IDisposable
 
         // Test with ManageUsers (most restrictive - only GlobalAdmin)
         var requirement = new RoleRequirement(RoleName.GlobalAdmin);
-        var context = new AuthorizationHandlerContext(new[] { requirement }, CreateClaimsPrincipal(), null);
+        var context = new AuthorizationHandlerContext(
+            new[] { requirement },
+            CreateClaimsPrincipal(),
+            null
+        );
 
         await handler.HandleAsync(context);
 
@@ -106,7 +143,11 @@ public class AuthorizationTests : IDisposable
         _tenantContext.CurrentUserId.Returns(Guid.Empty);
         var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin);
-        var context = new AuthorizationHandlerContext(new[] { requirement }, CreateClaimsPrincipal(), null);
+        var context = new AuthorizationHandlerContext(
+            new[] { requirement },
+            CreateClaimsPrincipal(),
+            null
+        );
 
         await handler.HandleAsync(context);
 
@@ -119,7 +160,11 @@ public class AuthorizationTests : IDisposable
         await SeedUserRole(RoleName.Auditor);
         var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin, RoleName.Auditor);
-        var context = new AuthorizationHandlerContext(new[] { requirement }, CreateClaimsPrincipal(), null);
+        var context = new AuthorizationHandlerContext(
+            new[] { requirement },
+            CreateClaimsPrincipal(),
+            null
+        );
 
         await handler.HandleAsync(context);
 
@@ -132,7 +177,11 @@ public class AuthorizationTests : IDisposable
         await SeedUserRole(RoleName.Auditor);
         var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin);
-        var context = new AuthorizationHandlerContext(new[] { requirement }, CreateClaimsPrincipal(), null);
+        var context = new AuthorizationHandlerContext(
+            new[] { requirement },
+            CreateClaimsPrincipal(),
+            null
+        );
 
         await handler.HandleAsync(context);
 

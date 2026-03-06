@@ -13,7 +13,13 @@ public class Comment
 
     private Comment() { }
 
-    public static Comment Create(Guid tenantId, string entityType, Guid entityId, Guid authorId, string content)
+    public static Comment Create(
+        Guid tenantId,
+        string entityType,
+        Guid entityId,
+        Guid authorId,
+        string content
+    )
     {
         return new Comment
         {
@@ -23,7 +29,7 @@ public class Comment
             EntityId = entityId,
             AuthorId = authorId,
             Content = content,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
         };
     }
 

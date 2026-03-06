@@ -18,14 +18,15 @@ public class RoleRequirementHandler : AuthorizationHandler<RoleRequirement>
 
     protected override async Task HandleRequirementAsync(
         AuthorizationHandlerContext context,
-        RoleRequirement requirement)
+        RoleRequirement requirement
+    )
     {
         var userId = _tenantContext.CurrentUserId;
         if (userId == Guid.Empty)
             return;
 
-        var userRoles = await _dbContext.UserTenantRoles
-            .AsNoTracking()
+        var userRoles = await _dbContext
+            .UserTenantRoles.AsNoTracking()
             .IgnoreQueryFilters()
             .Where(utr => utr.UserId == userId)
             .Select(utr => utr.Role)

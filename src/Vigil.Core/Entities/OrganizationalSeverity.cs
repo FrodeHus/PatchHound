@@ -25,7 +25,8 @@ public class OrganizationalSeverity
         Guid adjustedBy,
         string? assetCriticalityFactor = null,
         string? exposureFactor = null,
-        string? compensatingControls = null)
+        string? compensatingControls = null
+    )
     {
         return new OrganizationalSeverity
         {
@@ -38,7 +39,7 @@ public class OrganizationalSeverity
             AdjustedAt = DateTimeOffset.UtcNow,
             AssetCriticalityFactor = assetCriticalityFactor,
             ExposureFactor = exposureFactor,
-            CompensatingControls = compensatingControls
+            CompensatingControls = compensatingControls,
         };
     }
 }

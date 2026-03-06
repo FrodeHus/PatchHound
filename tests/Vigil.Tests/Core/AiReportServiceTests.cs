@@ -42,7 +42,11 @@ public class AiReportServiceTests
         };
 
         _azureProvider
-            .GenerateReportAsync(vulnerability, Arg.Any<IReadOnlyList<Asset>>(), Arg.Any<CancellationToken>())
+            .GenerateReportAsync(
+                vulnerability,
+                Arg.Any<IReadOnlyList<Asset>>(),
+                Arg.Any<CancellationToken>()
+            )
             .Returns("# AI Report\n\nThis is a generated report.");
 
         var result = await _service.GenerateReportAsync(
@@ -103,7 +107,11 @@ public class AiReportServiceTests
         );
 
         _azureProvider
-            .GenerateReportAsync(vulnerability, Arg.Any<IReadOnlyList<Asset>>(), Arg.Any<CancellationToken>())
+            .GenerateReportAsync(
+                vulnerability,
+                Arg.Any<IReadOnlyList<Asset>>(),
+                Arg.Any<CancellationToken>()
+            )
             .Returns("Report content");
 
         var result = await _service.GenerateReportAsync(
@@ -125,11 +133,19 @@ public class AiReportServiceTests
         var anthropicProvider = Substitute.For<IAiReportProvider>();
         anthropicProvider.ProviderName.Returns("Anthropic");
         anthropicProvider
-            .GenerateReportAsync(Arg.Any<Vulnerability>(), Arg.Any<IReadOnlyList<Asset>>(), Arg.Any<CancellationToken>())
+            .GenerateReportAsync(
+                Arg.Any<Vulnerability>(),
+                Arg.Any<IReadOnlyList<Asset>>(),
+                Arg.Any<CancellationToken>()
+            )
             .Returns("Anthropic report");
 
         _azureProvider
-            .GenerateReportAsync(Arg.Any<Vulnerability>(), Arg.Any<IReadOnlyList<Asset>>(), Arg.Any<CancellationToken>())
+            .GenerateReportAsync(
+                Arg.Any<Vulnerability>(),
+                Arg.Any<IReadOnlyList<Asset>>(),
+                Arg.Any<CancellationToken>()
+            )
             .Returns("Azure report");
 
         var service = new AiReportService(new[] { _azureProvider, anthropicProvider });

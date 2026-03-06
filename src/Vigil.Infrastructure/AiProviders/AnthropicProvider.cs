@@ -43,7 +43,9 @@ public class AnthropicProvider : IAiReportProvider
         sb.AppendLine("## Impact Assessment");
         foreach (var asset in affectedAssets)
         {
-            sb.AppendLine($"- **{asset.Name}** ({asset.AssetType}, Criticality: {asset.Criticality})");
+            sb.AppendLine(
+                $"- **{asset.Name}** ({asset.AssetType}, Criticality: {asset.Criticality})"
+            );
         }
         sb.AppendLine();
         sb.AppendLine("## Remediation Guidance");
@@ -51,7 +53,9 @@ public class AnthropicProvider : IAiReportProvider
         sb.AppendLine("- Implement network segmentation for exposed assets.");
         sb.AppendLine("- Enable enhanced monitoring and alerting.");
         sb.AppendLine();
-        sb.AppendLine("*This is a stub report. Connect to the Anthropic API for real AI-generated analysis.*");
+        sb.AppendLine(
+            "*This is a stub report. Connect to the Anthropic API for real AI-generated analysis.*"
+        );
 
         return Task.FromResult(sb.ToString());
     }

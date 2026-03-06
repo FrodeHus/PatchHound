@@ -7,7 +7,8 @@ public record AssetDto(
     string AssetType,
     string Criticality,
     string OwnerType,
-    int VulnerabilityCount);
+    int VulnerabilityCount
+);
 
 public record AssetDetailDto(
     Guid Id,
@@ -21,7 +22,8 @@ public record AssetDetailDto(
     Guid? OwnerTeamId,
     Guid? FallbackTeamId,
     string Metadata,
-    IReadOnlyList<AssetVulnerabilityDto> Vulnerabilities);
+    IReadOnlyList<AssetVulnerabilityDto> Vulnerabilities
+);
 
 public record AssetVulnerabilityDto(
     Guid VulnerabilityId,
@@ -30,11 +32,13 @@ public record AssetVulnerabilityDto(
     string VendorSeverity,
     string Status,
     DateTimeOffset DetectedDate,
-    DateTimeOffset? ResolvedDate);
+    DateTimeOffset? ResolvedDate
+);
 
 public record AssetFilterQuery(
     string? AssetType = null,
     string? OwnerType = null,
     Guid? OwnerId = null,
     Guid? TenantId = null,
-    string? Search = null);
+    string? Search = null
+);

@@ -14,7 +14,9 @@ namespace Vigil.Api.Controllers;
 [Authorize]
 public class CommentsController : ControllerBase
 {
-    private static readonly Dictionary<string, string> EntityTypeMap = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> EntityTypeMap = new(
+        StringComparer.OrdinalIgnoreCase
+    )
     {
         ["vulnerabilities"] = "Vulnerability",
         ["tasks"] = "RemediationTask",

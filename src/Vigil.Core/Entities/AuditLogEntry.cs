@@ -23,7 +23,8 @@ public class AuditLogEntry
         AuditAction action,
         string? oldValues,
         string? newValues,
-        Guid userId)
+        Guid userId
+    )
     {
         return new AuditLogEntry
         {
@@ -35,7 +36,7 @@ public class AuditLogEntry
             OldValues = oldValues,
             NewValues = newValues,
             UserId = userId,
-            Timestamp = DateTimeOffset.UtcNow
+            Timestamp = DateTimeOffset.UtcNow,
         };
     }
 }

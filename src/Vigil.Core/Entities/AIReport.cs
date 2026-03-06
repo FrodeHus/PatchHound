@@ -17,7 +17,8 @@ public class AIReport
         Guid tenantId,
         string content,
         string provider,
-        Guid generatedBy)
+        Guid generatedBy
+    )
     {
         return new AIReport
         {
@@ -27,7 +28,7 @@ public class AIReport
             Content = content,
             Provider = provider,
             GeneratedAt = DateTimeOffset.UtcNow,
-            GeneratedBy = generatedBy
+            GeneratedBy = generatedBy,
         };
     }
 }

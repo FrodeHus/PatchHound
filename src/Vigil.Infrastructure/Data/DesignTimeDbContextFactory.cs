@@ -9,7 +9,9 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<VigilDbCon
     public VigilDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<VigilDbContext>();
-        optionsBuilder.UseNpgsql("Host=localhost;Database=vigil_design;Username=postgres;Password=postgres");
+        optionsBuilder.UseNpgsql(
+            "Host=localhost;Database=vigil_design;Username=postgres;Password=postgres"
+        );
 
         return new VigilDbContext(optionsBuilder.Options, new DesignTimeTenantContext());
     }

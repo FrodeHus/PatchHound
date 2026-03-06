@@ -42,12 +42,7 @@ public class TeamsController : ControllerBase
             .OrderBy(t => t.Name)
             .Skip(pagination.Skip)
             .Take(pagination.PageSize)
-            .Select(t => new TeamDto(
-                t.Id,
-                t.TenantId,
-                t.Name,
-                t.Members.Count
-            ))
+            .Select(t => new TeamDto(t.Id, t.TenantId, t.Name, t.Members.Count))
             .ToListAsync(ct);
 
         return Ok(new PagedResponse<TeamDto>(items, totalCount));
@@ -57,8 +52,8 @@ public class TeamsController : ControllerBase
     [Authorize(Policy = Policies.ManageTeams)]
     public async Task<ActionResult<TeamDetailDto>> Get(Guid id, CancellationToken ct)
     {
-        var team = await _dbContext.Teams
-            .AsNoTracking()
+        var team = await _dbContext
+            .Teams.AsNoTracking()
             .Include(t => t.Members)
             .FirstOrDefaultAsync(t => t.Id == id, ct);
 
@@ -66,21 +61,24 @@ public class TeamsController : ControllerBase
             return NotFound();
 
         var userIds = team.Members.Select(m => m.UserId).ToList();
-        var users = await _dbContext.Users
-            .AsNoTracking()
+        var users = await _dbContext
+            .Users.AsNoTracking()
             .Where(u => userIds.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, ct);
 
-        return Ok(new TeamDetailDto(
-            team.Id,
-            team.TenantId,
-            team.Name,
-            team.Members.Select(m => new TeamMemberDto(
-                m.UserId,
-                users.TryGetValue(m.UserId, out var u) ? u.DisplayName : "Unknown",
-                users.TryGetValue(m.UserId, out var u2) ? u2.Email : "Unknown"
-            )).ToList()
-        ));
+        return Ok(
+            new TeamDetailDto(
+                team.Id,
+                team.TenantId,
+                team.Name,
+                team.Members.Select(m => new TeamMemberDto(
+                        m.UserId,
+                        users.TryGetValue(m.UserId, out var u) ? u.DisplayName : "Unknown",
+                        users.TryGetValue(m.UserId, out var u2) ? u2.Email : "Unknown"
+                    ))
+                    .ToList()
+            )
+        );
     }
 
     [HttpPost]
@@ -115,11 +113,13 @@ public class TeamsController : ControllerBase
         {
             "add" => await _teamService.AddMemberAsync(id, request.UserId, ct),
             "remove" => await _teamService.RemoveMemberAsync(id, request.UserId, ct),
-            _ => null
+            _ => null,
         };
 
         if (result is null)
-            return BadRequest(new ProblemDetails { Title = "Invalid action. Use 'add' or 'remove'." });
+            return BadRequest(
+                new ProblemDetails { Title = "Invalid action. Use 'add' or 'remove'." }
+            );
 
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });

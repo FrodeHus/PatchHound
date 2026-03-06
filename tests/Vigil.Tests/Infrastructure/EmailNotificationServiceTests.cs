@@ -63,12 +63,14 @@ public class EmailNotificationServiceTests : IDisposable
         notification.Body.Should().Be("<p>You have a new task.</p>");
         notification.RelatedEntityType.Should().Be("RemediationTask");
 
-        await _emailSender.Received(1).SendEmailAsync(
-            "alice@example.com",
-            "Task Assigned",
-            "<p>You have a new task.</p>",
-            Arg.Any<CancellationToken>()
-        );
+        await _emailSender
+            .Received(1)
+            .SendEmailAsync(
+                "alice@example.com",
+                "Task Assigned",
+                "<p>You have a new task.</p>",
+                Arg.Any<CancellationToken>()
+            );
     }
 
     [Fact]
@@ -90,12 +92,14 @@ public class EmailNotificationServiceTests : IDisposable
         var notifications = await _dbContext.Notifications.IgnoreQueryFilters().ToListAsync();
         notifications.Should().ContainSingle();
 
-        await _emailSender.DidNotReceive().SendEmailAsync(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>()
-        );
+        await _emailSender
+            .DidNotReceive()
+            .SendEmailAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>()
+            );
     }
 
     [Fact]
@@ -128,19 +132,23 @@ public class EmailNotificationServiceTests : IDisposable
         notifications.Should().HaveCount(2);
         notifications.Select(n => n.UserId).Should().BeEquivalentTo([user1.Id, user2.Id]);
 
-        await _emailSender.Received(1).SendEmailAsync(
-            "alice@example.com",
-            "Critical Vulnerability",
-            "<p>A new critical vulnerability has been discovered.</p>",
-            Arg.Any<CancellationToken>()
-        );
+        await _emailSender
+            .Received(1)
+            .SendEmailAsync(
+                "alice@example.com",
+                "Critical Vulnerability",
+                "<p>A new critical vulnerability has been discovered.</p>",
+                Arg.Any<CancellationToken>()
+            );
 
-        await _emailSender.Received(1).SendEmailAsync(
-            "bob@example.com",
-            "Critical Vulnerability",
-            "<p>A new critical vulnerability has been discovered.</p>",
-            Arg.Any<CancellationToken>()
-        );
+        await _emailSender
+            .Received(1)
+            .SendEmailAsync(
+                "bob@example.com",
+                "Critical Vulnerability",
+                "<p>A new critical vulnerability has been discovered.</p>",
+                Arg.Any<CancellationToken>()
+            );
     }
 
     [Fact]
@@ -164,12 +172,14 @@ public class EmailNotificationServiceTests : IDisposable
         var notifications = await _dbContext.Notifications.IgnoreQueryFilters().ToListAsync();
         notifications.Should().BeEmpty();
 
-        await _emailSender.DidNotReceive().SendEmailAsync(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>()
-        );
+        await _emailSender
+            .DidNotReceive()
+            .SendEmailAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>()
+            );
     }
 
     public void Dispose()

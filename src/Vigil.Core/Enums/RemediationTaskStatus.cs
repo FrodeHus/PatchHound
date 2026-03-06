@@ -7,5 +7,5 @@ public enum RemediationTaskStatus
     PatchScheduled,
     CannotPatch,
     Completed,
-    RiskAccepted
+    RiskAccepted,
 }

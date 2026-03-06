@@ -1,11 +1,6 @@
 namespace Vigil.Api.Models.Admin;
 
-public record UserDto(
-    Guid Id,
-    string Email,
-    string DisplayName,
-    IReadOnlyList<UserRoleDto> Roles
-);
+public record UserDto(Guid Id, string Email, string DisplayName, IReadOnlyList<UserRoleDto> Roles);
 
 public record UserRoleDto(Guid TenantId, string TenantName, string Role);
 

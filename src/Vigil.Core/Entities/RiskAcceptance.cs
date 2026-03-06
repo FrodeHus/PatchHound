@@ -30,7 +30,8 @@ public class RiskAcceptance
         string? conditions = null,
         DateTimeOffset? expiryDate = null,
         int? reviewFrequency = null,
-        DateTimeOffset? nextReviewDate = null)
+        DateTimeOffset? nextReviewDate = null
+    )
     {
         return new RiskAcceptance
         {
@@ -45,11 +46,16 @@ public class RiskAcceptance
             Conditions = conditions,
             ExpiryDate = expiryDate,
             ReviewFrequency = reviewFrequency,
-            NextReviewDate = nextReviewDate
+            NextReviewDate = nextReviewDate,
         };
     }
 
-    public void Approve(Guid approvedBy, string? conditions = null, DateTimeOffset? expiryDate = null, int? reviewFrequency = null)
+    public void Approve(
+        Guid approvedBy,
+        string? conditions = null,
+        DateTimeOffset? expiryDate = null,
+        int? reviewFrequency = null
+    )
     {
         ApprovedBy = approvedBy;
         ApprovedAt = DateTimeOffset.UtcNow;

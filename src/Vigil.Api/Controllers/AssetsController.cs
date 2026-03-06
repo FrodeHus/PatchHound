@@ -29,20 +29,31 @@ public class AssetsController : ControllerBase
     public async Task<ActionResult<PagedResponse<AssetDto>>> List(
         [FromQuery] AssetFilterQuery filter,
         [FromQuery] PaginationQuery pagination,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         var query = _dbContext.Assets.AsNoTracking().AsQueryable();
 
-        if (!string.IsNullOrEmpty(filter.AssetType) && Enum.TryParse<AssetType>(filter.AssetType, out var assetType))
+        if (
+            !string.IsNullOrEmpty(filter.AssetType)
+            && Enum.TryParse<AssetType>(filter.AssetType, out var assetType)
+        )
             query = query.Where(a => a.AssetType == assetType);
-        if (!string.IsNullOrEmpty(filter.OwnerType) && Enum.TryParse<OwnerType>(filter.OwnerType, out var ownerType))
+        if (
+            !string.IsNullOrEmpty(filter.OwnerType)
+            && Enum.TryParse<OwnerType>(filter.OwnerType, out var ownerType)
+        )
             query = query.Where(a => a.OwnerType == ownerType);
         if (filter.OwnerId.HasValue)
-            query = query.Where(a => a.OwnerUserId == filter.OwnerId.Value || a.OwnerTeamId == filter.OwnerId.Value);
+            query = query.Where(a =>
+                a.OwnerUserId == filter.OwnerId.Value || a.OwnerTeamId == filter.OwnerId.Value
+            );
         if (filter.TenantId.HasValue)
             query = query.Where(a => a.TenantId == filter.TenantId.Value);
         if (!string.IsNullOrEmpty(filter.Search))
-            query = query.Where(a => a.Name.Contains(filter.Search) || a.ExternalId.Contains(filter.Search));
+            query = query.Where(a =>
+                a.Name.Contains(filter.Search) || a.ExternalId.Contains(filter.Search)
+            );
 
         var totalCount = await query.CountAsync(ct);
 
@@ -57,7 +68,8 @@ public class AssetsController : ControllerBase
                 a.AssetType.ToString(),
                 a.Criticality.ToString(),
                 a.OwnerType.ToString(),
-                _dbContext.VulnerabilityAssets.Count(va => va.AssetId == a.Id)))
+                _dbContext.VulnerabilityAssets.Count(va => va.AssetId == a.Id)
+            ))
             .ToListAsync(ct);
 
         return Ok(new PagedResponse<AssetDto>(items, totalCount));
@@ -71,37 +83,51 @@ public class AssetsController : ControllerBase
         if (asset is null)
             return NotFound();
 
-        var vulnerabilities = await _dbContext.VulnerabilityAssets
-            .AsNoTracking()
+        var vulnerabilities = await _dbContext
+            .VulnerabilityAssets.AsNoTracking()
             .Where(va => va.AssetId == id)
-            .Join(_dbContext.Vulnerabilities, va => va.VulnerabilityId, v => v.Id, (va, v) => new AssetVulnerabilityDto(
-                v.Id,
-                v.ExternalId,
-                v.Title,
-                v.VendorSeverity.ToString(),
-                va.Status.ToString(),
-                va.DetectedDate,
-                va.ResolvedDate))
+            .Join(
+                _dbContext.Vulnerabilities,
+                va => va.VulnerabilityId,
+                v => v.Id,
+                (va, v) =>
+                    new AssetVulnerabilityDto(
+                        v.Id,
+                        v.ExternalId,
+                        v.Title,
+                        v.VendorSeverity.ToString(),
+                        va.Status.ToString(),
+                        va.DetectedDate,
+                        va.ResolvedDate
+                    )
+            )
             .ToListAsync(ct);
 
-        return Ok(new AssetDetailDto(
-            asset.Id,
-            asset.ExternalId,
-            asset.Name,
-            asset.Description,
-            asset.AssetType.ToString(),
-            asset.Criticality.ToString(),
-            asset.OwnerType.ToString(),
-            asset.OwnerUserId,
-            asset.OwnerTeamId,
-            asset.FallbackTeamId,
-            asset.Metadata,
-            vulnerabilities));
+        return Ok(
+            new AssetDetailDto(
+                asset.Id,
+                asset.ExternalId,
+                asset.Name,
+                asset.Description,
+                asset.AssetType.ToString(),
+                asset.Criticality.ToString(),
+                asset.OwnerType.ToString(),
+                asset.OwnerUserId,
+                asset.OwnerTeamId,
+                asset.FallbackTeamId,
+                asset.Metadata,
+                vulnerabilities
+            )
+        );
     }
 
     [HttpPut("{id:guid}/owner")]
     [Authorize(Policy = Policies.ModifyVulnerabilities)]
-    public async Task<IActionResult> AssignOwner(Guid id, [FromBody] AssignOwnerRequest request, CancellationToken ct)
+    public async Task<IActionResult> AssignOwner(
+        Guid id,
+        [FromBody] AssignOwnerRequest request,
+        CancellationToken ct
+    )
     {
         if (!Enum.TryParse<OwnerType>(request.OwnerType, out var ownerType))
             return BadRequest(new ProblemDetails { Title = "Invalid owner type" });
@@ -110,7 +136,7 @@ public class AssetsController : ControllerBase
         {
             OwnerType.User => await _assetService.AssignOwnerAsync(id, request.OwnerId, ct),
             OwnerType.Team => await _assetService.AssignTeamOwnerAsync(id, request.OwnerId, ct),
-            _ => throw new ArgumentOutOfRangeException()
+            _ => throw new ArgumentOutOfRangeException(),
         };
 
         if (!result.IsSuccess)
@@ -121,7 +147,11 @@ public class AssetsController : ControllerBase
 
     [HttpPut("{id:guid}/criticality")]
     [Authorize(Policy = Policies.ModifyVulnerabilities)]
-    public async Task<IActionResult> SetCriticality(Guid id, [FromBody] SetCriticalityRequest request, CancellationToken ct)
+    public async Task<IActionResult> SetCriticality(
+        Guid id,
+        [FromBody] SetCriticalityRequest request,
+        CancellationToken ct
+    )
     {
         if (!Enum.TryParse<Criticality>(request.Criticality, out var criticality))
             return BadRequest(new ProblemDetails { Title = "Invalid criticality value" });
@@ -135,12 +165,20 @@ public class AssetsController : ControllerBase
 
     [HttpPost("bulk-assign")]
     [Authorize(Policy = Policies.ModifyVulnerabilities)]
-    public async Task<ActionResult<BulkAssignResponse>> BulkAssign([FromBody] BulkAssignRequest request, CancellationToken ct)
+    public async Task<ActionResult<BulkAssignResponse>> BulkAssign(
+        [FromBody] BulkAssignRequest request,
+        CancellationToken ct
+    )
     {
         if (!Enum.TryParse<OwnerType>(request.OwnerType, out var ownerType))
             return BadRequest(new ProblemDetails { Title = "Invalid owner type" });
 
-        var result = await _assetService.BulkAssignOwnerAsync(request.AssetIds, request.OwnerId, ownerType, ct);
+        var result = await _assetService.BulkAssignOwnerAsync(
+            request.AssetIds,
+            request.OwnerId,
+            ownerType,
+            ct
+        );
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
 

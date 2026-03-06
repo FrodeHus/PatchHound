@@ -6,9 +6,8 @@ using Vigil.Infrastructure.Services;
 
 namespace Vigil.Worker;
 
-public class IngestionWorker(
-    IServiceScopeFactory scopeFactory,
-    ILogger<IngestionWorker> logger) : BackgroundService
+public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<IngestionWorker> logger)
+    : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(30);
 
@@ -41,8 +40,11 @@ public class IngestionWorker(
 
         foreach (var tenant in tenants)
         {
-            logger.LogInformation("Running ingestion for tenant {TenantId} ({TenantName})",
-                tenant.Id, tenant.Name);
+            logger.LogInformation(
+                "Running ingestion for tenant {TenantId} ({TenantName})",
+                tenant.Id,
+                tenant.Name
+            );
 
             await ingestionService.RunIngestionAsync(tenant.Id, ct);
         }

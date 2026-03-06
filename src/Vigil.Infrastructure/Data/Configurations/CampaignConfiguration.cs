@@ -17,8 +17,6 @@ public class CampaignConfiguration : IEntityTypeConfiguration<Campaign>
         builder.Property(c => c.Description).HasMaxLength(2048);
         builder.Property(c => c.Status).HasConversion<string>().HasMaxLength(32);
 
-        builder.HasMany(c => c.Vulnerabilities)
-            .WithOne()
-            .HasForeignKey(cv => cv.CampaignId);
+        builder.HasMany(c => c.Vulnerabilities).WithOne().HasForeignKey(cv => cv.CampaignId);
     }
 }

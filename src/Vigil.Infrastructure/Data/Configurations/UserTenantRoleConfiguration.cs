@@ -10,16 +10,22 @@ public class UserTenantRoleConfiguration : IEntityTypeConfiguration<UserTenantRo
     {
         builder.HasKey(utr => utr.Id);
 
-        builder.HasIndex(utr => new { utr.UserId, utr.TenantId, utr.Role }).IsUnique();
+        builder
+            .HasIndex(utr => new
+            {
+                utr.UserId,
+                utr.TenantId,
+                utr.Role,
+            })
+            .IsUnique();
 
         builder.Property(utr => utr.Role).HasConversion<string>().HasMaxLength(32);
 
-        builder.HasOne(utr => utr.User)
+        builder
+            .HasOne(utr => utr.User)
             .WithMany(u => u.TenantRoles)
             .HasForeignKey(utr => utr.UserId);
 
-        builder.HasOne(utr => utr.Tenant)
-            .WithMany()
-            .HasForeignKey(utr => utr.TenantId);
+        builder.HasOne(utr => utr.Tenant).WithMany().HasForeignKey(utr => utr.TenantId);
     }
 }
