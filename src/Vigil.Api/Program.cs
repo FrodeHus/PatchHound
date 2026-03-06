@@ -88,6 +88,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<VulnerabilityService>();
 builder.Services.AddScoped<RemediationTaskService>();
 builder.Services.AddScoped<AssetService>();
+builder.Services.AddScoped<CampaignService>();
 
 // CORS
 builder.Services.AddCors(options =>
