@@ -49,11 +49,18 @@ public class RiskAcceptance
         };
     }
 
-    public void Approve(Guid approvedBy)
+    public void Approve(Guid approvedBy, string? conditions = null, DateTimeOffset? expiryDate = null, int? reviewFrequency = null)
     {
         ApprovedBy = approvedBy;
         ApprovedAt = DateTimeOffset.UtcNow;
         Status = RiskAcceptanceStatus.Approved;
+
+        if (conditions is not null)
+            Conditions = conditions;
+        if (expiryDate.HasValue)
+            ExpiryDate = expiryDate;
+        if (reviewFrequency.HasValue)
+            ReviewFrequency = reviewFrequency;
     }
 
     public void Reject(Guid rejectedBy)
