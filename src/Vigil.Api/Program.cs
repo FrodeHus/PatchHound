@@ -8,6 +8,7 @@ using Vigil.Core.Enums;
 using Vigil.Core.Interfaces;
 using Vigil.Core.Services;
 using Vigil.Infrastructure.Data;
+using Vigil.Infrastructure.Options;
 using Vigil.Api.Hubs;
 using Vigil.Infrastructure.Repositories;
 using Vigil.Infrastructure.Services;
@@ -195,6 +196,11 @@ builder.Services.AddScoped<TeamService>();
 // Repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ITeamRepository, TeamRepository>();
+
+// Notifications & Email
+builder.Services.AddScoped<INotificationService, EmailNotificationService>();
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
 
 // SignalR
 builder.Services.AddSignalR();
