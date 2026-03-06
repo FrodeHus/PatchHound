@@ -1,0 +1,6 @@
+@Vigil.Api_HostAddress = http://localhost:5072
+
+GET {{Vigil.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

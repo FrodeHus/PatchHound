@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Vigil.Core\Vigil.Core.csproj" />
+    <ProjectReference Include="..\Vigil.Infrastructure\Vigil.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
