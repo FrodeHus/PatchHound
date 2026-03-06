@@ -5,6 +5,7 @@ using Vigil.Core.Enums;
 using Vigil.Core.Interfaces;
 using Vigil.Api.Auth;
 using Vigil.Api.Middleware;
+using Vigil.Core.Services;
 using Vigil.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -82,6 +83,9 @@ builder.Services.AddDbContext<VigilDbContext>(options =>
 // Tenant context (scoped - one per request)
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddHttpContextAccessor();
+
+// Application services
+builder.Services.AddScoped<VulnerabilityService>();
 
 // CORS
 builder.Services.AddCors(options =>
