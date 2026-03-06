@@ -1,8 +1,10 @@
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Identity.Web;
 using Vigil.Core.Enums;
 using Vigil.Core.Interfaces;
 using Vigil.Api.Auth;
+using Vigil.Api.Middleware;
 using Vigil.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -81,6 +83,30 @@ builder.Services.AddDbContext<VigilDbContext>(options =>
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddHttpContextAccessor();
 
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins(builder.Configuration["Frontend:Origin"] ?? "http://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials());
+});
+
+// Rate limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.Identity?.Name ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1)
+            }));
+    options.RejectionStatusCode = 429;
+});
+
 // OpenAPI
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
@@ -92,8 +118,11 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseMiddleware<ExceptionHandlerMiddleware>();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseCors();
+app.UseRateLimiter();
 app.MapControllers();
 app.Run();
