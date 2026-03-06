@@ -10,33 +10,167 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as VulnerabilitiesIndexRouteImport } from './routes/vulnerabilities/index'
+import { Route as TasksIndexRouteImport } from './routes/tasks/index'
+import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as CampaignsIndexRouteImport } from './routes/campaigns/index'
+import { Route as AuditLogIndexRouteImport } from './routes/audit-log/index'
+import { Route as AssetsIndexRouteImport } from './routes/assets/index'
+import { Route as VulnerabilitiesIdRouteImport } from './routes/vulnerabilities/$id'
+import { Route as CampaignsIdRouteImport } from './routes/campaigns/$id'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
+import { Route as AdminTeamsRouteImport } from './routes/admin/teams'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VulnerabilitiesIndexRoute = VulnerabilitiesIndexRouteImport.update({
+  id: '/vulnerabilities/',
+  path: '/vulnerabilities/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TasksIndexRoute = TasksIndexRouteImport.update({
+  id: '/tasks/',
+  path: '/tasks/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampaignsIndexRoute = CampaignsIndexRouteImport.update({
+  id: '/campaigns/',
+  path: '/campaigns/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuditLogIndexRoute = AuditLogIndexRouteImport.update({
+  id: '/audit-log/',
+  path: '/audit-log/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssetsIndexRoute = AssetsIndexRouteImport.update({
+  id: '/assets/',
+  path: '/assets/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VulnerabilitiesIdRoute = VulnerabilitiesIdRouteImport.update({
+  id: '/vulnerabilities/$id',
+  path: '/vulnerabilities/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampaignsIdRoute = CampaignsIdRouteImport.update({
+  id: '/campaigns/$id',
+  path: '/campaigns/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminTeamsRoute = AdminTeamsRouteImport.update({
+  id: '/admin/teams',
+  path: '/admin/teams',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin/teams': typeof AdminTeamsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/campaigns/$id': typeof CampaignsIdRoute
+  '/vulnerabilities/$id': typeof VulnerabilitiesIdRoute
+  '/assets/': typeof AssetsIndexRoute
+  '/audit-log/': typeof AuditLogIndexRoute
+  '/campaigns/': typeof CampaignsIndexRoute
+  '/settings/': typeof SettingsIndexRoute
+  '/tasks/': typeof TasksIndexRoute
+  '/vulnerabilities/': typeof VulnerabilitiesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/teams': typeof AdminTeamsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/campaigns/$id': typeof CampaignsIdRoute
+  '/vulnerabilities/$id': typeof VulnerabilitiesIdRoute
+  '/assets': typeof AssetsIndexRoute
+  '/audit-log': typeof AuditLogIndexRoute
+  '/campaigns': typeof CampaignsIndexRoute
+  '/settings': typeof SettingsIndexRoute
+  '/tasks': typeof TasksIndexRoute
+  '/vulnerabilities': typeof VulnerabilitiesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin/teams': typeof AdminTeamsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/campaigns/$id': typeof CampaignsIdRoute
+  '/vulnerabilities/$id': typeof VulnerabilitiesIdRoute
+  '/assets/': typeof AssetsIndexRoute
+  '/audit-log/': typeof AuditLogIndexRoute
+  '/campaigns/': typeof CampaignsIndexRoute
+  '/settings/': typeof SettingsIndexRoute
+  '/tasks/': typeof TasksIndexRoute
+  '/vulnerabilities/': typeof VulnerabilitiesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin/teams'
+    | '/admin/users'
+    | '/campaigns/$id'
+    | '/vulnerabilities/$id'
+    | '/assets/'
+    | '/audit-log/'
+    | '/campaigns/'
+    | '/settings/'
+    | '/tasks/'
+    | '/vulnerabilities/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/admin/teams'
+    | '/admin/users'
+    | '/campaigns/$id'
+    | '/vulnerabilities/$id'
+    | '/assets'
+    | '/audit-log'
+    | '/campaigns'
+    | '/settings'
+    | '/tasks'
+    | '/vulnerabilities'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin/teams'
+    | '/admin/users'
+    | '/campaigns/$id'
+    | '/vulnerabilities/$id'
+    | '/assets/'
+    | '/audit-log/'
+    | '/campaigns/'
+    | '/settings/'
+    | '/tasks/'
+    | '/vulnerabilities/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminTeamsRoute: typeof AdminTeamsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  CampaignsIdRoute: typeof CampaignsIdRoute
+  VulnerabilitiesIdRoute: typeof VulnerabilitiesIdRoute
+  AssetsIndexRoute: typeof AssetsIndexRoute
+  AuditLogIndexRoute: typeof AuditLogIndexRoute
+  CampaignsIndexRoute: typeof CampaignsIndexRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
+  TasksIndexRoute: typeof TasksIndexRoute
+  VulnerabilitiesIndexRoute: typeof VulnerabilitiesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +182,91 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/vulnerabilities/': {
+      id: '/vulnerabilities/'
+      path: '/vulnerabilities'
+      fullPath: '/vulnerabilities/'
+      preLoaderRoute: typeof VulnerabilitiesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tasks/': {
+      id: '/tasks/'
+      path: '/tasks'
+      fullPath: '/tasks/'
+      preLoaderRoute: typeof TasksIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/': {
+      id: '/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campaigns/': {
+      id: '/campaigns/'
+      path: '/campaigns'
+      fullPath: '/campaigns/'
+      preLoaderRoute: typeof CampaignsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/audit-log/': {
+      id: '/audit-log/'
+      path: '/audit-log'
+      fullPath: '/audit-log/'
+      preLoaderRoute: typeof AuditLogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assets/': {
+      id: '/assets/'
+      path: '/assets'
+      fullPath: '/assets/'
+      preLoaderRoute: typeof AssetsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vulnerabilities/$id': {
+      id: '/vulnerabilities/$id'
+      path: '/vulnerabilities/$id'
+      fullPath: '/vulnerabilities/$id'
+      preLoaderRoute: typeof VulnerabilitiesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campaigns/$id': {
+      id: '/campaigns/$id'
+      path: '/campaigns/$id'
+      fullPath: '/campaigns/$id'
+      preLoaderRoute: typeof CampaignsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/teams': {
+      id: '/admin/teams'
+      path: '/admin/teams'
+      fullPath: '/admin/teams'
+      preLoaderRoute: typeof AdminTeamsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminTeamsRoute: AdminTeamsRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  CampaignsIdRoute: CampaignsIdRoute,
+  VulnerabilitiesIdRoute: VulnerabilitiesIdRoute,
+  AssetsIndexRoute: AssetsIndexRoute,
+  AuditLogIndexRoute: AuditLogIndexRoute,
+  CampaignsIndexRoute: CampaignsIndexRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
+  TasksIndexRoute: TasksIndexRoute,
+  VulnerabilitiesIndexRoute: VulnerabilitiesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
