@@ -1,17 +1,12 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
 using Vigil.Api.Auth;
 using Vigil.Api.Middleware;
 using Vigil.Core.Enums;
 using Vigil.Core.Interfaces;
-using Vigil.Core.Services;
-using Vigil.Infrastructure.Data;
-using Vigil.Infrastructure.Options;
 using Vigil.Api.Hubs;
-using Vigil.Infrastructure.Repositories;
-using Vigil.Infrastructure.AiProviders;
+using Vigil.Infrastructure;
 using Vigil.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -175,39 +170,12 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddScoped<IAuthorizationHandler, RoleRequirementHandler>();
 
-// Database
-builder.Services.AddDbContext<VigilDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Vigil"))
-);
+// Infrastructure services (database, repositories, email, AI providers, vulnerability sources)
+builder.Services.AddVigilInfrastructure(builder.Configuration);
 
 // Tenant context (scoped - one per request)
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddHttpContextAccessor();
-
-// Application services
-builder.Services.AddScoped<VulnerabilityService>();
-builder.Services.AddScoped<RemediationTaskService>();
-builder.Services.AddScoped<AssetService>();
-builder.Services.AddScoped<CampaignService>();
-builder.Services.AddScoped<RiskAcceptanceService>();
-builder.Services.AddScoped<DashboardService>();
-builder.Services.AddScoped<UserService>();
-builder.Services.AddScoped<TeamService>();
-
-// Repositories
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<ITeamRepository, TeamRepository>();
-
-// Notifications & Email
-builder.Services.AddScoped<INotificationService, EmailNotificationService>();
-builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
-builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
-
-// AI Report Providers
-builder.Services.AddScoped<AiReportService>();
-builder.Services.AddScoped<IAiReportProvider, AzureOpenAiProvider>();
-builder.Services.AddScoped<IAiReportProvider, AnthropicProvider>();
-builder.Services.Configure<AiProviderOptions>(builder.Configuration.GetSection("AiProvider"));
 
 // SignalR
 builder.Services.AddSignalR();
