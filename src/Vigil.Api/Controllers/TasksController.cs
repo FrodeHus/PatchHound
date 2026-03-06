@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vigil.Api.Auth;
 using Vigil.Api.Models;
+using Vigil.Api.Models.RiskAcceptances;
 using Vigil.Api.Models.Tasks;
 using Vigil.Core.Enums;
+using Vigil.Core.Interfaces;
 using Vigil.Core.Services;
 using Vigil.Infrastructure.Data;
 
@@ -17,11 +19,19 @@ public class TasksController : ControllerBase
 {
     private readonly VigilDbContext _dbContext;
     private readonly RemediationTaskService _taskService;
+    private readonly RiskAcceptanceService _riskAcceptanceService;
+    private readonly ITenantContext _tenantContext;
 
-    public TasksController(VigilDbContext dbContext, RemediationTaskService taskService)
+    public TasksController(
+        VigilDbContext dbContext,
+        RemediationTaskService taskService,
+        RiskAcceptanceService riskAcceptanceService,
+        ITenantContext tenantContext)
     {
         _dbContext = dbContext;
         _taskService = taskService;
+        _riskAcceptanceService = riskAcceptanceService;
+        _tenantContext = tenantContext;
     }
 
     [HttpGet]
@@ -95,5 +105,50 @@ public class TasksController : ControllerBase
             return BadRequest(new ProblemDetails { Title = result.Error });
 
         return NoContent();
+    }
+
+    [HttpPost("{id:guid}/risk-acceptance")]
+    [Authorize(Policy = Policies.RequestRiskAcceptance)]
+    public async Task<IActionResult> RequestRiskAcceptance(
+        Guid id,
+        [FromBody] RequestRiskAcceptanceRequest request,
+        CancellationToken ct)
+    {
+        var task = await _dbContext.RemediationTasks.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (task is null)
+            return NotFound(new ProblemDetails { Title = "Task not found" });
+
+        var result = await _riskAcceptanceService.RequestAsync(
+            task.VulnerabilityId,
+            task.TenantId,
+            _tenantContext.CurrentUserId,
+            request.Justification,
+            task.AssetId,
+            request.Conditions,
+            request.ExpiryDate,
+            request.ReviewFrequency,
+            ct);
+
+        if (!result.IsSuccess)
+            return BadRequest(new ProblemDetails { Title = result.Error });
+
+        var acceptance = result.Value;
+        return CreatedAtAction(
+            nameof(RiskAcceptancesController.Get),
+            "RiskAcceptances",
+            new { id = acceptance.Id },
+            new RiskAcceptanceDto(
+                acceptance.Id,
+                acceptance.VulnerabilityId,
+                acceptance.AssetId,
+                acceptance.Status.ToString(),
+                acceptance.Justification,
+                acceptance.RequestedBy,
+                acceptance.RequestedAt,
+                acceptance.ApprovedBy,
+                acceptance.ApprovedAt,
+                acceptance.Conditions,
+                acceptance.ExpiryDate,
+                acceptance.ReviewFrequency));
     }
 }
