@@ -17,7 +17,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.DisplayName).HasMaxLength(256).IsRequired();
         builder.Property(u => u.EntraObjectId).HasMaxLength(256).IsRequired();
 
-        builder.HasMany(u => u.TenantRoles)
+        builder
+            .HasMany(u => u.TenantRoles)
             .WithOne(utr => utr.User)
             .HasForeignKey(utr => utr.UserId);
     }

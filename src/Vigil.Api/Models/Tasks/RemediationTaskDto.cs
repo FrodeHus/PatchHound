@@ -10,4 +10,5 @@ public record RemediationTaskDto(
     string? Justification,
     DateTimeOffset DueDate,
     DateTimeOffset CreatedAt,
-    bool IsOverdue);
+    bool IsOverdue
+);

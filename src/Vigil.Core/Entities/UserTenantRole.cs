@@ -21,7 +21,7 @@ public class UserTenantRole
             Id = Guid.NewGuid(),
             UserId = userId,
             TenantId = tenantId,
-            Role = role
+            Role = role,
         };
     }
 }

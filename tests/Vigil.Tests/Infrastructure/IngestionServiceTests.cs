@@ -42,41 +42,56 @@ public class IngestionServiceTests : IDisposable
     {
         // Arrange: create an asset with an owner so a task will be created
         var ownerId = Guid.NewGuid();
-        var asset = Asset.Create(_tenantId, "ASSET-1", AssetType.Device, "Server1", Criticality.High);
+        var asset = Asset.Create(
+            _tenantId,
+            "ASSET-1",
+            AssetType.Device,
+            "Server1",
+            Criticality.High
+        );
         asset.AssignOwner(ownerId);
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
         var results = new List<IngestionResult>
         {
-            new("CVE-2025-0001", "Test Vuln", "Description", Severity.High,
-                8.5m, "CVSS:3.1/AV:N", DateTimeOffset.UtcNow,
-                new List<IngestionAffectedAsset>
-                {
-                    new("ASSET-1", "Server1", AssetType.Device)
-                })
+            new(
+                "CVE-2025-0001",
+                "Test Vuln",
+                "Description",
+                Severity.High,
+                8.5m,
+                "CVSS:3.1/AV:N",
+                DateTimeOffset.UtcNow,
+                new List<IngestionAffectedAsset> { new("ASSET-1", "Server1", AssetType.Device) }
+            ),
         };
 
         // Act
-        await _service.ProcessResultsAsync(_tenantId, "TestSource", results, CancellationToken.None);
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "TestSource",
+            results,
+            CancellationToken.None
+        );
 
         // Assert
-        var vuln = await _dbContext.Vulnerabilities
-            .IgnoreQueryFilters()
+        var vuln = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
             .FirstOrDefaultAsync(v => v.ExternalId == "CVE-2025-0001");
         vuln.Should().NotBeNull();
         vuln!.Title.Should().Be("Test Vuln");
         vuln.VendorSeverity.Should().Be(Severity.High);
         vuln.Source.Should().Be("TestSource");
 
-        var va = await _dbContext.VulnerabilityAssets
-            .IgnoreQueryFilters()
+        var va = await _dbContext
+            .VulnerabilityAssets.IgnoreQueryFilters()
             .FirstOrDefaultAsync(va => va.VulnerabilityId == vuln.Id);
         va.Should().NotBeNull();
         va!.Status.Should().Be(VulnerabilityStatus.Open);
 
-        var task = await _dbContext.RemediationTasks
-            .IgnoreQueryFilters()
+        var task = await _dbContext
+            .RemediationTasks.IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.VulnerabilityId == vuln.Id);
         task.Should().NotBeNull();
         task!.AssigneeId.Should().Be(ownerId);
@@ -87,31 +102,46 @@ public class IngestionServiceTests : IDisposable
     public async Task NewVulnerability_NoOwner_SkipsTaskCreation()
     {
         // Arrange: asset without owner
-        var asset = Asset.Create(_tenantId, "ASSET-2", AssetType.Device, "Server2", Criticality.Low);
+        var asset = Asset.Create(
+            _tenantId,
+            "ASSET-2",
+            AssetType.Device,
+            "Server2",
+            Criticality.Low
+        );
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
         var results = new List<IngestionResult>
         {
-            new("CVE-2025-0002", "No Owner Vuln", "Desc", Severity.Medium,
-                5.0m, null, null,
-                new List<IngestionAffectedAsset>
-                {
-                    new("ASSET-2", "Server2", AssetType.Device)
-                })
+            new(
+                "CVE-2025-0002",
+                "No Owner Vuln",
+                "Desc",
+                Severity.Medium,
+                5.0m,
+                null,
+                null,
+                new List<IngestionAffectedAsset> { new("ASSET-2", "Server2", AssetType.Device) }
+            ),
         };
 
         // Act
-        await _service.ProcessResultsAsync(_tenantId, "TestSource", results, CancellationToken.None);
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "TestSource",
+            results,
+            CancellationToken.None
+        );
 
         // Assert
-        var vuln = await _dbContext.Vulnerabilities
-            .IgnoreQueryFilters()
+        var vuln = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
             .FirstOrDefaultAsync(v => v.ExternalId == "CVE-2025-0002");
         vuln.Should().NotBeNull();
 
-        var tasks = await _dbContext.RemediationTasks
-            .IgnoreQueryFilters()
+        var tasks = await _dbContext
+            .RemediationTasks.IgnoreQueryFilters()
             .Where(t => t.VulnerabilityId == vuln!.Id)
             .ToListAsync();
         tasks.Should().BeEmpty();
@@ -122,27 +152,44 @@ public class IngestionServiceTests : IDisposable
     {
         // Arrange: pre-existing vulnerability
         var existing = Vulnerability.Create(
-            _tenantId, "CVE-2025-0003", "Old Title", "Old Desc",
-            Severity.Medium, "TestSource", 5.0m, null, null);
+            _tenantId,
+            "CVE-2025-0003",
+            "Old Title",
+            "Old Desc",
+            Severity.Medium,
+            "TestSource",
+            5.0m,
+            null,
+            null
+        );
         await _dbContext.Vulnerabilities.AddAsync(existing);
         await _dbContext.SaveChangesAsync();
 
         var results = new List<IngestionResult>
         {
-            new("CVE-2025-0003", "Updated Title", "Updated Desc", Severity.High,
-                7.5m, "CVSS:3.1/AV:N", DateTimeOffset.UtcNow,
-                new List<IngestionAffectedAsset>
-                {
-                    new("ASSET-3", "Server3", AssetType.Device)
-                })
+            new(
+                "CVE-2025-0003",
+                "Updated Title",
+                "Updated Desc",
+                Severity.High,
+                7.5m,
+                "CVSS:3.1/AV:N",
+                DateTimeOffset.UtcNow,
+                new List<IngestionAffectedAsset> { new("ASSET-3", "Server3", AssetType.Device) }
+            ),
         };
 
         // Act
-        await _service.ProcessResultsAsync(_tenantId, "TestSource", results, CancellationToken.None);
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "TestSource",
+            results,
+            CancellationToken.None
+        );
 
         // Assert: should be exactly one vulnerability with this external ID
-        var vulns = await _dbContext.Vulnerabilities
-            .IgnoreQueryFilters()
+        var vulns = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
             .Where(v => v.ExternalId == "CVE-2025-0003" && v.TenantId == _tenantId)
             .ToListAsync();
         vulns.Should().ContainSingle();
@@ -156,40 +203,62 @@ public class IngestionServiceTests : IDisposable
     {
         // Arrange: existing open vulnerability with asset
         var vuln = Vulnerability.Create(
-            _tenantId, "CVE-2025-0004", "Will Resolve", "Desc",
-            Severity.Low, "TestSource");
+            _tenantId,
+            "CVE-2025-0004",
+            "Will Resolve",
+            "Desc",
+            Severity.Low,
+            "TestSource"
+        );
         await _dbContext.Vulnerabilities.AddAsync(vuln);
 
-        var asset = Asset.Create(_tenantId, "ASSET-4", AssetType.Device, "Server4", Criticality.Low);
+        var asset = Asset.Create(
+            _tenantId,
+            "ASSET-4",
+            AssetType.Device,
+            "Server4",
+            Criticality.Low
+        );
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
         var va = VulnerabilityAsset.Create(vuln.Id, asset.Id, DateTimeOffset.UtcNow);
         await _dbContext.VulnerabilityAssets.AddAsync(va);
 
-        var task = RemediationTask.Create(vuln.Id, asset.Id, _tenantId,
-            Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow.AddDays(30));
+        var task = RemediationTask.Create(
+            vuln.Id,
+            asset.Id,
+            _tenantId,
+            Guid.NewGuid(),
+            Guid.Empty,
+            DateTimeOffset.UtcNow.AddDays(30)
+        );
         await _dbContext.RemediationTasks.AddAsync(task);
         await _dbContext.SaveChangesAsync();
 
         // Act: ingestion returns empty results (vulnerability no longer present)
         var results = new List<IngestionResult>();
-        await _service.ProcessResultsAsync(_tenantId, "TestSource", results, CancellationToken.None);
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "TestSource",
+            results,
+            CancellationToken.None
+        );
 
         // Assert
-        var updatedVuln = await _dbContext.Vulnerabilities
-            .IgnoreQueryFilters()
+        var updatedVuln = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
             .FirstAsync(v => v.Id == vuln.Id);
         updatedVuln.Status.Should().Be(VulnerabilityStatus.Resolved);
 
-        var updatedVa = await _dbContext.VulnerabilityAssets
-            .IgnoreQueryFilters()
+        var updatedVa = await _dbContext
+            .VulnerabilityAssets.IgnoreQueryFilters()
             .FirstAsync(v => v.Id == va.Id);
         updatedVa.Status.Should().Be(VulnerabilityStatus.Resolved);
         updatedVa.ResolvedDate.Should().NotBeNull();
 
-        var updatedTask = await _dbContext.RemediationTasks
-            .IgnoreQueryFilters()
+        var updatedTask = await _dbContext
+            .RemediationTasks.IgnoreQueryFilters()
             .FirstAsync(t => t.Id == task.Id);
         updatedTask.Status.Should().Be(RemediationTaskStatus.Completed);
     }
@@ -200,20 +269,32 @@ public class IngestionServiceTests : IDisposable
         // Arrange: no pre-existing asset
         var results = new List<IngestionResult>
         {
-            new("CVE-2025-0005", "New Asset Vuln", "Desc", Severity.Critical,
-                9.0m, null, null,
+            new(
+                "CVE-2025-0005",
+                "New Asset Vuln",
+                "Desc",
+                Severity.Critical,
+                9.0m,
+                null,
+                null,
                 new List<IngestionAffectedAsset>
                 {
-                    new("NEW-ASSET-1", "NewServer", AssetType.CloudResource)
-                })
+                    new("NEW-ASSET-1", "NewServer", AssetType.CloudResource),
+                }
+            ),
         };
 
         // Act
-        await _service.ProcessResultsAsync(_tenantId, "TestSource", results, CancellationToken.None);
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "TestSource",
+            results,
+            CancellationToken.None
+        );
 
         // Assert
-        var asset = await _dbContext.Assets
-            .IgnoreQueryFilters()
+        var asset = await _dbContext
+            .Assets.IgnoreQueryFilters()
             .FirstOrDefaultAsync(a => a.ExternalId == "NEW-ASSET-1" && a.TenantId == _tenantId);
         asset.Should().NotBeNull();
         asset!.Name.Should().Be("NewServer");

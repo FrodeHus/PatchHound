@@ -24,7 +24,8 @@ public class RemediationTask
         Guid tenantId,
         Guid assigneeId,
         Guid assignedBy,
-        DateTimeOffset dueDate)
+        DateTimeOffset dueDate
+    )
     {
         var now = DateTimeOffset.UtcNow;
         return new RemediationTask
@@ -38,7 +39,7 @@ public class RemediationTask
             Status = RemediationTaskStatus.Pending,
             DueDate = dueDate,
             CreatedAt = now,
-            UpdatedAt = now
+            UpdatedAt = now,
         };
     }
 

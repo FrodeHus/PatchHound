@@ -7,8 +7,11 @@ namespace Vigil.Infrastructure.Repositories;
 
 public class CampaignRepository : RepositoryBase<Campaign>, ICampaignRepository
 {
-    public CampaignRepository(VigilDbContext dbContext) : base(dbContext) { }
+    public CampaignRepository(VigilDbContext dbContext)
+        : base(dbContext) { }
 
-    public async Task<IReadOnlyList<Campaign>> GetByTenantAsync(Guid tenantId, CancellationToken ct = default)
-        => await DbSet.AsNoTracking().Where(c => c.TenantId == tenantId).ToListAsync(ct);
+    public async Task<IReadOnlyList<Campaign>> GetByTenantAsync(
+        Guid tenantId,
+        CancellationToken ct = default
+    ) => await DbSet.AsNoTracking().Where(c => c.TenantId == tenantId).ToListAsync(ct);
 }

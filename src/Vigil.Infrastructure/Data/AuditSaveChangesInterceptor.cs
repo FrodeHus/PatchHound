@@ -19,12 +19,15 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData,
         InterceptionResult<int> result,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         var context = eventData.Context;
-        if (context is null) return base.SavingChangesAsync(eventData, result, cancellationToken);
+        if (context is null)
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
 
-        var entries = context.ChangeTracker.Entries()
+        var entries = context
+            .ChangeTracker.Entries()
             .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
             .Where(e => e.Entity is not AuditLogEntry)
             .ToList();
@@ -38,20 +41,28 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
                 EntityState.Added => AuditAction.Created,
                 EntityState.Modified => AuditAction.Updated,
                 EntityState.Deleted => AuditAction.Deleted,
-                _ => throw new InvalidOperationException()
+                _ => throw new InvalidOperationException(),
             };
 
-            string? oldValues = entry.State != EntityState.Added
-                ? SerializeValues(entry.Properties
-                    .Where(p => entry.State == EntityState.Deleted || p.IsModified)
-                    .ToDictionary(p => p.Metadata.Name, p => p.OriginalValue))
-                : null;
+            string? oldValues =
+                entry.State != EntityState.Added
+                    ? SerializeValues(
+                        entry
+                            .Properties.Where(p =>
+                                entry.State == EntityState.Deleted || p.IsModified
+                            )
+                            .ToDictionary(p => p.Metadata.Name, p => p.OriginalValue)
+                    )
+                    : null;
 
-            string? newValues = entry.State != EntityState.Deleted
-                ? SerializeValues(entry.Properties
-                    .Where(p => entry.State == EntityState.Added || p.IsModified)
-                    .ToDictionary(p => p.Metadata.Name, p => p.CurrentValue))
-                : null;
+            string? newValues =
+                entry.State != EntityState.Deleted
+                    ? SerializeValues(
+                        entry
+                            .Properties.Where(p => entry.State == EntityState.Added || p.IsModified)
+                            .ToDictionary(p => p.Metadata.Name, p => p.CurrentValue)
+                    )
+                    : null;
 
             var auditEntry = AuditLogEntry.Create(
                 tenantId,
@@ -60,7 +71,8 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
                 action,
                 oldValues,
                 newValues,
-                _tenantContext.CurrentUserId);
+                _tenantContext.CurrentUserId
+            );
 
             context.Set<AuditLogEntry>().Add(auditEntry);
         }

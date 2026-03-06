@@ -19,7 +19,7 @@ public class User
             Id = Guid.NewGuid(),
             Email = email,
             DisplayName = displayName,
-            EntraObjectId = entraObjectId
+            EntraObjectId = entraObjectId,
         };
     }
 }

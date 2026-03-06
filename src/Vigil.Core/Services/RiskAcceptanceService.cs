@@ -10,7 +10,10 @@ public class RiskAcceptanceService
     private readonly IRiskAcceptanceRepository _riskAcceptanceRepository;
     private readonly IUnitOfWork _unitOfWork;
 
-    public RiskAcceptanceService(IRiskAcceptanceRepository riskAcceptanceRepository, IUnitOfWork unitOfWork)
+    public RiskAcceptanceService(
+        IRiskAcceptanceRepository riskAcceptanceRepository,
+        IUnitOfWork unitOfWork
+    )
     {
         _riskAcceptanceRepository = riskAcceptanceRepository;
         _unitOfWork = unitOfWork;
@@ -25,7 +28,8 @@ public class RiskAcceptanceService
         string? conditions,
         DateTimeOffset? expiryDate,
         int? reviewFrequency,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         if (string.IsNullOrWhiteSpace(justification))
             return Result<RiskAcceptance>.Failure("Justification is required");
@@ -38,7 +42,8 @@ public class RiskAcceptanceService
             assetId,
             conditions,
             expiryDate,
-            reviewFrequency);
+            reviewFrequency
+        );
 
         await _riskAcceptanceRepository.AddAsync(acceptance, ct);
         await _unitOfWork.SaveChangesAsync(ct);
@@ -52,7 +57,8 @@ public class RiskAcceptanceService
         string? conditions,
         DateTimeOffset? expiryDate,
         int? reviewFrequency,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         var acceptance = await _riskAcceptanceRepository.GetByIdAsync(riskAcceptanceId, ct);
         if (acceptance is null)
@@ -71,7 +77,8 @@ public class RiskAcceptanceService
     public async Task<Result<RiskAcceptance>> RejectAsync(
         Guid riskAcceptanceId,
         Guid rejectedBy,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         var acceptance = await _riskAcceptanceRepository.GetByIdAsync(riskAcceptanceId, ct);
         if (acceptance is null)

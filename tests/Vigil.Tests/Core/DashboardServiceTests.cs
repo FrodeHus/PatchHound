@@ -24,7 +24,7 @@ public class DashboardServiceTests
         var pairs = new (Severity, Criticality)[]
         {
             (Severity.Critical, Criticality.Critical),
-            (Severity.Critical, Criticality.Critical)
+            (Severity.Critical, Criticality.Critical),
         };
 
         var score = DashboardService.CalculateExposureScore(pairs);
@@ -38,7 +38,7 @@ public class DashboardServiceTests
         var pairs = new (Severity, Criticality)[]
         {
             (Severity.Low, Criticality.Low),
-            (Severity.Low, Criticality.Low)
+            (Severity.Low, Criticality.Low),
         };
 
         var score = DashboardService.CalculateExposureScore(pairs);
@@ -53,7 +53,7 @@ public class DashboardServiceTests
         var pairs = new (Severity, Criticality)[]
         {
             (Severity.Critical, Criticality.Critical), // 10 * 10 = 100
-            (Severity.Low, Criticality.Low)             // 1 * 1 = 1
+            (Severity.Low, Criticality.Low), // 1 * 1 = 1
         };
 
         var score = DashboardService.CalculateExposureScore(pairs);
@@ -67,7 +67,7 @@ public class DashboardServiceTests
     {
         var pairs = new (Severity, Criticality)[]
         {
-            (Severity.High, Criticality.Medium) // 6 * 3 = 18
+            (Severity.High, Criticality.Medium), // 6 * 3 = 18
         };
 
         var score = DashboardService.CalculateExposureScore(pairs);
@@ -96,9 +96,9 @@ public class DashboardServiceTests
         var now = DateTimeOffset.UtcNow;
         var tasks = new (RemediationTaskStatus, DateTimeOffset)[]
         {
-            (RemediationTaskStatus.Pending, now.AddDays(5)),    // Due in future
+            (RemediationTaskStatus.Pending, now.AddDays(5)), // Due in future
             (RemediationTaskStatus.InProgress, now.AddDays(3)), // Due in future
-            (RemediationTaskStatus.Completed, now.AddDays(-1))  // Completed, even though past due
+            (RemediationTaskStatus.Completed, now.AddDays(-1)), // Completed, even though past due
         };
 
         var (compliance, overdue) = DashboardService.CalculateSlaCompliance(tasks, now);
@@ -113,10 +113,10 @@ public class DashboardServiceTests
         var now = DateTimeOffset.UtcNow;
         var tasks = new (RemediationTaskStatus, DateTimeOffset)[]
         {
-            (RemediationTaskStatus.Pending, now.AddDays(-2)),   // Overdue
-            (RemediationTaskStatus.InProgress, now.AddDays(-1)),// Overdue
-            (RemediationTaskStatus.Pending, now.AddDays(5)),    // Within SLA
-            (RemediationTaskStatus.Completed, now.AddDays(-3))  // Completed, not overdue
+            (RemediationTaskStatus.Pending, now.AddDays(-2)), // Overdue
+            (RemediationTaskStatus.InProgress, now.AddDays(-1)), // Overdue
+            (RemediationTaskStatus.Pending, now.AddDays(5)), // Within SLA
+            (RemediationTaskStatus.Completed, now.AddDays(-3)), // Completed, not overdue
         };
 
         var (compliance, overdue) = DashboardService.CalculateSlaCompliance(tasks, now);
@@ -132,7 +132,7 @@ public class DashboardServiceTests
         var tasks = new (RemediationTaskStatus, DateTimeOffset)[]
         {
             (RemediationTaskStatus.Completed, now.AddDays(-10)),
-            (RemediationTaskStatus.RiskAccepted, now.AddDays(-5))
+            (RemediationTaskStatus.RiskAccepted, now.AddDays(-5)),
         };
 
         var (compliance, overdue) = DashboardService.CalculateSlaCompliance(tasks, now);
@@ -148,7 +148,7 @@ public class DashboardServiceTests
         var tasks = new (RemediationTaskStatus, DateTimeOffset)[]
         {
             (RemediationTaskStatus.Pending, now.AddDays(-1)),
-            (RemediationTaskStatus.InProgress, now.AddDays(-2))
+            (RemediationTaskStatus.InProgress, now.AddDays(-2)),
         };
 
         var (compliance, overdue) = DashboardService.CalculateSlaCompliance(tasks, now);
@@ -187,8 +187,8 @@ public class DashboardServiceTests
         var now = DateTimeOffset.UtcNow;
         var tasks = new (DateTimeOffset, DateTimeOffset)[]
         {
-            (now.AddDays(-5), now),   // 5 days
-            (now.AddDays(-15), now)   // 15 days
+            (now.AddDays(-5), now), // 5 days
+            (now.AddDays(-15), now), // 15 days
         };
 
         var avg = DashboardService.CalculateAverageRemediationDays(tasks);

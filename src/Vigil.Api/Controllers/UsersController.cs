@@ -47,21 +47,24 @@ public class UsersController : ControllerBase
             .Distinct()
             .ToList();
 
-        var tenantNames = await _dbContext.Tenants
-            .AsNoTracking()
+        var tenantNames = await _dbContext
+            .Tenants.AsNoTracking()
             .Where(t => tenantIds.Contains(t.Id))
             .ToDictionaryAsync(t => t.Id, t => t.Name, ct);
 
-        var items = users.Select(u => new UserDto(
-            u.Id,
-            u.Email,
-            u.DisplayName,
-            u.TenantRoles.Select(r => new UserRoleDto(
-                r.TenantId,
-                tenantNames.GetValueOrDefault(r.TenantId, "Unknown"),
-                r.Role.ToString()
-            )).ToList()
-        )).ToList();
+        var items = users
+            .Select(u => new UserDto(
+                u.Id,
+                u.Email,
+                u.DisplayName,
+                u.TenantRoles.Select(r => new UserRoleDto(
+                        r.TenantId,
+                        tenantNames.GetValueOrDefault(r.TenantId, "Unknown"),
+                        r.Role.ToString()
+                    ))
+                    .ToList()
+            ))
+            .ToList();
 
         return Ok(new PagedResponse<UserDto>(items, totalCount));
     }
@@ -101,7 +104,9 @@ public class UsersController : ControllerBase
         foreach (var assignment in request.Roles)
         {
             if (!Enum.TryParse<RoleName>(assignment.Role, out var role))
-                return BadRequest(new ProblemDetails { Title = $"Invalid role: {assignment.Role}" });
+                return BadRequest(
+                    new ProblemDetails { Title = $"Invalid role: {assignment.Role}" }
+                );
 
             var result = await _userService.AssignRoleAsync(id, assignment.TenantId, role, ct);
             if (!result.IsSuccess)

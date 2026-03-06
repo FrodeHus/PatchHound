@@ -24,7 +24,8 @@ public class Notification
         string title,
         string body,
         string? relatedEntityType = null,
-        Guid? relatedEntityId = null)
+        Guid? relatedEntityId = null
+    )
     {
         return new Notification
         {
@@ -36,7 +37,7 @@ public class Notification
             Body = body,
             RelatedEntityType = relatedEntityType,
             RelatedEntityId = relatedEntityId,
-            SentAt = DateTimeOffset.UtcNow
+            SentAt = DateTimeOffset.UtcNow,
         };
     }
 

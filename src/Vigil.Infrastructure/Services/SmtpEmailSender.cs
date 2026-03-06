@@ -15,7 +15,12 @@ public class SmtpEmailSender : IEmailSender
         _options = options.Value;
     }
 
-    public async Task SendEmailAsync(string to, string subject, string htmlBody, CancellationToken ct = default)
+    public async Task SendEmailAsync(
+        string to,
+        string subject,
+        string htmlBody,
+        CancellationToken ct = default
+    )
     {
         using var client = new SmtpClient(_options.Host, _options.Port)
         {

@@ -17,7 +17,7 @@ public class Team
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            Name = name
+            Name = name,
         };
     }
 

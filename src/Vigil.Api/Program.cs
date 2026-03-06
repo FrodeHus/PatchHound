@@ -2,10 +2,10 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Identity.Web;
 using Vigil.Api.Auth;
+using Vigil.Api.Hubs;
 using Vigil.Api.Middleware;
 using Vigil.Core.Enums;
 using Vigil.Core.Interfaces;
-using Vigil.Api.Hubs;
 using Vigil.Infrastructure;
 using Vigil.Infrastructure.Services;
 

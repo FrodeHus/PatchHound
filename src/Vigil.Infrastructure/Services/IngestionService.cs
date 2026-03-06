@@ -20,7 +20,8 @@ public class IngestionService
     public IngestionService(
         VigilDbContext dbContext,
         IEnumerable<IVulnerabilitySource> sources,
-        ILogger<IngestionService> logger)
+        ILogger<IngestionService> logger
+    )
     {
         _dbContext = dbContext;
         _sources = sources;
@@ -35,20 +36,28 @@ public class IngestionService
             {
                 _logger.LogInformation(
                     "Starting ingestion from {Source} for tenant {TenantId}",
-                    source.SourceName, tenantId);
+                    source.SourceName,
+                    tenantId
+                );
 
                 var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
                 await ProcessResultsAsync(tenantId, source.SourceName, results, ct);
 
                 _logger.LogInformation(
                     "Completed ingestion from {Source} for tenant {TenantId}: {Count} vulnerabilities",
-                    source.SourceName, tenantId, results.Count);
+                    source.SourceName,
+                    tenantId,
+                    results.Count
+                );
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex,
+                _logger.LogError(
+                    ex,
                     "Error during ingestion from {Source} for tenant {TenantId}",
-                    source.SourceName, tenantId);
+                    source.SourceName,
+                    tenantId
+                );
             }
         }
     }
@@ -57,7 +66,8 @@ public class IngestionService
         Guid tenantId,
         string sourceName,
         IReadOnlyList<IngestionResult> results,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         // Track which external IDs were seen in this ingestion run
         var seenExternalIds = new HashSet<string>();
@@ -78,13 +88,16 @@ public class IngestionService
         Guid tenantId,
         string sourceName,
         IngestionResult result,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
-        var existing = await _dbContext.Vulnerabilities
-            .IgnoreQueryFilters()
+        var existing = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
             .Include(v => v.AffectedAssets)
             .FirstOrDefaultAsync(
-                v => v.ExternalId == result.ExternalId && v.TenantId == tenantId, ct);
+                v => v.ExternalId == result.ExternalId && v.TenantId == tenantId,
+                ct
+            );
 
         bool isNew = existing is null;
 
@@ -99,7 +112,8 @@ public class IngestionService
                 sourceName,
                 result.CvssScore,
                 result.CvssVector,
-                result.PublishedDate);
+                result.PublishedDate
+            );
 
             await _dbContext.Vulnerabilities.AddAsync(existing, ct);
         }
@@ -111,7 +125,8 @@ public class IngestionService
                 result.VendorSeverity,
                 result.CvssScore,
                 result.CvssVector,
-                result.PublishedDate);
+                result.PublishedDate
+            );
         }
 
         // Process affected assets
@@ -126,13 +141,16 @@ public class IngestionService
         Vulnerability vulnerability,
         IngestionAffectedAsset affectedAsset,
         bool isNewVulnerability,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         // Upsert the Asset
-        var asset = await _dbContext.Assets
-            .IgnoreQueryFilters()
+        var asset = await _dbContext
+            .Assets.IgnoreQueryFilters()
             .FirstOrDefaultAsync(
-                a => a.ExternalId == affectedAsset.ExternalAssetId && a.TenantId == tenantId, ct);
+                a => a.ExternalId == affectedAsset.ExternalAssetId && a.TenantId == tenantId,
+                ct
+            );
 
         if (asset is null)
         {
@@ -141,16 +159,19 @@ public class IngestionService
                 affectedAsset.ExternalAssetId,
                 affectedAsset.AssetType,
                 affectedAsset.AssetName,
-                Criticality.Medium);
+                Criticality.Medium
+            );
 
             await _dbContext.Assets.AddAsync(asset, ct);
         }
 
         // Check if VulnerabilityAsset already exists
-        var existingVa = await _dbContext.VulnerabilityAssets
-            .IgnoreQueryFilters()
+        var existingVa = await _dbContext
+            .VulnerabilityAssets.IgnoreQueryFilters()
             .FirstOrDefaultAsync(
-                va => va.VulnerabilityId == vulnerability.Id && va.AssetId == asset.Id, ct);
+                va => va.VulnerabilityId == vulnerability.Id && va.AssetId == asset.Id,
+                ct
+            );
 
         if (existingVa is not null)
             return;
@@ -159,7 +180,8 @@ public class IngestionService
         var vulnerabilityAsset = VulnerabilityAsset.Create(
             vulnerability.Id,
             asset.Id,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow
+        );
 
         await _dbContext.VulnerabilityAssets.AddAsync(vulnerabilityAsset, ct);
 
@@ -176,7 +198,8 @@ public class IngestionService
                     tenantId,
                     assigneeId.Value,
                     SystemUserId,
-                    dueDate);
+                    dueDate
+                );
 
                 await _dbContext.RemediationTasks.AddAsync(task, ct);
             }
@@ -213,14 +236,17 @@ public class IngestionService
         Guid tenantId,
         string sourceName,
         HashSet<string> seenExternalIds,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         // Find open vulnerabilities from this source that were not returned
-        var openVulnerabilities = await _dbContext.Vulnerabilities
-            .IgnoreQueryFilters()
-            .Where(v => v.TenantId == tenantId
-                        && v.Source == sourceName
-                        && v.Status == VulnerabilityStatus.Open)
+        var openVulnerabilities = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
+            .Where(v =>
+                v.TenantId == tenantId
+                && v.Source == sourceName
+                && v.Status == VulnerabilityStatus.Open
+            )
             .ToListAsync(ct);
 
         var absentVulns = openVulnerabilities
@@ -232,10 +258,9 @@ public class IngestionService
             vuln.UpdateStatus(VulnerabilityStatus.Resolved);
 
             // Resolve all VulnerabilityAsset entries
-            var vulnAssets = await _dbContext.VulnerabilityAssets
-                .IgnoreQueryFilters()
-                .Where(va => va.VulnerabilityId == vuln.Id
-                             && va.Status == VulnerabilityStatus.Open)
+            var vulnAssets = await _dbContext
+                .VulnerabilityAssets.IgnoreQueryFilters()
+                .Where(va => va.VulnerabilityId == vuln.Id && va.Status == VulnerabilityStatus.Open)
                 .ToListAsync(ct);
 
             foreach (var va in vulnAssets)
@@ -244,15 +269,19 @@ public class IngestionService
             }
 
             // Auto-close open remediation tasks
-            var openTasks = await _dbContext.RemediationTasks
-                .IgnoreQueryFilters()
-                .Where(t => t.VulnerabilityId == vuln.Id
-                            && t.Status != RemediationTaskStatus.Completed)
+            var openTasks = await _dbContext
+                .RemediationTasks.IgnoreQueryFilters()
+                .Where(t =>
+                    t.VulnerabilityId == vuln.Id && t.Status != RemediationTaskStatus.Completed
+                )
                 .ToListAsync(ct);
 
             foreach (var task in openTasks)
             {
-                task.UpdateStatus(RemediationTaskStatus.Completed, "Auto-closed: vulnerability resolved in source");
+                task.UpdateStatus(
+                    RemediationTaskStatus.Completed,
+                    "Auto-closed: vulnerability resolved in source"
+                );
             }
         }
     }

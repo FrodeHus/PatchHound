@@ -21,7 +21,8 @@ public class CampaignService
         Guid createdBy,
         string name,
         string? description,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         var campaign = Campaign.Create(tenantId, name, createdBy, description);
         await _campaignRepository.AddAsync(campaign, ct);
@@ -33,7 +34,8 @@ public class CampaignService
         Guid campaignId,
         string? name,
         string? description,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         var campaign = await _campaignRepository.GetByIdAsync(campaignId, ct);
         if (campaign is null)
@@ -61,7 +63,8 @@ public class CampaignService
     public async Task<Result<Campaign>> LinkVulnerabilitiesAsync(
         Guid campaignId,
         IReadOnlyList<Guid> vulnerabilityIds,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         var campaign = await _campaignRepository.GetByIdAsync(campaignId, ct);
         if (campaign is null)

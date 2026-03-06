@@ -39,9 +39,7 @@ public class AuditInterceptorTests : IDisposable
         _dbContext.Tenants.Add(tenant);
         await _dbContext.SaveChangesAsync();
 
-        var auditEntries = await _dbContext.AuditLogEntries
-            .IgnoreQueryFilters()
-            .ToListAsync();
+        var auditEntries = await _dbContext.AuditLogEntries.IgnoreQueryFilters().ToListAsync();
 
         auditEntries.Should().ContainSingle();
         auditEntries[0].Action.Should().Be(AuditAction.Created);
@@ -62,8 +60,8 @@ public class AuditInterceptorTests : IDisposable
         tenant.UpdateName("Updated Org");
         await _dbContext.SaveChangesAsync();
 
-        var auditEntries = await _dbContext.AuditLogEntries
-            .IgnoreQueryFilters()
+        var auditEntries = await _dbContext
+            .AuditLogEntries.IgnoreQueryFilters()
             .Where(a => a.Action == AuditAction.Updated)
             .ToListAsync();
 
@@ -82,8 +80,8 @@ public class AuditInterceptorTests : IDisposable
         _dbContext.Tenants.Remove(tenant);
         await _dbContext.SaveChangesAsync();
 
-        var auditEntries = await _dbContext.AuditLogEntries
-            .IgnoreQueryFilters()
+        var auditEntries = await _dbContext
+            .AuditLogEntries.IgnoreQueryFilters()
             .Where(a => a.Action == AuditAction.Deleted)
             .ToListAsync();
 
@@ -100,9 +98,7 @@ public class AuditInterceptorTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         // Should have 1 audit entry for Tenant, not additional entries for the AuditLogEntry itself
-        var auditEntries = await _dbContext.AuditLogEntries
-            .IgnoreQueryFilters()
-            .ToListAsync();
+        var auditEntries = await _dbContext.AuditLogEntries.IgnoreQueryFilters().ToListAsync();
 
         auditEntries.Should().ContainSingle();
         auditEntries[0].EntityType.Should().Be("Tenant");

@@ -10,9 +10,7 @@ public record IngestionResult(
     decimal? CvssScore,
     string? CvssVector,
     DateTimeOffset? PublishedDate,
-    IReadOnlyList<IngestionAffectedAsset> AffectedAssets);
+    IReadOnlyList<IngestionAffectedAsset> AffectedAssets
+);
 
-public record IngestionAffectedAsset(
-    string ExternalAssetId,
-    string AssetName,
-    AssetType AssetType);
+public record IngestionAffectedAsset(string ExternalAssetId, string AssetName, AssetType AssetType);

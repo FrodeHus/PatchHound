@@ -7,9 +7,8 @@ using Vigil.Infrastructure.Data;
 
 namespace Vigil.Worker;
 
-public class SlaCheckWorker(
-    IServiceScopeFactory scopeFactory,
-    ILogger<SlaCheckWorker> logger) : BackgroundService
+public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckWorker> logger)
+    : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromHours(1);
 
@@ -42,10 +41,12 @@ public class SlaCheckWorker(
         var now = DateTimeOffset.UtcNow;
 
         // Get all open/in-progress tasks across all tenants
-        var activeTasks = await dbContext.RemediationTasks
-            .IgnoreQueryFilters()
-            .Where(t => t.Status != RemediationTaskStatus.Completed
-                        && t.Status != RemediationTaskStatus.RiskAccepted)
+        var activeTasks = await dbContext
+            .RemediationTasks.IgnoreQueryFilters()
+            .Where(t =>
+                t.Status != RemediationTaskStatus.Completed
+                && t.Status != RemediationTaskStatus.RiskAccepted
+            )
             .ToListAsync(ct);
 
         foreach (var task in activeTasks)
@@ -57,7 +58,10 @@ public class SlaCheckWorker(
                 case SlaStatus.Overdue:
                     logger.LogWarning(
                         "Task {TaskId} for tenant {TenantId} is overdue (due: {DueDate})",
-                        task.Id, task.TenantId, task.DueDate);
+                        task.Id,
+                        task.TenantId,
+                        task.DueDate
+                    );
 
                     await notificationService.SendAsync(
                         task.AssigneeId,
@@ -67,13 +71,17 @@ public class SlaCheckWorker(
                         $"Task {task.Id} is past its SLA due date of {task.DueDate:yyyy-MM-dd}.",
                         "RemediationTask",
                         task.Id,
-                        ct);
+                        ct
+                    );
                     break;
 
                 case SlaStatus.NearDue:
                     logger.LogInformation(
                         "Task {TaskId} for tenant {TenantId} is near SLA due date ({DueDate})",
-                        task.Id, task.TenantId, task.DueDate);
+                        task.Id,
+                        task.TenantId,
+                        task.DueDate
+                    );
 
                     await notificationService.SendAsync(
                         task.AssigneeId,
@@ -83,7 +91,8 @@ public class SlaCheckWorker(
                         $"Task {task.Id} is approaching its SLA due date of {task.DueDate:yyyy-MM-dd}.",
                         "RemediationTask",
                         task.Id,
-                        ct);
+                        ct
+                    );
                     break;
             }
         }

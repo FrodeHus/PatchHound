@@ -16,7 +16,7 @@ public class Tenant
             Id = Guid.NewGuid(),
             Name = name,
             EntraTenantId = entraTenantId,
-            Settings = settings ?? "{}"
+            Settings = settings ?? "{}",
         };
     }
 

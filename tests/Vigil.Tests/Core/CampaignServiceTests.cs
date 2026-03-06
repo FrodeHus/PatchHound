@@ -33,7 +33,13 @@ public class CampaignServiceTests
     [Fact]
     public async Task CreateAsync_ReturnsCampaign()
     {
-        var result = await _service.CreateAsync(_tenantId, _userId, "New Campaign", "Description", CancellationToken.None);
+        var result = await _service.CreateAsync(
+            _tenantId,
+            _userId,
+            "New Campaign",
+            "Description",
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Name.Should().Be("New Campaign");
@@ -51,7 +57,12 @@ public class CampaignServiceTests
         var campaign = CreateCampaign();
         _campaignRepo.GetByIdAsync(campaign.Id, Arg.Any<CancellationToken>()).Returns(campaign);
 
-        var result = await _service.UpdateAsync(campaign.Id, "Updated Name", "Updated Description", CancellationToken.None);
+        var result = await _service.UpdateAsync(
+            campaign.Id,
+            "Updated Name",
+            "Updated Description",
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Name.Should().Be("Updated Name");
@@ -62,9 +73,16 @@ public class CampaignServiceTests
     [Fact]
     public async Task UpdateAsync_CampaignNotFound_ReturnsFailure()
     {
-        _campaignRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Campaign?)null);
+        _campaignRepo
+            .GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((Campaign?)null);
 
-        var result = await _service.UpdateAsync(Guid.NewGuid(), "Name", null, CancellationToken.None);
+        var result = await _service.UpdateAsync(
+            Guid.NewGuid(),
+            "Name",
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("not found");
@@ -76,7 +94,12 @@ public class CampaignServiceTests
         var campaign = CreateCampaign(CampaignStatus.Closed);
         _campaignRepo.GetByIdAsync(campaign.Id, Arg.Any<CancellationToken>()).Returns(campaign);
 
-        var result = await _service.UpdateAsync(campaign.Id, "New Name", null, CancellationToken.None);
+        var result = await _service.UpdateAsync(
+            campaign.Id,
+            "New Name",
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("closed");
@@ -98,7 +121,9 @@ public class CampaignServiceTests
     [Fact]
     public async Task CloseAsync_CampaignNotFound_ReturnsFailure()
     {
-        _campaignRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Campaign?)null);
+        _campaignRepo
+            .GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((Campaign?)null);
 
         var result = await _service.CloseAsync(Guid.NewGuid(), CancellationToken.None);
 
@@ -113,7 +138,11 @@ public class CampaignServiceTests
         _campaignRepo.GetByIdAsync(campaign.Id, Arg.Any<CancellationToken>()).Returns(campaign);
         var vulnIds = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() };
 
-        var result = await _service.LinkVulnerabilitiesAsync(campaign.Id, vulnIds, CancellationToken.None);
+        var result = await _service.LinkVulnerabilitiesAsync(
+            campaign.Id,
+            vulnIds,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Vulnerabilities.Should().HaveCount(2);
@@ -123,9 +152,15 @@ public class CampaignServiceTests
     [Fact]
     public async Task LinkVulnerabilitiesAsync_CampaignNotFound_ReturnsFailure()
     {
-        _campaignRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Campaign?)null);
+        _campaignRepo
+            .GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((Campaign?)null);
 
-        var result = await _service.LinkVulnerabilitiesAsync(Guid.NewGuid(), [Guid.NewGuid()], CancellationToken.None);
+        var result = await _service.LinkVulnerabilitiesAsync(
+            Guid.NewGuid(),
+            [Guid.NewGuid()],
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("not found");
@@ -137,7 +172,11 @@ public class CampaignServiceTests
         var campaign = CreateCampaign(CampaignStatus.Closed);
         _campaignRepo.GetByIdAsync(campaign.Id, Arg.Any<CancellationToken>()).Returns(campaign);
 
-        var result = await _service.LinkVulnerabilitiesAsync(campaign.Id, [Guid.NewGuid()], CancellationToken.None);
+        var result = await _service.LinkVulnerabilitiesAsync(
+            campaign.Id,
+            [Guid.NewGuid()],
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("closed");

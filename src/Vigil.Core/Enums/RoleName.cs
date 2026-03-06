@@ -7,5 +7,5 @@ public enum RoleName
     SecurityAnalyst,
     AssetOwner,
     Stakeholder,
-    Auditor
+    Auditor,
 }

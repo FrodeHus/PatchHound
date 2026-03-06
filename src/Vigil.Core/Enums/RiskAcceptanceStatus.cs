@@ -5,5 +5,5 @@ public enum RiskAcceptanceStatus
     Pending,
     Approved,
     Rejected,
-    Expired
+    Expired,
 }

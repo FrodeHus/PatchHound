@@ -8,7 +8,8 @@ public record CampaignDto(
     DateTimeOffset CreatedAt,
     int VulnerabilityCount,
     int TotalTasks,
-    int CompletedTasks);
+    int CompletedTasks
+);
 
 public record CampaignDetailDto(
     Guid Id,
@@ -20,7 +21,8 @@ public record CampaignDetailDto(
     int VulnerabilityCount,
     int TotalTasks,
     int CompletedTasks,
-    IReadOnlyList<Guid> VulnerabilityIds);
+    IReadOnlyList<Guid> VulnerabilityIds
+);
 
 public record CreateCampaignRequest(string Name, string? Description);
 

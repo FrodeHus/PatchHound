@@ -12,20 +12,21 @@ public record RiskAcceptanceDto(
     DateTimeOffset? ApprovedAt,
     string? Conditions,
     DateTimeOffset? ExpiryDate,
-    int? ReviewFrequency);
+    int? ReviewFrequency
+);
 
 public record RequestRiskAcceptanceRequest(
     string Justification,
     string? Conditions = null,
     DateTimeOffset? ExpiryDate = null,
-    int? ReviewFrequency = null);
+    int? ReviewFrequency = null
+);
 
 public record ApproveRejectRequest(
     string Action,
     string? Conditions = null,
     DateTimeOffset? ExpiryDate = null,
-    int? ReviewFrequency = null);
+    int? ReviewFrequency = null
+);
 
-public record RiskAcceptanceFilterQuery(
-    string? Status = null,
-    Guid? TenantId = null);
+public record RiskAcceptanceFilterQuery(string? Status = null, Guid? TenantId = null);

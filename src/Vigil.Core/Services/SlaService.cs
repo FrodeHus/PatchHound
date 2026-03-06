@@ -5,19 +5,22 @@ namespace Vigil.Core.Services;
 
 public class SlaService
 {
-    private static readonly IReadOnlyDictionary<Severity, int> DefaultSlaDays =
-        new Dictionary<Severity, int>
-        {
-            { Severity.Critical, 7 },
-            { Severity.High, 30 },
-            { Severity.Medium, 90 },
-            { Severity.Low, 180 },
-        };
+    private static readonly IReadOnlyDictionary<Severity, int> DefaultSlaDays = new Dictionary<
+        Severity,
+        int
+    >
+    {
+        { Severity.Critical, 7 },
+        { Severity.High, 30 },
+        { Severity.Medium, 90 },
+        { Severity.Low, 180 },
+    };
 
     public DateTimeOffset CalculateDueDate(
         Severity severity,
         DateTimeOffset createdAt,
-        string? tenantSettings = null)
+        string? tenantSettings = null
+    )
     {
         var days = GetSlaDays(severity, tenantSettings);
         return createdAt.AddDays(days);
@@ -30,7 +33,10 @@ public class SlaService
             try
             {
                 var settings = JsonSerializer.Deserialize<TenantSlaSettings>(tenantSettings);
-                if (settings?.SlaDays is not null && settings.SlaDays.TryGetValue(severity, out var overrideDays))
+                if (
+                    settings?.SlaDays is not null
+                    && settings.SlaDays.TryGetValue(severity, out var overrideDays)
+                )
                 {
                     return overrideDays;
                 }
@@ -47,7 +53,8 @@ public class SlaService
     public SlaStatus GetSlaStatus(
         DateTimeOffset createdAt,
         DateTimeOffset dueDate,
-        DateTimeOffset now)
+        DateTimeOffset now
+    )
     {
         if (now >= dueDate)
             return SlaStatus.Overdue;

@@ -38,7 +38,9 @@ public class AzureOpenAiProvider : IAiReportProvider
         sb.AppendLine("## Affected Assets");
         foreach (var asset in affectedAssets)
         {
-            sb.AppendLine($"- **{asset.Name}** ({asset.AssetType}, Criticality: {asset.Criticality})");
+            sb.AppendLine(
+                $"- **{asset.Name}** ({asset.AssetType}, Criticality: {asset.Criticality})"
+            );
         }
         sb.AppendLine();
         sb.AppendLine("## Recommendations");
@@ -46,7 +48,9 @@ public class AzureOpenAiProvider : IAiReportProvider
         sb.AppendLine("- Assess compensating controls for high-criticality assets.");
         sb.AppendLine("- Monitor affected assets for indicators of compromise.");
         sb.AppendLine();
-        sb.AppendLine("*This is a stub report. Connect to Azure OpenAI for real AI-generated analysis.*");
+        sb.AppendLine(
+            "*This is a stub report. Connect to Azure OpenAI for real AI-generated analysis.*"
+        );
 
         return Task.FromResult(sb.ToString());
     }

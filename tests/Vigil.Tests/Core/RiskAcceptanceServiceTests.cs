@@ -27,8 +27,16 @@ public class RiskAcceptanceServiceTests
     public async Task RequestAsync_Creates_Pending_Record()
     {
         var result = await _service.RequestAsync(
-            _vulnerabilityId, _tenantId, _requestedBy, "Risk is acceptable",
-            null, null, null, null, CancellationToken.None);
+            _vulnerabilityId,
+            _tenantId,
+            _requestedBy,
+            "Risk is acceptable",
+            null,
+            null,
+            null,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be(RiskAcceptanceStatus.Pending);
@@ -37,7 +45,9 @@ public class RiskAcceptanceServiceTests
         result.Value.RequestedBy.Should().Be(_requestedBy);
         result.Value.Justification.Should().Be("Risk is acceptable");
 
-        await _riskAcceptanceRepo.Received(1).AddAsync(Arg.Any<RiskAcceptance>(), Arg.Any<CancellationToken>());
+        await _riskAcceptanceRepo
+            .Received(1)
+            .AddAsync(Arg.Any<RiskAcceptance>(), Arg.Any<CancellationToken>());
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -45,8 +55,16 @@ public class RiskAcceptanceServiceTests
     public async Task RequestAsync_Without_Justification_Fails()
     {
         var result = await _service.RequestAsync(
-            _vulnerabilityId, _tenantId, _requestedBy, "",
-            null, null, null, null, CancellationToken.None);
+            _vulnerabilityId,
+            _tenantId,
+            _requestedBy,
+            "",
+            null,
+            null,
+            null,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Justification is required");
@@ -56,8 +74,16 @@ public class RiskAcceptanceServiceTests
     public async Task RequestAsync_With_Null_Justification_Fails()
     {
         var result = await _service.RequestAsync(
-            _vulnerabilityId, _tenantId, _requestedBy, null!,
-            null, null, null, null, CancellationToken.None);
+            _vulnerabilityId,
+            _tenantId,
+            _requestedBy,
+            null!,
+            null,
+            null,
+            null,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Justification is required");
@@ -66,13 +92,25 @@ public class RiskAcceptanceServiceTests
     [Fact]
     public async Task ApproveAsync_Transitions_To_Approved()
     {
-        var acceptance = RiskAcceptance.Create(_vulnerabilityId, _tenantId, _requestedBy, "Justified");
+        var acceptance = RiskAcceptance.Create(
+            _vulnerabilityId,
+            _tenantId,
+            _requestedBy,
+            "Justified"
+        );
         var approvedBy = Guid.NewGuid();
-        _riskAcceptanceRepo.GetByIdAsync(acceptance.Id, Arg.Any<CancellationToken>()).Returns(acceptance);
+        _riskAcceptanceRepo
+            .GetByIdAsync(acceptance.Id, Arg.Any<CancellationToken>())
+            .Returns(acceptance);
 
         var result = await _service.ApproveAsync(
-            acceptance.Id, approvedBy, "With conditions",
-            DateTimeOffset.UtcNow.AddMonths(6), 90, CancellationToken.None);
+            acceptance.Id,
+            approvedBy,
+            "With conditions",
+            DateTimeOffset.UtcNow.AddMonths(6),
+            90,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be(RiskAcceptanceStatus.Approved);
@@ -87,9 +125,16 @@ public class RiskAcceptanceServiceTests
     [Fact]
     public async Task RejectAsync_Transitions_To_Rejected()
     {
-        var acceptance = RiskAcceptance.Create(_vulnerabilityId, _tenantId, _requestedBy, "Justified");
+        var acceptance = RiskAcceptance.Create(
+            _vulnerabilityId,
+            _tenantId,
+            _requestedBy,
+            "Justified"
+        );
         var rejectedBy = Guid.NewGuid();
-        _riskAcceptanceRepo.GetByIdAsync(acceptance.Id, Arg.Any<CancellationToken>()).Returns(acceptance);
+        _riskAcceptanceRepo
+            .GetByIdAsync(acceptance.Id, Arg.Any<CancellationToken>())
+            .Returns(acceptance);
 
         var result = await _service.RejectAsync(acceptance.Id, rejectedBy, CancellationToken.None);
 
@@ -103,12 +148,25 @@ public class RiskAcceptanceServiceTests
     [Fact]
     public async Task ApproveAsync_NonPending_Fails()
     {
-        var acceptance = RiskAcceptance.Create(_vulnerabilityId, _tenantId, _requestedBy, "Justified");
+        var acceptance = RiskAcceptance.Create(
+            _vulnerabilityId,
+            _tenantId,
+            _requestedBy,
+            "Justified"
+        );
         acceptance.Approve(Guid.NewGuid()); // Already approved
-        _riskAcceptanceRepo.GetByIdAsync(acceptance.Id, Arg.Any<CancellationToken>()).Returns(acceptance);
+        _riskAcceptanceRepo
+            .GetByIdAsync(acceptance.Id, Arg.Any<CancellationToken>())
+            .Returns(acceptance);
 
         var result = await _service.ApproveAsync(
-            acceptance.Id, Guid.NewGuid(), null, null, null, CancellationToken.None);
+            acceptance.Id,
+            Guid.NewGuid(),
+            null,
+            null,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Only pending");
@@ -117,11 +175,22 @@ public class RiskAcceptanceServiceTests
     [Fact]
     public async Task RejectAsync_NonPending_Fails()
     {
-        var acceptance = RiskAcceptance.Create(_vulnerabilityId, _tenantId, _requestedBy, "Justified");
+        var acceptance = RiskAcceptance.Create(
+            _vulnerabilityId,
+            _tenantId,
+            _requestedBy,
+            "Justified"
+        );
         acceptance.Reject(Guid.NewGuid()); // Already rejected
-        _riskAcceptanceRepo.GetByIdAsync(acceptance.Id, Arg.Any<CancellationToken>()).Returns(acceptance);
+        _riskAcceptanceRepo
+            .GetByIdAsync(acceptance.Id, Arg.Any<CancellationToken>())
+            .Returns(acceptance);
 
-        var result = await _service.RejectAsync(acceptance.Id, Guid.NewGuid(), CancellationToken.None);
+        var result = await _service.RejectAsync(
+            acceptance.Id,
+            Guid.NewGuid(),
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Only pending");
@@ -130,10 +199,18 @@ public class RiskAcceptanceServiceTests
     [Fact]
     public async Task ApproveAsync_NotFound_ReturnsFailure()
     {
-        _riskAcceptanceRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((RiskAcceptance?)null);
+        _riskAcceptanceRepo
+            .GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((RiskAcceptance?)null);
 
         var result = await _service.ApproveAsync(
-            Guid.NewGuid(), Guid.NewGuid(), null, null, null, CancellationToken.None);
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            null,
+            null,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("not found");
@@ -142,9 +219,15 @@ public class RiskAcceptanceServiceTests
     [Fact]
     public async Task RejectAsync_NotFound_ReturnsFailure()
     {
-        _riskAcceptanceRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((RiskAcceptance?)null);
+        _riskAcceptanceRepo
+            .GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((RiskAcceptance?)null);
 
-        var result = await _service.RejectAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+        var result = await _service.RejectAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("not found");
@@ -157,8 +240,16 @@ public class RiskAcceptanceServiceTests
         var expiryDate = DateTimeOffset.UtcNow.AddMonths(6);
 
         var result = await _service.RequestAsync(
-            _vulnerabilityId, _tenantId, _requestedBy, "Risk is acceptable",
-            assetId, "Must monitor weekly", expiryDate, 30, CancellationToken.None);
+            _vulnerabilityId,
+            _tenantId,
+            _requestedBy,
+            "Risk is acceptable",
+            assetId,
+            "Must monitor weekly",
+            expiryDate,
+            30,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Value.AssetId.Should().Be(assetId);

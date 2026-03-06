@@ -28,7 +28,15 @@ public class EmailNotificationService : INotificationService
         CancellationToken ct = default
     )
     {
-        var notification = Notification.Create(userId, tenantId, type, title, body, relatedEntityType, relatedEntityId);
+        var notification = Notification.Create(
+            userId,
+            tenantId,
+            type,
+            title,
+            body,
+            relatedEntityType,
+            relatedEntityId
+        );
         _dbContext.Notifications.Add(notification);
         await _dbContext.SaveChangesAsync(ct);
 
@@ -50,13 +58,20 @@ public class EmailNotificationService : INotificationService
         CancellationToken ct = default
     )
     {
-        var members = await _dbContext
-            .TeamMembers.Where(tm => tm.TeamId == teamId)
-            .ToListAsync(ct);
+        var members = await _dbContext.TeamMembers.Where(tm => tm.TeamId == teamId).ToListAsync(ct);
 
         foreach (var member in members)
         {
-            await SendAsync(member.UserId, tenantId, type, title, body, relatedEntityType, relatedEntityId, ct);
+            await SendAsync(
+                member.UserId,
+                tenantId,
+                type,
+                title,
+                body,
+                relatedEntityType,
+                relatedEntityId,
+                ct
+            );
         }
     }
 }

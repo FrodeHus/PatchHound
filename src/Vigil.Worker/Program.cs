@@ -11,7 +11,8 @@ var builder = Host.CreateApplicationBuilder(args);
 
 // DbContext
 builder.Services.AddDbContext<VigilDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+);
 
 // Tenant context for worker (system-level, all tenants accessible)
 builder.Services.AddScoped<ITenantContext, WorkerTenantContext>();
@@ -19,7 +20,8 @@ builder.Services.AddScoped<ITenantContext, WorkerTenantContext>();
 // Ingestion pipeline
 builder.Services.AddScoped<IngestionService>();
 builder.Services.Configure<DefenderOptions>(
-    builder.Configuration.GetSection(DefenderOptions.SectionName));
+    builder.Configuration.GetSection(DefenderOptions.SectionName)
+);
 builder.Services.AddHttpClient<DefenderApiClient>();
 builder.Services.AddScoped<IVulnerabilitySource, DefenderVulnerabilitySource>();
 
@@ -62,6 +64,10 @@ internal class WorkerTenantContext : ITenantContext
 /// </summary>
 internal class NoOpEmailSender : IEmailSender
 {
-    public Task SendEmailAsync(string to, string subject, string htmlBody, CancellationToken ct = default)
-        => Task.CompletedTask;
+    public Task SendEmailAsync(
+        string to,
+        string subject,
+        string htmlBody,
+        CancellationToken ct = default
+    ) => Task.CompletedTask;
 }

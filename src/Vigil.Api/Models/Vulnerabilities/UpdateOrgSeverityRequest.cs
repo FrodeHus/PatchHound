@@ -5,4 +5,5 @@ public record UpdateOrgSeverityRequest(
     string Justification,
     string? AssetCriticalityFactor = null,
     string? ExposureFactor = null,
-    string? CompensatingControls = null);
+    string? CompensatingControls = null
+);

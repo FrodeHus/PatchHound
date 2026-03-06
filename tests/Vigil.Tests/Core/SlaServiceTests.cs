@@ -41,14 +41,9 @@ public class SlaServiceTests
     [Fact]
     public void CalculateDueDate_TenantOverride_UsesOverriddenDays()
     {
-        var settings = JsonSerializer.Serialize(new
-        {
-            SlaDays = new Dictionary<string, int>
-            {
-                { "Critical", 3 },
-                { "High", 14 },
-            }
-        });
+        var settings = JsonSerializer.Serialize(
+            new { SlaDays = new Dictionary<string, int> { { "Critical", 3 }, { "High", 14 } } }
+        );
 
         var criticalDueDate = _slaService.CalculateDueDate(Severity.Critical, _baseDate, settings);
         criticalDueDate.Should().Be(_baseDate.AddDays(3));
@@ -60,13 +55,9 @@ public class SlaServiceTests
     [Fact]
     public void CalculateDueDate_PartialOverride_FallsBackToDefaultForMissingSeverities()
     {
-        var settings = JsonSerializer.Serialize(new
-        {
-            SlaDays = new Dictionary<string, int>
-            {
-                { "Critical", 5 },
-            }
-        });
+        var settings = JsonSerializer.Serialize(
+            new { SlaDays = new Dictionary<string, int> { { "Critical", 5 } } }
+        );
 
         var criticalDueDate = _slaService.CalculateDueDate(Severity.Critical, _baseDate, settings);
         criticalDueDate.Should().Be(_baseDate.AddDays(5));
