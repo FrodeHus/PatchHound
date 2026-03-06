@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Vigil.Api.Auth;
 using Vigil.Core.Entities;
@@ -27,7 +28,7 @@ public class AuthorizationTests : IDisposable
         var options = new DbContextOptionsBuilder<VigilDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
-        _dbContext = new VigilDbContext(options, _tenantContext);
+        _dbContext = new VigilDbContext(options, BuildServiceProvider(_tenantContext));
     }
 
     [Fact]
@@ -203,4 +204,11 @@ public class AuthorizationTests : IDisposable
     }
 
     public void Dispose() => _dbContext.Dispose();
+
+    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(tenantContext);
+        return services.BuildServiceProvider();
+    }
 }

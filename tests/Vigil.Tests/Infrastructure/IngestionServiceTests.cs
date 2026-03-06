@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Vigil.Core.Entities;
@@ -28,7 +29,7 @@ public class IngestionServiceTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _dbContext = new VigilDbContext(options, tenantContext);
+        _dbContext = new VigilDbContext(options, BuildServiceProvider(tenantContext));
 
         _source = Substitute.For<IVulnerabilitySource>();
         _source.SourceName.Returns("TestSource");
@@ -302,4 +303,11 @@ public class IngestionServiceTests : IDisposable
     }
 
     public void Dispose() => _dbContext.Dispose();
+
+    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(tenantContext);
+        return services.BuildServiceProvider();
+    }
 }

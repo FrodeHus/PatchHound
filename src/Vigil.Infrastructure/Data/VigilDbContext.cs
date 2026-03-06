@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Vigil.Core.Entities;
 using Vigil.Core.Interfaces;
 
@@ -6,12 +7,12 @@ namespace Vigil.Infrastructure.Data;
 
 public class VigilDbContext : DbContext, IUnitOfWork
 {
-    private readonly ITenantContext _tenantContext;
+    private readonly IServiceProvider _serviceProvider;
 
-    public VigilDbContext(DbContextOptions<VigilDbContext> options, ITenantContext tenantContext)
+    public VigilDbContext(DbContextOptions<VigilDbContext> options, IServiceProvider serviceProvider)
         : base(options)
     {
-        _tenantContext = tenantContext;
+        _serviceProvider = serviceProvider;
     }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
@@ -32,35 +33,52 @@ public class VigilDbContext : DbContext, IUnitOfWork
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AIReport> AIReports => Set<AIReport>();
 
+    // Resolved lazily to break the circular dependency:
+    // VigilDbContext → ITenantContext → TenantContext → VigilDbContext.
+    // IServiceProvider is not traced by DI cycle detection.
+    // At runtime the scoped VigilDbContext already exists, so resolving
+    // ITenantContext doesn't cause recursive construction.
+    // EF Core re-evaluates instance member references in query filters per query,
+    // so each query gets the current user's tenant list.
+    private IReadOnlyList<Guid> AccessibleTenantIds =>
+        _serviceProvider.GetService<ITenantContext>()?.AccessibleTenantIds ?? [];
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(VigilDbContext).Assembly);
 
-        // Global query filters for tenant isolation
-        var accessibleTenants = _tenantContext.AccessibleTenantIds;
-
-        modelBuilder.Entity<Asset>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+        // Global query filters for tenant isolation.
+        // Referencing the instance property ensures EF Core re-evaluates per query.
+        modelBuilder.Entity<Asset>().HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Vulnerability>()
-            .HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<RemediationTask>()
-            .HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
-        modelBuilder.Entity<Campaign>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
-        modelBuilder.Entity<Comment>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<Campaign>()
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<Comment>()
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<RiskAcceptance>()
-            .HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<AuditLogEntry>()
-            .HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Notification>()
-            .HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<OrganizationalSeverity>()
-            .HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
-        modelBuilder.Entity<AIReport>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
-        modelBuilder.Entity<Team>().HasQueryFilter(e => accessibleTenants.Contains(e.TenantId));
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<AIReport>()
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<Team>()
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
     }
 }

@@ -54,6 +54,9 @@ async function ensureInitialized(): Promise<void> {
   }
 
   await msalInstance.initialize()
+  // Must handle redirect response before any other interaction,
+  // otherwise MSAL throws interaction_in_progress on page reload after login.
+  await msalInstance.handleRedirectPromise()
   isInitialized = true
 }
 

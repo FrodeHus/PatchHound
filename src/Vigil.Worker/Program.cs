@@ -37,7 +37,15 @@ builder.Services.AddHostedService<IngestionWorker>();
 builder.Services.AddHostedService<SlaCheckWorker>();
 
 var host = builder.Build();
-host.Run();
+
+// Apply pending database migrations on startup
+using (var scope = host.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<VigilDbContext>();
+    await dbContext.Database.MigrateAsync();
+}
+
+await host.RunAsync();
 
 /// <summary>
 /// Tenant context for the worker process. Provides system-level access to all tenants.

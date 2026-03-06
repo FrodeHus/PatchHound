@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Vigil.Core.Entities;
 using Vigil.Core.Enums;
@@ -27,7 +28,7 @@ public class EmailNotificationServiceTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _dbContext = new VigilDbContext(options, _tenantContext);
+        _dbContext = new VigilDbContext(options, BuildServiceProvider(_tenantContext));
         _emailSender = Substitute.For<IEmailSender>();
         _sut = new EmailNotificationService(_dbContext, _emailSender);
     }
@@ -185,5 +186,12 @@ public class EmailNotificationServiceTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
+    }
+
+    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(tenantContext);
+        return services.BuildServiceProvider();
     }
 }

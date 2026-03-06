@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Vigil.Core.Entities;
 using Vigil.Core.Enums;
@@ -29,7 +30,7 @@ public class AuditInterceptorTests : IDisposable
             .AddInterceptors(interceptor)
             .Options;
 
-        _dbContext = new VigilDbContext(options, _tenantContext);
+        _dbContext = new VigilDbContext(options, BuildServiceProvider(_tenantContext));
     }
 
     [Fact]
@@ -107,5 +108,12 @@ public class AuditInterceptorTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
+    }
+
+    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(tenantContext);
+        return services.BuildServiceProvider();
     }
 }

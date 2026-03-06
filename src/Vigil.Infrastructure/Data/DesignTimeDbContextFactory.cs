@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.DependencyInjection;
 using Vigil.Core.Interfaces;
 
 namespace Vigil.Infrastructure.Data;
@@ -13,7 +14,11 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<VigilDbCon
             "Host=localhost;Database=vigil_design;Username=postgres;Password=postgres"
         );
 
-        return new VigilDbContext(optionsBuilder.Options, new DesignTimeTenantContext());
+        var services = new ServiceCollection();
+        services.AddSingleton<ITenantContext>(new DesignTimeTenantContext());
+        var serviceProvider = services.BuildServiceProvider();
+
+        return new VigilDbContext(optionsBuilder.Options, serviceProvider);
     }
 
     private class DesignTimeTenantContext : ITenantContext

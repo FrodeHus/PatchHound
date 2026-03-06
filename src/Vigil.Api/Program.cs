@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
 using Vigil.Api.Auth;
 using Vigil.Api.Hubs;
@@ -7,6 +8,7 @@ using Vigil.Api.Middleware;
 using Vigil.Core.Enums;
 using Vigil.Core.Interfaces;
 using Vigil.Infrastructure;
+using Vigil.Infrastructure.Data;
 using Vigil.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -217,17 +219,24 @@ builder.Services.AddControllers();
 
 var app = builder.Build();
 
+// Apply pending database migrations on startup
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<VigilDbContext>();
+    await dbContext.Database.MigrateAsync();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
+app.UseCors();
 app.UseMiddleware<ExceptionHandlerMiddleware>();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseCors();
 app.UseRateLimiter();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
-app.Run();
+await app.RunAsync();

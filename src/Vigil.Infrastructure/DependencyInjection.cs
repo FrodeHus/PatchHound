@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Vigil.Core.Entities;
 using Vigil.Core.Interfaces;
 using Vigil.Core.Services;
 using Vigil.Infrastructure.AiProviders;
@@ -37,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITeamRepository, TeamRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IRepository<OrganizationalSeverity>, RepositoryBase<OrganizationalSeverity>>();
 
         // Application services
         services.AddScoped<VulnerabilityService>();
