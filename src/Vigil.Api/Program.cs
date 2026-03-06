@@ -8,7 +8,9 @@ using Vigil.Core.Enums;
 using Vigil.Core.Interfaces;
 using Vigil.Core.Services;
 using Vigil.Infrastructure.Data;
+using Vigil.Api.Hubs;
 using Vigil.Infrastructure.Repositories;
+using Vigil.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -194,6 +196,10 @@ builder.Services.AddScoped<TeamService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ITeamRepository, TeamRepository>();
 
+// SignalR
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IRealTimeNotifier, SignalRNotifier<NotificationHub>>();
+
 // CORS
 builder.Services.AddCors(options =>
 {
@@ -242,4 +248,5 @@ app.UseAuthorization();
 app.UseCors();
 app.UseRateLimiter();
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 app.Run();
