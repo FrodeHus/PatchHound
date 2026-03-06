@@ -17,11 +17,11 @@
 
 ```
 src/
-  VulnManager.Api/           # Web API host
-  VulnManager.Worker/        # Ingestion worker host
-  VulnManager.Core/          # Domain models, interfaces, business logic
-  VulnManager.Infrastructure/# EF Core, external service clients, email
-  VulnManager.Tests/         # Unit + integration tests
+  Vigil.Api/           # Web API host
+  Vigil.Worker/        # Ingestion worker host
+  Vigil.Core/          # Domain models, interfaces, business logic
+  Vigil.Infrastructure/# EF Core, external service clients, email
+  Vigil.Tests/         # Unit + integration tests
 ```
 
 - Core has zero dependencies on Infrastructure or API projects.
@@ -32,7 +32,7 @@ src/
 
 | Element | Convention | Example |
 |---------|-----------|---------|
-| Namespace | PascalCase, matches folder | `VulnManager.Core.Vulnerabilities` |
+| Namespace | PascalCase, matches folder | `Vigil.Core.Vulnerabilities` |
 | Class / Record | PascalCase | `RemediationTask` |
 | Interface | `I` prefix + PascalCase | `IVulnerabilitySource` |
 | Method | PascalCase | `GetByTenantAsync` |
