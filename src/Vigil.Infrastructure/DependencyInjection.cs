@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITeamRepository, TeamRepository>();
+        services.AddScoped<ITenantRepository, TenantRepository>();
 
         // Application services
         services.AddScoped<VulnerabilityService>();
@@ -47,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<UserService>();
         services.AddScoped<TeamService>();
         services.AddScoped<AiReportService>();
+        services.AddScoped<ISetupService, SetupService>();
 
         // Notifications & Email
         services.AddScoped<INotificationService, EmailNotificationService>();

@@ -11,7 +11,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 // DbContext
 builder.Services.AddDbContext<VigilDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Vigil"))
 );
 
 // Tenant context for worker (system-level, all tenants accessible)

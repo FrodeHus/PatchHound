@@ -1,41 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Bell } from 'lucide-react'
-import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
-import { getAccessToken } from '@/lib/auth'
-
-const HUB_BASE_URL = import.meta.env.VITE_SIGNALR_URL ?? import.meta.env.VITE_API_URL ?? ''
+import { useSignalR } from '@/hooks/useSignalR'
 
 export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0)
 
-  useEffect(() => {
-    const connection = new HubConnectionBuilder()
-      .withUrl(`${HUB_BASE_URL}/hubs/notifications`, {
-        accessTokenFactory: async () => (await getAccessToken()) ?? '',
-      })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Warning)
-      .build()
-
-    connection.on('NotificationCountUpdated', (count: number) => {
-      setUnreadCount(count)
-    })
-
-    void connection.start().catch(() => {
-      setUnreadCount(0)
-    })
-
-    return () => {
-      connection.off('NotificationCountUpdated')
-      void connection.stop()
-    }
+  const handleCountUpdated = useCallback((count: number) => {
+    setUnreadCount(count)
   }, [])
+
+  useSignalR('NotificationCountUpdated', handleCountUpdated)
 
   return (
     <button
       type="button"
       aria-label="Notifications"
       className="relative rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+      title={unreadCount > 0 ? `${unreadCount} unread notifications` : 'No unread notifications'}
     >
       <Bell size={18} />
       {unreadCount > 0 ? (

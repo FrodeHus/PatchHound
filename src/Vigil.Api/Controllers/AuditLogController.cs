@@ -32,6 +32,8 @@ public class AuditLogController : ControllerBase
 
         if (!string.IsNullOrEmpty(filter.EntityType))
             query = query.Where(e => e.EntityType == filter.EntityType);
+        if (filter.EntityId.HasValue)
+            query = query.Where(e => e.EntityId == filter.EntityId.Value);
         if (filter.Action.HasValue)
             query = query.Where(e => e.Action == filter.Action.Value);
         if (filter.UserId.HasValue)

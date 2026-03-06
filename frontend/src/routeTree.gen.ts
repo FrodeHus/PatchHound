@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VulnerabilitiesIndexRouteImport } from './routes/vulnerabilities/index'
 import { Route as TasksIndexRouteImport } from './routes/tasks/index'
+import { Route as SetupIndexRouteImport } from './routes/setup/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns/index'
 import { Route as AuditLogIndexRouteImport } from './routes/audit-log/index'
@@ -34,6 +35,11 @@ const VulnerabilitiesIndexRoute = VulnerabilitiesIndexRouteImport.update({
 const TasksIndexRoute = TasksIndexRouteImport.update({
   id: '/tasks/',
   path: '/tasks/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SetupIndexRoute = SetupIndexRouteImport.update({
+  id: '/setup/',
+  path: '/setup/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/audit-log/': typeof AuditLogIndexRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/setup/': typeof SetupIndexRoute
   '/tasks/': typeof TasksIndexRoute
   '/vulnerabilities/': typeof VulnerabilitiesIndexRoute
 }
@@ -100,6 +107,7 @@ export interface FileRoutesByTo {
   '/audit-log': typeof AuditLogIndexRoute
   '/campaigns': typeof CampaignsIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/setup': typeof SetupIndexRoute
   '/tasks': typeof TasksIndexRoute
   '/vulnerabilities': typeof VulnerabilitiesIndexRoute
 }
@@ -114,6 +122,7 @@ export interface FileRoutesById {
   '/audit-log/': typeof AuditLogIndexRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/setup/': typeof SetupIndexRoute
   '/tasks/': typeof TasksIndexRoute
   '/vulnerabilities/': typeof VulnerabilitiesIndexRoute
 }
@@ -129,6 +138,7 @@ export interface FileRouteTypes {
     | '/audit-log/'
     | '/campaigns/'
     | '/settings/'
+    | '/setup/'
     | '/tasks/'
     | '/vulnerabilities/'
   fileRoutesByTo: FileRoutesByTo
@@ -142,6 +152,7 @@ export interface FileRouteTypes {
     | '/audit-log'
     | '/campaigns'
     | '/settings'
+    | '/setup'
     | '/tasks'
     | '/vulnerabilities'
   id:
@@ -155,6 +166,7 @@ export interface FileRouteTypes {
     | '/audit-log/'
     | '/campaigns/'
     | '/settings/'
+    | '/setup/'
     | '/tasks/'
     | '/vulnerabilities/'
   fileRoutesById: FileRoutesById
@@ -169,6 +181,7 @@ export interface RootRouteChildren {
   AuditLogIndexRoute: typeof AuditLogIndexRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
+  SetupIndexRoute: typeof SetupIndexRoute
   TasksIndexRoute: typeof TasksIndexRoute
   VulnerabilitiesIndexRoute: typeof VulnerabilitiesIndexRoute
 }
@@ -194,6 +207,13 @@ declare module '@tanstack/react-router' {
       path: '/tasks'
       fullPath: '/tasks/'
       preLoaderRoute: typeof TasksIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/setup/': {
+      id: '/setup/'
+      path: '/setup'
+      fullPath: '/setup/'
+      preLoaderRoute: typeof SetupIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/': {
@@ -265,6 +285,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuditLogIndexRoute: AuditLogIndexRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
+  SetupIndexRoute: SetupIndexRoute,
   TasksIndexRoute: TasksIndexRoute,
   VulnerabilitiesIndexRoute: VulnerabilitiesIndexRoute,
 }

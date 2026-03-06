@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Vigil.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Vigil: Host=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      AzureAd__ClientId: ${AZURE_AD_CLIENT_ID}
+      AzureAd__TenantId: ${AZURE_AD_TENANT_ID}
+      AzureAd__Audience: ${AZURE_AD_AUDIENCE}
+      Frontend__Origin: ${FRONTEND_ORIGIN}
+      Smtp__Host: ${SMTP_HOST}
+      Smtp__Port: ${SMTP_PORT}
+      Smtp__Username: ${SMTP_USERNAME}
+      Smtp__Password: ${SMTP_PASSWORD}
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+
+  worker:
+    build:
+      context: .
+      dockerfile: src/Vigil.Worker/Dockerfile
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      ConnectionStrings__Vigil: Host=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Defender__ClientId: ${DEFENDER_CLIENT_ID}
+      Defender__ClientSecret: ${DEFENDER_CLIENT_SECRET}
+      Defender__TenantId: ${DEFENDER_TENANT_ID}
+      Defender__ApiBaseUrl: ${DEFENDER_API_BASE_URL}
+      Defender__TokenScope: ${DEFENDER_TOKEN_SCOPE}
+    depends_on:
+      - postgres
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_SIGNALR_URL: ${VITE_SIGNALR_URL}
+        VITE_ENTRA_CLIENT_ID: ${VITE_ENTRA_CLIENT_ID}
+        VITE_ENTRA_AUTHORITY: ${VITE_ENTRA_AUTHORITY}
+        VITE_API_SCOPES: ${VITE_API_SCOPES}
+    depends_on:
+      - api
+    ports:
+      - "3000:80"
+
+volumes:
+  pgdata:

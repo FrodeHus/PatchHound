@@ -21,4 +21,16 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          tanstack: ['@tanstack/react-router', '@tanstack/react-query'],
+          charts: ['recharts'],
+          auth: ['@azure/msal-browser', '@azure/msal-react'],
+          realtime: ['@microsoft/signalr'],
+        },
+      },
+    },
+  },
 })

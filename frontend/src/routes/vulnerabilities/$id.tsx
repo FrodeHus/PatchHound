@@ -1,4 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useVulnerabilityDetail } from '@/api/useVulnerabilities'
+import { VulnerabilityDetail } from '@/components/features/vulnerabilities/VulnerabilityDetail'
 
 export const Route = createFileRoute('/vulnerabilities/$id')({
   component: VulnerabilityDetailPage,
@@ -6,11 +8,15 @@ export const Route = createFileRoute('/vulnerabilities/$id')({
 
 function VulnerabilityDetailPage() {
   const { id } = Route.useParams()
+  const detailQuery = useVulnerabilityDetail(id)
 
-  return (
-    <section className="space-y-2">
-      <h1 className="text-2xl font-semibold">Vulnerability {id}</h1>
-      <p className="text-sm text-muted-foreground">Detail tabs and actions will be added in the next task.</p>
-    </section>
-  )
+  if (detailQuery.isLoading) {
+    return <p className="text-sm text-muted-foreground">Loading vulnerability details...</p>
+  }
+
+  if (detailQuery.isError || !detailQuery.data) {
+    return <p className="text-sm text-destructive">Failed to load vulnerability details.</p>
+  }
+
+  return <VulnerabilityDetail vulnerability={detailQuery.data} />
 }

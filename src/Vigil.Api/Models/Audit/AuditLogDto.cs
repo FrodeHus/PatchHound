@@ -16,6 +16,7 @@ public record AuditLogDto(
 
 public record AuditLogFilterQuery(
     string? EntityType = null,
+    Guid? EntityId = null,
     AuditAction? Action = null,
     Guid? UserId = null,
     Guid? TenantId = null,
