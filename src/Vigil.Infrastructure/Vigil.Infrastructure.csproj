@@ -1,0 +1,8 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Vigil.Core\Vigil.Core.csproj" />
+  </ItemGroup>
+
+
+</Project>
