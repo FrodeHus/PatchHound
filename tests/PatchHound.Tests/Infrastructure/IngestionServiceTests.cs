@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -28,6 +29,7 @@ public class IngestionServiceTests : IDisposable
 
         var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;
 
         _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(tenantContext));
@@ -202,7 +204,7 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ResolvedVulnerability_MarksVulnerabilityAssetResolved()
+    public async Task ResolvedVulnerability_SecondMissingSync_MarksVulnerabilityAssetResolved()
     {
         // Arrange: existing open vulnerability with asset
         var vuln = Vulnerability.Create(
@@ -226,7 +228,16 @@ public class IngestionServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var va = VulnerabilityAsset.Create(vuln.Id, asset.Id, DateTimeOffset.UtcNow);
+        var episode = VulnerabilityAssetEpisode.Create(
+            _tenantId,
+            vuln.Id,
+            asset.Id,
+            1,
+            va.DetectedDate
+        );
+        episode.MarkMissing();
         await _dbContext.VulnerabilityAssets.AddAsync(va);
+        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
 
         var task = RemediationTask.Create(
             vuln.Id,
@@ -380,6 +391,36 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessAssetsAsync_CreatesDeviceSoftwareLinksAndEpisodes()
+    {
+        var observedAt = DateTimeOffset.UtcNow;
+        var snapshot = new IngestionAssetInventorySnapshot(
+            [
+                new("machine-1", "server01.contoso.local", AssetType.Device),
+                new("software-1", "Contoso Agent 1.0", AssetType.Software),
+            ],
+            [
+                new("machine-1", "software-1", observedAt),
+            ]
+        );
+
+        await _service.ProcessAssetsAsync(_tenantId, snapshot, CancellationToken.None);
+
+        var installation = await _dbContext
+            .DeviceSoftwareInstallations.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(link => link.TenantId == _tenantId);
+        var episode = await _dbContext
+            .DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(current => current.TenantId == _tenantId);
+
+        installation.Should().NotBeNull();
+        installation!.LastSeenAt.Should().Be(observedAt);
+        episode.Should().NotBeNull();
+        episode!.EpisodeNumber.Should().Be(1);
+        episode.RemovedAt.Should().BeNull();
+    }
+
+    [Fact]
     public async Task ProcessResultsAsync_UpdatesExistingAssetNameFromLatestMachineName()
     {
         var asset = Asset.Create(
@@ -416,6 +457,189 @@ public class IngestionServiceTests : IDisposable
             .FirstAsync(current => current.Id == asset.Id);
 
         updatedAsset.Name.Should().Be("FreshMachineName");
+    }
+
+    [Fact]
+    public async Task ProcessResultsAsync_FirstMissingSync_DoesNotResolveEpisode()
+    {
+        var vulnerability = Vulnerability.Create(
+            _tenantId,
+            "CVE-2025-2001",
+            "Recurring vulnerability",
+            "Desc",
+            Severity.High,
+            "TestSource"
+        );
+        var asset = Asset.Create(_tenantId, "asset-1", AssetType.Device, "Server1", Criticality.Medium);
+        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
+        await _dbContext.Assets.AddAsync(asset);
+        await _dbContext.SaveChangesAsync();
+
+        var episode = VulnerabilityAssetEpisode.Create(_tenantId, vulnerability.Id, asset.Id, 1, DateTimeOffset.UtcNow.AddHours(-2));
+        var projection = VulnerabilityAsset.Create(vulnerability.Id, asset.Id, DateTimeOffset.UtcNow.AddHours(-2));
+        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
+        await _dbContext.VulnerabilityAssets.AddAsync(projection);
+        await _dbContext.SaveChangesAsync();
+
+        await _service.ProcessResultsAsync(_tenantId, "TestSource", [], CancellationToken.None);
+
+        var updatedEpisode = await _dbContext.VulnerabilityAssetEpisodes.IgnoreQueryFilters().FirstAsync();
+        var updatedProjection = await _dbContext.VulnerabilityAssets.IgnoreQueryFilters().FirstAsync();
+        var updatedVulnerability = await _dbContext.Vulnerabilities.IgnoreQueryFilters().FirstAsync();
+
+        updatedEpisode.Status.Should().Be(VulnerabilityStatus.Open);
+        updatedEpisode.MissingSyncCount.Should().Be(1);
+        updatedEpisode.ResolvedAt.Should().BeNull();
+        updatedProjection.Status.Should().Be(VulnerabilityStatus.Open);
+        updatedVulnerability.Status.Should().Be(VulnerabilityStatus.Open);
+    }
+
+    [Fact]
+    public async Task ProcessResultsAsync_SecondMissingSync_ResolvesEpisodeAndProjection()
+    {
+        var vulnerability = Vulnerability.Create(
+            _tenantId,
+            "CVE-2025-2002",
+            "Recurring vulnerability",
+            "Desc",
+            Severity.High,
+            "TestSource"
+        );
+        var asset = Asset.Create(_tenantId, "asset-1", AssetType.Device, "Server1", Criticality.Medium);
+        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
+        await _dbContext.Assets.AddAsync(asset);
+        await _dbContext.SaveChangesAsync();
+
+        var episode = VulnerabilityAssetEpisode.Create(_tenantId, vulnerability.Id, asset.Id, 1, DateTimeOffset.UtcNow.AddHours(-2));
+        episode.MarkMissing();
+        var projection = VulnerabilityAsset.Create(vulnerability.Id, asset.Id, DateTimeOffset.UtcNow.AddHours(-2));
+        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
+        await _dbContext.VulnerabilityAssets.AddAsync(projection);
+        await _dbContext.SaveChangesAsync();
+
+        await _service.ProcessResultsAsync(_tenantId, "TestSource", [], CancellationToken.None);
+
+        var updatedEpisode = await _dbContext.VulnerabilityAssetEpisodes.IgnoreQueryFilters().FirstAsync();
+        var updatedProjection = await _dbContext.VulnerabilityAssets.IgnoreQueryFilters().FirstAsync();
+        var updatedVulnerability = await _dbContext.Vulnerabilities.IgnoreQueryFilters().FirstAsync();
+
+        updatedEpisode.Status.Should().Be(VulnerabilityStatus.Resolved);
+        updatedEpisode.MissingSyncCount.Should().Be(2);
+        updatedEpisode.ResolvedAt.Should().NotBeNull();
+        updatedProjection.Status.Should().Be(VulnerabilityStatus.Resolved);
+        updatedProjection.ResolvedDate.Should().NotBeNull();
+        updatedVulnerability.Status.Should().Be(VulnerabilityStatus.Resolved);
+    }
+
+    [Fact]
+    public async Task ProcessResultsAsync_ReappearanceBeforeSecondMiss_ContinuesSameEpisode()
+    {
+        var vulnerability = Vulnerability.Create(
+            _tenantId,
+            "CVE-2025-2003",
+            "Recurring vulnerability",
+            "Desc",
+            Severity.High,
+            "TestSource"
+        );
+        var asset = Asset.Create(_tenantId, "asset-1", AssetType.Device, "Server1", Criticality.Medium);
+        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
+        await _dbContext.Assets.AddAsync(asset);
+        await _dbContext.SaveChangesAsync();
+
+        var firstSeenAt = DateTimeOffset.UtcNow.AddHours(-2);
+        var episode = VulnerabilityAssetEpisode.Create(_tenantId, vulnerability.Id, asset.Id, 1, firstSeenAt);
+        episode.MarkMissing();
+        var projection = VulnerabilityAsset.Create(vulnerability.Id, asset.Id, firstSeenAt);
+        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
+        await _dbContext.VulnerabilityAssets.AddAsync(projection);
+        await _dbContext.SaveChangesAsync();
+
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "TestSource",
+            [
+                new(
+                    "CVE-2025-2003",
+                    "Recurring vulnerability",
+                    "Desc",
+                    Severity.High,
+                    8.0m,
+                    null,
+                    null,
+                    [new IngestionAffectedAsset("asset-1", "Server1", AssetType.Device)]
+                ),
+            ],
+            CancellationToken.None
+        );
+
+        var episodes = await _dbContext.VulnerabilityAssetEpisodes.IgnoreQueryFilters().ToListAsync();
+        episodes.Should().HaveCount(1);
+        episodes[0].EpisodeNumber.Should().Be(1);
+        episodes[0].MissingSyncCount.Should().Be(0);
+        episodes[0].Status.Should().Be(VulnerabilityStatus.Open);
+    }
+
+    [Fact]
+    public async Task ProcessResultsAsync_ReappearanceAfterResolution_CreatesNewEpisode()
+    {
+        var vulnerability = Vulnerability.Create(
+            _tenantId,
+            "CVE-2025-2004",
+            "Recurring vulnerability",
+            "Desc",
+            Severity.High,
+            "TestSource"
+        );
+        var asset = Asset.Create(_tenantId, "asset-1", AssetType.Device, "Server1", Criticality.Medium);
+        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
+        await _dbContext.Assets.AddAsync(asset);
+        await _dbContext.SaveChangesAsync();
+
+        var firstSeenAt = DateTimeOffset.UtcNow.AddDays(-1);
+        var firstEpisode = VulnerabilityAssetEpisode.Create(_tenantId, vulnerability.Id, asset.Id, 1, firstSeenAt);
+        firstEpisode.MarkMissing();
+        firstEpisode.MarkMissing();
+        firstEpisode.Resolve(DateTimeOffset.UtcNow.AddHours(-2));
+        var projection = VulnerabilityAsset.Create(vulnerability.Id, asset.Id, firstSeenAt);
+        projection.Resolve(DateTimeOffset.UtcNow.AddHours(-2));
+        vulnerability.UpdateStatus(VulnerabilityStatus.Resolved);
+        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(firstEpisode);
+        await _dbContext.VulnerabilityAssets.AddAsync(projection);
+        await _dbContext.SaveChangesAsync();
+
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "TestSource",
+            [
+                new(
+                    "CVE-2025-2004",
+                    "Recurring vulnerability",
+                    "Desc",
+                    Severity.High,
+                    8.0m,
+                    null,
+                    null,
+                    [new IngestionAffectedAsset("asset-1", "Server1", AssetType.Device)]
+                ),
+            ],
+            CancellationToken.None
+        );
+
+        var episodes = await _dbContext
+            .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
+            .OrderBy(episode => episode.EpisodeNumber)
+            .ToListAsync();
+        var updatedProjection = await _dbContext.VulnerabilityAssets.IgnoreQueryFilters().FirstAsync();
+        var updatedVulnerability = await _dbContext.Vulnerabilities.IgnoreQueryFilters().FirstAsync();
+
+        episodes.Should().HaveCount(2);
+        episodes[0].Status.Should().Be(VulnerabilityStatus.Resolved);
+        episodes[1].EpisodeNumber.Should().Be(2);
+        episodes[1].Status.Should().Be(VulnerabilityStatus.Open);
+        updatedProjection.Status.Should().Be(VulnerabilityStatus.Open);
+        updatedProjection.ResolvedDate.Should().BeNull();
+        updatedVulnerability.Status.Should().Be(VulnerabilityStatus.Open);
     }
 
     public void Dispose() => _dbContext.Dispose();

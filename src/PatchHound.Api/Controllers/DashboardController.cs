@@ -117,6 +117,95 @@ public class DashboardController : ControllerBase
             ))
             .ToListAsync(ct);
 
+        var recurrenceRows = await _dbContext
+            .VulnerabilityAssetEpisodes.AsNoTracking()
+            .GroupBy(episode => new { episode.VulnerabilityId, episode.AssetId })
+            .Select(group => new
+            {
+                group.Key.VulnerabilityId,
+                group.Key.AssetId,
+                EpisodeCount = group.Count(),
+            })
+            .ToListAsync(ct);
+
+        var recurringPairs = recurrenceRows.Where(row => row.EpisodeCount > 1).ToList();
+        var recurringVulnerabilityIds = recurringPairs
+            .Select(row => row.VulnerabilityId)
+            .Distinct()
+            .ToList();
+
+        var recurrenceRatePercent = recurrenceRows.Count == 0
+            ? 0
+            : Math.Round((decimal)recurringPairs.Count / recurrenceRows.Count * 100m, 1);
+
+        var topRecurringVulnerabilityCounts = recurringPairs
+            .GroupBy(row => row.VulnerabilityId)
+            .Select(group => new
+            {
+                VulnerabilityId = group.Key,
+                EpisodeCount = group.Sum(row => row.EpisodeCount),
+                ReappearanceCount = group.Sum(row => row.EpisodeCount - 1),
+            })
+            .OrderByDescending(row => row.ReappearanceCount)
+            .ThenByDescending(row => row.EpisodeCount)
+            .Take(5)
+            .ToList();
+
+        var topRecurringVulnerabilityIds = topRecurringVulnerabilityCounts
+            .Select(row => row.VulnerabilityId)
+            .ToList();
+
+        var recurringVulnerabilities = await _dbContext
+            .Vulnerabilities.AsNoTracking()
+            .Where(v => topRecurringVulnerabilityIds.Contains(v.Id))
+            .ToDictionaryAsync(v => v.Id, ct);
+
+        var topRecurringVulnerabilities = topRecurringVulnerabilityCounts
+            .Select(row =>
+            {
+                var vulnerability = recurringVulnerabilities[row.VulnerabilityId];
+                return new RecurringVulnerabilityDto(
+                    vulnerability.Id,
+                    vulnerability.ExternalId,
+                    vulnerability.Title,
+                    row.EpisodeCount,
+                    row.ReappearanceCount
+                );
+            })
+            .ToList();
+
+        var topRecurringAssetCounts = recurringPairs
+            .GroupBy(row => row.AssetId)
+            .Select(group => new
+            {
+                AssetId = group.Key,
+                RecurringVulnerabilityCount = group.Count(),
+            })
+            .OrderByDescending(row => row.RecurringVulnerabilityCount)
+            .Take(5)
+            .ToList();
+
+        var recurringAssetIds = topRecurringAssetCounts.Select(row => row.AssetId).ToList();
+        var recurringAssets = await _dbContext
+            .Assets.AsNoTracking()
+            .Where(asset => recurringAssetIds.Contains(asset.Id))
+            .ToDictionaryAsync(asset => asset.Id, ct);
+
+        var topRecurringAssets = topRecurringAssetCounts
+            .Select(row =>
+            {
+                var asset = recurringAssets[row.AssetId];
+                return new RecurringAssetDto(
+                    asset.Id,
+                    asset.AssetType == AssetType.Device
+                        ? asset.DeviceComputerDnsName ?? asset.Name
+                        : asset.Name,
+                    asset.AssetType.ToString(),
+                    row.RecurringVulnerabilityCount
+                );
+            })
+            .ToList();
+
         return Ok(
             new DashboardSummaryDto(
                 exposureScore,
@@ -126,7 +215,11 @@ public class DashboardController : ControllerBase
                 overdueCount,
                 tasks.Count,
                 avgRemediationDays,
-                topVulns
+                topVulns,
+                recurringVulnerabilityIds.Count,
+                recurrenceRatePercent,
+                topRecurringVulnerabilities,
+                topRecurringAssets
             )
         );
     }
@@ -134,37 +227,69 @@ public class DashboardController : ControllerBase
     [HttpGet("trends")]
     public async Task<ActionResult<TrendDataDto>> GetTrends(CancellationToken ct)
     {
-        var twelveMonthsAgo = DateTimeOffset.UtcNow.AddMonths(-12);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var startDate = today.AddDays(-89);
 
-        var trends = await _dbContext
-            .Vulnerabilities.AsNoTracking()
-            .Where(v => v.PublishedDate.HasValue && v.PublishedDate.Value >= twelveMonthsAgo)
-            .GroupBy(v => new
-            {
-                v.PublishedDate!.Value.Year,
-                v.PublishedDate!.Value.Month,
-                v.VendorSeverity,
-            })
-            .Select(g => new
-            {
-                g.Key.Year,
-                g.Key.Month,
-                Severity = g.Key.VendorSeverity,
-                Count = g.Count(),
-            })
-            .OrderBy(x => x.Year)
-            .ThenBy(x => x.Month)
-            .ThenBy(x => x.Severity)
+        var episodeRows = await _dbContext
+            .VulnerabilityAssetEpisodes.AsNoTracking()
+            .Join(
+                _dbContext.Vulnerabilities.AsNoTracking(),
+                episode => episode.VulnerabilityId,
+                vulnerability => vulnerability.Id,
+                (episode, vulnerability) => new
+                {
+                    episode.VulnerabilityId,
+                    vulnerability.VendorSeverity,
+                    episode.FirstSeenAt,
+                    episode.ResolvedAt,
+                }
+            )
+            .Where(row =>
+                DateOnly.FromDateTime(row.FirstSeenAt.UtcDateTime) <= today
+                && DateOnly.FromDateTime((row.ResolvedAt ?? DateTimeOffset.UtcNow).UtcDateTime) >= startDate
+            )
             .ToListAsync(ct);
 
-        var items = trends
-            .Select(t => new TrendItem(
-                new DateOnly(t.Year, t.Month, 1),
-                t.Severity.ToString(),
-                t.Count
-            ))
-            .ToList();
+        var counts = new Dictionary<(DateOnly Date, Severity Severity), HashSet<Guid>>();
+
+        foreach (var row in episodeRows)
+        {
+            var firstSeenDate = DateOnly.FromDateTime(row.FirstSeenAt.UtcDateTime);
+            var resolvedDate = DateOnly.FromDateTime((row.ResolvedAt ?? DateTimeOffset.UtcNow).UtcDateTime);
+            var effectiveStart = firstSeenDate < startDate ? startDate : firstSeenDate;
+            var effectiveEnd = resolvedDate > today ? today : resolvedDate;
+
+            for (var date = effectiveStart; date <= effectiveEnd; date = date.AddDays(1))
+            {
+                var key = (date, row.VendorSeverity);
+                if (!counts.TryGetValue(key, out var vulnerabilityIds))
+                {
+                    vulnerabilityIds = [];
+                    counts[key] = vulnerabilityIds;
+                }
+
+                vulnerabilityIds.Add(row.VulnerabilityId);
+            }
+        }
+
+        var items = new List<TrendItem>();
+        foreach (var date in EachDay(startDate, today))
+        {
+            foreach (var severity in Enum.GetValues<Severity>())
+            {
+                counts.TryGetValue((date, severity), out var vulnerabilityIds);
+                items.Add(new TrendItem(date, severity.ToString(), vulnerabilityIds?.Count ?? 0));
+            }
+        }
 
         return Ok(new TrendDataDto(items));
+    }
+
+    private static IEnumerable<DateOnly> EachDay(DateOnly startDate, DateOnly endDate)
+    {
+        for (var current = startDate; current <= endDate; current = current.AddDays(1))
+        {
+            yield return current;
+        }
     }
 }

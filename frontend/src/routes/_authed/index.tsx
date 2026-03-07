@@ -101,7 +101,7 @@ function DashboardPage() {
           <TrendChart data={trends} />
         </div>
         <div className="xl:col-span-2">
-          <CriticalVulnerabilities items={summary.topCriticalVulnerabilities} />
+          <CriticalVulnerabilities items={summary.topCriticalVulnerabilities} summary={summary} />
         </div>
       </div>
     </section>

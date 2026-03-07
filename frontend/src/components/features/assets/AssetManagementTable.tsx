@@ -85,6 +85,7 @@ export function AssetManagementTable({
               <th className="py-2 pr-2">External ID</th>
               <th className="py-2 pr-2">Type</th>
               <th className="py-2 pr-2">Owner Type</th>
+              <th className="py-2 pr-2">Recurring</th>
               <th className="py-2 pr-2">Criticality</th>
               <th className="py-2 pr-2">Vulnerabilities</th>
               <th className="py-2 pr-2">Actions</th>
@@ -120,6 +121,15 @@ export function AssetManagementTable({
                   <td className="py-2 pr-2 font-mono text-xs">{asset.externalId}</td>
                   <td className="py-2 pr-2">{asset.assetType}</td>
                   <td className="py-2 pr-2">{asset.ownerType}</td>
+                  <td className="py-2 pr-2">
+                    {asset.recurringVulnerabilityCount > 0 ? (
+                      <span className="rounded-full border border-amber-300/70 bg-amber-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.14em] text-amber-900">
+                        {asset.recurringVulnerabilityCount}
+                      </span>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
                   <td className="py-2 pr-2">
                     <select
                       className="rounded-md border border-input bg-background px-2 py-1 text-sm"

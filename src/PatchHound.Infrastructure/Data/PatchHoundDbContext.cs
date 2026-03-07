@@ -22,8 +22,11 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<DeviceSoftwareInstallation> DeviceSoftwareInstallations => Set<DeviceSoftwareInstallation>();
+    public DbSet<DeviceSoftwareInstallationEpisode> DeviceSoftwareInstallationEpisodes =>
+        Set<DeviceSoftwareInstallationEpisode>();
     public DbSet<Vulnerability> Vulnerabilities => Set<Vulnerability>();
     public DbSet<VulnerabilityAsset> VulnerabilityAssets => Set<VulnerabilityAsset>();
+    public DbSet<VulnerabilityAssetEpisode> VulnerabilityAssetEpisodes => Set<VulnerabilityAssetEpisode>();
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
     public DbSet<RemediationTask> RemediationTasks => Set<RemediationTask>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
@@ -67,7 +70,13 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<DeviceSoftwareInstallation>()
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
+            .Entity<DeviceSoftwareInstallationEpisode>()
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
             .Entity<Vulnerability>()
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<VulnerabilityAssetEpisode>()
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<RemediationTask>()

@@ -93,6 +93,8 @@ export function AssetDetailPane({
                 <GenericMetadataSection metadata={metadata} />
               )}
 
+              {asset.assetType === 'Device' ? <DeviceActivityTimeline asset={asset} /> : null}
+
               <section className="rounded-2xl border border-border/70 bg-card p-4">
                 <div className="mb-4 flex items-end justify-between gap-3">
                   <div>
@@ -121,10 +123,29 @@ export function AssetDetailPane({
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="font-medium">{vulnerability.title}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium">{vulnerability.title}</p>
+                              {vulnerability.episodeCount > 1 ? (
+                                <span className="rounded-full border border-amber-300/70 bg-amber-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.14em] text-amber-900">
+                                  Recurred {vulnerability.episodeCount - 1}x
+                                </span>
+                              ) : null}
+                            </div>
                             <p className="mt-1 text-xs text-muted-foreground">
                               {vulnerability.externalId} • {vulnerability.vendorSeverity} • {vulnerability.status}
                             </p>
+                            {vulnerability.possibleCorrelatedSoftware.length > 0 ? (
+                              <p className="mt-2 text-xs text-amber-700">
+                                Possible correlation: {vulnerability.possibleCorrelatedSoftware.join(', ')}
+                              </p>
+                            ) : null}
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {vulnerability.episodes.map((episode) => (
+                                <span key={episode.episodeNumber} className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-[11px] text-muted-foreground">
+                                  #{episode.episodeNumber} {episode.status === 'Open' ? 'open' : 'resolved'}
+                                </span>
+                              ))}
+                            </div>
                           </div>
                           <p className="text-xs text-muted-foreground">
                             {new Date(vulnerability.detectedDate).toLocaleDateString()}
@@ -206,6 +227,144 @@ function DeviceSection({
           <KeyValueGrid metadata={metadata} />
         </div>
       ) : null}
+      <div className="mt-4">
+        <SectionHeader
+          eyebrow="Software history"
+          title="Installed software"
+          description="Current software inventory with install/remove episodes for correlation."
+        />
+        {asset.softwareInventory.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No software inventory is currently linked to this device.</p>
+        ) : (
+          <div className="space-y-2">
+            {asset.softwareInventory.map((software) => (
+              <div key={software.softwareAssetId} className="rounded-xl border border-border/70 bg-background px-3 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{software.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{software.externalId}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Last seen {new Date(software.lastSeenAt).toLocaleDateString()}</p>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {software.episodes.map((episode) => (
+                    <span key={episode.episodeNumber} className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-[11px] text-muted-foreground">
+                      #{episode.episodeNumber} {episode.removedAt ? 'removed' : 'installed'}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+type DeviceActivityItem = {
+  id: string
+  at: string
+  title: string
+  detail: string
+  tone: 'blue' | 'amber' | 'slate'
+}
+
+function DeviceActivityTimeline({ asset }: { asset: AssetDetail }) {
+  const items = useMemo<DeviceActivityItem[]>(() => {
+    const vulnerabilityEvents = asset.vulnerabilities.flatMap((vulnerability) =>
+      vulnerability.episodes.flatMap((episode) => {
+        const events: DeviceActivityItem[] = [
+          {
+            id: `vuln:${vulnerability.vulnerabilityId}:start:${episode.episodeNumber}`,
+            at: episode.firstSeenAt,
+            title: `${vulnerability.externalId} detected`,
+            detail: `${vulnerability.title} appeared on this device as episode #${episode.episodeNumber}.`,
+            tone: episode.episodeNumber > 1 ? 'amber' : 'blue',
+          },
+        ]
+
+        if (episode.resolvedAt) {
+          events.push({
+            id: `vuln:${vulnerability.vulnerabilityId}:end:${episode.episodeNumber}`,
+            at: episode.resolvedAt,
+            title: `${vulnerability.externalId} resolved`,
+            detail: `${vulnerability.title} was no longer detected on this device.`,
+            tone: 'slate',
+          })
+        }
+
+        return events
+      }),
+    )
+
+    const softwareEvents = asset.softwareInventory.flatMap((software) =>
+      software.episodes.flatMap((episode) => {
+        const events: DeviceActivityItem[] = [
+          {
+            id: `software:${software.softwareAssetId}:start:${episode.episodeNumber}`,
+            at: episode.firstSeenAt,
+            title: `${software.name} installed`,
+            detail: `${software.externalId} was present on the device in episode #${episode.episodeNumber}.`,
+            tone: episode.episodeNumber > 1 ? 'amber' : 'blue',
+          },
+        ]
+
+        if (episode.removedAt) {
+          events.push({
+            id: `software:${software.softwareAssetId}:end:${episode.episodeNumber}`,
+            at: episode.removedAt,
+            title: `${software.name} removed`,
+            detail: `${software.externalId} was no longer present on the device.`,
+            tone: 'slate',
+          })
+        }
+
+        return events
+      }),
+    )
+
+    return [...vulnerabilityEvents, ...softwareEvents].sort(
+      (left, right) => new Date(right.at).getTime() - new Date(left.at).getTime(),
+    )
+  }, [asset])
+
+  if (items.length === 0) {
+    return null
+  }
+
+  return (
+    <section className="rounded-2xl border border-border/70 bg-card p-4">
+      <SectionHeader
+        eyebrow="Timeline"
+        title="Device activity"
+        description="Merged vulnerability and software history to explain what changed on this device over time."
+      />
+      <div className="space-y-3">
+        {items.map((item, index) => (
+          <div key={item.id} className="flex gap-3">
+            <div className="flex w-5 flex-col items-center">
+              <span
+                className={`mt-1 h-2.5 w-2.5 rounded-full ${
+                  item.tone === 'amber'
+                    ? 'bg-amber-500'
+                    : item.tone === 'blue'
+                      ? 'bg-sky-500'
+                      : 'bg-slate-400'
+                }`}
+              />
+              {index < items.length - 1 ? <span className="mt-1 h-full w-px bg-border/80" /> : null}
+            </div>
+            <div className="flex-1 rounded-xl border border-border/70 bg-background px-3 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium">{item.title}</p>
+                <span className="text-xs text-muted-foreground">{new Date(item.at).toLocaleString()}</span>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   )
 }

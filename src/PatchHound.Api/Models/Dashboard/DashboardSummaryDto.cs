@@ -8,7 +8,11 @@ public record DashboardSummaryDto(
     int OverdueTaskCount,
     int TotalTaskCount,
     decimal AverageRemediationDays,
-    List<TopVulnerabilityDto> TopCriticalVulnerabilities
+    List<TopVulnerabilityDto> TopCriticalVulnerabilities,
+    int RecurringVulnerabilityCount,
+    decimal RecurrenceRatePercent,
+    List<RecurringVulnerabilityDto> TopRecurringVulnerabilities,
+    List<RecurringAssetDto> TopRecurringAssets
 );
 
 public record TopVulnerabilityDto(
@@ -19,6 +23,21 @@ public record TopVulnerabilityDto(
     decimal? CvssScore,
     int AffectedAssetCount,
     int DaysSincePublished
+);
+
+public record RecurringVulnerabilityDto(
+    Guid Id,
+    string ExternalId,
+    string Title,
+    int EpisodeCount,
+    int ReappearanceCount
+);
+
+public record RecurringAssetDto(
+    Guid AssetId,
+    string Name,
+    string AssetType,
+    int RecurringVulnerabilityCount
 );
 
 public record TrendDataDto(List<TrendItem> Items);

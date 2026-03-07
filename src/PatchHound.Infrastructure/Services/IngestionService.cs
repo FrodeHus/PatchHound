@@ -155,19 +155,25 @@ public class IngestionService
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
 
-        // Track which external IDs were seen in this ingestion run
-        var seenExternalIds = new HashSet<string>();
+        var seenPairKeys = new HashSet<string>(StringComparer.Ordinal);
         // Track assets created in this batch to avoid duplicate inserts
         var pendingAssets = new Dictionary<string, Asset>();
 
         foreach (var result in results)
         {
-            seenExternalIds.Add(result.ExternalId);
-            await UpsertVulnerabilityAsync(tenantId, sourceName, result, pendingAssets, ct);
+            await UpsertVulnerabilityAsync(
+                tenantId,
+                sourceName,
+                result,
+                pendingAssets,
+                seenPairKeys,
+                ct
+            );
         }
 
-        // Resolve vulnerabilities from this source that were not in the results
-        await ResolveAbsentVulnerabilitiesAsync(tenantId, sourceName, seenExternalIds, ct);
+        await ProcessMissingAssetEpisodesAsync(tenantId, sourceName, seenPairKeys, ct);
+        await _dbContext.SaveChangesAsync(ct);
+        await UpdateSourceVulnerabilityStatusesAsync(tenantId, sourceName, ct);
 
         await _dbContext.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -178,6 +184,7 @@ public class IngestionService
         string sourceName,
         IngestionResult result,
         Dictionary<string, Asset> pendingAssets,
+        HashSet<string> seenPairKeys,
         CancellationToken ct
     )
     {
@@ -226,8 +233,8 @@ public class IngestionService
                 tenantId,
                 existing!,
                 affectedAsset,
-                isNew,
                 pendingAssets,
+                seenPairKeys,
                 ct
             );
         }
@@ -237,11 +244,13 @@ public class IngestionService
         Guid tenantId,
         Vulnerability vulnerability,
         IngestionAffectedAsset affectedAsset,
-        bool isNewVulnerability,
         Dictionary<string, Asset> pendingAssets,
+        HashSet<string> seenPairKeys,
         CancellationToken ct
     )
     {
+        var now = DateTimeOffset.UtcNow;
+
         // Upsert the Asset — check pending batch first, then database
         var assetKey = $"{tenantId}:{affectedAsset.ExternalAssetId}";
         if (!pendingAssets.TryGetValue(assetKey, out var asset))
@@ -272,7 +281,8 @@ public class IngestionService
             asset.UpdateDetails(affectedAsset.AssetName, asset.Description);
         }
 
-        // Check if VulnerabilityAsset already exists
+        seenPairKeys.Add(BuildPairKey(vulnerability.Id, asset.Id));
+
         var existingVa = await _dbContext
             .VulnerabilityAssets.IgnoreQueryFilters()
             .FirstOrDefaultAsync(
@@ -280,36 +290,73 @@ public class IngestionService
                 ct
             );
 
-        if (existingVa is not null)
-            return;
+        var openEpisode = await _dbContext
+            .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(
+                episode =>
+                    episode.TenantId == tenantId
+                    && episode.VulnerabilityId == vulnerability.Id
+                    && episode.AssetId == asset.Id
+                    && episode.Status == VulnerabilityStatus.Open,
+                ct
+            );
 
-        // Create VulnerabilityAsset
-        var vulnerabilityAsset = VulnerabilityAsset.Create(
-            vulnerability.Id,
-            asset.Id,
-            DateTimeOffset.UtcNow
-        );
+        var projectionOpened = false;
 
-        await _dbContext.VulnerabilityAssets.AddAsync(vulnerabilityAsset, ct);
-
-        // Auto-create RemediationTask for new vulnerabilities
-        if (isNewVulnerability)
+        if (openEpisode is not null)
         {
-            var assigneeId = ResolveAssignee(asset);
-            if (assigneeId.HasValue)
-            {
-                var dueDate = CalculateDefaultDueDate(vulnerability.VendorSeverity);
-                var task = RemediationTask.Create(
-                    vulnerability.Id,
-                    asset.Id,
-                    tenantId,
-                    assigneeId.Value,
-                    SystemUserId,
-                    dueDate
-                );
+            openEpisode.Seen(now);
 
-                await _dbContext.RemediationTasks.AddAsync(task, ct);
+            if (existingVa is null)
+            {
+                existingVa = VulnerabilityAsset.Create(vulnerability.Id, asset.Id, openEpisode.FirstSeenAt);
+                await _dbContext.VulnerabilityAssets.AddAsync(existingVa, ct);
+                projectionOpened = true;
             }
+            else if (existingVa.Status != VulnerabilityStatus.Open)
+            {
+                existingVa.Reopen(openEpisode.FirstSeenAt);
+                projectionOpened = true;
+            }
+        }
+        else
+        {
+            var latestEpisode = await _dbContext
+                .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
+                .Where(episode =>
+                    episode.TenantId == tenantId
+                    && episode.VulnerabilityId == vulnerability.Id
+                    && episode.AssetId == asset.Id
+                )
+                .OrderByDescending(episode => episode.EpisodeNumber)
+                .FirstOrDefaultAsync(ct);
+
+            var nextEpisodeNumber = (latestEpisode?.EpisodeNumber ?? 0) + 1;
+            var episode = VulnerabilityAssetEpisode.Create(
+                tenantId,
+                vulnerability.Id,
+                asset.Id,
+                nextEpisodeNumber,
+                now
+            );
+            await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode, ct);
+
+            if (existingVa is null)
+            {
+                existingVa = VulnerabilityAsset.Create(vulnerability.Id, asset.Id, now);
+                await _dbContext.VulnerabilityAssets.AddAsync(existingVa, ct);
+                projectionOpened = true;
+            }
+            else if (existingVa.Status != VulnerabilityStatus.Open)
+            {
+                existingVa.Reopen(now);
+                projectionOpened = true;
+            }
+        }
+
+        if (projectionOpened)
+        {
+            await EnsureOpenRemediationTaskAsync(tenantId, vulnerability, asset, ct);
         }
     }
 
@@ -339,58 +386,171 @@ public class IngestionService
         return DateTimeOffset.UtcNow.AddDays(days);
     }
 
-    private async Task ResolveAbsentVulnerabilitiesAsync(
+    private async Task ProcessMissingAssetEpisodesAsync(
         Guid tenantId,
         string sourceName,
-        HashSet<string> seenExternalIds,
+        HashSet<string> seenPairKeys,
         CancellationToken ct
     )
     {
-        // Find open vulnerabilities from this source that were not returned
-        var openVulnerabilities = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
-            .Where(v =>
-                v.TenantId == tenantId
-                && v.Source == sourceName
-                && v.Status == VulnerabilityStatus.Open
+        var now = DateTimeOffset.UtcNow;
+        var openEpisodes = await _dbContext
+            .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
+            .Where(episode =>
+                episode.TenantId == tenantId
+                && episode.Status == VulnerabilityStatus.Open
+                && episode.Vulnerability.Source == sourceName
             )
             .ToListAsync(ct);
 
-        var absentVulns = openVulnerabilities
-            .Where(v => !seenExternalIds.Contains(v.ExternalId))
-            .ToList();
-
-        foreach (var vuln in absentVulns)
+        if (openEpisodes.Count == 0)
         {
-            vuln.UpdateStatus(VulnerabilityStatus.Resolved);
+            return;
+        }
 
-            // Resolve all VulnerabilityAsset entries
-            var vulnAssets = await _dbContext
-                .VulnerabilityAssets.IgnoreQueryFilters()
-                .Where(va => va.VulnerabilityId == vuln.Id && va.Status == VulnerabilityStatus.Open)
-                .ToListAsync(ct);
+        var episodePairs = openEpisodes
+            .Select(episode => BuildPairKey(episode.VulnerabilityId, episode.AssetId))
+            .ToHashSet(StringComparer.Ordinal);
 
-            foreach (var va in vulnAssets)
+        var currentProjections = await _dbContext
+            .VulnerabilityAssets.IgnoreQueryFilters()
+            .Where(va => episodePairs.Contains(BuildPairKey(va.VulnerabilityId, va.AssetId)))
+            .ToDictionaryAsync(va => BuildPairKey(va.VulnerabilityId, va.AssetId), ct);
+
+        foreach (var episode in openEpisodes)
+        {
+            var pairKey = BuildPairKey(episode.VulnerabilityId, episode.AssetId);
+            if (seenPairKeys.Contains(pairKey))
             {
-                va.Resolve(DateTimeOffset.UtcNow);
+                continue;
             }
 
-            // Auto-close open remediation tasks
-            var openTasks = await _dbContext
-                .RemediationTasks.IgnoreQueryFilters()
-                .Where(t =>
-                    t.VulnerabilityId == vuln.Id && t.Status != RemediationTaskStatus.Completed
-                )
-                .ToListAsync(ct);
-
-            foreach (var task in openTasks)
+            episode.MarkMissing();
+            if (episode.MissingSyncCount < 2)
             {
-                task.UpdateStatus(
-                    RemediationTaskStatus.Completed,
-                    "Auto-closed: vulnerability resolved in source"
-                );
+                continue;
+            }
+
+            episode.Resolve(now);
+
+            if (
+                currentProjections.TryGetValue(pairKey, out var projection)
+                && projection.Status == VulnerabilityStatus.Open
+            )
+            {
+                projection.Resolve(now);
+                await CloseOpenRemediationTasksAsync(episode.VulnerabilityId, episode.AssetId, ct);
             }
         }
+    }
+
+    private async Task UpdateSourceVulnerabilityStatusesAsync(
+        Guid tenantId,
+        string sourceName,
+        CancellationToken ct
+    )
+    {
+        var vulnerabilities = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
+            .Where(v => v.TenantId == tenantId && v.Source == sourceName)
+            .ToListAsync(ct);
+
+        if (vulnerabilities.Count == 0)
+        {
+            return;
+        }
+
+        var vulnerabilityIds = vulnerabilities.Select(v => v.Id).ToList();
+        var openVulnerabilityIds = await _dbContext
+            .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
+            .Where(episode =>
+                episode.TenantId == tenantId
+                && episode.Status == VulnerabilityStatus.Open
+                && vulnerabilityIds.Contains(episode.VulnerabilityId)
+            )
+            .Select(episode => episode.VulnerabilityId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var openVulnerabilitySet = openVulnerabilityIds.ToHashSet();
+
+        foreach (var vulnerability in vulnerabilities)
+        {
+            vulnerability.UpdateStatus(
+                openVulnerabilitySet.Contains(vulnerability.Id)
+                    ? VulnerabilityStatus.Open
+                    : VulnerabilityStatus.Resolved
+            );
+        }
+    }
+
+    private async Task EnsureOpenRemediationTaskAsync(
+        Guid tenantId,
+        Vulnerability vulnerability,
+        Asset asset,
+        CancellationToken ct
+    )
+    {
+        var existingTask = await _dbContext
+            .RemediationTasks.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(task =>
+                task.TenantId == tenantId
+                && task.VulnerabilityId == vulnerability.Id
+                && task.AssetId == asset.Id
+                && task.Status != RemediationTaskStatus.Completed,
+                ct
+            );
+
+        if (existingTask is not null)
+        {
+            return;
+        }
+
+        var assigneeId = ResolveAssignee(asset);
+        if (!assigneeId.HasValue)
+        {
+            return;
+        }
+
+        var task = RemediationTask.Create(
+            vulnerability.Id,
+            asset.Id,
+            tenantId,
+            assigneeId.Value,
+            SystemUserId,
+            CalculateDefaultDueDate(vulnerability.VendorSeverity)
+        );
+
+        await _dbContext.RemediationTasks.AddAsync(task, ct);
+    }
+
+    private async Task CloseOpenRemediationTasksAsync(
+        Guid vulnerabilityId,
+        Guid assetId,
+        CancellationToken ct
+    )
+    {
+        var openTasks = await _dbContext
+            .RemediationTasks.IgnoreQueryFilters()
+            .Where(task =>
+                task.VulnerabilityId == vulnerabilityId
+                && task.AssetId == assetId
+                && task.Status != RemediationTaskStatus.Completed
+            )
+            .ToListAsync(ct);
+
+        foreach (var task in openTasks)
+        {
+            task.UpdateStatus(
+                RemediationTaskStatus.Completed,
+                "Auto-closed: vulnerability resolved in source"
+            );
+        }
+    }
+
+    private static string BuildPairKey(Guid vulnerabilityId, Guid assetId)
+    {
+        return $"{vulnerabilityId:N}:{assetId:N}";
     }
 
     internal async Task ProcessAssetsAsync(
@@ -399,6 +559,8 @@ public class IngestionService
         CancellationToken ct
     )
     {
+        var assetIdsByExternalId = new Dictionary<string, Guid>(StringComparer.Ordinal);
+
         foreach (var asset in snapshot.Assets)
         {
             var existing = await _dbContext
@@ -433,6 +595,7 @@ public class IngestionService
                 }
                 existing.UpdateMetadata(asset.Metadata);
                 await _dbContext.Assets.AddAsync(existing, ct);
+                assetIdsByExternalId[asset.ExternalId] = existing.Id;
                 continue;
             }
 
@@ -451,8 +614,167 @@ public class IngestionService
                 );
             }
             existing.UpdateMetadata(asset.Metadata);
+            assetIdsByExternalId[asset.ExternalId] = existing.Id;
         }
 
+        await ProcessDeviceSoftwareLinksAsync(
+            tenantId,
+            snapshot.DeviceSoftwareLinks,
+            assetIdsByExternalId,
+            ct
+        );
+
         await _dbContext.SaveChangesAsync(ct);
+    }
+
+    private async Task ProcessDeviceSoftwareLinksAsync(
+        Guid tenantId,
+        IReadOnlyList<IngestionDeviceSoftwareLink> links,
+        Dictionary<string, Guid> assetIdsByExternalId,
+        CancellationToken ct
+    )
+    {
+        if (links.Count == 0)
+        {
+            return;
+        }
+
+        var persistedAssetIds = await _dbContext
+            .Assets.IgnoreQueryFilters()
+            .Where(asset => asset.TenantId == tenantId)
+            .Select(asset => new { asset.Id, asset.ExternalId })
+            .ToListAsync(ct);
+
+        foreach (var asset in persistedAssetIds)
+        {
+            assetIdsByExternalId.TryAdd(asset.ExternalId, asset.Id);
+        }
+
+        foreach (var link in links)
+        {
+            if (
+                !assetIdsByExternalId.TryGetValue(link.DeviceExternalId, out var deviceAssetId)
+                || !assetIdsByExternalId.TryGetValue(link.SoftwareExternalId, out var softwareAssetId)
+            )
+            {
+                continue;
+            }
+
+            var installation = await _dbContext
+                .DeviceSoftwareInstallations.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(current =>
+                    current.TenantId == tenantId
+                    && current.DeviceAssetId == deviceAssetId
+                    && current.SoftwareAssetId == softwareAssetId,
+                    ct
+                );
+
+            var openEpisode = await _dbContext
+                .DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(current =>
+                    current.TenantId == tenantId
+                    && current.DeviceAssetId == deviceAssetId
+                    && current.SoftwareAssetId == softwareAssetId
+                    && current.RemovedAt == null,
+                    ct
+                );
+
+            if (installation is null)
+            {
+                installation = DeviceSoftwareInstallation.Create(
+                    tenantId,
+                    deviceAssetId,
+                    softwareAssetId,
+                    link.ObservedAt
+                );
+                await _dbContext.DeviceSoftwareInstallations.AddAsync(installation, ct);
+            }
+            else
+            {
+                installation.Touch(link.ObservedAt);
+            }
+
+            if (openEpisode is null)
+            {
+                var latestEpisode = await _dbContext
+                    .DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters()
+                    .Where(current =>
+                        current.TenantId == tenantId
+                        && current.DeviceAssetId == deviceAssetId
+                        && current.SoftwareAssetId == softwareAssetId
+                    )
+                    .OrderByDescending(current => current.EpisodeNumber)
+                    .FirstOrDefaultAsync(ct);
+
+                openEpisode = DeviceSoftwareInstallationEpisode.Create(
+                    tenantId,
+                    deviceAssetId,
+                    softwareAssetId,
+                    (latestEpisode?.EpisodeNumber ?? 0) + 1,
+                    link.ObservedAt
+                );
+                await _dbContext.DeviceSoftwareInstallationEpisodes.AddAsync(openEpisode, ct);
+            }
+            else
+            {
+                openEpisode.Seen(link.ObservedAt);
+            }
+        }
+
+        var seenKeys = links
+            .Select(link => $"{link.DeviceExternalId}:{link.SoftwareExternalId}")
+            .ToHashSet(StringComparer.Ordinal);
+
+        var currentInstallations = await _dbContext
+            .DeviceSoftwareInstallations.IgnoreQueryFilters()
+            .Where(current => current.TenantId == tenantId)
+            .ToListAsync(ct);
+
+        if (currentInstallations.Count == 0)
+        {
+            return;
+        }
+
+        var externalIdsByAssetId = assetIdsByExternalId.ToDictionary(pair => pair.Value, pair => pair.Key);
+
+        foreach (var installation in currentInstallations)
+        {
+            if (
+                !externalIdsByAssetId.TryGetValue(installation.DeviceAssetId, out var deviceExternalId)
+                || !externalIdsByAssetId.TryGetValue(installation.SoftwareAssetId, out var softwareExternalId)
+            )
+            {
+                continue;
+            }
+
+            if (seenKeys.Contains($"{deviceExternalId}:{softwareExternalId}"))
+            {
+                continue;
+            }
+
+            installation.MarkMissing();
+            if (installation.MissingSyncCount < 2)
+            {
+                continue;
+            }
+
+            var openEpisode = await _dbContext
+                .DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(current =>
+                    current.TenantId == tenantId
+                    && current.DeviceAssetId == installation.DeviceAssetId
+                    && current.SoftwareAssetId == installation.SoftwareAssetId
+                    && current.RemovedAt == null,
+                    ct
+                );
+
+            openEpisode?.MarkMissing();
+            if (openEpisode is not null && openEpisode.MissingSyncCount >= 2)
+            {
+                openEpisode.Remove(DateTimeOffset.UtcNow);
+            }
+
+            _dbContext.DeviceSoftwareInstallations.Remove(installation);
+        }
     }
 }

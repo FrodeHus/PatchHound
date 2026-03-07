@@ -7,7 +7,8 @@ public record AssetDto(
     string AssetType,
     string Criticality,
     string OwnerType,
-    int VulnerabilityCount
+    int VulnerabilityCount,
+    int RecurringVulnerabilityCount
 );
 
 public record AssetDetailDto(
@@ -30,7 +31,8 @@ public record AssetDetailDto(
     string? DeviceLastIpAddress,
     string? DeviceAadDeviceId,
     string Metadata,
-    IReadOnlyList<AssetVulnerabilityDto> Vulnerabilities
+    IReadOnlyList<AssetVulnerabilityDto> Vulnerabilities,
+    IReadOnlyList<AssetSoftwareInstallationDto> SoftwareInventory
 );
 
 public record AssetVulnerabilityDto(
@@ -40,7 +42,34 @@ public record AssetVulnerabilityDto(
     string VendorSeverity,
     string Status,
     DateTimeOffset DetectedDate,
-    DateTimeOffset? ResolvedDate
+    DateTimeOffset? ResolvedDate,
+    int EpisodeCount,
+    IReadOnlyList<AssetVulnerabilityEpisodeDto> Episodes,
+    IReadOnlyList<string> PossibleCorrelatedSoftware
+);
+
+public record AssetVulnerabilityEpisodeDto(
+    int EpisodeNumber,
+    string Status,
+    DateTimeOffset FirstSeenAt,
+    DateTimeOffset LastSeenAt,
+    DateTimeOffset? ResolvedAt
+);
+
+public record AssetSoftwareInstallationDto(
+    Guid SoftwareAssetId,
+    string Name,
+    string ExternalId,
+    DateTimeOffset LastSeenAt,
+    int EpisodeCount,
+    IReadOnlyList<AssetSoftwareInstallationEpisodeDto> Episodes
+);
+
+public record AssetSoftwareInstallationEpisodeDto(
+    int EpisodeNumber,
+    DateTimeOffset FirstSeenAt,
+    DateTimeOffset LastSeenAt,
+    DateTimeOffset? RemovedAt
 );
 
 public record AssetFilterQuery(
