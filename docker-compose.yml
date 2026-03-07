@@ -49,6 +49,12 @@ services:
     depends_on:
       - postgres
       - openbao
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/system/status >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
     # No ports — internal only, accessed by frontend via Docker network
 
   worker:
@@ -80,7 +86,8 @@ services:
       ENTRA_SCOPES: ${ENTRA_SCOPES}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "3000:3000"
 

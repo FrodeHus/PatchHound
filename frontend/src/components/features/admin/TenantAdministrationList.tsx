@@ -1,8 +1,11 @@
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, Building2, KeyRound } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowRight, BadgeCheck, Building2, KeyRound, ShieldCheck } from 'lucide-react'
 import type { TenantListItem } from '@/api/settings.schemas'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -15,9 +18,21 @@ import {
 type TenantAdministrationListProps = {
   tenants: TenantListItem[]
   totalCount: number
+  isCreating: boolean
+  createError: string | null
+  onCreate: (payload: { name: string; entraTenantId: string }) => Promise<unknown>
 }
 
-export function TenantAdministrationList({ tenants, totalCount }: TenantAdministrationListProps) {
+export function TenantAdministrationList({
+  tenants,
+  totalCount,
+  isCreating,
+  createError,
+  onCreate,
+}: TenantAdministrationListProps) {
+  const [name, setName] = useState('')
+  const [entraTenantId, setEntraTenantId] = useState('')
+
   return (
     <section className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
@@ -58,6 +73,97 @@ export function TenantAdministrationList({ tenants, totalCount }: TenantAdminist
           </Card>
         </div>
       </div>
+
+      <Card className="rounded-[28px] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_9%,transparent),transparent_48%),var(--color-card)]">
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2">
+              <Badge variant="outline" className="w-fit rounded-full border-primary/20 bg-primary/10 text-primary">
+                Add New Tenant
+              </Badge>
+              <CardTitle className="text-2xl font-semibold tracking-[-0.04em]">
+                Register a tenant, seed the defaults, then finish the connection in sources.
+              </CardTitle>
+              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                You only need the tenant display name and the Microsoft Entra tenant ID. PatchHound will create the
+                tenant record, default SLA policy, and a disabled Microsoft Defender source template automatically.
+              </p>
+            </div>
+            <div className="grid min-w-[16rem] gap-2 text-sm text-muted-foreground">
+              <GuideItem
+                icon={BadgeCheck}
+                label="Required now"
+                text="Tenant name and Entra tenant ID."
+              />
+              <GuideItem
+                icon={ShieldCheck}
+                label="Finish after create"
+                text="Open Sources to add Defender app credentials and enable sync."
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.8fr)]">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Tenant Name</span>
+              <Input
+                placeholder="Contoso Production"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Entra Tenant ID</span>
+              <Input
+                placeholder="00000000-0000-0000-0000-000000000000"
+                value={entraTenantId}
+                onChange={(event) => setEntraTenantId(event.target.value)}
+              />
+            </label>
+            <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
+              <Button
+                disabled={isCreating || name.trim().length === 0 || entraTenantId.trim().length === 0}
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      await onCreate({
+                        name: name.trim(),
+                        entraTenantId: entraTenantId.trim(),
+                      })
+                      setName('')
+                      setEntraTenantId('')
+                    } catch {
+                      // Mutation state already captures the error.
+                    }
+                  })()
+                }}
+              >
+                {isCreating ? 'Creating tenant...' : 'Add tenant'}
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                After creation you will land on the tenant detail page to review SLA defaults and inventory state.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-border/70 bg-background/35 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">What gets created</p>
+            <div className="mt-4 space-y-2">
+              <SetupRow label="Tenant record" value="Registered immediately" />
+              <SetupRow label="Default SLA policy" value="Critical 7d, High 30d, Medium 90d, Low 180d" />
+              <SetupRow label="Tenant source template" value="Microsoft Defender, disabled until credentials are added" />
+            </div>
+            {createError ? (
+              <p className="mt-4 text-sm text-destructive">{createError}</p>
+            ) : (
+              <p className="mt-4 text-sm text-muted-foreground">
+                Use a distinct Entra tenant ID. Duplicate names or tenant IDs are rejected.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="rounded-[28px] border-border/70 bg-card/82">
         <CardHeader>
@@ -112,5 +218,36 @@ export function TenantAdministrationList({ tenants, totalCount }: TenantAdminist
         </CardContent>
       </Card>
     </section>
+  )
+}
+
+function SetupRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-3 py-3">
+      <span className="text-sm font-medium text-foreground">{label}</span>
+      <span className="max-w-[16rem] text-right text-xs text-muted-foreground">{value}</span>
+    </div>
+  )
+}
+
+function GuideItem({
+  icon: Icon,
+  label,
+  text,
+}: {
+  icon: typeof BadgeCheck
+  label: string
+  text: string
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-border/60 bg-background/30 px-3 py-3">
+      <span className="mt-0.5 flex size-8 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+        <Icon className="size-4" />
+      </span>
+      <div>
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+        <p className="mt-1 text-sm text-foreground">{text}</p>
+      </div>
+    </div>
   )
 }
