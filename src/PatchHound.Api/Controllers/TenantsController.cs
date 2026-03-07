@@ -6,6 +6,7 @@ using PatchHound.Api.Models;
 using PatchHound.Api.Models.Admin;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
@@ -21,16 +22,19 @@ public class TenantsController : ControllerBase
     private readonly PatchHoundDbContext _dbContext;
     private readonly ISecretStore _secretStore;
     private readonly AuditLogWriter _auditLogWriter;
+    private readonly ITenantContext _tenantContext;
 
     public TenantsController(
         PatchHoundDbContext dbContext,
         ISecretStore secretStore,
-        AuditLogWriter auditLogWriter
+        AuditLogWriter auditLogWriter,
+        ITenantContext tenantContext
     )
     {
         _dbContext = dbContext;
         _secretStore = secretStore;
         _auditLogWriter = auditLogWriter;
+        _tenantContext = tenantContext;
     }
 
     [HttpGet]
@@ -78,6 +82,9 @@ public class TenantsController : ControllerBase
     [Authorize(Policy = Policies.ConfigureTenant)]
     public async Task<ActionResult<TenantDetailDto>> Get(Guid id, CancellationToken ct)
     {
+        if (!_tenantContext.HasAccessToTenant(id))
+            return Forbid();
+
         var tenant = await _dbContext.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tenant is null)
             return NotFound();
@@ -141,6 +148,9 @@ public class TenantsController : ControllerBase
         CancellationToken ct
     )
     {
+        if (!_tenantContext.HasAccessToTenant(id))
+            return Forbid();
+
         var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tenant is null)
             return NotFound();
@@ -271,6 +281,9 @@ public class TenantsController : ControllerBase
     [Authorize(Policy = Policies.ConfigureTenant)]
     public async Task<IActionResult> TriggerSync(Guid id, string sourceKey, CancellationToken ct)
     {
+        if (!_tenantContext.HasAccessToTenant(id))
+            return Forbid();
+
         var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
         var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tenant is null)

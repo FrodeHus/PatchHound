@@ -111,6 +111,9 @@ public class UsersController : ControllerBase
     {
         foreach (var assignment in request.Roles)
         {
+            if (!_tenantContext.HasAccessToTenant(assignment.TenantId))
+                return Forbid();
+
             if (!Enum.TryParse<RoleName>(assignment.Role, out var role))
                 return BadRequest(
                     new ProblemDetails { Title = $"Invalid role: {assignment.Role}" }

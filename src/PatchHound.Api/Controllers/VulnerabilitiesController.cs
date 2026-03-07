@@ -519,6 +519,9 @@ public class VulnerabilitiesController : ControllerBase
         if (vulnerability is null)
             return NotFound(new ProblemDetails { Title = "Vulnerability not found" });
 
+        if (!_tenantContext.HasAccessToTenant(vulnerability.TenantId))
+            return Forbid();
+
         var assetIds = vulnerability.AffectedAssets.Select(a => a.AssetId).ToList();
         var affectedAssets = await _dbContext
             .Assets.AsNoTracking()

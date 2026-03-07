@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
@@ -34,6 +35,10 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
     private async Task RunIngestionCycleAsync(CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>() as WorkerTenantContext;
+        if (tenantContext is not null)
+            await tenantContext.InitializeAsync(ct);
+
         var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
         var ingestionService = scope.ServiceProvider.GetRequiredService<IngestionService>();
         var secretStore = scope.ServiceProvider.GetRequiredService<ISecretStore>();

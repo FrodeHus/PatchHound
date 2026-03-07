@@ -6,6 +6,7 @@ using PatchHound.Api.Models;
 using PatchHound.Api.Models.SecurityProfiles;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
 
@@ -18,14 +19,17 @@ public class SecurityProfilesController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly VulnerabilityAssessmentService _assessmentService;
+    private readonly ITenantContext _tenantContext;
 
     public SecurityProfilesController(
         PatchHoundDbContext dbContext,
-        VulnerabilityAssessmentService assessmentService
+        VulnerabilityAssessmentService assessmentService,
+        ITenantContext tenantContext
     )
     {
         _dbContext = dbContext;
         _assessmentService = assessmentService;
+        _tenantContext = tenantContext;
     }
 
     [HttpGet]
@@ -39,6 +43,8 @@ public class SecurityProfilesController : ControllerBase
         var query = _dbContext.AssetSecurityProfiles.AsNoTracking().AsQueryable();
         if (tenantId.HasValue)
         {
+            if (!_tenantContext.HasAccessToTenant(tenantId.Value))
+                return Forbid();
             query = query.Where(profile => profile.TenantId == tenantId.Value);
         }
 
@@ -71,6 +77,9 @@ public class SecurityProfilesController : ControllerBase
         CancellationToken ct
     )
     {
+        if (!_tenantContext.HasAccessToTenant(request.TenantId))
+            return Forbid();
+
         if (!TryParseRequest(request, out var parsed, out var error))
         {
             return BadRequest(new ProblemDetails { Title = error });

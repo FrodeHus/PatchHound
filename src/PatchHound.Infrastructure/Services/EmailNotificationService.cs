@@ -58,7 +58,7 @@ public class EmailNotificationService : INotificationService
         CancellationToken ct = default
     )
     {
-        var members = await _dbContext.TeamMembers.Where(tm => tm.TeamId == teamId).ToListAsync(ct);
+        var members = await _dbContext.TeamMembers.IgnoreQueryFilters().Where(tm => tm.TeamId == teamId).ToListAsync(ct);
 
         foreach (var member in members)
         {

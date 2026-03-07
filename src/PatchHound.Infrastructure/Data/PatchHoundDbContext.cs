@@ -34,8 +34,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<VulnerabilityAssetAssessment> VulnerabilityAssetAssessments => Set<VulnerabilityAssetAssessment>();
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
     public DbSet<RemediationTask> RemediationTasks => Set<RemediationTask>();
-    public DbSet<Campaign> Campaigns => Set<Campaign>();
-    public DbSet<CampaignVulnerability> CampaignVulnerabilities => Set<CampaignVulnerability>();
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<RiskAcceptance> RiskAcceptances => Set<RiskAcceptance>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
@@ -96,9 +94,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<RemediationTask>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<Campaign>()
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Comment>()

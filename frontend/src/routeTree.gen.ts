@@ -20,7 +20,6 @@ import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as AuthedVulnerabilitiesIndexRouteImport } from './routes/_authed/vulnerabilities/index'
 import { Route as AuthedTasksIndexRouteImport } from './routes/_authed/tasks/index'
 import { Route as AuthedSettingsIndexRouteImport } from './routes/_authed/settings/index'
-import { Route as AuthedCampaignsIndexRouteImport } from './routes/_authed/campaigns/index'
 import { Route as AuthedAuditLogIndexRouteImport } from './routes/_authed/audit-log/index'
 import { Route as AuthedAssetsIdRouteImport } from './routes/_authed/assets/$id'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
@@ -29,7 +28,6 @@ import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/ind
 import { Route as AuthedAdminSourcesRouteImport } from './routes/_authed/admin/sources'
 import { Route as AuthedAdminSecurityProfilesRouteImport } from './routes/_authed/admin/security-profiles'
 import { Route as AuthedVulnerabilitiesIdRouteImport } from './routes/_authed/vulnerabilities/$id'
-import { Route as AuthedCampaignsIdRouteImport } from './routes/_authed/campaigns/$id'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
 import { Route as AuthedAdminTeamsRouteImport } from './routes/_authed/admin/teams'
 import { Route as AuthedAdminTenantsIndexRouteImport } from './routes/_authed/admin/tenants/index'
@@ -90,11 +88,6 @@ const AuthedSettingsIndexRoute = AuthedSettingsIndexRouteImport.update({
   path: '/settings/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedCampaignsIndexRoute = AuthedCampaignsIndexRouteImport.update({
-  id: '/campaigns/',
-  path: '/campaigns/',
-  getParentRoute: () => AuthedRoute,
-} as any)
 const AuthedAuditLogIndexRoute = AuthedAuditLogIndexRouteImport.update({
   id: '/audit-log/',
   path: '/audit-log/',
@@ -136,11 +129,6 @@ const AuthedVulnerabilitiesIdRoute = AuthedVulnerabilitiesIdRouteImport.update({
   path: '/vulnerabilities/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedCampaignsIdRoute = AuthedCampaignsIdRouteImport.update({
-  id: '/campaigns/$id',
-  path: '/campaigns/$id',
-  getParentRoute: () => AuthedRoute,
-} as any)
 const AuthedAdminUsersRoute = AuthedAdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
@@ -175,13 +163,11 @@ export interface FileRoutesByFullPath {
   '/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
   '/admin/teams': typeof AuthedAdminTeamsRoute
   '/admin/users': typeof AuthedAdminUsersRoute
-  '/campaigns/$id': typeof AuthedCampaignsIdRoute
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/api/internal/events': typeof ApiInternalEventsRoute
   '/assets/$id': typeof AuthedAssetsIdRoute
   '/assets/': typeof AuthedAssetsIndexRoute
   '/audit-log/': typeof AuthedAuditLogIndexRoute
-  '/campaigns/': typeof AuthedCampaignsIndexRoute
   '/settings/': typeof AuthedSettingsIndexRoute
   '/tasks/': typeof AuthedTasksIndexRoute
   '/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
@@ -201,13 +187,11 @@ export interface FileRoutesByTo {
   '/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
   '/admin/teams': typeof AuthedAdminTeamsRoute
   '/admin/users': typeof AuthedAdminUsersRoute
-  '/campaigns/$id': typeof AuthedCampaignsIdRoute
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/api/internal/events': typeof ApiInternalEventsRoute
   '/assets/$id': typeof AuthedAssetsIdRoute
   '/assets': typeof AuthedAssetsIndexRoute
   '/audit-log': typeof AuthedAuditLogIndexRoute
-  '/campaigns': typeof AuthedCampaignsIndexRoute
   '/settings': typeof AuthedSettingsIndexRoute
   '/tasks': typeof AuthedTasksIndexRoute
   '/vulnerabilities': typeof AuthedVulnerabilitiesIndexRoute
@@ -229,13 +213,11 @@ export interface FileRoutesById {
   '/setup/': typeof SetupIndexRoute
   '/_authed/admin/teams': typeof AuthedAdminTeamsRoute
   '/_authed/admin/users': typeof AuthedAdminUsersRoute
-  '/_authed/campaigns/$id': typeof AuthedCampaignsIdRoute
   '/_authed/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/api/internal/events': typeof ApiInternalEventsRoute
   '/_authed/assets/$id': typeof AuthedAssetsIdRoute
   '/_authed/assets/': typeof AuthedAssetsIndexRoute
   '/_authed/audit-log/': typeof AuthedAuditLogIndexRoute
-  '/_authed/campaigns/': typeof AuthedCampaignsIndexRoute
   '/_authed/settings/': typeof AuthedSettingsIndexRoute
   '/_authed/tasks/': typeof AuthedTasksIndexRoute
   '/_authed/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
@@ -257,13 +239,11 @@ export interface FileRouteTypes {
     | '/admin/security-profiles'
     | '/admin/teams'
     | '/admin/users'
-    | '/campaigns/$id'
     | '/vulnerabilities/$id'
     | '/api/internal/events'
     | '/assets/$id'
     | '/assets/'
     | '/audit-log/'
-    | '/campaigns/'
     | '/settings/'
     | '/tasks/'
     | '/vulnerabilities/'
@@ -283,13 +263,11 @@ export interface FileRouteTypes {
     | '/admin/security-profiles'
     | '/admin/teams'
     | '/admin/users'
-    | '/campaigns/$id'
     | '/vulnerabilities/$id'
     | '/api/internal/events'
     | '/assets/$id'
     | '/assets'
     | '/audit-log'
-    | '/campaigns'
     | '/settings'
     | '/tasks'
     | '/vulnerabilities'
@@ -310,13 +288,11 @@ export interface FileRouteTypes {
     | '/setup/'
     | '/_authed/admin/teams'
     | '/_authed/admin/users'
-    | '/_authed/campaigns/$id'
     | '/_authed/vulnerabilities/$id'
     | '/api/internal/events'
     | '/_authed/assets/$id'
     | '/_authed/assets/'
     | '/_authed/audit-log/'
-    | '/_authed/campaigns/'
     | '/_authed/settings/'
     | '/_authed/tasks/'
     | '/_authed/vulnerabilities/'
@@ -414,13 +390,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSettingsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/campaigns/': {
-      id: '/_authed/campaigns/'
-      path: '/campaigns'
-      fullPath: '/campaigns/'
-      preLoaderRoute: typeof AuthedCampaignsIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/audit-log/': {
       id: '/_authed/audit-log/'
       path: '/audit-log'
@@ -477,13 +446,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedVulnerabilitiesIdRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/campaigns/$id': {
-      id: '/_authed/campaigns/$id'
-      path: '/campaigns/$id'
-      fullPath: '/campaigns/$id'
-      preLoaderRoute: typeof AuthedCampaignsIdRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/admin/users': {
       id: '/_authed/admin/users'
       path: '/admin/users'
@@ -522,12 +484,10 @@ interface AuthedRouteChildren {
   AuthedAdminSecurityProfilesRoute: typeof AuthedAdminSecurityProfilesRoute
   AuthedAdminTeamsRoute: typeof AuthedAdminTeamsRoute
   AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
-  AuthedCampaignsIdRoute: typeof AuthedCampaignsIdRoute
   AuthedVulnerabilitiesIdRoute: typeof AuthedVulnerabilitiesIdRoute
   AuthedAssetsIdRoute: typeof AuthedAssetsIdRoute
   AuthedAssetsIndexRoute: typeof AuthedAssetsIndexRoute
   AuthedAuditLogIndexRoute: typeof AuthedAuditLogIndexRoute
-  AuthedCampaignsIndexRoute: typeof AuthedCampaignsIndexRoute
   AuthedSettingsIndexRoute: typeof AuthedSettingsIndexRoute
   AuthedTasksIndexRoute: typeof AuthedTasksIndexRoute
   AuthedVulnerabilitiesIndexRoute: typeof AuthedVulnerabilitiesIndexRoute
@@ -542,12 +502,10 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminSecurityProfilesRoute: AuthedAdminSecurityProfilesRoute,
   AuthedAdminTeamsRoute: AuthedAdminTeamsRoute,
   AuthedAdminUsersRoute: AuthedAdminUsersRoute,
-  AuthedCampaignsIdRoute: AuthedCampaignsIdRoute,
   AuthedVulnerabilitiesIdRoute: AuthedVulnerabilitiesIdRoute,
   AuthedAssetsIdRoute: AuthedAssetsIdRoute,
   AuthedAssetsIndexRoute: AuthedAssetsIndexRoute,
   AuthedAuditLogIndexRoute: AuthedAuditLogIndexRoute,
-  AuthedCampaignsIndexRoute: AuthedCampaignsIndexRoute,
   AuthedSettingsIndexRoute: AuthedSettingsIndexRoute,
   AuthedTasksIndexRoute: AuthedTasksIndexRoute,
   AuthedVulnerabilitiesIndexRoute: AuthedVulnerabilitiesIndexRoute,

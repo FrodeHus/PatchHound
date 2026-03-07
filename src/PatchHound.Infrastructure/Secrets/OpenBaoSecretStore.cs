@@ -109,11 +109,12 @@ public class OpenBaoSecretStore : ISecretStore
 
             if (!response.IsSuccessStatusCode)
             {
-                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                _logger.LogError(
+                    "OpenBao unseal request failed. StatusCode: {StatusCode}.",
+                    (int)response.StatusCode
+                );
                 throw new SecretStoreUnavailableException(
-                    string.IsNullOrWhiteSpace(responseBody)
-                        ? $"OpenBao returned {(int)response.StatusCode} {response.ReasonPhrase}."
-                        : responseBody,
+                    $"OpenBao unseal returned {(int)response.StatusCode} {response.ReasonPhrase}.",
                     response.StatusCode
                 );
             }

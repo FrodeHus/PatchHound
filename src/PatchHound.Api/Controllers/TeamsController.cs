@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Admin;
+using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 
@@ -16,11 +17,13 @@ public class TeamsController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly TeamService _teamService;
+    private readonly ITenantContext _tenantContext;
 
-    public TeamsController(PatchHoundDbContext dbContext, TeamService teamService)
+    public TeamsController(PatchHoundDbContext dbContext, TeamService teamService, ITenantContext tenantContext)
     {
         _dbContext = dbContext;
         _teamService = teamService;
+        _tenantContext = tenantContext;
     }
 
     [HttpGet]
@@ -34,7 +37,11 @@ public class TeamsController : ControllerBase
         var query = _dbContext.Teams.AsNoTracking().AsQueryable();
 
         if (tenantId.HasValue)
+        {
+            if (!_tenantContext.HasAccessToTenant(tenantId.Value))
+                return Forbid();
             query = query.Where(t => t.TenantId == tenantId.Value);
+        }
 
         var totalCount = await query.CountAsync(ct);
 
@@ -104,6 +111,9 @@ public class TeamsController : ControllerBase
         CancellationToken ct
     )
     {
+        if (!_tenantContext.HasAccessToTenant(request.TenantId))
+            return Forbid();
+
         var result = await _teamService.CreateTeamAsync(request.TenantId, request.Name, ct);
 
         if (!result.IsSuccess)

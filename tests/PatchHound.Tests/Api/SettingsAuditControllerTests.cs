@@ -29,6 +29,8 @@ public class SettingsAuditControllerTests : IDisposable
         _tenantContext.CurrentTenantId.Returns(_tenantId);
         _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { _tenantId });
         _tenantContext.CurrentUserId.Returns(_userId);
+        _tenantContext.HasAccessToTenant(Arg.Any<Guid>()).Returns(callInfo =>
+            new List<Guid> { _tenantId }.Contains(callInfo.Arg<Guid>()));
 
         var interceptor = new AuditSaveChangesInterceptor(_tenantContext);
         var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
@@ -48,6 +50,7 @@ public class SettingsAuditControllerTests : IDisposable
         var tenant = Tenant.Create("Tenant One", "entra-1");
         _tenantContext.CurrentTenantId.Returns(tenant.Id);
         _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
+        _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
         var source = TenantSourceConfiguration.Create(
             tenant.Id,
             "microsoft-defender",
@@ -67,7 +70,8 @@ public class SettingsAuditControllerTests : IDisposable
         var controller = new TenantsController(
             _dbContext,
             _secretStore,
-            new AuditLogWriter(_dbContext, _tenantContext)
+            new AuditLogWriter(_dbContext, _tenantContext),
+            _tenantContext
         );
 
         var action = await controller.Update(

@@ -37,7 +37,6 @@ public static class DependencyInjection
         services.AddScoped<IVulnerabilityRepository, VulnerabilityRepository>();
         services.AddScoped<IAssetRepository, AssetRepository>();
         services.AddScoped<IRemediationTaskRepository, RemediationTaskRepository>();
-        services.AddScoped<ICampaignRepository, CampaignRepository>();
         services.AddScoped<IRiskAcceptanceRepository, RiskAcceptanceRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
@@ -52,7 +51,6 @@ public static class DependencyInjection
         services.AddScoped<VulnerabilityService>();
         services.AddScoped<RemediationTaskService>();
         services.AddScoped<AssetService>();
-        services.AddScoped<CampaignService>();
         services.AddScoped<RiskAcceptanceService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<UserService>();

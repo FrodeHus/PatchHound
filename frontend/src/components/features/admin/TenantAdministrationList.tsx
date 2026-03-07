@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
-import { ArrowRight, BadgeCheck, Building2, KeyRound, ShieldCheck } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Building2, DatabaseZap, KeyRound, ShieldCheck } from 'lucide-react'
 import type { TenantListItem } from '@/api/settings.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -50,7 +50,7 @@ export function TenantAdministrationList({
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
           <Card className="rounded-[28px] border-border/70 bg-card/80">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -68,6 +68,17 @@ export function TenantAdministrationList({
               </div>
               <CardTitle className="text-3xl font-semibold tracking-[-0.04em]">
                 {tenants.reduce((sum, tenant) => sum + tenant.configuredIngestionSourceCount, 0)}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card className="rounded-[28px] border-border/70 bg-card/80">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Ready To Connect</p>
+                <DatabaseZap className="size-4 text-primary" />
+              </div>
+              <CardTitle className="text-3xl font-semibold tracking-[-0.04em]">
+                {tenants.filter((tenant) => tenant.configuredIngestionSourceCount === 0).length}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -169,52 +180,46 @@ export function TenantAdministrationList({
         <CardHeader>
           <div className="flex items-end justify-between gap-3">
             <div>
-              <CardTitle>Configured Tenants</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">Select a tenant to review source credentials and sync cadence.</p>
+              <CardTitle>Tenant Directory</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Select a tenant to review identity, SLA, inventory footprint, and source readiness.
+              </p>
             </div>
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{totalCount} total</p>
           </div>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tenant</TableHead>
-                <TableHead>Entra Tenant ID</TableHead>
-                <TableHead>Configured Sources</TableHead>
-                <TableHead className="text-right">Open</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tenants.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
-                    No tenants found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                tenants.map((tenant) => (
-                  <TableRow key={tenant.id}>
-                    <TableCell className="font-medium">{tenant.name}</TableCell>
-                    <TableCell>
-                      <code className="rounded bg-muted px-2 py-1 text-xs">{tenant.entraTenantId}</code>
-                    </TableCell>
-                    <TableCell>{tenant.configuredIngestionSourceCount}</TableCell>
-                    <TableCell className="text-right">
-                      <Link
-                        to="/admin/tenants/$id"
-                        params={{ id: tenant.id }}
-                        className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-                      >
-                        View detail
-                        <ArrowRight className="size-4" />
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {tenants.length === 0 ? (
+            <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-6 text-sm text-muted-foreground">
+              No tenants found.
+            </div>
+          ) : (
+            tenants.map((tenant) => (
+              <Link
+                key={tenant.id}
+                to="/admin/tenants/$id"
+                params={{ id: tenant.id }}
+                className="group rounded-[24px] border border-border/70 bg-background/30 p-4 transition hover:border-primary/20 hover:bg-background/45"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-semibold tracking-tight">{tenant.name}</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">Entra Tenant</p>
+                  </div>
+                  <ArrowRight className="size-4 text-muted-foreground transition group-hover:text-primary" />
+                </div>
+                <code className="mt-3 block rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-xs text-muted-foreground">
+                  {tenant.entraTenantId}
+                </code>
+                <div className="mt-4 flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2">
+                  <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Configured Sources</span>
+                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/70 text-foreground">
+                    {tenant.configuredIngestionSourceCount}
+                  </Badge>
+                </div>
+              </Link>
+            ))
+          )}
         </CardContent>
       </Card>
     </section>

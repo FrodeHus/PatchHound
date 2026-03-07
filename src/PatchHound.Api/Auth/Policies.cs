@@ -9,7 +9,6 @@ public static class Policies
     public const string UpdateTaskStatus = nameof(UpdateTaskStatus);
     public const string RequestRiskAcceptance = nameof(RequestRiskAcceptance);
     public const string ApproveRiskAcceptance = nameof(ApproveRiskAcceptance);
-    public const string ManageCampaigns = nameof(ManageCampaigns);
     public const string ViewAuditLogs = nameof(ViewAuditLogs);
     public const string ManageUsers = nameof(ManageUsers);
     public const string ConfigureTenant = nameof(ConfigureTenant);
