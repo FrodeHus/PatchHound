@@ -43,6 +43,18 @@ export const assignAssetOwner = createServerFn({ method: 'POST' })
     await apiPut(`/assets/${assetId}/owner`, context.token, { ownerType, ownerId })
   })
 
+export const assignAssetSecurityProfile = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      assetId: z.string(),
+      securityProfileId: z.string().nullable(),
+    }),
+  )
+  .handler(async ({ context, data: { assetId, securityProfileId } }) => {
+    await apiPut(`/assets/${assetId}/security-profile`, context.token, { securityProfileId })
+  })
+
 export const setAssetCriticality = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ assetId: z.string(), criticality: z.string() }))

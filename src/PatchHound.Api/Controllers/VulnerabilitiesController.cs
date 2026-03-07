@@ -205,6 +205,20 @@ public class VulnerabilitiesController : ControllerBase
             .Assets.AsNoTracking()
             .Where(a => assetIds.Contains(a.Id))
             .ToDictionaryAsync(a => a.Id, ct);
+        var securityProfileIds = assets.Values
+            .Where(asset => asset.SecurityProfileId.HasValue)
+            .Select(asset => asset.SecurityProfileId!.Value)
+            .Distinct()
+            .ToList();
+        var securityProfileNamesById = await _dbContext
+            .AssetSecurityProfiles.AsNoTracking()
+            .Where(profile => securityProfileIds.Contains(profile.Id))
+            .ToDictionaryAsync(profile => profile.Id, profile => profile.Name, ct);
+
+        var assessmentsByAssetId = await _dbContext
+            .VulnerabilityAssetAssessments.AsNoTracking()
+            .Where(assessment => assessment.VulnerabilityId == id)
+            .ToDictionaryAsync(assessment => assessment.AssetId, ct);
 
         var episodeRows = await _dbContext
             .VulnerabilityAssetEpisodes.AsNoTracking()
@@ -268,28 +282,38 @@ public class VulnerabilitiesController : ControllerBase
             vulnerability.PublishedDate,
             tenantHistory,
             vulnerability
-                .AffectedAssets.Select(va => new AffectedAssetDto(
-                    va.AssetId,
-                    assets.TryGetValue(va.AssetId, out var asset) ? asset.Name : "Unknown",
-                    assets.TryGetValue(va.AssetId, out var a2)
-                        ? a2.AssetType.ToString()
-                        : "Unknown",
-                    va.Status.ToString(),
-                    va.DetectedDate,
-                    va.ResolvedDate,
-                    episodesByAssetId.TryGetValue(va.AssetId, out var episodes) ? episodes.Count : 0,
-                    episodesByAssetId.TryGetValue(va.AssetId, out var episodeHistory)
-                        ? episodeHistory
-                        : [],
-                    GetPossibleCorrelatedSoftware(
-                        softwareEpisodeRows
-                            .Where(row => row.DeviceAssetId == va.AssetId)
-                            .ToList(),
-                        episodesByAssetId.TryGetValue(va.AssetId, out var history)
-                            ? history
-                            : []
-                    )
-                ))
+                .AffectedAssets.Select(va =>
+                {
+                    assets.TryGetValue(va.AssetId, out var asset);
+                    assessmentsByAssetId.TryGetValue(va.AssetId, out var assessment);
+                    episodesByAssetId.TryGetValue(va.AssetId, out var episodeHistory);
+
+                    return new AffectedAssetDto(
+                        va.AssetId,
+                        asset?.Name ?? "Unknown",
+                        asset?.AssetType.ToString() ?? "Unknown",
+                        asset?.SecurityProfileId is Guid profileId
+                            && securityProfileNamesById.TryGetValue(profileId, out var profileName)
+                            ? profileName
+                            : null,
+                        va.Status.ToString(),
+                        vulnerability.VendorSeverity.ToString(),
+                        assessment?.BaseScore ?? vulnerability.CvssScore,
+                        assessment?.EffectiveSeverity.ToString() ?? vulnerability.VendorSeverity.ToString(),
+                        assessment?.EffectiveScore ?? vulnerability.CvssScore,
+                        assessment?.ReasonSummary,
+                        va.DetectedDate,
+                        va.ResolvedDate,
+                        episodeHistory?.Count ?? 0,
+                        episodeHistory ?? [],
+                        GetPossibleCorrelatedSoftware(
+                            softwareEpisodeRows
+                                .Where(row => row.DeviceAssetId == va.AssetId)
+                                .ToList(),
+                            episodeHistory ?? []
+                        )
+                    );
+                })
                 .ToList(),
             orgSeverity is null
                 ? null

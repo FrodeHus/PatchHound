@@ -4,9 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Assets;
+using PatchHound.Api.Models.SecurityProfiles;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Api.Controllers;
 
@@ -25,11 +27,17 @@ public class AssetsController : ControllerBase
 
     private readonly PatchHoundDbContext _dbContext;
     private readonly AssetService _assetService;
+    private readonly VulnerabilityAssessmentService _assessmentService;
 
-    public AssetsController(PatchHoundDbContext dbContext, AssetService assetService)
+    public AssetsController(
+        PatchHoundDbContext dbContext,
+        AssetService assetService,
+        VulnerabilityAssessmentService assessmentService
+    )
     {
         _dbContext = dbContext;
         _assetService = assetService;
+        _assessmentService = assessmentService;
     }
 
     [HttpGet]
@@ -106,6 +114,10 @@ public class AssetsController : ControllerBase
                 AssetType = a.AssetType.ToString(),
                 Criticality = a.Criticality.ToString(),
                 OwnerType = a.OwnerType.ToString(),
+                SecurityProfileName = _dbContext
+                    .AssetSecurityProfiles.Where(profile => profile.Id == a.SecurityProfileId)
+                    .Select(profile => profile.Name)
+                    .FirstOrDefault(),
                 VulnerabilityCount = _dbContext.VulnerabilityAssets.Count(va => va.AssetId == a.Id),
             })
             .ToListAsync(ct);
@@ -118,6 +130,7 @@ public class AssetsController : ControllerBase
                 a.AssetType,
                 a.Criticality,
                 a.OwnerType,
+                a.SecurityProfileName,
                 a.VulnerabilityCount,
                 recurringCountsByAssetId.TryGetValue(a.Id, out var recurringCount) ? recurringCount : 0
             ))
@@ -133,6 +146,22 @@ public class AssetsController : ControllerBase
         var asset = await _dbContext.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, ct);
         if (asset is null)
             return NotFound();
+
+        var securityProfile = asset.SecurityProfileId is Guid securityProfileId
+            ? await _dbContext
+                .AssetSecurityProfiles.AsNoTracking()
+                .Where(profile => profile.Id == securityProfileId)
+                .Select(profile => new AssetSecurityProfileSummaryDto(
+                    profile.Id,
+                    profile.Name,
+                    profile.EnvironmentClass.ToString(),
+                    profile.InternetReachability.ToString(),
+                    profile.ConfidentialityRequirement.ToString(),
+                    profile.IntegrityRequirement.ToString(),
+                    profile.AvailabilityRequirement.ToString()
+                ))
+                .FirstOrDefaultAsync(ct)
+            : null;
 
         var episodeRows = await _dbContext
             .VulnerabilityAssetEpisodes.AsNoTracking()
@@ -212,6 +241,11 @@ public class AssetsController : ControllerBase
 
         var softwareNamesByAssetId = softwareRows.ToDictionary(row => row.Id, row => row.Name);
 
+        var assessmentsByVulnerabilityId = await _dbContext
+            .VulnerabilityAssetAssessments.AsNoTracking()
+            .Where(assessment => assessment.AssetId == id)
+            .ToDictionaryAsync(assessment => assessment.VulnerabilityId, ct);
+
         var possibleCorrelationsByVulnerabilityId = episodeRows
             .GroupBy(row => row.VulnerabilityId)
             .ToDictionary(
@@ -252,22 +286,29 @@ public class AssetsController : ControllerBase
             .ToListAsync(ct);
 
         var vulnerabilities = vulnerabilityRows
-            .Select(row => new AssetVulnerabilityDto(
-                row.Id,
-                row.ExternalId,
-                row.Title,
-                row.VendorSeverity,
-                row.Status,
-                row.DetectedDate,
-                row.ResolvedDate,
-                episodesByVulnerabilityId.TryGetValue(row.Id, out var episodes) ? episodes.Count : 0,
-                episodesByVulnerabilityId.TryGetValue(row.Id, out var episodeHistory)
-                    ? episodeHistory
-                    : [],
-                possibleCorrelationsByVulnerabilityId.TryGetValue(row.Id, out var correlatedSoftware)
-                    ? correlatedSoftware
-                    : []
-            ))
+            .Select(row =>
+            {
+                assessmentsByVulnerabilityId.TryGetValue(row.Id, out var assessment);
+                episodesByVulnerabilityId.TryGetValue(row.Id, out var episodeHistory);
+                possibleCorrelationsByVulnerabilityId.TryGetValue(row.Id, out var correlatedSoftware);
+
+                return new AssetVulnerabilityDto(
+                    row.Id,
+                    row.ExternalId,
+                    row.Title,
+                    row.VendorSeverity,
+                    assessment?.BaseScore,
+                    assessment?.EffectiveSeverity.ToString() ?? row.VendorSeverity,
+                    assessment?.EffectiveScore,
+                    assessment?.ReasonSummary,
+                    row.Status,
+                    row.DetectedDate,
+                    row.ResolvedDate,
+                    episodeHistory?.Count ?? 0,
+                    episodeHistory ?? [],
+                    correlatedSoftware ?? []
+                );
+            })
             .ToList();
 
         var softwareInventory = softwareRows
@@ -295,6 +336,7 @@ public class AssetsController : ControllerBase
                 asset.OwnerUserId,
                 asset.OwnerTeamId,
                 asset.FallbackTeamId,
+                securityProfile,
                 asset.DeviceComputerDnsName,
                 asset.DeviceHealthStatus,
                 asset.DeviceOsPlatform,
@@ -330,6 +372,39 @@ public class AssetsController : ControllerBase
 
         if (!result.IsSuccess)
             return NotFound(new ProblemDetails { Title = result.Error });
+
+        return NoContent();
+    }
+
+    [HttpPut("{id:guid}/security-profile")]
+    [Authorize(Policy = Policies.ModifyVulnerabilities)]
+    public async Task<IActionResult> AssignSecurityProfile(
+        Guid id,
+        [FromBody] AssignAssetSecurityProfileRequest request,
+        CancellationToken ct
+    )
+    {
+        if (request.SecurityProfileId.HasValue)
+        {
+            var exists = await _dbContext
+                .AssetSecurityProfiles.AsNoTracking()
+                .AnyAsync(profile => profile.Id == request.SecurityProfileId.Value, ct);
+            if (!exists)
+            {
+                return BadRequest(new ProblemDetails { Title = "Security profile not found" });
+            }
+        }
+
+        var result = await _assetService.AssignSecurityProfileAsync(
+            id,
+            request.SecurityProfileId,
+            ct
+        );
+        if (!result.IsSuccess)
+            return NotFound(new ProblemDetails { Title = result.Error });
+
+        await _assessmentService.RecalculateForAssetAsync(id, ct);
+        await _dbContext.SaveChangesAsync(ct);
 
         return NoContent();
     }

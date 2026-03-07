@@ -15,6 +15,7 @@ public class Asset
     public Guid? OwnerUserId { get; private set; }
     public Guid? OwnerTeamId { get; private set; }
     public Guid? FallbackTeamId { get; private set; }
+    public Guid? SecurityProfileId { get; private set; }
     public string? DeviceComputerDnsName { get; private set; }
     public string? DeviceHealthStatus { get; private set; }
     public string? DeviceOsPlatform { get; private set; }
@@ -66,6 +67,11 @@ public class Asset
     public void SetCriticality(Criticality criticality)
     {
         Criticality = criticality;
+    }
+
+    public void AssignSecurityProfile(Guid? securityProfileId)
+    {
+        SecurityProfileId = securityProfileId;
     }
 
     public void UpdateDetails(string name, string? description = null)
