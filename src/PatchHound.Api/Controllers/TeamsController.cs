@@ -42,7 +42,13 @@ public class TeamsController : ControllerBase
             .OrderBy(t => t.Name)
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
-            .Select(t => new TeamDto(t.Id, t.TenantId, t.Name, t.Members.Count))
+            .Select(t => new TeamDto(
+                t.Id,
+                t.TenantId,
+                _dbContext.Tenants.Where(tenant => tenant.Id == t.TenantId).Select(tenant => tenant.Name).FirstOrDefault() ?? "Unknown tenant",
+                t.Name,
+                t.Members.Count
+            ))
             .ToListAsync(ct);
 
         return Ok(new PagedResponse<TeamDto>(items, totalCount));
@@ -65,12 +71,22 @@ public class TeamsController : ControllerBase
             .Users.AsNoTracking()
             .Where(u => userIds.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, ct);
+        var tenantName = await _dbContext
+            .Tenants.AsNoTracking()
+            .Where(tenant => tenant.Id == team.TenantId)
+            .Select(tenant => tenant.Name)
+            .FirstOrDefaultAsync(ct);
+        var assignedAssetCount = await _dbContext
+            .Assets.AsNoTracking()
+            .CountAsync(asset => asset.OwnerTeamId == team.Id, ct);
 
         return Ok(
             new TeamDetailDto(
                 team.Id,
                 team.TenantId,
+                tenantName ?? "Unknown tenant",
                 team.Name,
+                assignedAssetCount,
                 team.Members.Select(m => new TeamMemberDto(
                         m.UserId,
                         users.TryGetValue(m.UserId, out var u) ? u.DisplayName : "Unknown",
@@ -97,7 +113,7 @@ public class TeamsController : ControllerBase
         return CreatedAtAction(
             nameof(Get),
             new { id = team.Id },
-            new TeamDto(team.Id, team.TenantId, team.Name, 0)
+            new TeamDto(team.Id, team.TenantId, string.Empty, team.Name, 0)
         );
     }
 

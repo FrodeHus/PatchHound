@@ -41,8 +41,11 @@ public record AssetVulnerabilityDto(
     Guid VulnerabilityId,
     string ExternalId,
     string Title,
+    string Description,
     string VendorSeverity,
     decimal? VendorScore,
+    string? CvssVector,
+    DateTimeOffset? PublishedDate,
     string EffectiveSeverity,
     decimal? EffectiveScore,
     string? AssessmentReasonSummary,
@@ -90,6 +93,7 @@ public record AssetSecurityProfileSummaryDto(
 
 public record AssetFilterQuery(
     string? AssetType = null,
+    string? Criticality = null,
     string? OwnerType = null,
     Guid? OwnerId = null,
     Guid? TenantId = null,

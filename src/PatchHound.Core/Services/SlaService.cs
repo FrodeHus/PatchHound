@@ -1,4 +1,4 @@
-using System.Text.Json;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 
 namespace PatchHound.Core.Services;
@@ -19,32 +19,25 @@ public class SlaService
     public DateTimeOffset CalculateDueDate(
         Severity severity,
         DateTimeOffset createdAt,
-        string? tenantSettings = null
+        TenantSlaConfiguration? tenantSla = null
     )
     {
-        var days = GetSlaDays(severity, tenantSettings);
+        var days = GetSlaDays(severity, tenantSla);
         return createdAt.AddDays(days);
     }
 
-    public int GetSlaDays(Severity severity, string? tenantSettings = null)
+    public int GetSlaDays(Severity severity, TenantSlaConfiguration? tenantSla = null)
     {
-        if (!string.IsNullOrWhiteSpace(tenantSettings))
+        if (tenantSla is not null)
         {
-            try
+            return severity switch
             {
-                var settings = JsonSerializer.Deserialize<TenantSlaSettings>(tenantSettings);
-                if (
-                    settings?.SlaDays is not null
-                    && settings.SlaDays.TryGetValue(severity, out var overrideDays)
-                )
-                {
-                    return overrideDays;
-                }
-            }
-            catch (JsonException)
-            {
-                // Fall through to defaults if JSON is invalid
-            }
+                Severity.Critical => tenantSla.CriticalDays,
+                Severity.High => tenantSla.HighDays,
+                Severity.Medium => tenantSla.MediumDays,
+                Severity.Low => tenantSla.LowDays,
+                _ => DefaultSlaDays[Severity.Medium],
+            };
         }
 
         return DefaultSlaDays.TryGetValue(severity, out var defaultDays) ? defaultDays : 90;
@@ -79,9 +72,4 @@ public enum SlaStatus
     OnTrack,
     NearDue,
     Overdue,
-}
-
-internal class TenantSlaSettings
-{
-    public Dictionary<Severity, int>? SlaDays { get; set; }
 }

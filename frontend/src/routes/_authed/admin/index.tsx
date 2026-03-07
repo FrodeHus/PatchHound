@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Building2, ChevronRight, Settings2, ShieldCheck, ShieldEllipsis, Users } from 'lucide-react'
+import { Building2, ChevronRight, DatabaseZap, Settings2, ShieldCheck, ShieldEllipsis, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({
@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_authed/admin/')({
 type AdminArea = {
   title: string
   description: string
-  to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/security-profiles'
+  to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/sources' | '/admin/security-profiles'
   roles: Array<'GlobalAdmin' | 'SecurityManager'>
   icon: typeof Users
 }
@@ -31,10 +31,17 @@ const adminAreas: AdminArea[] = [
   },
   {
     title: 'Tenants',
-    description: 'Inspect tenant identity, ingestion configuration, manual sync, and inventory footprint.',
+    description: 'Inspect tenant identity and inventory footprint without source-management noise.',
     to: '/admin/tenants',
     roles: ['GlobalAdmin', 'SecurityManager'],
     icon: Building2,
+  },
+  {
+    title: 'Sources',
+    description: 'Configure tenant data sources and enrichment providers such as Microsoft Defender and NVD API.',
+    to: '/admin/sources',
+    roles: ['GlobalAdmin', 'SecurityManager'],
+    icon: DatabaseZap,
   },
   {
     title: 'Security Profiles',

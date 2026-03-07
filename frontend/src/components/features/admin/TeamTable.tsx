@@ -3,9 +3,11 @@ import type { TeamItem } from '@/api/teams.schemas'
 type TeamTableProps = {
   teams: TeamItem[]
   totalCount: number
+  selectedTeamId: string | null
+  onSelectTeam: (teamId: string) => void
 }
 
-export function TeamTable({ teams, totalCount }: TeamTableProps) {
+export function TeamTable({ teams, totalCount, selectedTeamId, onSelectTeam }: TeamTableProps) {
   return (
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="mb-3 flex items-end justify-between">
@@ -17,7 +19,7 @@ export function TeamTable({ teams, totalCount }: TeamTableProps) {
           <thead>
             <tr className="border-b border-border text-left text-muted-foreground">
               <th className="py-2 pr-2">Name</th>
-              <th className="py-2 pr-2">Tenant ID</th>
+              <th className="py-2 pr-2">Tenant</th>
               <th className="py-2 pr-2">Members</th>
             </tr>
           </thead>
@@ -27,8 +29,16 @@ export function TeamTable({ teams, totalCount }: TeamTableProps) {
             ) : (
               teams.map((team) => (
                 <tr key={team.id} className="border-b border-border/60">
-                  <td className="py-2 pr-2 font-medium">{team.name}</td>
-                  <td className="py-2 pr-2"><code>{team.tenantId}</code></td>
+                  <td className="py-2 pr-2 font-medium">
+                    <button
+                      type="button"
+                      className={selectedTeamId === team.id ? 'text-primary underline-offset-4 hover:underline' : 'hover:underline underline-offset-4'}
+                      onClick={() => onSelectTeam(team.id)}
+                    >
+                      {team.name}
+                    </button>
+                  </td>
+                  <td className="py-2 pr-2">{team.tenantName}</td>
                   <td className="py-2 pr-2">{team.memberCount}</td>
                 </tr>
               ))

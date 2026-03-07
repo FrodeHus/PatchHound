@@ -17,9 +17,7 @@ const steps = ['Welcome', 'Tenant', 'Defender', 'SLA', 'Admin', 'Review'] as con
 
 export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWizardProps) {
   const [stepIndex, setStepIndex] = useState(0)
-  const payload: SetupPayload = {
-    tenantSettings: '{}',
-  }
+  const payload: SetupPayload = {}
 
   return (
     <section className="mx-auto max-w-3xl space-y-4 py-6">
@@ -35,7 +33,7 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
       {stepIndex === 2 ? <DefenderConnectionStep /> : null}
       {stepIndex === 3 ? <SlaConfigStep /> : null}
       {stepIndex === 4 ? <AdminUserStep setupContext={setupContext} /> : null}
-      {stepIndex === 5 ? <ReviewStep setupContext={setupContext} payload={payload} /> : null}
+      {stepIndex === 5 ? <ReviewStep setupContext={setupContext} /> : null}
 
       <footer className="flex items-center justify-between">
         <button

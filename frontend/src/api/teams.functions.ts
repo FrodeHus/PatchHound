@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost } from '@/server/api'
-import { pagedTeamsSchema } from './teams.schemas'
+import { pagedTeamsSchema, teamDetailSchema } from './teams.schemas'
 import { buildFilterParams } from './utils'
 import { z } from 'zod'
 
@@ -25,4 +25,12 @@ export const createTeam = createServerFn({ method: 'POST' })
   .inputValidator(z.object({ name: z.string(), tenantId: z.string() }))
   .handler(async ({ context, data: payload }) => {
     await apiPost('/teams', context.token, payload)
+  })
+
+export const fetchTeamDetail = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ teamId: z.string() }))
+  .handler(async ({ context, data: { teamId } }) => {
+    const data = await apiGet(`/teams/${teamId}`, context.token)
+    return teamDetailSchema.parse(data)
   })

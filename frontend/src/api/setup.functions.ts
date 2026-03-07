@@ -42,7 +42,7 @@ export const fetchSetupContext = createServerFn({ method: 'GET' })
 export const completeSetup = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(setupPayloadSchema)
-  .handler(async ({ context, data: payload }) => {
+  .handler(async ({ context }) => {
     const status = await apiGet('/setup/status', '')
     const { isInitialized } = setupStatusSchema.parse(status)
     if (isInitialized) {
@@ -52,6 +52,5 @@ export const completeSetup = createServerFn({ method: 'POST' })
     const setupContext = await fetchSetupContext()
     await apiPost('/setup/complete', context.token, {
       tenantName: setupContext.tenantName,
-      tenantSettings: payload.tenantSettings,
     })
   })

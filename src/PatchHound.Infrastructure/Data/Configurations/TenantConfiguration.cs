@@ -14,6 +14,5 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 
         builder.Property(t => t.Name).HasMaxLength(256).IsRequired();
         builder.Property(t => t.EntraTenantId).HasMaxLength(256).IsRequired();
-        builder.Property(t => t.Settings).HasColumnType("text");
     }
 }

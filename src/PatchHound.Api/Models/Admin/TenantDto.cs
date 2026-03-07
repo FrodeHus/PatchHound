@@ -27,6 +27,8 @@ public record TenantIngestionSourceDto(
     string DisplayName,
     bool Enabled,
     string SyncSchedule,
+    bool SupportsScheduling,
+    bool SupportsManualSync,
     TenantSourceCredentialsDto Credentials,
     TenantIngestionRuntimeDto Runtime
 );
@@ -34,7 +36,7 @@ public record TenantIngestionSourceDto(
 public record TenantSourceCredentialsDto(
     string TenantId,
     string ClientId,
-    bool HasClientSecret,
+    bool HasSecret,
     string ApiBaseUrl,
     string TokenScope
 );
@@ -61,9 +63,7 @@ public record UpdateTenantIngestionSourceRequest(
 public record UpdateTenantSourceCredentialsRequest(
     string TenantId,
     string ClientId,
-    string ClientSecret,
+    string Secret,
     string ApiBaseUrl,
     string TokenScope
 );
-
-public record UpdateTenantSettingsRequest(string Settings);

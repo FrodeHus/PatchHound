@@ -43,7 +43,13 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             new EnvironmentalSeverityCalculator()
         );
-        _service = new IngestionService(_dbContext, new[] { _source }, assessmentService, logger);
+        _service = new IngestionService(
+            _dbContext,
+            new[] { _source },
+            [],
+            assessmentService,
+            logger
+        );
     }
 
     [Fact]

@@ -10,16 +10,22 @@ public class SetupService : ISetupService
 {
     private readonly ITenantRepository _tenantRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IRepository<TenantSourceConfiguration> _tenantSourceRepository;
+    private readonly IRepository<TenantSlaConfiguration> _tenantSlaRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public SetupService(
         ITenantRepository tenantRepository,
         IUserRepository userRepository,
+        IRepository<TenantSourceConfiguration> tenantSourceRepository,
+        IRepository<TenantSlaConfiguration> tenantSlaRepository,
         IUnitOfWork unitOfWork
     )
     {
         _tenantRepository = tenantRepository;
         _userRepository = userRepository;
+        _tenantSourceRepository = tenantSourceRepository;
+        _tenantSlaRepository = tenantSlaRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -78,8 +84,7 @@ public class SetupService : ISetupService
 
         var tenant = Tenant.Create(
             request.TenantName.Trim(),
-            request.EntraTenantId.Trim(),
-            string.IsNullOrWhiteSpace(request.TenantSettings) ? "{}" : request.TenantSettings
+            request.EntraTenantId.Trim()
         );
 
         var user =
@@ -93,6 +98,12 @@ public class SetupService : ISetupService
         var role = UserTenantRole.Create(user.Id, tenant.Id, RoleName.GlobalAdmin);
 
         await _tenantRepository.AddAsync(tenant, ct);
+        foreach (var source in TenantSourceDefaults.CreateDefaults(tenant.Id))
+        {
+            await _tenantSourceRepository.AddAsync(source, ct);
+        }
+        await _tenantSlaRepository.AddAsync(TenantSlaConfiguration.CreateDefault(tenant.Id), ct);
+
         if (existingUser is null)
         {
             await _userRepository.AddAsync(user, ct);
@@ -102,5 +113,32 @@ public class SetupService : ISetupService
         await transaction.CommitAsync(ct);
 
         return Result<Tenant>.Success(tenant);
+    }
+}
+
+internal static class TenantSourceDefaults
+{
+    public static IReadOnlyList<TenantSourceConfiguration> CreateDefaults(Guid tenantId)
+    {
+        return
+        [
+            TenantSourceConfiguration.Create(
+                tenantId,
+                "microsoft-defender",
+                "Microsoft Defender",
+                false,
+                "0 */6 * * *",
+                apiBaseUrl: "https://api.securitycenter.microsoft.com",
+                tokenScope: "https://api.securitycenter.microsoft.com/.default"
+            ),
+            TenantSourceConfiguration.Create(
+                tenantId,
+                "nvd",
+                "NVD API",
+                false,
+                string.Empty,
+                apiBaseUrl: "https://services.nvd.nist.gov"
+            ),
+        ];
     }
 }

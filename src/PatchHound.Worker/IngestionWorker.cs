@@ -50,44 +50,52 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
             return;
         }
 
-        var tenants = await dbContext.Tenants.AsNoTracking().ToListAsync(ct);
+        var sources = await dbContext
+            .TenantSourceConfigurations.AsNoTracking()
+            .Where(source => source.Enabled)
+            .ToListAsync(ct);
+        var tenants = await dbContext.Tenants.AsNoTracking().ToDictionaryAsync(tenant => tenant.Id, ct);
+        var now = DateTimeOffset.UtcNow;
 
-        foreach (var tenant in tenants)
+        foreach (var source in sources.Where(source =>
+            IsManualSyncQueued(source) || IngestionScheduleEvaluator.IsDue(source, now)))
         {
-            var sources = TenantSourceSettings.ReadSources(tenant.Settings);
-            var now = DateTimeOffset.UtcNow;
-
-            foreach (var source in sources.Where(source =>
-                IsManualSyncQueued(source) || IngestionScheduleEvaluator.IsDue(source, now)))
+            if (!tenants.TryGetValue(source.TenantId, out var tenant))
             {
-                var isManualSync = IsManualSyncQueued(source);
-                logger.LogInformation(
-                    "Running {TriggerType} ingestion for tenant {TenantId} ({TenantName}) and source {SourceKey}",
-                    isManualSync ? "manual" : "scheduled",
-                    tenant.Id,
-                    tenant.Name,
-                    source.Key
-                );
-
-                await ingestionService.RunIngestionAsync(tenant.Id, source.Key, ct);
+                continue;
             }
+
+            var isManualSync = IsManualSyncQueued(source);
+            logger.LogInformation(
+                "Running {TriggerType} ingestion for tenant {TenantId} ({TenantName}) and source {SourceKey}",
+                isManualSync ? "manual" : "scheduled",
+                tenant.Id,
+                tenant.Name,
+                source.SourceKey
+            );
+
+            await ingestionService.RunIngestionAsync(tenant.Id, source.SourceKey, ct);
         }
     }
 
-    private static bool IsManualSyncQueued(PersistedIngestionSource source)
+    private static bool IsManualSyncQueued(PatchHound.Core.Entities.TenantSourceConfiguration source)
     {
-        if (!source.Enabled || !TenantSourceSettings.HasConfiguredCredentials(source.Credentials))
+        if (
+            !source.Enabled
+            || !TenantSourceCatalog.SupportsManualSync(source)
+            || !TenantSourceCatalog.HasConfiguredCredentials(source)
+        )
         {
             return false;
         }
 
-        var manualRequestedAt = source.Runtime?.ManualRequestedAt?.ToUniversalTime();
+        var manualRequestedAt = source.ManualRequestedAt?.ToUniversalTime();
         if (!manualRequestedAt.HasValue)
         {
             return false;
         }
 
-        var lastStartedAt = source.Runtime?.LastStartedAt?.ToUniversalTime();
+        var lastStartedAt = source.LastStartedAt?.ToUniversalTime();
         return !lastStartedAt.HasValue || manualRequestedAt > lastStartedAt;
     }
 }

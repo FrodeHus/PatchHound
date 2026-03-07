@@ -12,9 +12,7 @@ export const setupContextSchema = z.object({
   adminEntraObjectId: z.string().min(1),
 })
 
-export const setupPayloadSchema = z.object({
-  tenantSettings: z.string(),
-})
+export const setupPayloadSchema = z.object({})
 
 export type SetupStatus = z.infer<typeof setupStatusSchema>
 export type SetupContext = z.infer<typeof setupContextSchema>

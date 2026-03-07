@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
-import { apiGet, apiPut } from '@/server/api'
+import { apiGet, apiPost, apiPut } from '@/server/api'
 import { assetDetailSchema, pagedAssetsSchema } from './assets.schemas'
 import { buildFilterParams } from './utils'
 import { z } from 'zod'
@@ -10,7 +10,9 @@ export const fetchAssets = createServerFn({ method: 'GET' })
   .inputValidator(
     z.object({
       assetType: z.string().optional(),
+      criticality: z.string().optional(),
       ownerType: z.string().optional(),
+      tenantId: z.string().optional(),
       search: z.string().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
@@ -60,4 +62,15 @@ export const setAssetCriticality = createServerFn({ method: 'POST' })
   .inputValidator(z.object({ assetId: z.string(), criticality: z.string() }))
   .handler(async ({ context, data: { assetId, criticality } }) => {
     await apiPut(`/assets/${assetId}/criticality`, context.token, { criticality })
+  })
+
+export const bulkAssignAssets = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({
+    assetIds: z.array(z.string()),
+    ownerType: z.enum(['User', 'Team']),
+    ownerId: z.string(),
+  }))
+  .handler(async ({ context, data }) => {
+    await apiPost('/assets/bulk-assign', context.token, data)
   })

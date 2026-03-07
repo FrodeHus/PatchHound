@@ -40,6 +40,8 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITeamRepository, TeamRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IRepository<TenantSourceConfiguration>, RepositoryBase<TenantSourceConfiguration>>();
+        services.AddScoped<IRepository<TenantSlaConfiguration>, RepositoryBase<TenantSlaConfiguration>>();
         services.AddScoped<IRepository<OrganizationalSeverity>, RepositoryBase<OrganizationalSeverity>>();
 
         // Application services
@@ -55,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<EnvironmentalSeverityCalculator>();
         services.AddScoped<VulnerabilityAssessmentService>();
+        services.AddScoped<IVulnerabilityEnricher, NvdVulnerabilityEnricher>();
 
         // Notifications & Email
         services.AddScoped<INotificationService, EmailNotificationService>();
@@ -69,8 +72,10 @@ public static class DependencyInjection
         // Vulnerability Sources
         services.AddScoped<IVulnerabilitySource, DefenderVulnerabilitySource>();
         services.AddHttpClient<DefenderApiClient>();
+        services.AddHttpClient<NvdApiClient>();
         services.AddHttpClient<ISecretStore, OpenBaoSecretStore>();
         services.AddScoped<DefenderTenantConfigurationProvider>();
+        services.AddScoped<NvdTenantConfigurationProvider>();
         services.Configure<OpenBaoOptions>(configuration.GetSection(OpenBaoOptions.SectionName));
 
         // Ingestion
