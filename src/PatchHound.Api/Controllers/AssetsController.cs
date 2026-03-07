@@ -15,6 +15,14 @@ namespace PatchHound.Api.Controllers;
 [Authorize]
 public class AssetsController : ControllerBase
 {
+    private sealed record SoftwareCorrelationRow(
+        Guid SoftwareAssetId,
+        int EpisodeNumber,
+        DateTimeOffset FirstSeenAt,
+        DateTimeOffset LastSeenAt,
+        DateTimeOffset? RemovedAt
+    );
+
     private readonly PatchHoundDbContext _dbContext;
     private readonly AssetService _assetService;
 
@@ -162,14 +170,13 @@ public class AssetsController : ControllerBase
             .Where(episode => episode.DeviceAssetId == id)
             .OrderBy(episode => episode.SoftwareAssetId)
             .ThenBy(episode => episode.EpisodeNumber)
-            .Select(episode => new
-            {
+            .Select(episode => new SoftwareCorrelationRow(
                 episode.SoftwareAssetId,
                 episode.EpisodeNumber,
                 episode.FirstSeenAt,
                 episode.LastSeenAt,
-                episode.RemovedAt,
-            })
+                episode.RemovedAt
+            ))
             .ToListAsync(ct);
 
         var softwareEpisodesByAssetId = softwareEpisodeRows
@@ -209,24 +216,19 @@ public class AssetsController : ControllerBase
             .GroupBy(row => row.VulnerabilityId)
             .ToDictionary(
                 group => group.Key,
-                group =>
-                    softwareEpisodeRows
-                        .Where(softwareEpisode =>
-                            group.Any(vulnerabilityEpisode =>
-                                softwareEpisode.FirstSeenAt <= vulnerabilityEpisode.FirstSeenAt
-                                && (softwareEpisode.RemovedAt is null
-                                    || softwareEpisode.RemovedAt >= vulnerabilityEpisode.FirstSeenAt)
-                            )
-                        )
-                        .Select(softwareEpisode =>
-                            softwareNamesByAssetId.TryGetValue(softwareEpisode.SoftwareAssetId, out var name)
-                                ? name
-                                : null
-                        )
-                        .Where(name => !string.IsNullOrWhiteSpace(name))
-                        .Cast<string>()
-                        .Distinct(StringComparer.Ordinal)
-                        .ToList() as IReadOnlyList<string>
+                group => RankPossibleCorrelatedSoftware(
+                    softwareEpisodeRows,
+                    softwareNamesByAssetId,
+                    group
+                        .Select(row => new AssetVulnerabilityEpisodeDto(
+                            row.EpisodeNumber,
+                            row.Status.ToString(),
+                            row.FirstSeenAt,
+                            row.LastSeenAt,
+                            row.ResolvedAt
+                        ))
+                        .ToList()
+                )
             );
 
         var vulnerabilityRows = await _dbContext
@@ -370,5 +372,73 @@ public class AssetsController : ControllerBase
             return BadRequest(new ProblemDetails { Title = result.Error });
 
         return Ok(new BulkAssignResponse(result.Value));
+    }
+
+    private static IReadOnlyList<string> RankPossibleCorrelatedSoftware(
+        IReadOnlyList<SoftwareCorrelationRow> softwareRows,
+        IReadOnlyDictionary<Guid, string> softwareNamesByAssetId,
+        IReadOnlyList<AssetVulnerabilityEpisodeDto> vulnerabilityEpisodes
+    )
+    {
+        return softwareRows
+            .Select(softwareRow =>
+            {
+                if (!softwareNamesByAssetId.TryGetValue(softwareRow.SoftwareAssetId, out var name))
+                {
+                    return null;
+                }
+
+                var matchingEpisode = vulnerabilityEpisodes
+                    .Where(episode =>
+                        softwareRow.FirstSeenAt <= episode.FirstSeenAt
+                        && (softwareRow.RemovedAt is null
+                            || softwareRow.RemovedAt >= episode.FirstSeenAt)
+                    )
+                    .Select(episode =>
+                    {
+                        var age = episode.FirstSeenAt - softwareRow.FirstSeenAt;
+                        var score = 0;
+
+                        if (softwareRow.EpisodeNumber > 1)
+                        {
+                            score += 200;
+                        }
+
+                        if (episode.EpisodeNumber > 1)
+                        {
+                            score += 100;
+                        }
+
+                        score += age.TotalDays switch
+                        {
+                            <= 1 => 80,
+                            <= 7 => 50,
+                            <= 30 => 20,
+                            _ => 0,
+                        };
+
+                        return new
+                        {
+                            Name = name,
+                            Score = score,
+                            Age = age,
+                        };
+                    })
+                    .OrderByDescending(item => item.Score)
+                    .ThenBy(item => item.Age)
+                    .FirstOrDefault();
+
+                return matchingEpisode;
+            })
+            .Where(item => item is not null)
+            .GroupBy(item => item!.Name, StringComparer.Ordinal)
+            .Select(group => group
+                .OrderByDescending(item => item!.Score)
+                .ThenBy(item => item!.Age)
+                .First())
+            .OrderByDescending(item => item!.Score)
+            .ThenBy(item => item!.Age)
+            .Select(item => item!.Name)
+            .ToList();
     }
 }
