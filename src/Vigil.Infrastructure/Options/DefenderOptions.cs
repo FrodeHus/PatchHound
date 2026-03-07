@@ -8,4 +8,5 @@ public class DefenderOptions
     public string ClientId { get; set; } = string.Empty;
     public string ClientSecret { get; set; } = string.Empty;
     public string ApiBaseUrl { get; set; } = "https://api.securitycenter.microsoft.com";
+    public string TokenScope { get; set; } = "https://api.securitycenter.microsoft.com/.default";
 }
