@@ -74,7 +74,7 @@ export function AssetManagementTable({
           }}
           placeholder="Owner GUID"
         />
-        <p className="self-center text-xs text-muted-foreground">Filter by type, then use row actions or open the inspector from the name or ID.</p>
+        <p className="self-center text-xs text-muted-foreground">Filter by type, then click the asset name to inspect details.</p>
       </div>
 
       <div className="overflow-x-auto">
@@ -109,30 +109,15 @@ export function AssetManagementTable({
                   <td className="py-2 pr-2 font-medium">
                     <button
                       type="button"
-                      className="flex text-left"
+                      className="font-medium text-left underline decoration-border underline-offset-4 transition hover:decoration-foreground"
                       onClick={() => {
                         onSelectAsset(asset.id)
                       }}
                     >
-                      <span className="flex flex-col">
-                        <span className="font-medium underline decoration-border underline-offset-4 transition hover:decoration-foreground">
-                          {asset.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">Open inspector</span>
-                      </span>
+                      {asset.name}
                     </button>
                   </td>
-                  <td className="py-2 pr-2">
-                    <button
-                      type="button"
-                      className="font-mono text-left text-xs underline decoration-border underline-offset-4 transition hover:decoration-foreground"
-                      onClick={() => {
-                        onSelectAsset(asset.id)
-                      }}
-                    >
-                      {asset.externalId}
-                    </button>
-                  </td>
+                  <td className="py-2 pr-2 font-mono text-xs">{asset.externalId}</td>
                   <td className="py-2 pr-2">{asset.assetType}</td>
                   <td className="py-2 pr-2">{asset.ownerType}</td>
                   <td className="py-2 pr-2">

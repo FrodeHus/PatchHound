@@ -22,11 +22,18 @@ export function ThemeSelector() {
   }, [])
 
   return (
-    <Select value={themeId} onValueChange={(nextThemeId) => {
-      setThemeId(nextThemeId)
-      window.localStorage.setItem(themeStorageKey, nextThemeId)
-      applyTheme(nextThemeId)
-    }}>
+    <Select
+      value={themeId}
+      onValueChange={(nextThemeId) => {
+        if (!nextThemeId) {
+          return
+        }
+
+        setThemeId(nextThemeId)
+        window.localStorage.setItem(themeStorageKey, nextThemeId)
+        applyTheme(nextThemeId)
+      }}
+    >
       <SelectTrigger className="h-10 w-full justify-between rounded-xl border-border/70 bg-background/55 px-3" aria-label="Select theme">
         <div className="flex items-center gap-2">
           <Palette className="size-4 text-muted-foreground" />

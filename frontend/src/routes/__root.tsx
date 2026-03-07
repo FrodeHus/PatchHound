@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '@/styles/app.css'
 import { getCurrentUser, type CurrentUser } from '@/server/auth.functions'
 import { defaultThemeId, themeStorageKey, themeOptions } from '@/lib/themes'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 interface RouterContext {
   user: CurrentUser | null
@@ -54,7 +55,9 @@ function RootDocument() {
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased">
         <QueryClientProvider client={queryClient}>
-          <Outlet />
+          <TooltipProvider>
+            <Outlet />
+          </TooltipProvider>
         </QueryClientProvider>
         <Scripts />
       </body>
