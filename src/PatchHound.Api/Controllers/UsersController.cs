@@ -5,6 +5,7 @@ using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Admin;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 
@@ -17,11 +18,13 @@ public class UsersController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly UserService _userService;
+    private readonly ITenantContext _tenantContext;
 
-    public UsersController(PatchHoundDbContext dbContext, UserService userService)
+    public UsersController(PatchHoundDbContext dbContext, UserService userService, ITenantContext tenantContext)
     {
         _dbContext = dbContext;
         _userService = userService;
+        _tenantContext = tenantContext;
     }
 
     [HttpGet]
@@ -31,7 +34,11 @@ public class UsersController : ControllerBase
         CancellationToken ct
     )
     {
-        var query = _dbContext.Users.AsNoTracking();
+        var accessibleTenantIds = _tenantContext.AccessibleTenantIds;
+
+        // Only return users who share at least one tenant with the caller
+        var query = _dbContext.Users.AsNoTracking()
+            .Where(u => u.TenantRoles.Any(r => accessibleTenantIds.Contains(r.TenantId)));
 
         var totalCount = await query.CountAsync(ct);
 
@@ -47,6 +54,7 @@ public class UsersController : ControllerBase
             .Distinct()
             .ToList();
 
+        // Tenant query filter already scopes this to accessible tenants
         var tenantNames = await _dbContext
             .Tenants.AsNoTracking()
             .Where(t => tenantIds.Contains(t.Id))

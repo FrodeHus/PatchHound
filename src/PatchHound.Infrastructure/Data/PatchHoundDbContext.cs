@@ -80,5 +80,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         modelBuilder
             .Entity<Team>()
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<Tenant>()
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.Id));
     }
 }

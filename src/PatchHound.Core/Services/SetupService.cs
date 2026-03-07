@@ -25,8 +25,7 @@ public class SetupService : ISetupService
 
     public async Task<bool> IsInitializedAsync(CancellationToken ct)
     {
-        var tenants = await _tenantRepository.GetAllAsync(ct);
-        return tenants.Count > 0;
+        return await _tenantRepository.AnyExistUnfilteredAsync(ct);
     }
 
     public async Task<Result<Tenant>> CompleteSetupAsync(SetupRequest request, CancellationToken ct)
