@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
+import { fetchAuditLog } from '@/api/audit-log.functions'
 import { fetchTenantDetail, fetchTenants } from '@/api/settings.functions'
+import { RecentAuditPanel } from '@/components/features/audit/RecentAuditPanel'
 import { GlobalEnrichmentSourceManagement } from '@/components/features/admin/GlobalEnrichmentSourceManagement'
 import { TenantSourceManagement } from '@/components/features/admin/TenantSourceManagement'
 import { Badge } from '@/components/ui/badge'
@@ -38,6 +40,28 @@ function SourcesAdministrationPage() {
     mutationFn: async () => fetchEnrichmentSources(),
   })
   const canManageGlobalEnrichment = user.roles.includes('GlobalAdmin')
+  const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
+  const tenantAuditMutation = useMutation({
+    mutationFn: async (tenantId: string) =>
+      fetchAuditLog({
+        data: {
+          tenantId,
+          entityType: 'TenantSourceConfiguration',
+          page: 1,
+          pageSize: 5,
+        },
+      }),
+  })
+  const enrichmentAuditMutation = useMutation({
+    mutationFn: async () =>
+      fetchAuditLog({
+        data: {
+          entityType: 'EnrichmentSourceConfiguration',
+          page: 1,
+          pageSize: 5,
+        },
+      }),
+  })
 
   useEffect(() => {
     if (!selectedTenantId || initialTenant?.id === selectedTenantId) {
@@ -58,6 +82,26 @@ function SourcesAdministrationPage() {
 
     void enrichmentMutation.mutateAsync()
   }, [canManageGlobalEnrichment, enrichmentMutation])
+
+  useEffect(() => {
+    if (!canViewAudit || activeView !== 'tenant' || !selectedTenantId) {
+      return
+    }
+
+    void tenantAuditMutation.mutateAsync(selectedTenantId)
+  }, [activeView, canViewAudit, selectedTenantId])
+
+  useEffect(() => {
+    if (!canViewAudit || activeView !== 'global-enrichment' || enrichmentAuditMutation.isPending) {
+      return
+    }
+
+    if (enrichmentAuditMutation.data) {
+      return
+    }
+
+    void enrichmentAuditMutation.mutateAsync()
+  }, [activeView, canViewAudit, enrichmentAuditMutation])
 
   const tenant = tenantMutation.data ?? (initialTenant?.id === selectedTenantId ? initialTenant : null)
   const enrichmentSources = enrichmentMutation.data ?? []
@@ -159,15 +203,37 @@ function SourcesAdministrationPage() {
 
       {activeView === 'tenant' && tenant ? <TenantSourceManagement key={tenant.id} tenant={tenant} /> : null}
 
+      {activeView === 'tenant' && tenant && canViewAudit ? (
+        <RecentAuditPanel
+          title="Source Activity"
+          description="Recent ingestion source configuration changes for the selected tenant."
+          items={tenantAuditMutation.data?.items ?? []}
+          emptyMessage="No recent tenant source changes have been recorded for this tenant."
+        />
+      ) : null}
+
       {activeView === 'global-enrichment' && canManageGlobalEnrichment ? (
         enrichmentMutation.data ? (
-          <GlobalEnrichmentSourceManagement
-            key={enrichmentSources.map((source) => source.key).join(':')}
-            sources={enrichmentSources}
-            onSaved={async () => {
-              await enrichmentMutation.mutateAsync()
-            }}
-          />
+          <div className="space-y-6">
+            <GlobalEnrichmentSourceManagement
+              key={enrichmentSources.map((source) => source.key).join(':')}
+              sources={enrichmentSources}
+              onSaved={async () => {
+                await enrichmentMutation.mutateAsync()
+                if (canViewAudit) {
+                  await enrichmentAuditMutation.mutateAsync()
+                }
+              }}
+            />
+            {canViewAudit ? (
+              <RecentAuditPanel
+                title="Enrichment Activity"
+                description="Recent changes to shared enrichment providers such as NVD."
+                items={enrichmentAuditMutation.data?.items ?? []}
+                emptyMessage="No recent enrichment source changes have been recorded."
+              />
+            ) : null}
+          </div>
         ) : (
           <Card className="rounded-[28px] border-border/70 bg-card/82">
             <CardContent className="py-8 text-sm text-muted-foreground">

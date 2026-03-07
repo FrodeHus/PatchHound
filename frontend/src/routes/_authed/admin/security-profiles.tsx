@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { ShieldCheck, Signal, TriangleAlert } from 'lucide-react'
+import { fetchAuditLog } from '@/api/audit-log.functions'
 import { createSecurityProfile, fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { fetchTenants } from '@/api/settings.functions'
+import { RecentAuditPanel } from '@/components/features/audit/RecentAuditPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,6 +77,7 @@ export const Route = createFileRoute('/_authed/admin/security-profiles')({
 
 function SecurityProfilesPage() {
   const router = useRouter()
+  const { user } = Route.useRouteContext()
   const data = Route.useLoaderData()
   const [tenantId, setTenantId] = useState(data.tenants[0]?.id ?? '')
   const [name, setName] = useState('')
@@ -112,6 +115,23 @@ function SecurityProfilesPage() {
       await router.invalidate()
     },
   })
+  const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
+  const recentAuditMutation = useMutation({
+    mutationFn: async () =>
+      fetchAuditLog({
+        data: {
+          entityType: 'AssetSecurityProfile',
+          page: 1,
+          pageSize: 5,
+        },
+      }),
+  })
+
+  useEffect(() => {
+    if (canViewAudit && !recentAuditMutation.data && !recentAuditMutation.isPending) {
+      void recentAuditMutation.mutateAsync()
+    }
+  }, [canViewAudit, recentAuditMutation.data, recentAuditMutation.isPending, recentAuditMutation.mutateAsync])
 
   return (
     <section className="space-y-4 pb-4">
@@ -376,6 +396,15 @@ function SecurityProfilesPage() {
           )}
         </CardContent>
       </Card>
+
+      {canViewAudit ? (
+        <RecentAuditPanel
+          title="Profile Activity"
+          description="Recent profile changes are shown here so security teams can see when severity logic changed."
+          items={recentAuditMutation.data?.items ?? []}
+          emptyMessage="No recent security profile changes have been recorded."
+        />
+      ) : null}
     </section>
   )
 }

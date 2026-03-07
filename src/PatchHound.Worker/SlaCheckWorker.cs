@@ -35,6 +35,10 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
     private async Task CheckSlaStatusAsync(CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>() as WorkerTenantContext;
+        if (tenantContext is not null)
+            await tenantContext.InitializeAsync(ct);
+
         var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
         var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
         var slaService = scope.ServiceProvider.GetRequiredService<SlaService>();

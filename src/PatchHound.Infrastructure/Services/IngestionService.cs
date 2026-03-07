@@ -138,13 +138,13 @@ public class IngestionService
     )
     {
         var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, ct);
+        var tenant = await _dbContext.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == tenantId, ct);
         if (tenant is null)
         {
             return;
         }
 
-        var source = await _dbContext.TenantSourceConfigurations.FirstOrDefaultAsync(
+        var source = await _dbContext.TenantSourceConfigurations.IgnoreQueryFilters().FirstOrDefaultAsync(
             item => item.TenantId == tenantId
                 && item.SourceKey == normalizedSourceKey,
             ct

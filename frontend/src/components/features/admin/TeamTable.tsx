@@ -1,4 +1,6 @@
 import type { TeamItem } from '@/api/teams.schemas'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type TeamTableProps = {
   teams: TeamItem[]
@@ -9,43 +11,61 @@ type TeamTableProps = {
 
 export function TeamTable({ teams, totalCount, selectedTeamId, onSelectTeam }: TeamTableProps) {
   return (
-    <section className="rounded-lg border border-border bg-card p-4">
-      <div className="mb-3 flex items-end justify-between">
-        <h2 className="text-lg font-semibold">Assignment Groups</h2>
-        <p className="text-xs text-muted-foreground">{totalCount} total</p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-muted-foreground">
-              <th className="py-2 pr-2">Name</th>
-              <th className="py-2 pr-2">Tenant</th>
-              <th className="py-2 pr-2">Members</th>
-            </tr>
-          </thead>
-          <tbody>
-            {teams.length === 0 ? (
-              <tr><td colSpan={3} className="py-3 text-muted-foreground">No assignment groups found.</td></tr>
-            ) : (
-              teams.map((team) => (
-                <tr key={team.id} className="border-b border-border/60">
-                  <td className="py-2 pr-2 font-medium">
-                    <button
-                      type="button"
-                      className={selectedTeamId === team.id ? 'text-primary underline-offset-4 hover:underline' : 'hover:underline underline-offset-4'}
-                      onClick={() => onSelectTeam(team.id)}
-                    >
-                      {team.name}
-                    </button>
-                  </td>
-                  <td className="py-2 pr-2">{team.tenantName}</td>
-                  <td className="py-2 pr-2">{team.memberCount}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <Card className="rounded-[28px] border-border/70 bg-card/82">
+      <CardHeader>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <CardTitle>Assignment Group Directory</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pick an assignment group to open its asset-assignment workspace.
+            </p>
+          </div>
+          <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+            {totalCount} total
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {teams.length === 0 ? (
+          <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-6 text-sm text-muted-foreground">
+            No assignment groups found.
+          </div>
+        ) : (
+          teams.map((team) => {
+            const isSelected = selectedTeamId === team.id
+
+            return (
+              <button
+                key={team.id}
+                type="button"
+                onClick={() => onSelectTeam(team.id)}
+                className={[
+                  'rounded-[24px] border p-4 text-left transition',
+                  isSelected
+                    ? 'border-primary/30 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_68%),var(--color-card)]'
+                    : 'border-border/70 bg-background/30 hover:border-primary/20 hover:bg-background/45',
+                ].join(' ')}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-base font-semibold tracking-tight">{team.name}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{team.tenantName}</p>
+                  </div>
+                  {isSelected ? (
+                    <Badge className="rounded-full border border-primary/20 bg-primary/10 text-primary hover:bg-primary/10">
+                      Active
+                    </Badge>
+                  ) : null}
+                </div>
+                <div className="mt-4 flex items-center justify-between rounded-2xl border border-border/60 bg-card/40 px-3 py-2">
+                  <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Members</span>
+                  <span className="text-sm font-medium">{team.memberCount}</span>
+                </div>
+              </button>
+            )
+          })
+        )}
+      </CardContent>
+    </Card>
   )
 }

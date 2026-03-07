@@ -39,15 +39,27 @@ export function AssignmentGroupDetailView({
   const allVisibleSelected = assets.length > 0 && assets.every((asset) => selectedAssetIds.includes(asset.id))
 
   return (
-    <section className="grid gap-4 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1fr)]">
-      <Card className="rounded-[28px] border-border/70 bg-card/85">
-        <CardHeader>
-          <CardTitle>{team.name}</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {team.tenantName} • {team.assignedAssetCount} assets currently assigned
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <section className="space-y-4">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1fr)]">
+        <Card className="rounded-[28px] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_58%),var(--color-card)]">
+          <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-2xl font-semibold tracking-[-0.03em]">{team.name}</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {team.tenantName} ownership lane with {team.assignedAssetCount} assets currently assigned.
+                </p>
+              </div>
+              <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/10 text-primary">
+                {team.tenantName}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SummaryMetric label="Members" value={String(team.members.length)} />
+              <SummaryMetric label="Assigned Assets" value={String(team.assignedAssetCount)} />
+            </div>
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
               {team.members.length} members
@@ -72,15 +84,15 @@ export function AssignmentGroupDetailView({
             )}
           </div>
         </CardContent>
-      </Card>
+        </Card>
 
-      <Card className="rounded-[28px] border-border/70 bg-card/85">
-        <CardHeader className="space-y-4">
+        <Card className="rounded-[28px] border-border/70 bg-card/85">
+          <CardHeader className="space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <CardTitle>Assign Assets</CardTitle>
+              <CardTitle>Asset Assignment Workspace</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                Filter tenant assets, select a set, and bulk-assign them to this assignment group.
+                Filter tenant assets, narrow the candidate set, and assign ownership in bulk.
               </p>
             </div>
             <Badge variant="outline" className="rounded-full border-primary/30 bg-primary/10 text-primary">
@@ -115,8 +127,8 @@ export function AssignmentGroupDetailView({
               <option value="Critical">Critical</option>
             </select>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">{totalAssetCount} matching assets</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{totalAssetCount} matching assets</p>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" className="rounded-full" onClick={onToggleAllVisible} disabled={assets.length === 0}>
                 {allVisibleSelected ? 'Clear visible selection' : 'Select visible'}
@@ -126,44 +138,52 @@ export function AssignmentGroupDetailView({
               </Button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
+          </CardHeader>
+          <CardContent>
           {isLoadingAssets ? (
             <p className="text-sm text-muted-foreground">Loading tenant assets...</p>
           ) : assets.length === 0 ? (
             <p className="text-sm text-muted-foreground">No assets matched the current filters.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-[24px] border border-border/70 bg-background/25">
               <table className="w-full min-w-[720px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="py-2 pr-2">Select</th>
-                    <th className="py-2 pr-2">Name</th>
-                    <th className="py-2 pr-2">Type</th>
-                    <th className="py-2 pr-2">Criticality</th>
-                    <th className="py-2 pr-2">Current Owner</th>
+                    <th className="px-4 py-3 pr-2">Select</th>
+                    <th className="px-4 py-3 pr-2">Name</th>
+                    <th className="px-4 py-3 pr-2">Type</th>
+                    <th className="px-4 py-3 pr-2">Criticality</th>
+                    <th className="px-4 py-3 pr-4">Current Owner</th>
                   </tr>
                 </thead>
                 <tbody>
                   {assets.map((asset) => (
                     <tr key={asset.id} className="border-b border-border/60">
-                      <td className="py-2 pr-2">
+                      <td className="px-4 py-3 pr-2">
                         <input
                           type="checkbox"
                           checked={selectedAssetIds.includes(asset.id)}
                           onChange={() => onToggleAsset(asset.id)}
                         />
                       </td>
-                      <td className="py-2 pr-2">
+                      <td className="px-4 py-3 pr-2">
                         <div>
                           <p className="font-medium">{asset.name}</p>
                           <p className="text-xs text-muted-foreground">{asset.externalId}</p>
                         </div>
                       </td>
-                      <td className="py-2 pr-2">{asset.assetType}</td>
-                      <td className="py-2 pr-2">{asset.criticality}</td>
-                      <td className="py-2 pr-2">
-                        {asset.ownerType === 'Team' ? 'Assignment Group' : asset.ownerType}
+                      <td className="px-4 py-3 pr-2">
+                        <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+                          {asset.assetType}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 pr-2">
+                        <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+                          {asset.criticality}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 pr-4">
+                        {formatOwnerLabel(asset.ownerType)}
                       </td>
                     </tr>
                   ))}
@@ -171,8 +191,30 @@ export function AssignmentGroupDetailView({
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </section>
   )
+}
+
+function SummaryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-background/35 p-4">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight">{value}</p>
+    </div>
+  )
+}
+
+function formatOwnerLabel(ownerType: string) {
+  if (ownerType === 'Team') {
+    return 'Assignment Group'
+  }
+
+  if (!ownerType || ownerType === 'None') {
+    return 'Unassigned'
+  }
+
+  return ownerType
 }

@@ -4,6 +4,8 @@ import { useMutation } from '@tanstack/react-query'
 import { ArrowLeft, Landmark } from 'lucide-react'
 import { updateTenant } from '@/api/settings.functions'
 import type { TenantDetail } from '@/api/settings.schemas'
+import type { AuditLogItem } from '@/api/audit-log.schemas'
+import { RecentAuditPanel } from '@/components/features/audit/RecentAuditPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,9 +13,15 @@ import { Input } from '@/components/ui/input'
 
 type TenantAdministrationDetailProps = {
   tenant: TenantDetail
+  canViewAudit?: boolean
+  recentAuditItems?: AuditLogItem[]
 }
 
-export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetailProps) {
+export function TenantAdministrationDetail({
+  tenant,
+  canViewAudit = false,
+  recentAuditItems = [],
+}: TenantAdministrationDetailProps) {
   const router = useRouter()
   const [name, setName] = useState(tenant.name)
   const [sla, setSla] = useState({
@@ -180,6 +188,15 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
           </label>
         </CardContent>
       </Card>
+
+      {canViewAudit ? (
+        <RecentAuditPanel
+          title="Tenant Activity"
+          description="Recent tenant-level configuration changes, including identity, SLA, and tenant-scoped configuration updates."
+          items={recentAuditItems}
+          emptyMessage="No recent tenant configuration changes have been recorded."
+        />
+      ) : null}
     </section>
   )
 }

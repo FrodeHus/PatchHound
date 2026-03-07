@@ -10,7 +10,9 @@ export const fetchAuditLog = createServerFn({ method: 'GET' })
   .inputValidator(
     z.object({
       entityType: z.string().optional(),
+      entityId: z.string().uuid().optional(),
       action: z.string().optional(),
+      tenantId: z.string().uuid().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
     }),

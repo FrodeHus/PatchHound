@@ -20,7 +20,6 @@ public class CommentsController : ControllerBase
     {
         ["vulnerabilities"] = "Vulnerability",
         ["tasks"] = "RemediationTask",
-        ["campaigns"] = "Campaign",
     };
 
     private readonly PatchHoundDbContext _dbContext;

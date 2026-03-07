@@ -208,18 +208,6 @@ builder.Services.AddAuthorization(options =>
     );
 
     options.AddPolicy(
-        Policies.ManageCampaigns,
-        policy =>
-            policy.AddRequirements(
-                new RoleRequirement(
-                    RoleName.GlobalAdmin,
-                    RoleName.SecurityManager,
-                    RoleName.SecurityAnalyst
-                )
-            )
-    );
-
-    options.AddPolicy(
         Policies.ViewAuditLogs,
         policy =>
             policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin, RoleName.Auditor))

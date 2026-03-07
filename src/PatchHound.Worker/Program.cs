@@ -27,23 +27,32 @@ await host.RunAsync();
 /// </summary>
 internal class WorkerTenantContext : ITenantContext
 {
-    private readonly Lazy<IReadOnlyList<Guid>> _accessibleTenantIds;
+    private readonly PatchHoundDbContext _dbContext;
+    private IReadOnlyList<Guid>? _accessibleTenantIds;
 
     public WorkerTenantContext(PatchHoundDbContext dbContext)
     {
-        _accessibleTenantIds = new Lazy<IReadOnlyList<Guid>>(() =>
-            dbContext.Tenants.AsNoTracking().IgnoreQueryFilters().Select(t => t.Id).ToList());
+        _dbContext = dbContext;
     }
 
     public Guid? CurrentTenantId => null;
 
-    public IReadOnlyList<Guid> AccessibleTenantIds => _accessibleTenantIds.Value;
+    public IReadOnlyList<Guid> AccessibleTenantIds => _accessibleTenantIds ?? Array.Empty<Guid>();
 
     public Guid CurrentUserId => Guid.Empty;
 
-    public bool HasAccessToTenant(Guid tenantId) => AccessibleTenantIds.Contains(tenantId);
+    public bool HasAccessToTenant(Guid tenantId) => true;
 
     public IReadOnlyList<string> GetRolesForTenant(Guid tenantId) => Array.Empty<string>();
+
+    internal async Task InitializeAsync(CancellationToken ct)
+    {
+        _accessibleTenantIds = await _dbContext.Tenants
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Select(t => t.Id)
+            .ToListAsync(ct);
+    }
 }
 
 /// <summary>
