@@ -42,7 +42,7 @@ public class ExceptionHandlerMiddleware
                 {
                     Status = (int)HttpStatusCode.ServiceUnavailable,
                     Title = "Secret store unavailable",
-                    Detail = secretStoreException.Message,
+                    Detail = "The secret store is temporarily unavailable. Please try again later.",
                     Type = "https://tools.ietf.org/html/rfc9110#section-15.6.4",
                 };
 

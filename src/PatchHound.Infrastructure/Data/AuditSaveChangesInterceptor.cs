@@ -26,6 +26,10 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
         if (context is null)
             return base.SavingChangesAsync(eventData, result, cancellationToken);
 
+        // Skip audit logging for system/worker operations (no authenticated user)
+        if (_tenantContext.CurrentUserId == Guid.Empty)
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+
         var entries = context
             .ChangeTracker.Entries()
             .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)

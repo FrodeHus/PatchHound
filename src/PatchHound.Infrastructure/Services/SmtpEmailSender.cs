@@ -1,6 +1,7 @@
-using System.Net;
-using System.Net.Mail;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Options;
+using MimeKit;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Options;
 
@@ -22,19 +23,25 @@ public class SmtpEmailSender : IEmailSender
         CancellationToken ct = default
     )
     {
-        using var client = new SmtpClient(_options.Host, _options.Port)
-        {
-            EnableSsl = _options.EnableSsl,
-            Credentials = string.IsNullOrEmpty(_options.Username)
-                ? null
-                : new NetworkCredential(_options.Username, _options.Password),
-        };
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse(_options.FromAddress));
+        message.To.Add(MailboxAddress.Parse(to));
+        message.Subject = subject;
+        message.Body = new TextPart("html") { Text = htmlBody };
 
-        var message = new MailMessage(_options.FromAddress, to, subject, htmlBody)
-        {
-            IsBodyHtml = true,
-        };
+        using var client = new SmtpClient();
+        var secureSocketOptions = _options.EnableSsl
+            ? SecureSocketOptions.StartTls
+            : SecureSocketOptions.None;
 
-        await client.SendMailAsync(message, ct);
+        await client.ConnectAsync(_options.Host, _options.Port, secureSocketOptions, ct);
+
+        if (!string.IsNullOrEmpty(_options.Username))
+        {
+            await client.AuthenticateAsync(_options.Username, _options.Password, ct);
+        }
+
+        await client.SendAsync(message, ct);
+        await client.DisconnectAsync(quit: true, ct);
     }
 }

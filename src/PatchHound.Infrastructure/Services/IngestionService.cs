@@ -544,14 +544,22 @@ public class IngestionService
             return;
         }
 
+        var episodeVulnIds = openEpisodes.Select(e => e.VulnerabilityId).Distinct().ToList();
+        var episodeAssetIds = openEpisodes.Select(e => e.AssetId).Distinct().ToList();
+
+        var candidateProjections = await _dbContext
+            .VulnerabilityAssets.IgnoreQueryFilters()
+            .Where(va => episodeVulnIds.Contains(va.VulnerabilityId)
+                && episodeAssetIds.Contains(va.AssetId))
+            .ToListAsync(ct);
+
         var episodePairs = openEpisodes
             .Select(episode => BuildPairKey(episode.VulnerabilityId, episode.AssetId))
             .ToHashSet(StringComparer.Ordinal);
 
-        var currentProjections = await _dbContext
-            .VulnerabilityAssets.IgnoreQueryFilters()
+        var currentProjections = candidateProjections
             .Where(va => episodePairs.Contains(BuildPairKey(va.VulnerabilityId, va.AssetId)))
-            .ToDictionaryAsync(va => BuildPairKey(va.VulnerabilityId, va.AssetId), ct);
+            .ToDictionary(va => BuildPairKey(va.VulnerabilityId, va.AssetId));
 
         foreach (var episode in openEpisodes)
         {

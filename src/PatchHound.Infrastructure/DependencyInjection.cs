@@ -82,7 +82,10 @@ public static class DependencyInjection
         services.AddHttpClient<ISecretStore, OpenBaoSecretStore>();
         services.AddScoped<DefenderTenantConfigurationProvider>();
         services.AddScoped<NvdGlobalConfigurationProvider>();
-        services.Configure<OpenBaoOptions>(configuration.GetSection(OpenBaoOptions.SectionName));
+        services.AddOptions<OpenBaoOptions>()
+            .Bind(configuration.GetSection(OpenBaoOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         // Ingestion
         services.AddScoped<IngestionService>();

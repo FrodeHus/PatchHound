@@ -51,7 +51,11 @@ public class TasksController : ControllerBase
         )
             query = query.Where(t => t.Status == status);
         if (filter.TenantId.HasValue)
+        {
+            if (!_tenantContext.HasAccessToTenant(filter.TenantId.Value))
+                return Forbid();
             query = query.Where(t => t.TenantId == filter.TenantId.Value);
+        }
         if (filter.AssigneeId.HasValue)
             query = query.Where(t => t.AssigneeId == filter.AssigneeId.Value);
 

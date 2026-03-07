@@ -19,15 +19,6 @@ builder.Services.AddHostedService<SlaCheckWorker>();
 
 var host = builder.Build();
 
-// Apply pending database migrations on startup
-using (var scope = host.Services.CreateScope())
-{
-    Console.WriteLine("[startup] PatchHound.Worker starting database migration check");
-    var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
-    await dbContext.Database.MigrateAsync();
-    Console.WriteLine("[startup] PatchHound.Worker database migration check completed");
-}
-
 Console.WriteLine("[startup] PatchHound.Worker host configured, starting background services");
 await host.RunAsync();
 
@@ -36,19 +27,23 @@ await host.RunAsync();
 /// </summary>
 internal class WorkerTenantContext : ITenantContext
 {
-    private readonly PatchHoundDbContext _dbContext;
+    private readonly Lazy<IReadOnlyList<Guid>> _accessibleTenantIds;
 
     public WorkerTenantContext(PatchHoundDbContext dbContext)
     {
-        _dbContext = dbContext;
+        _accessibleTenantIds = new Lazy<IReadOnlyList<Guid>>(() =>
+            dbContext.Tenants.AsNoTracking().IgnoreQueryFilters().Select(t => t.Id).ToList());
     }
 
     public Guid? CurrentTenantId => null;
 
-    public IReadOnlyList<Guid> AccessibleTenantIds =>
-        _dbContext.Tenants.AsNoTracking().IgnoreQueryFilters().Select(t => t.Id).ToList();
+    public IReadOnlyList<Guid> AccessibleTenantIds => _accessibleTenantIds.Value;
 
-    public Guid CurrentUserId => Guid.Empty; // System user
+    public Guid CurrentUserId => Guid.Empty;
+
+    public bool HasAccessToTenant(Guid tenantId) => AccessibleTenantIds.Contains(tenantId);
+
+    public IReadOnlyList<string> GetRolesForTenant(Guid tenantId) => Array.Empty<string>();
 }
 
 /// <summary>

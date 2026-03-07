@@ -270,6 +270,11 @@ builder.Services.AddAuthorization(options =>
                 new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager)
             )
     );
+
+    options.AddPolicy(
+        Policies.ManageVault,
+        policy => policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin))
+    );
 });
 
 builder.Services.AddScoped<IAuthorizationHandler, RoleRequirementHandler>();
@@ -357,10 +362,11 @@ app.Use(async (context, next) =>
 
 if (!string.IsNullOrWhiteSpace(frontendOrigin))
 {
-    app.UseCors();
+app.UseCors();
 }
 
 app.UseAuthentication();
+app.UseMiddleware<TenantContextMiddleware>();
 app.UseAuthorization();
 app.UseRateLimiter();
 app.MapControllers();

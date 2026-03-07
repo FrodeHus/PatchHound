@@ -33,6 +33,7 @@ public class SystemController : ControllerBase
     }
 
     [HttpGet("status")]
+    [AllowAnonymous]
     public async Task<ActionResult<SystemStatusDto>> GetStatus(CancellationToken ct)
     {
         var status = await _secretStore.GetStatusAsync(ct);
@@ -40,7 +41,7 @@ public class SystemController : ControllerBase
     }
 
     [HttpPost("openbao/unseal")]
-    [Authorize(Policy = Policies.ManageUsers)]
+    [Authorize(Policy = Policies.ManageVault)]
     public async Task<ActionResult<SystemStatusDto>> Unseal(
         [FromBody] OpenBaoUnsealRequest request,
         CancellationToken ct
@@ -81,6 +82,8 @@ public class SystemController : ControllerBase
         var existingSources = await _dbContext.EnrichmentSourceConfigurations
             .ToDictionaryAsync(source => source.SourceKey, StringComparer.OrdinalIgnoreCase, ct);
 
+        var pendingSecretWrites = new List<(string Path, string Key, string Value, string SourceKey, bool HadSecret, string OldSecretRef)>();
+
         foreach (var source in request)
         {
             existingSources.TryGetValue(source.Key, out var existingSource);
@@ -90,40 +93,16 @@ public class SystemController : ControllerBase
             if (!string.IsNullOrWhiteSpace(secretValue))
             {
                 var hadSecret = !string.IsNullOrWhiteSpace(secretRef);
+                var oldSecretRef = secretRef;
                 secretRef = $"system/enrichment-sources/{source.Key}";
-                await _secretStore.PutSecretAsync(
+                pendingSecretWrites.Add((
                     secretRef,
-                    new Dictionary<string, string>
-                    {
-                        [EnrichmentSourceCatalog.GetSecretKeyName(source.Key)] = secretValue,
-                    },
-                    ct
-                );
-
-                if (existingSource is not null)
-                {
-                    await _auditLogWriter.WriteAsync(
-                        Guid.Empty,
-                        "EnrichmentSourceSecret",
-                        existingSource.Id,
-                        hadSecret ? AuditAction.Updated : AuditAction.Created,
-                        hadSecret
-                            ? new
-                            {
-                                source.Key,
-                                HasSecret = true,
-                                SecretRef = existingSource.SecretRef,
-                            }
-                            : null,
-                        new
-                        {
-                            source.Key,
-                            HasSecret = true,
-                            SecretRef = secretRef,
-                        },
-                        ct
-                    );
-                }
+                    EnrichmentSourceCatalog.GetSecretKeyName(source.Key),
+                    secretValue,
+                    source.Key,
+                    hadSecret,
+                    oldSecretRef
+                ));
             }
 
             if (existingSource is null)
@@ -136,24 +115,7 @@ public class SystemController : ControllerBase
                     source.Credentials.ApiBaseUrl
                 );
                 await _dbContext.EnrichmentSourceConfigurations.AddAsync(existingSource, ct);
-
-                if (!string.IsNullOrWhiteSpace(secretValue))
-                {
-                    await _auditLogWriter.WriteAsync(
-                        Guid.Empty,
-                        "EnrichmentSourceSecret",
-                        existingSource.Id,
-                        AuditAction.Created,
-                        null,
-                        new
-                        {
-                            source.Key,
-                            HasSecret = true,
-                            SecretRef = secretRef,
-                        },
-                        ct
-                    );
-                }
+                existingSources[source.Key] = existingSource;
                 continue;
             }
 
@@ -166,6 +128,33 @@ public class SystemController : ControllerBase
         }
 
         await _dbContext.SaveChangesAsync(ct);
+
+        // Write secrets to vault after DB commit succeeds
+        foreach (var (path, key, value, sourceKey, hadSecret, oldSecretRef) in pendingSecretWrites)
+        {
+            await _secretStore.PutSecretAsync(
+                path,
+                new Dictionary<string, string> { [key] = value },
+                ct
+            );
+
+            if (existingSources.TryGetValue(sourceKey, out var auditSource))
+            {
+                await _auditLogWriter.WriteAsync(
+                    Guid.Empty,
+                    "EnrichmentSourceSecret",
+                    auditSource.Id,
+                    hadSecret ? AuditAction.Updated : AuditAction.Created,
+                    hadSecret ? new { Key = sourceKey, HasSecret = true, SecretRef = oldSecretRef } : null,
+                    new { Key = sourceKey, HasSecret = true, SecretRef = path },
+                    ct
+                );
+            }
+        }
+
+        if (pendingSecretWrites.Count > 0)
+            await _dbContext.SaveChangesAsync(ct);
+
         return NoContent();
     }
 

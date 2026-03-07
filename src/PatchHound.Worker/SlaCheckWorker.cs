@@ -54,6 +54,16 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
 
         foreach (var task in activeTasks)
         {
+            if (task.AssigneeId == Guid.Empty)
+            {
+                logger.LogWarning(
+                    "Task {TaskId} for tenant {TenantId} has no assignee, skipping SLA notification",
+                    task.Id,
+                    task.TenantId
+                );
+                continue;
+            }
+
             var status = slaService.GetSlaStatus(task.CreatedAt, task.DueDate, now);
 
             switch (status)

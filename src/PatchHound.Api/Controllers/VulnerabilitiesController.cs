@@ -78,7 +78,11 @@ public class VulnerabilitiesController : ControllerBase
                 v.Title.Contains(filter.Search) || v.ExternalId.Contains(filter.Search)
             );
         if (filter.TenantId.HasValue)
+        {
+            if (!_tenantContext.HasAccessToTenant(filter.TenantId.Value))
+                return Forbid();
             query = query.Where(v => v.TenantId == filter.TenantId.Value);
+        }
         if (filter.RecurrenceOnly == true)
         {
             query = query.Where(v =>

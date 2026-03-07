@@ -68,8 +68,12 @@ services:
       OpenBao__Token: ${OPENBAO_TOKEN:-}
       OpenBao__KvMount: ${OPENBAO_KV_MOUNT:-patchhound}
     depends_on:
-      - postgres
-      - openbao
+      postgres:
+        condition: service_started
+      openbao:
+        condition: service_started
+      api:
+        condition: service_healthy
 
   frontend:
     build:
