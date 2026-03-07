@@ -8,6 +8,7 @@ using PatchHound.Core.Enums;
 using PatchHound.Core.Entities;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
+using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Api.Controllers;
@@ -19,11 +20,17 @@ public class TenantsController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly ISecretStore _secretStore;
+    private readonly AuditLogWriter _auditLogWriter;
 
-    public TenantsController(PatchHoundDbContext dbContext, ISecretStore secretStore)
+    public TenantsController(
+        PatchHoundDbContext dbContext,
+        ISecretStore secretStore,
+        AuditLogWriter auditLogWriter
+    )
     {
         _dbContext = dbContext;
         _secretStore = secretStore;
+        _auditLogWriter = auditLogWriter;
     }
 
     [HttpGet]
@@ -164,6 +171,7 @@ public class TenantsController : ControllerBase
 
             if (!string.IsNullOrWhiteSpace(secretValue))
             {
+                var hadSecret = !string.IsNullOrWhiteSpace(secretRef);
                 secretRef = $"tenants/{tenant.Id}/sources/{source.Key}";
                 await _secretStore.PutSecretAsync(
                     secretRef,
@@ -173,6 +181,33 @@ public class TenantsController : ControllerBase
                     },
                     ct
                 );
+
+                var secretAuditNewValues = new
+                {
+                    source.Key,
+                    HasSecret = true,
+                    SecretRef = secretRef,
+                };
+
+                if (existingSource is not null)
+                {
+                    await _auditLogWriter.WriteAsync(
+                        tenant.Id,
+                        "TenantSourceSecret",
+                        existingSource.Id,
+                        hadSecret ? AuditAction.Updated : AuditAction.Created,
+                        hadSecret
+                            ? new
+                            {
+                                source.Key,
+                                HasSecret = true,
+                                SecretRef = existingSource.SecretRef,
+                            }
+                            : null,
+                        secretAuditNewValues,
+                        ct
+                    );
+                }
             }
 
             if (existingSource is null)
@@ -191,6 +226,24 @@ public class TenantsController : ControllerBase
                 );
                 await _dbContext.TenantSourceConfigurations.AddAsync(created, ct);
                 existingSources[source.Key] = created;
+
+                if (!string.IsNullOrWhiteSpace(secretValue))
+                {
+                    await _auditLogWriter.WriteAsync(
+                        tenant.Id,
+                        "TenantSourceSecret",
+                        created.Id,
+                        AuditAction.Created,
+                        null,
+                        new
+                        {
+                            source.Key,
+                            HasSecret = true,
+                            SecretRef = secretRef,
+                        },
+                        ct
+                    );
+                }
                 continue;
             }
 
