@@ -13,7 +13,7 @@ function AuditLogPage() {
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold">Audit Log</h1>
-      <AuditLogTable data={data} />
+      <AuditLogTable items={data.items} totalCount={data.totalCount} />
     </section>
   )
 }

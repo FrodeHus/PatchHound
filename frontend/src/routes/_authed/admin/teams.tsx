@@ -13,7 +13,7 @@ function TeamsPage() {
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold">Teams</h1>
-      <TeamTable data={data} />
+      <TeamTable teams={data.items} totalCount={data.totalCount} />
     </section>
   )
 }

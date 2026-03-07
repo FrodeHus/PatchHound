@@ -13,7 +13,7 @@ function VulnerabilitiesPage() {
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold">Vulnerabilities</h1>
-      <VulnerabilityTable data={data} />
+      <VulnerabilityTable items={data.items} totalCount={data.totalCount} />
     </section>
   )
 }

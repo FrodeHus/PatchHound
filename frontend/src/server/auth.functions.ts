@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import { normalizeRoles } from '@/server/roles'
 import { getSession } from '@/server/session'
 
 export const getCurrentUser = createServerFn({ method: 'GET' })
@@ -9,11 +10,17 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       return null
     }
 
+    const roles = normalizeRoles(session.roles)
+    if ((session.roles ?? []).join('|') !== roles.join('|')) {
+      session.roles = roles
+      await session.save()
+    }
+
     return {
       id: session.userId,
       email: session.email ?? '',
       displayName: session.displayName ?? '',
-      roles: session.roles ?? [],
+      roles,
       tenantId: session.tenantId,
       tenantIds: session.tenantIds ?? (session.tenantId ? [session.tenantId] : []),
     }

@@ -39,10 +39,10 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
-  { to: '/vulnerabilities', label: 'Vulnerabilities', icon: Bug, roles: ['SecurityManager', 'SecurityAnalyst', 'GlobalAdmin', 'Auditor'] },
-  { to: '/tasks', label: 'Remediation', icon: CheckSquare, roles: ['AssetOwner', 'SecurityManager', 'SecurityAnalyst', 'GlobalAdmin'] },
-  { to: '/assets', label: 'Assets', icon: Server, roles: ['SecurityManager', 'SecurityAnalyst', 'GlobalAdmin'] },
-  { to: '/campaigns', label: 'Campaigns', icon: Flag, roles: ['SecurityManager', 'SecurityAnalyst', 'GlobalAdmin'] },
+  { to: '/vulnerabilities', label: 'Vulnerabilities', icon: Bug },
+  { to: '/tasks', label: 'Remediation', icon: CheckSquare },
+  { to: '/assets', label: 'Assets', icon: Server },
+  { to: '/campaigns', label: 'Campaigns', icon: Flag },
   { to: '/audit-log', label: 'Audit Trail', icon: ScrollText, roles: ['Auditor', 'GlobalAdmin'] },
   { to: '/admin/users', label: 'Users', icon: Users, roles: ['GlobalAdmin'] },
   { to: '/admin/teams', label: 'Teams', icon: Users, roles: ['GlobalAdmin', 'SecurityManager'] },

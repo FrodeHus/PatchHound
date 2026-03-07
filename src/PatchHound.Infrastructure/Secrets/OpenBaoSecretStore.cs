@@ -38,11 +38,9 @@ public class OpenBaoSecretStore : ISecretStore
         );
         request.Headers.Add("X-Vault-Token", _options.Token);
 
-        using var response = await _httpClient.SendAsync(request, ct);
+        using var response = await SendAsync(request, ct);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             return null;
-
-        response.EnsureSuccessStatusCode();
 
         var payload = await response.Content.ReadFromJsonAsync<OpenBaoKvResponse>(cancellationToken: ct);
         return payload?.Data.Data.GetValueOrDefault(key);
@@ -68,8 +66,41 @@ public class OpenBaoSecretStore : ISecretStore
         request.Headers.Add("X-Vault-Token", _options.Token);
         request.Content = JsonContent.Create(new { data = values });
 
-        using var response = await _httpClient.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
+        using var response = await SendAsync(request, ct);
+    }
+
+    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        try
+        {
+            var response = await _httpClient.SendAsync(request, ct);
+            if (response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return response;
+            }
+
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
+            _logger.LogError(
+                "OpenBao request failed. Method: {Method}. Path: {Path}. StatusCode: {StatusCode}. Response: {Response}",
+                request.Method,
+                request.RequestUri?.PathAndQuery,
+                (int)response.StatusCode,
+                string.IsNullOrWhiteSpace(responseBody) ? "<empty>" : responseBody
+            );
+
+            throw new SecretStoreUnavailableException(
+                $"OpenBao returned {(int)response.StatusCode} {response.ReasonPhrase}.",
+                response.StatusCode
+            );
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new SecretStoreUnavailableException(
+                "OpenBao could not be reached.",
+                null,
+                ex
+            );
+        }
     }
 
     private sealed class OpenBaoKvResponse

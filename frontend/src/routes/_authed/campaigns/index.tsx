@@ -13,7 +13,7 @@ function CampaignsPage() {
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold">Campaigns</h1>
-      <CampaignList data={data} />
+      <CampaignList items={data.items} totalCount={data.totalCount} />
     </section>
   )
 }
