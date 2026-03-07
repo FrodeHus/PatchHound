@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
-import { ArrowLeft, Boxes, HardDrive, Landmark, Package, RotateCw, ServerCog } from 'lucide-react'
+import { ArrowLeft, Landmark, RotateCw } from 'lucide-react'
 import { triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
 import type { TenantDetail, TenantIngestionSource } from '@/api/settings.schemas'
 import { Badge } from '@/components/ui/badge'
@@ -131,12 +131,24 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
           <CardHeader>
             <CardTitle>Tenant Assets</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <CardContent className="space-y-4">
             <SnapshotRow icon={Landmark} label="Tenant ID" value={tenant.id} />
-            <SnapshotRow icon={Boxes} label="Total Assets" value={String(tenant.assets.totalCount)} />
-            <SnapshotRow icon={ServerCog} label="Devices" value={String(tenant.assets.deviceCount)} />
-            <SnapshotRow icon={Package} label="Software" value={String(tenant.assets.softwareCount)} />
-            <SnapshotRow icon={HardDrive} label="Cloud Resources" value={String(tenant.assets.cloudResourceCount)} />
+            <div className="rounded-2xl border border-border/70 bg-background/35 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Inventory</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Current asset footprint for this tenant.</p>
+                </div>
+                <Badge variant="outline" className="rounded-full border-primary/30 bg-primary/10 text-primary">
+                  {tenant.assets.totalCount} total
+                </Badge>
+              </div>
+              <div className="mt-4 space-y-2">
+                <AssetCountRow label="Devices" count={tenant.assets.deviceCount} />
+                <AssetCountRow label="Software" count={tenant.assets.softwareCount} />
+                <AssetCountRow label="Cloud Resources" count={tenant.assets.cloudResourceCount} />
+              </div>
+            </div>
             {saveState === 'saved' ? <p className="text-sm text-emerald-300">Tenant configuration saved.</p> : null}
             {saveState === 'error' ? <p className="text-sm text-destructive">Save failed. Try again.</p> : null}
             {syncState === 'success' ? <p className="text-sm text-emerald-300">Ingestion sync started.</p> : null}
@@ -376,6 +388,17 @@ function SnapshotRow({ icon: Icon, label, value }: SnapshotRowProps) {
         <Icon className="size-4 text-primary" />
       </div>
       <p className="mt-3 break-all text-sm font-medium text-foreground">{value}</p>
+    </div>
+  )
+}
+
+function AssetCountRow({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-3 py-2">
+      <span className="text-sm font-medium text-foreground">{label}</span>
+      <Badge variant="outline" className="rounded-full border-border/70 bg-background/70 text-foreground">
+        {count}
+      </Badge>
     </div>
   )
 }
