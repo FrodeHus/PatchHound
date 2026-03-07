@@ -1,7 +1,6 @@
 // frontend-start/src/server/session.ts
 import { getIronSession } from 'iron-session'
-import { getRequest } from '@tanstack/react-start/server'
-import type { IncomingMessage, ServerResponse } from 'node:http'
+import { getCookie, setCookie } from '@tanstack/react-start/server'
 
 export interface SessionData {
   accessToken?: string
@@ -16,6 +15,12 @@ export interface SessionData {
   oauthState?: string
 }
 
+type CookieOptions = Parameters<typeof setCookie>[2]
+type CookieDescriptor = {
+  name: string
+  value: string
+} & Partial<NonNullable<CookieOptions>>
+
 const sessionOptions = {
   password: process.env.SESSION_SECRET!,
   cookieName: 'vigil-session',
@@ -28,16 +33,31 @@ const sessionOptions = {
 }
 
 export async function getSession() {
-  const request = getRequest()
-  // iron-session works with a request/response pair
-  // For reading, we parse the cookie from the request headers
-  const cookieHeader = request.headers.get('cookie') ?? ''
-  const mockReq = { headers: { cookie: cookieHeader } } as IncomingMessage
-  const mockRes = {
-    getHeader: () => undefined,
-    setHeader: () => undefined,
-  } as unknown as ServerResponse<IncomingMessage>
-  return getIronSession<SessionData>(mockReq, mockRes, sessionOptions)
+  const cookies = {
+    get(name: string) {
+      const value = getCookie(name)
+      return value ? { name, value } : undefined
+    },
+    set(
+      nameOrOptions: string | CookieDescriptor,
+      value?: string,
+      cookie?: CookieOptions,
+    ) {
+      if (typeof nameOrOptions === 'string') {
+        if (value === undefined) {
+          throw new Error(`Missing cookie value for ${nameOrOptions}`)
+        }
+
+        setCookie(nameOrOptions, value, cookie)
+        return
+      }
+
+      const { name, value: optionValue, ...options } = nameOrOptions
+      setCookie(name, optionValue, options)
+    },
+  }
+
+  return getIronSession<SessionData>(cookies, sessionOptions)
 }
 
 export function isTokenExpired(session: SessionData): boolean {
