@@ -7,7 +7,9 @@ type AssetManagementTableProps = {
   isUpdating: boolean
   selectedAssetId: string | null
   assetTypeFilter: string
+  unassignedOnly: boolean
   onAssetTypeFilterChange: (assetType: string) => void
+  onUnassignedOnlyChange: (value: boolean) => void
   onSelectAsset: (assetId: string) => void
   onAssignOwner: (assetId: string, ownerType: 'User' | 'Team', ownerId: string) => void
   onSetCriticality: (assetId: string, criticality: string) => void
@@ -22,7 +24,9 @@ export function AssetManagementTable({
   isUpdating,
   selectedAssetId,
   assetTypeFilter,
+  unassignedOnly,
   onAssetTypeFilterChange,
+  onUnassignedOnlyChange,
   onSelectAsset,
   onAssignOwner,
   onSetCriticality,
@@ -51,6 +55,16 @@ export function AssetManagementTable({
             </option>
           ))}
         </select>
+        <label className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+          <input
+            type="checkbox"
+            checked={unassignedOnly}
+            onChange={(event) => {
+              onUnassignedOnlyChange(event.target.checked)
+            }}
+          />
+          <span>Unassigned only</span>
+        </label>
         <select
           className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
           value={ownerType}
@@ -74,7 +88,7 @@ export function AssetManagementTable({
           }}
           placeholder="Owner or assignment group GUID"
         />
-        <p className="self-center text-xs text-muted-foreground">Filter by type, then click the asset name to inspect details.</p>
+        <p className="self-center text-xs text-muted-foreground">Filter by type or ownership state, then click the asset name to inspect details.</p>
       </div>
 
       <div className="overflow-x-auto">
