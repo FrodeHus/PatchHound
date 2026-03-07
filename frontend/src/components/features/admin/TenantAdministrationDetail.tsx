@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
-import { ArrowLeft, Clock3, KeyRound, Landmark, RotateCw } from 'lucide-react'
+import { ArrowLeft, Boxes, HardDrive, Landmark, Package, RotateCw, ServerCog } from 'lucide-react'
 import { triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
 import type { TenantDetail, TenantIngestionSource } from '@/api/settings.schemas'
 import { Badge } from '@/components/ui/badge'
@@ -77,11 +77,6 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
     },
   })
 
-  const configuredSources = sources.filter((source) => {
-    const credentials = source.credentials
-    return Boolean(credentials.tenantId || credentials.clientId || credentials.hasClientSecret)
-  }).length
-
   function updateSource(
     key: string,
     mutate: (current: TenantIngestionSourceDraft) => TenantIngestionSourceDraft,
@@ -134,12 +129,14 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
 
         <Card className="rounded-[28px] border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_88%,black),var(--card))]">
           <CardHeader>
-            <CardTitle>Administration Snapshot</CardTitle>
+            <CardTitle>Tenant Assets</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+          <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <SnapshotRow icon={Landmark} label="Tenant ID" value={tenant.id} />
-            <SnapshotRow icon={KeyRound} label="Configured Sources" value={String(configuredSources)} />
-            <SnapshotRow icon={Clock3} label="Source Cards" value={String(sources.length)} />
+            <SnapshotRow icon={Boxes} label="Total Assets" value={String(tenant.assets.totalCount)} />
+            <SnapshotRow icon={ServerCog} label="Devices" value={String(tenant.assets.deviceCount)} />
+            <SnapshotRow icon={Package} label="Software" value={String(tenant.assets.softwareCount)} />
+            <SnapshotRow icon={HardDrive} label="Cloud Resources" value={String(tenant.assets.cloudResourceCount)} />
             {saveState === 'saved' ? <p className="text-sm text-emerald-300">Tenant configuration saved.</p> : null}
             {saveState === 'error' ? <p className="text-sm text-destructive">Save failed. Try again.</p> : null}
             {syncState === 'success' ? <p className="text-sm text-emerald-300">Ingestion sync started.</p> : null}

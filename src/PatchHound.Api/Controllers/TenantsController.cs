@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Admin;
+using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Tenants;
@@ -67,10 +68,25 @@ public class TenantsController : ControllerBase
         if (tenant is null)
             return NotFound();
 
+        var assetCounts = await _dbContext
+            .Assets.AsNoTracking()
+            .Where(asset => asset.TenantId == id)
+            .GroupBy(asset => asset.AssetType)
+            .Select(group => new { AssetType = group.Key, Count = group.Count() })
+            .ToListAsync(ct);
+
+        var assetSummary = new TenantAssetSummaryDto(
+            assetCounts.Sum(item => item.Count),
+            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.Device)?.Count ?? 0,
+            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.Software)?.Count ?? 0,
+            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.CloudResource)?.Count ?? 0
+        );
+
         return Ok(new TenantDetailDto(
             tenant.Id,
             tenant.Name,
             tenant.EntraTenantId,
+            assetSummary,
             GetIngestionSources(tenant.Settings)
         ));
     }

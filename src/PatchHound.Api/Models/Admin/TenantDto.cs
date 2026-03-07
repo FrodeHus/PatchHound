@@ -11,7 +11,15 @@ public record TenantDetailDto(
     Guid Id,
     string Name,
     string EntraTenantId,
+    TenantAssetSummaryDto Assets,
     IReadOnlyList<TenantIngestionSourceDto> IngestionSources
+);
+
+public record TenantAssetSummaryDto(
+    int TotalCount,
+    int DeviceCount,
+    int SoftwareCount,
+    int CloudResourceCount
 );
 
 public record TenantIngestionSourceDto(

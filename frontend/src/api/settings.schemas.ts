@@ -38,6 +38,12 @@ export const tenantDetailSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   entraTenantId: z.string(),
+  assets: z.object({
+    totalCount: z.number(),
+    deviceCount: z.number(),
+    softwareCount: z.number(),
+    cloudResourceCount: z.number(),
+  }),
   ingestionSources: z.array(tenantIngestionSourceSchema),
 })
 

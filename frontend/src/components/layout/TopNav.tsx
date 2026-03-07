@@ -20,6 +20,7 @@ import { TenantSelector } from '@/components/layout/TenantSelector'
 import type { CurrentUser } from '@/server/auth.functions'
 import { unsealOpenBao } from '@/server/system.functions'
 import { ThemeSelector } from '@/components/layout/ThemeSelector'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 type TopNavProps = {
   user: CurrentUser
@@ -91,24 +92,34 @@ export function TopNav({
                   {user.systemStatus?.openBaoSealed ? 'Data ingest paused' : 'Data ingest active'}
                 </div>
                 {user.systemStatus?.openBaoSealed ? (
-                  <Badge
-                    variant="outline"
-                    title={canUnsealOpenBao
-                      ? 'OpenBao is sealed. Click to provide unseal keys and resume ingestion.'
-                      : 'OpenBao is sealed. A Global Admin must unseal the vault to resume ingestion.'}
-                    className={[
-                      'rounded-full border-amber-400/25 bg-amber-400/10 text-amber-200',
-                      canUnsealOpenBao ? 'cursor-pointer hover:bg-amber-400/15' : '',
-                    ].join(' ')}
-                    onClick={() => {
-                      if (canUnsealOpenBao) {
-                        setIsUnsealDialogOpen(true)
-                      }
-                    }}
-                  >
-                    <AlertTriangle className="size-3.5" />
-                    OpenBao sealed
-                  </Badge>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={(
+                        <button
+                          type="button"
+                          className={[
+                            'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors',
+                            'border-amber-400/25 bg-amber-400/10 text-amber-200',
+                            canUnsealOpenBao ? 'cursor-pointer hover:bg-amber-400/15' : 'cursor-default',
+                          ].join(' ')}
+                          onClick={() => {
+                            if (canUnsealOpenBao) {
+                              setIsUnsealDialogOpen(true)
+                            }
+                          }}
+                        />
+                      )}
+                      disabled={!canUnsealOpenBao}
+                    >
+                      <AlertTriangle className="size-3.5" />
+                      OpenBao sealed
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {canUnsealOpenBao
+                        ? 'OpenBao is sealed. Click to provide unseal keys and resume ingestion.'
+                        : 'OpenBao is sealed. A Global Admin must unseal the vault to resume ingestion.'}
+                    </TooltipContent>
+                  </Tooltip>
                 ) : null}
               </div>
             </div>

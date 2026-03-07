@@ -24,7 +24,11 @@ export function TenantSelector({
       </div>
       <Select
         value={selectedTenantId ?? tenants[0]?.id ?? ''}
-        onValueChange={onSelectTenant}
+        onValueChange={(tenantId) => {
+          if (tenantId) {
+            onSelectTenant(tenantId)
+          }
+        }}
       >
         <SelectTrigger className="h-10 min-w-44 rounded-full border-border/70 bg-card/80 px-4 backdrop-blur">
           <SelectValue placeholder="Select tenant" />
