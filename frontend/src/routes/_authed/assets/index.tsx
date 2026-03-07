@@ -16,9 +16,16 @@ function AssetsPage() {
   const router = useRouter()
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
   const [assetTypeFilter, setAssetTypeFilter] = useState('')
+  const [unassignedOnly, setUnassignedOnly] = useState(false)
   const assetsQuery = useQuery({
-    queryKey: ['assets', assetTypeFilter],
-    queryFn: () => fetchAssets({ data: assetTypeFilter ? { assetType: assetTypeFilter } : {} }),
+    queryKey: ['assets', assetTypeFilter, unassignedOnly],
+    queryFn: () =>
+      fetchAssets({
+        data: {
+          ...(assetTypeFilter ? { assetType: assetTypeFilter } : {}),
+          ...(unassignedOnly ? { unassignedOnly: true } : {}),
+        },
+      }),
     initialData,
   })
   const ownerMutation = useMutation({
@@ -74,8 +81,13 @@ function AssetsPage() {
         isUpdating={ownerMutation.isPending || criticalityMutation.isPending || securityProfileMutation.isPending}
         selectedAssetId={selectedAssetId}
         assetTypeFilter={assetTypeFilter}
+        unassignedOnly={unassignedOnly}
         onAssetTypeFilterChange={(assetType) => {
           setAssetTypeFilter(assetType)
+          setSelectedAssetId(null)
+        }}
+        onUnassignedOnlyChange={(value) => {
+          setUnassignedOnly(value)
           setSelectedAssetId(null)
         }}
         onSelectAsset={setSelectedAssetId}

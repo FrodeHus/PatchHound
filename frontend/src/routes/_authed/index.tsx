@@ -1,12 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { AlertTriangle, CheckCircle2, ShieldAlert, TimerReset } from 'lucide-react'
 import { fetchDashboardSummary, fetchDashboardTrends } from '@/api/dashboard.functions'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { CriticalVulnerabilities } from '@/components/features/dashboard/CriticalVulnerabilities'
-import { ExposureScore } from '@/components/features/dashboard/ExposureScore'
+import { ExposureSlaCard } from '@/components/features/dashboard/ExposureSlaCard'
 import { RemediationVelocity } from '@/components/features/dashboard/RemediationVelocity'
-import { SlaComplianceCard } from '@/components/features/dashboard/SlaComplianceCard'
 import { TrendChart } from '@/components/features/dashboard/TrendChart'
 
 export const Route = createFileRoute('/_authed/')({
@@ -53,19 +51,11 @@ function DashboardPage() {
     <section className="space-y-6 pb-4">
       <Card className="overflow-hidden rounded-[36px] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_18%,transparent),transparent_42%),linear-gradient(180deg,color-mix(in_oklab,var(--card)_92%,black),var(--card))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <CardContent className="p-6 sm:p-7">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-3xl">
-              <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/10 px-3 py-1 text-primary">
-                Dashboard
-              </Badge>
-              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-foreground sm:text-4xl">
-                Exposure posture, remediation flow, and critical queue in one operating view.
-              </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-                Monitor what is drifting, where remediation is slowing, and which critical issues are aging into risk.
-              </p>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(22rem,1fr)]">
+            <div className="rounded-[30px] border border-border/60 bg-background/22 p-5 backdrop-blur-sm">
+              <TrendChart data={trends} embedded />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:w-[34rem]">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
               {statCards.map((item) => {
                 const Icon = item.icon
                 return (
@@ -84,12 +74,14 @@ function DashboardPage() {
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <ExposureScore score={summary.exposureScore} />
-        <SlaComplianceCard
-          percent={summary.slaCompliancePercent}
-          overdueCount={summary.overdueTaskCount}
-          totalCount={summary.totalTaskCount}
-        />
+        <div className="xl:col-span-2">
+          <ExposureSlaCard
+            exposureScore={summary.exposureScore}
+            slaCompliancePercent={summary.slaCompliancePercent}
+            overdueCount={summary.overdueTaskCount}
+            totalCount={summary.totalTaskCount}
+          />
+        </div>
         <RemediationVelocity
           averageDays={summary.averageRemediationDays}
           vulnerabilitiesBySeverity={summary.vulnerabilitiesBySeverity}
@@ -97,10 +89,7 @@ function DashboardPage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-5">
-        <div className="xl:col-span-3">
-          <TrendChart data={trends} />
-        </div>
-        <div className="xl:col-span-2">
+        <div className="xl:col-span-5">
           <CriticalVulnerabilities items={summary.topCriticalVulnerabilities} summary={summary} />
         </div>
       </div>
