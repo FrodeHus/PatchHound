@@ -1,40 +1,25 @@
-import { useMemo, useState } from 'react'
-import type { SetupPayload } from '@/api/setup.schemas'
+import { useState } from 'react'
+import type { SetupContext, SetupPayload } from '@/api/setup.schemas'
 import { AdminUserStep } from '@/components/features/setup/steps/AdminUserStep'
 import { DefenderConnectionStep } from '@/components/features/setup/steps/DefenderConnectionStep'
-import { EntraIdStep } from '@/components/features/setup/steps/EntraIdStep'
 import { ReviewStep } from '@/components/features/setup/steps/ReviewStep'
 import { SlaConfigStep } from '@/components/features/setup/steps/SlaConfigStep'
 import { TenantConfigStep } from '@/components/features/setup/steps/TenantConfigStep'
 import { WelcomeStep } from '@/components/features/setup/steps/WelcomeStep'
 
 type SetupWizardProps = {
+  setupContext: SetupContext
   isSubmitting: boolean
   onComplete: (payload: SetupPayload) => void
 }
 
-const steps = ['Welcome', 'Tenant', 'Entra ID', 'Defender', 'SLA', 'Admin', 'Review'] as const
+const steps = ['Welcome', 'Tenant', 'Defender', 'SLA', 'Admin', 'Review'] as const
 
-export function SetupWizard({ isSubmitting, onComplete }: SetupWizardProps) {
+export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWizardProps) {
   const [stepIndex, setStepIndex] = useState(0)
-  const [tenantName, setTenantName] = useState('')
-  const [entraTenantId, setEntraTenantId] = useState('')
-  const [tenantSettings, setTenantSettings] = useState('{}')
-  const [adminEmail, setAdminEmail] = useState('')
-  const [adminDisplayName, setAdminDisplayName] = useState('')
-  const [adminEntraObjectId, setAdminEntraObjectId] = useState('')
-
-  const payload = useMemo<SetupPayload>(
-    () => ({
-      tenantName: tenantName.trim(),
-      entraTenantId: entraTenantId.trim(),
-      tenantSettings,
-      adminEmail: adminEmail.trim(),
-      adminDisplayName: adminDisplayName.trim(),
-      adminEntraObjectId: adminEntraObjectId.trim(),
-    }),
-    [adminDisplayName, adminEmail, adminEntraObjectId, entraTenantId, tenantName, tenantSettings],
-  )
+  const payload: SetupPayload = {
+    tenantSettings: '{}',
+  }
 
   return (
     <section className="mx-auto max-w-3xl space-y-4 py-6">
@@ -45,29 +30,12 @@ export function SetupWizard({ isSubmitting, onComplete }: SetupWizardProps) {
 
       {stepIndex === 0 ? <WelcomeStep /> : null}
       {stepIndex === 1 ? (
-        <TenantConfigStep
-          tenantName={tenantName}
-          entraTenantId={entraTenantId}
-          onTenantNameChange={setTenantName}
-          onEntraTenantIdChange={setEntraTenantId}
-        />
+        <TenantConfigStep setupContext={setupContext} />
       ) : null}
-      {stepIndex === 2 ? (
-        <EntraIdStep tenantSettings={tenantSettings} onTenantSettingsChange={setTenantSettings} />
-      ) : null}
-      {stepIndex === 3 ? <DefenderConnectionStep /> : null}
-      {stepIndex === 4 ? <SlaConfigStep /> : null}
-      {stepIndex === 5 ? (
-        <AdminUserStep
-          adminEmail={adminEmail}
-          adminDisplayName={adminDisplayName}
-          adminEntraObjectId={adminEntraObjectId}
-          onAdminEmailChange={setAdminEmail}
-          onAdminDisplayNameChange={setAdminDisplayName}
-          onAdminEntraObjectIdChange={setAdminEntraObjectId}
-        />
-      ) : null}
-      {stepIndex === 6 ? <ReviewStep payload={payload} /> : null}
+      {stepIndex === 2 ? <DefenderConnectionStep /> : null}
+      {stepIndex === 3 ? <SlaConfigStep /> : null}
+      {stepIndex === 4 ? <AdminUserStep setupContext={setupContext} /> : null}
+      {stepIndex === 5 ? <ReviewStep setupContext={setupContext} payload={payload} /> : null}
 
       <footer className="flex items-center justify-between">
         <button
@@ -95,14 +63,7 @@ export function SetupWizard({ isSubmitting, onComplete }: SetupWizardProps) {
           <button
             type="button"
             className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            disabled={
-              isSubmitting
-              || payload.tenantName.length === 0
-              || payload.entraTenantId.length === 0
-              || payload.adminEmail.length === 0
-              || payload.adminDisplayName.length === 0
-              || payload.adminEntraObjectId.length === 0
-            }
+            disabled={isSubmitting}
             onClick={() => {
               onComplete(payload)
             }}

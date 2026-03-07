@@ -22,7 +22,30 @@ export type IdTokenClaims = {
   preferred_username?: string
   name?: string
   tid?: string
+  tenant_display_name?: string
+  tenant_name?: string
   roles?: string[]
+  [key: string]: unknown
+}
+
+const GRAPH_SCOPE = 'https://graph.microsoft.com/.default'
+
+export function getClaimString(
+  claims: IdTokenClaims | undefined,
+  claimNames: string[],
+): string | undefined {
+  if (!claims) {
+    return undefined
+  }
+
+  for (const claimName of claimNames) {
+    const value = claims[claimName]
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim()
+    }
+  }
+
+  return undefined
 }
 
 export async function getAuthorizationUrl(state: string): Promise<string> {
@@ -90,4 +113,54 @@ export async function refreshAccessToken(homeAccountId: string): Promise<{
     access_token: result.accessToken,
     expires_in: expiresIn,
   }
+}
+
+export async function resolveTenantDisplayName(
+  tenantId: string,
+  claims?: IdTokenClaims,
+): Promise<string> {
+  const claimValue = getClaimString(claims, ['tenant_display_name', 'tenant_name'])
+  if (claimValue) {
+    return claimValue
+  }
+
+  const graphClient = new ConfidentialClientApplication({
+    auth: {
+      clientId: ENTRA_CLIENT_ID,
+      clientSecret: ENTRA_CLIENT_SECRET,
+      authority: `https://login.microsoftonline.com/${tenantId}`,
+    },
+  })
+
+  const tokenResult = await graphClient.acquireTokenByClientCredential({
+    scopes: [GRAPH_SCOPE],
+  })
+
+  if (!tokenResult?.accessToken) {
+    throw new Error('Tenant directory lookup failed: Graph access token missing')
+  }
+
+  const response = await fetch(
+    'https://graph.microsoft.com/v1.0/organization?$select=id,displayName',
+    {
+      headers: {
+        Authorization: `Bearer ${tokenResult.accessToken}`,
+      },
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(`Tenant directory lookup failed: ${response.status} ${response.statusText}`)
+  }
+
+  const data = await response.json() as {
+    value?: Array<{ id?: string; displayName?: string }>
+  }
+
+  const organization = data.value?.find((entry) => entry.id === tenantId) ?? data.value?.[0]
+  if (!organization?.displayName?.trim()) {
+    throw new Error('Tenant directory lookup failed: display name missing')
+  }
+
+  return organization.displayName.trim()
 }

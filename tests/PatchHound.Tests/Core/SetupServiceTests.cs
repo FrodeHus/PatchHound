@@ -53,6 +53,9 @@ public class SetupServiceTests
         _tenantRepository
             .AnyExistUnfilteredAsync(Arg.Any<CancellationToken>())
             .Returns(false);
+        _userRepository
+            .GetByEntraObjectIdAsync("entra-admin-id", Arg.Any<CancellationToken>())
+            .Returns((User?)null);
         _userRepository.GetByEmailAsync("admin@example.com", Arg.Any<CancellationToken>()).Returns((User?)null);
 
         var request = new SetupRequest(
@@ -99,5 +102,40 @@ public class SetupServiceTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("already initialized");
+    }
+
+    [Fact]
+    public async Task CompleteSetupAsync_WhenUserAlreadyExistsByEntraObjectId_ReusesUser()
+    {
+        _tenantRepository
+            .AnyExistUnfilteredAsync(Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        var existingUser = User.Create("admin@example.com", "Admin", "entra-admin-id");
+        _userRepository
+            .GetByEntraObjectIdAsync("entra-admin-id", Arg.Any<CancellationToken>())
+            .Returns(existingUser);
+
+        var request = new SetupRequest(
+            "Acme",
+            "entra-tenant",
+            "{}",
+            "admin@example.com",
+            "Admin",
+            "entra-admin-id"
+        );
+
+        var result = await _service.CompleteSetupAsync(request, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await _userRepository.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
+        await _userRepository
+            .Received(1)
+            .AddRoleAsync(
+                Arg.Is<UserTenantRole>(role =>
+                    role.UserId == existingUser.Id && role.Role == RoleName.GlobalAdmin
+                ),
+                Arg.Any<CancellationToken>()
+            );
     }
 }

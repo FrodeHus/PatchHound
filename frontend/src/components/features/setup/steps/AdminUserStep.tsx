@@ -1,47 +1,21 @@
+import type { SetupContext } from '@/api/setup.schemas'
+
 type AdminUserStepProps = {
-  adminEmail: string
-  adminDisplayName: string
-  adminEntraObjectId: string
-  onAdminEmailChange: (value: string) => void
-  onAdminDisplayNameChange: (value: string) => void
-  onAdminEntraObjectIdChange: (value: string) => void
+  setupContext: SetupContext
 }
 
-export function AdminUserStep({
-  adminEmail,
-  adminDisplayName,
-  adminEntraObjectId,
-  onAdminEmailChange,
-  onAdminDisplayNameChange,
-  onAdminEntraObjectIdChange,
-}: AdminUserStepProps) {
+export function AdminUserStep({ setupContext }: AdminUserStepProps) {
   return (
     <section className="space-y-2 rounded-lg border border-border bg-card p-4">
       <h2 className="text-lg font-semibold">Admin User</h2>
-      <input
-        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-        placeholder="Admin email"
-        value={adminEmail}
-        onChange={(event) => {
-          onAdminEmailChange(event.target.value)
-        }}
-      />
-      <input
-        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-        placeholder="Admin display name"
-        value={adminDisplayName}
-        onChange={(event) => {
-          onAdminDisplayNameChange(event.target.value)
-        }}
-      />
-      <input
-        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-        placeholder="Admin Entra object ID"
-        value={adminEntraObjectId}
-        onChange={(event) => {
-          onAdminEntraObjectIdChange(event.target.value)
-        }}
-      />
+      <p className="text-sm text-muted-foreground">
+        The currently logged-in Entra user will be granted the first Global Admin role.
+      </p>
+      <dl className="grid gap-2 text-sm">
+        <div><dt className="text-xs text-muted-foreground">Email</dt><dd>{setupContext.adminEmail}</dd></div>
+        <div><dt className="text-xs text-muted-foreground">Display Name</dt><dd>{setupContext.adminDisplayName}</dd></div>
+        <div><dt className="text-xs text-muted-foreground">Entra Object ID</dt><dd>{setupContext.adminEntraObjectId}</dd></div>
+      </dl>
     </section>
   )
 }

@@ -15,6 +15,14 @@ public class UserRepository : RepositoryBase<User>, IUserRepository
         return await DbContext.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
     }
 
+    public async Task<User?> GetByEntraObjectIdAsync(
+        string entraObjectId,
+        CancellationToken ct = default
+    )
+    {
+        return await DbContext.Users.FirstOrDefaultAsync(u => u.EntraObjectId == entraObjectId, ct);
+    }
+
     public async Task<User?> GetByIdWithRolesAsync(Guid id, CancellationToken ct = default)
     {
         return await DbContext

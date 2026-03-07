@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { exchangeCodeForTokens } from '@/server/auth'
+import { exchangeCodeForTokens, getClaimString } from '@/server/auth'
 import { redirectResponse } from '@/server/http'
 import { normalizeRoles } from '@/server/roles'
 import { getSession } from '@/server/session'
@@ -43,6 +43,8 @@ export const Route = createFileRoute('/auth/callback')({
         session.email = claims.preferred_username
         session.displayName = claims.name
         session.tenantId = claims.tid
+        session.tenantName = getClaimString(claims, ['tenant_display_name', 'tenant_name'])
+        session.entraRoles = claims.roles ?? []
         session.roles = normalizeRoles(claims.roles)
         session.oauthState = undefined
         await session.save()
