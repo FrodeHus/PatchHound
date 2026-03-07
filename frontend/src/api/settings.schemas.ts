@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const tenantCredentialsSchema = z.object({
   tenantId: z.string(),
   clientId: z.string(),
-  clientSecret: z.string(),
+  hasClientSecret: z.boolean(),
   apiBaseUrl: z.string(),
   tokenScope: z.string(),
 })

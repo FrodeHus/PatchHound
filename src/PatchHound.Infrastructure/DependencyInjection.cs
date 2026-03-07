@@ -8,7 +8,9 @@ using PatchHound.Infrastructure.AiProviders;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Options;
 using PatchHound.Infrastructure.Repositories;
+using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Tenants;
 using PatchHound.Infrastructure.VulnerabilitySources;
 
 namespace PatchHound.Infrastructure;
@@ -65,7 +67,10 @@ public static class DependencyInjection
         // Vulnerability Sources
         services.AddScoped<IVulnerabilitySource, DefenderVulnerabilitySource>();
         services.AddHttpClient<DefenderApiClient>();
+        services.AddHttpClient<ISecretStore, OpenBaoSecretStore>();
+        services.AddScoped<DefenderTenantConfigurationProvider>();
         services.Configure<DefenderOptions>(configuration.GetSection(DefenderOptions.SectionName));
+        services.Configure<OpenBaoOptions>(configuration.GetSection(OpenBaoOptions.SectionName));
 
         // Ingestion
         services.AddScoped<IngestionService>();

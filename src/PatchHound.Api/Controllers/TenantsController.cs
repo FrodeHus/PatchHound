@@ -2,13 +2,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Admin;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Options;
+using PatchHound.Infrastructure.Secrets;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Api.Controllers;
 
@@ -19,16 +19,17 @@ public class TenantsController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly DefenderOptions _defenderOptions;
+    private readonly ISecretStore _secretStore;
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    };
-
-    public TenantsController(PatchHoundDbContext dbContext, IOptions<DefenderOptions> defenderOptions)
+    public TenantsController(
+        PatchHoundDbContext dbContext,
+        IOptions<DefenderOptions> defenderOptions,
+        ISecretStore secretStore
+    )
     {
         _dbContext = dbContext;
         _defenderOptions = defenderOptions.Value;
+        _secretStore = secretStore;
     }
 
     [HttpGet]
@@ -98,14 +99,54 @@ public class TenantsController : ControllerBase
             return ValidationProblem("Tenant name is required.");
 
         tenant.UpdateName(request.Name.Trim());
+        var existingSources = TenantSourceSettings
+            .ReadSources(tenant.Settings, _defenderOptions)
+            .ToDictionary(source => source.Key, StringComparer.OrdinalIgnoreCase);
 
-        var settings = ParseSettingsObject(tenant.Settings);
-        settings["ingestionSources"] = JsonSerializer.SerializeToNode(
-            request.IngestionSources.Select(MapToPersistedSource).ToList(),
-            JsonOptions
-        );
+        var updatedSources = new List<PersistedIngestionSource>();
+        foreach (var source in request.IngestionSources)
+        {
+            existingSources.TryGetValue(source.Key, out var existingSource);
+            var secretRef = existingSource?.Credentials?.SecretRef ?? string.Empty;
+            var secretValue = source.Credentials.ClientSecret;
 
-        tenant.UpdateSettings(settings.ToJsonString(JsonOptions));
+            if (string.IsNullOrWhiteSpace(secretValue))
+            {
+                secretValue = existingSource?.Credentials?.ClientSecret ?? string.Empty;
+            }
+
+            if (!string.IsNullOrWhiteSpace(secretValue))
+            {
+                secretRef = $"tenants/{tenant.Id}/sources/{source.Key}";
+                await _secretStore.PutSecretAsync(
+                    secretRef,
+                    new Dictionary<string, string>
+                    {
+                        ["clientSecret"] = secretValue,
+                    },
+                    ct
+                );
+            }
+
+            updatedSources.Add(new PersistedIngestionSource
+            {
+                Key = source.Key,
+                DisplayName = source.DisplayName,
+                Enabled = source.Enabled,
+                SyncSchedule = source.SyncSchedule,
+                Credentials = new PersistedSourceCredentials
+                {
+                    TenantId = source.Credentials.TenantId,
+                    ClientId = source.Credentials.ClientId,
+                    ClientSecret = string.Empty,
+                    SecretRef = secretRef,
+                    ApiBaseUrl = source.Credentials.ApiBaseUrl,
+                    TokenScope = source.Credentials.TokenScope,
+                },
+            });
+        }
+
+        tenant.UpdateSettings(TenantSourceSettings.WriteSources(tenant.Settings, updatedSources));
         await _dbContext.SaveChangesAsync(ct);
 
         return NoContent();
@@ -137,125 +178,29 @@ public class TenantsController : ControllerBase
 
     private List<TenantIngestionSourceDto> GetIngestionSources(string settings)
     {
-        var defaults = new Dictionary<string, TenantIngestionSourceDto>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["microsoft-defender"] = new(
-                "microsoft-defender",
-                "Microsoft Defender",
-                false,
-                "0 */6 * * *",
+        return TenantSourceSettings
+            .ReadSources(settings, _defenderOptions)
+            .Select(source => new TenantIngestionSourceDto(
+                source.Key,
+                source.DisplayName,
+                source.Enabled,
+                source.SyncSchedule,
                 new TenantSourceCredentialsDto(
-                    string.Empty,
-                    string.Empty,
-                    string.Empty,
-                    string.IsNullOrWhiteSpace(_defenderOptions.ApiBaseUrl)
-                        ? "https://api.securitycenter.microsoft.com"
-                        : _defenderOptions.ApiBaseUrl,
-                    string.IsNullOrWhiteSpace(_defenderOptions.TokenScope)
-                        ? "https://api.securitycenter.microsoft.com/.default"
-                        : _defenderOptions.TokenScope
+                    source.Credentials?.TenantId ?? string.Empty,
+                    source.Credentials?.ClientId ?? string.Empty,
+                    !string.IsNullOrWhiteSpace(source.Credentials?.SecretRef)
+                        || !string.IsNullOrWhiteSpace(source.Credentials?.ClientSecret),
+                    source.Credentials?.ApiBaseUrl ?? string.Empty,
+                    source.Credentials?.TokenScope ?? string.Empty
                 )
-            ),
-        };
-
-        var settingsObject = ParseSettingsObject(settings);
-        var sourcesNode = settingsObject["ingestionSources"] as JsonArray;
-
-        if (sourcesNode is null)
-            return defaults.Values.ToList();
-
-        foreach (var node in sourcesNode)
-        {
-            if (node is null)
-                continue;
-
-            var parsed = node.Deserialize<PersistedIngestionSource>(JsonOptions);
-            if (parsed is null || string.IsNullOrWhiteSpace(parsed.Key))
-                continue;
-
-            var fallback = defaults.GetValueOrDefault(parsed.Key);
-            defaults[parsed.Key] = new TenantIngestionSourceDto(
-                parsed.Key,
-                string.IsNullOrWhiteSpace(parsed.DisplayName)
-                    ? fallback?.DisplayName ?? parsed.Key
-                    : parsed.DisplayName,
-                parsed.Enabled,
-                string.IsNullOrWhiteSpace(parsed.SyncSchedule) ? "0 */6 * * *" : parsed.SyncSchedule,
-                new TenantSourceCredentialsDto(
-                    parsed.Credentials?.TenantId ?? string.Empty,
-                    parsed.Credentials?.ClientId ?? string.Empty,
-                    parsed.Credentials?.ClientSecret ?? string.Empty,
-                    string.IsNullOrWhiteSpace(parsed.Credentials?.ApiBaseUrl)
-                        ? fallback?.Credentials.ApiBaseUrl ?? "https://api.securitycenter.microsoft.com"
-                        : parsed.Credentials.ApiBaseUrl,
-                    string.IsNullOrWhiteSpace(parsed.Credentials?.TokenScope)
-                        ? fallback?.Credentials.TokenScope ?? "https://api.securitycenter.microsoft.com/.default"
-                        : parsed.Credentials.TokenScope
-                )
-            );
-        }
-
-        return defaults.Values.OrderBy(source => source.DisplayName).ToList();
-    }
-
-    private static JsonObject ParseSettingsObject(string settings)
-    {
-        if (string.IsNullOrWhiteSpace(settings))
-            return [];
-
-        try
-        {
-            return JsonNode.Parse(settings) as JsonObject ?? [];
-        }
-        catch (JsonException)
-        {
-            return [];
-        }
+            ))
+            .ToList();
     }
 
     private static bool HasConfiguredCredentials(TenantSourceCredentialsDto credentials)
     {
         return !string.IsNullOrWhiteSpace(credentials.TenantId)
             || !string.IsNullOrWhiteSpace(credentials.ClientId)
-            || !string.IsNullOrWhiteSpace(credentials.ClientSecret);
-    }
-
-    private static PersistedIngestionSource MapToPersistedSource(
-        UpdateTenantIngestionSourceRequest request
-    )
-    {
-        return new PersistedIngestionSource
-        {
-            Key = request.Key,
-            DisplayName = request.DisplayName,
-            Enabled = request.Enabled,
-            SyncSchedule = request.SyncSchedule,
-            Credentials = new PersistedSourceCredentials
-            {
-                TenantId = request.Credentials.TenantId,
-                ClientId = request.Credentials.ClientId,
-                ClientSecret = request.Credentials.ClientSecret,
-                ApiBaseUrl = request.Credentials.ApiBaseUrl,
-                TokenScope = request.Credentials.TokenScope,
-            },
-        };
-    }
-
-    private sealed class PersistedIngestionSource
-    {
-        public string Key { get; set; } = string.Empty;
-        public string DisplayName { get; set; } = string.Empty;
-        public bool Enabled { get; set; }
-        public string SyncSchedule { get; set; } = string.Empty;
-        public PersistedSourceCredentials? Credentials { get; set; }
-    }
-
-    private sealed class PersistedSourceCredentials
-    {
-        public string TenantId { get; set; } = string.Empty;
-        public string ClientId { get; set; } = string.Empty;
-        public string ClientSecret { get; set; } = string.Empty;
-        public string ApiBaseUrl { get; set; } = string.Empty;
-        public string TokenScope { get; set; } = string.Empty;
+            || credentials.HasClientSecret;
     }
 }

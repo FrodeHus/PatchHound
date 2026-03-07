@@ -112,6 +112,51 @@ Notes:
 - `VITE_*` variables are not used by the current frontend server runtime.
 - API and Worker execute `Database.Migrate()` at startup, so the DB user must have migration privileges.
 
+## OpenBao Token Setup
+
+PatchHound uses OpenBao for tenant source secrets. The API and worker need an `OPENBAO_TOKEN` with read/write access to `patchhound/data/tenants/*`.
+
+1. Start and initialize OpenBao:
+
+```bash
+docker compose up -d openbao
+docker compose exec openbao bao operator init
+docker compose exec openbao bao operator unseal
+docker compose exec openbao bao login
+```
+
+2. Enable the KV mount used by PatchHound:
+
+```bash
+docker compose exec openbao bao secrets enable -path=patchhound kv-v2
+```
+
+3. Create a policy and token for PatchHound:
+
+```bash
+docker compose exec openbao sh -c 'cat >/tmp/patchhound-policy.hcl <<EOF
+path "patchhound/data/tenants/*" {
+  capabilities = ["create", "update", "read"]
+}
+EOF
+bao policy write patchhound /tmp/patchhound-policy.hcl
+bao token create -policy=patchhound'
+```
+
+4. Put the generated token in `.env`:
+
+```bash
+OPENBAO_TOKEN=replace-with-generated-token
+```
+
+5. Restart the backend services:
+
+```bash
+docker compose up -d --build api worker
+```
+
+If `OPENBAO_TOKEN` is missing, tenant secret writes will fail and the worker will only use environment-based Defender credentials as fallback.
+
 ## Entra ID Application Configuration
 
 Configure one Microsoft Entra app registration for local and Docker development:

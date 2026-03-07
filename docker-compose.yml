@@ -10,6 +10,22 @@ services:
     ports:
       - "5432:5432"
 
+  openbao:
+    image: openbao/openbao
+    command: server -config=/openbao/config/openbao.hcl
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - ./deploy/openbao/config:/openbao/config:ro
+      - openbao_data:/openbao/file
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD-SHELL", "bao status -address=http://127.0.0.1:8200 >/dev/null 2>&1 || test $? -eq 2"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   api:
     build:
       context: .
@@ -21,12 +37,16 @@ services:
       AzureAd__TenantId: ${AZURE_AD_TENANT_ID}
       AzureAd__Audience: ${AZURE_AD_AUDIENCE}
       AzureAd__EnablePiiLogging: ${AZURE_AD_ENABLE_PII_LOGGING:-false}
+      OpenBao__Address: ${OPENBAO_INTERNAL_ADDR:-http://openbao:8200}
+      OpenBao__Token: ${OPENBAO_TOKEN}
+      OpenBao__KvMount: ${OPENBAO_KV_MOUNT:-patchhound}
       Smtp__Host: ${SMTP_HOST}
       Smtp__Port: ${SMTP_PORT}
       Smtp__Username: ${SMTP_USERNAME}
       Smtp__Password: ${SMTP_PASSWORD}
     depends_on:
       - postgres
+      - openbao
     # No ports — internal only, accessed by frontend via Docker network
 
   worker:
@@ -41,8 +61,12 @@ services:
       Defender__TenantId: ${DEFENDER_TENANT_ID}
       Defender__ApiBaseUrl: ${DEFENDER_API_BASE_URL}
       Defender__TokenScope: ${DEFENDER_TOKEN_SCOPE}
+      OpenBao__Address: ${OPENBAO_INTERNAL_ADDR:-http://openbao:8200}
+      OpenBao__Token: ${OPENBAO_TOKEN}
+      OpenBao__KvMount: ${OPENBAO_KV_MOUNT:-patchhound}
     depends_on:
       - postgres
+      - openbao
 
   frontend:
     build:
@@ -65,3 +89,4 @@ services:
 
 volumes:
   pgdata:
+  openbao_data:

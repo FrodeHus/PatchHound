@@ -15,7 +15,7 @@ type TenantAdministrationDetailProps = {
 
 export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetailProps) {
   const [name, setName] = useState(tenant.name)
-  const [sources, setSources] = useState(tenant.ingestionSources)
+  const [sources, setSources] = useState(() => tenant.ingestionSources.map(mapSourceToDraft))
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
 
   const mutation = useMutation({
@@ -24,7 +24,19 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
         data: {
           tenantId: tenant.id,
           name: name.trim(),
-          ingestionSources: sources,
+          ingestionSources: sources.map((source) => ({
+            key: source.key,
+            displayName: source.displayName,
+            enabled: source.enabled,
+            syncSchedule: source.syncSchedule,
+            credentials: {
+              tenantId: source.credentials.tenantId,
+              clientId: source.credentials.clientId,
+              clientSecret: source.credentials.clientSecret,
+              apiBaseUrl: source.credentials.apiBaseUrl,
+              tokenScope: source.credentials.tokenScope,
+            },
+          })),
         },
       })
     },
@@ -38,12 +50,12 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
 
   const configuredSources = sources.filter((source) => {
     const credentials = source.credentials
-    return Boolean(credentials.tenantId || credentials.clientId || credentials.clientSecret)
+    return Boolean(credentials.tenantId || credentials.clientId || credentials.hasClientSecret)
   }).length
 
   function updateSource(
     key: string,
-    mutate: (current: TenantIngestionSource) => TenantIngestionSource,
+    mutate: (current: TenantIngestionSourceDraft) => TenantIngestionSourceDraft,
   ) {
     setSaveState('idle')
     setSources((current) => current.map((source) => (source.key === key ? mutate(source) : source)))
@@ -108,7 +120,7 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
       <div className="space-y-4">
         {sources.map((source) => {
           const isConfigured = Boolean(
-            source.credentials.tenantId || source.credentials.clientId || source.credentials.clientSecret,
+            source.credentials.tenantId || source.credentials.clientId || source.credentials.hasClientSecret,
           )
 
           return (
@@ -211,10 +223,15 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
                     <Input
                       type="password"
                       value={source.credentials.clientSecret}
+                      placeholder={source.credentials.hasClientSecret ? 'Stored in OpenBao. Enter a new value to rotate.' : 'Not configured'}
                       onChange={(event) => {
                         updateSource(source.key, (current) => ({
                           ...current,
-                          credentials: { ...current.credentials, clientSecret: event.target.value },
+                          credentials: {
+                            ...current.credentials,
+                            clientSecret: event.target.value,
+                            hasClientSecret: current.credentials.hasClientSecret || event.target.value.trim().length > 0,
+                          },
                         }))
                       }}
                     />
@@ -251,6 +268,22 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
       </div>
     </section>
   )
+}
+
+type TenantIngestionSourceDraft = Omit<TenantIngestionSource, 'credentials'> & {
+  credentials: TenantIngestionSource['credentials'] & {
+    clientSecret: string
+  }
+}
+
+function mapSourceToDraft(source: TenantIngestionSource): TenantIngestionSourceDraft {
+  return {
+    ...source,
+    credentials: {
+      ...source.credentials,
+      clientSecret: '',
+    },
+  }
 }
 
 type SnapshotRowProps = {

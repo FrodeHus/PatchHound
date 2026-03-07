@@ -25,7 +25,7 @@ public record TenantIngestionSourceDto(
 public record TenantSourceCredentialsDto(
     string TenantId,
     string ClientId,
-    string ClientSecret,
+    bool HasClientSecret,
     string ApiBaseUrl,
     string TokenScope
 );

@@ -4,9 +4,22 @@ import { apiGet, apiPut } from '@/server/api'
 import {
   pagedTenantSchema,
   tenantDetailSchema,
-  tenantIngestionSourceSchema,
 } from './settings.schemas'
 import { z } from 'zod'
+
+const updateTenantIngestionSourceSchema = z.object({
+  key: z.string(),
+  displayName: z.string(),
+  enabled: z.boolean(),
+  syncSchedule: z.string(),
+  credentials: z.object({
+    tenantId: z.string(),
+    clientId: z.string(),
+    clientSecret: z.string(),
+    apiBaseUrl: z.string(),
+    tokenScope: z.string(),
+  }),
+})
 
 export const fetchTenants = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
@@ -36,7 +49,7 @@ export const updateTenant = createServerFn({ method: 'POST' })
   .inputValidator(z.object({
     tenantId: z.string(),
     name: z.string().min(1),
-    ingestionSources: z.array(tenantIngestionSourceSchema),
+    ingestionSources: z.array(updateTenantIngestionSourceSchema),
   }))
   .handler(async ({ context, data: { tenantId, name, ingestionSources } }) => {
     await apiPut(`/tenants/${tenantId}`, context.token, { name, ingestionSources })
