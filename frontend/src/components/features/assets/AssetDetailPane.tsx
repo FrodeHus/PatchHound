@@ -174,6 +174,7 @@ function DeviceSection({
   metadata: MetadataRecord
 }) {
   const normalizedFields = [
+    { label: 'Machine Name', value: asset.deviceComputerDnsName ?? asset.name ?? 'Unknown' },
     { label: 'Health Status', value: asset.deviceHealthStatus ?? 'Unknown' },
     { label: 'OS Platform', value: asset.deviceOsPlatform ?? 'Unknown' },
     { label: 'OS Version', value: asset.deviceOsVersion ?? 'Unknown' },
