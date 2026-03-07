@@ -45,7 +45,7 @@ public class UsersController : ControllerBase
         var users = await query
             .OrderBy(u => u.DisplayName)
             .Skip(pagination.Skip)
-            .Take(pagination.PageSize)
+            .Take(pagination.BoundedPageSize)
             .Include(u => u.TenantRoles)
             .ToListAsync(ct);
 

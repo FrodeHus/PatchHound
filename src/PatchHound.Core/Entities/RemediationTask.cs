@@ -15,6 +15,7 @@ public class RemediationTask
     public DateTimeOffset DueDate { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+    public DateTimeOffset? LastSlaNotifiedAt { get; private set; }
 
     private RemediationTask() { }
 
@@ -55,5 +56,10 @@ public class RemediationTask
         AssigneeId = newAssigneeId;
         AssignedBy = assignedBy;
         UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void MarkSlaNotified()
+    {
+        LastSlaNotifiedAt = DateTimeOffset.UtcNow;
     }
 }

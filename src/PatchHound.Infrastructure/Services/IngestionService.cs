@@ -103,7 +103,7 @@ public class IngestionService
                     {
                         runtime.LastCompletedAt = DateTimeOffset.UtcNow;
                         runtime.LastStatus = "Failed";
-                        runtime.LastError = ex.Message;
+                        runtime.LastError = $"Ingestion failed: {ex.GetType().Name}";
                     },
                     ct
                 );
@@ -146,6 +146,8 @@ public class IngestionService
         CancellationToken ct
     )
     {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
+
         // Track which external IDs were seen in this ingestion run
         var seenExternalIds = new HashSet<string>();
         // Track assets created in this batch to avoid duplicate inserts
@@ -161,6 +163,7 @@ public class IngestionService
         await ResolveAbsentVulnerabilitiesAsync(tenantId, sourceName, seenExternalIds, ct);
 
         await _dbContext.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 
     private async Task UpsertVulnerabilityAsync(

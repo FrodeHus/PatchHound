@@ -30,11 +30,6 @@ public class SetupService : ISetupService
 
     public async Task<Result<Tenant>> CompleteSetupAsync(SetupRequest request, CancellationToken ct)
     {
-        if (await IsInitializedAsync(ct))
-        {
-            return Result<Tenant>.Failure("Application is already initialized");
-        }
-
         if (string.IsNullOrWhiteSpace(request.TenantName))
         {
             return Result<Tenant>.Failure("Tenant name is required");
@@ -58,6 +53,14 @@ public class SetupService : ISetupService
         if (string.IsNullOrWhiteSpace(request.AdminEntraObjectId))
         {
             return Result<Tenant>.Failure("Admin Entra object ID is required");
+        }
+
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(ct);
+
+        // Re-check inside the transaction to prevent TOCTOU race
+        if (await IsInitializedAsync(ct))
+        {
+            return Result<Tenant>.Failure("Application is already initialized");
         }
 
         var existingUser = await _userRepository.GetByEmailAsync(request.AdminEmail, ct);
@@ -84,6 +87,7 @@ public class SetupService : ISetupService
         await _userRepository.AddAsync(user, ct);
         await _userRepository.AddRoleAsync(role, ct);
         await _unitOfWork.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
 
         return Result<Tenant>.Success(tenant);
     }

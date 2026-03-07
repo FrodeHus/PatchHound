@@ -11,6 +11,7 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
     : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromHours(1);
+    private static readonly TimeSpan NotificationCooldown = TimeSpan.FromHours(24);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -39,6 +40,7 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
         var slaService = scope.ServiceProvider.GetRequiredService<SlaService>();
 
         var now = DateTimeOffset.UtcNow;
+        var cooldownThreshold = now - NotificationCooldown;
 
         // Get all open/in-progress tasks across all tenants
         var activeTasks = await dbContext
@@ -46,6 +48,7 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
             .Where(t =>
                 t.Status != RemediationTaskStatus.Completed
                 && t.Status != RemediationTaskStatus.RiskAccepted
+                && (t.LastSlaNotifiedAt == null || t.LastSlaNotifiedAt < cooldownThreshold)
             )
             .ToListAsync(ct);
 
@@ -73,6 +76,7 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
                         task.Id,
                         ct
                     );
+                    task.MarkSlaNotified();
                     break;
 
                 case SlaStatus.NearDue:
@@ -93,8 +97,11 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
                         task.Id,
                         ct
                     );
+                    task.MarkSlaNotified();
                     break;
             }
         }
+
+        await dbContext.SaveChangesAsync(ct);
     }
 }

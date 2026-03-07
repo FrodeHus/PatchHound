@@ -41,7 +41,7 @@ public class TeamsController : ControllerBase
         var items = await query
             .OrderBy(t => t.Name)
             .Skip(pagination.Skip)
-            .Take(pagination.PageSize)
+            .Take(pagination.BoundedPageSize)
             .Select(t => new TeamDto(t.Id, t.TenantId, t.Name, t.Members.Count))
             .ToListAsync(ct);
 
