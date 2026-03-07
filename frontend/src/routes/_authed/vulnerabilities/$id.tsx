@@ -12,7 +12,7 @@ function VulnerabilityDetailPage() {
 
   return (
     <section className="space-y-4">
-      <VulnerabilityDetail data={detail} />
+      <VulnerabilityDetail vulnerability={detail} />
     </section>
   )
 }
