@@ -19,6 +19,7 @@
 - Frontend setup: `cd frontend && npm install`
 - Frontend dev server: `npm run dev`
 - Frontend lint: `npm run lint`
+- Frontend typecheck: `npm run typecheck`
 - Frontend tests: `npm test`
 - Frontend production build: `npm run build`
 - Full stack via Docker: `docker compose up -d --build`
@@ -28,7 +29,7 @@
 - TypeScript/React: 2-space indentation, `PascalCase` components, `camelCase` variables/functions.
 - Keep API contracts in `*.schemas.ts` (Zod) and server calls in `*.functions.ts`.
 - Prefer explicit imports and small, feature-scoped components.
-- Run `npm run lint` before opening a PR.
+- Run `npm run lint` and `npm run typecheck` before opening a PR.
 
 ## Testing Guidelines
 - Backend: xUnit tests in `tests/PatchHound.Tests`, file pattern `*Tests.cs`.

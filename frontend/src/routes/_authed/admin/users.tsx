@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { fetchUsers } from '@/api/users.functions'
 import { updateUserRoles } from '@/api/users.functions'
 import { UserTable } from '@/components/features/admin/UserTable'
@@ -11,6 +11,7 @@ export const Route = createFileRoute('/_authed/admin/users')({
 
 function UsersPage() {
   const data = Route.useLoaderData()
+  const router = useRouter()
   const mutation = useMutation({
     mutationFn: async (payload: { userId: string; roles: Array<{ tenantId: string; role: string }> }) => {
       await updateUserRoles({
@@ -20,6 +21,7 @@ function UsersPage() {
         },
       })
     },
+    onSuccess: () => { void router.invalidate() },
   })
 
   return (

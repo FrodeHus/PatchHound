@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
 import { fetchAssets } from '@/api/assets.functions'
 import { assignAssetOwner, setAssetCriticality } from '@/api/assets.functions'
@@ -11,6 +11,7 @@ export const Route = createFileRoute('/_authed/assets/')({
 
 function AssetsPage() {
   const data = Route.useLoaderData()
+  const router = useRouter()
   const ownerMutation = useMutation({
     mutationFn: async (payload: { assetId: string; ownerType: 'User' | 'Team'; ownerId: string }) => {
       await assignAssetOwner({
@@ -21,6 +22,7 @@ function AssetsPage() {
         },
       })
     },
+    onSuccess: () => { void router.invalidate() },
   })
   const criticalityMutation = useMutation({
     mutationFn: async (payload: { assetId: string; criticality: string }) => {
@@ -31,6 +33,7 @@ function AssetsPage() {
         },
       })
     },
+    onSuccess: () => { void router.invalidate() },
   })
 
   return (

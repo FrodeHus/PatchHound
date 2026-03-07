@@ -1,5 +1,4 @@
 import { createServerFn } from '@tanstack/react-start'
-import { normalizeRoles } from '@/server/roles'
 import { apiGet } from '@/server/api'
 import { getSession } from '@/server/session'
 
@@ -17,12 +16,6 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       return null
     }
 
-    const roles = normalizeRoles(session.roles)
-    if ((session.roles ?? []).join('|') !== roles.join('|')) {
-      session.roles = roles
-      await session.save()
-    }
-
     let systemStatus: SystemStatus | null = null
     try {
       systemStatus = await apiGet<SystemStatus>('/system/status', session.accessToken)
@@ -34,7 +27,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       id: session.userId,
       email: session.email ?? '',
       displayName: session.displayName ?? '',
-      roles,
+      roles: session.roles ?? [],
       tenantId: session.tenantId,
       tenantIds: session.tenantIds ?? (session.tenantId ? [session.tenantId] : []),
       systemStatus,

@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost } from '@/server/api'
 import { pagedTeamsSchema } from './teams.schemas'
+import { buildFilterParams } from './utils'
 import { z } from 'zod'
 
 export const fetchTeams = createServerFn({ method: 'GET' })
@@ -14,11 +15,7 @@ export const fetchTeams = createServerFn({ method: 'GET' })
     }),
   )
   .handler(async ({ context, data: filters }) => {
-    const params = new URLSearchParams()
-    if (filters.tenantId) params.set('tenantId', filters.tenantId)
-    params.set('page', String(filters.page ?? 1))
-    params.set('pageSize', String(filters.pageSize ?? 50))
-
+    const params = buildFilterParams(filters)
     const data = await apiGet(`/teams?${params.toString()}`, context.token)
     return pagedTeamsSchema.parse(data)
   })

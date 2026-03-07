@@ -1,8 +1,5 @@
 import { z } from 'zod'
-
-const isoDateTimeSchema = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
-  message: 'Invalid datetime',
-})
+import { isoDateTimeSchema } from './common.schemas'
 
 export const vulnerabilitySchema = z.object({
   id: z.string().uuid(),

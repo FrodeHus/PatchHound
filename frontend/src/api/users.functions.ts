@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost, apiPut } from '@/server/api'
 import { pagedUsersSchema } from './users.schemas'
+import { buildFilterParams } from './utils'
 import { z } from 'zod'
 
 export const fetchUsers = createServerFn({ method: 'GET' })
@@ -13,9 +14,8 @@ export const fetchUsers = createServerFn({ method: 'GET' })
     }),
   )
   .handler(async ({ context, data: filters }) => {
-    const page = filters.page ?? 1
-    const pageSize = filters.pageSize ?? 50
-    const data = await apiGet(`/users?page=${page}&pageSize=${pageSize}`, context.token)
+    const params = buildFilterParams(filters)
+    const data = await apiGet(`/users?${params.toString()}`, context.token)
     return pagedUsersSchema.parse(data)
   })
 
@@ -23,7 +23,7 @@ export const inviteUser = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(
     z.object({
-      email: z.string(),
+      email: z.string().email(),
       displayName: z.string(),
       entraObjectId: z.string(),
     }),

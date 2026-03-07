@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { nullableIsoDateTimeSchema } from './common.schemas'
 
 export const tenantCredentialsSchema = z.object({
   tenantId: z.string(),
@@ -8,14 +9,10 @@ export const tenantCredentialsSchema = z.object({
   tokenScope: z.string(),
 })
 
-const nullableDateString = z.string().nullable().refine((value) => value === null || !Number.isNaN(Date.parse(value)), {
-  message: 'Invalid date',
-})
-
 export const tenantIngestionRuntimeSchema = z.object({
-  lastStartedAt: nullableDateString,
-  lastCompletedAt: nullableDateString,
-  lastSucceededAt: nullableDateString,
+  lastStartedAt: nullableIsoDateTimeSchema,
+  lastCompletedAt: nullableIsoDateTimeSchema,
+  lastSucceededAt: nullableIsoDateTimeSchema,
   lastStatus: z.string(),
   lastError: z.string(),
 })

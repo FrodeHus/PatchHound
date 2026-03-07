@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
 import { fetchTasks } from '@/api/tasks.functions'
 import { updateTaskStatus } from '@/api/tasks.functions'
@@ -11,6 +11,7 @@ export const Route = createFileRoute('/_authed/tasks/')({
 
 function TasksPage() {
   const data = Route.useLoaderData()
+  const router = useRouter()
   const mutation = useMutation({
     mutationFn: async (payload: { taskId: string; status: string; justification?: string }) => {
       await updateTaskStatus({
@@ -21,6 +22,7 @@ function TasksPage() {
         },
       })
     },
+    onSuccess: () => { void router.invalidate() },
   })
 
   return (

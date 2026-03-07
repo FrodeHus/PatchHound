@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isoDateTimeSchema } from './common.schemas'
 
 export const auditLogSchema = z.object({
   id: z.string().uuid(),
@@ -9,7 +10,7 @@ export const auditLogSchema = z.object({
   oldValues: z.string().nullable(),
   newValues: z.string().nullable(),
   userId: z.string().uuid(),
-  timestamp: z.string().datetime(),
+  timestamp: isoDateTimeSchema,
 })
 
 export const pagedAuditLogSchema = z.object({

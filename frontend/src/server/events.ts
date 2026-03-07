@@ -1,22 +1,26 @@
 type EventHandler = (event: string, data: unknown) => void
 
-// In-memory map of connected clients
-const clients = new Map<string, EventHandler>()
+let nextConnectionId = 0
+
+// In-memory map of connected clients keyed by connection ID
+const clients = new Map<number, { userId: string; handler: EventHandler }>()
 
 export function addClient(userId: string, handler: EventHandler): () => void {
-  clients.set(userId, handler)
-  return () => { clients.delete(userId) }
+  const connectionId = nextConnectionId++
+  clients.set(connectionId, { userId, handler })
+  return () => { clients.delete(connectionId) }
 }
 
 export function sendToUser(userId: string, event: string, data: unknown) {
-  const handler = clients.get(userId)
-  if (handler) {
-    handler(event, data)
+  for (const client of clients.values()) {
+    if (client.userId === userId) {
+      client.handler(event, data)
+    }
   }
 }
 
 export function broadcastToAll(event: string, data: unknown) {
-  for (const handler of clients.values()) {
-    handler(event, data)
+  for (const client of clients.values()) {
+    client.handler(event, data)
   }
 }

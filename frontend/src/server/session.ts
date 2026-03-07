@@ -25,7 +25,7 @@ const sessionOptions = {
   password: process.env.SESSION_SECRET!,
   cookieName: 'patchhound-session',
   cookieOptions: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: 'lax' as const,
     maxAge: 7 * 24 * 60 * 60, // 7 days

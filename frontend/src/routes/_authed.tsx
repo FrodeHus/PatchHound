@@ -4,7 +4,7 @@ import { AppShell } from '@/components/layout/AppShell'
 export const Route = createFileRoute('/_authed')({
   beforeLoad: async ({ context }) => {
     if (!context.user) {
-      throw redirect({ to: '/login' })
+      throw redirect({ to: '/auth/login' })
     }
     return { user: context.user }
   },
