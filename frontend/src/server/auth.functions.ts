@@ -1,6 +1,13 @@
 import { createServerFn } from '@tanstack/react-start'
 import { normalizeRoles } from '@/server/roles'
+import { apiGet } from '@/server/api'
 import { getSession } from '@/server/session'
+
+type SystemStatus = {
+  openBaoAvailable: boolean
+  openBaoInitialized: boolean
+  openBaoSealed: boolean
+}
 
 export const getCurrentUser = createServerFn({ method: 'GET' })
   .handler(async () => {
@@ -16,6 +23,13 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       await session.save()
     }
 
+    let systemStatus: SystemStatus | null = null
+    try {
+      systemStatus = await apiGet<SystemStatus>('/system/status', session.accessToken)
+    } catch {
+      systemStatus = null
+    }
+
     return {
       id: session.userId,
       email: session.email ?? '',
@@ -23,6 +37,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       roles,
       tenantId: session.tenantId,
       tenantIds: session.tenantIds ?? (session.tenantId ? [session.tenantId] : []),
+      systemStatus,
     }
   })
 

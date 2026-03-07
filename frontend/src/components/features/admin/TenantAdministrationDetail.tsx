@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
-import { ArrowLeft, Clock3, KeyRound, Landmark } from 'lucide-react'
-import { updateTenant } from '@/api/settings.functions'
+import { ArrowLeft, Clock3, KeyRound, Landmark, RotateCw } from 'lucide-react'
+import { triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
 import type { TenantDetail, TenantIngestionSource } from '@/api/settings.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,9 +14,12 @@ type TenantAdministrationDetailProps = {
 }
 
 export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetailProps) {
+  const router = useRouter()
   const [name, setName] = useState(tenant.name)
   const [sources, setSources] = useState(() => tenant.ingestionSources.map(mapSourceToDraft))
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
+  const [syncingSourceKey, setSyncingSourceKey] = useState<string | null>(null)
+  const [syncState, setSyncState] = useState<'idle' | 'success' | 'error'>('idle')
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -42,9 +45,35 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
     },
     onSuccess: () => {
       setSaveState('saved')
+      void router.invalidate()
     },
     onError: () => {
       setSaveState('error')
+    },
+  })
+
+  const syncMutation = useMutation({
+    mutationFn: async (sourceKey: string) => {
+      await triggerTenantIngestionSync({
+        data: {
+          tenantId: tenant.id,
+          sourceKey,
+        },
+      })
+    },
+    onMutate: (sourceKey) => {
+      setSyncingSourceKey(sourceKey)
+      setSyncState('idle')
+    },
+    onSuccess: async () => {
+      setSyncState('success')
+      await router.invalidate()
+    },
+    onError: () => {
+      setSyncState('error')
+    },
+    onSettled: () => {
+      setSyncingSourceKey(null)
     },
   })
 
@@ -113,6 +142,8 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
             <SnapshotRow icon={Clock3} label="Source Cards" value={String(sources.length)} />
             {saveState === 'saved' ? <p className="text-sm text-emerald-300">Tenant configuration saved.</p> : null}
             {saveState === 'error' ? <p className="text-sm text-destructive">Save failed. Try again.</p> : null}
+            {syncState === 'success' ? <p className="text-sm text-emerald-300">Ingestion sync started.</p> : null}
+            {syncState === 'error' ? <p className="text-sm text-destructive">Sync trigger failed. Try again.</p> : null}
           </CardContent>
         </Card>
       </div>
@@ -147,8 +178,40 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
                     {isConfigured ? 'Configured' : 'Needs credentials'}
                   </Badge>
                 </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>Last ingestion: {formatTimestamp(source.runtime.lastCompletedAt)}</span>
+                  {source.runtime.lastStatus ? (
+                    <Badge variant="outline" className="rounded-full border-border/70 bg-background/60 text-muted-foreground">
+                      {source.runtime.lastStatus}
+                    </Badge>
+                  ) : null}
+                </div>
               </CardHeader>
               <CardContent className="space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Manual ingestion sync</p>
+                    <p className="text-xs text-muted-foreground">
+                      Force a new source sync immediately. Last successful sync: {formatTimestamp(source.runtime.lastSucceededAt)}
+                    </p>
+                    {source.runtime.lastError ? (
+                      <p className="text-xs text-destructive">Last error: {source.runtime.lastError}</p>
+                    ) : null}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full"
+                    disabled={syncMutation.isPending || !source.enabled}
+                    onClick={() => {
+                      syncMutation.mutate(source.key)
+                    }}
+                  >
+                    <RotateCw className="size-4" />
+                    {syncingSourceKey === source.key ? 'Syncing...' : 'Run sync now'}
+                  </Button>
+                </div>
+
                 <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
                   <input
                     type="checkbox"
@@ -284,6 +347,22 @@ function mapSourceToDraft(source: TenantIngestionSource): TenantIngestionSourceD
       clientSecret: '',
     },
   }
+}
+
+function formatTimestamp(value: string | null) {
+  if (!value) {
+    return 'Never'
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat('en', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }
 
 type SnapshotRowProps = {

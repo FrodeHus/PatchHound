@@ -1,4 +1,4 @@
-import { Menu, LogOut, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, Menu, LogOut, ShieldCheck } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 import { TenantSelector } from '@/components/layout/TenantSelector'
+import { ThemeSelector } from '@/components/layout/ThemeSelector'
 import type { CurrentUser } from '@/server/auth.functions'
 
 type TopNavProps = {
@@ -66,15 +67,30 @@ export function TopNav({
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">Security posture command</h1>
-                <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200">
-                  <ShieldCheck className="size-3.5" />
-                  Data ingest active
+                <div
+                  className={user.systemStatus?.openBaoSealed
+                    ? 'flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs text-amber-200'
+                    : 'flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200'}
+                >
+                  {user.systemStatus?.openBaoSealed ? <AlertTriangle className="size-3.5" /> : <ShieldCheck className="size-3.5" />}
+                  {user.systemStatus?.openBaoSealed ? 'Data ingest paused' : 'Data ingest active'}
                 </div>
+                {user.systemStatus?.openBaoSealed ? (
+                  <Badge
+                    variant="outline"
+                    title="OpenBao is sealed. Unseal the vault to allow ingestion workers to read tenant credentials and start syncs."
+                    className="rounded-full border-amber-400/25 bg-amber-400/10 text-amber-200"
+                  >
+                    <AlertTriangle className="size-3.5" />
+                    OpenBao sealed
+                  </Badge>
+                ) : null}
               </div>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <ThemeSelector />
             <TenantSelector
               tenants={tenants}
               selectedTenantId={selectedTenantId}

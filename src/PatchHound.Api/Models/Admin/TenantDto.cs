@@ -19,7 +19,8 @@ public record TenantIngestionSourceDto(
     string DisplayName,
     bool Enabled,
     string SyncSchedule,
-    TenantSourceCredentialsDto Credentials
+    TenantSourceCredentialsDto Credentials,
+    TenantIngestionRuntimeDto Runtime
 );
 
 public record TenantSourceCredentialsDto(
@@ -28,6 +29,14 @@ public record TenantSourceCredentialsDto(
     bool HasClientSecret,
     string ApiBaseUrl,
     string TokenScope
+);
+
+public record TenantIngestionRuntimeDto(
+    DateTimeOffset? LastStartedAt,
+    DateTimeOffset? LastCompletedAt,
+    DateTimeOffset? LastSucceededAt,
+    string LastStatus,
+    string LastError
 );
 
 public record UpdateTenantRequest(string Name, List<UpdateTenantIngestionSourceRequest> IngestionSources);

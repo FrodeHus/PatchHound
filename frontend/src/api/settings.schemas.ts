@@ -8,12 +8,25 @@ export const tenantCredentialsSchema = z.object({
   tokenScope: z.string(),
 })
 
+const nullableDateString = z.string().nullable().refine((value) => value === null || !Number.isNaN(Date.parse(value)), {
+  message: 'Invalid date',
+})
+
+export const tenantIngestionRuntimeSchema = z.object({
+  lastStartedAt: nullableDateString,
+  lastCompletedAt: nullableDateString,
+  lastSucceededAt: nullableDateString,
+  lastStatus: z.string(),
+  lastError: z.string(),
+})
+
 export const tenantIngestionSourceSchema = z.object({
   key: z.string(),
   displayName: z.string(),
   enabled: z.boolean(),
   syncSchedule: z.string(),
   credentials: tenantCredentialsSchema,
+  runtime: tenantIngestionRuntimeSchema,
 })
 
 export const tenantListItemSchema = z.object({

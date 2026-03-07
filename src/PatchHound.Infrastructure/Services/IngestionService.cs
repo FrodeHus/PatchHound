@@ -5,6 +5,7 @@ using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Infrastructure.Services;
 
@@ -30,8 +31,30 @@ public class IngestionService
 
     public async Task RunIngestionAsync(Guid tenantId, CancellationToken ct)
     {
-        foreach (var source in _sources)
+        await RunIngestionAsync(tenantId, null, ct);
+    }
+
+    public async Task RunIngestionAsync(Guid tenantId, string? sourceKey, CancellationToken ct)
+    {
+        var sources = string.IsNullOrWhiteSpace(sourceKey)
+            ? _sources
+            : _sources.Where(source =>
+                string.Equals(source.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase));
+
+        foreach (var source in sources)
         {
+            await UpdateRuntimeStateAsync(
+                tenantId,
+                source.SourceKey,
+                runtime =>
+                {
+                    runtime.LastStartedAt = DateTimeOffset.UtcNow;
+                    runtime.LastStatus = "Running";
+                    runtime.LastError = string.Empty;
+                },
+                ct
+            );
+
             try
             {
                 _logger.LogInformation(
@@ -49,6 +72,20 @@ public class IngestionService
                     tenantId,
                     results.Count
                 );
+
+                await UpdateRuntimeStateAsync(
+                    tenantId,
+                    source.SourceKey,
+                    runtime =>
+                    {
+                        var now = DateTimeOffset.UtcNow;
+                        runtime.LastCompletedAt = now;
+                        runtime.LastSucceededAt = now;
+                        runtime.LastStatus = "Succeeded";
+                        runtime.LastError = string.Empty;
+                    },
+                    ct
+                );
             }
             catch (Exception ex)
             {
@@ -58,8 +95,48 @@ public class IngestionService
                     source.SourceName,
                     tenantId
                 );
+
+                await UpdateRuntimeStateAsync(
+                    tenantId,
+                    source.SourceKey,
+                    runtime =>
+                    {
+                        runtime.LastCompletedAt = DateTimeOffset.UtcNow;
+                        runtime.LastStatus = "Failed";
+                        runtime.LastError = ex.Message;
+                    },
+                    ct
+                );
             }
         }
+    }
+
+    private async Task UpdateRuntimeStateAsync(
+        Guid tenantId,
+        string sourceKey,
+        Action<PersistedIngestionRuntimeState> update,
+        CancellationToken ct
+    )
+    {
+        var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, ct);
+        if (tenant is null)
+        {
+            return;
+        }
+
+        var sources = TenantSourceSettings.ReadSources(tenant.Settings);
+        var source = sources.FirstOrDefault(item =>
+            string.Equals(item.Key, sourceKey, StringComparison.OrdinalIgnoreCase));
+
+        if (source is null)
+        {
+            return;
+        }
+
+        source.Runtime ??= new PersistedIngestionRuntimeState();
+        update(source.Runtime);
+        tenant.UpdateSettings(TenantSourceSettings.WriteSources(tenant.Settings, sources));
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     internal async Task ProcessResultsAsync(

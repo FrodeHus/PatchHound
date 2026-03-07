@@ -69,6 +69,27 @@ public class OpenBaoSecretStore : ISecretStore
         using var response = await SendAsync(request, ct);
     }
 
+    public async Task<OpenBaoStatus> GetStatusAsync(CancellationToken ct)
+    {
+        try
+        {
+            using var response = await _httpClient.GetAsync("/v1/sys/seal-status", ct);
+            response.EnsureSuccessStatusCode();
+
+            var payload = await response.Content.ReadFromJsonAsync<OpenBaoSealStatusResponse>(cancellationToken: ct);
+            return new OpenBaoStatus(
+                true,
+                payload?.Initialized ?? false,
+                payload?.Sealed ?? true
+            );
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            _logger.LogWarning(ex, "Unable to retrieve OpenBao seal status.");
+            return new OpenBaoStatus(false, false, true);
+        }
+    }
+
     private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
         try
@@ -106,6 +127,12 @@ public class OpenBaoSecretStore : ISecretStore
     private sealed class OpenBaoKvResponse
     {
         public OpenBaoKvData Data { get; set; } = new();
+    }
+
+    private sealed class OpenBaoSealStatusResponse
+    {
+        public bool Initialized { get; set; }
+        public bool Sealed { get; set; }
     }
 
     private sealed class OpenBaoKvData

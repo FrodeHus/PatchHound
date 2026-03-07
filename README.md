@@ -104,8 +104,8 @@ Reference defaults are in `.env.example`. Docker Compose consumes this file dire
 - Database: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
 - API auth: `AZURE_AD_CLIENT_ID`, `AZURE_AD_TENANT_ID`, `AZURE_AD_AUDIENCE`
 - API CORS/logout URL: `FRONTEND_ORIGIN`
+- OpenBao: `OPENBAO_ADDR`, `OPENBAO_INTERNAL_ADDR`, `OPENBAO_TOKEN`, `OPENBAO_KV_MOUNT`
 - SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`
-- Worker Defender ingestion: `DEFENDER_CLIENT_ID`, `DEFENDER_CLIENT_SECRET`, `DEFENDER_TENANT_ID`, `DEFENDER_API_BASE_URL`, `DEFENDER_TOKEN_SCOPE`
 - Frontend server runtime: `API_BASE_URL`, `SESSION_SECRET`, `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`, `ENTRA_TENANT_ID`, `ENTRA_REDIRECT_URI`, `ENTRA_SCOPES`, `FRONTEND_ORIGIN`
 
 Notes:
@@ -155,7 +155,7 @@ OPENBAO_TOKEN=replace-with-generated-token
 docker compose up -d --build api worker
 ```
 
-If `OPENBAO_TOKEN` is missing, tenant secret writes will fail and the worker will only use environment-based Defender credentials as fallback.
+If `OPENBAO_TOKEN` is missing, tenant secret writes will fail and the worker will not be able to read tenant ingestion credentials.
 
 If you run `bao` outside the container or before the container environment is refreshed, use the HTTP address explicitly:
 

@@ -1,20 +1,20 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using PatchHound.Infrastructure.Options;
-
 namespace PatchHound.Infrastructure.Tenants;
 
 public static class TenantSourceSettings
 {
-    private const string DefaultDefenderSchedule = "0 */6 * * *";
-    private const string DefenderSourceKey = "microsoft-defender";
+    public const string DefaultDefenderSchedule = "0 */6 * * *";
+    public const string DefenderSourceKey = "microsoft-defender";
+    public const string DefaultDefenderApiBaseUrl = "https://api.securitycenter.microsoft.com";
+    public const string DefaultDefenderTokenScope = "https://api.securitycenter.microsoft.com/.default";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    public static List<PersistedIngestionSource> ReadSources(string settings, DefenderOptions defaults)
+    public static List<PersistedIngestionSource> ReadSources(string settings)
     {
         var configuredSources = ParseSettingsObject(settings)["ingestionSources"] as JsonArray;
         var sources = configuredSources?
@@ -22,7 +22,7 @@ public static class TenantSourceSettings
 
         if (sources.Any(source => string.Equals(source.Key, DefenderSourceKey, StringComparison.OrdinalIgnoreCase)))
         {
-            return NormalizeSources(sources, defaults);
+            return NormalizeSources(sources);
         }
 
         sources.Add(new PersistedIngestionSource
@@ -33,12 +33,12 @@ public static class TenantSourceSettings
             SyncSchedule = DefaultDefenderSchedule,
             Credentials = new PersistedSourceCredentials
             {
-                ApiBaseUrl = DefaultIfEmpty(defaults.ApiBaseUrl, "https://api.securitycenter.microsoft.com"),
-                TokenScope = DefaultIfEmpty(defaults.TokenScope, "https://api.securitycenter.microsoft.com/.default"),
+                ApiBaseUrl = DefaultDefenderApiBaseUrl,
+                TokenScope = DefaultDefenderTokenScope,
             },
         });
 
-        return NormalizeSources(sources, defaults);
+        return NormalizeSources(sources);
     }
 
     public static string WriteSources(
@@ -54,10 +54,15 @@ public static class TenantSourceSettings
         return settings.ToJsonString(JsonOptions);
     }
 
-    private static List<PersistedIngestionSource> NormalizeSources(
-        IEnumerable<PersistedIngestionSource> sources,
-        DefenderOptions defaults
-    )
+    public static bool HasConfiguredCredentials(PersistedSourceCredentials? credentials)
+    {
+        return !string.IsNullOrWhiteSpace(credentials?.TenantId)
+            || !string.IsNullOrWhiteSpace(credentials?.ClientId)
+            || !string.IsNullOrWhiteSpace(credentials?.SecretRef)
+            || !string.IsNullOrWhiteSpace(credentials?.ClientSecret);
+    }
+
+    private static List<PersistedIngestionSource> NormalizeSources(IEnumerable<PersistedIngestionSource> sources)
     {
         return sources
             .Where(source => !string.IsNullOrWhiteSpace(source.Key))
@@ -75,13 +80,14 @@ public static class TenantSourceSettings
                     SecretRef = source.Credentials?.SecretRef ?? string.Empty,
                     ApiBaseUrl = DefaultIfEmpty(
                         source.Credentials?.ApiBaseUrl,
-                        DefaultIfEmpty(defaults.ApiBaseUrl, "https://api.securitycenter.microsoft.com")
+                        DefaultDefenderApiBaseUrl
                     ),
                     TokenScope = DefaultIfEmpty(
                         source.Credentials?.TokenScope,
-                        DefaultIfEmpty(defaults.TokenScope, "https://api.securitycenter.microsoft.com/.default")
+                        DefaultDefenderTokenScope
                     ),
                 },
+                Runtime = source.Runtime ?? new PersistedIngestionRuntimeState(),
             })
             .OrderBy(source => source.DisplayName)
             .ToList();
@@ -115,6 +121,7 @@ public class PersistedIngestionSource
     public bool Enabled { get; set; }
     public string SyncSchedule { get; set; } = string.Empty;
     public PersistedSourceCredentials? Credentials { get; set; }
+    public PersistedIngestionRuntimeState Runtime { get; set; } = new();
 }
 
 public class PersistedSourceCredentials
@@ -125,4 +132,13 @@ public class PersistedSourceCredentials
     public string SecretRef { get; set; } = string.Empty;
     public string ApiBaseUrl { get; set; } = string.Empty;
     public string TokenScope { get; set; } = string.Empty;
+}
+
+public class PersistedIngestionRuntimeState
+{
+    public DateTimeOffset? LastStartedAt { get; set; }
+    public DateTimeOffset? LastCompletedAt { get; set; }
+    public DateTimeOffset? LastSucceededAt { get; set; }
+    public string LastStatus { get; set; } = string.Empty;
+    public string LastError { get; set; } = string.Empty;
 }

@@ -58,11 +58,6 @@ services:
     environment:
       DOTNET_ENVIRONMENT: ${WORKER_ENVIRONMENT:-Development}
       ConnectionStrings__PatchHound: Host=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
-      Defender__ClientId: ${DEFENDER_CLIENT_ID}
-      Defender__ClientSecret: ${DEFENDER_CLIENT_SECRET}
-      Defender__TenantId: ${DEFENDER_TENANT_ID}
-      Defender__ApiBaseUrl: ${DEFENDER_API_BASE_URL}
-      Defender__TokenScope: ${DEFENDER_TOKEN_SCOPE}
       OpenBao__Address: ${OPENBAO_INTERNAL_ADDR:-http://openbao:8200}
       OpenBao__Token: ${OPENBAO_TOKEN:-}
       OpenBao__KvMount: ${OPENBAO_KV_MOUNT:-patchhound}

@@ -32,6 +32,7 @@ public class IngestionServiceTests : IDisposable
         _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(tenantContext));
 
         _source = Substitute.For<IVulnerabilitySource>();
+        _source.SourceKey.Returns("test-source");
         _source.SourceName.Returns("TestSource");
 
         var logger = Substitute.For<ILogger<IngestionService>>();

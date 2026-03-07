@@ -69,7 +69,6 @@ public static class DependencyInjection
         services.AddHttpClient<DefenderApiClient>();
         services.AddHttpClient<ISecretStore, OpenBaoSecretStore>();
         services.AddScoped<DefenderTenantConfigurationProvider>();
-        services.Configure<DefenderOptions>(configuration.GetSection(DefenderOptions.SectionName));
         services.Configure<OpenBaoOptions>(configuration.GetSection(OpenBaoOptions.SectionName));
 
         // Ingestion

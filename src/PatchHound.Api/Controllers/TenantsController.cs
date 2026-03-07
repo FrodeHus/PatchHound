@@ -1,13 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Admin;
 using PatchHound.Infrastructure.Data;
-using PatchHound.Infrastructure.Options;
 using PatchHound.Infrastructure.Secrets;
+using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Api.Controllers;
@@ -18,18 +17,18 @@ namespace PatchHound.Api.Controllers;
 public class TenantsController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
-    private readonly DefenderOptions _defenderOptions;
     private readonly ISecretStore _secretStore;
+    private readonly IngestionService _ingestionService;
 
     public TenantsController(
         PatchHoundDbContext dbContext,
-        IOptions<DefenderOptions> defenderOptions,
-        ISecretStore secretStore
+        ISecretStore secretStore,
+        IngestionService ingestionService
     )
     {
         _dbContext = dbContext;
-        _defenderOptions = defenderOptions.Value;
         _secretStore = secretStore;
+        _ingestionService = ingestionService;
     }
 
     [HttpGet]
@@ -100,7 +99,7 @@ public class TenantsController : ControllerBase
 
         tenant.UpdateName(request.Name.Trim());
         var existingSources = TenantSourceSettings
-            .ReadSources(tenant.Settings, _defenderOptions)
+            .ReadSources(tenant.Settings)
             .ToDictionary(source => source.Key, StringComparer.OrdinalIgnoreCase);
 
         var updatedSources = new List<PersistedIngestionSource>();
@@ -152,6 +151,27 @@ public class TenantsController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("{id:guid}/ingestion-sources/{sourceKey}/sync")]
+    [Authorize(Policy = Policies.ConfigureTenant)]
+    public async Task<IActionResult> TriggerSync(Guid id, string sourceKey, CancellationToken ct)
+    {
+        var tenant = await _dbContext.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (tenant is null)
+            return NotFound();
+
+        var configuredSource = TenantSourceSettings
+            .ReadSources(tenant.Settings)
+            .FirstOrDefault(source => string.Equals(source.Key, sourceKey, StringComparison.OrdinalIgnoreCase));
+
+        if (configuredSource is null)
+        {
+            return NotFound(new ProblemDetails { Title = "Ingestion source not found" });
+        }
+
+        await _ingestionService.RunIngestionAsync(id, sourceKey, ct);
+        return NoContent();
+    }
+
     [HttpPut("{id:guid}/settings")]
     [Authorize(Policy = Policies.ConfigureTenant)]
     public async Task<IActionResult> UpdateSettings(
@@ -179,7 +199,7 @@ public class TenantsController : ControllerBase
     private List<TenantIngestionSourceDto> GetIngestionSources(string settings)
     {
         return TenantSourceSettings
-            .ReadSources(settings, _defenderOptions)
+            .ReadSources(settings)
             .Select(source => new TenantIngestionSourceDto(
                 source.Key,
                 source.DisplayName,
@@ -192,6 +212,13 @@ public class TenantsController : ControllerBase
                         || !string.IsNullOrWhiteSpace(source.Credentials?.ClientSecret),
                     source.Credentials?.ApiBaseUrl ?? string.Empty,
                     source.Credentials?.TokenScope ?? string.Empty
+                ),
+                new TenantIngestionRuntimeDto(
+                    source.Runtime?.LastStartedAt,
+                    source.Runtime?.LastCompletedAt,
+                    source.Runtime?.LastSucceededAt,
+                    source.Runtime?.LastStatus ?? string.Empty,
+                    source.Runtime?.LastError ?? string.Empty
                 )
             ))
             .ToList();

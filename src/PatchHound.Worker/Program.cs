@@ -3,6 +3,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Options;
+using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.VulnerabilitySources;
 using PatchHound.Worker;
@@ -19,10 +20,10 @@ builder.Services.AddScoped<ITenantContext, WorkerTenantContext>();
 
 // Ingestion pipeline
 builder.Services.AddScoped<IngestionService>();
-builder.Services.Configure<DefenderOptions>(
-    builder.Configuration.GetSection(DefenderOptions.SectionName)
-);
 builder.Services.AddHttpClient<DefenderApiClient>();
+builder.Services.AddHttpClient<ISecretStore, OpenBaoSecretStore>();
+builder.Services.Configure<OpenBaoOptions>(builder.Configuration.GetSection(OpenBaoOptions.SectionName));
+builder.Services.AddScoped<DefenderTenantConfigurationProvider>();
 builder.Services.AddScoped<IVulnerabilitySource, DefenderVulnerabilitySource>();
 
 // Notification services
