@@ -57,10 +57,13 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
             var sources = TenantSourceSettings.ReadSources(tenant.Settings);
             var now = DateTimeOffset.UtcNow;
 
-            foreach (var source in sources.Where(source => IngestionScheduleEvaluator.IsDue(source, now)))
+            foreach (var source in sources.Where(source =>
+                IsManualSyncQueued(source) || IngestionScheduleEvaluator.IsDue(source, now)))
             {
+                var isManualSync = IsManualSyncQueued(source);
                 logger.LogInformation(
-                    "Running scheduled ingestion for tenant {TenantId} ({TenantName}) and source {SourceKey}",
+                    "Running {TriggerType} ingestion for tenant {TenantId} ({TenantName}) and source {SourceKey}",
+                    isManualSync ? "manual" : "scheduled",
                     tenant.Id,
                     tenant.Name,
                     source.Key
@@ -69,5 +72,22 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
                 await ingestionService.RunIngestionAsync(tenant.Id, source.Key, ct);
             }
         }
+    }
+
+    private static bool IsManualSyncQueued(PersistedIngestionSource source)
+    {
+        if (!source.Enabled || !TenantSourceSettings.HasConfiguredCredentials(source.Credentials))
+        {
+            return false;
+        }
+
+        var manualRequestedAt = source.Runtime?.ManualRequestedAt?.ToUniversalTime();
+        if (!manualRequestedAt.HasValue)
+        {
+            return false;
+        }
+
+        var lastStartedAt = source.Runtime?.LastStartedAt?.ToUniversalTime();
+        return !lastStartedAt.HasValue || manualRequestedAt > lastStartedAt;
     }
 }

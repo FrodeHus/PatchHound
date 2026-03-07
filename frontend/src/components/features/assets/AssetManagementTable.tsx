@@ -5,16 +5,25 @@ type AssetManagementTableProps = {
   assets: Asset[]
   totalCount: number
   isUpdating: boolean
+  selectedAssetId: string | null
+  assetTypeFilter: string
+  onAssetTypeFilterChange: (assetType: string) => void
+  onSelectAsset: (assetId: string) => void
   onAssignOwner: (assetId: string, ownerType: 'User' | 'Team', ownerId: string) => void
   onSetCriticality: (assetId: string, criticality: string) => void
 }
 
 const criticalityOptions = ['Low', 'Medium', 'High', 'Critical']
+const assetTypeOptions = ['All', 'Device', 'Software', 'CloudResource']
 
 export function AssetManagementTable({
   assets,
   totalCount,
   isUpdating,
+  selectedAssetId,
+  assetTypeFilter,
+  onAssetTypeFilterChange,
+  onSelectAsset,
   onAssignOwner,
   onSetCriticality,
 }: AssetManagementTableProps) {
@@ -28,7 +37,20 @@ export function AssetManagementTable({
         <p className="text-xs text-muted-foreground">{totalCount} total</p>
       </div>
 
-      <div className="mb-3 grid gap-2 rounded-md border border-border/70 bg-muted/30 p-3 md:grid-cols-[120px_1fr_auto]">
+      <div className="mb-3 grid gap-2 rounded-md border border-border/70 bg-muted/30 p-3 md:grid-cols-[140px_120px_1fr_auto]">
+        <select
+          className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+          value={assetTypeFilter}
+          onChange={(event) => {
+            onAssetTypeFilterChange(event.target.value)
+          }}
+        >
+          {assetTypeOptions.map((option) => (
+            <option key={option} value={option === 'All' ? '' : option}>
+              {option}
+            </option>
+          ))}
+        </select>
         <select
           className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
           value={ownerType}
@@ -52,7 +74,7 @@ export function AssetManagementTable({
           }}
           placeholder="Owner GUID"
         />
-        <p className="self-center text-xs text-muted-foreground">Used for "Assign Owner" action per row.</p>
+        <p className="self-center text-xs text-muted-foreground">Filter by type, then use row actions or open the inspector from the name or ID.</p>
       </div>
 
       <div className="overflow-x-auto">
@@ -77,9 +99,40 @@ export function AssetManagementTable({
               </tr>
             ) : (
               assets.map((asset) => (
-                <tr key={asset.id} className="border-b border-border/60">
-                  <td className="py-2 pr-2 font-medium">{asset.name}</td>
-                  <td className="py-2 pr-2">{asset.externalId}</td>
+                <tr
+                  key={asset.id}
+                  className={[
+                    'border-b border-border/60 transition',
+                    selectedAssetId === asset.id ? 'bg-muted/40' : 'hover:bg-muted/10',
+                  ].join(' ')}
+                >
+                  <td className="py-2 pr-2 font-medium">
+                    <button
+                      type="button"
+                      className="flex text-left"
+                      onClick={() => {
+                        onSelectAsset(asset.id)
+                      }}
+                    >
+                      <span className="flex flex-col">
+                        <span className="font-medium underline decoration-border underline-offset-4 transition hover:decoration-foreground">
+                          {asset.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">Open inspector</span>
+                      </span>
+                    </button>
+                  </td>
+                  <td className="py-2 pr-2">
+                    <button
+                      type="button"
+                      className="font-mono text-left text-xs underline decoration-border underline-offset-4 transition hover:decoration-foreground"
+                      onClick={() => {
+                        onSelectAsset(asset.id)
+                      }}
+                    >
+                      {asset.externalId}
+                    </button>
+                  </td>
                   <td className="py-2 pr-2">{asset.assetType}</td>
                   <td className="py-2 pr-2">{asset.ownerType}</td>
                   <td className="py-2 pr-2">
@@ -88,6 +141,9 @@ export function AssetManagementTable({
                       defaultValue={asset.criticality}
                       onChange={(event) => {
                         onSetCriticality(asset.id, event.target.value)
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation()
                       }}
                       disabled={isUpdating}
                     >
@@ -104,7 +160,8 @@ export function AssetManagementTable({
                       type="button"
                       className="rounded-md border border-input px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
                       disabled={isUpdating || ownerId.trim().length === 0}
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation()
                         onAssignOwner(asset.id, ownerType, ownerId)
                       }}
                     >

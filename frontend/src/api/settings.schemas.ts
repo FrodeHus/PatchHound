@@ -10,6 +10,7 @@ export const tenantCredentialsSchema = z.object({
 })
 
 export const tenantIngestionRuntimeSchema = z.object({
+  manualRequestedAt: nullableIsoDateTimeSchema,
   lastStartedAt: nullableIsoDateTimeSchema,
   lastCompletedAt: nullableIsoDateTimeSchema,
   lastSucceededAt: nullableIsoDateTimeSchema,

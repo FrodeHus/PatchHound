@@ -32,6 +32,7 @@ public record TenantSourceCredentialsDto(
 );
 
 public record TenantIngestionRuntimeDto(
+    DateTimeOffset? ManualRequestedAt,
     DateTimeOffset? LastStartedAt,
     DateTimeOffset? LastCompletedAt,
     DateTimeOffset? LastSucceededAt,

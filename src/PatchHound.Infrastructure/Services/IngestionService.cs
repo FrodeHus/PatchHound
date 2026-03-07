@@ -48,6 +48,7 @@ public class IngestionService
                 source.SourceKey,
                 runtime =>
                 {
+                    runtime.ManualRequestedAt = null;
                     runtime.LastStartedAt = DateTimeOffset.UtcNow;
                     runtime.LastStatus = "Running";
                     runtime.LastError = string.Empty;
@@ -65,6 +66,12 @@ public class IngestionService
 
                 var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
                 await ProcessResultsAsync(tenantId, source.SourceName, results, ct);
+
+                if (source is IAssetInventorySource assetInventorySource)
+                {
+                    var assets = await assetInventorySource.FetchAssetsAsync(tenantId, ct);
+                    await ProcessAssetsAsync(tenantId, assets, ct);
+                }
 
                 _logger.LogInformation(
                     "Completed ingestion from {Source} for tenant {TenantId}: {Count} vulnerabilities",
@@ -215,7 +222,14 @@ public class IngestionService
         // Process affected assets
         foreach (var affectedAsset in result.AffectedAssets)
         {
-            await UpsertVulnerabilityAssetAsync(tenantId, existing!, affectedAsset, isNew, pendingAssets, ct);
+            await UpsertVulnerabilityAssetAsync(
+                tenantId,
+                existing!,
+                affectedAsset,
+                isNew,
+                pendingAssets,
+                ct
+            );
         }
     }
 
@@ -252,6 +266,10 @@ public class IngestionService
 
             await _dbContext.Assets.AddAsync(asset, ct);
             pendingAssets[assetKey] = asset;
+        }
+        else if (!string.Equals(asset.Name, affectedAsset.AssetName, StringComparison.Ordinal))
+        {
+            asset.UpdateDetails(affectedAsset.AssetName, asset.Description);
         }
 
         // Check if VulnerabilityAsset already exists
@@ -373,5 +391,42 @@ public class IngestionService
                 );
             }
         }
+    }
+
+    internal async Task ProcessAssetsAsync(
+        Guid tenantId,
+        IReadOnlyList<IngestionAsset> assets,
+        CancellationToken ct
+    )
+    {
+        foreach (var asset in assets)
+        {
+            var existing = await _dbContext
+                .Assets.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(
+                    current => current.ExternalId == asset.ExternalId && current.TenantId == tenantId,
+                    ct
+                );
+
+            if (existing is null)
+            {
+                existing = Asset.Create(
+                    tenantId,
+                    asset.ExternalId,
+                    asset.AssetType,
+                    asset.Name,
+                    Criticality.Medium,
+                    asset.Description
+                );
+                existing.UpdateMetadata(asset.Metadata);
+                await _dbContext.Assets.AddAsync(existing, ct);
+                continue;
+            }
+
+            existing.UpdateDetails(asset.Name, asset.Description);
+            existing.UpdateMetadata(asset.Metadata);
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
     }
 }

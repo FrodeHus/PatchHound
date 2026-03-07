@@ -152,6 +152,7 @@ public class PersistedSourceCredentials
 
 public class PersistedIngestionRuntimeState
 {
+    public DateTimeOffset? ManualRequestedAt { get; set; }
     public DateTimeOffset? LastStartedAt { get; set; }
     public DateTimeOffset? LastCompletedAt { get; set; }
     public DateTimeOffset? LastSucceededAt { get; set; }

@@ -60,6 +60,12 @@ public class Asset
         Criticality = criticality;
     }
 
+    public void UpdateDetails(string name, string? description = null)
+    {
+        Name = name;
+        Description = description;
+    }
+
     public void UpdateMetadata(string metadata)
     {
         Metadata = metadata;
