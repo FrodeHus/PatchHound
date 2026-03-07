@@ -64,7 +64,7 @@ export function AssetManagementTable({
           }}
         >
           <option value="User">User</option>
-          <option value="Team">Team</option>
+          <option value="Team">Assignment Group</option>
         </select>
         <input
           className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
@@ -72,7 +72,7 @@ export function AssetManagementTable({
           onChange={(event) => {
             setOwnerId(event.target.value)
           }}
-          placeholder="Owner GUID"
+          placeholder="Owner or assignment group GUID"
         />
         <p className="self-center text-xs text-muted-foreground">Filter by type, then click the asset name to inspect details.</p>
       </div>
@@ -84,7 +84,7 @@ export function AssetManagementTable({
               <th className="py-2 pr-2">Name</th>
               <th className="py-2 pr-2">External ID</th>
               <th className="py-2 pr-2">Type</th>
-              <th className="py-2 pr-2">Owner Type</th>
+              <th className="py-2 pr-2">Assigned To</th>
               <th className="py-2 pr-2">Recurring</th>
               <th className="py-2 pr-2">Criticality</th>
               <th className="py-2 pr-2">Vulnerabilities</th>
@@ -94,7 +94,7 @@ export function AssetManagementTable({
           <tbody>
             {assets.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-3 text-muted-foreground">
+                <td colSpan={8} className="py-3 text-muted-foreground">
                   No assets found.
                 </td>
               </tr>
@@ -120,7 +120,7 @@ export function AssetManagementTable({
                   </td>
                   <td className="py-2 pr-2 font-mono text-xs">{asset.externalId}</td>
                   <td className="py-2 pr-2">{asset.assetType}</td>
-                  <td className="py-2 pr-2">{asset.ownerType}</td>
+                  <td className="py-2 pr-2">{asset.ownerType === 'Team' ? 'Assignment Group' : asset.ownerType}</td>
                   <td className="py-2 pr-2">
                     {asset.recurringVulnerabilityCount > 0 ? (
                       <span className="rounded-full border border-amber-300/70 bg-amber-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.14em] text-amber-900">

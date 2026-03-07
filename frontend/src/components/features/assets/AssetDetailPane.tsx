@@ -78,11 +78,11 @@ export function AssetDetailPane({
 
               <section className="grid gap-3 md:grid-cols-2">
                 {asset.ownerType === 'Team' ? (
-                  <DataCard label="Owner Team" value={asset.ownerTeamId ?? 'Unassigned'} mono />
+                  <DataCard label="Assignment Group" value={asset.ownerTeamId ?? 'Unassigned'} mono />
                 ) : (
                   <DataCard label="Owner User" value={asset.ownerUserId ?? 'Unassigned'} mono />
                 )}
-                <DataCard label="Fallback Team" value={asset.fallbackTeamId ?? 'None'} mono />
+                <DataCard label="Fallback Assignment Group" value={asset.fallbackTeamId ?? 'None'} mono />
               </section>
 
               {asset.assetType === 'Software' ? (
