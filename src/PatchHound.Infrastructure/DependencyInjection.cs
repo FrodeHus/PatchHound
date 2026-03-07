@@ -23,8 +23,11 @@ public static class DependencyInjection
     )
     {
         // Database
-        services.AddDbContext<PatchHoundDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("PatchHound"))
+        services.AddScoped<AuditSaveChangesInterceptor>();
+        services.AddDbContext<PatchHoundDbContext>((sp, options) =>
+            options
+                .UseNpgsql(configuration.GetConnectionString("PatchHound"))
+                .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>())
         );
 
         // Unit of Work
@@ -60,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<EnvironmentalSeverityCalculator>();
         services.AddScoped<VulnerabilityAssessmentService>();
         services.AddScoped<IVulnerabilityEnricher, NvdVulnerabilityEnricher>();
+        services.AddScoped<AuditLogWriter>();
 
         // Notifications & Email
         services.AddScoped<INotificationService, EmailNotificationService>();

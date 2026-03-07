@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models.System;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
+using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.Tenants;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,11 +19,17 @@ public class SystemController : ControllerBase
 {
     private readonly ISecretStore _secretStore;
     private readonly PatchHoundDbContext _dbContext;
+    private readonly AuditLogWriter _auditLogWriter;
 
-    public SystemController(ISecretStore secretStore, PatchHoundDbContext dbContext)
+    public SystemController(
+        ISecretStore secretStore,
+        PatchHoundDbContext dbContext,
+        AuditLogWriter auditLogWriter
+    )
     {
         _secretStore = secretStore;
         _dbContext = dbContext;
+        _auditLogWriter = auditLogWriter;
     }
 
     [HttpGet("status")]
@@ -81,6 +89,7 @@ public class SystemController : ControllerBase
 
             if (!string.IsNullOrWhiteSpace(secretValue))
             {
+                var hadSecret = !string.IsNullOrWhiteSpace(secretRef);
                 secretRef = $"system/enrichment-sources/{source.Key}";
                 await _secretStore.PutSecretAsync(
                     secretRef,
@@ -90,6 +99,31 @@ public class SystemController : ControllerBase
                     },
                     ct
                 );
+
+                if (existingSource is not null)
+                {
+                    await _auditLogWriter.WriteAsync(
+                        Guid.Empty,
+                        "EnrichmentSourceSecret",
+                        existingSource.Id,
+                        hadSecret ? AuditAction.Updated : AuditAction.Created,
+                        hadSecret
+                            ? new
+                            {
+                                source.Key,
+                                HasSecret = true,
+                                SecretRef = existingSource.SecretRef,
+                            }
+                            : null,
+                        new
+                        {
+                            source.Key,
+                            HasSecret = true,
+                            SecretRef = secretRef,
+                        },
+                        ct
+                    );
+                }
             }
 
             if (existingSource is null)
@@ -102,6 +136,24 @@ public class SystemController : ControllerBase
                     source.Credentials.ApiBaseUrl
                 );
                 await _dbContext.EnrichmentSourceConfigurations.AddAsync(existingSource, ct);
+
+                if (!string.IsNullOrWhiteSpace(secretValue))
+                {
+                    await _auditLogWriter.WriteAsync(
+                        Guid.Empty,
+                        "EnrichmentSourceSecret",
+                        existingSource.Id,
+                        AuditAction.Created,
+                        null,
+                        new
+                        {
+                            source.Key,
+                            HasSecret = true,
+                            SecretRef = secretRef,
+                        },
+                        ct
+                    );
+                }
                 continue;
             }
 

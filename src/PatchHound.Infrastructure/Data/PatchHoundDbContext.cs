@@ -108,7 +108,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<AuditLogEntry>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => e.TenantId == Guid.Empty || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Notification>()
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
