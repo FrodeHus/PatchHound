@@ -1,4 +1,4 @@
-import type { UserItem } from '@/api/useUsers'
+import type { UserItem } from '@/api/users.schemas'
 import { ManageRolesDialog } from '@/components/features/admin/ManageRolesDialog'
 
 type UserTableProps = {

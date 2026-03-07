@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import type { Campaign } from '@/api/useCampaigns'
+import type { Campaign } from '@/api/campaigns.schemas'
 
 type CampaignListProps = {
   items: Campaign[]

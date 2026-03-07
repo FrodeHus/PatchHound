@@ -1,4 +1,4 @@
-import type { AuditLogItem } from '@/api/useAuditLog'
+import type { AuditLogItem } from '@/api/audit-log.schemas'
 
 type AuditDetailDialogProps = {
   selected: AuditLogItem | null

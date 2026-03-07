@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { TenantItem } from '@/api/useSettings'
+import type { TenantItem } from '@/api/settings.schemas'
 
 type TenantManagementProps = {
   tenants: TenantItem[]

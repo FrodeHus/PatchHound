@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AuditLogItem } from '@/api/useAuditLog'
+import type { AuditLogItem } from '@/api/audit-log.schemas'
 import { AuditDetailDialog } from '@/components/features/audit/AuditDetailDialog'
 
 type AuditLogTableProps = {

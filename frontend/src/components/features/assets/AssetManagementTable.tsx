@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Asset } from '@/api/useAssets'
+import type { Asset } from '@/api/assets.schemas'
 
 type AssetManagementTableProps = {
   assets: Asset[]

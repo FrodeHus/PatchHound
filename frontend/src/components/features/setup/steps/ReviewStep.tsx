@@ -1,4 +1,4 @@
-import type { SetupPayload } from '@/api/useSetup'
+import type { SetupPayload } from '@/api/setup.schemas'
 
 type ReviewStepProps = {
   payload: SetupPayload

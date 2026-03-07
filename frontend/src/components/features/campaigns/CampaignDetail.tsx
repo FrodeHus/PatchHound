@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { CampaignDetail as CampaignDetailModel } from '@/api/useCampaigns'
+import type { CampaignDetail as CampaignDetailModel } from '@/api/campaigns.schemas'
 
 type CampaignDetailProps = {
   campaign: CampaignDetailModel

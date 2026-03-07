@@ -1,4 +1,4 @@
-import type { TeamItem } from '@/api/useTeams'
+import type { TeamItem } from '@/api/teams.schemas'
 
 type TeamTableProps = {
   teams: TeamItem[]

@@ -1,4 +1,4 @@
-import type { AuditLogItem } from '@/api/useVulnerabilities'
+import type { AuditLogItem } from '@/api/audit-log.schemas'
 
 type TimelineTabProps = {
   items: AuditLogItem[]

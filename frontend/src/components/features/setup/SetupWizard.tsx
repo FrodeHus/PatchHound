@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { SetupPayload } from '@/api/useSetup'
+import type { SetupPayload } from '@/api/setup.schemas'
 import { AdminUserStep } from '@/components/features/setup/steps/AdminUserStep'
 import { DefenderConnectionStep } from '@/components/features/setup/steps/DefenderConnectionStep'
 import { EntraIdStep } from '@/components/features/setup/steps/EntraIdStep'

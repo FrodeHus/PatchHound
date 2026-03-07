@@ -1,4 +1,4 @@
-import type { RemediationTask } from '@/api/useTasks'
+import type { RemediationTask } from '@/api/tasks.schemas'
 import { TaskStatusUpdate } from '@/components/features/tasks/TaskStatusUpdate'
 
 type TaskListProps = {

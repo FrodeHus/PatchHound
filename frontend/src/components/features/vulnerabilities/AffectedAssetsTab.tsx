@@ -1,4 +1,4 @@
-import type { AffectedAsset } from '@/api/useVulnerabilities'
+import type { AffectedAsset } from '@/api/vulnerabilities.schemas'
 
 type AffectedAssetsTabProps = {
   assets: AffectedAsset[]

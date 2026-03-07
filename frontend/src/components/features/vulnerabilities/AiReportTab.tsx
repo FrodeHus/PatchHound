@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useGenerateAiReport } from '@/api/useVulnerabilities'
+import { useMutation } from '@tanstack/react-query'
+import { generateAiReport } from '@/api/vulnerabilities.functions'
 
 type AiReportTabProps = {
   vulnerabilityId: string
@@ -7,7 +8,15 @@ type AiReportTabProps = {
 
 export function AiReportTab({ vulnerabilityId }: AiReportTabProps) {
   const [providerName, setProviderName] = useState('mock')
-  const mutation = useGenerateAiReport(vulnerabilityId)
+  const mutation = useMutation({
+    mutationFn: (provider: string) =>
+      generateAiReport({
+        data: {
+          id: vulnerabilityId,
+          providerName: provider,
+        },
+      }),
+  })
 
   return (
     <section className="space-y-3 rounded-lg border border-border bg-card p-4">

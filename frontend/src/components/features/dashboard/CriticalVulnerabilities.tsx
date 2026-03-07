@@ -1,4 +1,4 @@
-import type { TopVulnerability } from '@/api/useDashboard'
+import type { TopVulnerability } from '@/api/dashboard.schemas'
 
 type CriticalVulnerabilitiesProps = {
   items: TopVulnerability[]

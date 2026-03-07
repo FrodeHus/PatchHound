@@ -1,15 +1,17 @@
 import { useCallback, useState } from 'react'
 import { Bell } from 'lucide-react'
-import { useSignalR } from '@/hooks/useSignalR'
+import { useSSE } from '@/hooks/useSSE'
 
 export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0)
 
-  const handleCountUpdated = useCallback((count: number) => {
-    setUnreadCount(count)
+  const handleCountUpdated = useCallback((count: unknown) => {
+    if (typeof count === 'number') {
+      setUnreadCount(count)
+    }
   }, [])
 
-  useSignalR('NotificationCountUpdated', handleCountUpdated)
+  useSSE('NotificationCountUpdated', handleCountUpdated)
 
   return (
     <button

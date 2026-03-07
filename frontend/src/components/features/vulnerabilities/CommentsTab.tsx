@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { CommentItem } from '@/api/useVulnerabilities'
+import type { CommentItem } from '@/api/vulnerabilities.schemas'
 
 type CommentsTabProps = {
   comments: CommentItem[]

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { VulnerabilityDetail } from '@/api/useVulnerabilities'
-import { useUpdateOrganizationalSeverity } from '@/api/useVulnerabilities'
+import { useMutation } from '@tanstack/react-query'
+import { updateOrganizationalSeverity } from '@/api/vulnerabilities.functions'
+import type { VulnerabilityDetail } from '@/api/vulnerabilities.schemas'
 
 type OrgSeverityPanelProps = {
   vulnerability: VulnerabilityDetail
@@ -9,7 +10,15 @@ type OrgSeverityPanelProps = {
 const severityOptions = ['Low', 'Medium', 'High', 'Critical']
 
 export function OrgSeverityPanel({ vulnerability }: OrgSeverityPanelProps) {
-  const mutation = useUpdateOrganizationalSeverity(vulnerability.id)
+  const mutation = useMutation({
+    mutationFn: (payload: { adjustedSeverity: string; justification: string }) =>
+      updateOrganizationalSeverity({
+        data: {
+          id: vulnerability.id,
+          ...payload,
+        },
+      }),
+  })
   const [adjustedSeverity, setAdjustedSeverity] = useState(
     vulnerability.organizationalSeverity?.adjustedSeverity ?? vulnerability.vendorSeverity,
   )

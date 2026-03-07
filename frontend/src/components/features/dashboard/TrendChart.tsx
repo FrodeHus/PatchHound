@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { TrendData } from '@/api/useDashboard'
+import type { TrendData } from '@/api/dashboard.schemas'
 
 type TrendChartProps = {
   data: TrendData
