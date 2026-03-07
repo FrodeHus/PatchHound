@@ -307,18 +307,20 @@ public class IngestionServiceTests : IDisposable
     [Fact]
     public async Task ProcessAssetsAsync_UpsertsSoftwareInventoryAsSoftwareAssets()
     {
-        var assets = new List<IngestionAsset>
-        {
-            new(
-                "software-1",
-                "Contoso Agent 1.0",
-                AssetType.Software,
-                "Contoso Agent 1.0",
-                """{"vendor":"Contoso","version":"1.0","exposedMachines":5}"""
-            ),
-        };
+        var snapshot = new IngestionAssetInventorySnapshot(
+            [
+                new(
+                    "software-1",
+                    "Contoso Agent 1.0",
+                    AssetType.Software,
+                    "Contoso Agent 1.0",
+                    Metadata: """{"vendor":"Contoso","version":"1.0","exposedMachines":5}"""
+                ),
+            ],
+            []
+        );
 
-        await _service.ProcessAssetsAsync(_tenantId, assets, CancellationToken.None);
+        await _service.ProcessAssetsAsync(_tenantId, snapshot, CancellationToken.None);
 
         var asset = await _dbContext
             .Assets.IgnoreQueryFilters()
@@ -331,6 +333,48 @@ public class IngestionServiceTests : IDisposable
         var metadata = JsonNode.Parse(asset.Metadata);
         metadata?["vendor"]?.GetValue<string>().Should().Be("Contoso");
         metadata?["exposedMachines"]?.GetValue<int>().Should().Be(5);
+    }
+
+    [Fact]
+    public async Task ProcessAssetsAsync_UpsertsNormalizedDeviceFields()
+    {
+        var lastSeenAt = DateTimeOffset.UtcNow;
+        var snapshot = new IngestionAssetInventorySnapshot(
+            [
+                new(
+                    "machine-1",
+                    "server01.contoso.local",
+                    AssetType.Device,
+                    "Windows 11 23H2",
+                    "Active",
+                    "Windows11",
+                    "23H2",
+                    "High",
+                    lastSeenAt,
+                    "10.0.0.15",
+                    "aad-device-1"
+                ),
+            ],
+            []
+        );
+
+        await _service.ProcessAssetsAsync(_tenantId, snapshot, CancellationToken.None);
+
+        var asset = await _dbContext
+            .Assets.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(a => a.ExternalId == "machine-1" && a.TenantId == _tenantId);
+
+        asset.Should().NotBeNull();
+        asset!.AssetType.Should().Be(AssetType.Device);
+        asset.Name.Should().Be("server01.contoso.local");
+        asset.Description.Should().Be("Windows 11 23H2");
+        asset.DeviceHealthStatus.Should().Be("Active");
+        asset.DeviceOsPlatform.Should().Be("Windows11");
+        asset.DeviceOsVersion.Should().Be("23H2");
+        asset.DeviceRiskScore.Should().Be("High");
+        asset.DeviceLastSeenAt.Should().Be(lastSeenAt);
+        asset.DeviceLastIpAddress.Should().Be("10.0.0.15");
+        asset.DeviceAadDeviceId.Should().Be("aad-device-1");
     }
 
     [Fact]

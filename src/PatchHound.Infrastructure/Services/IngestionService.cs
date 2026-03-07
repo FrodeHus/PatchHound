@@ -64,14 +64,14 @@ public class IngestionService
                     tenantId
                 );
 
-                var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
-                await ProcessResultsAsync(tenantId, source.SourceName, results, ct);
-
                 if (source is IAssetInventorySource assetInventorySource)
                 {
-                    var assets = await assetInventorySource.FetchAssetsAsync(tenantId, ct);
-                    await ProcessAssetsAsync(tenantId, assets, ct);
+                    var assetSnapshot = await assetInventorySource.FetchAssetsAsync(tenantId, ct);
+                    await ProcessAssetsAsync(tenantId, assetSnapshot, ct);
                 }
+
+                var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
+                await ProcessResultsAsync(tenantId, source.SourceName, results, ct);
 
                 _logger.LogInformation(
                     "Completed ingestion from {Source} for tenant {TenantId}: {Count} vulnerabilities",
@@ -395,11 +395,11 @@ public class IngestionService
 
     internal async Task ProcessAssetsAsync(
         Guid tenantId,
-        IReadOnlyList<IngestionAsset> assets,
+        IngestionAssetInventorySnapshot snapshot,
         CancellationToken ct
     )
     {
-        foreach (var asset in assets)
+        foreach (var asset in snapshot.Assets)
         {
             var existing = await _dbContext
                 .Assets.IgnoreQueryFilters()
@@ -418,12 +418,36 @@ public class IngestionService
                     Criticality.Medium,
                     asset.Description
                 );
+                if (asset.AssetType == AssetType.Device)
+                {
+                    existing.UpdateDeviceDetails(
+                        asset.DeviceHealthStatus,
+                        asset.DeviceOsPlatform,
+                        asset.DeviceOsVersion,
+                        asset.DeviceRiskScore,
+                        asset.DeviceLastSeenAt,
+                        asset.DeviceLastIpAddress,
+                        asset.DeviceAadDeviceId
+                    );
+                }
                 existing.UpdateMetadata(asset.Metadata);
                 await _dbContext.Assets.AddAsync(existing, ct);
                 continue;
             }
 
             existing.UpdateDetails(asset.Name, asset.Description);
+            if (asset.AssetType == AssetType.Device)
+            {
+                existing.UpdateDeviceDetails(
+                    asset.DeviceHealthStatus,
+                    asset.DeviceOsPlatform,
+                    asset.DeviceOsVersion,
+                    asset.DeviceRiskScore,
+                    asset.DeviceLastSeenAt,
+                    asset.DeviceLastIpAddress,
+                    asset.DeviceAadDeviceId
+                );
+            }
             existing.UpdateMetadata(asset.Metadata);
         }
 

@@ -90,6 +90,52 @@ public class OpenBaoSecretStore : ISecretStore
         }
     }
 
+    public async Task<OpenBaoStatus> UnsealAsync(IReadOnlyList<string> keys, CancellationToken ct)
+    {
+        if (keys.Count == 0)
+        {
+            throw new ArgumentException("At least one unseal key is required.", nameof(keys));
+        }
+
+        OpenBaoSealStatusResponse? lastPayload = null;
+
+        foreach (var key in keys.Where(key => !string.IsNullOrWhiteSpace(key)))
+        {
+            using var response = await _httpClient.PostAsJsonAsync(
+                "/v1/sys/unseal",
+                new { key = key.Trim() },
+                ct
+            );
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                throw new SecretStoreUnavailableException(
+                    string.IsNullOrWhiteSpace(responseBody)
+                        ? $"OpenBao returned {(int)response.StatusCode} {response.ReasonPhrase}."
+                        : responseBody,
+                    response.StatusCode
+                );
+            }
+
+            lastPayload = await response.Content.ReadFromJsonAsync<OpenBaoSealStatusResponse>(
+                cancellationToken: ct
+            );
+
+            if (lastPayload is { Sealed: false })
+            {
+                break;
+            }
+        }
+
+        if (lastPayload is null)
+        {
+            return await GetStatusAsync(ct);
+        }
+
+        return new OpenBaoStatus(true, lastPayload.Initialized, lastPayload.Sealed);
+    }
+
     private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
         try

@@ -78,6 +78,33 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
+                    b.Property<string>("DeviceAadDeviceId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("DeviceHealthStatus")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("DeviceLastIpAddress")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset?>("DeviceLastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeviceOsPlatform")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("DeviceOsVersion")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("DeviceRiskScore")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("ExternalId")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -259,6 +286,36 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.HasIndex("EntityType", "EntityId");
 
                     b.ToTable("Comments");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.DeviceSoftwareInstallation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DeviceAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SoftwareAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SoftwareAssetId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("DeviceAssetId", "SoftwareAssetId")
+                        .IsUnique();
+
+                    b.ToTable("DeviceSoftwareInstallations");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.Notification", b =>
@@ -699,6 +756,25 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasForeignKey("CampaignId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.DeviceSoftwareInstallation", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.Asset", "DeviceAsset")
+                        .WithMany()
+                        .HasForeignKey("DeviceAssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PatchHound.Core.Entities.Asset", "SoftwareAsset")
+                        .WithMany()
+                        .HasForeignKey("SoftwareAssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DeviceAsset");
+
+                    b.Navigation("SoftwareAsset");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.TeamMember", b =>

@@ -4,5 +4,5 @@ namespace PatchHound.Core.Interfaces;
 
 public interface IAssetInventorySource
 {
-    Task<IReadOnlyList<IngestionAsset>> FetchAssetsAsync(Guid tenantId, CancellationToken ct);
+    Task<IngestionAssetInventorySnapshot> FetchAssetsAsync(Guid tenantId, CancellationToken ct);
 }

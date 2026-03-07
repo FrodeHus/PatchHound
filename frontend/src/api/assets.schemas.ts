@@ -31,6 +31,13 @@ export const assetDetailSchema = z.object({
   ownerUserId: z.string().uuid().nullable(),
   ownerTeamId: z.string().uuid().nullable(),
   fallbackTeamId: z.string().uuid().nullable(),
+  deviceHealthStatus: z.string().nullable(),
+  deviceOsPlatform: z.string().nullable(),
+  deviceOsVersion: z.string().nullable(),
+  deviceRiskScore: z.string().nullable(),
+  deviceLastSeenAt: z.string().nullable(),
+  deviceLastIpAddress: z.string().nullable(),
+  deviceAadDeviceId: z.string().nullable(),
   metadata: z.string(),
   vulnerabilities: z.array(assetVulnerabilitySchema),
 })

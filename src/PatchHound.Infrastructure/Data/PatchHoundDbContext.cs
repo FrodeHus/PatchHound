@@ -21,6 +21,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<DeviceSoftwareInstallation> DeviceSoftwareInstallations => Set<DeviceSoftwareInstallation>();
     public DbSet<Vulnerability> Vulnerabilities => Set<Vulnerability>();
     public DbSet<VulnerabilityAsset> VulnerabilityAssets => Set<VulnerabilityAsset>();
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
@@ -62,6 +63,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         // Global query filters for tenant isolation.
         // Referencing the instance property ensures EF Core re-evaluates per query.
         modelBuilder.Entity<Asset>().HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<DeviceSoftwareInstallation>()
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Vulnerability>()
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));

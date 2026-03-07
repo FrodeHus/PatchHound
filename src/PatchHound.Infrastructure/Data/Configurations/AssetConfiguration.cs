@@ -16,6 +16,12 @@ public class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.Property(a => a.ExternalId).HasMaxLength(256).IsRequired();
         builder.Property(a => a.Name).HasMaxLength(256).IsRequired();
         builder.Property(a => a.Description).HasMaxLength(2048);
+        builder.Property(a => a.DeviceHealthStatus).HasMaxLength(64);
+        builder.Property(a => a.DeviceOsPlatform).HasMaxLength(128);
+        builder.Property(a => a.DeviceOsVersion).HasMaxLength(128);
+        builder.Property(a => a.DeviceRiskScore).HasMaxLength(64);
+        builder.Property(a => a.DeviceLastIpAddress).HasMaxLength(128);
+        builder.Property(a => a.DeviceAadDeviceId).HasMaxLength(128);
         builder.Property(a => a.AssetType).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.Criticality).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.OwnerType).HasConversion<string>().HasMaxLength(32);

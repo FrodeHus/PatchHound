@@ -24,5 +24,23 @@ public record IngestionAsset(
     string Name,
     AssetType AssetType,
     string? Description = null,
+    string? DeviceHealthStatus = null,
+    string? DeviceOsPlatform = null,
+    string? DeviceOsVersion = null,
+    string? DeviceRiskScore = null,
+    DateTimeOffset? DeviceLastSeenAt = null,
+    string? DeviceLastIpAddress = null,
+    string? DeviceAadDeviceId = null,
     string Metadata = "{}"
+);
+
+public record IngestionDeviceSoftwareLink(
+    string DeviceExternalId,
+    string SoftwareExternalId,
+    DateTimeOffset ObservedAt
+);
+
+public record IngestionAssetInventorySnapshot(
+    IReadOnlyList<IngestionAsset> Assets,
+    IReadOnlyList<IngestionDeviceSoftwareLink> DeviceSoftwareLinks
 );
