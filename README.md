@@ -157,6 +157,13 @@ docker compose up -d --build api worker
 
 If `OPENBAO_TOKEN` is missing, tenant secret writes will fail and the worker will only use environment-based Defender credentials as fallback.
 
+If you run `bao` outside the container or before the container environment is refreshed, use the HTTP address explicitly:
+
+```bash
+docker compose exec openbao bao status -address=http://127.0.0.1:8200
+docker compose exec openbao bao operator init -address=http://127.0.0.1:8200
+```
+
 ## Entra ID Application Configuration
 
 Configure one Microsoft Entra app registration for local and Docker development:

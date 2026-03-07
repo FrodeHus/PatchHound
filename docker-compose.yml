@@ -12,11 +12,13 @@ services:
 
   openbao:
     image: openbao/openbao
-    command: server -config=/openbao/config/openbao.hcl
+    command: server -config=/etc/openbao/openbao.hcl
+    environment:
+      BAO_ADDR: http://127.0.0.1:8200
     cap_add:
       - IPC_LOCK
     volumes:
-      - ./deploy/openbao/config:/openbao/config:ro
+      - ./deploy/openbao/config/openbao.hcl:/etc/openbao/openbao.hcl:ro
       - openbao_data:/openbao/file
     ports:
       - "8200:8200"
@@ -38,7 +40,7 @@ services:
       AzureAd__Audience: ${AZURE_AD_AUDIENCE}
       AzureAd__EnablePiiLogging: ${AZURE_AD_ENABLE_PII_LOGGING:-false}
       OpenBao__Address: ${OPENBAO_INTERNAL_ADDR:-http://openbao:8200}
-      OpenBao__Token: ${OPENBAO_TOKEN}
+      OpenBao__Token: ${OPENBAO_TOKEN:-}
       OpenBao__KvMount: ${OPENBAO_KV_MOUNT:-patchhound}
       Smtp__Host: ${SMTP_HOST}
       Smtp__Port: ${SMTP_PORT}
@@ -62,7 +64,7 @@ services:
       Defender__ApiBaseUrl: ${DEFENDER_API_BASE_URL}
       Defender__TokenScope: ${DEFENDER_TOKEN_SCOPE}
       OpenBao__Address: ${OPENBAO_INTERNAL_ADDR:-http://openbao:8200}
-      OpenBao__Token: ${OPENBAO_TOKEN}
+      OpenBao__Token: ${OPENBAO_TOKEN:-}
       OpenBao__KvMount: ${OPENBAO_KV_MOUNT:-patchhound}
     depends_on:
       - postgres
