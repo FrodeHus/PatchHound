@@ -54,7 +54,6 @@ public class SetupController : ControllerBase
             new SetupRequest(
                 request.TenantName,
                 setupIdentity.Value.EntraTenantId,
-                request.TenantSettings,
                 setupIdentity.Value.AdminEmail,
                 setupIdentity.Value.AdminDisplayName,
                 setupIdentity.Value.AdminEntraObjectId

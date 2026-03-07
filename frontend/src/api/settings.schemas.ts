@@ -4,7 +4,7 @@ import { nullableIsoDateTimeSchema } from './common.schemas'
 export const tenantCredentialsSchema = z.object({
   tenantId: z.string(),
   clientId: z.string(),
-  hasClientSecret: z.boolean(),
+  hasSecret: z.boolean(),
   apiBaseUrl: z.string(),
   tokenScope: z.string(),
 })
@@ -23,6 +23,8 @@ export const tenantIngestionSourceSchema = z.object({
   displayName: z.string(),
   enabled: z.boolean(),
   syncSchedule: z.string(),
+  supportsScheduling: z.boolean(),
+  supportsManualSync: z.boolean(),
   credentials: tenantCredentialsSchema,
   runtime: tenantIngestionRuntimeSchema,
 })

@@ -5,6 +5,7 @@ using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Admin;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Entities;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Tenants;
@@ -45,8 +46,13 @@ public class TenantsController : ControllerBase
                 t.Id,
                 t.Name,
                 t.EntraTenantId,
-                t.Settings,
             })
+            .ToListAsync(ct);
+
+        var tenantIds = items.Select(item => item.Id).ToList();
+        var sourceCounts = await _dbContext
+            .TenantSourceConfigurations.AsNoTracking()
+            .Where(source => tenantIds.Contains(source.TenantId))
             .ToListAsync(ct);
 
         return Ok(new PagedResponse<TenantListItemDto>(
@@ -54,7 +60,8 @@ public class TenantsController : ControllerBase
                 t.Id,
                 t.Name,
                 t.EntraTenantId,
-                GetConfiguredIngestionSourceCount(t.Settings)
+                sourceCounts.Count(source =>
+                    source.TenantId == t.Id && TenantSourceCatalog.HasConfiguredCredentials(source))
             )).ToList(),
             totalCount
         ));
@@ -82,12 +89,18 @@ public class TenantsController : ControllerBase
             assetCounts.FirstOrDefault(item => item.AssetType == AssetType.CloudResource)?.Count ?? 0
         );
 
+        var sources = await _dbContext
+            .TenantSourceConfigurations.AsNoTracking()
+            .Where(source => source.TenantId == id)
+            .OrderBy(source => source.DisplayName)
+            .ToListAsync(ct);
+
         return Ok(new TenantDetailDto(
             tenant.Id,
             tenant.Name,
             tenant.EntraTenantId,
             assetSummary,
-            GetIngestionSources(tenant.Settings)
+            sources.Select(MapSourceDto).ToList()
         ));
     }
 
@@ -107,20 +120,20 @@ public class TenantsController : ControllerBase
             return ValidationProblem("Tenant name is required.");
 
         tenant.UpdateName(request.Name.Trim());
-        var existingSources = TenantSourceSettings
-            .ReadSources(tenant.Settings)
-            .ToDictionary(source => source.Key, StringComparer.OrdinalIgnoreCase);
+        var existingSources = await _dbContext
+            .TenantSourceConfigurations
+            .Where(source => source.TenantId == tenant.Id)
+            .ToDictionaryAsync(source => source.SourceKey, StringComparer.OrdinalIgnoreCase, ct);
 
-        var updatedSources = new List<PersistedIngestionSource>();
         foreach (var source in request.IngestionSources)
         {
             existingSources.TryGetValue(source.Key, out var existingSource);
-            var secretRef = existingSource?.Credentials?.SecretRef ?? string.Empty;
-            var secretValue = source.Credentials.ClientSecret;
+            var secretRef = existingSource?.SecretRef ?? string.Empty;
+            var secretValue = source.Credentials.Secret.Trim();
 
             if (string.IsNullOrWhiteSpace(secretValue))
             {
-                secretValue = existingSource?.Credentials?.ClientSecret ?? string.Empty;
+                secretValue = string.Empty;
             }
 
             if (!string.IsNullOrWhiteSpace(secretValue))
@@ -130,31 +143,43 @@ public class TenantsController : ControllerBase
                     secretRef,
                     new Dictionary<string, string>
                     {
-                        ["clientSecret"] = secretValue,
+                        [TenantSourceCatalog.GetSecretKeyName(source.Key)] = secretValue,
                     },
                     ct
                 );
             }
 
-            updatedSources.Add(new PersistedIngestionSource
+            if (existingSource is null)
             {
-                Key = source.Key,
-                DisplayName = source.DisplayName,
-                Enabled = source.Enabled,
-                SyncSchedule = source.SyncSchedule,
-                Credentials = new PersistedSourceCredentials
-                {
-                    TenantId = source.Credentials.TenantId,
-                    ClientId = source.Credentials.ClientId,
-                    ClientSecret = string.Empty,
-                    SecretRef = secretRef,
-                    ApiBaseUrl = source.Credentials.ApiBaseUrl,
-                    TokenScope = source.Credentials.TokenScope,
-                },
-            });
+                var created = TenantSourceConfiguration.Create(
+                    tenant.Id,
+                    source.Key,
+                    source.DisplayName,
+                    source.Enabled,
+                    source.SyncSchedule,
+                    source.Credentials.TenantId,
+                    source.Credentials.ClientId,
+                    secretRef,
+                    source.Credentials.ApiBaseUrl,
+                    source.Credentials.TokenScope
+                );
+                await _dbContext.TenantSourceConfigurations.AddAsync(created, ct);
+                existingSources[source.Key] = created;
+                continue;
+            }
+
+            existingSource.UpdateConfiguration(
+                source.DisplayName,
+                source.Enabled,
+                source.SyncSchedule,
+                source.Credentials.TenantId,
+                source.Credentials.ClientId,
+                secretRef,
+                source.Credentials.ApiBaseUrl,
+                source.Credentials.TokenScope
+            );
         }
 
-        tenant.UpdateSettings(TenantSourceSettings.WriteSources(tenant.Settings, updatedSources));
         await _dbContext.SaveChangesAsync(ct);
 
         return NoContent();
@@ -168,87 +193,52 @@ public class TenantsController : ControllerBase
         if (tenant is null)
             return NotFound();
 
-        var configuredSources = TenantSourceSettings.ReadSources(tenant.Settings);
-        var configuredSource = configuredSources.FirstOrDefault(source =>
-            string.Equals(source.Key, sourceKey, StringComparison.OrdinalIgnoreCase));
+        var configuredSource = await _dbContext
+            .TenantSourceConfigurations
+            .FirstOrDefaultAsync(source =>
+                source.TenantId == tenant.Id
+                && string.Equals(source.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase), ct);
 
         if (configuredSource is null)
         {
             return NotFound(new ProblemDetails { Title = "Ingestion source not found" });
         }
 
-        configuredSource.Runtime ??= new PersistedIngestionRuntimeState();
-        configuredSource.Runtime.ManualRequestedAt = DateTimeOffset.UtcNow;
-        configuredSource.Runtime.LastStatus = "Queued";
-        configuredSource.Runtime.LastError = string.Empty;
+        if (!TenantSourceCatalog.SupportsManualSync(configuredSource))
+        {
+            return BadRequest(new ProblemDetails { Title = "This source does not support manual sync." });
+        }
 
-        tenant.UpdateSettings(TenantSourceSettings.WriteSources(tenant.Settings, configuredSources));
+        configuredSource.QueueManualSync(DateTimeOffset.UtcNow);
         await _dbContext.SaveChangesAsync(ct);
 
         return Accepted();
     }
 
-    [HttpPut("{id:guid}/settings")]
-    [Authorize(Policy = Policies.ConfigureTenant)]
-    public async Task<IActionResult> UpdateSettings(
-        Guid id,
-        [FromBody] UpdateTenantSettingsRequest request,
-        CancellationToken ct
-    )
+    private static TenantIngestionSourceDto MapSourceDto(TenantSourceConfiguration source)
     {
-        // Validate that settings is valid JSON with expected structure
-        if (!TenantSourceSettings.IsValidSettingsJson(request.Settings))
-            return ValidationProblem("Settings must be a valid JSON object.");
-
-        var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
-        if (tenant is null)
-            return NotFound();
-
-        tenant.UpdateSettings(request.Settings);
-        await _dbContext.SaveChangesAsync(ct);
-
-        return NoContent();
-    }
-
-    private int GetConfiguredIngestionSourceCount(string settings)
-    {
-        return GetIngestionSources(settings)
-            .Count(source => HasConfiguredCredentials(source.Credentials));
-    }
-
-    private List<TenantIngestionSourceDto> GetIngestionSources(string settings)
-    {
-        return TenantSourceSettings
-            .ReadSources(settings)
-            .Select(source => new TenantIngestionSourceDto(
-                source.Key,
-                source.DisplayName,
-                source.Enabled,
-                source.SyncSchedule,
-                new TenantSourceCredentialsDto(
-                    source.Credentials?.TenantId ?? string.Empty,
-                    source.Credentials?.ClientId ?? string.Empty,
-                    !string.IsNullOrWhiteSpace(source.Credentials?.SecretRef)
-                        || !string.IsNullOrWhiteSpace(source.Credentials?.ClientSecret),
-                    source.Credentials?.ApiBaseUrl ?? string.Empty,
-                    source.Credentials?.TokenScope ?? string.Empty
-                ),
-                new TenantIngestionRuntimeDto(
-                    source.Runtime?.ManualRequestedAt,
-                    source.Runtime?.LastStartedAt,
-                    source.Runtime?.LastCompletedAt,
-                    source.Runtime?.LastSucceededAt,
-                    source.Runtime?.LastStatus ?? string.Empty,
-                    source.Runtime?.LastError ?? string.Empty
-                )
-            ))
-            .ToList();
-    }
-
-    private static bool HasConfiguredCredentials(TenantSourceCredentialsDto credentials)
-    {
-        return !string.IsNullOrWhiteSpace(credentials.TenantId)
-            || !string.IsNullOrWhiteSpace(credentials.ClientId)
-            || credentials.HasClientSecret;
+        return new TenantIngestionSourceDto(
+            source.SourceKey,
+            source.DisplayName,
+            source.Enabled,
+            source.SyncSchedule,
+            TenantSourceCatalog.SupportsScheduling(source),
+            TenantSourceCatalog.SupportsManualSync(source),
+            new TenantSourceCredentialsDto(
+                source.CredentialTenantId,
+                source.ClientId,
+                !string.IsNullOrWhiteSpace(source.SecretRef),
+                source.ApiBaseUrl,
+                source.TokenScope
+            ),
+            new TenantIngestionRuntimeDto(
+                source.ManualRequestedAt,
+                source.LastStartedAt,
+                source.LastCompletedAt,
+                source.LastSucceededAt,
+                source.LastStatus,
+                source.LastError
+            )
+        );
     }
 }

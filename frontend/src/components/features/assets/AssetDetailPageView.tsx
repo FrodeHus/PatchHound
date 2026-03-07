@@ -126,8 +126,11 @@ export function AssetDetailPageView({
                       </p>
                       <div className="grid gap-2 sm:grid-cols-2">
                         <MetricCard label="Vendor Severity" value={vulnerability.vendorScore ? `${vulnerability.vendorSeverity} (${vulnerability.vendorScore.toFixed(1)})` : vulnerability.vendorSeverity} />
+                        <MetricCard label="CVSS Vector" value={vulnerability.cvssVector ?? 'Not available'} mono />
                         <MetricCard label="Effective Severity" value={vulnerability.effectiveScore ? `${vulnerability.effectiveSeverity} (${vulnerability.effectiveScore.toFixed(1)})` : vulnerability.effectiveSeverity} />
+                        <MetricCard label="Published" value={vulnerability.publishedDate ? new Date(vulnerability.publishedDate).toLocaleDateString() : 'Unknown'} />
                       </div>
+                      <p className="text-sm text-muted-foreground">{vulnerability.description}</p>
                       {vulnerability.assessmentReasonSummary ? (
                         <p className="text-xs text-sky-700">{vulnerability.assessmentReasonSummary}</p>
                       ) : null}

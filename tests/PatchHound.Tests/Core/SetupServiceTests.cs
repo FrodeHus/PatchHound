@@ -12,6 +12,8 @@ public class SetupServiceTests
 {
     private readonly ITenantRepository _tenantRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IRepository<TenantSourceConfiguration> _tenantSourceRepository;
+    private readonly IRepository<TenantSlaConfiguration> _tenantSlaRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly SetupService _service;
 
@@ -19,8 +21,16 @@ public class SetupServiceTests
     {
         _tenantRepository = Substitute.For<ITenantRepository>();
         _userRepository = Substitute.For<IUserRepository>();
+        _tenantSourceRepository = Substitute.For<IRepository<TenantSourceConfiguration>>();
+        _tenantSlaRepository = Substitute.For<IRepository<TenantSlaConfiguration>>();
         _unitOfWork = Substitute.For<IUnitOfWork>();
-        _service = new SetupService(_tenantRepository, _userRepository, _unitOfWork);
+        _service = new SetupService(
+            _tenantRepository,
+            _userRepository,
+            _tenantSourceRepository,
+            _tenantSlaRepository,
+            _unitOfWork
+        );
     }
 
     [Fact]
@@ -61,7 +71,6 @@ public class SetupServiceTests
         var request = new SetupRequest(
             "Acme",
             "entra-tenant",
-            "{}",
             "admin@example.com",
             "Admin",
             "entra-admin-id"
@@ -72,6 +81,8 @@ public class SetupServiceTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Name.Should().Be("Acme");
         await _tenantRepository.Received(1).AddAsync(Arg.Any<Tenant>(), Arg.Any<CancellationToken>());
+        await _tenantSourceRepository.Received(2).AddAsync(Arg.Any<TenantSourceConfiguration>(), Arg.Any<CancellationToken>());
+        await _tenantSlaRepository.Received(1).AddAsync(Arg.Any<TenantSlaConfiguration>(), Arg.Any<CancellationToken>());
         await _userRepository.Received(1).AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
         await _userRepository
             .Received(1)
@@ -92,7 +103,6 @@ public class SetupServiceTests
         var request = new SetupRequest(
             "Acme",
             "entra-tenant",
-            "{}",
             "admin@example.com",
             "Admin",
             "entra-admin-id"
@@ -119,7 +129,6 @@ public class SetupServiceTests
         var request = new SetupRequest(
             "Acme",
             "entra-tenant",
-            "{}",
             "admin@example.com",
             "Admin",
             "entra-admin-id"

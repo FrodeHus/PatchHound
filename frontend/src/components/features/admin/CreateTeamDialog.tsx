@@ -2,10 +2,11 @@ import { useState } from 'react'
 
 type CreateTeamDialogProps = {
   isSubmitting: boolean
+  tenants: Array<{ id: string; name: string }>
   onCreate: (payload: { name: string; tenantId: string }) => void
 }
 
-export function CreateTeamDialog({ isSubmitting, onCreate }: CreateTeamDialogProps) {
+export function CreateTeamDialog({ isSubmitting, tenants, onCreate }: CreateTeamDialogProps) {
   const [name, setName] = useState('')
   const [tenantId, setTenantId] = useState('')
 
@@ -17,7 +18,18 @@ export function CreateTeamDialog({ isSubmitting, onCreate }: CreateTeamDialogPro
       </p>
       <div className="mt-2 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
         <input className="rounded-md border border-input bg-background px-2 py-1.5 text-sm" placeholder="Assignment group name" value={name} onChange={(event) => setName(event.target.value)} />
-        <input className="rounded-md border border-input bg-background px-2 py-1.5 text-sm" placeholder="Tenant GUID" value={tenantId} onChange={(event) => setTenantId(event.target.value)} />
+        <select
+          className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+          value={tenantId}
+          onChange={(event) => setTenantId(event.target.value)}
+        >
+          <option value="">Select tenant</option>
+          {tenants.map((tenant) => (
+            <option key={tenant.id} value={tenant.id}>
+              {tenant.name}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50"

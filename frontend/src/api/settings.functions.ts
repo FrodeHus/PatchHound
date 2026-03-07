@@ -15,7 +15,7 @@ const updateTenantIngestionSourceSchema = z.object({
   credentials: z.object({
     tenantId: z.string(),
     clientId: z.string(),
-    clientSecret: z.string(),
+    secret: z.string(),
     apiBaseUrl: z.string(),
     tokenScope: z.string(),
   }),

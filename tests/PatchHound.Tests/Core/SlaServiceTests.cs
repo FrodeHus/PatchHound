@@ -1,5 +1,5 @@
-using System.Text.Json;
 using FluentAssertions;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Services;
 
@@ -33,7 +33,7 @@ public class SlaServiceTests
     [Fact]
     public void CalculateDueDate_EmptySettings_UsesDefaults()
     {
-        var dueDate = _slaService.CalculateDueDate(Severity.High, _baseDate, "{}");
+        var dueDate = _slaService.CalculateDueDate(Severity.High, _baseDate, null);
 
         dueDate.Should().Be(_baseDate.AddDays(30));
     }
@@ -41,9 +41,8 @@ public class SlaServiceTests
     [Fact]
     public void CalculateDueDate_TenantOverride_UsesOverriddenDays()
     {
-        var settings = JsonSerializer.Serialize(
-            new { SlaDays = new Dictionary<string, int> { { "Critical", 3 }, { "High", 14 } } }
-        );
+        var settings = TenantSlaConfiguration.CreateDefault(Guid.NewGuid());
+        settings.Update(3, 14, 90, 180);
 
         var criticalDueDate = _slaService.CalculateDueDate(Severity.Critical, _baseDate, settings);
         criticalDueDate.Should().Be(_baseDate.AddDays(3));
@@ -55,9 +54,8 @@ public class SlaServiceTests
     [Fact]
     public void CalculateDueDate_PartialOverride_FallsBackToDefaultForMissingSeverities()
     {
-        var settings = JsonSerializer.Serialize(
-            new { SlaDays = new Dictionary<string, int> { { "Critical", 5 } } }
-        );
+        var settings = TenantSlaConfiguration.CreateDefault(Guid.NewGuid());
+        settings.Update(5, 30, 90, 180);
 
         var criticalDueDate = _slaService.CalculateDueDate(Severity.Critical, _baseDate, settings);
         criticalDueDate.Should().Be(_baseDate.AddDays(5));
@@ -68,9 +66,9 @@ public class SlaServiceTests
     }
 
     [Fact]
-    public void CalculateDueDate_InvalidJson_UsesDefaults()
+    public void CalculateDueDate_NoTenantConfig_UsesDefaults()
     {
-        var dueDate = _slaService.CalculateDueDate(Severity.Critical, _baseDate, "not-valid-json");
+        var dueDate = _slaService.CalculateDueDate(Severity.Critical, _baseDate, null);
 
         dueDate.Should().Be(_baseDate.AddDays(7));
     }

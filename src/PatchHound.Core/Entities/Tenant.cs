@@ -5,24 +5,17 @@ public class Tenant
     public Guid Id { get; private set; }
     public string Name { get; private set; } = null!;
     public string EntraTenantId { get; private set; } = null!;
-    public string Settings { get; private set; } = "{}";
 
     private Tenant() { }
 
-    public static Tenant Create(string name, string entraTenantId, string? settings = null)
+    public static Tenant Create(string name, string entraTenantId)
     {
         return new Tenant
         {
             Id = Guid.NewGuid(),
             Name = name,
             EntraTenantId = entraTenantId,
-            Settings = settings ?? "{}",
         };
-    }
-
-    public void UpdateSettings(string settings)
-    {
-        Settings = settings;
     }
 
     public void UpdateName(string name)

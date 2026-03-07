@@ -165,12 +165,25 @@ export function AssetDetailPane({
                                   : vulnerability.vendorSeverity}
                               />
                               <DataCard
+                                label="CVSS Vector"
+                                value={vulnerability.cvssVector ?? 'Not available'}
+                              />
+                              <DataCard
                                 label="Effective Severity"
                                 value={vulnerability.effectiveScore
                                   ? `${vulnerability.effectiveSeverity} (${vulnerability.effectiveScore.toFixed(1)})`
                                   : vulnerability.effectiveSeverity}
                               />
+                              <DataCard
+                                label="Published"
+                                value={vulnerability.publishedDate
+                                  ? new Date(vulnerability.publishedDate).toLocaleDateString()
+                                  : 'Unknown'}
+                              />
                             </div>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              {vulnerability.description}
+                            </p>
                             {vulnerability.assessmentReasonSummary ? (
                               <p className="mt-2 text-xs text-sky-700">
                                 {vulnerability.assessmentReasonSummary}

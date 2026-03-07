@@ -56,6 +56,11 @@ public class AssetsController : ControllerBase
         )
             query = query.Where(a => a.AssetType == assetType);
         if (
+            !string.IsNullOrEmpty(filter.Criticality)
+            && Enum.TryParse<Criticality>(filter.Criticality, out var criticality)
+        )
+            query = query.Where(a => a.Criticality == criticality);
+        if (
             !string.IsNullOrEmpty(filter.OwnerType)
             && Enum.TryParse<OwnerType>(filter.OwnerType, out var ownerType)
         )
@@ -277,7 +282,10 @@ public class AssetsController : ControllerBase
                     v.Id,
                     v.ExternalId,
                     v.Title,
+                    v.Description,
                     VendorSeverity = v.VendorSeverity.ToString(),
+                    v.CvssVector,
+                    v.PublishedDate,
                     Status = va.Status.ToString(),
                     va.DetectedDate,
                     va.ResolvedDate,
@@ -296,8 +304,11 @@ public class AssetsController : ControllerBase
                     row.Id,
                     row.ExternalId,
                     row.Title,
+                    row.Description,
                     row.VendorSeverity,
                     assessment?.BaseScore,
+                    assessment?.BaseVector ?? row.CvssVector,
+                    row.PublishedDate,
                     assessment?.EffectiveSeverity.ToString() ?? row.VendorSeverity,
                     assessment?.EffectiveScore,
                     assessment?.ReasonSummary,

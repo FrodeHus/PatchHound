@@ -13,6 +13,7 @@ public class IngestionService
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly IEnumerable<IVulnerabilitySource> _sources;
+    private readonly IEnumerable<IVulnerabilityEnricher> _enrichers;
     private readonly VulnerabilityAssessmentService _assessmentService;
     private readonly ILogger<IngestionService> _logger;
 
@@ -22,12 +23,14 @@ public class IngestionService
     public IngestionService(
         PatchHoundDbContext dbContext,
         IEnumerable<IVulnerabilitySource> sources,
+        IEnumerable<IVulnerabilityEnricher> enrichers,
         VulnerabilityAssessmentService assessmentService,
         ILogger<IngestionService> logger
     )
     {
         _dbContext = dbContext;
         _sources = sources;
+        _enrichers = enrichers;
         _assessmentService = assessmentService;
         _logger = logger;
     }
@@ -74,13 +77,14 @@ public class IngestionService
                 }
 
                 var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
-                await ProcessResultsAsync(tenantId, source.SourceName, results, ct);
+                var enrichedResults = await EnrichResultsAsync(tenantId, results, ct);
+                await ProcessResultsAsync(tenantId, source.SourceName, enrichedResults, ct);
 
                 _logger.LogInformation(
                     "Completed ingestion from {Source} for tenant {TenantId}: {Count} vulnerabilities",
                     source.SourceName,
                     tenantId,
-                    results.Count
+                    enrichedResults.Count
                 );
 
                 await UpdateRuntimeStateAsync(
@@ -124,7 +128,7 @@ public class IngestionService
     private async Task UpdateRuntimeStateAsync(
         Guid tenantId,
         string sourceKey,
-        Action<PersistedIngestionRuntimeState> update,
+        Action<TenantIngestionRuntimeState> update,
         CancellationToken ct
     )
     {
@@ -134,19 +138,93 @@ public class IngestionService
             return;
         }
 
-        var sources = TenantSourceSettings.ReadSources(tenant.Settings);
-        var source = sources.FirstOrDefault(item =>
-            string.Equals(item.Key, sourceKey, StringComparison.OrdinalIgnoreCase));
+        var source = await _dbContext.TenantSourceConfigurations.FirstOrDefaultAsync(
+            item => item.TenantId == tenantId
+                && string.Equals(item.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase),
+            ct
+        );
 
         if (source is null)
         {
             return;
         }
 
-        source.Runtime ??= new PersistedIngestionRuntimeState();
-        update(source.Runtime);
-        tenant.UpdateSettings(TenantSourceSettings.WriteSources(tenant.Settings, sources));
+        var runtime = new TenantIngestionRuntimeState(
+            source.ManualRequestedAt,
+            source.LastStartedAt,
+            source.LastCompletedAt,
+            source.LastSucceededAt,
+            source.LastStatus,
+            source.LastError
+        );
+        update(runtime);
+        source.UpdateRuntime(
+            runtime.ManualRequestedAt,
+            runtime.LastStartedAt,
+            runtime.LastCompletedAt,
+            runtime.LastSucceededAt,
+            runtime.LastStatus,
+            runtime.LastError
+        );
         await _dbContext.SaveChangesAsync(ct);
+    }
+
+    private async Task<IReadOnlyList<IngestionResult>> EnrichResultsAsync(
+        Guid tenantId,
+        IReadOnlyList<IngestionResult> results,
+        CancellationToken ct
+    )
+    {
+        var current = results;
+        foreach (var enricher in _enrichers)
+        {
+            await UpdateRuntimeStateAsync(
+                tenantId,
+                enricher.SourceKey,
+                runtime =>
+                {
+                    runtime.LastStartedAt = DateTimeOffset.UtcNow;
+                    runtime.LastStatus = "Running";
+                    runtime.LastError = string.Empty;
+                },
+                ct
+            );
+
+            try
+            {
+                current = await enricher.EnrichAsync(tenantId, current, ct);
+                await UpdateRuntimeStateAsync(
+                    tenantId,
+                    enricher.SourceKey,
+                    runtime =>
+                    {
+                        var now = DateTimeOffset.UtcNow;
+                        runtime.LastCompletedAt = now;
+                        runtime.LastSucceededAt = now;
+                        runtime.LastStatus = "Succeeded";
+                        runtime.LastError = string.Empty;
+                    },
+                    ct
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during enrichment from {Source} for tenant {TenantId}", enricher.SourceKey, tenantId);
+                await UpdateRuntimeStateAsync(
+                    tenantId,
+                    enricher.SourceKey,
+                    runtime =>
+                    {
+                        runtime.LastCompletedAt = DateTimeOffset.UtcNow;
+                        runtime.LastStatus = "Failed";
+                        runtime.LastError = $"Enrichment failed: {ex.GetType().Name}";
+                    },
+                    ct
+                );
+            }
+        }
+
+        return current;
     }
 
     internal async Task ProcessResultsAsync(
@@ -806,4 +884,31 @@ public class IngestionService
             _dbContext.DeviceSoftwareInstallations.Remove(installation);
         }
     }
+}
+
+internal sealed class TenantIngestionRuntimeState
+{
+    public TenantIngestionRuntimeState(
+        DateTimeOffset? manualRequestedAt,
+        DateTimeOffset? lastStartedAt,
+        DateTimeOffset? lastCompletedAt,
+        DateTimeOffset? lastSucceededAt,
+        string lastStatus,
+        string lastError
+    )
+    {
+        ManualRequestedAt = manualRequestedAt;
+        LastStartedAt = lastStartedAt;
+        LastCompletedAt = lastCompletedAt;
+        LastSucceededAt = lastSucceededAt;
+        LastStatus = lastStatus;
+        LastError = lastError;
+    }
+
+    public DateTimeOffset? ManualRequestedAt { get; set; }
+    public DateTimeOffset? LastStartedAt { get; set; }
+    public DateTimeOffset? LastCompletedAt { get; set; }
+    public DateTimeOffset? LastSucceededAt { get; set; }
+    public string LastStatus { get; set; }
+    public string LastError { get; set; }
 }

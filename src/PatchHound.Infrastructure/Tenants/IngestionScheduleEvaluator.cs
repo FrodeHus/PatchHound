@@ -1,12 +1,17 @@
 using Cronos;
+using PatchHound.Core.Entities;
 
 namespace PatchHound.Infrastructure.Tenants;
 
 public static class IngestionScheduleEvaluator
 {
-    public static bool IsDue(PersistedIngestionSource source, DateTimeOffset nowUtc)
+    public static bool IsDue(TenantSourceConfiguration source, DateTimeOffset nowUtc)
     {
-        if (!source.Enabled || !TenantSourceSettings.HasConfiguredCredentials(source.Credentials))
+        if (
+            !source.Enabled
+            || !TenantSourceCatalog.SupportsScheduling(source)
+            || !TenantSourceCatalog.HasConfiguredCredentials(source)
+        )
         {
             return false;
         }
@@ -21,8 +26,8 @@ public static class IngestionScheduleEvaluator
             return false;
         }
 
-        var lastStartedAt = source.Runtime?.LastStartedAt?.ToUniversalTime();
-        var lastCompletedAt = source.Runtime?.LastCompletedAt?.ToUniversalTime();
+        var lastStartedAt = source.LastStartedAt?.ToUniversalTime();
+        var lastCompletedAt = source.LastCompletedAt?.ToUniversalTime();
         if (lastStartedAt.HasValue && (!lastCompletedAt.HasValue || lastCompletedAt < lastStartedAt))
         {
             return false;
