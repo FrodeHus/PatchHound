@@ -6,6 +6,7 @@ using PatchHound.Api.Models;
 using PatchHound.Api.Models.Assets;
 using PatchHound.Api.Models.SecurityProfiles;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
@@ -28,16 +29,19 @@ public class AssetsController : ControllerBase
     private readonly PatchHoundDbContext _dbContext;
     private readonly AssetService _assetService;
     private readonly VulnerabilityAssessmentService _assessmentService;
+    private readonly ITenantContext _tenantContext;
 
     public AssetsController(
         PatchHoundDbContext dbContext,
         AssetService assetService,
-        VulnerabilityAssessmentService assessmentService
+        VulnerabilityAssessmentService assessmentService,
+        ITenantContext tenantContext
     )
     {
         _dbContext = dbContext;
         _assetService = assetService;
         _assessmentService = assessmentService;
+        _tenantContext = tenantContext;
     }
 
     [HttpGet]
@@ -72,7 +76,11 @@ public class AssetsController : ControllerBase
                 a.OwnerUserId == filter.OwnerId.Value || a.OwnerTeamId == filter.OwnerId.Value
             );
         if (filter.TenantId.HasValue)
+        {
+            if (!_tenantContext.HasAccessToTenant(filter.TenantId.Value))
+                return Forbid();
             query = query.Where(a => a.TenantId == filter.TenantId.Value);
+        }
         if (!string.IsNullOrEmpty(filter.Search))
             query = query.Where(a =>
                 a.Name.Contains(filter.Search)

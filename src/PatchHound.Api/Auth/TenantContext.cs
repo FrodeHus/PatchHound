@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 
@@ -6,63 +7,123 @@ namespace PatchHound.Api.Auth;
 
 public class TenantContext : ITenantContext
 {
-    private readonly Lazy<IReadOnlyList<Guid>> _accessibleTenantIds;
-    private readonly Lazy<Guid> _currentUserId;
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private Guid _currentUserId;
+    private IReadOnlyList<Guid> _accessibleTenantIds = Array.Empty<Guid>();
+    private Dictionary<Guid, List<RoleName>> _rolesByTenantId = new();
+    private IReadOnlyList<RoleName> _normalizedClaimRoles = Array.Empty<RoleName>();
+    private Guid? _currentTenantId;
+    private bool _initialized;
 
-    public TenantContext(IHttpContextAccessor httpContextAccessor, PatchHoundDbContext dbContext)
+    public Guid? CurrentTenantId => _currentTenantId;
+    public IReadOnlyList<Guid> AccessibleTenantIds => _accessibleTenantIds;
+    public Guid CurrentUserId => _currentUserId;
+
+    public bool HasAccessToTenant(Guid tenantId) => _accessibleTenantIds.Contains(tenantId);
+
+    public IReadOnlyList<string> GetRolesForTenant(Guid tenantId)
     {
-        _httpContextAccessor = httpContextAccessor;
+        if (_rolesByTenantId.TryGetValue(tenantId, out var roles))
+            return roles.Select(r => r.ToString()).ToList();
 
-        // Lazy-load to avoid querying DB on every request if not needed
-        _currentUserId = new Lazy<Guid>(() =>
+        return Array.Empty<string>();
+    }
+
+    internal IReadOnlyList<RoleName> GetRoleNamesForTenant(Guid tenantId)
+    {
+        if (_rolesByTenantId.TryGetValue(tenantId, out var roles))
+            return roles;
+
+        return Array.Empty<RoleName>();
+    }
+
+    internal IReadOnlyList<RoleName> GetAllRoleNames()
+    {
+        return _rolesByTenantId.Values
+            .SelectMany(r => r)
+            .Distinct()
+            .ToList();
+    }
+
+    internal async Task InitializeAsync(HttpContext httpContext, PatchHoundDbContext dbContext)
+    {
+        if (_initialized)
+            return;
+
+        _initialized = true;
+
+        var oid =
+            httpContext.User?.FindFirst(
+                "http://schemas.microsoft.com/identity/claims/objectidentifier"
+            )?.Value
+            ?? httpContext.User?.FindFirst("oid")?.Value;
+        var tokenTenantId = httpContext.User?.FindFirst("tid")?.Value;
+        _normalizedClaimRoles = EntraRoleNormalizer.Normalize(
+            httpContext.User is null ? [] : RoleClaimReader.ReadClaims(httpContext.User)
+        );
+
+        if (oid is not null && Guid.TryParse(oid, out _))
         {
-            var oid =
-                _httpContextAccessor
-                    .HttpContext?.User?.FindFirst(
-                        "http://schemas.microsoft.com/identity/claims/objectidentifier"
-                    )
-                    ?.Value ?? _httpContextAccessor.HttpContext?.User?.FindFirst("oid")?.Value;
-
-            if (oid is null || !Guid.TryParse(oid, out _))
-                return Guid.Empty;
-
-            // Look up internal user ID from EntraObjectId
-            var user = dbContext
+            var user = await dbContext
                 .Users.AsNoTracking()
                 .IgnoreQueryFilters()
-                .FirstOrDefault(u => u.EntraObjectId == oid);
+                .FirstOrDefaultAsync(u => u.EntraObjectId == oid);
 
-            return user?.Id ?? Guid.Empty;
-        });
+            if (user is not null)
+            {
+                _currentUserId = user.Id;
 
-        _accessibleTenantIds = new Lazy<IReadOnlyList<Guid>>(() =>
+                var userTenantRoles = await dbContext
+                    .UserTenantRoles.AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Where(utr => utr.UserId == _currentUserId)
+                    .Select(utr => new { utr.TenantId, utr.Role })
+                    .ToListAsync();
+
+                _rolesByTenantId = userTenantRoles
+                    .GroupBy(r => r.TenantId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(r => r.Role).Distinct().ToList()
+                    );
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(tokenTenantId) && _normalizedClaimRoles.Count > 0)
         {
-            var userId = CurrentUserId;
-            if (userId == Guid.Empty)
-                return Array.Empty<Guid>();
-
-            return dbContext
-                .UserTenantRoles.AsNoTracking()
+            var internalTenantIds = await dbContext
+                .Tenants.AsNoTracking()
                 .IgnoreQueryFilters()
-                .Where(utr => utr.UserId == userId)
-                .Select(utr => utr.TenantId)
-                .Distinct()
-                .ToList();
-        });
-    }
+                .Where(tenant => tenant.EntraTenantId == tokenTenantId)
+                .Select(tenant => tenant.Id)
+                .ToListAsync();
 
-    public Guid? CurrentTenantId
-    {
-        get
+            foreach (var tenantId in internalTenantIds)
+            {
+                if (!_rolesByTenantId.TryGetValue(tenantId, out var existingRoles))
+                {
+                    _rolesByTenantId[tenantId] = _normalizedClaimRoles.ToList();
+                    continue;
+                }
+
+                _rolesByTenantId[tenantId] = existingRoles
+                    .Concat(_normalizedClaimRoles)
+                    .Distinct()
+                    .ToList();
+            }
+        }
+
+        _accessibleTenantIds = _rolesByTenantId.Keys.ToList();
+
+        // Resolve current tenant: prefer explicit header, fall back to single-tenant
+        if (httpContext.Request.Headers.TryGetValue("X-Tenant-Id", out var tenantHeader)
+            && Guid.TryParse(tenantHeader.FirstOrDefault(), out var requestedTenantId)
+            && _accessibleTenantIds.Contains(requestedTenantId))
         {
-            // If user has access to exactly one tenant, that's the current one
-            // Otherwise, the tenant is determined by query parameter or header
-            var tenants = AccessibleTenantIds;
-            return tenants.Count == 1 ? tenants[0] : null;
+            _currentTenantId = requestedTenantId;
+        }
+        else if (_accessibleTenantIds.Count == 1)
+        {
+            _currentTenantId = _accessibleTenantIds[0];
         }
     }
-
-    public IReadOnlyList<Guid> AccessibleTenantIds => _accessibleTenantIds.Value;
-    public Guid CurrentUserId => _currentUserId.Value;
 }

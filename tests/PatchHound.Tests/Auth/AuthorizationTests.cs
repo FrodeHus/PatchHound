@@ -1,20 +1,15 @@
 using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using PatchHound.Api.Auth;
-using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
-using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Tests.Auth;
 
-public class AuthorizationTests : IDisposable
+public class AuthorizationTests
 {
-    private readonly PatchHoundDbContext _dbContext;
     private readonly ITenantContext _tenantContext;
     private readonly Guid _tenantId = Guid.NewGuid();
     private readonly Guid _userId = Guid.NewGuid();
@@ -24,28 +19,20 @@ public class AuthorizationTests : IDisposable
         _tenantContext = Substitute.For<ITenantContext>();
         _tenantContext.CurrentUserId.Returns(_userId);
         _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { _tenantId });
-
-        var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(_tenantContext));
+        _tenantContext.CurrentTenantId.Returns(_tenantId);
     }
 
     [Fact]
     public async Task SecurityAnalyst_CanAdjustSeverity()
     {
-        await SeedUserRole(RoleName.SecurityAnalyst);
-        var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
+        SetupRolesForTenant(RoleName.SecurityAnalyst);
+        var handler = new RoleRequirementHandler(_tenantContext);
         var requirement = new RoleRequirement(
             RoleName.GlobalAdmin,
             RoleName.SecurityManager,
             RoleName.SecurityAnalyst
         );
-        var context = new AuthorizationHandlerContext(
-            new[] { requirement },
-            CreateClaimsPrincipal(),
-            null
-        );
+        var context = CreateAuthContext(requirement);
 
         await handler.HandleAsync(context);
 
@@ -55,18 +42,14 @@ public class AuthorizationTests : IDisposable
     [Fact]
     public async Task AssetOwner_CannotAdjustSeverity()
     {
-        await SeedUserRole(RoleName.AssetOwner);
-        var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
+        SetupRolesForTenant(RoleName.AssetOwner);
+        var handler = new RoleRequirementHandler(_tenantContext);
         var requirement = new RoleRequirement(
             RoleName.GlobalAdmin,
             RoleName.SecurityManager,
             RoleName.SecurityAnalyst
         );
-        var context = new AuthorizationHandlerContext(
-            new[] { requirement },
-            CreateClaimsPrincipal(),
-            null
-        );
+        var context = CreateAuthContext(requirement);
 
         await handler.HandleAsync(context);
 
@@ -76,8 +59,8 @@ public class AuthorizationTests : IDisposable
     [Fact]
     public async Task Stakeholder_CanViewVulnerabilities()
     {
-        await SeedUserRole(RoleName.Stakeholder);
-        var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
+        SetupRolesForTenant(RoleName.Stakeholder);
+        var handler = new RoleRequirementHandler(_tenantContext);
         var requirement = new RoleRequirement(
             RoleName.GlobalAdmin,
             RoleName.SecurityManager,
@@ -86,11 +69,7 @@ public class AuthorizationTests : IDisposable
             RoleName.Stakeholder,
             RoleName.Auditor
         );
-        var context = new AuthorizationHandlerContext(
-            new[] { requirement },
-            CreateClaimsPrincipal(),
-            null
-        );
+        var context = CreateAuthContext(requirement);
 
         await handler.HandleAsync(context);
 
@@ -100,19 +79,15 @@ public class AuthorizationTests : IDisposable
     [Fact]
     public async Task Stakeholder_CannotAddComments()
     {
-        await SeedUserRole(RoleName.Stakeholder);
-        var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
+        SetupRolesForTenant(RoleName.Stakeholder);
+        var handler = new RoleRequirementHandler(_tenantContext);
         var requirement = new RoleRequirement(
             RoleName.GlobalAdmin,
             RoleName.SecurityManager,
             RoleName.SecurityAnalyst,
             RoleName.AssetOwner
         );
-        var context = new AuthorizationHandlerContext(
-            new[] { requirement },
-            CreateClaimsPrincipal(),
-            null
-        );
+        var context = CreateAuthContext(requirement);
 
         await handler.HandleAsync(context);
 
@@ -122,16 +97,10 @@ public class AuthorizationTests : IDisposable
     [Fact]
     public async Task GlobalAdmin_CanDoEverything()
     {
-        await SeedUserRole(RoleName.GlobalAdmin);
-        var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
-
-        // Test with ManageUsers (most restrictive - only GlobalAdmin)
+        SetupRolesForTenant(RoleName.GlobalAdmin);
+        var handler = new RoleRequirementHandler(_tenantContext);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin);
-        var context = new AuthorizationHandlerContext(
-            new[] { requirement },
-            CreateClaimsPrincipal(),
-            null
-        );
+        var context = CreateAuthContext(requirement);
 
         await handler.HandleAsync(context);
 
@@ -142,13 +111,9 @@ public class AuthorizationTests : IDisposable
     public async Task UnknownUser_IsRejected()
     {
         _tenantContext.CurrentUserId.Returns(Guid.Empty);
-        var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
+        var handler = new RoleRequirementHandler(_tenantContext);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin);
-        var context = new AuthorizationHandlerContext(
-            new[] { requirement },
-            CreateClaimsPrincipal(),
-            null
-        );
+        var context = CreateAuthContext(requirement);
 
         await handler.HandleAsync(context);
 
@@ -156,16 +121,27 @@ public class AuthorizationTests : IDisposable
     }
 
     [Fact]
+    public async Task NormalizedEntraTenantAdminRole_SatisfiesGlobalAdminRequirement()
+    {
+        _tenantContext.CurrentUserId.Returns(Guid.Empty);
+        _tenantContext.AccessibleTenantIds.Returns(Array.Empty<Guid>());
+
+        var handler = new RoleRequirementHandler(_tenantContext);
+        var requirement = new RoleRequirement(RoleName.GlobalAdmin);
+        var context = CreateAuthContext(requirement, "Tenant.Admin");
+
+        await handler.HandleAsync(context);
+
+        context.HasSucceeded.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Auditor_CanViewAuditLogs()
     {
-        await SeedUserRole(RoleName.Auditor);
-        var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
+        SetupRolesForTenant(RoleName.Auditor);
+        var handler = new RoleRequirementHandler(_tenantContext);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin, RoleName.Auditor);
-        var context = new AuthorizationHandlerContext(
-            new[] { requirement },
-            CreateClaimsPrincipal(),
-            null
-        );
+        var context = CreateAuthContext(requirement);
 
         await handler.HandleAsync(context);
 
@@ -175,40 +151,64 @@ public class AuthorizationTests : IDisposable
     [Fact]
     public async Task Auditor_CannotManageUsers()
     {
-        await SeedUserRole(RoleName.Auditor);
-        var handler = new RoleRequirementHandler(_dbContext, _tenantContext);
+        SetupRolesForTenant(RoleName.Auditor);
+        var handler = new RoleRequirementHandler(_tenantContext);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin);
-        var context = new AuthorizationHandlerContext(
-            new[] { requirement },
-            CreateClaimsPrincipal(),
-            null
-        );
+        var context = CreateAuthContext(requirement);
 
         await handler.HandleAsync(context);
 
         context.HasSucceeded.Should().BeFalse();
     }
 
-    private async Task SeedUserRole(RoleName role)
+    [Fact]
+    public async Task MultiTenant_RolesCheckedForCurrentTenantOnly()
     {
-        var userTenantRole = UserTenantRole.Create(_userId, _tenantId, role);
-        _dbContext.UserTenantRoles.Add(userTenantRole);
-        await _dbContext.SaveChangesAsync();
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenantA, tenantB });
+        _tenantContext.CurrentTenantId.Returns(tenantB);
+
+        // User is SecurityAnalyst in tenantA, Stakeholder in tenantB
+        _tenantContext.GetRolesForTenant(tenantA)
+            .Returns(new List<string> { RoleName.SecurityAnalyst.ToString() });
+        _tenantContext.GetRolesForTenant(tenantB)
+            .Returns(new List<string> { RoleName.Stakeholder.ToString() });
+
+        var handler = new RoleRequirementHandler(_tenantContext);
+        var requirement = new RoleRequirement(
+            RoleName.GlobalAdmin,
+            RoleName.SecurityManager,
+            RoleName.SecurityAnalyst
+        );
+        var context = CreateAuthContext(requirement);
+
+        await handler.HandleAsync(context);
+
+        // Should fail because current tenant is B and user only has Stakeholder there
+        context.HasSucceeded.Should().BeFalse();
     }
 
-    private ClaimsPrincipal CreateClaimsPrincipal()
+    private void SetupRolesForTenant(RoleName role)
+    {
+        _tenantContext.GetRolesForTenant(_tenantId)
+            .Returns(new List<string> { role.ToString() });
+    }
+
+    private AuthorizationHandlerContext CreateAuthContext(RoleRequirement requirement, params string[] roles)
     {
         var identity = new ClaimsIdentity("test");
         identity.AddClaim(new Claim("oid", _userId.ToString()));
-        return new ClaimsPrincipal(identity);
-    }
+        foreach (var role in roles)
+        {
+            identity.AddClaim(new Claim("roles", role));
+        }
+        var principal = new ClaimsPrincipal(identity);
 
-    public void Dispose() => _dbContext.Dispose();
-
-    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(tenantContext);
-        return services.BuildServiceProvider();
+        return new AuthorizationHandlerContext(
+            new[] { requirement },
+            principal,
+            null
+        );
     }
 }

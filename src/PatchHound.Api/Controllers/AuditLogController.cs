@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Audit;
+using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Api.Controllers;
@@ -14,10 +15,12 @@ namespace PatchHound.Api.Controllers;
 public class AuditLogController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
+    private readonly ITenantContext _tenantContext;
 
-    public AuditLogController(PatchHoundDbContext dbContext)
+    public AuditLogController(PatchHoundDbContext dbContext, ITenantContext tenantContext)
     {
         _dbContext = dbContext;
+        _tenantContext = tenantContext;
     }
 
     [HttpGet]
@@ -39,7 +42,11 @@ public class AuditLogController : ControllerBase
         if (filter.UserId.HasValue)
             query = query.Where(e => e.UserId == filter.UserId.Value);
         if (filter.TenantId.HasValue)
+        {
+            if (!_tenantContext.HasAccessToTenant(filter.TenantId.Value))
+                return Forbid();
             query = query.Where(e => e.TenantId == filter.TenantId.Value);
+        }
         if (filter.FromDate.HasValue)
             query = query.Where(e => e.Timestamp >= filter.FromDate.Value);
         if (filter.ToDate.HasValue)

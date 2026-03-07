@@ -48,7 +48,11 @@ public class CampaignsController : ControllerBase
         )
             query = query.Where(c => c.Status == status);
         if (filter.TenantId.HasValue)
+        {
+            if (!_tenantContext.HasAccessToTenant(filter.TenantId.Value))
+                return Forbid();
             query = query.Where(c => c.TenantId == filter.TenantId.Value);
+        }
 
         var totalCount = await query.CountAsync(ct);
 

@@ -47,7 +47,11 @@ public class RiskAcceptancesController : ControllerBase
         )
             query = query.Where(r => r.Status == status);
         if (filter.TenantId.HasValue)
+        {
+            if (!_tenantContext.HasAccessToTenant(filter.TenantId.Value))
+                return Forbid();
             query = query.Where(r => r.TenantId == filter.TenantId.Value);
+        }
 
         var totalCount = await query.CountAsync(ct);
 
