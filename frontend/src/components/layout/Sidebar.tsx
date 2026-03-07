@@ -2,7 +2,6 @@ import { Link } from '@tanstack/react-router'
 import type { ComponentType } from 'react'
 import {
   Bug,
-  Building2,
   CheckSquare,
   Flag,
   LayoutDashboard,
@@ -10,7 +9,7 @@ import {
   Server,
   Settings,
   Shield,
-  Users,
+  ShieldCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -44,9 +43,7 @@ const navItems: NavItem[] = [
   { to: '/assets', label: 'Assets', icon: Server },
   { to: '/campaigns', label: 'Campaigns', icon: Flag },
   { to: '/audit-log', label: 'Audit Trail', icon: ScrollText, roles: ['Auditor', 'GlobalAdmin'] },
-  { to: '/admin/users', label: 'Users', icon: Users, roles: ['GlobalAdmin'] },
-  { to: '/admin/teams', label: 'Assignment Groups', icon: Users, roles: ['GlobalAdmin', 'SecurityManager'] },
-  { to: '/admin/tenants', label: 'Tenants', icon: Building2, roles: ['GlobalAdmin', 'SecurityManager'] },
+  { to: '/admin', label: 'Admin Console', icon: ShieldCheck, roles: ['GlobalAdmin', 'SecurityManager'] },
   { to: '/settings', label: 'Settings', icon: Settings, roles: ['GlobalAdmin', 'SecurityManager'] },
 ]
 

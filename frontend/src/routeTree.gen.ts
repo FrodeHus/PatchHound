@@ -24,6 +24,7 @@ import { Route as AuthedCampaignsIndexRouteImport } from './routes/_authed/campa
 import { Route as AuthedAuditLogIndexRouteImport } from './routes/_authed/audit-log/index'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
 import { Route as ApiInternalEventsRouteImport } from './routes/api/internal/events'
+import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/index'
 import { Route as AuthedVulnerabilitiesIdRouteImport } from './routes/_authed/vulnerabilities/$id'
 import { Route as AuthedCampaignsIdRouteImport } from './routes/_authed/campaigns/$id'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
@@ -106,6 +107,11 @@ const ApiInternalEventsRoute = ApiInternalEventsRouteImport.update({
   path: '/api/internal/events',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthedAdminIndexRoute = AuthedAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedVulnerabilitiesIdRoute = AuthedVulnerabilitiesIdRouteImport.update({
   id: '/vulnerabilities/$id',
   path: '/vulnerabilities/$id',
@@ -145,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
   '/setup/': typeof SetupIndexRoute
+  '/admin/': typeof AuthedAdminIndexRoute
   '/admin/teams': typeof AuthedAdminTeamsRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/campaigns/$id': typeof AuthedCampaignsIdRoute
@@ -167,6 +174,7 @@ export interface FileRoutesByTo {
   '/auth/logout': typeof AuthLogoutRoute
   '/': typeof AuthedIndexRoute
   '/setup': typeof SetupIndexRoute
+  '/admin': typeof AuthedAdminIndexRoute
   '/admin/teams': typeof AuthedAdminTeamsRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/campaigns/$id': typeof AuthedCampaignsIdRoute
@@ -190,6 +198,7 @@ export interface FileRoutesById {
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
   '/_authed/': typeof AuthedIndexRoute
+  '/_authed/admin/': typeof AuthedAdminIndexRoute
   '/setup/': typeof SetupIndexRoute
   '/_authed/admin/teams': typeof AuthedAdminTeamsRoute
   '/_authed/admin/users': typeof AuthedAdminUsersRoute
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/logout'
     | '/setup/'
+    | '/admin/'
     | '/admin/teams'
     | '/admin/users'
     | '/campaigns/$id'
@@ -237,6 +247,7 @@ export interface FileRouteTypes {
     | '/auth/logout'
     | '/'
     | '/setup'
+    | '/admin'
     | '/admin/teams'
     | '/admin/users'
     | '/campaigns/$id'
@@ -259,6 +270,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/logout'
     | '/_authed/'
+    | '/_authed/admin/'
     | '/setup/'
     | '/_authed/admin/teams'
     | '/_authed/admin/users'
@@ -386,6 +398,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAssetsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/': {
+      id: '/_authed/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthedAdminIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/api/internal/events': {
       id: '/api/internal/events'
       path: '/api/internal/events'
@@ -440,6 +459,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthedRouteChildren {
   AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
   AuthedAdminTeamsRoute: typeof AuthedAdminTeamsRoute
   AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
   AuthedCampaignsIdRoute: typeof AuthedCampaignsIdRoute
@@ -456,6 +476,7 @@ interface AuthedRouteChildren {
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedIndexRoute: AuthedIndexRoute,
+  AuthedAdminIndexRoute: AuthedAdminIndexRoute,
   AuthedAdminTeamsRoute: AuthedAdminTeamsRoute,
   AuthedAdminUsersRoute: AuthedAdminUsersRoute,
   AuthedCampaignsIdRoute: AuthedCampaignsIdRoute,
