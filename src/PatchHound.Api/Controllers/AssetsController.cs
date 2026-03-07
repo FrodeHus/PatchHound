@@ -64,7 +64,9 @@ public class AssetsController : ControllerBase
             .Select(a => new AssetDto(
                 a.Id,
                 a.ExternalId,
-                a.Name,
+                a.AssetType == AssetType.Device
+                    ? a.DeviceComputerDnsName ?? a.Name
+                    : a.Name,
                 a.AssetType.ToString(),
                 a.Criticality.ToString(),
                 a.OwnerType.ToString(),
@@ -115,6 +117,7 @@ public class AssetsController : ControllerBase
                 asset.OwnerUserId,
                 asset.OwnerTeamId,
                 asset.FallbackTeamId,
+                asset.DeviceComputerDnsName,
                 asset.DeviceHealthStatus,
                 asset.DeviceOsPlatform,
                 asset.DeviceOsVersion,

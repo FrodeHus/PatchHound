@@ -346,6 +346,7 @@ public class IngestionServiceTests : IDisposable
                     "server01.contoso.local",
                     AssetType.Device,
                     "Windows 11 23H2",
+                    "server01.contoso.local",
                     "Active",
                     "Windows11",
                     "23H2",
@@ -368,6 +369,7 @@ public class IngestionServiceTests : IDisposable
         asset!.AssetType.Should().Be(AssetType.Device);
         asset.Name.Should().Be("server01.contoso.local");
         asset.Description.Should().Be("Windows 11 23H2");
+        asset.DeviceComputerDnsName.Should().Be("server01.contoso.local");
         asset.DeviceHealthStatus.Should().Be("Active");
         asset.DeviceOsPlatform.Should().Be("Windows11");
         asset.DeviceOsVersion.Should().Be("23H2");

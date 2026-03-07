@@ -421,6 +421,7 @@ public class IngestionService
                 if (asset.AssetType == AssetType.Device)
                 {
                     existing.UpdateDeviceDetails(
+                        asset.DeviceComputerDnsName,
                         asset.DeviceHealthStatus,
                         asset.DeviceOsPlatform,
                         asset.DeviceOsVersion,
@@ -439,6 +440,7 @@ public class IngestionService
             if (asset.AssetType == AssetType.Device)
             {
                 existing.UpdateDeviceDetails(
+                    asset.DeviceComputerDnsName,
                     asset.DeviceHealthStatus,
                     asset.DeviceOsPlatform,
                     asset.DeviceOsVersion,

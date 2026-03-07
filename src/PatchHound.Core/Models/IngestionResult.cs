@@ -24,6 +24,7 @@ public record IngestionAsset(
     string Name,
     AssetType AssetType,
     string? Description = null,
+    string? DeviceComputerDnsName = null,
     string? DeviceHealthStatus = null,
     string? DeviceOsPlatform = null,
     string? DeviceOsVersion = null,

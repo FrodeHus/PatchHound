@@ -21,6 +21,7 @@ public record AssetDetailDto(
     Guid? OwnerUserId,
     Guid? OwnerTeamId,
     Guid? FallbackTeamId,
+    string? DeviceComputerDnsName,
     string? DeviceHealthStatus,
     string? DeviceOsPlatform,
     string? DeviceOsVersion,

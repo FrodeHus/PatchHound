@@ -31,6 +31,7 @@ export const assetDetailSchema = z.object({
   ownerUserId: z.string().uuid().nullable(),
   ownerTeamId: z.string().uuid().nullable(),
   fallbackTeamId: z.string().uuid().nullable(),
+  deviceComputerDnsName: z.string().nullable(),
   deviceHealthStatus: z.string().nullable(),
   deviceOsPlatform: z.string().nullable(),
   deviceOsVersion: z.string().nullable(),

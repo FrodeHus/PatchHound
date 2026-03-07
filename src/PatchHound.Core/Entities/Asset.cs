@@ -15,6 +15,7 @@ public class Asset
     public Guid? OwnerUserId { get; private set; }
     public Guid? OwnerTeamId { get; private set; }
     public Guid? FallbackTeamId { get; private set; }
+    public string? DeviceComputerDnsName { get; private set; }
     public string? DeviceHealthStatus { get; private set; }
     public string? DeviceOsPlatform { get; private set; }
     public string? DeviceOsVersion { get; private set; }
@@ -79,6 +80,7 @@ public class Asset
     }
 
     public void UpdateDeviceDetails(
+        string? computerDnsName,
         string? healthStatus,
         string? osPlatform,
         string? osVersion,
@@ -88,6 +90,7 @@ public class Asset
         string? aadDeviceId
     )
     {
+        DeviceComputerDnsName = computerDnsName;
         DeviceHealthStatus = healthStatus;
         DeviceOsPlatform = osPlatform;
         DeviceOsVersion = osVersion;
