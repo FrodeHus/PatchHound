@@ -326,9 +326,13 @@ var app = builder.Build();
 // Apply pending database migrations on startup
 using (var scope = app.Services.CreateScope())
 {
+    Console.WriteLine("[startup] PatchHound.Api starting database migration check");
     var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
     await dbContext.Database.MigrateAsync();
+    Console.WriteLine("[startup] PatchHound.Api database migration check completed");
 }
+
+Console.WriteLine("[startup] PatchHound.Api application configured, starting web host");
 
 if (app.Environment.IsDevelopment())
 {

@@ -44,6 +44,17 @@ export const fetchTenantDetail = createServerFn({ method: 'GET' })
     return tenantDetailSchema.parse(data)
   })
 
+export const createTenant = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({
+    name: z.string().min(1),
+    entraTenantId: z.string().min(1),
+  }))
+  .handler(async ({ context, data: { name, entraTenantId } }) => {
+    const data = await apiPost('/tenants', context.token, { name, entraTenantId })
+    return tenantDetailSchema.parse(data)
+  })
+
 export const updateTenant = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(z.object({

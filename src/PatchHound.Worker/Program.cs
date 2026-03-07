@@ -22,10 +22,13 @@ var host = builder.Build();
 // Apply pending database migrations on startup
 using (var scope = host.Services.CreateScope())
 {
+    Console.WriteLine("[startup] PatchHound.Worker starting database migration check");
     var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
     await dbContext.Database.MigrateAsync();
+    Console.WriteLine("[startup] PatchHound.Worker database migration check completed");
 }
 
+Console.WriteLine("[startup] PatchHound.Worker host configured, starting background services");
 await host.RunAsync();
 
 /// <summary>

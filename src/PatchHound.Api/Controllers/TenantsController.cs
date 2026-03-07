@@ -82,42 +82,55 @@ public class TenantsController : ControllerBase
         if (tenant is null)
             return NotFound();
 
-        var assetCounts = await _dbContext
-            .Assets.AsNoTracking()
-            .Where(asset => asset.TenantId == id)
-            .GroupBy(asset => asset.AssetType)
-            .Select(group => new { AssetType = group.Key, Count = group.Count() })
-            .ToListAsync(ct);
+        return Ok(await BuildTenantDetailDto(id, ignoreQueryFilters: false, ct));
+    }
 
-        var assetSummary = new TenantAssetSummaryDto(
-            assetCounts.Sum(item => item.Count),
-            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.Device)?.Count ?? 0,
-            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.Software)?.Count ?? 0,
-            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.CloudResource)?.Count ?? 0
-        );
-        var sla = await _dbContext.TenantSlaConfigurations.AsNoTracking()
-            .FirstOrDefaultAsync(config => config.TenantId == id, ct);
-        var slaDto = new TenantSlaConfigurationDto(
-            sla?.CriticalDays ?? 7,
-            sla?.HighDays ?? 30,
-            sla?.MediumDays ?? 90,
-            sla?.LowDays ?? 180
-        );
+    [HttpPost]
+    [Authorize(Policy = Policies.ConfigureTenant)]
+    public async Task<ActionResult<TenantDetailDto>> Create(
+        [FromBody] CreateTenantRequest request,
+        CancellationToken ct
+    )
+    {
+        var name = request.Name.Trim();
+        var entraTenantId = request.EntraTenantId.Trim();
 
-        var sources = await _dbContext
-            .TenantSourceConfigurations.AsNoTracking()
-            .Where(source => source.TenantId == id)
-            .OrderBy(source => source.DisplayName)
-            .ToListAsync(ct);
+        if (string.IsNullOrWhiteSpace(name))
+            return ValidationProblem("Tenant name is required.");
 
-        return Ok(new TenantDetailDto(
-            tenant.Id,
-            tenant.Name,
-            tenant.EntraTenantId,
-            assetSummary,
-            slaDto,
-            sources.Select(MapSourceDto).ToList()
-        ));
+        if (string.IsNullOrWhiteSpace(entraTenantId))
+            return ValidationProblem("Entra tenant ID is required.");
+
+        var normalizedEntraTenantId = entraTenantId.ToLowerInvariant();
+        var existingTenant = await _dbContext.Tenants.IgnoreQueryFilters()
+            .AnyAsync(
+                tenant =>
+                    tenant.Name == name
+                    || tenant.EntraTenantId.ToLower() == normalizedEntraTenantId,
+                ct
+            );
+
+        if (existingTenant)
+        {
+            return Conflict(new ProblemDetails
+            {
+                Title = "Tenant already exists",
+                Detail = "A tenant with the same name or Entra tenant ID is already registered.",
+            });
+        }
+
+        var tenant = Tenant.Create(name, entraTenantId);
+        await _dbContext.Tenants.AddAsync(tenant, ct);
+        await _dbContext.TenantSlaConfigurations.AddAsync(TenantSlaConfiguration.CreateDefault(tenant.Id), ct);
+
+        foreach (var source in TenantSourceCatalog.CreateDefaults(tenant.Id))
+        {
+            await _dbContext.TenantSourceConfigurations.AddAsync(source, ct);
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
+        var detail = await BuildTenantDetailDto(tenant.Id, ignoreQueryFilters: true, ct);
+        return CreatedAtAction(nameof(Get), new { id = tenant.Id }, detail);
     }
 
     [HttpPut("{id:guid}")]
@@ -319,6 +332,75 @@ public class TenantsController : ControllerBase
                 source.LastStatus,
                 source.LastError
             )
+        );
+    }
+
+    private async Task<TenantDetailDto> BuildTenantDetailDto(
+        Guid tenantId,
+        bool ignoreQueryFilters,
+        CancellationToken ct
+    )
+    {
+        var tenantQuery = _dbContext.Tenants.AsNoTracking();
+        if (ignoreQueryFilters)
+        {
+            tenantQuery = tenantQuery.IgnoreQueryFilters();
+        }
+
+        var tenant = await tenantQuery
+            .SingleAsync(t => t.Id == tenantId, ct);
+
+        var assetsQuery = _dbContext.Assets.AsNoTracking();
+        if (ignoreQueryFilters)
+        {
+            assetsQuery = assetsQuery.IgnoreQueryFilters();
+        }
+
+        var assetCounts = await assetsQuery
+            .Where(asset => asset.TenantId == tenantId)
+            .GroupBy(asset => asset.AssetType)
+            .Select(group => new { AssetType = group.Key, Count = group.Count() })
+            .ToListAsync(ct);
+
+        var assetSummary = new TenantAssetSummaryDto(
+            assetCounts.Sum(item => item.Count),
+            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.Device)?.Count ?? 0,
+            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.Software)?.Count ?? 0,
+            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.CloudResource)?.Count ?? 0
+        );
+        var slaQuery = _dbContext.TenantSlaConfigurations.AsNoTracking();
+        if (ignoreQueryFilters)
+        {
+            slaQuery = slaQuery.IgnoreQueryFilters();
+        }
+
+        var sla = await slaQuery
+            .FirstOrDefaultAsync(config => config.TenantId == tenantId, ct);
+        var slaDto = new TenantSlaConfigurationDto(
+            sla?.CriticalDays ?? 7,
+            sla?.HighDays ?? 30,
+            sla?.MediumDays ?? 90,
+            sla?.LowDays ?? 180
+        );
+
+        var sourcesQuery = _dbContext.TenantSourceConfigurations.AsNoTracking();
+        if (ignoreQueryFilters)
+        {
+            sourcesQuery = sourcesQuery.IgnoreQueryFilters();
+        }
+
+        var sources = await sourcesQuery
+            .Where(source => source.TenantId == tenantId)
+            .OrderBy(source => source.DisplayName)
+            .ToListAsync(ct);
+
+        return new TenantDetailDto(
+            tenant.Id,
+            tenant.Name,
+            tenant.EntraTenantId,
+            assetSummary,
+            slaDto,
+            sources.Select(MapSourceDto).ToList()
         );
     }
 }
