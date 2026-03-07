@@ -1,15 +1,34 @@
-import { Menu } from 'lucide-react'
-import type { CurrentUser } from '@/types/api'
+import { Menu, LogOut, ShieldCheck } from 'lucide-react'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 import { TenantSelector } from '@/components/layout/TenantSelector'
+import type { CurrentUser } from '@/server/auth.functions'
 
 type TopNavProps = {
-  user: CurrentUser | null
+  user: CurrentUser
   selectedTenantId: string | null
   onSelectTenant: (tenantId: string) => void
   onToggleSidebar: () => void
-  onLogin: () => void
   onLogout: () => void
+}
+
+function getInitials(displayName: string, email: string) {
+  const source = displayName.trim() || email.trim()
+  return source
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
 }
 
 export function TopNav({
@@ -17,50 +36,85 @@ export function TopNav({
   selectedTenantId,
   onSelectTenant,
   onToggleSidebar,
-  onLogin,
   onLogout,
 }: TopNavProps) {
-  return (
-    <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur">
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          className="rounded-md p-2 hover:bg-muted md:hidden"
-          aria-label="Toggle menu"
-          onClick={onToggleSidebar}
-        >
-          <Menu size={18} />
-        </button>
-        <TenantSelector
-          tenants={user?.tenants ?? []}
-          selectedTenantId={selectedTenantId}
-          onSelectTenant={onSelectTenant}
-        />
-      </div>
+  const tenants = user.tenantIds.map((tenantId) => ({ id: tenantId, name: tenantId }))
 
-      <div className="flex items-center gap-3">
-        <NotificationBell />
-        <div className="hidden text-right text-sm sm:block">
-          <p className="font-medium">{user?.displayName ?? 'Guest'}</p>
-          <p className="text-xs text-muted-foreground">{user?.email ?? 'Not signed in'}</p>
+  return (
+    <header className="sticky top-0 z-20 px-4 pb-4 pt-4 sm:px-6">
+      <div className="rounded-[28px] border border-border/70 bg-card/78 p-3 backdrop-blur-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="rounded-full border-border/70 bg-background/55 md:hidden"
+              aria-label="Toggle menu"
+              onClick={onToggleSidebar}
+            >
+              <Menu className="size-4" />
+            </Button>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/10 text-primary">
+                  Live posture
+                </Badge>
+                <span className="hidden text-xs text-muted-foreground sm:inline">Unified vulnerability operations</span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">Security posture command</h1>
+                <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200">
+                  <ShieldCheck className="size-3.5" />
+                  Data ingest active
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <TenantSelector
+              tenants={tenants}
+              selectedTenantId={selectedTenantId}
+              onSelectTenant={onSelectTenant}
+            />
+            <NotificationBell />
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="ghost" className="h-11 rounded-full border border-border/70 bg-background/55 px-2 hover:bg-accent/70" />
+                }
+              >
+                <Avatar className="size-8 border border-border/70">
+                  <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
+                    {getInitials(user.displayName, user.email)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden text-left sm:block">
+                  <p className="text-sm font-medium leading-none">{user.displayName || user.email}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{user.roles[0] ?? 'Member'}</p>
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 rounded-2xl border-border/70 bg-popover/95 p-2 backdrop-blur">
+                <DropdownMenuLabel className="px-3 py-2">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">{user.displayName || 'Signed in'}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="rounded-xl px-3 py-2">
+                  {user.tenantIds.length} tenant scope{user.tenantIds.length === 1 ? '' : 's'}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="rounded-xl px-3 py-2" onClick={onLogout}>
+                  <LogOut className="size-4" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-        {user ? (
-          <button
-            type="button"
-            className="rounded-md border border-input px-3 py-1.5 text-sm hover:bg-muted"
-            onClick={onLogout}
-          >
-            Logout
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90"
-            onClick={onLogin}
-          >
-            Login
-          </button>
-        )}
       </div>
     </header>
   )

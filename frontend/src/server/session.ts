@@ -1,10 +1,10 @@
 // frontend-start/src/server/session.ts
 import { getIronSession } from 'iron-session'
 import { getRequest } from '@tanstack/react-start/server'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 
 export interface SessionData {
   accessToken?: string
-  refreshToken?: string
   tokenExpiry?: number
   userId?: string
   email?: string
@@ -12,6 +12,8 @@ export interface SessionData {
   tenantId?: string
   roles?: string[]
   tenantIds?: string[]
+  homeAccountId?: string
+  oauthState?: string
 }
 
 const sessionOptions = {
@@ -30,8 +32,11 @@ export async function getSession() {
   // iron-session works with a request/response pair
   // For reading, we parse the cookie from the request headers
   const cookieHeader = request.headers.get('cookie') ?? ''
-  const mockReq = { headers: { cookie: cookieHeader } } as any
-  const mockRes = { getHeader: () => '', setHeader: () => {} } as any
+  const mockReq = { headers: { cookie: cookieHeader } } as IncomingMessage
+  const mockRes = {
+    getHeader: () => undefined,
+    setHeader: () => undefined,
+  } as unknown as ServerResponse<IncomingMessage>
   return getIronSession<SessionData>(mockReq, mockRes, sessionOptions)
 }
 

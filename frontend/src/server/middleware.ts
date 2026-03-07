@@ -12,13 +12,10 @@ export const authMiddleware = createMiddleware({ type: 'function' })
     }
 
     // Refresh token if expired
-    if (isTokenExpired(session) && session.refreshToken) {
+    if (isTokenExpired(session) && session.homeAccountId) {
       try {
-        const tokens = await refreshAccessToken(session.refreshToken)
+        const tokens = await refreshAccessToken(session.homeAccountId)
         session.accessToken = tokens.access_token
-        if (tokens.refresh_token) {
-          session.refreshToken = tokens.refresh_token
-        }
         session.tokenExpiry = Date.now() + tokens.expires_in * 1000
         await session.save()
       } catch {
@@ -26,6 +23,9 @@ export const authMiddleware = createMiddleware({ type: 'function' })
         session.destroy()
         throw redirect({ to: '/auth/login' })
       }
+    } else if (isTokenExpired(session)) {
+      session.destroy()
+      throw redirect({ to: '/auth/login' })
     }
 
     return next({

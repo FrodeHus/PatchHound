@@ -1,34 +1,51 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { exchangeCodeForTokens, parseIdToken } from '@/server/auth'
+import { exchangeCodeForTokens } from '@/server/auth'
 import { getSession } from '@/server/session'
 
 export const Route = createFileRoute('/auth/callback')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const url = new URL(request.url)
-        const code = url.searchParams.get('code')
-        const error = url.searchParams.get('error')
-
-        if (error || !code) {
-          return Response.redirect('/?error=auth_failed', 302)
-        }
-
-        const tokens = await exchangeCodeForTokens(code)
-        const claims = parseIdToken(tokens.id_token)
+        const callbackUrl = new URL(request.url)
+        const code = callbackUrl.searchParams.get('code')
+        const state = callbackUrl.searchParams.get('state')
+        const error = callbackUrl.searchParams.get('error')
+        const redirectTo = (path: string) => Response.redirect(new URL(path, callbackUrl).toString(), 302)
 
         const session = await getSession()
+
+        if (error || !code) {
+          return redirectTo('/?error=auth_failed')
+        }
+
+        if (!state || state !== session.oauthState) {
+          return redirectTo('/?error=invalid_auth_state')
+        }
+
+        let tokens: Awaited<ReturnType<typeof exchangeCodeForTokens>>
+        try {
+          tokens = await exchangeCodeForTokens(code)
+        } catch {
+          return redirectTo('/?error=token_exchange_failed')
+        }
+
+        if (!tokens.claims) {
+          return redirectTo('/?error=missing_id_token_claims')
+        }
+
+        const claims = tokens.claims
         session.accessToken = tokens.access_token
-        session.refreshToken = tokens.refresh_token
         session.tokenExpiry = Date.now() + tokens.expires_in * 1000
+        session.homeAccountId = tokens.home_account_id
         session.userId = claims.oid
         session.email = claims.preferred_username
         session.displayName = claims.name
         session.tenantId = claims.tid
         session.roles = claims.roles ?? []
+        session.oauthState = undefined
         await session.save()
 
-        return Response.redirect('/', 302)
+        return redirectTo('/')
       },
     },
   },

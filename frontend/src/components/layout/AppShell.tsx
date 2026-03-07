@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { TopNav } from '@/components/layout/TopNav'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import type { CurrentUser } from '@/server/auth.functions'
 
 const selectedTenantStorageKey = 'vigil:selected-tenant'
@@ -18,8 +19,7 @@ function getInitialTenantId(): string | null {
 export function AppShell({ user, children }: AppShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(getInitialTenantId)
-  const tenants = user.tenantIds?.map(id => ({ id, name: id })) ?? []
-  const effectiveSelectedTenantId = selectedTenantId ?? tenants[0]?.id ?? null
+  const effectiveSelectedTenantId = selectedTenantId ?? user.tenantIds[0] ?? null
 
   useEffect(() => {
     if (!selectedTenantId && effectiveSelectedTenantId) {
@@ -30,13 +30,22 @@ export function AppShell({ user, children }: AppShellProps) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex min-h-screen">
-        <Sidebar
-          user={user}
-          isOpen={isSidebarOpen}
-          onNavigate={() => {
-            setIsSidebarOpen(false)
-          }}
-        />
+        <div className="sticky top-0 hidden h-screen md:block">
+          <Sidebar user={user} />
+        </div>
+
+        <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+          <SheetContent side="left" className="w-[22rem] border-r border-sidebar-border/80 bg-sidebar/94 p-0 text-sidebar-foreground sm:max-w-[22rem]">
+            <Sidebar
+              user={user}
+              compact
+              onNavigate={() => {
+                setIsSidebarOpen(false)
+              }}
+            />
+          </SheetContent>
+        </Sheet>
+
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <TopNav
             user={user}
@@ -48,14 +57,15 @@ export function AppShell({ user, children }: AppShellProps) {
             onToggleSidebar={() => {
               setIsSidebarOpen((currentValue) => !currentValue)
             }}
-            onLogin={() => {
-              window.location.href = '/auth/login'
-            }}
             onLogout={() => {
               window.location.href = '/auth/logout'
             }}
           />
-          <main className="flex-1 p-4 sm:p-6">{children}</main>
+          <main className="flex-1 px-4 pb-6 sm:px-6">
+            <div className="mx-auto w-full max-w-[1600px]">
+              {children}
+            </div>
+          </main>
         </div>
       </div>
     </div>

@@ -1,6 +1,5 @@
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -9,6 +8,8 @@ import {
   YAxis,
 } from 'recharts'
 import type { TrendData } from '@/api/dashboard.schemas'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 type TrendChartProps = {
   data: TrendData
@@ -46,25 +47,52 @@ function formatChartData(data: TrendData): ChartPoint[] {
 
 export function TrendChart({ data }: TrendChartProps) {
   const points = formatChartData(data)
+  const legend = [
+    { label: 'Low', className: 'bg-chart-2' },
+    { label: 'Medium', className: 'bg-chart-4' },
+    { label: 'High', className: 'bg-chart-1' },
+    { label: 'Critical', className: 'bg-destructive' },
+  ]
 
   return (
-    <section className="rounded-lg border border-border bg-card p-4">
-      <h2 className="text-lg font-semibold">Vulnerability Trends (12 months)</h2>
-      <div className="mt-3 h-[280px] w-full">
+    <Card className="rounded-[32px] border-border/70 bg-card/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+      <CardHeader className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Trendline</p>
+          <CardTitle className="mt-2 text-xl font-semibold tracking-tight">Open vulnerabilities over 12 months</CardTitle>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {legend.map((item) => (
+            <Badge key={item.label} variant="outline" className="rounded-full border-border/70 bg-background/30 px-2.5 py-1 text-xs text-foreground">
+              <span className={`mr-2 inline-block size-2 rounded-full ${item.className}`} />
+              {item.label}
+            </Badge>
+          ))}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="h-[320px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={points}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-            <Tooltip />
-            <Legend />
-            <Line type="monotone" dataKey="Low" stroke="var(--chart-2)" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="Medium" stroke="var(--chart-4)" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="High" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="Critical" stroke="var(--destructive)" strokeWidth={2} dot={false} />
+            <CartesianGrid vertical={false} stroke="color-mix(in oklab, var(--border) 85%, transparent)" />
+            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} />
+            <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} />
+            <Tooltip
+              contentStyle={{
+                background: 'var(--color-popover)',
+                border: '1px solid color-mix(in oklab, var(--border) 90%, transparent)',
+                borderRadius: '16px',
+                color: 'var(--color-popover-foreground)',
+              }}
+            />
+            <Line type="monotone" dataKey="Low" stroke="var(--color-chart-2)" strokeWidth={2.5} dot={false} />
+            <Line type="monotone" dataKey="Medium" stroke="var(--color-chart-4)" strokeWidth={2.5} dot={false} />
+            <Line type="monotone" dataKey="High" stroke="var(--color-chart-1)" strokeWidth={2.5} dot={false} />
+            <Line type="monotone" dataKey="Critical" stroke="var(--color-destructive)" strokeWidth={2.5} dot={false} />
           </LineChart>
         </ResponsiveContainer>
-      </div>
-    </section>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
