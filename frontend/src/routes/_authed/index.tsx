@@ -1,5 +1,5 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { AlertTriangle, CheckCircle2, ShieldAlert, TimerReset } from 'lucide-react'
+import { Link, createFileRoute } from '@tanstack/react-router'
+import { AlertTriangle, CheckCircle2, Settings2, ShieldAlert, TimerReset, Users, UsersRound, Waypoints } from 'lucide-react'
 import { fetchDashboardSummary, fetchDashboardTrends } from '@/api/dashboard.functions'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,6 +22,38 @@ export const Route = createFileRoute('/_authed/')({
 
 function DashboardPage() {
   const { summary, trends } = Route.useLoaderData()
+  const quickLinks = [
+    {
+      label: 'Vulnerabilities',
+      description: 'Review backlog, severity, and status.',
+      to: '/vulnerabilities',
+      icon: ShieldAlert,
+    },
+    {
+      label: 'Assets',
+      description: 'Inspect affected hosts and platforms.',
+      to: '/assets',
+      icon: Waypoints,
+    },
+    {
+      label: 'Teams',
+      description: 'Manage ownership and routing.',
+      to: '/admin/teams',
+      icon: UsersRound,
+    },
+    {
+      label: 'Users',
+      description: 'Control access and membership.',
+      to: '/admin/users',
+      icon: Users,
+    },
+    {
+      label: 'Settings',
+      description: 'Configure integrations and defaults.',
+      to: '/settings',
+      icon: Settings2,
+    },
+  ] as const
   const statCards = [
     {
       label: 'Critical backlog',
@@ -64,6 +96,28 @@ function DashboardPage() {
               <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
                 Monitor what is drifting, where remediation is slowing, and which critical issues are aging into risk.
               </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {quickLinks.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <Link
+                      key={item.label}
+                      to={item.to}
+                      className="group rounded-3xl border border-border/70 bg-background/35 p-4 transition-colors hover:border-primary/40 hover:bg-background/55"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{item.label}</p>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.description}</p>
+                        </div>
+                        <span className="rounded-2xl border border-border/80 bg-background/70 p-2 text-primary transition-transform group-hover:translate-x-0.5">
+                          <Icon className="size-4" />
+                        </span>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:w-[34rem]">
               {statCards.map((item) => {

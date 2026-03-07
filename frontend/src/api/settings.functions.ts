@@ -1,7 +1,11 @@
 import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPut } from '@/server/api'
-import { pagedTenantSchema } from './settings.schemas'
+import {
+  pagedTenantSchema,
+  tenantDetailSchema,
+  tenantIngestionSourceSchema,
+} from './settings.schemas'
 import { z } from 'zod'
 
 export const fetchTenants = createServerFn({ method: 'GET' })
@@ -19,9 +23,21 @@ export const fetchTenants = createServerFn({ method: 'GET' })
     return pagedTenantSchema.parse(data)
   })
 
-export const updateTenantSettings = createServerFn({ method: 'POST' })
+export const fetchTenantDetail = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .inputValidator(z.object({ tenantId: z.string(), settings: z.string() }))
-  .handler(async ({ context, data: { tenantId, settings } }) => {
-    await apiPut(`/tenants/${tenantId}/settings`, context.token, { settings })
+  .inputValidator(z.object({ tenantId: z.string() }))
+  .handler(async ({ context, data: { tenantId } }) => {
+    const data = await apiGet(`/tenants/${tenantId}`, context.token)
+    return tenantDetailSchema.parse(data)
+  })
+
+export const updateTenant = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({
+    tenantId: z.string(),
+    name: z.string().min(1),
+    ingestionSources: z.array(tenantIngestionSourceSchema),
+  }))
+  .handler(async ({ context, data: { tenantId, name, ingestionSources } }) => {
+    await apiPut(`/tenants/${tenantId}`, context.token, { name, ingestionSources })
   })

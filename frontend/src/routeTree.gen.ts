@@ -28,6 +28,8 @@ import { Route as AuthedVulnerabilitiesIdRouteImport } from './routes/_authed/vu
 import { Route as AuthedCampaignsIdRouteImport } from './routes/_authed/campaigns/$id'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
 import { Route as AuthedAdminTeamsRouteImport } from './routes/_authed/admin/teams'
+import { Route as AuthedAdminTenantsIndexRouteImport } from './routes/_authed/admin/tenants/index'
+import { Route as AuthedAdminTenantsIdRouteImport } from './routes/_authed/admin/tenants/$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -124,6 +126,16 @@ const AuthedAdminTeamsRoute = AuthedAdminTeamsRouteImport.update({
   path: '/admin/teams',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAdminTenantsIndexRoute = AuthedAdminTenantsIndexRouteImport.update({
+  id: '/admin/tenants/',
+  path: '/admin/tenants/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAdminTenantsIdRoute = AuthedAdminTenantsIdRouteImport.update({
+  id: '/admin/tenants/$id',
+  path: '/admin/tenants/$id',
+  getParentRoute: () => AuthedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
@@ -144,6 +156,8 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AuthedSettingsIndexRoute
   '/tasks/': typeof AuthedTasksIndexRoute
   '/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
+  '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
+  '/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -164,6 +178,8 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthedSettingsIndexRoute
   '/tasks': typeof AuthedTasksIndexRoute
   '/vulnerabilities': typeof AuthedVulnerabilitiesIndexRoute
+  '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
+  '/admin/tenants': typeof AuthedAdminTenantsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -186,6 +202,8 @@ export interface FileRoutesById {
   '/_authed/settings/': typeof AuthedSettingsIndexRoute
   '/_authed/tasks/': typeof AuthedTasksIndexRoute
   '/_authed/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
+  '/_authed/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
+  '/_authed/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -208,6 +226,8 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/tasks/'
     | '/vulnerabilities/'
+    | '/admin/tenants/$id'
+    | '/admin/tenants/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -228,6 +248,8 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/vulnerabilities'
+    | '/admin/tenants/$id'
+    | '/admin/tenants'
   id:
     | '__root__'
     | '/_authed'
@@ -249,6 +271,8 @@ export interface FileRouteTypes {
     | '/_authed/settings/'
     | '/_authed/tasks/'
     | '/_authed/vulnerabilities/'
+    | '/_authed/admin/tenants/$id'
+    | '/_authed/admin/tenants/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -397,6 +421,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminTeamsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/tenants/': {
+      id: '/_authed/admin/tenants/'
+      path: '/admin/tenants'
+      fullPath: '/admin/tenants/'
+      preLoaderRoute: typeof AuthedAdminTenantsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/admin/tenants/$id': {
+      id: '/_authed/admin/tenants/$id'
+      path: '/admin/tenants/$id'
+      fullPath: '/admin/tenants/$id'
+      preLoaderRoute: typeof AuthedAdminTenantsIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
   }
 }
 
@@ -412,6 +450,8 @@ interface AuthedRouteChildren {
   AuthedSettingsIndexRoute: typeof AuthedSettingsIndexRoute
   AuthedTasksIndexRoute: typeof AuthedTasksIndexRoute
   AuthedVulnerabilitiesIndexRoute: typeof AuthedVulnerabilitiesIndexRoute
+  AuthedAdminTenantsIdRoute: typeof AuthedAdminTenantsIdRoute
+  AuthedAdminTenantsIndexRoute: typeof AuthedAdminTenantsIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -426,6 +466,8 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSettingsIndexRoute: AuthedSettingsIndexRoute,
   AuthedTasksIndexRoute: AuthedTasksIndexRoute,
   AuthedVulnerabilitiesIndexRoute: AuthedVulnerabilitiesIndexRoute,
+  AuthedAdminTenantsIdRoute: AuthedAdminTenantsIdRoute,
+  AuthedAdminTenantsIndexRoute: AuthedAdminTenantsIndexRoute,
 }
 
 const AuthedRouteWithChildren =
