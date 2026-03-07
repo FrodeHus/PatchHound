@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPut } from '@/server/api'
-import { pagedAssetsSchema } from './assets.schemas'
+import { assetDetailSchema, pagedAssetsSchema } from './assets.schemas'
 import { buildFilterParams } from './utils'
 import { z } from 'zod'
 
@@ -20,6 +20,14 @@ export const fetchAssets = createServerFn({ method: 'GET' })
     const params = buildFilterParams(filters)
     const data = await apiGet(`/assets?${params.toString()}`, context.token)
     return pagedAssetsSchema.parse(data)
+  })
+
+export const fetchAssetDetail = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ assetId: z.string() }))
+  .handler(async ({ context, data: { assetId } }) => {
+    const data = await apiGet(`/assets/${assetId}`, context.token)
+    return assetDetailSchema.parse(data)
   })
 
 export const assignAssetOwner = createServerFn({ method: 'POST' })

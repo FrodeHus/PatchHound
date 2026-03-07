@@ -1,5 +1,23 @@
 const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:8080/api'
 
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  if (response.status === 204) {
+    return null as T
+  }
+
+  const contentLength = response.headers.get('content-length')
+  if (contentLength === '0') {
+    return null as T
+  }
+
+  const text = await response.text()
+  if (!text.trim()) {
+    return null as T
+  }
+
+  return JSON.parse(text) as T
+}
+
 export async function apiGet<T>(path: string, token: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -9,11 +27,7 @@ export async function apiGet<T>(path: string, token: string): Promise<T> {
     throw new Error(`API error: ${response.status} ${response.statusText}`)
   }
 
-  if (response.status === 204) {
-    return null as T
-  }
-
-  return response.json() as Promise<T>
+  return parseJsonResponse<T>(response)
 }
 
 export async function apiPost<T>(path: string, token: string, body?: unknown): Promise<T> {
@@ -30,11 +44,7 @@ export async function apiPost<T>(path: string, token: string, body?: unknown): P
     throw new Error(`API error: ${response.status} ${response.statusText}`)
   }
 
-  if (response.status === 204) {
-    return null as T
-  }
-
-  return response.json() as Promise<T>
+  return parseJsonResponse<T>(response)
 }
 
 export async function apiPut<T>(path: string, token: string, body?: unknown): Promise<T> {
@@ -51,11 +61,7 @@ export async function apiPut<T>(path: string, token: string, body?: unknown): Pr
     throw new Error(`API error: ${response.status} ${response.statusText}`)
   }
 
-  if (response.status === 204) {
-    return null as T
-  }
-
-  return response.json() as Promise<T>
+  return parseJsonResponse<T>(response)
 }
 
 export async function apiDelete<T>(path: string, token: string): Promise<T> {
@@ -68,9 +74,5 @@ export async function apiDelete<T>(path: string, token: string): Promise<T> {
     throw new Error(`API error: ${response.status} ${response.statusText}`)
   }
 
-  if (response.status === 204) {
-    return null as T
-  }
-
-  return response.json() as Promise<T>
+  return parseJsonResponse<T>(response)
 }

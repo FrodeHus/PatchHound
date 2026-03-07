@@ -13,4 +13,16 @@ public record IngestionResult(
     IReadOnlyList<IngestionAffectedAsset> AffectedAssets
 );
 
-public record IngestionAffectedAsset(string ExternalAssetId, string AssetName, AssetType AssetType);
+public record IngestionAffectedAsset(
+    string ExternalAssetId,
+    string AssetName,
+    AssetType AssetType
+);
+
+public record IngestionAsset(
+    string ExternalId,
+    string Name,
+    AssetType AssetType,
+    string? Description = null,
+    string Metadata = "{}"
+);

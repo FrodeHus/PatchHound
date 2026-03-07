@@ -6,7 +6,6 @@ using PatchHound.Api.Models;
 using PatchHound.Api.Models.Admin;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
-using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Api.Controllers;
@@ -18,17 +17,11 @@ public class TenantsController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly ISecretStore _secretStore;
-    private readonly IngestionService _ingestionService;
 
-    public TenantsController(
-        PatchHoundDbContext dbContext,
-        ISecretStore secretStore,
-        IngestionService ingestionService
-    )
+    public TenantsController(PatchHoundDbContext dbContext, ISecretStore secretStore)
     {
         _dbContext = dbContext;
         _secretStore = secretStore;
-        _ingestionService = ingestionService;
     }
 
     [HttpGet]
@@ -155,21 +148,28 @@ public class TenantsController : ControllerBase
     [Authorize(Policy = Policies.ConfigureTenant)]
     public async Task<IActionResult> TriggerSync(Guid id, string sourceKey, CancellationToken ct)
     {
-        var tenant = await _dbContext.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
+        var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tenant is null)
             return NotFound();
 
-        var configuredSource = TenantSourceSettings
-            .ReadSources(tenant.Settings)
-            .FirstOrDefault(source => string.Equals(source.Key, sourceKey, StringComparison.OrdinalIgnoreCase));
+        var configuredSources = TenantSourceSettings.ReadSources(tenant.Settings);
+        var configuredSource = configuredSources.FirstOrDefault(source =>
+            string.Equals(source.Key, sourceKey, StringComparison.OrdinalIgnoreCase));
 
         if (configuredSource is null)
         {
             return NotFound(new ProblemDetails { Title = "Ingestion source not found" });
         }
 
-        await _ingestionService.RunIngestionAsync(id, sourceKey, ct);
-        return NoContent();
+        configuredSource.Runtime ??= new PersistedIngestionRuntimeState();
+        configuredSource.Runtime.ManualRequestedAt = DateTimeOffset.UtcNow;
+        configuredSource.Runtime.LastStatus = "Queued";
+        configuredSource.Runtime.LastError = string.Empty;
+
+        tenant.UpdateSettings(TenantSourceSettings.WriteSources(tenant.Settings, configuredSources));
+        await _dbContext.SaveChangesAsync(ct);
+
+        return Accepted();
     }
 
     [HttpPut("{id:guid}/settings")]
@@ -218,6 +218,7 @@ public class TenantsController : ControllerBase
                     source.Credentials?.TokenScope ?? string.Empty
                 ),
                 new TenantIngestionRuntimeDto(
+                    source.Runtime?.ManualRequestedAt,
                     source.Runtime?.LastStartedAt,
                     source.Runtime?.LastCompletedAt,
                     source.Runtime?.LastSucceededAt,

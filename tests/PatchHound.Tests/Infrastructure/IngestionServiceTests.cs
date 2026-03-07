@@ -9,6 +9,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
+using System.Text.Json.Nodes;
 
 namespace PatchHound.Tests.Infrastructure;
 
@@ -301,6 +302,74 @@ public class IngestionServiceTests : IDisposable
         asset.Should().NotBeNull();
         asset!.Name.Should().Be("NewServer");
         asset.AssetType.Should().Be(AssetType.CloudResource);
+    }
+
+    [Fact]
+    public async Task ProcessAssetsAsync_UpsertsSoftwareInventoryAsSoftwareAssets()
+    {
+        var assets = new List<IngestionAsset>
+        {
+            new(
+                "software-1",
+                "Contoso Agent 1.0",
+                AssetType.Software,
+                "Contoso Agent 1.0",
+                """{"vendor":"Contoso","version":"1.0","exposedMachines":5}"""
+            ),
+        };
+
+        await _service.ProcessAssetsAsync(_tenantId, assets, CancellationToken.None);
+
+        var asset = await _dbContext
+            .Assets.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(a => a.ExternalId == "software-1" && a.TenantId == _tenantId);
+
+        asset.Should().NotBeNull();
+        asset!.AssetType.Should().Be(AssetType.Software);
+        asset.Name.Should().Be("Contoso Agent 1.0");
+
+        var metadata = JsonNode.Parse(asset.Metadata);
+        metadata?["vendor"]?.GetValue<string>().Should().Be("Contoso");
+        metadata?["exposedMachines"]?.GetValue<int>().Should().Be(5);
+    }
+
+    [Fact]
+    public async Task ProcessResultsAsync_UpdatesExistingAssetNameFromLatestMachineName()
+    {
+        var asset = Asset.Create(
+            _tenantId,
+            "machine-1",
+            AssetType.Device,
+            "OldMachineName",
+            Criticality.Medium
+        );
+        await _dbContext.Assets.AddAsync(asset);
+        await _dbContext.SaveChangesAsync();
+
+        var results = new List<IngestionResult>
+        {
+            new(
+                "CVE-2025-7777",
+                "Updated machine vulnerability",
+                "Desc",
+                Severity.High,
+                7.5m,
+                null,
+                null,
+                new List<IngestionAffectedAsset>
+                {
+                    new("machine-1", "FreshMachineName", AssetType.Device),
+                }
+            ),
+        };
+
+        await _service.ProcessResultsAsync(_tenantId, "TestSource", results, CancellationToken.None);
+
+        var updatedAsset = await _dbContext
+            .Assets.IgnoreQueryFilters()
+            .FirstAsync(current => current.Id == asset.Id);
+
+        updatedAsset.Name.Should().Be("FreshMachineName");
     }
 
     public void Dispose() => _dbContext.Dispose();
