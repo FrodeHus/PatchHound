@@ -183,18 +183,6 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IRealTimeNotifier, SignalRNotifier<NotificationHub>>();
 
-// CORS
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-        policy
-            .WithOrigins(builder.Configuration["Frontend:Origin"] ?? "http://localhost:5173")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials()
-    );
-});
-
 // Rate limiting
 builder.Services.AddRateLimiter(options =>
 {
@@ -231,7 +219,6 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseCors();
 app.UseMiddleware<ExceptionHandlerMiddleware>();
 app.UseHttpsRedirection();
 app.UseAuthentication();

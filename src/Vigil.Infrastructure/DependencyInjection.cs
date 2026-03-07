@@ -70,6 +70,9 @@ public static class DependencyInjection
         // Ingestion
         services.AddScoped<IngestionService>();
 
+        // Event Pusher (pushes events to TanStack Start SSE endpoint)
+        services.AddHttpClient<IEventPusher, HttpEventPusher>();
+
         return services;
     }
 }
