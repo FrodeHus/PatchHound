@@ -13,8 +13,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 import { TenantSelector } from '@/components/layout/TenantSelector'
-import { ThemeSelector } from '@/components/layout/ThemeSelector'
 import type { CurrentUser } from '@/server/auth.functions'
+import { ThemeSelector } from '@/components/layout/ThemeSelector'
 
 type TopNavProps = {
   user: CurrentUser
@@ -90,7 +90,6 @@ export function TopNav({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <ThemeSelector />
             <TenantSelector
               tenants={tenants}
               selectedTenantId={selectedTenantId}
@@ -113,15 +112,19 @@ export function TopNav({
                   <p className="mt-1 text-xs text-muted-foreground">{user.roles[0] ?? 'Member'}</p>
                 </div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 rounded-2xl border-border/70 bg-popover/95 p-2 backdrop-blur">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="px-3 py-2">
+                <DropdownMenuContent align="end" className="w-64 rounded-2xl border-border/70 bg-popover/95 p-2 backdrop-blur">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel className="px-3 py-2">
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-foreground">{user.displayName || 'Signed in'}</p>
                       <p className="text-xs text-muted-foreground">{user.email}</p>
                     </div>
                   </DropdownMenuLabel>
-                </DropdownMenuGroup>
+                  </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <div className="px-2 py-2">
+                  <ThemeSelector />
+                </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="rounded-xl px-3 py-2">
                   {user.tenantIds.length} tenant scope{user.tenantIds.length === 1 ? '' : 's'}
