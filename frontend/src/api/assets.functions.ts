@@ -12,6 +12,7 @@ export const fetchAssets = createServerFn({ method: 'GET' })
       assetType: z.string().optional(),
       criticality: z.string().optional(),
       ownerType: z.string().optional(),
+      unassignedOnly: z.boolean().optional(),
       tenantId: z.string().optional(),
       search: z.string().optional(),
       page: z.number().optional(),

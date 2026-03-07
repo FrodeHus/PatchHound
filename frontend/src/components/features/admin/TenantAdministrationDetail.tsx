@@ -16,6 +16,12 @@ type TenantAdministrationDetailProps = {
 export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetailProps) {
   const router = useRouter()
   const [name, setName] = useState(tenant.name)
+  const [sla, setSla] = useState({
+    criticalDays: String(tenant.sla.criticalDays),
+    highDays: String(tenant.sla.highDays),
+    mediumDays: String(tenant.sla.mediumDays),
+    lowDays: String(tenant.sla.lowDays),
+  })
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
 
   const mutation = useMutation({
@@ -24,6 +30,12 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
         data: {
           tenantId: tenant.id,
           name: name.trim(),
+          sla: {
+            criticalDays: Number(sla.criticalDays),
+            highDays: Number(sla.highDays),
+            mediumDays: Number(sla.mediumDays),
+            lowDays: Number(sla.lowDays),
+          },
           ingestionSources: tenant.ingestionSources.map((source) => ({
             key: source.key,
             displayName: source.displayName,
@@ -64,7 +76,14 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
         </div>
         <Button
           onClick={() => mutation.mutate()}
-          disabled={mutation.isPending || name.trim().length === 0}
+          disabled={
+            mutation.isPending
+            || name.trim().length === 0
+            || !isPositiveInteger(sla.criticalDays)
+            || !isPositiveInteger(sla.highDays)
+            || !isPositiveInteger(sla.mediumDays)
+            || !isPositiveInteger(sla.lowDays)
+          }
         >
           {mutation.isPending ? 'Saving...' : 'Save tenant'}
         </Button>
@@ -125,6 +144,42 @@ export function TenantAdministrationDetail({ tenant }: TenantAdministrationDetai
           </CardContent>
         </Card>
       </div>
+
+      <Card className="rounded-[28px] border-border/70 bg-card/82">
+        <CardHeader>
+          <CardTitle>SLA Configuration</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-4">
+          <label className="space-y-2">
+            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Critical</span>
+            <Input
+              value={sla.criticalDays}
+              onChange={(event) => setSla((current) => ({ ...current, criticalDays: event.target.value }))}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">High</span>
+            <Input
+              value={sla.highDays}
+              onChange={(event) => setSla((current) => ({ ...current, highDays: event.target.value }))}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Medium</span>
+            <Input
+              value={sla.mediumDays}
+              onChange={(event) => setSla((current) => ({ ...current, mediumDays: event.target.value }))}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Low</span>
+            <Input
+              value={sla.lowDays}
+              onChange={(event) => setSla((current) => ({ ...current, lowDays: event.target.value }))}
+            />
+          </label>
+        </CardContent>
+      </Card>
     </section>
   )
 }
@@ -156,4 +211,9 @@ function AssetCountRow({ label, count }: { label: string; count: number }) {
       </Badge>
     </div>
   )
+}
+
+function isPositiveInteger(value: string) {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0
 }

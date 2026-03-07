@@ -65,6 +65,8 @@ public class AssetsController : ControllerBase
             && Enum.TryParse<OwnerType>(filter.OwnerType, out var ownerType)
         )
             query = query.Where(a => a.OwnerType == ownerType);
+        if (filter.UnassignedOnly == true)
+            query = query.Where(a => a.OwnerUserId == null && a.OwnerTeamId == null);
         if (filter.OwnerId.HasValue)
             query = query.Where(a =>
                 a.OwnerUserId == filter.OwnerId.Value || a.OwnerTeamId == filter.OwnerId.Value
@@ -73,7 +75,9 @@ public class AssetsController : ControllerBase
             query = query.Where(a => a.TenantId == filter.TenantId.Value);
         if (!string.IsNullOrEmpty(filter.Search))
             query = query.Where(a =>
-                a.Name.Contains(filter.Search) || a.ExternalId.Contains(filter.Search)
+                a.Name.Contains(filter.Search)
+                || (a.DeviceComputerDnsName != null && a.DeviceComputerDnsName.Contains(filter.Search))
+                || a.ExternalId.Contains(filter.Search)
             );
 
         var totalCount = await query.CountAsync(ct);

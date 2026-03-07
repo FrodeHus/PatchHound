@@ -4,6 +4,7 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
+using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Tenants;
 
@@ -14,6 +15,7 @@ public class IngestionService
     private readonly PatchHoundDbContext _dbContext;
     private readonly IEnumerable<IVulnerabilitySource> _sources;
     private readonly IEnumerable<IVulnerabilityEnricher> _enrichers;
+    private readonly SlaService _slaService;
     private readonly VulnerabilityAssessmentService _assessmentService;
     private readonly ILogger<IngestionService> _logger;
 
@@ -24,6 +26,7 @@ public class IngestionService
         PatchHoundDbContext dbContext,
         IEnumerable<IVulnerabilitySource> sources,
         IEnumerable<IVulnerabilityEnricher> enrichers,
+        SlaService slaService,
         VulnerabilityAssessmentService assessmentService,
         ILogger<IngestionService> logger
     )
@@ -31,6 +34,7 @@ public class IngestionService
         _dbContext = dbContext;
         _sources = sources;
         _enrichers = enrichers;
+        _slaService = slaService;
         _assessmentService = assessmentService;
         _logger = logger;
     }
@@ -42,10 +46,11 @@ public class IngestionService
 
     public async Task RunIngestionAsync(Guid tenantId, string? sourceKey, CancellationToken ct)
     {
+        var normalizedSourceKey = sourceKey?.Trim().ToLowerInvariant();
         var sources = string.IsNullOrWhiteSpace(sourceKey)
             ? _sources
             : _sources.Where(source =>
-                string.Equals(source.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase));
+                source.SourceKey == normalizedSourceKey);
 
         foreach (var source in sources)
         {
@@ -132,6 +137,7 @@ public class IngestionService
         CancellationToken ct
     )
     {
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
         var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, ct);
         if (tenant is null)
         {
@@ -140,7 +146,7 @@ public class IngestionService
 
         var source = await _dbContext.TenantSourceConfigurations.FirstOrDefaultAsync(
             item => item.TenantId == tenantId
-                && string.Equals(item.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase),
+                && item.SourceKey == normalizedSourceKey,
             ct
         );
 
@@ -178,8 +184,7 @@ public class IngestionService
         var current = results;
         foreach (var enricher in _enrichers)
         {
-            await UpdateRuntimeStateAsync(
-                tenantId,
+            await UpdateEnrichmentRuntimeStateAsync(
                 enricher.SourceKey,
                 runtime =>
                 {
@@ -193,8 +198,7 @@ public class IngestionService
             try
             {
                 current = await enricher.EnrichAsync(tenantId, current, ct);
-                await UpdateRuntimeStateAsync(
-                    tenantId,
+                await UpdateEnrichmentRuntimeStateAsync(
                     enricher.SourceKey,
                     runtime =>
                     {
@@ -210,8 +214,7 @@ public class IngestionService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during enrichment from {Source} for tenant {TenantId}", enricher.SourceKey, tenantId);
-                await UpdateRuntimeStateAsync(
-                    tenantId,
+                await UpdateEnrichmentRuntimeStateAsync(
                     enricher.SourceKey,
                     runtime =>
                     {
@@ -225,6 +228,39 @@ public class IngestionService
         }
 
         return current;
+    }
+
+    private async Task UpdateEnrichmentRuntimeStateAsync(
+        string sourceKey,
+        Action<GlobalEnrichmentRuntimeState> update,
+        CancellationToken ct
+    )
+    {
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        var source = await _dbContext.EnrichmentSourceConfigurations.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item => item.SourceKey == normalizedSourceKey, ct);
+
+        if (source is null)
+        {
+            return;
+        }
+
+        var runtime = new GlobalEnrichmentRuntimeState(
+            source.LastStartedAt,
+            source.LastCompletedAt,
+            source.LastSucceededAt,
+            source.LastStatus,
+            source.LastError
+        );
+        update(runtime);
+        source.UpdateRuntime(
+            runtime.LastStartedAt,
+            runtime.LastCompletedAt,
+            runtime.LastSucceededAt,
+            runtime.LastStatus,
+            runtime.LastError
+        );
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     internal async Task ProcessResultsAsync(
@@ -290,7 +326,10 @@ public class IngestionService
                 sourceName,
                 result.CvssScore,
                 result.CvssVector,
-                result.PublishedDate
+                result.PublishedDate,
+                result.ProductVendor,
+                result.ProductName,
+                result.ProductVersion
             );
 
             await _dbContext.Vulnerabilities.AddAsync(existing, ct);
@@ -303,7 +342,10 @@ public class IngestionService
                 result.VendorSeverity,
                 result.CvssScore,
                 result.CvssVector,
-                result.PublishedDate
+                result.PublishedDate,
+                result.ProductVendor,
+                result.ProductName,
+                result.ProductVersion
             );
         }
 
@@ -480,19 +522,6 @@ public class IngestionService
         return null;
     }
 
-    private static DateTimeOffset CalculateDefaultDueDate(Severity severity)
-    {
-        var days = severity switch
-        {
-            Severity.Critical => 7,
-            Severity.High => 30,
-            Severity.Medium => 90,
-            Severity.Low => 180,
-            _ => 90,
-        };
-        return DateTimeOffset.UtcNow.AddDays(days);
-    }
-
     private async Task ProcessMissingAssetEpisodesAsync(
         Guid tenantId,
         string sourceName,
@@ -619,13 +648,20 @@ public class IngestionService
             return;
         }
 
+        var tenantSla = await _dbContext.TenantSlaConfigurations.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(config => config.TenantId == tenantId, ct);
+
         var task = RemediationTask.Create(
             vulnerability.Id,
             asset.Id,
             tenantId,
             assigneeId.Value,
             SystemUserId,
-            CalculateDefaultDueDate(vulnerability.VendorSeverity)
+            _slaService.CalculateDueDate(
+                vulnerability.VendorSeverity,
+                DateTimeOffset.UtcNow,
+                tenantSla
+            )
         );
 
         await _dbContext.RemediationTasks.AddAsync(task, ct);
@@ -906,6 +942,30 @@ internal sealed class TenantIngestionRuntimeState
     }
 
     public DateTimeOffset? ManualRequestedAt { get; set; }
+    public DateTimeOffset? LastStartedAt { get; set; }
+    public DateTimeOffset? LastCompletedAt { get; set; }
+    public DateTimeOffset? LastSucceededAt { get; set; }
+    public string LastStatus { get; set; }
+    public string LastError { get; set; }
+}
+
+internal sealed class GlobalEnrichmentRuntimeState
+{
+    public GlobalEnrichmentRuntimeState(
+        DateTimeOffset? lastStartedAt,
+        DateTimeOffset? lastCompletedAt,
+        DateTimeOffset? lastSucceededAt,
+        string lastStatus,
+        string lastError
+    )
+    {
+        LastStartedAt = lastStartedAt;
+        LastCompletedAt = lastCompletedAt;
+        LastSucceededAt = lastSucceededAt;
+        LastStatus = lastStatus;
+        LastError = lastError;
+    }
+
     public DateTimeOffset? LastStartedAt { get; set; }
     public DateTimeOffset? LastCompletedAt { get; set; }
     public DateTimeOffset? LastSucceededAt { get; set; }

@@ -8,6 +8,7 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
+using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
 using System.Text.Json.Nodes;
@@ -47,6 +48,7 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             new[] { _source },
             [],
+            new SlaService(),
             assessmentService,
             logger
         );
@@ -78,7 +80,10 @@ public class IngestionServiceTests : IDisposable
                 8.5m,
                 "CVSS:3.1/AV:N",
                 DateTimeOffset.UtcNow,
-                new List<IngestionAffectedAsset> { new("ASSET-1", "Server1", AssetType.Device) }
+                new List<IngestionAffectedAsset> { new("ASSET-1", "Server1", AssetType.Device) },
+                "Microsoft",
+                "Windows Server",
+                "2022"
             ),
         };
 
@@ -98,6 +103,9 @@ public class IngestionServiceTests : IDisposable
         vuln!.Title.Should().Be("Test Vuln");
         vuln.VendorSeverity.Should().Be(Severity.High);
         vuln.Source.Should().Be("TestSource");
+        vuln.ProductVendor.Should().Be("Microsoft");
+        vuln.ProductName.Should().Be("Windows Server");
+        vuln.ProductVersion.Should().Be("2022");
 
         var va = await _dbContext
             .VulnerabilityAssets.IgnoreQueryFilters()

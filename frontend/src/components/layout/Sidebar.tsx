@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   ScrollText,
   Server,
-  Settings,
   Shield,
   ShieldCheck,
 } from 'lucide-react'
@@ -44,7 +43,6 @@ const navItems: NavItem[] = [
   { to: '/campaigns', label: 'Campaigns', icon: Flag },
   { to: '/audit-log', label: 'Audit Trail', icon: ScrollText, roles: ['Auditor', 'GlobalAdmin'] },
   { to: '/admin', label: 'Admin Console', icon: ShieldCheck, roles: ['GlobalAdmin', 'SecurityManager'] },
-  { to: '/settings', label: 'Settings', icon: Settings, roles: ['GlobalAdmin', 'SecurityManager'] },
 ]
 
 function canAccess(item: NavItem, user: CurrentUser): boolean {

@@ -46,6 +46,12 @@ export const tenantDetailSchema = z.object({
     softwareCount: z.number(),
     cloudResourceCount: z.number(),
   }),
+  sla: z.object({
+    criticalDays: z.number(),
+    highDays: z.number(),
+    mediumDays: z.number(),
+    lowDays: z.number(),
+  }),
   ingestionSources: z.array(tenantIngestionSourceSchema),
 })
 

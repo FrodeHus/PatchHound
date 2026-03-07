@@ -95,6 +95,7 @@ public record AssetFilterQuery(
     string? AssetType = null,
     string? Criticality = null,
     string? OwnerType = null,
+    bool? UnassignedOnly = null,
     Guid? OwnerId = null,
     Guid? TenantId = null,
     string? Search = null

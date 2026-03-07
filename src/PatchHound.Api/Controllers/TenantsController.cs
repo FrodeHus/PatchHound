@@ -88,6 +88,14 @@ public class TenantsController : ControllerBase
             assetCounts.FirstOrDefault(item => item.AssetType == AssetType.Software)?.Count ?? 0,
             assetCounts.FirstOrDefault(item => item.AssetType == AssetType.CloudResource)?.Count ?? 0
         );
+        var sla = await _dbContext.TenantSlaConfigurations.AsNoTracking()
+            .FirstOrDefaultAsync(config => config.TenantId == id, ct);
+        var slaDto = new TenantSlaConfigurationDto(
+            sla?.CriticalDays ?? 7,
+            sla?.HighDays ?? 30,
+            sla?.MediumDays ?? 90,
+            sla?.LowDays ?? 180
+        );
 
         var sources = await _dbContext
             .TenantSourceConfigurations.AsNoTracking()
@@ -100,6 +108,7 @@ public class TenantsController : ControllerBase
             tenant.Name,
             tenant.EntraTenantId,
             assetSummary,
+            slaDto,
             sources.Select(MapSourceDto).ToList()
         ));
     }
@@ -118,8 +127,25 @@ public class TenantsController : ControllerBase
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return ValidationProblem("Tenant name is required.");
+        if (request.Sla.CriticalDays <= 0 || request.Sla.HighDays <= 0 || request.Sla.MediumDays <= 0 || request.Sla.LowDays <= 0)
+            return ValidationProblem("SLA days must be positive integers.");
 
         tenant.UpdateName(request.Name.Trim());
+        var sla = await _dbContext.TenantSlaConfigurations.FirstOrDefaultAsync(
+            config => config.TenantId == tenant.Id,
+            ct
+        );
+        if (sla is null)
+        {
+            sla = TenantSlaConfiguration.CreateDefault(tenant.Id);
+            await _dbContext.TenantSlaConfigurations.AddAsync(sla, ct);
+        }
+        sla.Update(
+            request.Sla.CriticalDays,
+            request.Sla.HighDays,
+            request.Sla.MediumDays,
+            request.Sla.LowDays
+        );
         var existingSources = await _dbContext
             .TenantSourceConfigurations
             .Where(source => source.TenantId == tenant.Id)
@@ -189,6 +215,7 @@ public class TenantsController : ControllerBase
     [Authorize(Policy = Policies.ConfigureTenant)]
     public async Task<IActionResult> TriggerSync(Guid id, string sourceKey, CancellationToken ct)
     {
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
         var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tenant is null)
             return NotFound();
@@ -197,7 +224,7 @@ public class TenantsController : ControllerBase
             .TenantSourceConfigurations
             .FirstOrDefaultAsync(source =>
                 source.TenantId == tenant.Id
-                && string.Equals(source.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase), ct);
+                && source.SourceKey == normalizedSourceKey, ct);
 
         if (configuredSource is null)
         {

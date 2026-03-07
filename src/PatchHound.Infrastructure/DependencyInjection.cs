@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<ITeamRepository, TeamRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IRepository<TenantSourceConfiguration>, RepositoryBase<TenantSourceConfiguration>>();
+        services.AddScoped<IRepository<EnrichmentSourceConfiguration>, RepositoryBase<EnrichmentSourceConfiguration>>();
         services.AddScoped<IRepository<TenantSlaConfiguration>, RepositoryBase<TenantSlaConfiguration>>();
         services.AddScoped<IRepository<OrganizationalSeverity>, RepositoryBase<OrganizationalSeverity>>();
 
@@ -53,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<DashboardService>();
         services.AddScoped<UserService>();
         services.AddScoped<TeamService>();
+        services.AddScoped<SlaService>();
         services.AddScoped<AiReportService>();
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<EnvironmentalSeverityCalculator>();
@@ -75,7 +77,7 @@ public static class DependencyInjection
         services.AddHttpClient<NvdApiClient>();
         services.AddHttpClient<ISecretStore, OpenBaoSecretStore>();
         services.AddScoped<DefenderTenantConfigurationProvider>();
-        services.AddScoped<NvdTenantConfigurationProvider>();
+        services.AddScoped<NvdGlobalConfigurationProvider>();
         services.Configure<OpenBaoOptions>(configuration.GetSection(OpenBaoOptions.SectionName));
 
         // Ingestion

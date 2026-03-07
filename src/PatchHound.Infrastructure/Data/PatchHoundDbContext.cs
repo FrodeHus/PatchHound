@@ -17,6 +17,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantSourceConfiguration> TenantSourceConfigurations => Set<TenantSourceConfiguration>();
+    public DbSet<EnrichmentSourceConfiguration> EnrichmentSourceConfigurations => Set<EnrichmentSourceConfiguration>();
     public DbSet<TenantSlaConfiguration> TenantSlaConfigurations => Set<TenantSlaConfiguration>();
     public DbSet<User> Users => Set<User>();
     public DbSet<UserTenantRole> UserTenantRoles => Set<UserTenantRole>();
@@ -82,6 +83,11 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         modelBuilder
             .Entity<Vulnerability>()
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<VulnerabilityAsset>()
+            .HasQueryFilter(e =>
+                AccessibleTenantIds.Contains(e.Vulnerability.TenantId)
+                && AccessibleTenantIds.Contains(e.Asset.TenantId));
         modelBuilder
             .Entity<VulnerabilityAssetEpisode>()
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
