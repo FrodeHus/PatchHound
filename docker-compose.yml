@@ -20,15 +20,13 @@ services:
       AzureAd__ClientId: ${AZURE_AD_CLIENT_ID}
       AzureAd__TenantId: ${AZURE_AD_TENANT_ID}
       AzureAd__Audience: ${AZURE_AD_AUDIENCE}
-      Frontend__Origin: ${FRONTEND_ORIGIN}
       Smtp__Host: ${SMTP_HOST}
       Smtp__Port: ${SMTP_PORT}
       Smtp__Username: ${SMTP_USERNAME}
       Smtp__Password: ${SMTP_PASSWORD}
     depends_on:
       - postgres
-    ports:
-      - "8080:8080"
+    # No ports — internal only, accessed by frontend via Docker network
 
   worker:
     build:
@@ -47,18 +45,22 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./frontend-start
       dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL}
-        VITE_SIGNALR_URL: ${VITE_SIGNALR_URL}
-        VITE_ENTRA_CLIENT_ID: ${VITE_ENTRA_CLIENT_ID}
-        VITE_ENTRA_AUTHORITY: ${VITE_ENTRA_AUTHORITY}
-        VITE_API_SCOPES: ${VITE_API_SCOPES}
+    environment:
+      NODE_ENV: production
+      API_BASE_URL: http://api:8080/api
+      SESSION_SECRET: ${SESSION_SECRET}
+      ENTRA_CLIENT_ID: ${AZURE_AD_CLIENT_ID}
+      ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET}
+      ENTRA_TENANT_ID: ${AZURE_AD_TENANT_ID}
+      ENTRA_REDIRECT_URI: ${FRONTEND_ORIGIN}/auth/callback
+      ENTRA_SCOPES: ${ENTRA_SCOPES}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
     depends_on:
       - api
     ports:
-      - "3000:80"
+      - "3000:3000"
 
 volumes:
   pgdata:
