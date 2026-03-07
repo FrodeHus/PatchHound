@@ -1,5 +1,5 @@
 {
-  "name": "vigil-frontend",
+  "name": "patchhound-frontend",
   "private": true,
   "type": "module",
   "scripts": {

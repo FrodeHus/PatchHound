@@ -1,4 +1,4 @@
-# Vigil
+# PatchHound
 
 Self-hosted, multi-tenant vulnerability management platform with Microsoft Defender ingestion, role-based access, SLA-driven remediation tracking, real-time notifications, and audit trails.
 
@@ -6,7 +6,7 @@ Self-hosted, multi-tenant vulnerability management platform with Microsoft Defen
 
 ```
 +-----------------------+         +-----------------------+
-| Frontend (Vite/React) | <-----> | Vigil API (.NET 10)   |
+| Frontend (Vite/React) | <-----> | PatchHound API (.NET 10)   |
 | TanStack Router/Query |  HTTPS  | REST + SignalR        |
 +-----------------------+         +-----------+-----------+
                                               |
@@ -18,7 +18,7 @@ Self-hosted, multi-tenant vulnerability management platform with Microsoft Defen
                                               ^
                                               |
                                     +---------+------------+
-                                    | Vigil Worker (.NET)  |
+                                    | PatchHound Worker (.NET)  |
                                     | Defender ingestion   |
                                     +----------------------+
 ```
@@ -62,15 +62,15 @@ docker compose up -d
 ### Backend
 
 ```bash
-dotnet build Vigil.slnx
-dotnet test Vigil.slnx -v minimal
+dotnet build PatchHound.slnx
+dotnet test PatchHound.slnx -v minimal
 ```
 
 Run API + Worker locally (migrations are applied automatically on startup):
 
 ```bash
-dotnet run --project src/Vigil.Api
-dotnet run --project src/Vigil.Worker
+dotnet run --project src/PatchHound.Api
+dotnet run --project src/PatchHound.Worker
 ```
 
 ### Frontend
@@ -163,4 +163,4 @@ Set `SESSION_SECRET` to a strong value with at least 32 characters.
 
 - Design: `docs/plans/2026-03-06-vulnerability-management-design.md`
 - Code standards: `docs/plans/2026-03-06-code-standards.md`
-- Implementation plan: `docs/plans/2026-03-06-vigil-implementation-plan.md`
+- Implementation plan: `docs/plans/2026-03-06-patchhound-implementation-plan.md`

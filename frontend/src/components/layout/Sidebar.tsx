@@ -72,7 +72,7 @@ export function Sidebar({ user, onNavigate, compact = false }: SidebarProps) {
             <Shield className="size-5" />
           </div>
           <div>
-            <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Vigil Console</div>
+            <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">PatchHound Console</div>
             <div className="text-lg font-semibold tracking-tight">Threat Exposure Control</div>
           </div>
         </div>

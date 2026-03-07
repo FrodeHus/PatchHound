@@ -4,7 +4,7 @@ import { TopNav } from '@/components/layout/TopNav'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import type { CurrentUser } from '@/server/auth.functions'
 
-const selectedTenantStorageKey = 'vigil:selected-tenant'
+const selectedTenantStorageKey = 'patchhound:selected-tenant'
 
 type AppShellProps = {
   user: CurrentUser

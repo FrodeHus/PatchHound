@@ -23,7 +23,7 @@ type CookieDescriptor = {
 
 const sessionOptions = {
   password: process.env.SESSION_SECRET!,
-  cookieName: 'vigil-session',
+  cookieName: 'patchhound-session',
   cookieOptions: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,

@@ -13,10 +13,10 @@ services:
   api:
     build:
       context: .
-      dockerfile: src/Vigil.Api/Dockerfile
+      dockerfile: src/PatchHound.Api/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: ${API_ENVIRONMENT:-Development}
-      ConnectionStrings__Vigil: Host=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      ConnectionStrings__PatchHound: Host=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       AzureAd__ClientId: ${AZURE_AD_CLIENT_ID}
       AzureAd__TenantId: ${AZURE_AD_TENANT_ID}
       AzureAd__Audience: ${AZURE_AD_AUDIENCE}
@@ -32,10 +32,10 @@ services:
   worker:
     build:
       context: .
-      dockerfile: src/Vigil.Worker/Dockerfile
+      dockerfile: src/PatchHound.Worker/Dockerfile
     environment:
       DOTNET_ENVIRONMENT: ${WORKER_ENVIRONMENT:-Development}
-      ConnectionStrings__Vigil: Host=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      ConnectionStrings__PatchHound: Host=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       Defender__ClientId: ${DEFENDER_CLIENT_ID}
       Defender__ClientSecret: ${DEFENDER_CLIENT_SECRET}
       Defender__TenantId: ${DEFENDER_TENANT_ID}

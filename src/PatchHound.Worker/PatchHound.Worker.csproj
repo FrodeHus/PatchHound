@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <PropertyGroup>
+    <UserSecretsId>dotnet-PatchHound.Worker-e581a381-1285-4971-b5b5-e747fa87d883</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Identity.Web" Version="4.5.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PatchHound.Core\PatchHound.Core.csproj" />
+    <ProjectReference Include="..\PatchHound.Infrastructure\PatchHound.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

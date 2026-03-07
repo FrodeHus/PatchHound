@@ -2,11 +2,11 @@
 
 ## Project Structure & Module Organization
 - `src/` contains .NET projects:
-- `src/Vigil.Api` REST API + auth + hubs.
-- `src/Vigil.Core` domain entities, enums, interfaces, business services.
-- `src/Vigil.Infrastructure` EF Core, repositories, integrations (AI, SMTP, Defender).
-- `src/Vigil.Worker` background workers (ingestion, SLA checks).
-- `tests/Vigil.Tests` contains backend unit/integration tests (xUnit).
+- `src/PatchHound.Api` REST API + auth + hubs.
+- `src/PatchHound.Core` domain entities, enums, interfaces, business services.
+- `src/PatchHound.Infrastructure` EF Core, repositories, integrations (AI, SMTP, Defender).
+- `src/PatchHound.Worker` background workers (ingestion, SLA checks).
+- `tests/PatchHound.Tests` contains backend unit/integration tests (xUnit).
 - `frontend/` is the TanStack Start app (React + Vite). Key folders:
 - `frontend/src/api` server functions (`*.functions.ts`) and schemas (`*.schemas.ts`).
 - `frontend/src/routes` route files.
@@ -14,8 +14,8 @@
 - `docs/plans` holds design/implementation notes.
 
 ## Build, Test, and Development Commands
-- Backend build: `dotnet build Vigil.slnx`
-- Backend tests: `dotnet test Vigil.slnx -v minimal`
+- Backend build: `dotnet build PatchHound.slnx`
+- Backend tests: `dotnet test PatchHound.slnx -v minimal`
 - Frontend setup: `cd frontend && npm install`
 - Frontend dev server: `npm run dev`
 - Frontend lint: `npm run lint`
@@ -31,7 +31,7 @@
 - Run `npm run lint` before opening a PR.
 
 ## Testing Guidelines
-- Backend: xUnit tests in `tests/Vigil.Tests`, file pattern `*Tests.cs`.
+- Backend: xUnit tests in `tests/PatchHound.Tests`, file pattern `*Tests.cs`.
 - Frontend: Vitest (`npm test`), place tests near related code or feature folder.
 - Add/adjust tests for behavior changes in services, repositories, and API/server functions.
 - No enforced coverage gate currently; prioritize meaningful assertions for changed code paths.
@@ -41,7 +41,7 @@
 - Keep commits scoped and atomic; avoid mixing unrelated frontend/backend refactors.
 - PRs should include:
 - concise summary and motivation,
-- impacted areas (`src/Vigil.Api/...`, `frontend/src/...`),
+- impacted areas (`src/PatchHound.Api/...`, `frontend/src/...`),
 - test evidence (command output summary),
 - screenshots/GIFs for UI changes.
 - Link related issue/task when available.

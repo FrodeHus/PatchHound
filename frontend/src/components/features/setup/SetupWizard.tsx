@@ -39,7 +39,7 @@ export function SetupWizard({ isSubmitting, onComplete }: SetupWizardProps) {
   return (
     <section className="mx-auto max-w-3xl space-y-4 py-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">Vigil Setup Wizard</h1>
+        <h1 className="text-2xl font-semibold">PatchHound Setup Wizard</h1>
         <p className="text-sm text-muted-foreground">Step {stepIndex + 1} of {steps.length}: {steps[stepIndex]}</p>
       </header>
 

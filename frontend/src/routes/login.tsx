@@ -9,7 +9,7 @@ function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="w-full max-w-sm space-y-6 text-center">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Vigil</h1>
+          <h1 className="text-3xl font-bold tracking-tight">PatchHound</h1>
           <p className="text-muted-foreground">Vulnerability Management Platform</p>
         </div>
         <a
