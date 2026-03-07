@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { redirectResponse } from '@/server/http'
 import { getSession } from '@/server/session'
 
 export const Route = createFileRoute('/auth/logout')({
@@ -12,7 +13,7 @@ export const Route = createFileRoute('/auth/logout')({
         const postLogoutUri = encodeURIComponent(process.env.FRONTEND_ORIGIN ?? 'http://localhost:3000')
         const logoutUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/logout?post_logout_redirect_uri=${postLogoutUri}`
 
-        return Response.redirect(logoutUrl, 302)
+        return redirectResponse(logoutUrl)
       },
     },
   },

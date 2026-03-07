@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { exchangeCodeForTokens } from '@/server/auth'
+import { redirectResponse } from '@/server/http'
 import { getSession } from '@/server/session'
 
 export const Route = createFileRoute('/auth/callback')({
@@ -10,7 +11,7 @@ export const Route = createFileRoute('/auth/callback')({
         const code = callbackUrl.searchParams.get('code')
         const state = callbackUrl.searchParams.get('state')
         const error = callbackUrl.searchParams.get('error')
-        const redirectTo = (path: string) => Response.redirect(new URL(path, callbackUrl).toString(), 302)
+        const redirectTo = (path: string) => redirectResponse(new URL(path, callbackUrl).toString())
 
         const session = await getSession()
 

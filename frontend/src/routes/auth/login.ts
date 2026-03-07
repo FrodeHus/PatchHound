@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { getAuthorizationUrl } from '@/server/auth'
+import { redirectResponse } from '@/server/http'
 import { getSession } from '@/server/session'
 
 export const Route = createFileRoute('/auth/login')({
@@ -12,7 +13,7 @@ export const Route = createFileRoute('/auth/login')({
         await session.save()
 
         const url = await getAuthorizationUrl(state)
-        return Response.redirect(url, 302)
+        return redirectResponse(url)
       },
     },
   },
