@@ -1,22 +1,27 @@
 import {
-  createRootRoute,
+  createRootRouteWithContext,
   HeadContent,
   Outlet,
   Scripts,
 } from '@tanstack/react-router'
+import { getCurrentUser, type CurrentUser } from '@/server/auth.functions'
 
-export const Route = createRootRoute({
+interface RouterContext {
+  user: CurrentUser | null
+}
+
+export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: 'Vigil — Vulnerability Management' },
     ],
-    links: [
-      { rel: 'icon', href: '/favicon.ico' },
-      { rel: 'stylesheet', href: '/src/styles/app.css' },
-    ],
   }),
+  beforeLoad: async () => {
+    const user = await getCurrentUser()
+    return { user }
+  },
   component: RootDocument,
 })
 
