@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router'
 import type { TopVulnerability } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +16,8 @@ type CriticalVulnerabilitiesProps = {
 }
 
 export function CriticalVulnerabilities({ items }: CriticalVulnerabilitiesProps) {
+  const navigate = useNavigate()
+
   return (
     <Card className="rounded-[32px] border-border/70 bg-card/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <CardHeader className="p-5 pb-2">
@@ -48,9 +51,26 @@ export function CriticalVulnerabilities({ items }: CriticalVulnerabilitiesProps)
               </TableRow>
             ) : (
               items.map((item) => (
-                <TableRow key={item.id} className="border-border/50">
-                  <TableCell className="font-medium text-foreground">{item.externalId}</TableCell>
-                  <TableCell className="max-w-[18rem] truncate text-muted-foreground">{item.title}</TableCell>
+                <TableRow
+                  key={item.id}
+                  tabIndex={0}
+                  className="cursor-pointer border-border/50 transition-colors hover:bg-accent/20 focus-visible:bg-accent/20 focus-visible:outline-none"
+                  onClick={() => {
+                    void navigate({ to: '/vulnerabilities/$id', params: { id: item.id } })
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      void navigate({ to: '/vulnerabilities/$id', params: { id: item.id } })
+                    }
+                  }}
+                >
+                  <TableCell className="font-medium text-foreground transition-colors group-hover:text-primary">
+                    {item.externalId}
+                  </TableCell>
+                  <TableCell className="max-w-[18rem] truncate text-muted-foreground">
+                    {item.title}
+                  </TableCell>
                   <TableCell>
                     <Badge className="rounded-full border border-destructive/20 bg-destructive/10 text-destructive hover:bg-destructive/10">
                       {item.severity}
