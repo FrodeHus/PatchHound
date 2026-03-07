@@ -15,6 +15,13 @@ public class Asset
     public Guid? OwnerUserId { get; private set; }
     public Guid? OwnerTeamId { get; private set; }
     public Guid? FallbackTeamId { get; private set; }
+    public string? DeviceHealthStatus { get; private set; }
+    public string? DeviceOsPlatform { get; private set; }
+    public string? DeviceOsVersion { get; private set; }
+    public string? DeviceRiskScore { get; private set; }
+    public DateTimeOffset? DeviceLastSeenAt { get; private set; }
+    public string? DeviceLastIpAddress { get; private set; }
+    public string? DeviceAadDeviceId { get; private set; }
     public string Metadata { get; private set; } = "{}";
 
     private Asset() { }
@@ -69,5 +76,24 @@ public class Asset
     public void UpdateMetadata(string metadata)
     {
         Metadata = metadata;
+    }
+
+    public void UpdateDeviceDetails(
+        string? healthStatus,
+        string? osPlatform,
+        string? osVersion,
+        string? riskScore,
+        DateTimeOffset? lastSeenAt,
+        string? lastIpAddress,
+        string? aadDeviceId
+    )
+    {
+        DeviceHealthStatus = healthStatus;
+        DeviceOsPlatform = osPlatform;
+        DeviceOsVersion = osVersion;
+        DeviceRiskScore = riskScore;
+        DeviceLastSeenAt = lastSeenAt;
+        DeviceLastIpAddress = lastIpAddress;
+        DeviceAadDeviceId = aadDeviceId;
     }
 }

@@ -86,7 +86,7 @@ export function AssetDetailPane({
               {asset.assetType === 'Software' ? (
                 <SoftwareSection metadata={metadata} />
               ) : asset.assetType === 'Device' ? (
-                <DeviceSection metadata={metadata} />
+                <DeviceSection asset={asset} metadata={metadata} />
               ) : (
                 <GenericMetadataSection metadata={metadata} />
               )}
@@ -164,21 +164,45 @@ function SoftwareSection({ metadata }: { metadata: MetadataRecord }) {
   )
 }
 
-function DeviceSection({ metadata }: { metadata: MetadataRecord }) {
+function DeviceSection({
+  asset,
+  metadata,
+}: {
+  asset: AssetDetail
+  metadata: MetadataRecord
+}) {
+  const normalizedFields = [
+    { label: 'Health Status', value: asset.deviceHealthStatus ?? 'Unknown' },
+    { label: 'OS Platform', value: asset.deviceOsPlatform ?? 'Unknown' },
+    { label: 'OS Version', value: asset.deviceOsVersion ?? 'Unknown' },
+    { label: 'Risk Score', value: asset.deviceRiskScore ?? 'Unknown' },
+    { label: 'Last Seen', value: asset.deviceLastSeenAt ? new Date(asset.deviceLastSeenAt).toLocaleString() : 'Unknown' },
+    { label: 'Last IP Address', value: asset.deviceLastIpAddress ?? 'Unknown' },
+    { label: 'Entra Device ID', value: asset.deviceAadDeviceId ?? 'Unknown', mono: true },
+  ]
+
   return (
     <section className="rounded-2xl border border-border/70 bg-card p-4">
       <SectionHeader
         eyebrow="Device telemetry"
         title="Host context"
-        description="Machine-specific metadata currently stored for this device asset."
+        description="Normalized machine fields captured from the Defender device inventory."
       />
-      {Object.keys(metadata).length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No device-specific metadata is currently stored for this record.
-        </p>
-      ) : (
-        <KeyValueGrid metadata={metadata} />
-      )}
+      <div className="grid gap-3 md:grid-cols-2">
+        {normalizedFields.map((field) => (
+          <DataCard key={field.label} label={field.label} value={field.value} mono={field.mono === true} />
+        ))}
+      </div>
+      {Object.keys(metadata).length > 0 ? (
+        <div className="mt-4">
+          <SectionHeader
+            eyebrow="Additional metadata"
+            title="Stored context"
+            description="Any remaining type-specific data that has not been normalized yet."
+          />
+          <KeyValueGrid metadata={metadata} />
+        </div>
+      ) : null}
     </section>
   )
 }

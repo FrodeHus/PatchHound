@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { useRouter } from '@tanstack/react-router'
 import { AlertTriangle, Menu, LogOut, ShieldCheck } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -12,8 +15,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { NotificationBell } from '@/components/layout/NotificationBell'
+import { OpenBaoUnsealDialog } from '@/components/layout/OpenBaoUnsealDialog'
 import { TenantSelector } from '@/components/layout/TenantSelector'
 import type { CurrentUser } from '@/server/auth.functions'
+import { unsealOpenBao } from '@/server/system.functions'
 import { ThemeSelector } from '@/components/layout/ThemeSelector'
 
 type TopNavProps = {
@@ -40,7 +45,17 @@ export function TopNav({
   onToggleSidebar,
   onLogout,
 }: TopNavProps) {
+  const router = useRouter()
+  const [isUnsealDialogOpen, setIsUnsealDialogOpen] = useState(false)
   const tenants = user.tenantIds.map((tenantId) => ({ id: tenantId, name: tenantId }))
+  const canUnsealOpenBao = user.roles.includes('GlobalAdmin')
+  const unsealMutation = useMutation({
+    mutationFn: (keys: [string, string, string]) => unsealOpenBao({ data: { keys } }),
+    onSuccess: async () => {
+      setIsUnsealDialogOpen(false)
+      await router.invalidate()
+    },
+  })
 
   return (
     <header className="sticky top-0 z-20 px-4 pb-4 pt-4 sm:px-6">
@@ -78,8 +93,18 @@ export function TopNav({
                 {user.systemStatus?.openBaoSealed ? (
                   <Badge
                     variant="outline"
-                    title="OpenBao is sealed. Unseal the vault to allow ingestion workers to read tenant credentials and start syncs."
-                    className="rounded-full border-amber-400/25 bg-amber-400/10 text-amber-200"
+                    title={canUnsealOpenBao
+                      ? 'OpenBao is sealed. Click to provide unseal keys and resume ingestion.'
+                      : 'OpenBao is sealed. A Global Admin must unseal the vault to resume ingestion.'}
+                    className={[
+                      'rounded-full border-amber-400/25 bg-amber-400/10 text-amber-200',
+                      canUnsealOpenBao ? 'cursor-pointer hover:bg-amber-400/15' : '',
+                    ].join(' ')}
+                    onClick={() => {
+                      if (canUnsealOpenBao) {
+                        setIsUnsealDialogOpen(true)
+                      }
+                    }}
                   >
                     <AlertTriangle className="size-3.5" />
                     OpenBao sealed
@@ -138,6 +163,20 @@ export function TopNav({
           </div>
         </div>
       </div>
+      <OpenBaoUnsealDialog
+        isOpen={isUnsealDialogOpen}
+        isSubmitting={unsealMutation.isPending}
+        errorMessage={unsealMutation.error instanceof Error ? unsealMutation.error.message : null}
+        onClose={() => {
+          if (!unsealMutation.isPending) {
+            setIsUnsealDialogOpen(false)
+            unsealMutation.reset()
+          }
+        }}
+        onSubmit={(keys) => {
+          unsealMutation.mutate(keys)
+        }}
+      />
     </header>
   )
 }

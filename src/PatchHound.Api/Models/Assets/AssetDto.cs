@@ -21,6 +21,13 @@ public record AssetDetailDto(
     Guid? OwnerUserId,
     Guid? OwnerTeamId,
     Guid? FallbackTeamId,
+    string? DeviceHealthStatus,
+    string? DeviceOsPlatform,
+    string? DeviceOsVersion,
+    string? DeviceRiskScore,
+    DateTimeOffset? DeviceLastSeenAt,
+    string? DeviceLastIpAddress,
+    string? DeviceAadDeviceId,
     string Metadata,
     IReadOnlyList<AssetVulnerabilityDto> Vulnerabilities
 );

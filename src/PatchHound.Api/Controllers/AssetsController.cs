@@ -115,6 +115,13 @@ public class AssetsController : ControllerBase
                 asset.OwnerUserId,
                 asset.OwnerTeamId,
                 asset.FallbackTeamId,
+                asset.DeviceHealthStatus,
+                asset.DeviceOsPlatform,
+                asset.DeviceOsVersion,
+                asset.DeviceRiskScore,
+                asset.DeviceLastSeenAt,
+                asset.DeviceLastIpAddress,
+                asset.DeviceAadDeviceId,
                 asset.Metadata,
                 vulnerabilities
             )
