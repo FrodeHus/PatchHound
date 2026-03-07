@@ -4,6 +4,7 @@ import {
   Outlet,
   Scripts,
 } from '@tanstack/react-router'
+import '@/styles/app.css'
 import { getCurrentUser, type CurrentUser } from '@/server/auth.functions'
 
 interface RouterContext {

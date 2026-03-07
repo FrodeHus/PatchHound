@@ -1,6 +1,10 @@
+using System.Text;
+using System.Text.Json;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Logging;
 using Microsoft.Identity.Web;
 using Vigil.Api.Auth;
 using Vigil.Api.Hubs;
@@ -12,11 +16,111 @@ using Vigil.Infrastructure.Data;
 using Vigil.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+var azureAdConfig = builder.Configuration.GetSection("AzureAd");
+var jwtLogPii =
+    builder.Environment.IsDevelopment()
+    || builder.Configuration.GetValue<bool>("AzureAd:EnablePiiLogging");
+
+if (jwtLogPii)
+{
+    IdentityModelEventSource.ShowPII = true;
+}
 
 // Authentication - Entra ID multi-tenant
 builder
     .Services.AddAuthentication()
-    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+    .AddMicrosoftIdentityWebApi(azureAdConfig);
+
+builder.Services.Configure<JwtBearerOptions>(
+    JwtBearerDefaults.AuthenticationScheme,
+    options =>
+    {
+        var configuredAudience = azureAdConfig["Audience"];
+        var clientId = azureAdConfig["ClientId"];
+        var validAudiences = new[] { configuredAudience, clientId }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var existingEvents = options.Events;
+
+        if (validAudiences.Length > 0)
+        {
+            options.TokenValidationParameters.ValidAudiences = validAudiences;
+        }
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("AuthDiagnostics");
+
+                if (existingEvents?.OnTokenValidated is not null)
+                {
+                    await existingEvents.OnTokenValidated(context);
+                }
+
+                var audiences = context.Principal?
+                    .Claims.Where(claim => claim.Type == "aud")
+                    .Select(claim => claim.Value)
+                    .ToArray();
+
+                logger.LogInformation(
+                    "JWT token validated. Expected audiences: {ExpectedAudiences}. Token audiences: {TokenAudiences}",
+                    validAudiences.Length > 0 ? string.Join(", ", validAudiences) : "<none>",
+                    audiences is { Length: > 0 } ? string.Join(", ", audiences) : "<none>"
+                );
+            },
+            OnAuthenticationFailed = async context =>
+            {
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("AuthDiagnostics");
+
+                if (existingEvents?.OnAuthenticationFailed is not null)
+                {
+                    await existingEvents.OnAuthenticationFailed(context);
+                }
+
+                var authorizationHeader = context.Request.Headers.Authorization.ToString();
+                var tokenClaims = TryReadBearerTokenClaims(authorizationHeader);
+
+                logger.LogError(
+                    context.Exception,
+                    "JWT authentication failed. Expected audiences: {ExpectedAudiences}. Authorization header present: {HasAuthorizationHeader}. Raw header prefix: {AuthorizationPrefix}. Token audience: {TokenAudience}. Token azp: {AuthorizedParty}. Token appid: {AppId}. PII logging enabled: {PiiLoggingEnabled}",
+                    validAudiences.Length > 0 ? string.Join(", ", validAudiences) : "<none>",
+                    !string.IsNullOrWhiteSpace(authorizationHeader),
+                    string.IsNullOrWhiteSpace(authorizationHeader)
+                        ? "<missing>"
+                        : authorizationHeader.Split(' ')[0],
+                    tokenClaims?.Audience ?? "<unavailable>",
+                    tokenClaims?.AuthorizedParty ?? "<unavailable>",
+                    tokenClaims?.AppId ?? "<unavailable>",
+                    jwtLogPii
+                );
+            },
+            OnChallenge = async context =>
+            {
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("AuthDiagnostics");
+
+                if (existingEvents?.OnChallenge is not null)
+                {
+                    await existingEvents.OnChallenge(context);
+                }
+
+                logger.LogWarning(
+                    "JWT challenge triggered. Error: {Error}. Description: {Description}. Expected audiences: {ExpectedAudiences}",
+                    context.Error,
+                    context.ErrorDescription,
+                    validAudiences.Length > 0 ? string.Join(", ", validAudiences) : "<none>"
+                );
+            },
+        };
+    }
+);
 
 builder.Services.AddAuthorization(options =>
 {
@@ -227,3 +331,76 @@ app.UseRateLimiter();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
 await app.RunAsync();
+
+static TokenDiagnostics? TryReadBearerTokenClaims(string authorizationHeader)
+{
+    if (string.IsNullOrWhiteSpace(authorizationHeader))
+    {
+        return null;
+    }
+
+    const string bearerPrefix = "Bearer ";
+    if (!authorizationHeader.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+    {
+        return null;
+    }
+
+    var token = authorizationHeader[bearerPrefix.Length..].Trim();
+    var segments = token.Split('.');
+    if (segments.Length < 2)
+    {
+        return null;
+    }
+
+    try
+    {
+        var payload = segments[1]
+            .Replace('-', '+')
+            .Replace('_', '/');
+
+        payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+        var json = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        return new TokenDiagnostics(
+            GetStringOrArray(root, "aud"),
+            GetString(root, "azp"),
+            GetString(root, "appid")
+        );
+    }
+    catch
+    {
+        return null;
+    }
+}
+
+static string? GetString(JsonElement element, string propertyName)
+{
+    if (!element.TryGetProperty(propertyName, out var property))
+    {
+        return null;
+    }
+
+    return property.ValueKind == JsonValueKind.String ? property.GetString() : property.ToString();
+}
+
+static string? GetStringOrArray(JsonElement element, string propertyName)
+{
+    if (!element.TryGetProperty(propertyName, out var property))
+    {
+        return null;
+    }
+
+    return property.ValueKind switch
+    {
+        JsonValueKind.String => property.GetString(),
+        JsonValueKind.Array => string.Join(
+            ", ",
+            property.EnumerateArray().Select(item => item.ToString())
+        ),
+        _ => property.ToString(),
+    };
+}
+
+sealed record TokenDiagnostics(string? Audience, string? AuthorizedParty, string? AppId);

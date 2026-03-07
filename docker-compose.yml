@@ -15,11 +15,12 @@ services:
       context: .
       dockerfile: src/Vigil.Api/Dockerfile
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: ${API_ENVIRONMENT:-Development}
       ConnectionStrings__Vigil: Host=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       AzureAd__ClientId: ${AZURE_AD_CLIENT_ID}
       AzureAd__TenantId: ${AZURE_AD_TENANT_ID}
       AzureAd__Audience: ${AZURE_AD_AUDIENCE}
+      AzureAd__EnablePiiLogging: ${AZURE_AD_ENABLE_PII_LOGGING:-false}
       Smtp__Host: ${SMTP_HOST}
       Smtp__Port: ${SMTP_PORT}
       Smtp__Username: ${SMTP_USERNAME}
@@ -33,7 +34,7 @@ services:
       context: .
       dockerfile: src/Vigil.Worker/Dockerfile
     environment:
-      DOTNET_ENVIRONMENT: Development
+      DOTNET_ENVIRONMENT: ${WORKER_ENVIRONMENT:-Development}
       ConnectionStrings__Vigil: Host=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       Defender__ClientId: ${DEFENDER_CLIENT_ID}
       Defender__ClientSecret: ${DEFENDER_CLIENT_SECRET}
@@ -48,7 +49,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${FRONTEND_NODE_ENV:-production}
       API_BASE_URL: http://api:8080/api
       SESSION_SECRET: ${SESSION_SECRET}
       ENTRA_CLIENT_ID: ${AZURE_AD_CLIENT_ID}

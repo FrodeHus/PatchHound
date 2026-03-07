@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -97,12 +98,14 @@ export function TopNav({
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64 rounded-2xl border-border/70 bg-popover/95 p-2 backdrop-blur">
-                <DropdownMenuLabel className="px-3 py-2">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">{user.displayName || 'Signed in'}</p>
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
-                  </div>
-                </DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="px-3 py-2">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-foreground">{user.displayName || 'Signed in'}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="rounded-xl px-3 py-2">
                   {user.tenantIds.length} tenant scope{user.tenantIds.length === 1 ? '' : 's'}
