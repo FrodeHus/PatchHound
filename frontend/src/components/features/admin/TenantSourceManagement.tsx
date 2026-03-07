@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 
 type TenantSourceManagementProps = {
   tenant: TenantDetail
@@ -26,6 +27,7 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
         data: {
           tenantId: tenant.id,
           name: tenant.name,
+          sla: tenant.sla,
           ingestionSources: sources.map((source) => ({
             key: source.key,
             displayName: source.displayName,
@@ -84,59 +86,106 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
     setSources((current) => current.map((source) => (source.key === key ? mutate(source) : source)))
   }
 
-  const ingestionSources = sources.filter((source) => source.key !== 'nvd')
-  const enrichmentSources = sources.filter((source) => source.key === 'nvd')
-
   return (
     <section className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Sources</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Configure tenant ingestion sources separately from enrichment providers.
-          </p>
-        </div>
-        <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-          {mutation.isPending ? 'Saving...' : 'Save source changes'}
-        </Button>
-      </div>
+      <Card className="rounded-[30px] border-border/70 bg-card/82 shadow-sm">
+        <CardHeader className="border-b border-border/60 pb-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-semibold tracking-[-0.03em]">Tenant Sources</h2>
+              <p className="text-sm text-muted-foreground">
+                Configure ingestion connectors, credentials, schedules, and manual sync for the selected tenant.
+              </p>
+            </div>
+            <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="rounded-full px-5">
+              {mutation.isPending ? 'Saving...' : 'Save source changes'}
+            </Button>
+          </div>
+        </CardHeader>
 
-      <SourceSection
-        title="Tenant Sources"
-        description="Primary ingestion sources that discover tenant assets and vulnerabilities."
-        sources={ingestionSources}
-        syncingSourceKey={syncingSourceKey}
-        syncMutation={syncMutation}
-        onUpdateSource={updateSource}
-      />
+        <CardContent className="space-y-5 pt-5">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[24px] border border-border/70 bg-background/30 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Configured Sources</p>
+              <p className="mt-2 text-2xl font-semibold">
+                {sources.filter((source) => source.credentials.tenantId || source.credentials.clientId || source.credentials.hasSecret).length}
+              </p>
+            </div>
+            <div className="rounded-[24px] border border-border/70 bg-background/30 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Enabled Sources</p>
+              <p className="mt-2 text-2xl font-semibold">{sources.filter((source) => source.enabled).length}</p>
+            </div>
+            <div className="rounded-[24px] border border-border/70 bg-background/30 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Manual Sync</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Supported for {sources.filter((source) => source.supportsManualSync).length} source{sources.filter((source) => source.supportsManualSync).length === 1 ? '' : 's'}.
+              </p>
+            </div>
+          </div>
 
-      <SourceSection
-        title="Enrichment Sources"
-        description="Secondary providers that enrich ingested vulnerabilities with additional context such as CVSS vectors and published dates."
-        sources={enrichmentSources}
-        syncingSourceKey={syncingSourceKey}
-        syncMutation={syncMutation}
-        onUpdateSource={updateSource}
-      />
+          <div className="rounded-[26px] border border-border/70 bg-background/25 p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold">Tenant Sources</h3>
+                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+                    {sources.length}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Credentials and schedules used by the worker to collect tenant inventory and vulnerability data.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {saveState === 'saved' ? <StatusPill tone="success">Configuration saved</StatusPill> : null}
+                {saveState === 'error' ? <StatusPill tone="error">Save failed</StatusPill> : null}
+                {syncState === 'success' ? <StatusPill tone="success">Sync queued</StatusPill> : null}
+                {syncState === 'error' ? <StatusPill tone="error">Sync failed</StatusPill> : null}
+              </div>
+            </div>
 
-      {saveState === 'saved' ? <p className="text-sm text-emerald-300">Source configuration saved.</p> : null}
-      {saveState === 'error' ? <p className="text-sm text-destructive">Save failed. Try again.</p> : null}
-      {syncState === 'success' ? <p className="text-sm text-emerald-300">Ingestion sync started.</p> : null}
-      {syncState === 'error' ? <p className="text-sm text-destructive">Sync trigger failed. Try again.</p> : null}
+            <div className="mt-5 space-y-4">
+              <SourceSection
+                sources={sources}
+                syncingSourceKey={syncingSourceKey}
+                syncMutation={syncMutation}
+                onUpdateSource={updateSource}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </section>
   )
 }
 
+function StatusPill({
+  children,
+  tone,
+}: {
+  children: string
+  tone: 'success' | 'error'
+}) {
+  return (
+    <span
+      className={cn(
+        'rounded-full border px-3 py-1',
+        tone === 'success'
+          ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300'
+          : 'border-destructive/25 bg-destructive/10 text-destructive',
+      )}
+    >
+      {children}
+    </span>
+  )
+}
+
 function SourceSection({
-  title,
-  description,
   sources,
   syncingSourceKey,
   syncMutation,
   onUpdateSource,
 }: {
-  title: string
-  description: string
   sources: TenantIngestionSourceDraft[]
   syncingSourceKey: string | null
   syncMutation: ReturnType<typeof useMutation<void, Error, string>>
@@ -145,27 +194,26 @@ function SourceSection({
     mutate: (current: TenantIngestionSourceDraft) => TenantIngestionSourceDraft,
   ) => void
 }) {
+  if (!sources.length) {
+    return (
+      <div className="rounded-[22px] border border-dashed border-border/70 bg-background/20 px-4 py-8 text-sm text-muted-foreground">
+        No sources are available in this category for the selected tenant.
+      </div>
+    )
+  }
+
   return (
     <section className="space-y-4">
-      <div className="space-y-1">
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
       {sources.map((source) => {
         const isConfigured = Boolean(
-          source.key === 'nvd'
-            ? source.credentials.hasSecret
-            : source.credentials.tenantId || source.credentials.clientId || source.credentials.hasSecret,
+          source.credentials.tenantId || source.credentials.clientId || source.credentials.hasSecret,
         )
-        const isEnrichmentSource = source.key === 'nvd'
-        const secretLabel = isEnrichmentSource ? 'API Key' : 'Client Secret'
-        const sourceSummary = isEnrichmentSource
-          ? 'Configure NVD enrichment. When enabled, worker-driven syncs will look up each CVE in NVD and fill missing description, CVSS vector, and published date.'
-          : 'Configure API credentials and the schedule string used for sync orchestration.'
+        const secretLabel = 'Client Secret'
+        const sourceSummary = 'Configure API credentials and the schedule string used for tenant ingestion orchestration.'
 
         return (
-          <Card key={source.key} className="rounded-[28px] border-border/70 bg-card/82">
-            <CardHeader>
+          <Card key={source.key} className="rounded-[26px] border-border/70 bg-card/82 shadow-sm">
+            <CardHeader className="border-b border-border/60 pb-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
@@ -174,7 +222,7 @@ function SourceSection({
                       {source.key}
                     </Badge>
                     <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/10 text-primary">
-                      {isEnrichmentSource ? 'Enrichment' : 'Ingestion'}
+                      Ingestion
                     </Badge>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{sourceSummary}</p>
@@ -189,7 +237,7 @@ function SourceSection({
                 </Badge>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>{isEnrichmentSource ? 'Last enrichment' : 'Last ingestion'}: {formatTimestamp(source.runtime.lastCompletedAt)}</span>
+                <span>Last ingestion: {formatTimestamp(source.runtime.lastCompletedAt)}</span>
                 {source.runtime.lastStatus ? (
                   <Badge variant="outline" className="rounded-full border-border/70 bg-background/60 text-muted-foreground">
                     {source.runtime.lastStatus}
@@ -197,7 +245,7 @@ function SourceSection({
                 ) : null}
               </div>
             </CardHeader>
-            <CardContent className="space-y-5">
+            <CardContent className="space-y-5 pt-5">
               {source.supportsManualSync ? (
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
                   <div className="space-y-1">
@@ -249,7 +297,7 @@ function SourceSection({
                 <div>
                   <p className="text-sm font-medium">Enable source</p>
                   <p className="text-xs text-muted-foreground">
-                    {isEnrichmentSource ? 'Used during worker enrichment of vulnerability data.' : 'Included in tenant ingestion schedule and credential validation.'}
+                    Included in tenant ingestion schedule and credential validation.
                   </p>
                 </div>
               </label>
@@ -282,40 +330,36 @@ function SourceSection({
                   </label>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-border/70 bg-background/25 px-4 py-3 text-sm text-muted-foreground">
-                    Worker-driven enrichment with no dedicated schedule.
+                    This source does not currently support a dedicated schedule.
                   </div>
                 )}
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                {!isEnrichmentSource ? (
-                  <>
-                    <label className="space-y-2">
-                      <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Credential Tenant ID</span>
-                      <Input
-                        value={source.credentials.tenantId}
-                        onChange={(event) => {
-                          onUpdateSource(source.key, (current) => ({
-                            ...current,
-                            credentials: { ...current.credentials, tenantId: event.target.value },
-                          }))
-                        }}
-                      />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Client ID</span>
-                      <Input
-                        value={source.credentials.clientId}
-                        onChange={(event) => {
-                          onUpdateSource(source.key, (current) => ({
-                            ...current,
-                            credentials: { ...current.credentials, clientId: event.target.value },
-                          }))
-                        }}
-                      />
-                    </label>
-                  </>
-                ) : null}
+                <label className="space-y-2">
+                  <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Credential Tenant ID</span>
+                  <Input
+                    value={source.credentials.tenantId}
+                    onChange={(event) => {
+                      onUpdateSource(source.key, (current) => ({
+                        ...current,
+                        credentials: { ...current.credentials, tenantId: event.target.value },
+                      }))
+                    }}
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Client ID</span>
+                  <Input
+                    value={source.credentials.clientId}
+                    onChange={(event) => {
+                      onUpdateSource(source.key, (current) => ({
+                        ...current,
+                        credentials: { ...current.credentials, clientId: event.target.value },
+                      }))
+                    }}
+                  />
+                </label>
                 <label className="space-y-2 md:col-span-2">
                   <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{secretLabel}</span>
                   <Input
@@ -346,20 +390,18 @@ function SourceSection({
                     }}
                   />
                 </label>
-                {!isEnrichmentSource ? (
-                  <label className="space-y-2">
-                    <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Token Scope</span>
-                    <Input
-                      value={source.credentials.tokenScope}
-                      onChange={(event) => {
-                        onUpdateSource(source.key, (current) => ({
-                          ...current,
-                          credentials: { ...current.credentials, tokenScope: event.target.value },
-                        }))
-                      }}
-                    />
-                  </label>
-                ) : null}
+                <label className="space-y-2">
+                  <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Token Scope</span>
+                  <Input
+                    value={source.credentials.tokenScope}
+                    onChange={(event) => {
+                      onUpdateSource(source.key, (current) => ({
+                        ...current,
+                        credentials: { ...current.credentials, tokenScope: event.target.value },
+                      }))
+                    }}
+                  />
+                </label>
               </div>
             </CardContent>
           </Card>

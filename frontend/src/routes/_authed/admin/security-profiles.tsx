@@ -2,20 +2,31 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { createSecurityProfile, fetchSecurityProfiles } from '@/api/security-profiles.functions'
+import { fetchTenants } from '@/api/settings.functions'
 
 const environmentClassOptions = ['Workstation', 'Server', 'JumpHost', 'Lab', 'Kiosk', 'OT']
 const internetReachabilityOptions = ['Internet', 'InternalNetwork', 'AdjacentOnly', 'LocalOnly']
 const requirementOptions = ['Low', 'Medium', 'High']
 
 export const Route = createFileRoute('/_authed/admin/security-profiles')({
-  loader: () => fetchSecurityProfiles({ data: {} }),
+  loader: async () => {
+    const [profiles, tenants] = await Promise.all([
+      fetchSecurityProfiles({ data: {} }),
+      fetchTenants({ data: { page: 1, pageSize: 100 } }),
+    ])
+
+    return {
+      profiles,
+      tenants: tenants.items,
+    }
+  },
   component: SecurityProfilesPage,
 })
 
 function SecurityProfilesPage() {
   const router = useRouter()
   const data = Route.useLoaderData()
-  const [tenantId, setTenantId] = useState('')
+  const [tenantId, setTenantId] = useState(data.tenants[0]?.id ?? '')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [environmentClass, setEnvironmentClass] = useState(environmentClassOptions[0])
@@ -23,6 +34,7 @@ function SecurityProfilesPage() {
   const [confidentialityRequirement, setConfidentialityRequirement] = useState(requirementOptions[1])
   const [integrityRequirement, setIntegrityRequirement] = useState(requirementOptions[1])
   const [availabilityRequirement, setAvailabilityRequirement] = useState(requirementOptions[1])
+  const tenantNames = new Map(data.tenants.map((tenant) => [tenant.id, tenant.name]))
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -58,7 +70,17 @@ function SecurityProfilesPage() {
       <section className="rounded-lg border border-border bg-card p-4">
         <h2 className="text-lg font-semibold">Create Security Profile</h2>
         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <input className="rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Tenant GUID" value={tenantId} onChange={(event) => setTenantId(event.target.value)} />
+          <select
+            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={tenantId}
+            onChange={(event) => setTenantId(event.target.value)}
+          >
+            {data.tenants.map((tenant) => (
+              <option key={tenant.id} value={tenant.id}>
+                {tenant.name}
+              </option>
+            ))}
+          </select>
           <input className="rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Profile name" value={name} onChange={(event) => setName(event.target.value)} />
           <input className="rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-2" placeholder="Description" value={description} onChange={(event) => setDescription(event.target.value)} />
           <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={environmentClass} onChange={(event) => setEnvironmentClass(event.target.value)}>
@@ -92,7 +114,7 @@ function SecurityProfilesPage() {
       <section className="rounded-lg border border-border bg-card p-4">
         <div className="mb-3 flex items-end justify-between">
           <h2 className="text-lg font-semibold">Profiles</h2>
-          <p className="text-xs text-muted-foreground">{data.totalCount} total</p>
+          <p className="text-xs text-muted-foreground">{data.profiles.totalCount} total</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] border-collapse text-sm">
@@ -107,11 +129,11 @@ function SecurityProfilesPage() {
               </tr>
             </thead>
             <tbody>
-              {data.items.length === 0 ? (
+              {data.profiles.items.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-3 text-muted-foreground">No security profiles found.</td>
                 </tr>
-              ) : data.items.map((profile) => (
+              ) : data.profiles.items.map((profile) => (
                 <tr key={profile.id} className="border-b border-border/60">
                   <td className="py-2 pr-2">
                     <div>
@@ -119,7 +141,7 @@ function SecurityProfilesPage() {
                       <p className="text-xs text-muted-foreground">{profile.description ?? 'No description'}</p>
                     </div>
                   </td>
-                  <td className="py-2 pr-2"><code>{profile.tenantId}</code></td>
+                  <td className="py-2 pr-2">{tenantNames.get(profile.tenantId) ?? profile.tenantId}</td>
                   <td className="py-2 pr-2">{profile.environmentClass}</td>
                   <td className="py-2 pr-2">{profile.internetReachability}</td>
                   <td className="py-2 pr-2">

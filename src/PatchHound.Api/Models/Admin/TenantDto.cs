@@ -12,6 +12,7 @@ public record TenantDetailDto(
     string Name,
     string EntraTenantId,
     TenantAssetSummaryDto Assets,
+    TenantSlaConfigurationDto Sla,
     IReadOnlyList<TenantIngestionSourceDto> IngestionSources
 );
 
@@ -20,6 +21,13 @@ public record TenantAssetSummaryDto(
     int DeviceCount,
     int SoftwareCount,
     int CloudResourceCount
+);
+
+public record TenantSlaConfigurationDto(
+    int CriticalDays,
+    int HighDays,
+    int MediumDays,
+    int LowDays
 );
 
 public record TenantIngestionSourceDto(
@@ -50,7 +58,18 @@ public record TenantIngestionRuntimeDto(
     string LastError
 );
 
-public record UpdateTenantRequest(string Name, List<UpdateTenantIngestionSourceRequest> IngestionSources);
+public record UpdateTenantRequest(
+    string Name,
+    UpdateTenantSlaConfigurationRequest Sla,
+    List<UpdateTenantIngestionSourceRequest> IngestionSources
+);
+
+public record UpdateTenantSlaConfigurationRequest(
+    int CriticalDays,
+    int HighDays,
+    int MediumDays,
+    int LowDays
+);
 
 public record UpdateTenantIngestionSourceRequest(
     string Key,

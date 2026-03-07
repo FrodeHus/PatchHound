@@ -5,10 +5,11 @@ type UserTableProps = {
   users: UserItem[]
   totalCount: number
   isUpdatingRoles: boolean
+  tenants: Array<{ id: string; name: string }>
   onUpdateRoles: (userId: string, roles: Array<{ tenantId: string; role: string }>) => void
 }
 
-export function UserTable({ users, totalCount, isUpdatingRoles, onUpdateRoles }: UserTableProps) {
+export function UserTable({ users, totalCount, isUpdatingRoles, tenants, onUpdateRoles }: UserTableProps) {
   return (
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="mb-3 flex items-end justify-between">
@@ -43,7 +44,12 @@ export function UserTable({ users, totalCount, isUpdatingRoles, onUpdateRoles }:
                     </div>
                   </td>
                   <td className="py-2 pr-2">
-                    <ManageRolesDialog userId={user.id} isSubmitting={isUpdatingRoles} onUpdateRoles={onUpdateRoles} />
+                    <ManageRolesDialog
+                      userId={user.id}
+                      isSubmitting={isUpdatingRoles}
+                      tenants={tenants}
+                      onUpdateRoles={onUpdateRoles}
+                    />
                   </td>
                 </tr>
               ))

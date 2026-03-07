@@ -10,7 +10,10 @@ public record IngestionResult(
     decimal? CvssScore,
     string? CvssVector,
     DateTimeOffset? PublishedDate,
-    IReadOnlyList<IngestionAffectedAsset> AffectedAssets
+    IReadOnlyList<IngestionAffectedAsset> AffectedAssets,
+    string? ProductVendor = null,
+    string? ProductName = null,
+    string? ProductVersion = null
 );
 
 public record IngestionAffectedAsset(

@@ -1,37 +1,17 @@
 using Microsoft.EntityFrameworkCore;
+using PatchHound.Infrastructure;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
-using PatchHound.Infrastructure.Options;
-using PatchHound.Infrastructure.Secrets;
-using PatchHound.Infrastructure.Services;
-using PatchHound.Infrastructure.VulnerabilitySources;
 using PatchHound.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-// DbContext
-builder.Services.AddDbContext<PatchHoundDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("PatchHound"))
-);
+builder.Services.AddPatchHoundInfrastructure(builder.Configuration);
 
 // Tenant context for worker (system-level, all tenants accessible)
 builder.Services.AddScoped<ITenantContext, WorkerTenantContext>();
-
-// Ingestion pipeline
-builder.Services.AddScoped<IngestionService>();
-builder.Services.AddHttpClient<DefenderApiClient>();
-builder.Services.AddHttpClient<ISecretStore, OpenBaoSecretStore>();
-builder.Services.Configure<OpenBaoOptions>(builder.Configuration.GetSection(OpenBaoOptions.SectionName));
-builder.Services.AddScoped<DefenderTenantConfigurationProvider>();
-builder.Services.AddScoped<IVulnerabilitySource, DefenderVulnerabilitySource>();
-
-// Notification services
-builder.Services.AddScoped<INotificationService, EmailNotificationService>();
 builder.Services.AddScoped<IEmailSender, NoOpEmailSender>();
-
-// SLA service
-builder.Services.AddScoped<SlaService>();
 
 // Hosted services
 builder.Services.AddHostedService<IngestionWorker>();

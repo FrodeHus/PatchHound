@@ -11,6 +11,7 @@ public class SetupService : ISetupService
     private readonly ITenantRepository _tenantRepository;
     private readonly IUserRepository _userRepository;
     private readonly IRepository<TenantSourceConfiguration> _tenantSourceRepository;
+    private readonly IRepository<EnrichmentSourceConfiguration> _enrichmentSourceRepository;
     private readonly IRepository<TenantSlaConfiguration> _tenantSlaRepository;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -18,6 +19,7 @@ public class SetupService : ISetupService
         ITenantRepository tenantRepository,
         IUserRepository userRepository,
         IRepository<TenantSourceConfiguration> tenantSourceRepository,
+        IRepository<EnrichmentSourceConfiguration> enrichmentSourceRepository,
         IRepository<TenantSlaConfiguration> tenantSlaRepository,
         IUnitOfWork unitOfWork
     )
@@ -25,6 +27,7 @@ public class SetupService : ISetupService
         _tenantRepository = tenantRepository;
         _userRepository = userRepository;
         _tenantSourceRepository = tenantSourceRepository;
+        _enrichmentSourceRepository = enrichmentSourceRepository;
         _tenantSlaRepository = tenantSlaRepository;
         _unitOfWork = unitOfWork;
     }
@@ -102,6 +105,10 @@ public class SetupService : ISetupService
         {
             await _tenantSourceRepository.AddAsync(source, ct);
         }
+        foreach (var source in EnrichmentSourceDefaults.CreateDefaults())
+        {
+            await _enrichmentSourceRepository.AddAsync(source, ct);
+        }
         await _tenantSlaRepository.AddAsync(TenantSlaConfiguration.CreateDefault(tenant.Id), ct);
 
         if (existingUser is null)
@@ -131,12 +138,20 @@ internal static class TenantSourceDefaults
                 apiBaseUrl: "https://api.securitycenter.microsoft.com",
                 tokenScope: "https://api.securitycenter.microsoft.com/.default"
             ),
-            TenantSourceConfiguration.Create(
-                tenantId,
+        ];
+    }
+}
+
+internal static class EnrichmentSourceDefaults
+{
+    public static IReadOnlyList<EnrichmentSourceConfiguration> CreateDefaults()
+    {
+        return
+        [
+            EnrichmentSourceConfiguration.Create(
                 "nvd",
                 "NVD API",
                 false,
-                string.Empty,
                 apiBaseUrl: "https://services.nvd.nist.gov"
             ),
         ];

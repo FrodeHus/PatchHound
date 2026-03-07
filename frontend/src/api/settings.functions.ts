@@ -49,10 +49,16 @@ export const updateTenant = createServerFn({ method: 'POST' })
   .inputValidator(z.object({
     tenantId: z.string(),
     name: z.string().min(1),
+    sla: z.object({
+      criticalDays: z.number().int().positive(),
+      highDays: z.number().int().positive(),
+      mediumDays: z.number().int().positive(),
+      lowDays: z.number().int().positive(),
+    }),
     ingestionSources: z.array(updateTenantIngestionSourceSchema),
   }))
-  .handler(async ({ context, data: { tenantId, name, ingestionSources } }) => {
-    await apiPut(`/tenants/${tenantId}`, context.token, { name, ingestionSources })
+  .handler(async ({ context, data: { tenantId, name, sla, ingestionSources } }) => {
+    await apiPut(`/tenants/${tenantId}`, context.token, { name, sla, ingestionSources })
   })
 
 export const triggerTenantIngestionSync = createServerFn({ method: 'POST' })
