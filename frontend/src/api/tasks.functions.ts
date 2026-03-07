@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 export const fetchTasks = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator(
+  .inputValidator(
     z.object({
       status: z.string().optional(),
       page: z.number().optional(),
@@ -25,7 +25,7 @@ export const fetchTasks = createServerFn({ method: 'GET' })
 
 export const updateTaskStatus = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .validator(
+  .inputValidator(
     z.object({
       id: z.string(),
       status: z.string(),

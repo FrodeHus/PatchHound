@@ -12,7 +12,7 @@ import { z } from 'zod'
 
 export const fetchVulnerabilities = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator(
+  .inputValidator(
     z.object({
       severity: z.string().optional(),
       status: z.string().optional(),
@@ -37,7 +37,7 @@ export const fetchVulnerabilities = createServerFn({ method: 'GET' })
 
 export const fetchVulnerabilityDetail = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string() }))
+  .inputValidator(z.object({ id: z.string() }))
   .handler(async ({ context, data: { id } }) => {
     const data = await apiGet(`/vulnerabilities/${id}`, context.token)
     return vulnerabilityDetailSchema.parse(data)
@@ -45,7 +45,7 @@ export const fetchVulnerabilityDetail = createServerFn({ method: 'GET' })
 
 export const updateOrganizationalSeverity = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .validator(
+  .inputValidator(
     z.object({
       id: z.string(),
       adjustedSeverity: z.string(),
@@ -61,7 +61,7 @@ export const updateOrganizationalSeverity = createServerFn({ method: 'POST' })
 
 export const generateAiReport = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string(), providerName: z.string() }))
+  .inputValidator(z.object({ id: z.string(), providerName: z.string() }))
   .handler(async ({ context, data: { id, providerName } }) => {
     const data = await apiPost(`/vulnerabilities/${id}/ai-report`, context.token, { providerName })
     return aiReportSchema.parse(data)
@@ -69,7 +69,7 @@ export const generateAiReport = createServerFn({ method: 'POST' })
 
 export const fetchVulnerabilityComments = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string() }))
+  .inputValidator(z.object({ id: z.string() }))
   .handler(async ({ context, data: { id } }) => {
     const data = await apiGet(`/vulnerabilities/${id}/comments`, context.token)
     return z.array(commentSchema).parse(data)
@@ -77,7 +77,7 @@ export const fetchVulnerabilityComments = createServerFn({ method: 'GET' })
 
 export const addVulnerabilityComment = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string(), content: z.string() }))
+  .inputValidator(z.object({ id: z.string(), content: z.string() }))
   .handler(async ({ context, data: { id, content } }) => {
     const data = await apiPost(`/vulnerabilities/${id}/comments`, context.token, { content })
     return commentSchema.parse(data)
@@ -85,7 +85,7 @@ export const addVulnerabilityComment = createServerFn({ method: 'POST' })
 
 export const fetchVulnerabilityTimeline = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string() }))
+  .inputValidator(z.object({ id: z.string() }))
   .handler(async ({ context, data: { id } }) => {
     const params = new URLSearchParams({
       entityType: 'Vulnerability',

@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 export const fetchAssets = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator(
+  .inputValidator(
     z.object({
       assetType: z.string().optional(),
       ownerType: z.string().optional(),
@@ -29,7 +29,7 @@ export const fetchAssets = createServerFn({ method: 'GET' })
 
 export const assignAssetOwner = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .validator(
+  .inputValidator(
     z.object({
       assetId: z.string(),
       ownerType: z.enum(['User', 'Team']),
@@ -42,7 +42,7 @@ export const assignAssetOwner = createServerFn({ method: 'POST' })
 
 export const setAssetCriticality = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .validator(z.object({ assetId: z.string(), criticality: z.string() }))
+  .inputValidator(z.object({ assetId: z.string(), criticality: z.string() }))
   .handler(async ({ context, data: { assetId, criticality } }) => {
     await apiPut(`/assets/${assetId}/criticality`, context.token, { criticality })
   })

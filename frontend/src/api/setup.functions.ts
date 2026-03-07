@@ -10,7 +10,7 @@ export const fetchSetupStatus = createServerFn({ method: 'GET' })
   })
 
 export const completeSetup = createServerFn({ method: 'POST' })
-  .validator(setupPayloadSchema)
+  .inputValidator(setupPayloadSchema)
   .handler(async ({ data: payload }) => {
     await apiPost('/setup/complete', '', payload)
   })

@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 export const fetchCampaigns = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator(
+  .inputValidator(
     z.object({
       status: z.string().optional(),
       page: z.number().optional(),
@@ -25,7 +25,7 @@ export const fetchCampaigns = createServerFn({ method: 'GET' })
 
 export const fetchCampaignDetail = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator(z.object({ id: z.string() }))
+  .inputValidator(z.object({ id: z.string() }))
   .handler(async ({ context, data: { id } }) => {
     const data = await apiGet(`/campaigns/${id}`, context.token)
     return campaignDetailSchema.parse(data)
@@ -33,7 +33,7 @@ export const fetchCampaignDetail = createServerFn({ method: 'GET' })
 
 export const createCampaign = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .validator(z.object({ name: z.string(), description: z.string().optional() }))
+  .inputValidator(z.object({ name: z.string(), description: z.string().optional() }))
   .handler(async ({ context, data: { name, description } }) => {
     const data = await apiPost('/campaigns', context.token, {
       name,
@@ -44,14 +44,14 @@ export const createCampaign = createServerFn({ method: 'POST' })
 
 export const linkCampaignVulnerabilities = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .validator(z.object({ campaignId: z.string(), vulnerabilityIds: z.array(z.string()) }))
+  .inputValidator(z.object({ campaignId: z.string(), vulnerabilityIds: z.array(z.string()) }))
   .handler(async ({ context, data: { campaignId, vulnerabilityIds } }) => {
     await apiPost(`/campaigns/${campaignId}/vulnerabilities`, context.token, { vulnerabilityIds })
   })
 
 export const bulkAssignCampaign = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .validator(z.object({ campaignId: z.string(), assigneeId: z.string() }))
+  .inputValidator(z.object({ campaignId: z.string(), assigneeId: z.string() }))
   .handler(async ({ context, data: { campaignId, assigneeId } }) => {
     await apiPost(`/campaigns/${campaignId}/bulk-assign`, context.token, { assigneeId })
   })

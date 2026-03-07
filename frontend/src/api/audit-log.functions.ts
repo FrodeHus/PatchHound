@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 export const fetchAuditLog = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator(
+  .inputValidator(
     z.object({
       entityType: z.string().optional(),
       action: z.string().optional(),

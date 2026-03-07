@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 export const fetchUsers = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator(
+  .inputValidator(
     z.object({
       page: z.number().optional(),
       pageSize: z.number().optional(),
@@ -21,7 +21,7 @@ export const fetchUsers = createServerFn({ method: 'GET' })
 
 export const inviteUser = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .validator(
+  .inputValidator(
     z.object({
       email: z.string(),
       displayName: z.string(),
@@ -34,7 +34,7 @@ export const inviteUser = createServerFn({ method: 'POST' })
 
 export const updateUserRoles = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .validator(
+  .inputValidator(
     z.object({
       userId: z.string(),
       roles: z.array(z.object({ tenantId: z.string(), role: z.string() })),

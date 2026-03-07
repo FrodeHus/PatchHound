@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 export const fetchTeams = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator(
+  .inputValidator(
     z.object({
       tenantId: z.string().optional(),
       page: z.number().optional(),
@@ -25,7 +25,7 @@ export const fetchTeams = createServerFn({ method: 'GET' })
 
 export const createTeam = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .validator(z.object({ name: z.string(), tenantId: z.string() }))
+  .inputValidator(z.object({ name: z.string(), tenantId: z.string() }))
   .handler(async ({ context, data: payload }) => {
     await apiPost('/teams', context.token, payload)
   })
