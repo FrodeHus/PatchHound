@@ -45,7 +45,7 @@ const navItems: NavItem[] = [
   { to: '/campaigns', label: 'Campaigns', icon: Flag },
   { to: '/audit-log', label: 'Audit Trail', icon: ScrollText, roles: ['Auditor', 'GlobalAdmin'] },
   { to: '/admin/users', label: 'Users', icon: Users, roles: ['GlobalAdmin'] },
-  { to: '/admin/teams', label: 'Teams', icon: Users, roles: ['GlobalAdmin', 'SecurityManager'] },
+  { to: '/admin/teams', label: 'Assignment Groups', icon: Users, roles: ['GlobalAdmin', 'SecurityManager'] },
   { to: '/admin/tenants', label: 'Tenants', icon: Building2, roles: ['GlobalAdmin', 'SecurityManager'] },
   { to: '/settings', label: 'Settings', icon: Settings, roles: ['GlobalAdmin', 'SecurityManager'] },
 ]
