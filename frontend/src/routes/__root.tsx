@@ -4,12 +4,15 @@ import {
   Outlet,
   Scripts,
 } from '@tanstack/react-router'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '@/styles/app.css'
 import { getCurrentUser, type CurrentUser } from '@/server/auth.functions'
 
 interface RouterContext {
   user: CurrentUser | null
 }
+
+const queryClient = new QueryClient()
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
@@ -33,7 +36,9 @@ function RootDocument() {
         <HeadContent />
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased">
-        <Outlet />
+        <QueryClientProvider client={queryClient}>
+          <Outlet />
+        </QueryClientProvider>
         <Scripts />
       </body>
     </html>

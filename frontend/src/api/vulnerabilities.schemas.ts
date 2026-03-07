@@ -1,5 +1,9 @@
 import { z } from 'zod'
 
+const isoDateTimeSchema = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
+  message: 'Invalid datetime',
+})
+
 export const vulnerabilitySchema = z.object({
   id: z.string().uuid(),
   externalId: z.string(),
@@ -8,7 +12,7 @@ export const vulnerabilitySchema = z.object({
   status: z.string(),
   source: z.string(),
   cvssScore: z.number().nullable(),
-  publishedDate: z.string().datetime().nullable(),
+  publishedDate: isoDateTimeSchema.nullable(),
   affectedAssetCount: z.number(),
   adjustedSeverity: z.string().nullable(),
 })
@@ -23,8 +27,8 @@ export const affectedAssetSchema = z.object({
   assetName: z.string(),
   assetType: z.string(),
   status: z.string(),
-  detectedDate: z.string().datetime(),
-  resolvedDate: z.string().datetime().nullable(),
+  detectedDate: isoDateTimeSchema,
+  resolvedDate: isoDateTimeSchema.nullable(),
 })
 
 export const orgSeveritySchema = z.object({
@@ -33,7 +37,7 @@ export const orgSeveritySchema = z.object({
   assetCriticalityFactor: z.string().nullable(),
   exposureFactor: z.string().nullable(),
   compensatingControls: z.string().nullable(),
-  adjustedAt: z.string().datetime(),
+  adjustedAt: isoDateTimeSchema,
 })
 
 export const vulnerabilityDetailSchema = z.object({
@@ -46,7 +50,7 @@ export const vulnerabilityDetailSchema = z.object({
   source: z.string(),
   cvssScore: z.number().nullable(),
   cvssVector: z.string().nullable(),
-  publishedDate: z.string().datetime().nullable(),
+  publishedDate: isoDateTimeSchema.nullable(),
   affectedAssets: z.array(affectedAssetSchema),
   organizationalSeverity: orgSeveritySchema.nullable(),
 })
@@ -56,7 +60,7 @@ export const aiReportSchema = z.object({
   vulnerabilityId: z.string().uuid(),
   content: z.string(),
   provider: z.string(),
-  generatedAt: z.string().datetime(),
+  generatedAt: isoDateTimeSchema,
 })
 
 export const commentSchema = z.object({
@@ -65,8 +69,8 @@ export const commentSchema = z.object({
   entityId: z.string().uuid(),
   authorId: z.string().uuid(),
   content: z.string(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime().nullable(),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema.nullable(),
 })
 
 export type Vulnerability = z.infer<typeof vulnerabilitySchema>
