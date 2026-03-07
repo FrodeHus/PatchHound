@@ -16,3 +16,4 @@ export const pagedAssetsSchema = z.object({
 })
 
 export type Asset = z.infer<typeof assetSchema>
+export type PagedAssets = z.infer<typeof pagedAssetsSchema>

@@ -1,9 +1,15 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { fetchSetupStatus } from '@/api/setup.functions'
 import { SetupWizard } from '@/components/features/setup/SetupWizard'
 
 export const Route = createFileRoute('/setup/')({
-  loader: () => fetchSetupStatus(),
+  loader: async () => {
+    const status = await fetchSetupStatus()
+    if (status.isInitialized) {
+      throw redirect({ to: '/' })
+    }
+    return status
+  },
   component: SetupPage,
 })
 

@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPut } from '@/server/api'
 import { pagedAssetsSchema } from './assets.schemas'
+import { buildFilterParams } from './utils'
 import { z } from 'zod'
 
 export const fetchAssets = createServerFn({ method: 'GET' })
@@ -16,13 +17,7 @@ export const fetchAssets = createServerFn({ method: 'GET' })
     }),
   )
   .handler(async ({ context, data: filters }) => {
-    const params = new URLSearchParams()
-    if (filters.assetType) params.set('assetType', filters.assetType)
-    if (filters.ownerType) params.set('ownerType', filters.ownerType)
-    if (filters.search) params.set('search', filters.search)
-    params.set('page', String(filters.page ?? 1))
-    params.set('pageSize', String(filters.pageSize ?? 50))
-
+    const params = buildFilterParams(filters)
     const data = await apiGet(`/assets?${params.toString()}`, context.token)
     return pagedAssetsSchema.parse(data)
   })

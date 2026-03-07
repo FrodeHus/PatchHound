@@ -7,13 +7,14 @@ import {
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '@/styles/app.css'
 import { getCurrentUser, type CurrentUser } from '@/server/auth.functions'
-import { defaultThemeId, themeStorageKey } from '@/lib/themes'
+import { defaultThemeId, themeStorageKey, themeOptions } from '@/lib/themes'
 
 interface RouterContext {
   user: CurrentUser | null
 }
 
 const queryClient = new QueryClient()
+const darkThemeIds = themeOptions.filter(t => t.mode === 'dark').map(t => t.id)
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
@@ -42,15 +43,7 @@ function RootDocument() {
                 var storageKey = ${JSON.stringify(themeStorageKey)};
                 var fallbackTheme = ${JSON.stringify(defaultThemeId)};
                 var storedTheme = window.localStorage.getItem(storageKey) || fallbackTheme;
-                var darkThemes = new Set([
-                  'patchhound',
-                  'solarized',
-                  'cyberpunk',
-                  'hackthebox',
-                  'catppuccin-frappe',
-                  'catppuccin-macchiato',
-                  'catppuccin-mocha'
-                ]);
+                var darkThemes = new Set(${JSON.stringify(darkThemeIds)});
                 document.documentElement.dataset.theme = storedTheme;
                 document.documentElement.classList.toggle('dark', darkThemes.has(storedTheme));
                 document.documentElement.style.colorScheme = darkThemes.has(storedTheme) ? 'dark' : 'light';

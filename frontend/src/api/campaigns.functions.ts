@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost } from '@/server/api'
 import { pagedCampaignSchema, campaignDetailSchema } from './campaigns.schemas'
+import { buildFilterParams } from './utils'
 import { z } from 'zod'
 
 export const fetchCampaigns = createServerFn({ method: 'GET' })
@@ -14,11 +15,7 @@ export const fetchCampaigns = createServerFn({ method: 'GET' })
     }),
   )
   .handler(async ({ context, data: filters }) => {
-    const params = new URLSearchParams()
-    if (filters.status) params.set('status', filters.status)
-    params.set('page', String(filters.page ?? 1))
-    params.set('pageSize', String(filters.pageSize ?? 50))
-
+    const params = buildFilterParams(filters)
     const data = await apiGet(`/campaigns?${params.toString()}`, context.token)
     return pagedCampaignSchema.parse(data)
   })

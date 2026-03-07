@@ -5,7 +5,11 @@ export const Route = createFileRoute('/api/internal/events')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // Only allow internal calls (from Docker network)
+        const internalToken = request.headers.get('X-Internal-Token')
+        if (!internalToken || internalToken !== process.env.INTERNAL_EVENT_SECRET) {
+          return new Response('Forbidden', { status: 403 })
+        }
+
         const body = await request.json() as {
           event: string
           data: unknown

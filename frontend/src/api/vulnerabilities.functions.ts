@@ -8,6 +8,7 @@ import {
   commentSchema,
 } from './vulnerabilities.schemas'
 import { pagedAuditLogSchema } from './audit-log.schemas'
+import { buildFilterParams } from './utils'
 import { z } from 'zod'
 
 export const fetchVulnerabilities = createServerFn({ method: 'GET' })
@@ -23,14 +24,7 @@ export const fetchVulnerabilities = createServerFn({ method: 'GET' })
     }),
   )
   .handler(async ({ context, data: filters }) => {
-    const params = new URLSearchParams()
-    if (filters.severity) params.set('severity', filters.severity)
-    if (filters.status) params.set('status', filters.status)
-    if (filters.source) params.set('source', filters.source)
-    if (filters.search) params.set('search', filters.search)
-    params.set('page', String(filters.page ?? 1))
-    params.set('pageSize', String(filters.pageSize ?? 25))
-
+    const params = buildFilterParams(filters, { pageSize: 25 })
     const data = await apiGet(`/vulnerabilities?${params.toString()}`, context.token)
     return pagedVulnerabilitySchema.parse(data)
   })

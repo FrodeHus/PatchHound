@@ -12,5 +12,10 @@ export const fetchSetupStatus = createServerFn({ method: 'GET' })
 export const completeSetup = createServerFn({ method: 'POST' })
   .inputValidator(setupPayloadSchema)
   .handler(async ({ data: payload }) => {
+    const status = await apiGet('/setup/status', '')
+    const { isInitialized } = setupStatusSchema.parse(status)
+    if (isInitialized) {
+      throw new Error('Setup has already been completed')
+    }
     await apiPost('/setup/complete', '', payload)
   })
