@@ -45,7 +45,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend-start
+      context: ./frontend
       dockerfile: Dockerfile
     environment:
       NODE_ENV: production

@@ -1,41 +1,40 @@
-import { createRootRoute, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
-import { useEffect } from 'react'
-import { useSetupStatus } from '@/api/useSetup'
-import { AppShell } from '@/components/layout/AppShell'
+import {
+  createRootRouteWithContext,
+  HeadContent,
+  Outlet,
+  Scripts,
+} from '@tanstack/react-router'
+import { getCurrentUser, type CurrentUser } from '@/server/auth.functions'
 
-export const Route = createRootRoute({
-  component: RootLayout,
+interface RouterContext {
+  user: CurrentUser | null
+}
+
+export const Route = createRootRouteWithContext<RouterContext>()({
+  head: () => ({
+    meta: [
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      { title: 'Vigil — Vulnerability Management' },
+    ],
+  }),
+  beforeLoad: async () => {
+    const user = await getCurrentUser()
+    return { user }
+  },
+  component: RootDocument,
 })
 
-function RootLayout() {
-  const navigate = useNavigate()
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const setupStatusQuery = useSetupStatus()
-  const isSetupRoute = pathname.startsWith('/setup')
-  const isInitialized = setupStatusQuery.data?.isInitialized
-
-  useEffect(() => {
-    if (setupStatusQuery.isLoading || setupStatusQuery.isError || isInitialized === undefined) {
-      return
-    }
-
-    if (!isInitialized && !isSetupRoute) {
-      void navigate({ to: '/setup' })
-      return
-    }
-
-    if (isInitialized && isSetupRoute) {
-      void navigate({ to: '/' })
-    }
-  }, [isInitialized, isSetupRoute, navigate, setupStatusQuery.isError, setupStatusQuery.isLoading])
-
-  if (isSetupRoute) {
-    return <Outlet />
-  }
-
+function RootDocument() {
   return (
-    <AppShell>
-      <Outlet />
-    </AppShell>
+    <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
+      <body className="min-h-screen bg-background text-foreground antialiased">
+        <Outlet />
+        <Scripts />
+      </body>
+    </html>
   )
 }

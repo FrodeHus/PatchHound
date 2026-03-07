@@ -1,35 +1,33 @@
 {
-  "name": "frontend",
+  "name": "vigil-frontend",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "dev": "vite dev",
+    "build": "vite build",
+    "start": "node .output/server/index.mjs",
     "test": "vitest run",
-    "preview": "vite preview"
+    "lint": "eslint ."
   },
   "dependencies": {
-    "@azure/msal-browser": "^5.4.0",
-    "@azure/msal-react": "^5.0.6",
-    "@microsoft/signalr": "^10.0.0",
-    "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-router": "^1.166.2",
+    "@tanstack/react-start": "^1.166.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.3.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.577.0",
     "radix-ui": "^1.4.3",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
     "recharts": "^3.7.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.1",
-    "zod": "^4.3.6"
+    "iron-session": "^8.0.4",
+    "openid-client": "^6.4.3"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
+    "@tailwindcss/vite": "^4.2.1",
     "@tanstack/router-plugin": "^1.166.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -37,16 +35,11 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "jsdom": "^28.1.0",
-    "shadcn": "^3.8.5",
-    "tw-animate-css": "^1.4.0",
+    "nitro": "npm:nitro-nightly@latest",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1",
-    "vitest": "^4.0.18"
+    "vite-tsconfig-paths": "^4.3.2",
+    "vitest": "^4.0.18",
+    "jsdom": "^28.1.0"
   }
 }

@@ -71,11 +71,13 @@ public class IngestionService
     {
         // Track which external IDs were seen in this ingestion run
         var seenExternalIds = new HashSet<string>();
+        // Track assets created in this batch to avoid duplicate inserts
+        var pendingAssets = new Dictionary<string, Asset>();
 
         foreach (var result in results)
         {
             seenExternalIds.Add(result.ExternalId);
-            await UpsertVulnerabilityAsync(tenantId, sourceName, result, ct);
+            await UpsertVulnerabilityAsync(tenantId, sourceName, result, pendingAssets, ct);
         }
 
         // Resolve vulnerabilities from this source that were not in the results
@@ -88,6 +90,7 @@ public class IngestionService
         Guid tenantId,
         string sourceName,
         IngestionResult result,
+        Dictionary<string, Asset> pendingAssets,
         CancellationToken ct
     )
     {
@@ -132,7 +135,7 @@ public class IngestionService
         // Process affected assets
         foreach (var affectedAsset in result.AffectedAssets)
         {
-            await UpsertVulnerabilityAssetAsync(tenantId, existing!, affectedAsset, isNew, ct);
+            await UpsertVulnerabilityAssetAsync(tenantId, existing!, affectedAsset, isNew, pendingAssets, ct);
         }
     }
 
@@ -141,16 +144,21 @@ public class IngestionService
         Vulnerability vulnerability,
         IngestionAffectedAsset affectedAsset,
         bool isNewVulnerability,
+        Dictionary<string, Asset> pendingAssets,
         CancellationToken ct
     )
     {
-        // Upsert the Asset
-        var asset = await _dbContext
-            .Assets.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(
-                a => a.ExternalId == affectedAsset.ExternalAssetId && a.TenantId == tenantId,
-                ct
-            );
+        // Upsert the Asset — check pending batch first, then database
+        var assetKey = $"{tenantId}:{affectedAsset.ExternalAssetId}";
+        if (!pendingAssets.TryGetValue(assetKey, out var asset))
+        {
+            asset = await _dbContext
+                .Assets.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(
+                    a => a.ExternalId == affectedAsset.ExternalAssetId && a.TenantId == tenantId,
+                    ct
+                );
+        }
 
         if (asset is null)
         {
@@ -163,6 +171,7 @@ public class IngestionService
             );
 
             await _dbContext.Assets.AddAsync(asset, ct);
+            pendingAssets[assetKey] = asset;
         }
 
         // Check if VulnerabilityAsset already exists
