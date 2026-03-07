@@ -84,6 +84,7 @@ export function AssetManagementTable({
               <th className="py-2 pr-2">Name</th>
               <th className="py-2 pr-2">External ID</th>
               <th className="py-2 pr-2">Type</th>
+              <th className="py-2 pr-2">Security Profile</th>
               <th className="py-2 pr-2">Assigned To</th>
               <th className="py-2 pr-2">Recurring</th>
               <th className="py-2 pr-2">Criticality</th>
@@ -94,7 +95,7 @@ export function AssetManagementTable({
           <tbody>
             {assets.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-3 text-muted-foreground">
+                <td colSpan={9} className="py-3 text-muted-foreground">
                   No assets found.
                 </td>
               </tr>
@@ -120,6 +121,7 @@ export function AssetManagementTable({
                   </td>
                   <td className="py-2 pr-2 font-mono text-xs">{asset.externalId}</td>
                   <td className="py-2 pr-2">{asset.assetType}</td>
+                  <td className="py-2 pr-2">{asset.securityProfileName ?? '-'}</td>
                   <td className="py-2 pr-2">{asset.ownerType === 'Team' ? 'Assignment Group' : asset.ownerType}</td>
                   <td className="py-2 pr-2">
                     {asset.recurringVulnerabilityCount > 0 ? (

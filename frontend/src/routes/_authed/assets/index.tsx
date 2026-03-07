@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { assignAssetOwner, fetchAssetDetail, fetchAssets, setAssetCriticality } from '@/api/assets.functions'
+import { assignAssetOwner, assignAssetSecurityProfile, fetchAssetDetail, fetchAssets, setAssetCriticality } from '@/api/assets.functions'
+import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { AssetDetailPane } from '@/components/features/assets/AssetDetailPane'
 import { AssetManagementTable } from '@/components/features/assets/AssetManagementTable'
 
@@ -43,10 +44,25 @@ function AssetsPage() {
     },
     onSuccess: () => { void router.invalidate() },
   })
+  const securityProfileMutation = useMutation({
+    mutationFn: async (payload: { assetId: string; securityProfileId: string | null }) => {
+      await assignAssetSecurityProfile({ data: payload })
+    },
+    onSuccess: async () => {
+      await router.invalidate()
+      if (selectedAssetId) {
+        await assetDetailQuery.refetch()
+      }
+    },
+  })
   const assetDetailQuery = useQuery({
     queryKey: ['asset', selectedAssetId],
     queryFn: () => fetchAssetDetail({ data: { assetId: selectedAssetId! } }),
     enabled: Boolean(selectedAssetId),
+  })
+  const securityProfilesQuery = useQuery({
+    queryKey: ['security-profiles'],
+    queryFn: () => fetchSecurityProfiles({ data: {} }),
   })
 
   return (
@@ -55,7 +71,7 @@ function AssetsPage() {
       <AssetManagementTable
         assets={assetsQuery.data.items}
         totalCount={assetsQuery.data.totalCount}
-        isUpdating={ownerMutation.isPending || criticalityMutation.isPending}
+        isUpdating={ownerMutation.isPending || criticalityMutation.isPending || securityProfileMutation.isPending}
         selectedAssetId={selectedAssetId}
         assetTypeFilter={assetTypeFilter}
         onAssetTypeFilterChange={(assetType) => {
@@ -72,8 +88,13 @@ function AssetsPage() {
       />
       <AssetDetailPane
         asset={assetDetailQuery.data ?? null}
+        securityProfiles={securityProfilesQuery.data?.items ?? []}
         isLoading={assetDetailQuery.isLoading}
+        isAssigningSecurityProfile={securityProfileMutation.isPending}
         isOpen={selectedAssetId !== null}
+        onAssignSecurityProfile={(assetId, securityProfileId) => {
+          securityProfileMutation.mutate({ assetId, securityProfileId })
+        }}
         onOpenChange={(open) => {
           if (!open) {
             setSelectedAssetId(null)

@@ -12,6 +12,7 @@ public class AssetConfiguration : IEntityTypeConfiguration<Asset>
 
         builder.HasIndex(a => new { a.TenantId, a.ExternalId }).IsUnique();
         builder.HasIndex(a => a.TenantId);
+        builder.HasIndex(a => a.SecurityProfileId);
 
         builder.Property(a => a.ExternalId).HasMaxLength(256).IsRequired();
         builder.Property(a => a.Name).HasMaxLength(256).IsRequired();
@@ -27,5 +28,11 @@ public class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.Property(a => a.Criticality).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.OwnerType).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.Metadata).HasColumnType("text");
+
+        builder
+            .HasOne<AssetSecurityProfile>()
+            .WithMany()
+            .HasForeignKey(a => a.SecurityProfileId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

@@ -17,7 +17,9 @@ export function AffectedAssetsTab({ assets }: AffectedAssetsTabProps) {
             <tr className="border-b border-border text-left text-muted-foreground">
               <th className="py-2 pr-2">Asset</th>
               <th className="py-2 pr-2">Type</th>
+              <th className="py-2 pr-2">Profile</th>
               <th className="py-2 pr-2">Status</th>
+              <th className="py-2 pr-2">Effective Severity</th>
               <th className="py-2 pr-2">Episodes</th>
               <th className="py-2 pr-2">Detected</th>
               <th className="py-2 pr-2">Resolved</th>
@@ -51,7 +53,20 @@ export function AffectedAssetsTab({ assets }: AffectedAssetsTabProps) {
                       </div>
                     </td>
                     <td className="py-2 pr-2">{asset.assetType}</td>
+                    <td className="py-2 pr-2">{asset.securityProfileName ?? '-'}</td>
                     <td className="py-2 pr-2">{asset.status}</td>
+                    <td className="py-2 pr-2">
+                      <div className="space-y-1">
+                        <p>
+                          {asset.effectiveScore
+                            ? `${asset.effectiveSeverity} (${asset.effectiveScore.toFixed(1)})`
+                            : asset.effectiveSeverity}
+                        </p>
+                        {asset.assessmentReasonSummary ? (
+                          <p className="text-xs text-sky-700">{asset.assessmentReasonSummary}</p>
+                        ) : null}
+                      </div>
+                    </td>
                     <td className="py-2 pr-2">
                       <div className="flex flex-wrap gap-1">
                         {asset.episodes.map((episode) => (
@@ -66,7 +81,7 @@ export function AffectedAssetsTab({ assets }: AffectedAssetsTabProps) {
                   </tr>
                   {isExpanded ? (
                     <tr className="border-b border-border/60 bg-muted/10">
-                      <td colSpan={6} className="px-0 py-0">
+                      <td colSpan={8} className="px-0 py-0">
                         <div className="space-y-3 p-4">
                           <div>
                             <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Episode timeline</p>

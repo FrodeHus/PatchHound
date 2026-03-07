@@ -7,6 +7,7 @@ public record AssetDto(
     string AssetType,
     string Criticality,
     string OwnerType,
+    string? SecurityProfileName,
     int VulnerabilityCount,
     int RecurringVulnerabilityCount
 );
@@ -22,6 +23,7 @@ public record AssetDetailDto(
     Guid? OwnerUserId,
     Guid? OwnerTeamId,
     Guid? FallbackTeamId,
+    AssetSecurityProfileSummaryDto? SecurityProfile,
     string? DeviceComputerDnsName,
     string? DeviceHealthStatus,
     string? DeviceOsPlatform,
@@ -40,6 +42,10 @@ public record AssetVulnerabilityDto(
     string ExternalId,
     string Title,
     string VendorSeverity,
+    decimal? VendorScore,
+    string EffectiveSeverity,
+    decimal? EffectiveScore,
+    string? AssessmentReasonSummary,
     string Status,
     DateTimeOffset DetectedDate,
     DateTimeOffset? ResolvedDate,
@@ -70,6 +76,16 @@ public record AssetSoftwareInstallationEpisodeDto(
     DateTimeOffset FirstSeenAt,
     DateTimeOffset LastSeenAt,
     DateTimeOffset? RemovedAt
+);
+
+public record AssetSecurityProfileSummaryDto(
+    Guid Id,
+    string Name,
+    string EnvironmentClass,
+    string InternetReachability,
+    string ConfidentialityRequirement,
+    string IntegrityRequirement,
+    string AvailabilityRequirement
 );
 
 public record AssetFilterQuery(

@@ -13,6 +13,7 @@ public class IngestionService
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly IEnumerable<IVulnerabilitySource> _sources;
+    private readonly VulnerabilityAssessmentService _assessmentService;
     private readonly ILogger<IngestionService> _logger;
 
     // System user ID used as "assignedBy" for auto-created tasks
@@ -21,11 +22,13 @@ public class IngestionService
     public IngestionService(
         PatchHoundDbContext dbContext,
         IEnumerable<IVulnerabilitySource> sources,
+        VulnerabilityAssessmentService assessmentService,
         ILogger<IngestionService> logger
     )
     {
         _dbContext = dbContext;
         _sources = sources;
+        _assessmentService = assessmentService;
         _logger = logger;
     }
 
@@ -358,6 +361,32 @@ public class IngestionService
         {
             await EnsureOpenRemediationTaskAsync(tenantId, vulnerability, asset, ct);
         }
+
+        _assessmentService.UpsertAssessment(
+            tenantId,
+            vulnerability,
+            asset,
+            await ResolveSecurityProfileAsync(asset, tenantId, ct)
+        );
+    }
+
+    private async Task<AssetSecurityProfile?> ResolveSecurityProfileAsync(
+        Asset asset,
+        Guid tenantId,
+        CancellationToken ct
+    )
+    {
+        if (!asset.SecurityProfileId.HasValue)
+        {
+            return null;
+        }
+
+        return await _dbContext
+            .AssetSecurityProfiles.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(
+                profile => profile.Id == asset.SecurityProfileId.Value && profile.TenantId == tenantId,
+                ct
+            );
     }
 
     private static Guid? ResolveAssignee(Asset asset)

@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { AssetDetail } from '@/api/assets.schemas'
+import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import {
   Sheet,
   SheetContent,
@@ -11,8 +12,11 @@ import {
 
 type AssetDetailPaneProps = {
   asset: AssetDetail | null
+  securityProfiles: SecurityProfile[]
   isLoading: boolean
+  isAssigningSecurityProfile: boolean
   isOpen: boolean
+  onAssignSecurityProfile: (assetId: string, securityProfileId: string | null) => void
   onOpenChange: (open: boolean) => void
 }
 
@@ -20,8 +24,11 @@ type MetadataRecord = Record<string, unknown>
 
 export function AssetDetailPane({
   asset,
+  securityProfiles,
   isLoading,
+  isAssigningSecurityProfile,
   isOpen,
+  onAssignSecurityProfile,
   onOpenChange,
 }: AssetDetailPaneProps) {
   const metadata = useMemo(() => parseMetadata(asset?.metadata), [asset?.metadata])
@@ -66,6 +73,13 @@ export function AssetDetailPane({
                     <p className="max-w-2xl text-sm text-muted-foreground">
                       {asset.description ?? getDefaultDescription(asset.assetType)}
                     </p>
+                    <Link
+                      to="/assets/$id"
+                      params={{ id: asset.id }}
+                      className="inline-flex rounded-full border border-border/70 bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/20"
+                    >
+                      Open detail view
+                    </Link>
                   </div>
                   <div className="rounded-xl border border-border/70 bg-background px-3 py-2 text-right">
                     <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -84,6 +98,15 @@ export function AssetDetailPane({
                 )}
                 <DataCard label="Fallback Assignment Group" value={asset.fallbackTeamId ?? 'None'} mono />
               </section>
+
+              {asset.assetType === 'Device' ? (
+                <DeviceSecurityProfileSection
+                  asset={asset}
+                  securityProfiles={securityProfiles}
+                  isAssigningSecurityProfile={isAssigningSecurityProfile}
+                  onAssignSecurityProfile={onAssignSecurityProfile}
+                />
+              ) : null}
 
               {asset.assetType === 'Software' ? (
                 <SoftwareSection metadata={metadata} />
@@ -134,6 +157,25 @@ export function AssetDetailPane({
                             <p className="mt-1 text-xs text-muted-foreground">
                               {vulnerability.externalId} • {vulnerability.vendorSeverity} • {vulnerability.status}
                             </p>
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              <DataCard
+                                label="Vendor Severity"
+                                value={vulnerability.vendorScore
+                                  ? `${vulnerability.vendorSeverity} (${vulnerability.vendorScore.toFixed(1)})`
+                                  : vulnerability.vendorSeverity}
+                              />
+                              <DataCard
+                                label="Effective Severity"
+                                value={vulnerability.effectiveScore
+                                  ? `${vulnerability.effectiveSeverity} (${vulnerability.effectiveScore.toFixed(1)})`
+                                  : vulnerability.effectiveSeverity}
+                              />
+                            </div>
+                            {vulnerability.assessmentReasonSummary ? (
+                              <p className="mt-2 text-xs text-sky-700">
+                                {vulnerability.assessmentReasonSummary}
+                              </p>
+                            ) : null}
                             {vulnerability.possibleCorrelatedSoftware.length > 0 ? (
                               <p className="mt-2 text-xs text-amber-700">
                                 Possible correlation: {vulnerability.possibleCorrelatedSoftware.join(', ')}
@@ -161,6 +203,57 @@ export function AssetDetailPane({
         </div>
       </SheetContent>
     </Sheet>
+  )
+}
+
+function DeviceSecurityProfileSection({
+  asset,
+  securityProfiles,
+  isAssigningSecurityProfile,
+  onAssignSecurityProfile,
+}: {
+  asset: AssetDetail
+  securityProfiles: SecurityProfile[]
+  isAssigningSecurityProfile: boolean
+  onAssignSecurityProfile: (assetId: string, securityProfileId: string | null) => void
+}) {
+  return (
+    <section className="rounded-2xl border border-border/70 bg-card p-4">
+      <SectionHeader
+        eyebrow="Security profile"
+        title="Environmental severity profile"
+        description="Apply a reusable device environment profile to recalculate effective vulnerability severity."
+      />
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+        <select
+          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={asset.securityProfile?.id ?? ''}
+          onChange={(event) => {
+            onAssignSecurityProfile(asset.id, event.target.value || null)
+          }}
+          disabled={isAssigningSecurityProfile}
+        >
+          <option value="">No security profile</option>
+          {securityProfiles.map((profile) => (
+            <option key={profile.id} value={profile.id}>
+              {profile.name} • {profile.internetReachability}
+            </option>
+          ))}
+        </select>
+        <div className="rounded-xl border border-border/70 bg-background px-3 py-3 text-sm text-muted-foreground">
+          {isAssigningSecurityProfile ? 'Applying profile...' : asset.securityProfile?.name ?? 'Using vendor severity only'}
+        </div>
+      </div>
+      {asset.securityProfile ? (
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <DataCard label="Environment Class" value={asset.securityProfile.environmentClass} />
+          <DataCard label="Reachability" value={asset.securityProfile.internetReachability} />
+          <DataCard label="Confidentiality Requirement" value={asset.securityProfile.confidentialityRequirement} />
+          <DataCard label="Integrity Requirement" value={asset.securityProfile.integrityRequirement} />
+          <DataCard label="Availability Requirement" value={asset.securityProfile.availabilityRequirement} />
+        </div>
+      ) : null}
+    </section>
   )
 }
 

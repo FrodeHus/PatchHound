@@ -21,12 +21,14 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<AssetSecurityProfile> AssetSecurityProfiles => Set<AssetSecurityProfile>();
     public DbSet<DeviceSoftwareInstallation> DeviceSoftwareInstallations => Set<DeviceSoftwareInstallation>();
     public DbSet<DeviceSoftwareInstallationEpisode> DeviceSoftwareInstallationEpisodes =>
         Set<DeviceSoftwareInstallationEpisode>();
     public DbSet<Vulnerability> Vulnerabilities => Set<Vulnerability>();
     public DbSet<VulnerabilityAsset> VulnerabilityAssets => Set<VulnerabilityAsset>();
     public DbSet<VulnerabilityAssetEpisode> VulnerabilityAssetEpisodes => Set<VulnerabilityAssetEpisode>();
+    public DbSet<VulnerabilityAssetAssessment> VulnerabilityAssetAssessments => Set<VulnerabilityAssetAssessment>();
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
     public DbSet<RemediationTask> RemediationTasks => Set<RemediationTask>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
@@ -67,6 +69,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         // Referencing the instance property ensures EF Core re-evaluates per query.
         modelBuilder.Entity<Asset>().HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
+            .Entity<AssetSecurityProfile>()
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
             .Entity<DeviceSoftwareInstallation>()
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
@@ -77,6 +82,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<VulnerabilityAssetEpisode>()
+            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<VulnerabilityAssetAssessment>()
             .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<RemediationTask>()

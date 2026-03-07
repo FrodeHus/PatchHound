@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Building2, ChevronRight, Settings2, ShieldCheck, Users } from 'lucide-react'
+import { Building2, ChevronRight, Settings2, ShieldCheck, ShieldEllipsis, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({
@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_authed/admin/')({
 type AdminArea = {
   title: string
   description: string
-  to: '/admin/users' | '/admin/teams' | '/admin/tenants'
+  to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/security-profiles'
   roles: Array<'GlobalAdmin' | 'SecurityManager'>
   icon: typeof Users
 }
@@ -35,6 +35,13 @@ const adminAreas: AdminArea[] = [
     to: '/admin/tenants',
     roles: ['GlobalAdmin', 'SecurityManager'],
     icon: Building2,
+  },
+  {
+    title: 'Security Profiles',
+    description: 'Create reusable device environment profiles used to recalculate effective vulnerability severity.',
+    to: '/admin/security-profiles',
+    roles: ['GlobalAdmin', 'SecurityManager'],
+    icon: ShieldEllipsis,
   },
 ]
 

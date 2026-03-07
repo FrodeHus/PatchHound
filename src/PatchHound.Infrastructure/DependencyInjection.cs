@@ -53,6 +53,8 @@ public static class DependencyInjection
         services.AddScoped<TeamService>();
         services.AddScoped<AiReportService>();
         services.AddScoped<ISetupService, SetupService>();
+        services.AddScoped<EnvironmentalSeverityCalculator>();
+        services.AddScoped<VulnerabilityAssessmentService>();
 
         // Notifications & Email
         services.AddScoped<INotificationService, EmailNotificationService>();

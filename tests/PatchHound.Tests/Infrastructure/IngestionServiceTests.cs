@@ -36,10 +36,14 @@ public class IngestionServiceTests : IDisposable
 
         _source = Substitute.For<IVulnerabilitySource>();
         _source.SourceKey.Returns("test-source");
-        _source.SourceName.Returns("TestSource");
+       _source.SourceName.Returns("TestSource");
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        _service = new IngestionService(_dbContext, new[] { _source }, logger);
+        var assessmentService = new VulnerabilityAssessmentService(
+            _dbContext,
+            new EnvironmentalSeverityCalculator()
+        );
+        _service = new IngestionService(_dbContext, new[] { _source }, assessmentService, logger);
     }
 
     [Fact]
@@ -201,6 +205,56 @@ public class IngestionServiceTests : IDisposable
         vulns[0].Title.Should().Be("Updated Title");
         vulns[0].VendorSeverity.Should().Be(Severity.High);
         vulns[0].CvssScore.Should().Be(7.5m);
+    }
+
+    [Fact]
+    public async Task ProcessResults_WithSecurityProfile_CreatesAssessment()
+    {
+        var profile = AssetSecurityProfile.Create(
+            _tenantId,
+            "Internal only",
+            null,
+            EnvironmentClass.Server,
+            InternetReachability.LocalOnly,
+            SecurityRequirementLevel.Medium,
+            SecurityRequirementLevel.Medium,
+            SecurityRequirementLevel.Medium
+        );
+        var asset = Asset.Create(
+            _tenantId,
+            "ASSET-ENV-1",
+            AssetType.Device,
+            "ServerEnv",
+            Criticality.High
+        );
+        asset.AssignSecurityProfile(profile.Id);
+
+        await _dbContext.AssetSecurityProfiles.AddAsync(profile);
+        await _dbContext.Assets.AddAsync(asset);
+        await _dbContext.SaveChangesAsync();
+
+        var results = new List<IngestionResult>
+        {
+            new(
+                "CVE-2025-ENV-1",
+                "Reachability test",
+                "Desc",
+                Severity.Critical,
+                9.8m,
+                "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                DateTimeOffset.UtcNow,
+                new List<IngestionAffectedAsset> { new("ASSET-ENV-1", "ServerEnv", AssetType.Device) }
+            ),
+        };
+
+        await _service.ProcessResultsAsync(_tenantId, "TestSource", results, CancellationToken.None);
+
+        var assessment = await _dbContext
+            .VulnerabilityAssetAssessments.IgnoreQueryFilters()
+            .SingleAsync(item => item.AssetId == asset.Id);
+
+        assessment.AssetSecurityProfileId.Should().Be(profile.Id);
+        assessment.EffectiveScore.Should().BeLessThan(9.8m);
     }
 
     [Fact]

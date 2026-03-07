@@ -64,6 +64,22 @@ public class AssetService
         return Result<Asset>.Success(asset);
     }
 
+    public async Task<Result<Asset>> AssignSecurityProfileAsync(
+        Guid assetId,
+        Guid? securityProfileId,
+        CancellationToken ct
+    )
+    {
+        var asset = await _assetRepository.GetByIdAsync(assetId, ct);
+        if (asset is null)
+            return Result<Asset>.Failure("Asset not found");
+
+        asset.AssignSecurityProfile(securityProfileId);
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        return Result<Asset>.Success(asset);
+    }
+
     public async Task<Result<int>> BulkAssignOwnerAsync(
         IReadOnlyList<Guid> assetIds,
         Guid ownerId,
