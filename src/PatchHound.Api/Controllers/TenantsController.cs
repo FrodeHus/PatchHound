@@ -45,7 +45,7 @@ public class TenantsController : ControllerBase
         var items = await query
             .OrderBy(t => t.Name)
             .Skip(pagination.Skip)
-            .Take(pagination.PageSize)
+            .Take(pagination.BoundedPageSize)
             .Select(t => new
             {
                 t.Id,
@@ -180,6 +180,10 @@ public class TenantsController : ControllerBase
         CancellationToken ct
     )
     {
+        // Validate that settings is valid JSON with expected structure
+        if (!TenantSourceSettings.IsValidSettingsJson(request.Settings))
+            return ValidationProblem("Settings must be a valid JSON object.");
+
         var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tenant is null)
             return NotFound();

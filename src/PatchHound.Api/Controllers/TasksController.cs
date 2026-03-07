@@ -61,7 +61,7 @@ public class TasksController : ControllerBase
         var items = await query
             .OrderBy(t => t.DueDate)
             .Skip(pagination.Skip)
-            .Take(pagination.PageSize)
+            .Take(pagination.BoundedPageSize)
             .Select(t => new RemediationTaskDto(
                 t.Id,
                 t.VulnerabilityId,

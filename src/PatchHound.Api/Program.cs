@@ -17,9 +17,7 @@ using PatchHound.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 var azureAdConfig = builder.Configuration.GetSection("AzureAd");
-var jwtLogPii =
-    builder.Environment.IsDevelopment()
-    || builder.Configuration.GetValue<bool>("AzureAd:EnablePiiLogging");
+var jwtLogPii = builder.Environment.IsDevelopment();
 
 if (jwtLogPii)
 {
@@ -305,6 +303,20 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = 429;
 });
 
+// CORS
+var frontendOrigin = builder.Configuration["Frontend:Origin"];
+if (!string.IsNullOrWhiteSpace(frontendOrigin))
+{
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+            policy.WithOrigins(frontendOrigin)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials());
+    });
+}
+
 // OpenAPI
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
@@ -322,9 +334,28 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+else
+{
+    app.UseHsts();
+}
 
 app.UseMiddleware<ExceptionHandlerMiddleware>();
 app.UseHttpsRedirection();
+
+// Security headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    await next();
+});
+
+if (!string.IsNullOrWhiteSpace(frontendOrigin))
+{
+    app.UseCors();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();

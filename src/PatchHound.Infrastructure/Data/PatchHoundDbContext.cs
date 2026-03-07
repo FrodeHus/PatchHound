@@ -33,6 +33,18 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AIReport> AIReports => Set<AIReport>();
 
+    public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken ct = default)
+    {
+        var transaction = await Database.BeginTransactionAsync(ct);
+        return new EfTransaction(transaction);
+    }
+
+    private sealed class EfTransaction(Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction inner) : IUnitOfWorkTransaction
+    {
+        public Task CommitAsync(CancellationToken ct = default) => inner.CommitAsync(ct);
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
+    }
+
     // Resolved lazily to break the circular dependency:
     // PatchHoundDbContext → ITenantContext → TenantContext → PatchHoundDbContext.
     // IServiceProvider is not traced by DI cycle detection.

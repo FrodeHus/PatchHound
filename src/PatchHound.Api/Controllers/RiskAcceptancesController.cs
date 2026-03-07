@@ -54,7 +54,7 @@ public class RiskAcceptancesController : ControllerBase
         var items = await query
             .OrderByDescending(r => r.RequestedAt)
             .Skip(pagination.Skip)
-            .Take(pagination.PageSize)
+            .Take(pagination.BoundedPageSize)
             .Select(r => new RiskAcceptanceDto(
                 r.Id,
                 r.VulnerabilityId,

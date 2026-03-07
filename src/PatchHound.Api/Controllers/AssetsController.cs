@@ -60,7 +60,7 @@ public class AssetsController : ControllerBase
         var items = await query
             .OrderBy(a => a.Name)
             .Skip(pagination.Skip)
-            .Take(pagination.PageSize)
+            .Take(pagination.BoundedPageSize)
             .Select(a => new AssetDto(
                 a.Id,
                 a.ExternalId,

@@ -50,7 +50,7 @@ public class AuditLogController : ControllerBase
         var items = await query
             .OrderByDescending(e => e.Timestamp)
             .Skip(pagination.Skip)
-            .Take(pagination.PageSize)
+            .Take(pagination.BoundedPageSize)
             .Select(e => new AuditLogDto(
                 e.Id,
                 e.TenantId,

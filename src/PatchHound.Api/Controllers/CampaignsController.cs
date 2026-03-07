@@ -55,7 +55,7 @@ public class CampaignsController : ControllerBase
         var items = await query
             .OrderByDescending(c => c.CreatedAt)
             .Skip(pagination.Skip)
-            .Take(pagination.PageSize)
+            .Take(pagination.BoundedPageSize)
             .Select(c => new CampaignDto(
                 c.Id,
                 c.Name,

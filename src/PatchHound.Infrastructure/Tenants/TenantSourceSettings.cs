@@ -54,6 +54,22 @@ public static class TenantSourceSettings
         return settings.ToJsonString(JsonOptions);
     }
 
+    public static bool IsValidSettingsJson(string settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings))
+            return false;
+
+        try
+        {
+            var node = JsonNode.Parse(settings);
+            return node is JsonObject;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
     public static bool HasConfiguredCredentials(PersistedSourceCredentials? credentials)
     {
         return !string.IsNullOrWhiteSpace(credentials?.TenantId)

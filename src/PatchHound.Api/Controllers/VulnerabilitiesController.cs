@@ -69,7 +69,7 @@ public class VulnerabilitiesController : ControllerBase
             .OrderByDescending(v => v.CvssScore)
             .ThenByDescending(v => v.PublishedDate)
             .Skip(pagination.Skip)
-            .Take(pagination.PageSize)
+            .Take(pagination.BoundedPageSize)
             .Select(v => new VulnerabilityDto(
                 v.Id,
                 v.ExternalId,
