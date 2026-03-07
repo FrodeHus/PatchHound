@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import type { TopVulnerability } from '@/api/dashboard.schemas'
+import type { DashboardSummary, TopVulnerability } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -13,9 +13,10 @@ import {
 
 type CriticalVulnerabilitiesProps = {
   items: TopVulnerability[]
+  summary: DashboardSummary
 }
 
-export function CriticalVulnerabilities({ items }: CriticalVulnerabilitiesProps) {
+export function CriticalVulnerabilities({ items, summary }: CriticalVulnerabilitiesProps) {
   const navigate = useNavigate()
 
   return (
@@ -32,6 +33,22 @@ export function CriticalVulnerabilities({ items }: CriticalVulnerabilitiesProps)
         </div>
       </CardHeader>
       <CardContent className="overflow-x-auto p-5 pt-1">
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-border/70 bg-background/35 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Recurring vulnerabilities</p>
+            <p className="mt-2 text-2xl font-semibold">{summary.recurringVulnerabilityCount}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{summary.recurrenceRatePercent}% of tracked vulnerability-asset histories have recurred.</p>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-background/35 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Top recurring asset</p>
+            <p className="mt-2 text-sm font-semibold">{summary.topRecurringAssets[0]?.name ?? 'No recurring assets yet'}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {summary.topRecurringAssets[0]
+                ? `${summary.topRecurringAssets[0].recurringVulnerabilityCount} recurring vulnerabilities`
+                : 'Waiting for recurrence history.'}
+            </p>
+          </div>
+        </div>
         <Table className="min-w-[520px]">
           <TableHeader>
             <TableRow className="border-border/60 hover:bg-transparent">
@@ -83,6 +100,31 @@ export function CriticalVulnerabilities({ items }: CriticalVulnerabilitiesProps)
             )}
           </TableBody>
         </Table>
+        {summary.topRecurringVulnerabilities.length > 0 ? (
+          <div className="mt-5 rounded-2xl border border-border/70 bg-background/35 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Top recurring CVEs</p>
+            <div className="mt-3 space-y-2">
+              {summary.topRecurringVulnerabilities.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-left hover:bg-accent/20"
+                  onClick={() => {
+                    void navigate({ to: '/vulnerabilities/$id', params: { id: item.id } })
+                  }}
+                >
+                  <div>
+                    <p className="text-sm font-medium">{item.externalId}</p>
+                    <p className="text-xs text-muted-foreground">{item.title}</p>
+                  </div>
+                  <Badge variant="outline" className="rounded-full border-amber-300/70 bg-amber-50 text-amber-900">
+                    {item.reappearanceCount}x
+                  </Badge>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )

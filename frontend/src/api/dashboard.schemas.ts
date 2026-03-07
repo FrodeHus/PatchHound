@@ -19,6 +19,21 @@ export const dashboardSummarySchema = z.object({
   totalTaskCount: z.number(),
   averageRemediationDays: z.number(),
   topCriticalVulnerabilities: z.array(topVulnerabilitySchema),
+  recurringVulnerabilityCount: z.number(),
+  recurrenceRatePercent: z.number(),
+  topRecurringVulnerabilities: z.array(z.object({
+    id: z.string().uuid(),
+    externalId: z.string(),
+    title: z.string(),
+    episodeCount: z.number(),
+    reappearanceCount: z.number(),
+  })),
+  topRecurringAssets: z.array(z.object({
+    assetId: z.string().uuid(),
+    name: z.string(),
+    assetType: z.string(),
+    recurringVulnerabilityCount: z.number(),
+  })),
 })
 
 export const trendItemSchema = z.object({

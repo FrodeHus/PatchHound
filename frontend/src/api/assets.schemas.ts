@@ -8,6 +8,7 @@ export const assetSchema = z.object({
   criticality: z.string(),
   ownerType: z.string(),
   vulnerabilityCount: z.number(),
+  recurringVulnerabilityCount: z.number(),
 })
 
 export const assetVulnerabilitySchema = z.object({
@@ -18,6 +19,15 @@ export const assetVulnerabilitySchema = z.object({
   status: z.string(),
   detectedDate: z.string(),
   resolvedDate: z.string().nullable(),
+  episodeCount: z.number(),
+  episodes: z.array(z.object({
+    episodeNumber: z.number(),
+    status: z.string(),
+    firstSeenAt: z.string(),
+    lastSeenAt: z.string(),
+    resolvedAt: z.string().nullable(),
+  })),
+  possibleCorrelatedSoftware: z.array(z.string()),
 })
 
 export const assetDetailSchema = z.object({
@@ -41,6 +51,19 @@ export const assetDetailSchema = z.object({
   deviceAadDeviceId: z.string().nullable(),
   metadata: z.string(),
   vulnerabilities: z.array(assetVulnerabilitySchema),
+  softwareInventory: z.array(z.object({
+    softwareAssetId: z.string().uuid(),
+    name: z.string(),
+    externalId: z.string(),
+    lastSeenAt: z.string(),
+    episodeCount: z.number(),
+    episodes: z.array(z.object({
+      episodeNumber: z.number(),
+      firstSeenAt: z.string(),
+      lastSeenAt: z.string(),
+      removedAt: z.string().nullable(),
+    })),
+  })),
 })
 
 export const pagedAssetsSchema = z.object({

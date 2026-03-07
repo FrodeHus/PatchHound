@@ -45,6 +45,18 @@ function formatChartData(data: TrendData): ChartPoint[] {
   return Array.from(map.values())
 }
 
+function formatAxisDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+  }).format(date)
+}
+
 export function TrendChart({ data }: TrendChartProps) {
   const points = formatChartData(data)
   const legend = [
@@ -59,7 +71,7 @@ export function TrendChart({ data }: TrendChartProps) {
       <CardHeader className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Trendline</p>
-          <CardTitle className="mt-2 text-xl font-semibold tracking-tight">Open vulnerabilities over 12 months</CardTitle>
+          <CardTitle className="mt-2 text-xl font-semibold tracking-tight">Open vulnerability trend over 90 days</CardTitle>
         </div>
         <div className="flex flex-wrap gap-2">
           {legend.map((item) => (
@@ -75,9 +87,17 @@ export function TrendChart({ data }: TrendChartProps) {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={points}>
             <CartesianGrid vertical={false} stroke="color-mix(in oklab, var(--border) 85%, transparent)" />
-            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} />
+            <XAxis
+              dataKey="date"
+              tickFormatter={formatAxisDate}
+              minTickGap={24}
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }}
+            />
             <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} />
             <Tooltip
+              labelFormatter={(value) => formatAxisDate(String(value))}
               contentStyle={{
                 background: 'var(--color-popover)',
                 border: '1px solid color-mix(in oklab, var(--border) 90%, transparent)',

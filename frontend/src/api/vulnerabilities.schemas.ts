@@ -12,6 +12,9 @@ export const vulnerabilitySchema = z.object({
   publishedDate: isoDateTimeSchema.nullable(),
   affectedAssetCount: z.number(),
   adjustedSeverity: z.string().nullable(),
+  episodeCount: z.number(),
+  reappearanceCount: z.number(),
+  hasRecentReappearance: z.boolean(),
 })
 
 export const pagedVulnerabilitySchema = z.object({
@@ -26,6 +29,15 @@ export const affectedAssetSchema = z.object({
   status: z.string(),
   detectedDate: isoDateTimeSchema,
   resolvedDate: isoDateTimeSchema.nullable(),
+  episodeCount: z.number(),
+  episodes: z.array(z.object({
+    episodeNumber: z.number(),
+    status: z.string(),
+    firstSeenAt: isoDateTimeSchema,
+    lastSeenAt: isoDateTimeSchema,
+    resolvedAt: isoDateTimeSchema.nullable(),
+  })),
+  possibleCorrelatedSoftware: z.array(z.string()),
 })
 
 export const orgSeveritySchema = z.object({
@@ -48,6 +60,16 @@ export const vulnerabilityDetailSchema = z.object({
   cvssScore: z.number().nullable(),
   cvssVector: z.string().nullable(),
   publishedDate: isoDateTimeSchema.nullable(),
+  tenantHistory: z.object({
+    firstSeenAt: isoDateTimeSchema.nullable(),
+    lastSeenAt: isoDateTimeSchema.nullable(),
+    lastGoneAt: isoDateTimeSchema.nullable(),
+    lastReappearedAt: isoDateTimeSchema.nullable(),
+    currentlyPresent: z.boolean(),
+    openAssetCount: z.number(),
+    episodeCount: z.number(),
+    reappearanceCount: z.number(),
+  }),
   affectedAssets: z.array(affectedAssetSchema),
   organizationalSeverity: orgSeveritySchema.nullable(),
 })

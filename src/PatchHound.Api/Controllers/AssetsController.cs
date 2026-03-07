@@ -57,22 +57,63 @@ public class AssetsController : ControllerBase
 
         var totalCount = await query.CountAsync(ct);
 
-        var items = await query
+        var assetIds = await query
             .OrderBy(a => a.Name)
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
+            .Select(a => a.Id)
+            .ToListAsync(ct);
+
+        var recurringCounts = await _dbContext
+            .VulnerabilityAssetEpisodes.AsNoTracking()
+            .Where(episode => assetIds.Contains(episode.AssetId))
+            .GroupBy(episode => new { episode.AssetId, episode.VulnerabilityId })
+            .Select(group => new
+            {
+                group.Key.AssetId,
+                IsRecurring = group.Count() > 1,
+            })
+            .Where(item => item.IsRecurring)
+            .GroupBy(item => item.AssetId)
+            .Select(group => new
+            {
+                AssetId = group.Key,
+                Count = group.Count(),
+            })
+            .ToListAsync(ct);
+
+        var recurringCountsByAssetId = recurringCounts.ToDictionary(item => item.AssetId, item => item.Count);
+
+        var itemRows = await query
+            .OrderBy(a => a.Name)
+            .Skip(pagination.Skip)
+            .Take(pagination.BoundedPageSize)
+            .Select(a => new
+            {
+                a.Id,
+                a.ExternalId,
+                Name = a.AssetType == AssetType.Device
+                    ? a.DeviceComputerDnsName ?? a.Name
+                    : a.Name,
+                AssetType = a.AssetType.ToString(),
+                Criticality = a.Criticality.ToString(),
+                OwnerType = a.OwnerType.ToString(),
+                VulnerabilityCount = _dbContext.VulnerabilityAssets.Count(va => va.AssetId == a.Id),
+            })
+            .ToListAsync(ct);
+
+        var items = itemRows
             .Select(a => new AssetDto(
                 a.Id,
                 a.ExternalId,
-                a.AssetType == AssetType.Device
-                    ? a.DeviceComputerDnsName ?? a.Name
-                    : a.Name,
-                a.AssetType.ToString(),
-                a.Criticality.ToString(),
-                a.OwnerType.ToString(),
-                _dbContext.VulnerabilityAssets.Count(va => va.AssetId == a.Id)
+                a.Name,
+                a.AssetType,
+                a.Criticality,
+                a.OwnerType,
+                a.VulnerabilityCount,
+                recurringCountsByAssetId.TryGetValue(a.Id, out var recurringCount) ? recurringCount : 0
             ))
-            .ToListAsync(ct);
+            .ToList();
 
         return Ok(new PagedResponse<AssetDto>(items, totalCount));
     }
@@ -85,25 +126,160 @@ public class AssetsController : ControllerBase
         if (asset is null)
             return NotFound();
 
-        var vulnerabilities = await _dbContext
+        var episodeRows = await _dbContext
+            .VulnerabilityAssetEpisodes.AsNoTracking()
+            .Where(episode => episode.AssetId == id)
+            .OrderBy(episode => episode.VulnerabilityId)
+            .ThenBy(episode => episode.EpisodeNumber)
+            .Select(episode => new
+            {
+                episode.VulnerabilityId,
+                episode.EpisodeNumber,
+                episode.Status,
+                episode.FirstSeenAt,
+                episode.LastSeenAt,
+                episode.ResolvedAt,
+            })
+            .ToListAsync(ct);
+
+        var episodesByVulnerabilityId = episodeRows
+            .GroupBy(row => row.VulnerabilityId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(row => new AssetVulnerabilityEpisodeDto(
+                        row.EpisodeNumber,
+                        row.Status.ToString(),
+                        row.FirstSeenAt,
+                        row.LastSeenAt,
+                        row.ResolvedAt
+                    ))
+                    .ToList() as IReadOnlyList<AssetVulnerabilityEpisodeDto>
+            );
+
+        var softwareEpisodeRows = await _dbContext
+            .DeviceSoftwareInstallationEpisodes.AsNoTracking()
+            .Where(episode => episode.DeviceAssetId == id)
+            .OrderBy(episode => episode.SoftwareAssetId)
+            .ThenBy(episode => episode.EpisodeNumber)
+            .Select(episode => new
+            {
+                episode.SoftwareAssetId,
+                episode.EpisodeNumber,
+                episode.FirstSeenAt,
+                episode.LastSeenAt,
+                episode.RemovedAt,
+            })
+            .ToListAsync(ct);
+
+        var softwareEpisodesByAssetId = softwareEpisodeRows
+            .GroupBy(row => row.SoftwareAssetId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(row => new AssetSoftwareInstallationEpisodeDto(
+                        row.EpisodeNumber,
+                        row.FirstSeenAt,
+                        row.LastSeenAt,
+                        row.RemovedAt
+                    ))
+                    .ToList() as IReadOnlyList<AssetSoftwareInstallationEpisodeDto>
+            );
+
+        var softwareRows = await _dbContext
+            .DeviceSoftwareInstallations.AsNoTracking()
+            .Where(link => link.DeviceAssetId == id)
+            .Join(
+                _dbContext.Assets,
+                link => link.SoftwareAssetId,
+                software => software.Id,
+                (link, software) => new
+                {
+                    software.Id,
+                    software.Name,
+                    software.ExternalId,
+                    link.LastSeenAt,
+                }
+            )
+            .ToListAsync(ct);
+
+        var softwareNamesByAssetId = softwareRows.ToDictionary(row => row.Id, row => row.Name);
+
+        var possibleCorrelationsByVulnerabilityId = episodeRows
+            .GroupBy(row => row.VulnerabilityId)
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                    softwareEpisodeRows
+                        .Where(softwareEpisode =>
+                            group.Any(vulnerabilityEpisode =>
+                                softwareEpisode.FirstSeenAt <= vulnerabilityEpisode.FirstSeenAt
+                                && (softwareEpisode.RemovedAt is null
+                                    || softwareEpisode.RemovedAt >= vulnerabilityEpisode.FirstSeenAt)
+                            )
+                        )
+                        .Select(softwareEpisode =>
+                            softwareNamesByAssetId.TryGetValue(softwareEpisode.SoftwareAssetId, out var name)
+                                ? name
+                                : null
+                        )
+                        .Where(name => !string.IsNullOrWhiteSpace(name))
+                        .Cast<string>()
+                        .Distinct(StringComparer.Ordinal)
+                        .ToList() as IReadOnlyList<string>
+            );
+
+        var vulnerabilityRows = await _dbContext
             .VulnerabilityAssets.AsNoTracking()
             .Where(va => va.AssetId == id)
             .Join(
                 _dbContext.Vulnerabilities,
                 va => va.VulnerabilityId,
                 v => v.Id,
-                (va, v) =>
-                    new AssetVulnerabilityDto(
-                        v.Id,
-                        v.ExternalId,
-                        v.Title,
-                        v.VendorSeverity.ToString(),
-                        va.Status.ToString(),
-                        va.DetectedDate,
-                        va.ResolvedDate
-                    )
+                (va, v) => new
+                {
+                    v.Id,
+                    v.ExternalId,
+                    v.Title,
+                    VendorSeverity = v.VendorSeverity.ToString(),
+                    Status = va.Status.ToString(),
+                    va.DetectedDate,
+                    va.ResolvedDate,
+                }
             )
             .ToListAsync(ct);
+
+        var vulnerabilities = vulnerabilityRows
+            .Select(row => new AssetVulnerabilityDto(
+                row.Id,
+                row.ExternalId,
+                row.Title,
+                row.VendorSeverity,
+                row.Status,
+                row.DetectedDate,
+                row.ResolvedDate,
+                episodesByVulnerabilityId.TryGetValue(row.Id, out var episodes) ? episodes.Count : 0,
+                episodesByVulnerabilityId.TryGetValue(row.Id, out var episodeHistory)
+                    ? episodeHistory
+                    : [],
+                possibleCorrelationsByVulnerabilityId.TryGetValue(row.Id, out var correlatedSoftware)
+                    ? correlatedSoftware
+                    : []
+            ))
+            .ToList();
+
+        var softwareInventory = softwareRows
+            .Select(row => new AssetSoftwareInstallationDto(
+                row.Id,
+                row.Name,
+                row.ExternalId,
+                row.LastSeenAt,
+                softwareEpisodesByAssetId.TryGetValue(row.Id, out var episodes) ? episodes.Count : 0,
+                softwareEpisodesByAssetId.TryGetValue(row.Id, out var episodeHistory)
+                    ? episodeHistory
+                    : []
+            ))
+            .ToList();
 
         return Ok(
             new AssetDetailDto(
@@ -126,7 +302,8 @@ public class AssetsController : ControllerBase
                 asset.DeviceLastIpAddress,
                 asset.DeviceAadDeviceId,
                 asset.Metadata,
-                vulnerabilities
+                vulnerabilities,
+                softwareInventory
             )
         );
     }
