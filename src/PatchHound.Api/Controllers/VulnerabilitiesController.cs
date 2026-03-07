@@ -28,6 +28,7 @@ public class VulnerabilitiesController : ControllerBase
     private sealed record SoftwareCorrelationRow(
         Guid DeviceAssetId,
         string Name,
+        int EpisodeNumber,
         DateTimeOffset FirstSeenAt,
         DateTimeOffset? RemovedAt
     );
@@ -245,6 +246,7 @@ public class VulnerabilitiesController : ControllerBase
                 (episode, software) => new SoftwareCorrelationRow(
                     episode.DeviceAssetId,
                     software.Name,
+                    episode.EpisodeNumber,
                     episode.FirstSeenAt,
                     episode.RemovedAt
                 )
@@ -390,14 +392,59 @@ public class VulnerabilitiesController : ControllerBase
     )
     {
         return softwareRows
-            .Where(softwareRow =>
-                episodes.Any(episode =>
-                    softwareRow.FirstSeenAt <= episode.FirstSeenAt
-                    && (softwareRow.RemovedAt is null || softwareRow.RemovedAt >= episode.FirstSeenAt)
-                )
-            )
-            .Select(softwareRow => (string)softwareRow.Name)
-            .Distinct(StringComparer.Ordinal)
+            .Select(softwareRow =>
+            {
+                var matchingEpisodes = episodes
+                    .Where(episode =>
+                        softwareRow.FirstSeenAt <= episode.FirstSeenAt
+                        && (softwareRow.RemovedAt is null
+                            || softwareRow.RemovedAt >= episode.FirstSeenAt)
+                    )
+                    .Select(episode =>
+                    {
+                        var age = episode.FirstSeenAt - softwareRow.FirstSeenAt;
+                        var score = 0;
+
+                        if (softwareRow.EpisodeNumber > 1)
+                        {
+                            score += 200;
+                        }
+
+                        if (episode.EpisodeNumber > 1)
+                        {
+                            score += 100;
+                        }
+
+                        score += age.TotalDays switch
+                        {
+                            <= 1 => 80,
+                            <= 7 => 50,
+                            <= 30 => 20,
+                            _ => 0,
+                        };
+
+                        return new
+                        {
+                            softwareRow.Name,
+                            Score = score,
+                            Age = age,
+                        };
+                    })
+                    .OrderByDescending(item => item.Score)
+                    .ThenBy(item => item.Age)
+                    .FirstOrDefault();
+
+                return matchingEpisodes;
+            })
+            .Where(item => item is not null)
+            .GroupBy(item => item!.Name, StringComparer.Ordinal)
+            .Select(group => group
+                .OrderByDescending(item => item!.Score)
+                .ThenBy(item => item!.Age)
+                .First())
+            .OrderByDescending(item => item!.Score)
+            .ThenBy(item => item!.Age)
+            .Select(item => item!.Name)
             .ToList();
     }
 
