@@ -63,7 +63,7 @@ internal class WorkerTenantContext : ITenantContext
     public Guid? CurrentTenantId => null;
 
     public IReadOnlyList<Guid> AccessibleTenantIds =>
-        _dbContext.Tenants.AsNoTracking().Select(t => t.Id).ToList();
+        _dbContext.Tenants.AsNoTracking().IgnoreQueryFilters().Select(t => t.Id).ToList();
 
     public Guid CurrentUserId => Guid.Empty; // System user
 }

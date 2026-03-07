@@ -27,8 +27,8 @@ public class SetupServiceTests
     public async Task IsInitializedAsync_WhenNoTenants_ReturnsFalse()
     {
         _tenantRepository
-            .GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<Tenant>());
+            .AnyExistUnfilteredAsync(Arg.Any<CancellationToken>())
+            .Returns(false);
 
         var result = await _service.IsInitializedAsync(CancellationToken.None);
 
@@ -39,8 +39,8 @@ public class SetupServiceTests
     public async Task IsInitializedAsync_WhenTenantsExist_ReturnsTrue()
     {
         _tenantRepository
-            .GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns([Tenant.Create("Acme", "entra-tenant")]);
+            .AnyExistUnfilteredAsync(Arg.Any<CancellationToken>())
+            .Returns(true);
 
         var result = await _service.IsInitializedAsync(CancellationToken.None);
 
@@ -51,8 +51,8 @@ public class SetupServiceTests
     public async Task CompleteSetupAsync_WhenNotInitialized_CreatesTenantAndAdminRole()
     {
         _tenantRepository
-            .GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<Tenant>());
+            .AnyExistUnfilteredAsync(Arg.Any<CancellationToken>())
+            .Returns(false);
         _userRepository.GetByEmailAsync("admin@example.com", Arg.Any<CancellationToken>()).Returns((User?)null);
 
         var request = new SetupRequest(
@@ -83,8 +83,8 @@ public class SetupServiceTests
     public async Task CompleteSetupAsync_WhenInitialized_ReturnsFailure()
     {
         _tenantRepository
-            .GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns([Tenant.Create("Existing", "entra")]);
+            .AnyExistUnfilteredAsync(Arg.Any<CancellationToken>())
+            .Returns(true);
 
         var request = new SetupRequest(
             "Acme",
