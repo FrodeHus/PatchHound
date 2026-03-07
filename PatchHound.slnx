@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PatchHound.Api/PatchHound.Api.csproj" />
+    <Project Path="src/PatchHound.Core/PatchHound.Core.csproj" />
+    <Project Path="src/PatchHound.Infrastructure/PatchHound.Infrastructure.csproj" />
+    <Project Path="src/PatchHound.Worker/PatchHound.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PatchHound.Tests/PatchHound.Tests.csproj" />
+  </Folder>
+</Solution>
