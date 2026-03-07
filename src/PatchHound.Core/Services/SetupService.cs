@@ -63,8 +63,15 @@ public class SetupService : ISetupService
             return Result<Tenant>.Failure("Application is already initialized");
         }
 
-        var existingUser = await _userRepository.GetByEmailAsync(request.AdminEmail, ct);
-        if (existingUser is not null)
+        var existingUser = await _userRepository.GetByEntraObjectIdAsync(
+            request.AdminEntraObjectId,
+            ct
+        );
+
+        if (
+            existingUser is null
+            && await _userRepository.GetByEmailAsync(request.AdminEmail, ct) is not null
+        )
         {
             return Result<Tenant>.Failure("Admin email already exists");
         }
@@ -75,16 +82,21 @@ public class SetupService : ISetupService
             string.IsNullOrWhiteSpace(request.TenantSettings) ? "{}" : request.TenantSettings
         );
 
-        var user = User.Create(
-            request.AdminEmail.Trim(),
-            request.AdminDisplayName.Trim(),
-            request.AdminEntraObjectId.Trim()
-        );
+        var user =
+            existingUser
+            ?? User.Create(
+                request.AdminEmail.Trim(),
+                request.AdminDisplayName.Trim(),
+                request.AdminEntraObjectId.Trim()
+            );
 
         var role = UserTenantRole.Create(user.Id, tenant.Id, RoleName.GlobalAdmin);
 
         await _tenantRepository.AddAsync(tenant, ct);
-        await _userRepository.AddAsync(user, ct);
+        if (existingUser is null)
+        {
+            await _userRepository.AddAsync(user, ct);
+        }
         await _userRepository.AddRoleAsync(role, ct);
         await _unitOfWork.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);

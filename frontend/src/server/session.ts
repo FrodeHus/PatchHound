@@ -9,6 +9,8 @@ export interface SessionData {
   email?: string
   displayName?: string
   tenantId?: string
+  tenantName?: string
+  entraRoles?: string[]
   roles?: string[]
   tenantIds?: string[]
   homeAccountId?: string
