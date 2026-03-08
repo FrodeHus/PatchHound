@@ -25,6 +25,8 @@ public record IngestionAffectedSoftware(
     bool Vulnerable,
     string Criteria,
     string? VersionStartIncluding,
+    string? VersionStartExcluding,
+    string? VersionEndIncluding,
     string? VersionEndExcluding
 );
 

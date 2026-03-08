@@ -32,6 +32,7 @@ public record AssetDetailDto(
     DateTimeOffset? DeviceLastSeenAt,
     string? DeviceLastIpAddress,
     string? DeviceAadDeviceId,
+    SoftwareCpeBindingDto? SoftwareCpeBinding,
     string Metadata,
     IReadOnlyList<AssetVulnerabilityDto> Vulnerabilities,
     IReadOnlyList<AssetSoftwareInstallationDto> SoftwareInventory
@@ -70,6 +71,7 @@ public record AssetSoftwareInstallationDto(
     string Name,
     string ExternalId,
     DateTimeOffset LastSeenAt,
+    SoftwareCpeBindingDto? CpeBinding,
     int EpisodeCount,
     IReadOnlyList<AssetSoftwareInstallationEpisodeDto> Episodes
 );
@@ -79,6 +81,17 @@ public record AssetSoftwareInstallationEpisodeDto(
     DateTimeOffset FirstSeenAt,
     DateTimeOffset LastSeenAt,
     DateTimeOffset? RemovedAt
+);
+
+public record SoftwareCpeBindingDto(
+    Guid Id,
+    string Cpe23Uri,
+    string BindingMethod,
+    string Confidence,
+    string? MatchedVendor,
+    string? MatchedProduct,
+    string? MatchedVersion,
+    DateTimeOffset LastValidatedAt
 );
 
 public record AssetSecurityProfileSummaryDto(

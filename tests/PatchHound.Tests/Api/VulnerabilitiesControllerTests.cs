@@ -425,6 +425,8 @@ public class VulnerabilitiesControllerTests : IDisposable
                                                     Criteria =
                                                         "cpe:2.3:a:contoso:widget:*:*:*:*:*:*:*:*",
                                                     VersionStartIncluding = "1.0.0",
+                                                    VersionStartExcluding = "1.0.1",
+                                                    VersionEndIncluding = "1.9.9",
                                                     VersionEndExcluding = "2.0.0",
                                                 },
                                             ],
@@ -470,6 +472,8 @@ public class VulnerabilitiesControllerTests : IDisposable
         detail.AffectedSoftware.Should().ContainSingle();
         detail.AffectedSoftware[0].Criteria.Should().Be("cpe:2.3:a:contoso:widget:*:*:*:*:*:*:*:*");
         detail.AffectedSoftware[0].VersionStartIncluding.Should().Be("1.0.0");
+        detail.AffectedSoftware[0].VersionStartExcluding.Should().Be("1.0.1");
+        detail.AffectedSoftware[0].VersionEndIncluding.Should().Be("1.9.9");
         detail.AffectedSoftware[0].VersionEndExcluding.Should().Be("2.0.0");
         detail.References.Should().ContainSingle();
         detail.References[0].Url.Should().Be("https://nvd.nist.gov/vuln/detail/CVE-2026-4242");
@@ -493,6 +497,8 @@ public class VulnerabilitiesControllerTests : IDisposable
             .Criteria.Should()
             .Be("cpe:2.3:a:contoso:widget:*:*:*:*:*:*:*:*");
         persisted.AffectedSoftware.First().VersionStartIncluding.Should().Be("1.0.0");
+        persisted.AffectedSoftware.First().VersionStartExcluding.Should().Be("1.0.1");
+        persisted.AffectedSoftware.First().VersionEndIncluding.Should().Be("1.9.9");
         persisted.AffectedSoftware.First().VersionEndExcluding.Should().Be("2.0.0");
         persisted.References.Should().ContainSingle();
         persisted

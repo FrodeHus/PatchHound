@@ -30,6 +30,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<AssetSecurityProfile> AssetSecurityProfiles => Set<AssetSecurityProfile>();
+    public DbSet<SoftwareCpeBinding> SoftwareCpeBindings => Set<SoftwareCpeBinding>();
     public DbSet<DeviceSoftwareInstallation> DeviceSoftwareInstallations =>
         Set<DeviceSoftwareInstallation>();
     public DbSet<DeviceSoftwareInstallationEpisode> DeviceSoftwareInstallationEpisodes =>
@@ -89,6 +90,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<AssetSecurityProfile>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<SoftwareCpeBinding>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<DeviceSoftwareInstallation>()

@@ -109,7 +109,7 @@ export function AssetDetailPane({
               ) : null}
 
               {asset.assetType === 'Software' ? (
-                <SoftwareSection metadata={metadata} />
+                <SoftwareSection asset={asset} metadata={metadata} />
               ) : asset.assetType === 'Device' ? (
                 <DeviceSection asset={asset} metadata={metadata} />
               ) : (
@@ -270,7 +270,7 @@ function DeviceSecurityProfileSection({
   )
 }
 
-function SoftwareSection({ metadata }: { metadata: MetadataRecord }) {
+function SoftwareSection({ asset, metadata }: { asset: AssetDetail; metadata: MetadataRecord }) {
   return (
     <section className="rounded-2xl border border-border/70 bg-card p-4">
       <SectionHeader
@@ -288,6 +288,14 @@ function SoftwareSection({ metadata }: { metadata: MetadataRecord }) {
           label="Public Exploit"
           value={readBoolean(metadata.publicExploit) ? 'Observed' : 'Not reported'}
         />
+      </div>
+      <div className="mt-4">
+        <SectionHeader
+          eyebrow="CPE binding"
+          title="Normalized product identity"
+          description="The reusable CPE identity PatchHound will use for NVD-based software matching."
+        />
+        <SoftwareCpeBindingSummary binding={asset.softwareCpeBinding} />
       </div>
     </section>
   )
@@ -359,12 +367,46 @@ function DeviceSection({
                     </span>
                   ))}
                 </div>
+                <div className="mt-3">
+                  <SoftwareCpeBindingSummary binding={software.cpeBinding} compact />
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
     </section>
+  )
+}
+
+function SoftwareCpeBindingSummary({
+  binding,
+  compact = false,
+}: {
+  binding: AssetDetail['softwareCpeBinding'] | AssetDetail['softwareInventory'][number]['cpeBinding']
+  compact?: boolean
+}) {
+  if (!binding) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No CPE binding has been recorded for this software asset yet.
+      </p>
+    )
+  }
+
+  return (
+    <div className={compact ? 'grid gap-3 md:grid-cols-2' : 'grid gap-3 md:grid-cols-2'}>
+      <DataCard label="CPE 2.3 URI" value={binding.cpe23Uri} mono />
+      <DataCard label="Confidence" value={binding.confidence} />
+      <DataCard label="Binding Method" value={binding.bindingMethod} />
+      <DataCard label="Matched Vendor" value={binding.matchedVendor ?? 'Unknown'} />
+      <DataCard label="Matched Product" value={binding.matchedProduct ?? 'Unknown'} />
+      <DataCard label="Matched Version" value={binding.matchedVersion ?? 'Unknown'} />
+      <DataCard
+        label="Last Validated"
+        value={new Date(binding.lastValidatedAt).toLocaleString()}
+      />
+    </div>
   )
 }
 
