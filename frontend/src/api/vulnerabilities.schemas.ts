@@ -63,9 +63,16 @@ export const vulnerabilityDetailSchema = z.object({
   vendorSeverity: z.string(),
   status: z.string(),
   source: z.string(),
+  sources: z.array(z.string()),
   cvssScore: z.number().nullable(),
   cvssVector: z.string().nullable(),
   publishedDate: isoDateTimeSchema.nullable(),
+  affectedSoftware: z.array(z.object({
+    vulnerable: z.boolean(),
+    criteria: z.string(),
+    versionStartIncluding: z.string().nullable(),
+    versionEndExcluding: z.string().nullable(),
+  })),
   references: z.array(z.object({
     url: z.string().url(),
     source: z.string(),

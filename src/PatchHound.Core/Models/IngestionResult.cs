@@ -14,10 +14,19 @@ public record IngestionResult(
     string? ProductVendor = null,
     string? ProductName = null,
     string? ProductVersion = null,
-    IReadOnlyList<IngestionReference>? References = null
+    IReadOnlyList<IngestionReference>? References = null,
+    IReadOnlyList<IngestionAffectedSoftware>? AffectedSoftware = null,
+    IReadOnlyList<string>? Sources = null
 );
 
 public record IngestionReference(string Url, string Source, IReadOnlyList<string> Tags);
+
+public record IngestionAffectedSoftware(
+    bool Vulnerable,
+    string Criteria,
+    string? VersionStartIncluding,
+    string? VersionEndExcluding
+);
 
 public record IngestionAffectedAsset(string ExternalAssetId, string AssetName, AssetType AssetType);
 

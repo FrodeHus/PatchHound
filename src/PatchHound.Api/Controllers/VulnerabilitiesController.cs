@@ -80,7 +80,7 @@ public class VulnerabilitiesController : ControllerBase
         )
             query = query.Where(v => v.Status == status);
         if (!string.IsNullOrEmpty(filter.Source))
-            query = query.Where(v => v.Source == filter.Source);
+            query = query.Where(v => v.Source.Contains(filter.Source));
         if (!string.IsNullOrEmpty(filter.Search))
             query = query.Where(v =>
                 v.Title.Contains(filter.Search) || v.ExternalId.Contains(filter.Search)
@@ -176,7 +176,7 @@ public class VulnerabilitiesController : ControllerBase
                 v.Title,
                 v.VendorSeverity,
                 v.Status,
-                v.Source,
+                FormatSourceDisplay(v.Source),
                 v.CvssScore,
                 v.PublishedDate,
                 v.AffectedAssetCount,
@@ -207,7 +207,8 @@ public class VulnerabilitiesController : ControllerBase
     public async Task<ActionResult<VulnerabilityDetailDto>> Get(Guid id, CancellationToken ct)
     {
         var vulnerability = await _dbContext
-            .Vulnerabilities.Include(v => v.References)
+            .Vulnerabilities.Include(v => v.AffectedSoftware)
+            .Include(v => v.References)
             .Include(v => v.AffectedAssets)
             .FirstOrDefaultAsync(v => v.Id == id, ct);
 
@@ -301,10 +302,20 @@ public class VulnerabilitiesController : ControllerBase
             vulnerability.Description,
             vulnerability.VendorSeverity.ToString(),
             vulnerability.Status.ToString(),
-            vulnerability.Source,
+            FormatSourceDisplay(vulnerability.Source),
+            vulnerability.GetSources(),
             vulnerability.CvssScore,
             vulnerability.CvssVector,
             vulnerability.PublishedDate,
+            vulnerability
+                .AffectedSoftware.OrderBy(item => item.Criteria)
+                .Select(item => new VulnerabilityAffectedSoftwareDto(
+                    item.Vulnerable,
+                    item.Criteria,
+                    item.VersionStartIncluding,
+                    item.VersionEndExcluding
+                ))
+                .ToList(),
             vulnerability
                 .References.OrderBy(reference => reference.Source)
                 .ThenBy(reference => reference.Url)
@@ -411,6 +422,30 @@ public class VulnerabilitiesController : ControllerBase
         var nextCvssScore = vulnerability.CvssScore ?? cvssMetric?.CvssData?.BaseScore;
         var nextCvssVector = vulnerability.CvssVector ?? cvssMetric?.CvssData?.VectorString;
         var nextPublishedDate = vulnerability.PublishedDate ?? cve.Published;
+        var nextAffectedSoftware =
+            vulnerability.AffectedSoftware.Count > 0
+                ? vulnerability
+                    .AffectedSoftware.Select(item =>
+                        (
+                            Vulnerable: item.Vulnerable,
+                            Criteria: item.Criteria,
+                            VersionStartIncluding: item.VersionStartIncluding,
+                            VersionEndExcluding: item.VersionEndExcluding
+                        )
+                    )
+                    .ToList()
+                : cve
+                    .Configurations.SelectMany(FlattenAffectedSoftware)
+                    .Where(item => !string.IsNullOrWhiteSpace(item.Criteria))
+                    .Select(item =>
+                        (
+                            Vulnerable: item.Vulnerable,
+                            Criteria: item.Criteria,
+                            VersionStartIncluding: item.VersionStartIncluding,
+                            VersionEndExcluding: item.VersionEndExcluding
+                        )
+                    )
+                    .ToList();
         var nextReferences =
             vulnerability.References.Count > 0
                 ? vulnerability
@@ -457,12 +492,39 @@ public class VulnerabilitiesController : ControllerBase
             .OrderBy(reference => reference.Url)
             .ThenBy(reference => reference.Source)
             .ToList();
+        var currentAffectedSoftware = vulnerability
+            .AffectedSoftware.Select(item =>
+                (
+                    item.Vulnerable,
+                    item.Criteria,
+                    item.VersionStartIncluding,
+                    item.VersionEndExcluding
+                )
+            )
+            .OrderBy(item => item.Criteria)
+            .ThenBy(item => item.VersionStartIncluding)
+            .ThenBy(item => item.VersionEndExcluding)
+            .ToList();
+        var desiredAffectedSoftware = nextAffectedSoftware
+            .Select(item =>
+                (
+                    item.Vulnerable,
+                    item.Criteria,
+                    item.VersionStartIncluding,
+                    item.VersionEndExcluding
+                )
+            )
+            .OrderBy(item => item.Criteria)
+            .ThenBy(item => item.VersionStartIncluding)
+            .ThenBy(item => item.VersionEndExcluding)
+            .ToList();
 
         if (
             string.Equals(vulnerability.Description, nextDescription, StringComparison.Ordinal)
             && vulnerability.CvssScore == nextCvssScore
             && string.Equals(vulnerability.CvssVector, nextCvssVector, StringComparison.Ordinal)
             && vulnerability.PublishedDate == nextPublishedDate
+            && currentAffectedSoftware.SequenceEqual(desiredAffectedSoftware)
             && currentReferences.SequenceEqual(desiredReferences)
         )
         {
@@ -473,6 +535,7 @@ public class VulnerabilitiesController : ControllerBase
             vulnerability.Title,
             nextDescription,
             vulnerability.VendorSeverity,
+            MergeSourceSummary(vulnerability.Source, "NVD"),
             nextCvssScore,
             nextCvssVector,
             nextPublishedDate,
@@ -506,6 +569,30 @@ public class VulnerabilitiesController : ControllerBase
             );
         }
 
+        var existingAffectedSoftware = await _dbContext
+            .VulnerabilityAffectedSoftware.Where(item => item.VulnerabilityId == vulnerability.Id)
+            .ToListAsync(ct);
+        if (existingAffectedSoftware.Count > 0)
+        {
+            _dbContext.VulnerabilityAffectedSoftware.RemoveRange(existingAffectedSoftware);
+        }
+
+        if (nextAffectedSoftware.Count > 0)
+        {
+            await _dbContext.VulnerabilityAffectedSoftware.AddRangeAsync(
+                nextAffectedSoftware.Select(item =>
+                    VulnerabilityAffectedSoftware.Create(
+                        vulnerability.Id,
+                        item.Vulnerable,
+                        item.Criteria,
+                        item.VersionStartIncluding,
+                        item.VersionEndExcluding
+                    )
+                ),
+                ct
+            );
+        }
+
         await _dbContext.SaveChangesAsync(ct);
     }
 
@@ -514,7 +601,60 @@ public class VulnerabilitiesController : ControllerBase
         return string.IsNullOrWhiteSpace(vulnerability.Description)
             || !vulnerability.CvssScore.HasValue
             || string.IsNullOrWhiteSpace(vulnerability.CvssVector)
-            || !vulnerability.PublishedDate.HasValue;
+            || !vulnerability.PublishedDate.HasValue
+            || vulnerability.AffectedSoftware.Count == 0
+            || vulnerability.References.Count == 0;
+    }
+
+    private static string FormatSourceDisplay(string source)
+    {
+        return string.Join(
+            ", ",
+            source.Split(
+                '|',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+            )
+        );
+    }
+
+    private static string MergeSourceSummary(string existingSource, string sourceToAdd)
+    {
+        return string.Join(
+            "|",
+            existingSource
+                .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Append(sourceToAdd)
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+        );
+    }
+
+    private static IEnumerable<NvdCpeMatch> FlattenAffectedSoftware(NvdConfiguration configuration)
+    {
+        foreach (var node in configuration.Nodes)
+        {
+            foreach (var match in FlattenAffectedSoftware(node))
+            {
+                yield return match;
+            }
+        }
+    }
+
+    private static IEnumerable<NvdCpeMatch> FlattenAffectedSoftware(NvdConfigurationNode node)
+    {
+        foreach (var match in node.CpeMatch)
+        {
+            yield return match;
+        }
+
+        foreach (var child in node.Nodes)
+        {
+            foreach (var match in FlattenAffectedSoftware(child))
+            {
+                yield return match;
+            }
+        }
     }
 
     private static VulnerabilityTenantHistoryDto BuildTenantHistory(

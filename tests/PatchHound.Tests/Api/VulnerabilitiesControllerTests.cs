@@ -409,6 +409,29 @@ public class VulnerabilitiesControllerTests : IDisposable
                                     Tags = ["Vendor Advisory"],
                                 },
                             ],
+                            Configurations =
+                            [
+                                new NvdConfiguration
+                                {
+                                    Nodes =
+                                    [
+                                        new NvdConfigurationNode
+                                        {
+                                            CpeMatch =
+                                            [
+                                                new NvdCpeMatch
+                                                {
+                                                    Vulnerable = true,
+                                                    Criteria =
+                                                        "cpe:2.3:a:contoso:widget:*:*:*:*:*:*:*:*",
+                                                    VersionStartIncluding = "1.0.0",
+                                                    VersionEndExcluding = "2.0.0",
+                                                },
+                                            ],
+                                        },
+                                    ],
+                                },
+                            ],
                         },
                     },
                 ],
@@ -443,20 +466,34 @@ public class VulnerabilitiesControllerTests : IDisposable
         detail.CvssScore.Should().Be(8.8m);
         detail.CvssVector.Should().Be("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
         detail.PublishedDate.Should().Be(new DateTimeOffset(2026, 1, 15, 0, 0, 0, TimeSpan.Zero));
+        detail.Sources.Should().Contain(["MicrosoftDefender", "NVD"]);
+        detail.AffectedSoftware.Should().ContainSingle();
+        detail.AffectedSoftware[0].Criteria.Should().Be("cpe:2.3:a:contoso:widget:*:*:*:*:*:*:*:*");
+        detail.AffectedSoftware[0].VersionStartIncluding.Should().Be("1.0.0");
+        detail.AffectedSoftware[0].VersionEndExcluding.Should().Be("2.0.0");
         detail.References.Should().ContainSingle();
         detail.References[0].Url.Should().Be("https://nvd.nist.gov/vuln/detail/CVE-2026-4242");
         detail.References[0].Source.Should().Be("nvd@nist.gov");
         detail.References[0].Tags.Should().Contain("Vendor Advisory");
 
         var persisted = await requestContext
-            .Vulnerabilities.Include(v => v.References)
+            .Vulnerabilities.Include(v => v.AffectedSoftware)
+            .Include(v => v.References)
             .FirstAsync(v => v.Id == vulnerability.Id);
         persisted.Description.Should().Be("Enriched description from NVD.");
         persisted.CvssScore.Should().Be(8.8m);
         persisted.CvssVector.Should().Be("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
+        persisted.Source.Should().Be("MicrosoftDefender|NVD");
         persisted
             .PublishedDate.Should()
             .Be(new DateTimeOffset(2026, 1, 15, 0, 0, 0, TimeSpan.Zero));
+        persisted.AffectedSoftware.Should().ContainSingle();
+        persisted
+            .AffectedSoftware.First()
+            .Criteria.Should()
+            .Be("cpe:2.3:a:contoso:widget:*:*:*:*:*:*:*:*");
+        persisted.AffectedSoftware.First().VersionStartIncluding.Should().Be("1.0.0");
+        persisted.AffectedSoftware.First().VersionEndExcluding.Should().Be("2.0.0");
         persisted.References.Should().ContainSingle();
         persisted
             .References.First()

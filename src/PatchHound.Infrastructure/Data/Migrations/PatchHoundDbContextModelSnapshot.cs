@@ -940,6 +940,38 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("Vulnerabilities");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.VulnerabilityAffectedSoftware", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Criteria")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<Guid>("VulnerabilityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Vulnerable")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("VersionEndExcluding")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("VersionStartIncluding")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VulnerabilityId");
+
+                    b.ToTable("VulnerabilityAffectedSoftware");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.VulnerabilityReference", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1273,6 +1305,17 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Navigation("Vulnerability");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.VulnerabilityAffectedSoftware", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.Vulnerability", "Vulnerability")
+                        .WithMany("AffectedSoftware")
+                        .HasForeignKey("VulnerabilityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vulnerability");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.VulnerabilityReference", b =>
                 {
                     b.HasOne("PatchHound.Core.Entities.Vulnerability", "Vulnerability")
@@ -1296,6 +1339,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("PatchHound.Core.Entities.Vulnerability", b =>
                 {
+                    b.Navigation("AffectedSoftware");
+
                     b.Navigation("AffectedAssets");
 
                     b.Navigation("References");
