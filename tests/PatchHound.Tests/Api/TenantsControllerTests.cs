@@ -195,6 +195,92 @@ public class TenantsControllerTests : IDisposable
         updatedSource.LastStatus.Should().Be("Queued");
     }
 
+    [Fact]
+    public async Task ListRuns_ReturnsPagedRunsForSource()
+    {
+        var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");
+        await _dbContext.Tenants.AddAsync(tenant);
+
+        var firstRun = IngestionRun.Start(
+            tenant.Id,
+            "microsoft-defender",
+            DateTimeOffset.UtcNow.AddMinutes(-20)
+        );
+        firstRun.CompleteSucceeded(
+            DateTimeOffset.UtcNow.AddMinutes(-19),
+            10,
+            5,
+            2,
+            10,
+            12,
+            12,
+            3,
+            1,
+            5,
+            5,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0
+        );
+
+        var secondRun = IngestionRun.Start(
+            tenant.Id,
+            "microsoft-defender",
+            DateTimeOffset.UtcNow.AddMinutes(-10)
+        );
+        secondRun.CompleteFailed(
+            DateTimeOffset.UtcNow.AddMinutes(-9),
+            "Ingestion failed: TimeoutException",
+            4,
+            2,
+            1,
+            4,
+            4,
+            4,
+            1,
+            2,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0
+        );
+
+        await _dbContext.IngestionRuns.AddRangeAsync(firstRun, secondRun);
+        await _dbContext.SaveChangesAsync();
+
+        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
+        _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
+
+        var action = await _controller.ListRuns(
+            tenant.Id,
+            "microsoft-defender",
+            new PatchHound.Api.Models.PaginationQuery(1, 10),
+            CancellationToken.None
+        );
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = ok
+            .Value.Should()
+            .BeOfType<PatchHound.Api.Models.PagedResponse<TenantIngestionRunDto>>()
+            .Subject;
+        payload.TotalCount.Should().Be(2);
+        payload.Items.Should().HaveCount(2);
+        payload.Items[0].Status.Should().Be("Failed");
+        payload.Items[0].Error.Should().Be("Ingestion failed: TimeoutException");
+        payload.Items[1].FetchedVulnerabilityCount.Should().Be(10);
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

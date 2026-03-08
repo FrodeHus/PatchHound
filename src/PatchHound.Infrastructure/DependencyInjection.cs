@@ -70,6 +70,9 @@ public static class DependencyInjection
         services.AddScoped<UserService>();
         services.AddScoped<TeamService>();
         services.AddScoped<SlaService>();
+        services.AddScoped<RemediationTaskProjectionService>();
+        services.AddScoped<StagedVulnerabilityMergeService>();
+        services.AddScoped<StagedAssetMergeService>();
         services.AddScoped<AiReportService>();
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<EnvironmentalSeverityCalculator>();

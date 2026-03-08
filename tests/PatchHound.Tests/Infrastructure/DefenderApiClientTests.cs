@@ -17,7 +17,64 @@ public class DefenderApiClientTests
     );
 
     [Fact]
-    public async Task GetVulnerabilitiesAsync_FollowsAllPagedResponses()
+    public async Task GetVulnerabilityCatalogAsync_FollowsAllPagedResponses()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            CreateJsonResponse(
+                """
+                {
+                  "value": [
+                    {
+                      "id": "CVE-2026-0001",
+                      "name": "Contoso vulnerability",
+                      "description": "Catalog description",
+                      "severity": "High",
+                      "cvssV3": 8.1,
+                      "cvssVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+                    }
+                  ],
+                  "@odata.nextLink": "https://api.securitycenter.microsoft.com/api/vulnerabilities?$skip=1"
+                }
+                """
+            ),
+            CreateJsonResponse(
+                """
+                {
+                  "value": [
+                    {
+                      "id": "CVE-2026-0002",
+                      "name": "Contoso vulnerability 2",
+                      "description": "Catalog description 2",
+                      "severity": "Medium"
+                    }
+                  ]
+                }
+                """
+            )
+        );
+        var client = new TestDefenderApiClient(new HttpClient(handler));
+
+        var response = await client.GetVulnerabilityCatalogAsync(
+            Configuration,
+            CancellationToken.None
+        );
+
+        response.Value.Should().HaveCount(2);
+        response
+            .Value.Select(entry => entry.Id)
+            .Should()
+            .ContainInOrder("CVE-2026-0001", "CVE-2026-0002");
+        handler
+            .RequestUris.Should()
+            .ContainInOrder(
+                "https://api.securitycenter.microsoft.com/api/vulnerabilities?$top=8000",
+                "https://api.securitycenter.microsoft.com/api/vulnerabilities?$skip=1"
+            );
+        handler.AuthorizationHeaders.Should().OnlyContain(value => value == "Bearer test-token");
+    }
+
+    [Fact]
+    public async Task GetMachineVulnerabilitiesAsync_FollowsAllPagedResponses()
     {
         var handler = new SequenceHttpMessageHandler(
             CreateJsonResponse(
@@ -62,17 +119,19 @@ public class DefenderApiClientTests
         );
         var client = new TestDefenderApiClient(new HttpClient(handler));
 
-        var response = await client.GetVulnerabilitiesAsync(Configuration, CancellationToken.None);
+        var response = await client.GetMachineVulnerabilitiesAsync(
+            Configuration,
+            CancellationToken.None
+        );
 
         response.Value.Should().HaveCount(2);
         response.Value.Select(entry => entry.Id).Should().ContainInOrder("entry-1", "entry-2");
         handler
             .RequestUris.Should()
             .ContainInOrder(
-                "https://api.securitycenter.microsoft.com/api/vulnerabilities/machinesVulnerabilities",
+                "https://api.securitycenter.microsoft.com/api/vulnerabilities/machinesVulnerabilities?$top=8000",
                 "https://api.securitycenter.microsoft.com/api/vulnerabilities/machinesVulnerabilities?$skip=1"
             );
-        handler.AuthorizationHeaders.Should().OnlyContain(value => value == "Bearer test-token");
     }
 
     [Fact]
