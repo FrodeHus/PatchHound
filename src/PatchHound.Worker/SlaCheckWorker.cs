@@ -15,7 +15,7 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("SlaCheckWorker started");
+        logger.LogInformation("SlaCheckWorker started with polling interval {Interval}", Interval);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -34,17 +34,17 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
 
     private async Task CheckSlaStatusAsync(CancellationToken ct)
     {
-        using var scope = scopeFactory.CreateScope();
-        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>() as WorkerTenantContext;
-        if (tenantContext is not null)
-            await tenantContext.InitializeAsync(ct);
+        var cycleStartedAt = DateTimeOffset.UtcNow;
+        logger.LogInformation("Starting SLA check cycle at {CycleStartedAt}", cycleStartedAt);
 
+        using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
         var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
         var slaService = scope.ServiceProvider.GetRequiredService<SlaService>();
 
         var now = DateTimeOffset.UtcNow;
         var cooldownThreshold = now - NotificationCooldown;
+        var notificationsSent = 0;
 
         // Get all open/in-progress tasks across all tenants
         var activeTasks = await dbContext
@@ -91,6 +91,7 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
                         ct
                     );
                     task.MarkSlaNotified();
+                    notificationsSent++;
                     break;
 
                 case SlaStatus.NearDue:
@@ -112,10 +113,18 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
                         ct
                     );
                     task.MarkSlaNotified();
+                    notificationsSent++;
                     break;
             }
         }
 
         await dbContext.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "Completed SLA check cycle at {CycleCompletedAt}. Active tasks evaluated: {ActiveTaskCount}. Notifications sent: {NotificationsSent}.",
+            DateTimeOffset.UtcNow,
+            activeTasks.Count,
+            notificationsSent
+        );
     }
 }

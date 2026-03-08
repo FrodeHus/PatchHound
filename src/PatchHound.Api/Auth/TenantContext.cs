@@ -17,6 +17,7 @@ public class TenantContext : ITenantContext
     public Guid? CurrentTenantId => _currentTenantId;
     public IReadOnlyList<Guid> AccessibleTenantIds => _accessibleTenantIds;
     public Guid CurrentUserId => _currentUserId;
+    public bool IsSystemContext => false;
 
     public bool HasAccessToTenant(Guid tenantId) => _accessibleTenantIds.Contains(tenantId);
 

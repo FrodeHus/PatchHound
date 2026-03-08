@@ -61,6 +61,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     // so each query gets the current user's tenant list.
     private IReadOnlyList<Guid> AccessibleTenantIds =>
         _serviceProvider.GetService<ITenantContext>()?.AccessibleTenantIds ?? [];
+    private bool IsSystemContext =>
+        _serviceProvider.GetService<ITenantContext>()?.IsSystemContext ?? false;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -68,62 +70,68 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
 
         // Global query filters for tenant isolation.
         // Referencing the instance property ensures EF Core re-evaluates per query.
-        modelBuilder.Entity<Asset>().HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder.Entity<Asset>().HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<AssetSecurityProfile>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<DeviceSoftwareInstallation>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<DeviceSoftwareInstallationEpisode>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Vulnerability>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<VulnerabilityAsset>()
             .HasQueryFilter(e =>
-                AccessibleTenantIds.Contains(e.Vulnerability.TenantId)
-                && AccessibleTenantIds.Contains(e.Asset.TenantId));
+                IsSystemContext
+                || (
+                    AccessibleTenantIds.Contains(e.Vulnerability.TenantId)
+                    && AccessibleTenantIds.Contains(e.Asset.TenantId)
+                ));
         modelBuilder
             .Entity<VulnerabilityAssetEpisode>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<VulnerabilityAssetAssessment>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<RemediationTask>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Comment>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<RiskAcceptance>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<AuditLogEntry>()
-            .HasQueryFilter(e => e.TenantId == Guid.Empty || AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || e.TenantId == Guid.Empty
+                || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Notification>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<OrganizationalSeverity>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<AIReport>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Team>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Tenant>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.Id));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.Id));
         modelBuilder
             .Entity<TenantSourceConfiguration>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantSlaConfiguration>()
-            .HasQueryFilter(e => AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
     }
 }

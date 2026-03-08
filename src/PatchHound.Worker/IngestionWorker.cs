@@ -15,7 +15,10 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("IngestionWorker started");
+        logger.LogInformation(
+            "IngestionWorker started with polling interval {Interval}",
+            Interval
+        );
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -34,11 +37,10 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
 
     private async Task RunIngestionCycleAsync(CancellationToken ct)
     {
-        using var scope = scopeFactory.CreateScope();
-        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>() as WorkerTenantContext;
-        if (tenantContext is not null)
-            await tenantContext.InitializeAsync(ct);
+        var cycleStartedAt = DateTimeOffset.UtcNow;
+        logger.LogInformation("Starting ingestion polling cycle at {CycleStartedAt}", cycleStartedAt);
 
+        using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
         var ingestionService = scope.ServiceProvider.GetRequiredService<IngestionService>();
         var secretStore = scope.ServiceProvider.GetRequiredService<ISecretStore>();
@@ -60,6 +62,9 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
             .ToListAsync(ct);
         var tenants = await dbContext.Tenants.AsNoTracking().ToDictionaryAsync(tenant => tenant.Id, ct);
         var now = DateTimeOffset.UtcNow;
+        var runnableSources = 0;
+        var dueSources = 0;
+        var manualSources = 0;
 
         foreach (var source in sources)
         {
@@ -90,9 +95,22 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
             }
 
             var isManualSync = IsManualSyncQueued(source);
-            if (!isManualSync && !IngestionScheduleEvaluator.IsDue(source, now))
+            var isDue = IngestionScheduleEvaluator.IsDue(source, now);
+
+            if (source.Enabled && TenantSourceCatalog.HasConfiguredCredentials(source))
+            {
+                runnableSources++;
+            }
+
+            if (!isManualSync && !isDue)
             {
                 continue;
+            }
+
+            dueSources++;
+            if (isManualSync)
+            {
+                manualSources++;
             }
 
             logger.LogInformation(
@@ -105,6 +123,15 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
 
             await ingestionService.RunIngestionAsync(tenant.Id, source.SourceKey, ct);
         }
+
+        logger.LogInformation(
+            "Completed ingestion polling cycle at {CycleCompletedAt}. Sources scanned: {SourceCount}. Runnable sources: {RunnableSources}. Due sources: {DueSources}. Manual syncs queued: {ManualSources}.",
+            DateTimeOffset.UtcNow,
+            sources.Count,
+            runnableSources,
+            dueSources,
+            manualSources
+        );
     }
 
     private static bool IsManualSyncQueued(PatchHound.Core.Entities.TenantSourceConfiguration source)
