@@ -32,7 +32,7 @@ export const fetchTenants = createServerFn({ method: 'GET' })
   .handler(async ({ context, data: filters }) => {
     const page = filters.page ?? 1
     const pageSize = filters.pageSize ?? 100
-    const data = await apiGet(`/tenants?page=${page}&pageSize=${pageSize}`, context.token)
+    const data = await apiGet(`/tenants?page=${page}&pageSize=${pageSize}`, context)
     return pagedTenantSchema.parse(data)
   })
 
@@ -40,7 +40,7 @@ export const fetchTenantDetail = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ tenantId: z.string() }))
   .handler(async ({ context, data: { tenantId } }) => {
-    const data = await apiGet(`/tenants/${tenantId}`, context.token)
+    const data = await apiGet(`/tenants/${tenantId}`, context)
     return tenantDetailSchema.parse(data)
   })
 
@@ -51,7 +51,7 @@ export const createTenant = createServerFn({ method: 'POST' })
     entraTenantId: z.string().min(1),
   }))
   .handler(async ({ context, data: { name, entraTenantId } }) => {
-    const data = await apiPost('/tenants', context.token, { name, entraTenantId })
+    const data = await apiPost('/tenants', context, { name, entraTenantId })
     return tenantDetailSchema.parse(data)
   })
 
@@ -69,7 +69,7 @@ export const updateTenant = createServerFn({ method: 'POST' })
     ingestionSources: z.array(updateTenantIngestionSourceSchema),
   }))
   .handler(async ({ context, data: { tenantId, name, sla, ingestionSources } }) => {
-    await apiPut(`/tenants/${tenantId}`, context.token, { name, sla, ingestionSources })
+    await apiPut(`/tenants/${tenantId}`, context, { name, sla, ingestionSources })
   })
 
 export const triggerTenantIngestionSync = createServerFn({ method: 'POST' })
@@ -79,5 +79,5 @@ export const triggerTenantIngestionSync = createServerFn({ method: 'POST' })
     sourceKey: z.string(),
   }))
   .handler(async ({ context, data: { tenantId, sourceKey } }) => {
-    await apiPost(`/tenants/${tenantId}/ingestion-sources/${sourceKey}/sync`, context.token)
+    await apiPost(`/tenants/${tenantId}/ingestion-sources/${sourceKey}/sync`, context)
   })

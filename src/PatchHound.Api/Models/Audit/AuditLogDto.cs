@@ -7,10 +7,12 @@ public record AuditLogDto(
     Guid TenantId,
     string EntityType,
     Guid EntityId,
+    string? EntityLabel,
     AuditAction Action,
     string? OldValues,
     string? NewValues,
     Guid UserId,
+    string? UserDisplayName,
     DateTimeOffset Timestamp
 );
 

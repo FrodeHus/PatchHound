@@ -19,6 +19,6 @@ export const fetchAuditLog = createServerFn({ method: 'GET' })
   )
   .handler(async ({ context, data: filters }) => {
     const params = buildFilterParams(filters)
-    const data = await apiGet(`/audit-log?${params.toString()}`, context.token)
+    const data = await apiGet(`/audit-log?${params.toString()}`, context)
     return pagedAuditLogSchema.parse(data)
   })

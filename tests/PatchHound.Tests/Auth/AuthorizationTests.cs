@@ -128,7 +128,26 @@ public class AuthorizationTests
 
         var handler = new RoleRequirementHandler(_tenantContext);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin);
-        var context = CreateAuthContext(requirement, "Tenant.Admin");
+        var context = CreateAuthContext(requirement, roles: ["Tenant.Admin"]);
+
+        await handler.HandleAsync(context);
+
+        context.HasSucceeded.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ClaimTypesRole_IsReadAndNormalizedDuringAuthorization()
+    {
+        _tenantContext.CurrentUserId.Returns(Guid.Empty);
+        _tenantContext.AccessibleTenantIds.Returns(Array.Empty<Guid>());
+
+        var handler = new RoleRequirementHandler(_tenantContext);
+        var requirement = new RoleRequirement(RoleName.GlobalAdmin);
+        var context = CreateAuthContext(
+            requirement,
+            roleClaimType: ClaimTypes.Role,
+            roles: ["Tenant.Admin"]
+        );
 
         await handler.HandleAsync(context);
 
@@ -195,13 +214,17 @@ public class AuthorizationTests
             .Returns(new List<string> { role.ToString() });
     }
 
-    private AuthorizationHandlerContext CreateAuthContext(RoleRequirement requirement, params string[] roles)
+    private AuthorizationHandlerContext CreateAuthContext(
+        RoleRequirement requirement,
+        string roleClaimType = "roles",
+        params string[] roles
+    )
     {
         var identity = new ClaimsIdentity("test");
         identity.AddClaim(new Claim("oid", _userId.ToString()));
         foreach (var role in roles)
         {
-            identity.AddClaim(new Claim("roles", role));
+            identity.AddClaim(new Claim(roleClaimType, role));
         }
         var principal = new ClaimsPrincipal(identity);
 

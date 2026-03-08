@@ -21,7 +21,7 @@ export const fetchAssets = createServerFn({ method: 'GET' })
   )
   .handler(async ({ context, data: filters }) => {
     const params = buildFilterParams(filters)
-    const data = await apiGet(`/assets?${params.toString()}`, context.token)
+    const data = await apiGet(`/assets?${params.toString()}`, context)
     return pagedAssetsSchema.parse(data)
   })
 
@@ -29,7 +29,7 @@ export const fetchAssetDetail = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ assetId: z.string() }))
   .handler(async ({ context, data: { assetId } }) => {
-    const data = await apiGet(`/assets/${assetId}`, context.token)
+    const data = await apiGet(`/assets/${assetId}`, context)
     return assetDetailSchema.parse(data)
   })
 
@@ -43,7 +43,7 @@ export const assignAssetOwner = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ context, data: { assetId, ownerType, ownerId } }) => {
-    await apiPut(`/assets/${assetId}/owner`, context.token, { ownerType, ownerId })
+    await apiPut(`/assets/${assetId}/owner`, context, { ownerType, ownerId })
   })
 
 export const assignAssetSecurityProfile = createServerFn({ method: 'POST' })
@@ -55,14 +55,14 @@ export const assignAssetSecurityProfile = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ context, data: { assetId, securityProfileId } }) => {
-    await apiPut(`/assets/${assetId}/security-profile`, context.token, { securityProfileId })
+    await apiPut(`/assets/${assetId}/security-profile`, context, { securityProfileId })
   })
 
 export const setAssetCriticality = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ assetId: z.string(), criticality: z.string() }))
   .handler(async ({ context, data: { assetId, criticality } }) => {
-    await apiPut(`/assets/${assetId}/criticality`, context.token, { criticality })
+    await apiPut(`/assets/${assetId}/criticality`, context, { criticality })
   })
 
 export const bulkAssignAssets = createServerFn({ method: 'POST' })
@@ -73,5 +73,5 @@ export const bulkAssignAssets = createServerFn({ method: 'POST' })
     ownerId: z.string(),
   }))
   .handler(async ({ context, data }) => {
-    await apiPost('/assets/bulk-assign', context.token, data)
+    await apiPost('/assets/bulk-assign', context, data)
   })

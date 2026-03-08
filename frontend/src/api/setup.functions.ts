@@ -8,7 +8,7 @@ import { setupContextSchema, setupStatusSchema, setupPayloadSchema } from './set
 export const fetchSetupStatus = createServerFn({ method: 'GET' })
   .handler(async () => {
     // Setup does not require auth — it runs before any tenant exists
-    const data = await apiGet('/setup/status', '')
+    const data = await apiGet('/setup/status', { token: '' })
     return setupStatusSchema.parse(data)
   })
 
@@ -43,14 +43,14 @@ export const completeSetup = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(setupPayloadSchema)
   .handler(async ({ context }) => {
-    const status = await apiGet('/setup/status', '')
+    const status = await apiGet('/setup/status', { token: '' })
     const { isInitialized } = setupStatusSchema.parse(status)
     if (isInitialized) {
       throw new Error('Setup has already been completed')
     }
 
     const setupContext = await fetchSetupContext()
-    await apiPost('/setup/complete', context.token, {
+    await apiPost('/setup/complete', context, {
       tenantName: setupContext.tenantName,
     })
   })

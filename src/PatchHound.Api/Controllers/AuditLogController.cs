@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Audit;
@@ -54,23 +55,91 @@ public class AuditLogController : ControllerBase
 
         var totalCount = await query.CountAsync(ct);
 
-        var items = await query
+        var entries = await query
             .OrderByDescending(e => e.Timestamp)
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
-            .Select(e => new AuditLogDto(
-                e.Id,
-                e.TenantId,
-                e.EntityType,
-                e.EntityId,
-                e.Action,
-                e.OldValues,
-                e.NewValues,
-                e.UserId,
-                e.Timestamp
-            ))
             .ToListAsync(ct);
 
+        var userDisplayNames = await _dbContext
+            .Users.AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(user => entries.Select(entry => entry.UserId).Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, user => user.DisplayName, ct);
+
+        var items = entries
+            .Select(entry => new AuditLogDto(
+                entry.Id,
+                entry.TenantId,
+                entry.EntityType,
+                entry.EntityId,
+                ResolveEntityLabel(entry.EntityType, entry.OldValues, entry.NewValues),
+                entry.Action,
+                entry.OldValues,
+                entry.NewValues,
+                entry.UserId,
+                userDisplayNames.GetValueOrDefault(entry.UserId),
+                entry.Timestamp
+            ))
+            .ToList();
+
         return Ok(new PagedResponse<AuditLogDto>(items, totalCount));
+    }
+
+    private static string? ResolveEntityLabel(string entityType, string? oldValues, string? newValues)
+    {
+        var values = ParseValues(newValues).Count > 0 ? ParseValues(newValues) : ParseValues(oldValues);
+
+        return entityType switch
+        {
+            "Tenant" => GetValue(values, "Name"),
+            "TenantSourceConfiguration" => GetValue(values, "DisplayName") ?? GetValue(values, "SourceKey"),
+            "EnrichmentSourceConfiguration" => GetValue(values, "DisplayName") ?? GetValue(values, "SourceKey"),
+            "AssetSecurityProfile" => GetValue(values, "Name"),
+            "Team" => GetValue(values, "Name"),
+            "UserTenantRole" => GetValue(values, "Role"),
+            _ => GetValue(values, "Name") ?? GetValue(values, "DisplayName") ?? GetValue(values, "Title"),
+        };
+    }
+
+    private static Dictionary<string, string?> ParseValues(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return [];
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(raw);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return [];
+            }
+
+            var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                values[property.Name] = property.Value.ValueKind switch
+                {
+                    JsonValueKind.String => property.Value.GetString(),
+                    JsonValueKind.Null => null,
+                    _ => property.Value.ToString(),
+                };
+            }
+
+            return values;
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static string? GetValue(Dictionary<string, string?> values, string key)
+    {
+        return values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : null;
     }
 }

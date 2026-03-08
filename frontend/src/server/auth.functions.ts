@@ -18,7 +18,10 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
 
     let systemStatus: SystemStatus | null = null
     try {
-      systemStatus = await apiGet<SystemStatus>('/system/status', session.accessToken)
+      systemStatus = await apiGet<SystemStatus>('/system/status', {
+        token: session.accessToken,
+        tenantId: session.tenantId,
+      })
     } catch {
       systemStatus = null
     }
