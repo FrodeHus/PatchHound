@@ -49,8 +49,7 @@ public class IngestionService
         var normalizedSourceKey = sourceKey?.Trim().ToLowerInvariant();
         var sources = string.IsNullOrWhiteSpace(sourceKey)
             ? _sources
-            : _sources.Where(source =>
-                source.SourceKey == normalizedSourceKey);
+            : _sources.Where(source => source.SourceKey == normalizedSourceKey);
 
         foreach (var source in sources)
         {
@@ -138,17 +137,20 @@ public class IngestionService
     )
     {
         var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var tenant = await _dbContext.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == tenantId, ct);
+        var tenant = await _dbContext
+            .Tenants.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Id == tenantId, ct);
         if (tenant is null)
         {
             return;
         }
 
-        var source = await _dbContext.TenantSourceConfigurations.IgnoreQueryFilters().FirstOrDefaultAsync(
-            item => item.TenantId == tenantId
-                && item.SourceKey == normalizedSourceKey,
-            ct
-        );
+        var source = await _dbContext
+            .TenantSourceConfigurations.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(
+                item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
+                ct
+            );
 
         if (source is null)
         {
@@ -213,7 +215,12 @@ public class IngestionService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during enrichment from {Source} for tenant {TenantId}", enricher.SourceKey, tenantId);
+                _logger.LogError(
+                    ex,
+                    "Error during enrichment from {Source} for tenant {TenantId}",
+                    enricher.SourceKey,
+                    tenantId
+                );
                 await UpdateEnrichmentRuntimeStateAsync(
                     enricher.SourceKey,
                     runtime =>
@@ -237,7 +244,8 @@ public class IngestionService
     )
     {
         var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var source = await _dbContext.EnrichmentSourceConfigurations.IgnoreQueryFilters()
+        var source = await _dbContext
+            .EnrichmentSourceConfigurations.IgnoreQueryFilters()
             .FirstOrDefaultAsync(item => item.SourceKey == normalizedSourceKey, ct);
 
         if (source is null)
@@ -432,7 +440,11 @@ public class IngestionService
 
             if (existingVa is null)
             {
-                existingVa = VulnerabilityAsset.Create(vulnerability.Id, asset.Id, openEpisode.FirstSeenAt);
+                existingVa = VulnerabilityAsset.Create(
+                    vulnerability.Id,
+                    asset.Id,
+                    openEpisode.FirstSeenAt
+                );
                 await _dbContext.VulnerabilityAssets.AddAsync(existingVa, ct);
                 projectionOpened = true;
             }
@@ -504,7 +516,8 @@ public class IngestionService
         return await _dbContext
             .AssetSecurityProfiles.IgnoreQueryFilters()
             .FirstOrDefaultAsync(
-                profile => profile.Id == asset.SecurityProfileId.Value && profile.TenantId == tenantId,
+                profile =>
+                    profile.Id == asset.SecurityProfileId.Value && profile.TenantId == tenantId,
                 ct
             );
     }
@@ -549,8 +562,9 @@ public class IngestionService
 
         var candidateProjections = await _dbContext
             .VulnerabilityAssets.IgnoreQueryFilters()
-            .Where(va => episodeVulnIds.Contains(va.VulnerabilityId)
-                && episodeAssetIds.Contains(va.AssetId))
+            .Where(va =>
+                episodeVulnIds.Contains(va.VulnerabilityId) && episodeAssetIds.Contains(va.AssetId)
+            )
             .ToListAsync(ct);
 
         var episodePairs = openEpisodes
@@ -637,11 +651,12 @@ public class IngestionService
     {
         var existingTask = await _dbContext
             .RemediationTasks.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(task =>
-                task.TenantId == tenantId
-                && task.VulnerabilityId == vulnerability.Id
-                && task.AssetId == asset.Id
-                && task.Status != RemediationTaskStatus.Completed,
+            .FirstOrDefaultAsync(
+                task =>
+                    task.TenantId == tenantId
+                    && task.VulnerabilityId == vulnerability.Id
+                    && task.AssetId == asset.Id
+                    && task.Status != RemediationTaskStatus.Completed,
                 ct
             );
 
@@ -656,7 +671,8 @@ public class IngestionService
             return;
         }
 
-        var tenantSla = await _dbContext.TenantSlaConfigurations.IgnoreQueryFilters()
+        var tenantSla = await _dbContext
+            .TenantSlaConfigurations.IgnoreQueryFilters()
             .FirstOrDefaultAsync(config => config.TenantId == tenantId, ct);
 
         var task = RemediationTask.Create(
@@ -717,7 +733,8 @@ public class IngestionService
             var existing = await _dbContext
                 .Assets.IgnoreQueryFilters()
                 .FirstOrDefaultAsync(
-                    current => current.ExternalId == asset.ExternalId && current.TenantId == tenantId,
+                    current =>
+                        current.ExternalId == asset.ExternalId && current.TenantId == tenantId,
                     ct
                 );
 
@@ -805,7 +822,10 @@ public class IngestionService
         {
             if (
                 !assetIdsByExternalId.TryGetValue(link.DeviceExternalId, out var deviceAssetId)
-                || !assetIdsByExternalId.TryGetValue(link.SoftwareExternalId, out var softwareAssetId)
+                || !assetIdsByExternalId.TryGetValue(
+                    link.SoftwareExternalId,
+                    out var softwareAssetId
+                )
             )
             {
                 continue;
@@ -813,20 +833,22 @@ public class IngestionService
 
             var installation = await _dbContext
                 .DeviceSoftwareInstallations.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(current =>
-                    current.TenantId == tenantId
-                    && current.DeviceAssetId == deviceAssetId
-                    && current.SoftwareAssetId == softwareAssetId,
+                .FirstOrDefaultAsync(
+                    current =>
+                        current.TenantId == tenantId
+                        && current.DeviceAssetId == deviceAssetId
+                        && current.SoftwareAssetId == softwareAssetId,
                     ct
                 );
 
             var openEpisode = await _dbContext
                 .DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(current =>
-                    current.TenantId == tenantId
-                    && current.DeviceAssetId == deviceAssetId
-                    && current.SoftwareAssetId == softwareAssetId
-                    && current.RemovedAt == null,
+                .FirstOrDefaultAsync(
+                    current =>
+                        current.TenantId == tenantId
+                        && current.DeviceAssetId == deviceAssetId
+                        && current.SoftwareAssetId == softwareAssetId
+                        && current.RemovedAt == null,
                     ct
                 );
 
@@ -886,13 +908,22 @@ public class IngestionService
             return;
         }
 
-        var externalIdsByAssetId = assetIdsByExternalId.ToDictionary(pair => pair.Value, pair => pair.Key);
+        var externalIdsByAssetId = assetIdsByExternalId.ToDictionary(
+            pair => pair.Value,
+            pair => pair.Key
+        );
 
         foreach (var installation in currentInstallations)
         {
             if (
-                !externalIdsByAssetId.TryGetValue(installation.DeviceAssetId, out var deviceExternalId)
-                || !externalIdsByAssetId.TryGetValue(installation.SoftwareAssetId, out var softwareExternalId)
+                !externalIdsByAssetId.TryGetValue(
+                    installation.DeviceAssetId,
+                    out var deviceExternalId
+                )
+                || !externalIdsByAssetId.TryGetValue(
+                    installation.SoftwareAssetId,
+                    out var softwareExternalId
+                )
             )
             {
                 continue;
@@ -911,11 +942,12 @@ public class IngestionService
 
             var openEpisode = await _dbContext
                 .DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(current =>
-                    current.TenantId == tenantId
-                    && current.DeviceAssetId == installation.DeviceAssetId
-                    && current.SoftwareAssetId == installation.SoftwareAssetId
-                    && current.RemovedAt == null,
+                .FirstOrDefaultAsync(
+                    current =>
+                        current.TenantId == tenantId
+                        && current.DeviceAssetId == installation.DeviceAssetId
+                        && current.SoftwareAssetId == installation.SoftwareAssetId
+                        && current.RemovedAt == null,
                     ct
                 );
 

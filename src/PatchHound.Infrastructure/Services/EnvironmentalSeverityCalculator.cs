@@ -39,7 +39,11 @@ public class EnvironmentalSeverityCalculator
 
         var factors = new List<AssessmentFactor>
         {
-            new("BaseSeverity", vulnerability.VendorSeverity.ToString(), "Vendor/base severity from the source feed."),
+            new(
+                "BaseSeverity",
+                vulnerability.VendorSeverity.ToString(),
+                "Vendor/base severity from the source feed."
+            ),
             new("AssetCriticality", asset.Criticality.ToString(), "Current asset criticality."),
         };
 
@@ -55,7 +59,10 @@ public class EnvironmentalSeverityCalculator
             );
         }
 
-        var modifiedAttackVector = ApplyReachability(parsed.AttackVector, profile.InternetReachability);
+        var modifiedAttackVector = ApplyReachability(
+            parsed.AttackVector,
+            profile.InternetReachability
+        );
         var confidentialityRequirement = RequirementMultiplier(profile.ConfidentialityRequirement);
         var integrityRequirement = RequirementMultiplier(profile.IntegrityRequirement);
         var availabilityRequirement = RequirementMultiplier(profile.AvailabilityRequirement);
@@ -132,10 +139,7 @@ public class EnvironmentalSeverityCalculator
         var mcValue = (double)mc;
         var miValue = (double)mi;
         var maValue = (double)ma;
-        var miss = Math.Min(
-            1d - ((1d - mcValue) * (1d - miValue) * (1d - maValue)),
-            0.915d
-        );
+        var miss = Math.Min(1d - ((1d - mcValue) * (1d - miValue) * (1d - maValue)), 0.915d);
 
         var scopeChanged = parsed.Scope == ScopeMetric.Changed;
         var modifiedImpact = scopeChanged
@@ -147,7 +151,8 @@ public class EnvironmentalSeverityCalculator
             return 0m;
         }
 
-        var exploitability = 8.22d
+        var exploitability =
+            8.22d
             * AttackVectorWeight(modifiedAttackVector)
             * AttackComplexityWeight(parsed.AttackComplexity)
             * PrivilegesRequiredWeight(parsed.PrivilegesRequired, scopeChanged)
@@ -235,7 +240,9 @@ public class EnvironmentalSeverityCalculator
 
         if (reasons.Count == 0)
         {
-            reasons.Add("Profile settings kept the effective severity close to the vendor baseline");
+            reasons.Add(
+                "Profile settings kept the effective severity close to the vendor baseline"
+            );
         }
 
         return $"{baseSeverity} -> {effectiveSeverity}. {string.Join("; ", reasons)}.";

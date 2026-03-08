@@ -28,16 +28,15 @@ public static class IngestionScheduleEvaluator
 
         var lastStartedAt = source.LastStartedAt?.ToUniversalTime();
         var lastCompletedAt = source.LastCompletedAt?.ToUniversalTime();
-        if (lastStartedAt.HasValue && (!lastCompletedAt.HasValue || lastCompletedAt < lastStartedAt))
+        if (
+            lastStartedAt.HasValue && (!lastCompletedAt.HasValue || lastCompletedAt < lastStartedAt)
+        )
         {
             return false;
         }
 
         var referenceTime = lastStartedAt?.UtcDateTime ?? nowUtc.UtcDateTime.AddYears(-1);
-        var nextOccurrence = expression.GetNextOccurrence(
-            referenceTime,
-            !lastStartedAt.HasValue
-        );
+        var nextOccurrence = expression.GetNextOccurrence(referenceTime, !lastStartedAt.HasValue);
 
         if (!nextOccurrence.HasValue)
         {

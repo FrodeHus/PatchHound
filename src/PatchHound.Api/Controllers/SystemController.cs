@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models.System;
 using PatchHound.Core.Entities;
@@ -8,7 +9,6 @@ using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.Tenants;
-using Microsoft.EntityFrameworkCore;
 
 namespace PatchHound.Api.Controllers;
 
@@ -53,8 +53,8 @@ public class SystemController : ControllerBase
         CancellationToken ct
     )
     {
-        var keys = request.Keys
-            .Where(key => !string.IsNullOrWhiteSpace(key))
+        var keys = request
+            .Keys.Where(key => !string.IsNullOrWhiteSpace(key))
             .Select(key => key.Trim())
             .ToList();
 
@@ -69,9 +69,12 @@ public class SystemController : ControllerBase
 
     [HttpGet("enrichment-sources")]
     [Authorize(Policy = Policies.ManageUsers)]
-    public async Task<ActionResult<IReadOnlyList<EnrichmentSourceDto>>> GetEnrichmentSources(CancellationToken ct)
+    public async Task<ActionResult<IReadOnlyList<EnrichmentSourceDto>>> GetEnrichmentSources(
+        CancellationToken ct
+    )
     {
-        var sources = await _dbContext.EnrichmentSourceConfigurations.AsNoTracking()
+        var sources = await _dbContext
+            .EnrichmentSourceConfigurations.AsNoTracking()
             .OrderBy(source => source.DisplayName)
             .ToListAsync(ct);
 
@@ -85,10 +88,21 @@ public class SystemController : ControllerBase
         CancellationToken ct
     )
     {
-        var existingSources = await _dbContext.EnrichmentSourceConfigurations
-            .ToDictionaryAsync(source => source.SourceKey, StringComparer.OrdinalIgnoreCase, ct);
+        var existingSources = await _dbContext.EnrichmentSourceConfigurations.ToDictionaryAsync(
+            source => source.SourceKey,
+            StringComparer.OrdinalIgnoreCase,
+            ct
+        );
 
-        var pendingSecretWrites = new List<(string Path, string Key, string Value, string SourceKey, bool HadSecret, string OldSecretRef)>();
+        var pendingSecretWrites =
+            new List<(
+                string Path,
+                string Key,
+                string Value,
+                string SourceKey,
+                bool HadSecret,
+                string OldSecretRef
+            )>();
 
         foreach (var source in request)
         {
@@ -101,14 +115,16 @@ public class SystemController : ControllerBase
                 var hadSecret = !string.IsNullOrWhiteSpace(secretRef);
                 var oldSecretRef = secretRef;
                 secretRef = $"system/enrichment-sources/{source.Key}";
-                pendingSecretWrites.Add((
-                    secretRef,
-                    EnrichmentSourceCatalog.GetSecretKeyName(source.Key),
-                    secretValue,
-                    source.Key,
-                    hadSecret,
-                    oldSecretRef
-                ));
+                pendingSecretWrites.Add(
+                    (
+                        secretRef,
+                        EnrichmentSourceCatalog.GetSecretKeyName(source.Key),
+                        secretValue,
+                        source.Key,
+                        hadSecret,
+                        oldSecretRef
+                    )
+                );
             }
 
             if (existingSource is null)
@@ -151,8 +167,20 @@ public class SystemController : ControllerBase
                     "EnrichmentSourceSecret",
                     auditSource.Id,
                     hadSecret ? AuditAction.Updated : AuditAction.Created,
-                    hadSecret ? new { Key = sourceKey, HasSecret = true, SecretRef = oldSecretRef } : null,
-                    new { Key = sourceKey, HasSecret = true, SecretRef = path },
+                    hadSecret
+                        ? new
+                        {
+                            Key = sourceKey,
+                            HasSecret = true,
+                            SecretRef = oldSecretRef,
+                        }
+                        : null,
+                    new
+                    {
+                        Key = sourceKey,
+                        HasSecret = true,
+                        SecretRef = path,
+                    },
                     ct
                 );
             }

@@ -15,10 +15,25 @@ public class AssetSecurityProfileConfiguration : IEntityTypeConfiguration<AssetS
 
         builder.Property(profile => profile.Name).HasMaxLength(256).IsRequired();
         builder.Property(profile => profile.Description).HasMaxLength(2048);
-        builder.Property(profile => profile.EnvironmentClass).HasConversion<string>().HasMaxLength(32);
-        builder.Property(profile => profile.InternetReachability).HasConversion<string>().HasMaxLength(32);
-        builder.Property(profile => profile.ConfidentialityRequirement).HasConversion<string>().HasMaxLength(32);
-        builder.Property(profile => profile.IntegrityRequirement).HasConversion<string>().HasMaxLength(32);
-        builder.Property(profile => profile.AvailabilityRequirement).HasConversion<string>().HasMaxLength(32);
+        builder
+            .Property(profile => profile.EnvironmentClass)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder
+            .Property(profile => profile.InternetReachability)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder
+            .Property(profile => profile.ConfidentialityRequirement)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder
+            .Property(profile => profile.IntegrityRequirement)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder
+            .Property(profile => profile.AvailabilityRequirement)
+            .HasConversion<string>()
+            .HasMaxLength(32);
     }
 }

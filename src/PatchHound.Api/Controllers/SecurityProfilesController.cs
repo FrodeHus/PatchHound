@@ -67,7 +67,14 @@ public class SecurityProfilesController : ControllerBase
             ))
             .ToListAsync(ct);
 
-        return Ok(new PagedResponse<SecurityProfileDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
+        return Ok(
+            new PagedResponse<SecurityProfileDto>(
+                items,
+                totalCount,
+                pagination.Page,
+                pagination.BoundedPageSize
+            )
+        );
     }
 
     [HttpPost]
@@ -99,11 +106,7 @@ public class SecurityProfilesController : ControllerBase
         _dbContext.AssetSecurityProfiles.Add(profile);
         await _dbContext.SaveChangesAsync(ct);
 
-        return CreatedAtAction(
-            nameof(List),
-            new { tenantId = profile.TenantId },
-            ToDto(profile)
-        );
+        return CreatedAtAction(nameof(List), new { tenantId = profile.TenantId }, ToDto(profile));
     }
 
     [HttpPut("{id:guid}")]

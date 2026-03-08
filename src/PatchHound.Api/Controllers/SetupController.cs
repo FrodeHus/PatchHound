@@ -1,10 +1,10 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PatchHound.Api.Models.Setup;
 using PatchHound.Core.Common;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
-using System.Security.Claims;
 
 namespace PatchHound.Api.Controllers;
 
@@ -76,8 +76,7 @@ public class SetupController : ControllerBase
                 claim.Type == "roles"
                 || claim.Type == ClaimTypes.Role
                 || claim.Type == "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
-            )
-            && string.Equals(claim.Value, "Tenant.Admin", StringComparison.Ordinal)
+            ) && string.Equals(claim.Value, "Tenant.Admin", StringComparison.Ordinal)
         );
     }
 
@@ -113,9 +112,7 @@ public class SetupController : ControllerBase
         }
 
         var adminDisplayName =
-            user.FindFirstValue("name")
-            ?? user.FindFirstValue(ClaimTypes.Name)
-            ?? adminEmail;
+            user.FindFirstValue("name") ?? user.FindFirstValue(ClaimTypes.Name) ?? adminEmail;
 
         return Result<SetupIdentity>.Success(
             new SetupIdentity(

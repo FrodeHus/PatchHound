@@ -64,10 +64,7 @@ public record UpdateTenantRequest(
     List<UpdateTenantIngestionSourceRequest> IngestionSources
 );
 
-public record CreateTenantRequest(
-    string Name,
-    string EntraTenantId
-);
+public record CreateTenantRequest(string Name, string EntraTenantId);
 
 public record UpdateTenantSlaConfigurationRequest(
     int CriticalDays,

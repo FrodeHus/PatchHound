@@ -4,7 +4,8 @@ using PatchHound.Core.Entities;
 
 namespace PatchHound.Infrastructure.Data.Configurations;
 
-public class TenantSourceConfigurationConfiguration : IEntityTypeConfiguration<TenantSourceConfiguration>
+public class TenantSourceConfigurationConfiguration
+    : IEntityTypeConfiguration<TenantSourceConfiguration>
 {
     public void Configure(EntityTypeBuilder<TenantSourceConfiguration> builder)
     {

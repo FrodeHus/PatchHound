@@ -1,6 +1,6 @@
-using PatchHound.Infrastructure;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
+using PatchHound.Infrastructure;
 using PatchHound.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);

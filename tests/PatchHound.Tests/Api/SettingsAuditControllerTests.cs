@@ -29,8 +29,9 @@ public class SettingsAuditControllerTests : IDisposable
         _tenantContext.CurrentTenantId.Returns(_tenantId);
         _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { _tenantId });
         _tenantContext.CurrentUserId.Returns(_userId);
-        _tenantContext.HasAccessToTenant(Arg.Any<Guid>()).Returns(callInfo =>
-            new List<Guid> { _tenantId }.Contains(callInfo.Arg<Guid>()));
+        _tenantContext
+            .HasAccessToTenant(Arg.Any<Guid>())
+            .Returns(callInfo => new List<Guid> { _tenantId }.Contains(callInfo.Arg<Guid>()));
 
         var interceptor = new AuditSaveChangesInterceptor(_tenantContext);
         var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
@@ -40,7 +41,12 @@ public class SettingsAuditControllerTests : IDisposable
 
         _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(_tenantContext));
         _secretStore = Substitute.For<ISecretStore>();
-        _secretStore.PutSecretAsync(Arg.Any<string>(), Arg.Any<IReadOnlyDictionary<string, string>>(), Arg.Any<CancellationToken>())
+        _secretStore
+            .PutSecretAsync(
+                Arg.Any<string>(),
+                Arg.Any<IReadOnlyDictionary<string, string>>(),
+                Arg.Any<CancellationToken>()
+            )
             .Returns(Task.CompletedTask);
     }
 
@@ -100,7 +106,8 @@ public class SettingsAuditControllerTests : IDisposable
 
         action.Should().BeOfType<NoContentResult>();
 
-        var secretAudit = await _dbContext.AuditLogEntries.IgnoreQueryFilters()
+        var secretAudit = await _dbContext
+            .AuditLogEntries.IgnoreQueryFilters()
             .SingleAsync(entry => entry.EntityType == "TenantSourceSecret");
 
         secretAudit.TenantId.Should().Be(tenant.Id);
@@ -148,9 +155,13 @@ public class SettingsAuditControllerTests : IDisposable
         action.Should().BeOfType<NoContentResult>();
 
         var visibleEntries = await _dbContext.AuditLogEntries.AsNoTracking().ToListAsync();
-        visibleEntries.Should().ContainSingle(entry => entry.EntityType == "EnrichmentSourceSecret");
+        visibleEntries
+            .Should()
+            .ContainSingle(entry => entry.EntityType == "EnrichmentSourceSecret");
 
-        var secretAudit = visibleEntries.Single(entry => entry.EntityType == "EnrichmentSourceSecret");
+        var secretAudit = visibleEntries.Single(entry =>
+            entry.EntityType == "EnrichmentSourceSecret"
+        );
         secretAudit.TenantId.Should().Be(Guid.Empty);
         secretAudit.Action.Should().Be(AuditAction.Updated);
         secretAudit.UserId.Should().Be(_userId);

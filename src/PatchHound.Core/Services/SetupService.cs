@@ -85,10 +85,7 @@ public class SetupService : ISetupService
             return Result<Tenant>.Failure("Admin email already exists");
         }
 
-        var tenant = Tenant.Create(
-            request.TenantName.Trim(),
-            request.EntraTenantId.Trim()
-        );
+        var tenant = Tenant.Create(request.TenantName.Trim(), request.EntraTenantId.Trim());
 
         var user =
             existingUser

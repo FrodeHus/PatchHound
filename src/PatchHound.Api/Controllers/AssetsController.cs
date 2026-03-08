@@ -84,7 +84,10 @@ public class AssetsController : ControllerBase
         if (!string.IsNullOrEmpty(filter.Search))
             query = query.Where(a =>
                 a.Name.Contains(filter.Search)
-                || (a.DeviceComputerDnsName != null && a.DeviceComputerDnsName.Contains(filter.Search))
+                || (
+                    a.DeviceComputerDnsName != null
+                    && a.DeviceComputerDnsName.Contains(filter.Search)
+                )
                 || a.ExternalId.Contains(filter.Search)
             );
 
@@ -101,21 +104,16 @@ public class AssetsController : ControllerBase
             .VulnerabilityAssetEpisodes.AsNoTracking()
             .Where(episode => assetIds.Contains(episode.AssetId))
             .GroupBy(episode => new { episode.AssetId, episode.VulnerabilityId })
-            .Select(group => new
-            {
-                group.Key.AssetId,
-                IsRecurring = group.Count() > 1,
-            })
+            .Select(group => new { group.Key.AssetId, IsRecurring = group.Count() > 1 })
             .Where(item => item.IsRecurring)
             .GroupBy(item => item.AssetId)
-            .Select(group => new
-            {
-                AssetId = group.Key,
-                Count = group.Count(),
-            })
+            .Select(group => new { AssetId = group.Key, Count = group.Count() })
             .ToListAsync(ct);
 
-        var recurringCountsByAssetId = recurringCounts.ToDictionary(item => item.AssetId, item => item.Count);
+        var recurringCountsByAssetId = recurringCounts.ToDictionary(
+            item => item.AssetId,
+            item => item.Count
+        );
 
         var itemRows = await query
             .OrderBy(a => a.Name)
@@ -125,9 +123,7 @@ public class AssetsController : ControllerBase
             {
                 a.Id,
                 a.ExternalId,
-                Name = a.AssetType == AssetType.Device
-                    ? a.DeviceComputerDnsName ?? a.Name
-                    : a.Name,
+                Name = a.AssetType == AssetType.Device ? a.DeviceComputerDnsName ?? a.Name : a.Name,
                 AssetType = a.AssetType.ToString(),
                 Criticality = a.Criticality.ToString(),
                 OwnerType = a.OwnerType.ToString(),
@@ -149,11 +145,20 @@ public class AssetsController : ControllerBase
                 a.OwnerType,
                 a.SecurityProfileName,
                 a.VulnerabilityCount,
-                recurringCountsByAssetId.TryGetValue(a.Id, out var recurringCount) ? recurringCount : 0
+                recurringCountsByAssetId.TryGetValue(a.Id, out var recurringCount)
+                    ? recurringCount
+                    : 0
             ))
             .ToList();
 
-        return Ok(new PagedResponse<AssetDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
+        return Ok(
+            new PagedResponse<AssetDto>(
+                items,
+                totalCount,
+                pagination.Page,
+                pagination.BoundedPageSize
+            )
+        );
     }
 
     [HttpGet("{id:guid}")]
@@ -200,15 +205,16 @@ public class AssetsController : ControllerBase
             .GroupBy(row => row.VulnerabilityId)
             .ToDictionary(
                 group => group.Key,
-                group => group
-                    .Select(row => new AssetVulnerabilityEpisodeDto(
-                        row.EpisodeNumber,
-                        row.Status.ToString(),
-                        row.FirstSeenAt,
-                        row.LastSeenAt,
-                        row.ResolvedAt
-                    ))
-                    .ToList() as IReadOnlyList<AssetVulnerabilityEpisodeDto>
+                group =>
+                    group
+                        .Select(row => new AssetVulnerabilityEpisodeDto(
+                            row.EpisodeNumber,
+                            row.Status.ToString(),
+                            row.FirstSeenAt,
+                            row.LastSeenAt,
+                            row.ResolvedAt
+                        ))
+                        .ToList() as IReadOnlyList<AssetVulnerabilityEpisodeDto>
             );
 
         var softwareEpisodeRows = await _dbContext
@@ -229,14 +235,15 @@ public class AssetsController : ControllerBase
             .GroupBy(row => row.SoftwareAssetId)
             .ToDictionary(
                 group => group.Key,
-                group => group
-                    .Select(row => new AssetSoftwareInstallationEpisodeDto(
-                        row.EpisodeNumber,
-                        row.FirstSeenAt,
-                        row.LastSeenAt,
-                        row.RemovedAt
-                    ))
-                    .ToList() as IReadOnlyList<AssetSoftwareInstallationEpisodeDto>
+                group =>
+                    group
+                        .Select(row => new AssetSoftwareInstallationEpisodeDto(
+                            row.EpisodeNumber,
+                            row.FirstSeenAt,
+                            row.LastSeenAt,
+                            row.RemovedAt
+                        ))
+                        .ToList() as IReadOnlyList<AssetSoftwareInstallationEpisodeDto>
             );
 
         var softwareRows = await _dbContext
@@ -246,13 +253,14 @@ public class AssetsController : ControllerBase
                 _dbContext.Assets,
                 link => link.SoftwareAssetId,
                 software => software.Id,
-                (link, software) => new
-                {
-                    software.Id,
-                    software.Name,
-                    software.ExternalId,
-                    link.LastSeenAt,
-                }
+                (link, software) =>
+                    new
+                    {
+                        software.Id,
+                        software.Name,
+                        software.ExternalId,
+                        link.LastSeenAt,
+                    }
             )
             .ToListAsync(ct);
 
@@ -267,19 +275,20 @@ public class AssetsController : ControllerBase
             .GroupBy(row => row.VulnerabilityId)
             .ToDictionary(
                 group => group.Key,
-                group => RankPossibleCorrelatedSoftware(
-                    softwareEpisodeRows,
-                    softwareNamesByAssetId,
-                    group
-                        .Select(row => new AssetVulnerabilityEpisodeDto(
-                            row.EpisodeNumber,
-                            row.Status.ToString(),
-                            row.FirstSeenAt,
-                            row.LastSeenAt,
-                            row.ResolvedAt
-                        ))
-                        .ToList()
-                )
+                group =>
+                    RankPossibleCorrelatedSoftware(
+                        softwareEpisodeRows,
+                        softwareNamesByAssetId,
+                        group
+                            .Select(row => new AssetVulnerabilityEpisodeDto(
+                                row.EpisodeNumber,
+                                row.Status.ToString(),
+                                row.FirstSeenAt,
+                                row.LastSeenAt,
+                                row.ResolvedAt
+                            ))
+                            .ToList()
+                    )
             );
 
         var vulnerabilityRows = await _dbContext
@@ -289,19 +298,20 @@ public class AssetsController : ControllerBase
                 _dbContext.Vulnerabilities,
                 va => va.VulnerabilityId,
                 v => v.Id,
-                (va, v) => new
-                {
-                    v.Id,
-                    v.ExternalId,
-                    v.Title,
-                    v.Description,
-                    VendorSeverity = v.VendorSeverity.ToString(),
-                    v.CvssVector,
-                    v.PublishedDate,
-                    Status = va.Status.ToString(),
-                    va.DetectedDate,
-                    va.ResolvedDate,
-                }
+                (va, v) =>
+                    new
+                    {
+                        v.Id,
+                        v.ExternalId,
+                        v.Title,
+                        v.Description,
+                        VendorSeverity = v.VendorSeverity.ToString(),
+                        v.CvssVector,
+                        v.PublishedDate,
+                        Status = va.Status.ToString(),
+                        va.DetectedDate,
+                        va.ResolvedDate,
+                    }
             )
             .ToListAsync(ct);
 
@@ -310,7 +320,10 @@ public class AssetsController : ControllerBase
             {
                 assessmentsByVulnerabilityId.TryGetValue(row.Id, out var assessment);
                 episodesByVulnerabilityId.TryGetValue(row.Id, out var episodeHistory);
-                possibleCorrelationsByVulnerabilityId.TryGetValue(row.Id, out var correlatedSoftware);
+                possibleCorrelationsByVulnerabilityId.TryGetValue(
+                    row.Id,
+                    out var correlatedSoftware
+                );
 
                 return new AssetVulnerabilityDto(
                     row.Id,
@@ -340,7 +353,9 @@ public class AssetsController : ControllerBase
                 row.Name,
                 row.ExternalId,
                 row.LastSeenAt,
-                softwareEpisodesByAssetId.TryGetValue(row.Id, out var episodes) ? episodes.Count : 0,
+                softwareEpisodesByAssetId.TryGetValue(row.Id, out var episodes)
+                    ? episodes.Count
+                    : 0,
                 softwareEpisodesByAssetId.TryGetValue(row.Id, out var episodeHistory)
                     ? episodeHistory
                     : []
@@ -489,8 +504,10 @@ public class AssetsController : ControllerBase
                 var matchingEpisode = vulnerabilityEpisodes
                     .Where(episode =>
                         softwareRow.FirstSeenAt <= episode.FirstSeenAt
-                        && (softwareRow.RemovedAt is null
-                            || softwareRow.RemovedAt >= episode.FirstSeenAt)
+                        && (
+                            softwareRow.RemovedAt is null
+                            || softwareRow.RemovedAt >= episode.FirstSeenAt
+                        )
                     )
                     .Select(episode =>
                     {
@@ -530,10 +547,9 @@ public class AssetsController : ControllerBase
             })
             .Where(item => item is not null)
             .GroupBy(item => item!.Name, StringComparer.Ordinal)
-            .Select(group => group
-                .OrderByDescending(item => item!.Score)
-                .ThenBy(item => item!.Age)
-                .First())
+            .Select(group =>
+                group.OrderByDescending(item => item!.Score).ThenBy(item => item!.Age).First()
+            )
             .OrderByDescending(item => item!.Score)
             .ThenBy(item => item!.Age)
             .Select(item => item!.Name)

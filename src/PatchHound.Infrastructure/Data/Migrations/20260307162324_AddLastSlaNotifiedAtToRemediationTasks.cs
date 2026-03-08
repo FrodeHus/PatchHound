@@ -15,15 +15,14 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 name: "LastSlaNotifiedAt",
                 table: "RemediationTasks",
                 type: "timestamp with time zone",
-                nullable: true);
+                nullable: true
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "LastSlaNotifiedAt",
-                table: "RemediationTasks");
+            migrationBuilder.DropColumn(name: "LastSlaNotifiedAt", table: "RemediationTasks");
         }
     }
 }

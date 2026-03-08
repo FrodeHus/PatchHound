@@ -189,9 +189,11 @@ public class AuthorizationTests
         _tenantContext.CurrentTenantId.Returns(tenantB);
 
         // User is SecurityAnalyst in tenantA, Stakeholder in tenantB
-        _tenantContext.GetRolesForTenant(tenantA)
+        _tenantContext
+            .GetRolesForTenant(tenantA)
             .Returns(new List<string> { RoleName.SecurityAnalyst.ToString() });
-        _tenantContext.GetRolesForTenant(tenantB)
+        _tenantContext
+            .GetRolesForTenant(tenantB)
             .Returns(new List<string> { RoleName.Stakeholder.ToString() });
 
         var handler = new RoleRequirementHandler(_tenantContext);
@@ -210,8 +212,7 @@ public class AuthorizationTests
 
     private void SetupRolesForTenant(RoleName role)
     {
-        _tenantContext.GetRolesForTenant(_tenantId)
-            .Returns(new List<string> { role.ToString() });
+        _tenantContext.GetRolesForTenant(_tenantId).Returns(new List<string> { role.ToString() });
     }
 
     private AuthorizationHandlerContext CreateAuthContext(
@@ -228,10 +229,6 @@ public class AuthorizationTests
         }
         var principal = new ClaimsPrincipal(identity);
 
-        return new AuthorizationHandlerContext(
-            new[] { requirement },
-            principal,
-            null
-        );
+        return new AuthorizationHandlerContext(new[] { requirement }, principal, null);
     }
 }

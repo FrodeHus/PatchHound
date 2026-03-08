@@ -13,13 +13,24 @@ public class HttpEventPusher : IEventPusher
     {
         _httpClient = httpClient;
         _httpClient.BaseAddress = new Uri(
-            configuration["Frontend:InternalUrl"] ?? "http://frontend:3000");
+            configuration["Frontend:InternalUrl"] ?? "http://frontend:3000"
+        );
         _internalToken = configuration["Frontend:InternalEventSecret"];
     }
 
-    public async Task PushAsync(string eventName, object data, string? userId = null, CancellationToken ct = default)
+    public async Task PushAsync(
+        string eventName,
+        object data,
+        string? userId = null,
+        CancellationToken ct = default
+    )
     {
-        var payload = new { @event = eventName, data, userId };
+        var payload = new
+        {
+            @event = eventName,
+            data,
+            userId,
+        };
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/internal/events")
         {
             Content = JsonContent.Create(payload),

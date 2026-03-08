@@ -35,7 +35,12 @@ public class EnrichmentSourceConfiguration
         };
     }
 
-    public void UpdateConfiguration(string displayName, bool enabled, string secretRef, string apiBaseUrl)
+    public void UpdateConfiguration(
+        string displayName,
+        bool enabled,
+        string secretRef,
+        string apiBaseUrl
+    )
     {
         DisplayName = displayName;
         Enabled = enabled;

@@ -42,7 +42,9 @@ public class OpenBaoSecretStore : ISecretStore
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             return null;
 
-        var payload = await response.Content.ReadFromJsonAsync<OpenBaoKvResponse>(cancellationToken: ct);
+        var payload = await response.Content.ReadFromJsonAsync<OpenBaoKvResponse>(
+            cancellationToken: ct
+        );
         return payload?.Data.Data.GetValueOrDefault(key);
     }
 
@@ -76,12 +78,10 @@ public class OpenBaoSecretStore : ISecretStore
             using var response = await _httpClient.GetAsync("/v1/sys/seal-status", ct);
             response.EnsureSuccessStatusCode();
 
-            var payload = await response.Content.ReadFromJsonAsync<OpenBaoSealStatusResponse>(cancellationToken: ct);
-            return new OpenBaoStatus(
-                true,
-                payload?.Initialized ?? false,
-                payload?.Sealed ?? true
+            var payload = await response.Content.ReadFromJsonAsync<OpenBaoSealStatusResponse>(
+                cancellationToken: ct
             );
+            return new OpenBaoStatus(true, payload?.Initialized ?? false, payload?.Sealed ?? true);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
@@ -137,12 +137,18 @@ public class OpenBaoSecretStore : ISecretStore
         return new OpenBaoStatus(true, lastPayload.Initialized, lastPayload.Sealed);
     }
 
-    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    private async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken ct
+    )
     {
         try
         {
             var response = await _httpClient.SendAsync(request, ct);
-            if (response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            if (
+                response.IsSuccessStatusCode
+                || response.StatusCode == System.Net.HttpStatusCode.NotFound
+            )
             {
                 return response;
             }
@@ -163,11 +169,7 @@ public class OpenBaoSecretStore : ISecretStore
         }
         catch (HttpRequestException ex)
         {
-            throw new SecretStoreUnavailableException(
-                "OpenBao could not be reached.",
-                null,
-                ex
-            );
+            throw new SecretStoreUnavailableException("OpenBao could not be reached.", null, ex);
         }
     }
 

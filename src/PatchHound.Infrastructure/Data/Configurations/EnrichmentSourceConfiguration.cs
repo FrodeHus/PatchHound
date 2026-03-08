@@ -4,7 +4,8 @@ using PatchHound.Core.Entities;
 
 namespace PatchHound.Infrastructure.Data.Configurations;
 
-public class EnrichmentSourceConfigurationConfiguration : IEntityTypeConfiguration<EnrichmentSourceConfiguration>
+public class EnrichmentSourceConfigurationConfiguration
+    : IEntityTypeConfiguration<EnrichmentSourceConfiguration>
 {
     public void Configure(EntityTypeBuilder<EnrichmentSourceConfiguration> builder)
     {

@@ -16,27 +16,62 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    SourceKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    DisplayName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    SourceKey = table.Column<string>(
+                        type: "character varying(128)",
+                        maxLength: 128,
+                        nullable: false
+                    ),
+                    DisplayName = table.Column<string>(
+                        type: "character varying(256)",
+                        maxLength: 256,
+                        nullable: false
+                    ),
                     Enabled = table.Column<bool>(type: "boolean", nullable: false),
-                    SecretRef = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    ApiBaseUrl = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    LastStartedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    LastCompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    LastSucceededAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    LastStatus = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    LastError = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false)
+                    SecretRef = table.Column<string>(
+                        type: "character varying(512)",
+                        maxLength: 512,
+                        nullable: false
+                    ),
+                    ApiBaseUrl = table.Column<string>(
+                        type: "character varying(512)",
+                        maxLength: 512,
+                        nullable: false
+                    ),
+                    LastStartedAt = table.Column<DateTimeOffset>(
+                        type: "timestamp with time zone",
+                        nullable: true
+                    ),
+                    LastCompletedAt = table.Column<DateTimeOffset>(
+                        type: "timestamp with time zone",
+                        nullable: true
+                    ),
+                    LastSucceededAt = table.Column<DateTimeOffset>(
+                        type: "timestamp with time zone",
+                        nullable: true
+                    ),
+                    LastStatus = table.Column<string>(
+                        type: "character varying(64)",
+                        maxLength: 64,
+                        nullable: false
+                    ),
+                    LastError = table.Column<string>(
+                        type: "character varying(512)",
+                        maxLength: 512,
+                        nullable: false
+                    ),
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_EnrichmentSourceConfigurations", x => x.Id);
-                });
+                }
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_EnrichmentSourceConfigurations_SourceKey",
                 table: "EnrichmentSourceConfigurations",
                 column: "SourceKey",
-                unique: true);
+                unique: true
+            );
 
             migrationBuilder.Sql(
                 $"""
@@ -143,8 +178,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 """
             );
 
-            migrationBuilder.DropTable(
-                name: "EnrichmentSourceConfigurations");
+            migrationBuilder.DropTable(name: "EnrichmentSourceConfigurations");
         }
     }
 }

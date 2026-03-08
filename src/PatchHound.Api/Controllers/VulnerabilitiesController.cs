@@ -86,9 +86,11 @@ public class VulnerabilitiesController : ControllerBase
         if (filter.RecurrenceOnly == true)
         {
             query = query.Where(v =>
-                _dbContext.VulnerabilityAssetEpisodes.Count(episode => episode.VulnerabilityId == v.Id)
-                > _dbContext.VulnerabilityAssetEpisodes
-                    .Where(episode => episode.VulnerabilityId == v.Id)
+                _dbContext.VulnerabilityAssetEpisodes.Count(episode =>
+                    episode.VulnerabilityId == v.Id
+                )
+                > _dbContext
+                    .VulnerabilityAssetEpisodes.Where(episode => episode.VulnerabilityId == v.Id)
                     .Select(episode => episode.AssetId)
                     .Distinct()
                     .Count()
@@ -182,7 +184,14 @@ public class VulnerabilitiesController : ControllerBase
             ))
             .ToList();
 
-        return Ok(new PagedResponse<VulnerabilityDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
+        return Ok(
+            new PagedResponse<VulnerabilityDto>(
+                items,
+                totalCount,
+                pagination.Page,
+                pagination.BoundedPageSize
+            )
+        );
     }
 
     [HttpGet("{id:guid}")]
@@ -209,8 +218,8 @@ public class VulnerabilitiesController : ControllerBase
             .Assets.AsNoTracking()
             .Where(a => assetIds.Contains(a.Id))
             .ToDictionaryAsync(a => a.Id, ct);
-        var securityProfileIds = assets.Values
-            .Where(asset => asset.SecurityProfileId.HasValue)
+        var securityProfileIds = assets
+            .Values.Where(asset => asset.SecurityProfileId.HasValue)
             .Select(asset => asset.SecurityProfileId!.Value)
             .Distinct()
             .ToList();
@@ -243,15 +252,16 @@ public class VulnerabilitiesController : ControllerBase
             .GroupBy(row => row.AssetId)
             .ToDictionary(
                 group => group.Key,
-                group => group
-                    .Select(row => new VulnerabilityEpisodeDto(
-                        row.EpisodeNumber,
-                        row.Status.ToString(),
-                        row.FirstSeenAt,
-                        row.LastSeenAt,
-                        row.ResolvedAt
-                    ))
-                    .ToList() as IReadOnlyList<VulnerabilityEpisodeDto>
+                group =>
+                    group
+                        .Select(row => new VulnerabilityEpisodeDto(
+                            row.EpisodeNumber,
+                            row.Status.ToString(),
+                            row.FirstSeenAt,
+                            row.LastSeenAt,
+                            row.ResolvedAt
+                        ))
+                        .ToList() as IReadOnlyList<VulnerabilityEpisodeDto>
             );
 
         var softwareEpisodeRows = await _dbContext
@@ -261,13 +271,14 @@ public class VulnerabilitiesController : ControllerBase
                 _dbContext.Assets.AsNoTracking(),
                 episode => episode.SoftwareAssetId,
                 software => software.Id,
-                (episode, software) => new SoftwareCorrelationRow(
-                    episode.DeviceAssetId,
-                    software.Name,
-                    episode.EpisodeNumber,
-                    episode.FirstSeenAt,
-                    episode.RemovedAt
-                )
+                (episode, software) =>
+                    new SoftwareCorrelationRow(
+                        episode.DeviceAssetId,
+                        software.Name,
+                        episode.EpisodeNumber,
+                        episode.FirstSeenAt,
+                        episode.RemovedAt
+                    )
             )
             .ToListAsync(ct);
 
@@ -297,13 +308,14 @@ public class VulnerabilitiesController : ControllerBase
                         asset?.Name ?? "Unknown",
                         asset?.AssetType.ToString() ?? "Unknown",
                         asset?.SecurityProfileId is Guid profileId
-                            && securityProfileNamesById.TryGetValue(profileId, out var profileName)
+                        && securityProfileNamesById.TryGetValue(profileId, out var profileName)
                             ? profileName
                             : null,
                         va.Status.ToString(),
                         vulnerability.VendorSeverity.ToString(),
                         assessment?.BaseScore ?? vulnerability.CvssScore,
-                        assessment?.EffectiveSeverity.ToString() ?? vulnerability.VendorSeverity.ToString(),
+                        assessment?.EffectiveSeverity.ToString()
+                            ?? vulnerability.VendorSeverity.ToString(),
                         assessment?.EffectiveScore ?? vulnerability.CvssScore,
                         assessment?.ReasonSummary,
                         va.DetectedDate,
@@ -340,16 +352,7 @@ public class VulnerabilitiesController : ControllerBase
     {
         if (episodeRows.Count == 0)
         {
-            return new VulnerabilityTenantHistoryDto(
-                null,
-                null,
-                null,
-                null,
-                false,
-                0,
-                0,
-                0
-            );
+            return new VulnerabilityTenantHistoryDto(null, null, null, null, false, 0, 0, 0);
         }
 
         var events = episodeRows
@@ -425,8 +428,10 @@ public class VulnerabilitiesController : ControllerBase
                 var matchingEpisodes = episodes
                     .Where(episode =>
                         softwareRow.FirstSeenAt <= episode.FirstSeenAt
-                        && (softwareRow.RemovedAt is null
-                            || softwareRow.RemovedAt >= episode.FirstSeenAt)
+                        && (
+                            softwareRow.RemovedAt is null
+                            || softwareRow.RemovedAt >= episode.FirstSeenAt
+                        )
                     )
                     .Select(episode =>
                     {
@@ -466,10 +471,9 @@ public class VulnerabilitiesController : ControllerBase
             })
             .Where(item => item is not null)
             .GroupBy(item => item!.Name, StringComparer.Ordinal)
-            .Select(group => group
-                .OrderByDescending(item => item!.Score)
-                .ThenBy(item => item!.Age)
-                .First())
+            .Select(group =>
+                group.OrderByDescending(item => item!.Score).ThenBy(item => item!.Age).First()
+            )
             .OrderByDescending(item => item!.Score)
             .ThenBy(item => item!.Age)
             .Select(item => item!.Name)

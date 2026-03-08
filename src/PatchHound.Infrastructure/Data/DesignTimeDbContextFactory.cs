@@ -27,7 +27,9 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<PatchHound
         public IReadOnlyList<Guid> AccessibleTenantIds => Array.Empty<Guid>();
         public Guid CurrentUserId => Guid.Empty;
         public bool IsSystemContext => false;
+
         public bool HasAccessToTenant(Guid tenantId) => false;
+
         public IReadOnlyList<string> GetRolesForTenant(Guid tenantId) => Array.Empty<string>();
     }
 }

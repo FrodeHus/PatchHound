@@ -24,10 +24,11 @@ public static class DependencyInjection
     {
         // Database
         services.AddScoped<AuditSaveChangesInterceptor>();
-        services.AddDbContext<PatchHoundDbContext>((sp, options) =>
-            options
-                .UseNpgsql(configuration.GetConnectionString("PatchHound"))
-                .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>())
+        services.AddDbContext<PatchHoundDbContext>(
+            (sp, options) =>
+                options
+                    .UseNpgsql(configuration.GetConnectionString("PatchHound"))
+                    .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>())
         );
 
         // Unit of Work
@@ -42,10 +43,22 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITeamRepository, TeamRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
-        services.AddScoped<IRepository<TenantSourceConfiguration>, RepositoryBase<TenantSourceConfiguration>>();
-        services.AddScoped<IRepository<EnrichmentSourceConfiguration>, RepositoryBase<EnrichmentSourceConfiguration>>();
-        services.AddScoped<IRepository<TenantSlaConfiguration>, RepositoryBase<TenantSlaConfiguration>>();
-        services.AddScoped<IRepository<OrganizationalSeverity>, RepositoryBase<OrganizationalSeverity>>();
+        services.AddScoped<
+            IRepository<TenantSourceConfiguration>,
+            RepositoryBase<TenantSourceConfiguration>
+        >();
+        services.AddScoped<
+            IRepository<EnrichmentSourceConfiguration>,
+            RepositoryBase<EnrichmentSourceConfiguration>
+        >();
+        services.AddScoped<
+            IRepository<TenantSlaConfiguration>,
+            RepositoryBase<TenantSlaConfiguration>
+        >();
+        services.AddScoped<
+            IRepository<OrganizationalSeverity>,
+            RepositoryBase<OrganizationalSeverity>
+        >();
 
         // Application services
         services.AddScoped<VulnerabilityService>();
@@ -80,7 +93,8 @@ public static class DependencyInjection
         services.AddHttpClient<ISecretStore, OpenBaoSecretStore>();
         services.AddScoped<DefenderTenantConfigurationProvider>();
         services.AddScoped<NvdGlobalConfigurationProvider>();
-        services.AddOptions<OpenBaoOptions>()
+        services
+            .AddOptions<OpenBaoOptions>()
             .Bind(configuration.GetSection(OpenBaoOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();

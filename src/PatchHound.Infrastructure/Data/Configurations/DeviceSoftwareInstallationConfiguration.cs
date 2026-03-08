@@ -4,7 +4,8 @@ using PatchHound.Core.Entities;
 
 namespace PatchHound.Infrastructure.Data.Configurations;
 
-public class DeviceSoftwareInstallationConfiguration : IEntityTypeConfiguration<DeviceSoftwareInstallation>
+public class DeviceSoftwareInstallationConfiguration
+    : IEntityTypeConfiguration<DeviceSoftwareInstallation>
 {
     public void Configure(EntityTypeBuilder<DeviceSoftwareInstallation> builder)
     {

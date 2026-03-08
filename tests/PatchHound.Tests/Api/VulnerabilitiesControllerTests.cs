@@ -60,8 +60,18 @@ public class VulnerabilitiesControllerTests : IDisposable
             Severity.High,
             "MicrosoftDefender"
         );
-        var recurringAsset = Asset.Create(_tenantId, "device-1", AssetType.Device, "Device 1", Criticality.High);
-        var recurringLink = VulnerabilityAsset.Create(recurringVulnerability.Id, recurringAsset.Id, DateTimeOffset.UtcNow.AddDays(-10));
+        var recurringAsset = Asset.Create(
+            _tenantId,
+            "device-1",
+            AssetType.Device,
+            "Device 1",
+            Criticality.High
+        );
+        var recurringLink = VulnerabilityAsset.Create(
+            recurringVulnerability.Id,
+            recurringAsset.Id,
+            DateTimeOffset.UtcNow.AddDays(-10)
+        );
 
         var nonRecurringAcrossAssets = Vulnerability.Create(
             _tenantId,
@@ -71,10 +81,30 @@ public class VulnerabilitiesControllerTests : IDisposable
             Severity.High,
             "MicrosoftDefender"
         );
-        var assetTwo = Asset.Create(_tenantId, "device-2", AssetType.Device, "Device 2", Criticality.Medium);
-        var assetThree = Asset.Create(_tenantId, "device-3", AssetType.Device, "Device 3", Criticality.Medium);
-        var linkTwo = VulnerabilityAsset.Create(nonRecurringAcrossAssets.Id, assetTwo.Id, DateTimeOffset.UtcNow.AddDays(-6));
-        var linkThree = VulnerabilityAsset.Create(nonRecurringAcrossAssets.Id, assetThree.Id, DateTimeOffset.UtcNow.AddDays(-5));
+        var assetTwo = Asset.Create(
+            _tenantId,
+            "device-2",
+            AssetType.Device,
+            "Device 2",
+            Criticality.Medium
+        );
+        var assetThree = Asset.Create(
+            _tenantId,
+            "device-3",
+            AssetType.Device,
+            "Device 3",
+            Criticality.Medium
+        );
+        var linkTwo = VulnerabilityAsset.Create(
+            nonRecurringAcrossAssets.Id,
+            assetTwo.Id,
+            DateTimeOffset.UtcNow.AddDays(-6)
+        );
+        var linkThree = VulnerabilityAsset.Create(
+            nonRecurringAcrossAssets.Id,
+            assetThree.Id,
+            DateTimeOffset.UtcNow.AddDays(-5)
+        );
 
         await _dbContext.AddRangeAsync(
             recurringVulnerability,
@@ -88,10 +118,34 @@ public class VulnerabilitiesControllerTests : IDisposable
         );
 
         await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(
-            VulnerabilityAssetEpisode.Create(_tenantId, recurringVulnerability.Id, recurringAsset.Id, 1, DateTimeOffset.UtcNow.AddDays(-20)),
-            VulnerabilityAssetEpisode.Create(_tenantId, recurringVulnerability.Id, recurringAsset.Id, 2, DateTimeOffset.UtcNow.AddDays(-3)),
-            VulnerabilityAssetEpisode.Create(_tenantId, nonRecurringAcrossAssets.Id, assetTwo.Id, 1, DateTimeOffset.UtcNow.AddDays(-6)),
-            VulnerabilityAssetEpisode.Create(_tenantId, nonRecurringAcrossAssets.Id, assetThree.Id, 1, DateTimeOffset.UtcNow.AddDays(-5))
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                recurringVulnerability.Id,
+                recurringAsset.Id,
+                1,
+                DateTimeOffset.UtcNow.AddDays(-20)
+            ),
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                recurringVulnerability.Id,
+                recurringAsset.Id,
+                2,
+                DateTimeOffset.UtcNow.AddDays(-3)
+            ),
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                nonRecurringAcrossAssets.Id,
+                assetTwo.Id,
+                1,
+                DateTimeOffset.UtcNow.AddDays(-6)
+            ),
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                nonRecurringAcrossAssets.Id,
+                assetThree.Id,
+                1,
+                DateTimeOffset.UtcNow.AddDays(-5)
+            )
         );
         await _dbContext.SaveChangesAsync();
 
@@ -114,7 +168,13 @@ public class VulnerabilitiesControllerTests : IDisposable
     [Fact]
     public async Task Get_RanksPossibleCorrelatedSoftware_ByReinstallAndTiming()
     {
-        var device = Asset.Create(_tenantId, "device-1", AssetType.Device, "Device 1", Criticality.High);
+        var device = Asset.Create(
+            _tenantId,
+            "device-1",
+            AssetType.Device,
+            "Device 1",
+            Criticality.High
+        );
         var vulnerability = Vulnerability.Create(
             _tenantId,
             "CVE-2026-0100",
@@ -123,13 +183,42 @@ public class VulnerabilitiesControllerTests : IDisposable
             Severity.Critical,
             "MicrosoftDefender"
         );
-        var link = VulnerabilityAsset.Create(vulnerability.Id, device.Id, new DateTimeOffset(2026, 2, 10, 12, 0, 0, TimeSpan.Zero));
+        var link = VulnerabilityAsset.Create(
+            vulnerability.Id,
+            device.Id,
+            new DateTimeOffset(2026, 2, 10, 12, 0, 0, TimeSpan.Zero)
+        );
 
-        var closeReinstall = Asset.Create(_tenantId, "soft-1", AssetType.Software, "Contoso Agent", Criticality.Low);
-        var closeInstall = Asset.Create(_tenantId, "soft-2", AssetType.Software, "Nearby Utility", Criticality.Low);
-        var oldInstall = Asset.Create(_tenantId, "soft-3", AssetType.Software, "Legacy Runtime", Criticality.Low);
+        var closeReinstall = Asset.Create(
+            _tenantId,
+            "soft-1",
+            AssetType.Software,
+            "Contoso Agent",
+            Criticality.Low
+        );
+        var closeInstall = Asset.Create(
+            _tenantId,
+            "soft-2",
+            AssetType.Software,
+            "Nearby Utility",
+            Criticality.Low
+        );
+        var oldInstall = Asset.Create(
+            _tenantId,
+            "soft-3",
+            AssetType.Software,
+            "Legacy Runtime",
+            Criticality.Low
+        );
 
-        await _dbContext.AddRangeAsync(device, vulnerability, link, closeReinstall, closeInstall, oldInstall);
+        await _dbContext.AddRangeAsync(
+            device,
+            vulnerability,
+            link,
+            closeReinstall,
+            closeInstall,
+            oldInstall
+        );
 
         var firstEpisode = VulnerabilityAssetEpisode.Create(
             _tenantId,
@@ -171,7 +260,11 @@ public class VulnerabilitiesControllerTests : IDisposable
         );
 
         await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(firstEpisode, secondEpisode);
-        await _dbContext.DeviceSoftwareInstallationEpisodes.AddRangeAsync(reinstallEpisode, nearbyEpisode, oldEpisode);
+        await _dbContext.DeviceSoftwareInstallationEpisodes.AddRangeAsync(
+            reinstallEpisode,
+            nearbyEpisode,
+            oldEpisode
+        );
         await _dbContext.SaveChangesAsync();
 
         var action = await _controller.Get(vulnerability.Id, CancellationToken.None);
@@ -180,7 +273,9 @@ public class VulnerabilitiesControllerTests : IDisposable
         var payload = result.Value.Should().BeOfType<VulnerabilityDetailDto>().Subject;
         var asset = payload.AffectedAssets.Should().ContainSingle().Subject;
 
-        asset.PossibleCorrelatedSoftware.Should().Equal("Contoso Agent", "Nearby Utility", "Legacy Runtime");
+        asset
+            .PossibleCorrelatedSoftware.Should()
+            .Equal("Contoso Agent", "Nearby Utility", "Legacy Runtime");
     }
 
     [Fact]

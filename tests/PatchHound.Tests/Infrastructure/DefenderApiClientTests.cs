@@ -66,10 +66,12 @@ public class DefenderApiClientTests
 
         response.Value.Should().HaveCount(2);
         response.Value.Select(entry => entry.Id).Should().ContainInOrder("entry-1", "entry-2");
-        handler.RequestUris.Should().ContainInOrder(
-            "https://api.securitycenter.microsoft.com/api/vulnerabilities/machinesVulnerabilities",
-            "https://api.securitycenter.microsoft.com/api/vulnerabilities/machinesVulnerabilities?$skip=1"
-        );
+        handler
+            .RequestUris.Should()
+            .ContainInOrder(
+                "https://api.securitycenter.microsoft.com/api/vulnerabilities/machinesVulnerabilities",
+                "https://api.securitycenter.microsoft.com/api/vulnerabilities/machinesVulnerabilities?$skip=1"
+            );
         handler.AuthorizationHeaders.Should().OnlyContain(value => value == "Bearer test-token");
     }
 
@@ -109,10 +111,12 @@ public class DefenderApiClientTests
 
         response.Value.Should().HaveCount(2);
         response.Value.Select(entry => entry.Id).Should().ContainInOrder("machine-1", "machine-2");
-        handler.RequestUris.Should().ContainInOrder(
-            "https://api.securitycenter.microsoft.com/api/machines?$top=10000",
-            "https://api.securitycenter.microsoft.com/api/machines?$skip=1"
-        );
+        handler
+            .RequestUris.Should()
+            .ContainInOrder(
+                "https://api.securitycenter.microsoft.com/api/machines?$top=10000",
+                "https://api.securitycenter.microsoft.com/api/machines?$skip=1"
+            );
     }
 
     [Fact]
@@ -158,11 +162,16 @@ public class DefenderApiClientTests
         );
 
         response.Value.Should().HaveCount(2);
-        response.Value.Select(entry => entry.Id).Should().ContainInOrder("software-1", "software-2");
-        handler.RequestUris.Should().ContainInOrder(
-            "https://api.securitycenter.microsoft.com/api/machines/machine-1/software",
-            "https://api.securitycenter.microsoft.com/api/machines/machine-1/software?$skip=1"
-        );
+        response
+            .Value.Select(entry => entry.Id)
+            .Should()
+            .ContainInOrder("software-1", "software-2");
+        handler
+            .RequestUris.Should()
+            .ContainInOrder(
+                "https://api.securitycenter.microsoft.com/api/machines/machine-1/software",
+                "https://api.securitycenter.microsoft.com/api/machines/machine-1/software?$skip=1"
+            );
     }
 
     private static HttpResponseMessage CreateJsonResponse(string json)
@@ -173,7 +182,8 @@ public class DefenderApiClientTests
         };
     }
 
-    private sealed class TestDefenderApiClient(HttpClient httpClient) : DefenderApiClient(httpClient)
+    private sealed class TestDefenderApiClient(HttpClient httpClient)
+        : DefenderApiClient(httpClient)
     {
         protected override Task<string> GetAccessTokenAsync(
             DefenderClientConfiguration configuration,
@@ -184,9 +194,8 @@ public class DefenderApiClientTests
         }
     }
 
-    private sealed class SequenceHttpMessageHandler(
-        params HttpResponseMessage[] responses
-    ) : HttpMessageHandler
+    private sealed class SequenceHttpMessageHandler(params HttpResponseMessage[] responses)
+        : HttpMessageHandler
     {
         private readonly Queue<HttpResponseMessage> _responses = new(responses);
 

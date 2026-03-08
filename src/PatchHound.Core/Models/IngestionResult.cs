@@ -16,11 +16,7 @@ public record IngestionResult(
     string? ProductVersion = null
 );
 
-public record IngestionAffectedAsset(
-    string ExternalAssetId,
-    string AssetName,
-    AssetType AssetType
-);
+public record IngestionAffectedAsset(string ExternalAssetId, string AssetName, AssetType AssetType);
 
 public record IngestionAsset(
     string ExternalId,

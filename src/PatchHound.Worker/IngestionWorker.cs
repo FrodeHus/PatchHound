@@ -15,10 +15,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation(
-            "IngestionWorker started with polling interval {Interval}",
-            Interval
-        );
+        logger.LogInformation("IngestionWorker started with polling interval {Interval}", Interval);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -38,7 +35,10 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
     private async Task RunIngestionCycleAsync(CancellationToken ct)
     {
         var cycleStartedAt = DateTimeOffset.UtcNow;
-        logger.LogInformation("Starting ingestion polling cycle at {CycleStartedAt}", cycleStartedAt);
+        logger.LogInformation(
+            "Starting ingestion polling cycle at {CycleStartedAt}",
+            cycleStartedAt
+        );
 
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
@@ -57,10 +57,10 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
             return;
         }
 
-        var sources = await dbContext
-            .TenantSourceConfigurations
-            .ToListAsync(ct);
-        var tenants = await dbContext.Tenants.AsNoTracking().ToDictionaryAsync(tenant => tenant.Id, ct);
+        var sources = await dbContext.TenantSourceConfigurations.ToListAsync(ct);
+        var tenants = await dbContext
+            .Tenants.AsNoTracking()
+            .ToDictionaryAsync(tenant => tenant.Id, ct);
         var now = DateTimeOffset.UtcNow;
         var runnableSources = 0;
         var dueSources = 0;
@@ -134,7 +134,9 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
         );
     }
 
-    private static bool IsManualSyncQueued(PatchHound.Core.Entities.TenantSourceConfiguration source)
+    private static bool IsManualSyncQueued(
+        PatchHound.Core.Entities.TenantSourceConfiguration source
+    )
     {
         if (
             !source.Enabled
