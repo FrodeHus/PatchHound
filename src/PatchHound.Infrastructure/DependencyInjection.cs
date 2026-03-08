@@ -28,7 +28,15 @@ public static class DependencyInjection
         services.AddDbContext<PatchHoundDbContext>(
             (sp, options) =>
                 options
-                    .UseNpgsql(configuration.GetConnectionString("PatchHound"))
+                    .UseNpgsql(
+                        configuration.GetConnectionString("PatchHound"),
+                        npgsql =>
+                            npgsql.EnableRetryOnFailure(
+                                maxRetryCount: 5,
+                                maxRetryDelay: TimeSpan.FromSeconds(10),
+                                errorCodesToAdd: null
+                            )
+                    )
                     .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>())
         );
 

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Logging;
+using Npgsql;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Hubs;
 using PatchHound.Api.Middleware;
@@ -89,7 +90,9 @@ builder.Services.Configure<JwtBearerOptions>(
                     !string.IsNullOrWhiteSpace(authorizationHeader),
                     string.IsNullOrWhiteSpace(authorizationHeader)
                         ? "<missing>"
-                        : authorizationHeader.Split(' ')[0][..Math.Min(authorizationHeader.Split(' ')[0].Length, 10)],
+                        : authorizationHeader.Split(' ')[0][
+                            ..Math.Min(authorizationHeader.Split(' ')[0].Length, 10)
+                        ],
                     tokenClaims?.Audience ?? "<unavailable>",
                     tokenClaims?.AuthorizedParty ?? "<unavailable>",
                     tokenClaims?.AppId ?? "<unavailable>",
@@ -317,7 +320,10 @@ using (var scope = app.Services.CreateScope())
 {
     Console.WriteLine("[startup] PatchHound.Api starting database migration check");
     var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
-    await dbContext.Database.MigrateAsync();
+    var migrationLogger = scope
+        .ServiceProvider.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("StartupMigration");
+    await MigrateWithRetryAsync(dbContext, migrationLogger, app.Lifetime.ApplicationStopping);
     Console.WriteLine("[startup] PatchHound.Api database migration check completed");
 }
 
@@ -358,6 +364,41 @@ app.UseRateLimiter();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
 await app.RunAsync();
+
+static async Task MigrateWithRetryAsync(
+    PatchHoundDbContext dbContext,
+    ILogger logger,
+    CancellationToken ct
+)
+{
+    const int maxAttempts = 12;
+
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            await dbContext.Database.MigrateAsync(ct);
+            return;
+        }
+        catch (Exception ex)
+            when (attempt < maxAttempts
+                && (
+                    ex is NpgsqlException
+                    || ex.InnerException is NpgsqlException
+                    || ex is TimeoutException
+                )
+            )
+        {
+            logger.LogWarning(
+                ex,
+                "Database migration startup attempt {Attempt}/{MaxAttempts} failed. Retrying in 5 seconds.",
+                attempt,
+                maxAttempts
+            );
+            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+        }
+    }
+}
 
 static TokenDiagnostics? TryReadBearerTokenClaims(string authorizationHeader)
 {

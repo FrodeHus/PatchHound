@@ -37,6 +37,7 @@ public class VulnerabilitiesController : ControllerBase
     private readonly VulnerabilityService _vulnerabilityService;
     private readonly AiReportService _aiReportService;
     private readonly ITenantContext _tenantContext;
+
     public VulnerabilitiesController(
         PatchHoundDbContext dbContext,
         VulnerabilityService vulnerabilityService,
@@ -81,6 +82,10 @@ public class VulnerabilitiesController : ControllerBase
             if (!_tenantContext.HasAccessToTenant(filter.TenantId.Value))
                 return Forbid();
             query = query.Where(v => v.TenantId == filter.TenantId.Value);
+        }
+        if (filter.PresentOnly != false)
+        {
+            query = query.Where(v => v.Status == VulnerabilityStatus.Open);
         }
         if (filter.RecurrenceOnly == true)
         {
