@@ -74,7 +74,7 @@ public class AuditLogController : ControllerBase
                 entry.EntityType,
                 entry.EntityId,
                 ResolveEntityLabel(entry.EntityType, entry.OldValues, entry.NewValues),
-                entry.Action,
+                entry.Action.ToString(),
                 entry.OldValues,
                 entry.NewValues,
                 entry.UserId,

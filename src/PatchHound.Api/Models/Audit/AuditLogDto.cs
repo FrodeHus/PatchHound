@@ -8,7 +8,7 @@ public record AuditLogDto(
     string EntityType,
     Guid EntityId,
     string? EntityLabel,
-    AuditAction Action,
+    string Action,
     string? OldValues,
     string? NewValues,
     Guid UserId,
