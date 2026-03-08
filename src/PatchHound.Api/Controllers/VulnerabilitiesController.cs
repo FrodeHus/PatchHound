@@ -85,14 +85,10 @@ public class VulnerabilitiesController : ControllerBase
         if (filter.RecurrenceOnly == true)
         {
             query = query.Where(v =>
-                _dbContext.VulnerabilityAssetEpisodes.Count(episode =>
-                    episode.VulnerabilityId == v.Id
-                )
-                > _dbContext
-                    .VulnerabilityAssetEpisodes.Where(episode => episode.VulnerabilityId == v.Id)
-                    .Select(episode => episode.AssetId)
-                    .Distinct()
-                    .Count()
+                _dbContext
+                    .VulnerabilityAssetEpisodes.Where(e => e.VulnerabilityId == v.Id)
+                    .GroupBy(e => e.AssetId)
+                    .Any(g => g.Count() > 1)
             );
         }
 
