@@ -940,6 +940,36 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("Vulnerabilities");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.VulnerabilityReference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Tags")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<Guid>("VulnerabilityId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VulnerabilityId");
+
+                    b.ToTable("VulnerabilityReferences");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.VulnerabilityAsset", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1243,6 +1273,17 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Navigation("Vulnerability");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.VulnerabilityReference", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.Vulnerability", "Vulnerability")
+                        .WithMany("References")
+                        .HasForeignKey("VulnerabilityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vulnerability");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.Team", b =>
                 {
                     b.Navigation("Members");
@@ -1256,6 +1297,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
             modelBuilder.Entity("PatchHound.Core.Entities.Vulnerability", b =>
                 {
                     b.Navigation("AffectedAssets");
+
+                    b.Navigation("References");
                 });
 #pragma warning restore 612, 618
         }

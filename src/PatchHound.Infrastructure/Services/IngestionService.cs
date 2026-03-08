@@ -337,7 +337,8 @@ public class IngestionService
                 result.PublishedDate,
                 result.ProductVendor,
                 result.ProductName,
-                result.ProductVersion
+                result.ProductVersion,
+                MapReferences(result.References)
             );
 
             await _dbContext.Vulnerabilities.AddAsync(existing, ct);
@@ -353,7 +354,8 @@ public class IngestionService
                 result.PublishedDate,
                 result.ProductVendor,
                 result.ProductName,
-                result.ProductVersion
+                result.ProductVersion,
+                MapReferences(result.References)
             );
         }
 
@@ -369,6 +371,19 @@ public class IngestionService
                 ct
             );
         }
+    }
+
+    private static IReadOnlyList<(
+        string Url,
+        string Source,
+        IReadOnlyList<string> Tags
+    )> MapReferences(IReadOnlyList<IngestionReference>? references)
+    {
+        return references
+                ?.Select(reference =>
+                    (reference.Url, reference.Source, (IReadOnlyList<string>)reference.Tags)
+                )
+                .ToList() ?? [];
     }
 
     private async Task UpsertVulnerabilityAssetAsync(

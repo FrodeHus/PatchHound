@@ -13,8 +13,11 @@ public record IngestionResult(
     IReadOnlyList<IngestionAffectedAsset> AffectedAssets,
     string? ProductVendor = null,
     string? ProductName = null,
-    string? ProductVersion = null
+    string? ProductVersion = null,
+    IReadOnlyList<IngestionReference>? References = null
 );
+
+public record IngestionReference(string Url, string Source, IReadOnlyList<string> Tags);
 
 public record IngestionAffectedAsset(string ExternalAssetId, string AssetName, AssetType AssetType);
 

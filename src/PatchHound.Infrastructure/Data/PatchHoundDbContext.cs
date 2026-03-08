@@ -35,6 +35,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<DeviceSoftwareInstallationEpisode> DeviceSoftwareInstallationEpisodes =>
         Set<DeviceSoftwareInstallationEpisode>();
     public DbSet<Vulnerability> Vulnerabilities => Set<Vulnerability>();
+    public DbSet<VulnerabilityReference> VulnerabilityReferences => Set<VulnerabilityReference>();
     public DbSet<VulnerabilityAsset> VulnerabilityAssets => Set<VulnerabilityAsset>();
     public DbSet<VulnerabilityAssetEpisode> VulnerabilityAssetEpisodes =>
         Set<VulnerabilityAssetEpisode>();
@@ -96,6 +97,11 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         modelBuilder
             .Entity<Vulnerability>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<VulnerabilityReference>()
+            .HasQueryFilter(e =>
+                IsSystemContext || AccessibleTenantIds.Contains(e.Vulnerability.TenantId)
+            );
         modelBuilder
             .Entity<VulnerabilityAsset>()
             .HasQueryFilter(e =>
