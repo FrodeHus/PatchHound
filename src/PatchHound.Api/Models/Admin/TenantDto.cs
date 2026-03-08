@@ -38,7 +38,8 @@ public record TenantIngestionSourceDto(
     bool SupportsScheduling,
     bool SupportsManualSync,
     TenantSourceCredentialsDto Credentials,
-    TenantIngestionRuntimeDto Runtime
+    TenantIngestionRuntimeDto Runtime,
+    IReadOnlyList<TenantIngestionRunDto> RecentRuns
 );
 
 public record TenantSourceCredentialsDto(
@@ -55,6 +56,32 @@ public record TenantIngestionRuntimeDto(
     DateTimeOffset? LastSucceededAt,
     string LastStatus,
     string LastError
+);
+
+public record TenantIngestionRunDto(
+    Guid Id,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? CompletedAt,
+    string Status,
+    int FetchedVulnerabilityCount,
+    int FetchedAssetCount,
+    int FetchedSoftwareInstallationCount,
+    int StagedVulnerabilityCount,
+    int StagedExposureCount,
+    int MergedExposureCount,
+    int OpenedProjectionCount,
+    int ResolvedProjectionCount,
+    int StagedAssetCount,
+    int MergedAssetCount,
+    int StagedSoftwareLinkCount,
+    int ResolvedSoftwareLinkCount,
+    int InstallationsCreated,
+    int InstallationsTouched,
+    int InstallationEpisodesOpened,
+    int InstallationEpisodesSeen,
+    int StaleInstallationsMarked,
+    int InstallationsRemoved,
+    string Error
 );
 
 public record UpdateTenantRequest(

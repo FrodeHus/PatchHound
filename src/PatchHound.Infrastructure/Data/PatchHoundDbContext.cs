@@ -22,6 +22,12 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<TenantSourceConfiguration> TenantSourceConfigurations =>
         Set<TenantSourceConfiguration>();
     public DbSet<IngestionRun> IngestionRuns => Set<IngestionRun>();
+    public DbSet<StagedVulnerability> StagedVulnerabilities => Set<StagedVulnerability>();
+    public DbSet<StagedVulnerabilityExposure> StagedVulnerabilityExposures =>
+        Set<StagedVulnerabilityExposure>();
+    public DbSet<StagedAsset> StagedAssets => Set<StagedAsset>();
+    public DbSet<StagedDeviceSoftwareInstallation> StagedDeviceSoftwareInstallations =>
+        Set<StagedDeviceSoftwareInstallation>();
     public DbSet<EnrichmentSourceConfiguration> EnrichmentSourceConfigurations =>
         Set<EnrichmentSourceConfiguration>();
     public DbSet<TenantSlaConfiguration> TenantSlaConfigurations => Set<TenantSlaConfiguration>();
@@ -171,6 +177,18 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<IngestionRun>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<StagedVulnerability>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<StagedVulnerabilityExposure>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<StagedAsset>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<StagedDeviceSoftwareInstallation>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantSlaConfiguration>()

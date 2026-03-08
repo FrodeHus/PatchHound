@@ -408,7 +408,74 @@ public class TenantsController : ControllerBase
         return Accepted();
     }
 
-    private static TenantIngestionSourceDto MapSourceDto(TenantSourceConfiguration source)
+    [HttpGet("{id:guid}/ingestion-sources/{sourceKey}/runs")]
+    [Authorize(Policy = Policies.ConfigureTenant)]
+    public async Task<ActionResult<PagedResponse<TenantIngestionRunDto>>> ListRuns(
+        Guid id,
+        string sourceKey,
+        [FromQuery] PaginationQuery pagination,
+        CancellationToken ct
+    )
+    {
+        if (!_tenantContext.HasAccessToTenant(id))
+            return Forbid();
+
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (tenant is null)
+            return NotFound();
+
+        var query = _dbContext
+            .IngestionRuns.AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(run => run.TenantId == id && run.SourceKey == normalizedSourceKey);
+
+        var totalCount = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(run => run.StartedAt)
+            .Skip(pagination.Skip)
+            .Take(pagination.BoundedPageSize)
+            .Select(run => new TenantIngestionRunDto(
+                run.Id,
+                run.StartedAt,
+                run.CompletedAt,
+                run.Status,
+                run.FetchedVulnerabilityCount,
+                run.FetchedAssetCount,
+                run.FetchedSoftwareInstallationCount,
+                run.StagedVulnerabilityCount,
+                run.StagedExposureCount,
+                run.MergedExposureCount,
+                run.OpenedProjectionCount,
+                run.ResolvedProjectionCount,
+                run.StagedAssetCount,
+                run.MergedAssetCount,
+                run.StagedSoftwareLinkCount,
+                run.ResolvedSoftwareLinkCount,
+                run.InstallationsCreated,
+                run.InstallationsTouched,
+                run.InstallationEpisodesOpened,
+                run.InstallationEpisodesSeen,
+                run.StaleInstallationsMarked,
+                run.InstallationsRemoved,
+                run.Error
+            ))
+            .ToListAsync(ct);
+
+        return Ok(
+            new PagedResponse<TenantIngestionRunDto>(
+                items,
+                totalCount,
+                pagination.Page,
+                pagination.BoundedPageSize
+            )
+        );
+    }
+
+    private static TenantIngestionSourceDto MapSourceDto(
+        TenantSourceConfiguration source,
+        IReadOnlyList<TenantIngestionRunDto> recentRuns
+    )
     {
         return new TenantIngestionSourceDto(
             source.SourceKey,
@@ -430,7 +497,8 @@ public class TenantsController : ControllerBase
                 source.LastSucceededAt,
                 source.LastStatus,
                 source.LastError
-            )
+            ),
+            recentRuns
         );
     }
 
@@ -491,6 +559,52 @@ public class TenantsController : ControllerBase
             .Where(source => source.TenantId == tenantId)
             .OrderBy(source => source.DisplayName)
             .ToListAsync(ct);
+        var sourceKeys = sources.Select(source => source.SourceKey).ToList();
+        var recentRuns =
+            sourceKeys.Count == 0
+                ? []
+                : await _dbContext
+                    .IngestionRuns.AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Where(run => run.TenantId == tenantId && sourceKeys.Contains(run.SourceKey))
+                    .OrderByDescending(run => run.StartedAt)
+                    .ToListAsync(ct);
+        var recentRunsBySourceKey = recentRuns
+            .GroupBy(run => run.SourceKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                    (IReadOnlyList<TenantIngestionRunDto>)
+                        group
+                            .Take(5)
+                            .Select(run => new TenantIngestionRunDto(
+                                run.Id,
+                                run.StartedAt,
+                                run.CompletedAt,
+                                run.Status,
+                                run.FetchedVulnerabilityCount,
+                                run.FetchedAssetCount,
+                                run.FetchedSoftwareInstallationCount,
+                                run.StagedVulnerabilityCount,
+                                run.StagedExposureCount,
+                                run.MergedExposureCount,
+                                run.OpenedProjectionCount,
+                                run.ResolvedProjectionCount,
+                                run.StagedAssetCount,
+                                run.MergedAssetCount,
+                                run.StagedSoftwareLinkCount,
+                                run.ResolvedSoftwareLinkCount,
+                                run.InstallationsCreated,
+                                run.InstallationsTouched,
+                                run.InstallationEpisodesOpened,
+                                run.InstallationEpisodesSeen,
+                                run.StaleInstallationsMarked,
+                                run.InstallationsRemoved,
+                                run.Error
+                            ))
+                            .ToList(),
+                StringComparer.OrdinalIgnoreCase
+            );
 
         return new TenantDetailDto(
             tenant.Id,
@@ -498,7 +612,14 @@ public class TenantsController : ControllerBase
             tenant.EntraTenantId,
             assetSummary,
             slaDto,
-            sources.Select(MapSourceDto).ToList()
+            sources
+                .Select(source =>
+                    MapSourceDto(
+                        source,
+                        recentRunsBySourceKey.GetValueOrDefault(source.SourceKey, [])
+                    )
+                )
+                .ToList()
         );
     }
 }

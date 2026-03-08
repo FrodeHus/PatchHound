@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost, apiPut } from '@/server/api'
 import {
+  pagedTenantIngestionRunSchema,
   pagedTenantSchema,
   tenantDetailSchema,
 } from './settings.schemas'
@@ -79,4 +80,22 @@ export const triggerTenantIngestionSync = createServerFn({ method: 'POST' })
   }))
   .handler(async ({ context, data: { tenantId, sourceKey } }) => {
     await apiPost(`/tenants/${tenantId}/ingestion-sources/${sourceKey}/sync`, context)
+  })
+
+export const fetchTenantIngestionRuns = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({
+    tenantId: z.string(),
+    sourceKey: z.string(),
+    page: z.number().optional(),
+    pageSize: z.number().optional(),
+  }))
+  .handler(async ({ context, data: { tenantId, sourceKey, page, pageSize } }) => {
+    const queryPage = page ?? 1
+    const queryPageSize = pageSize ?? 10
+    const data = await apiGet(
+      `/tenants/${tenantId}/ingestion-sources/${sourceKey}/runs?page=${queryPage}&pageSize=${queryPageSize}`,
+      context,
+    )
+    return pagedTenantIngestionRunSchema.parse(data)
   })

@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query'
 import { ChevronDown, KeyRound, RotateCw } from 'lucide-react'
 import { triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
 import type { TenantDetail, TenantIngestionSource } from '@/api/settings.schemas'
+import { SourceRunHistorySheet } from '@/components/features/admin/SourceRunHistorySheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,6 +22,7 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
   const [syncingSourceKey, setSyncingSourceKey] = useState<string | null>(null)
   const [syncState, setSyncState] = useState<'idle' | 'success' | 'error'>('idle')
   const [expandedSourceKey, setExpandedSourceKey] = useState<string | null>(null)
+  const [historySourceKey, setHistorySourceKey] = useState<string | null>(null)
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -151,6 +153,7 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
                 expandedSourceKey={expandedSourceKey}
                 syncingSourceKey={syncingSourceKey}
                 syncMutation={syncMutation}
+                onOpenHistory={setHistorySourceKey}
                 onToggleExpanded={(sourceKey) => {
                   setExpandedSourceKey((current) => (current === sourceKey ? null : sourceKey))
                 }}
@@ -160,6 +163,17 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
           </div>
         </CardContent>
       </Card>
+      <SourceRunHistorySheet
+        tenantId={tenant.id}
+        sourceKey={historySourceKey}
+        sourceDisplayName={sources.find((source) => source.key === historySourceKey)?.displayName ?? null}
+        isOpen={historySourceKey !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setHistorySourceKey(null)
+          }
+        }}
+      />
     </section>
   )
 }
@@ -191,6 +205,7 @@ function SourceSection({
   expandedSourceKey,
   syncingSourceKey,
   syncMutation,
+  onOpenHistory,
   onToggleExpanded,
   onUpdateSource,
 }: {
@@ -199,6 +214,7 @@ function SourceSection({
   expandedSourceKey: string | null
   syncingSourceKey: string | null
   syncMutation: ReturnType<typeof useMutation<void, Error, string>>
+  onOpenHistory: (sourceKey: string) => void
   onToggleExpanded: (sourceKey: string) => void
   onUpdateSource: (
     key: string,
@@ -420,6 +436,83 @@ function SourceSection({
                   />
                 </label>
               </div>
+
+              <div className="space-y-3 rounded-2xl border border-border/70 bg-background/20 px-4 py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Recent ingestion runs</p>
+                    <p className="text-xs text-muted-foreground">
+                      Latest worker runs for this source, including staged and merged item counts.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+                      {source.recentRuns.length}
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-full"
+                      onClick={() => onOpenHistory(source.key)}
+                    >
+                      View full history
+                    </Button>
+                  </div>
+                </div>
+
+                {source.recentRuns.length ? (
+                  <div className="space-y-2">
+                    {source.recentRuns.map((run) => (
+                      <div
+                        key={run.id}
+                        className="rounded-2xl border border-border/70 bg-background/50 px-4 py-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <StatusBadge tone={getRunStatusTone(run.status)}>{run.status}</StatusBadge>
+                            <span className="text-muted-foreground">
+                              Started {formatTimestamp(run.startedAt)}
+                            </span>
+                            <span className="text-muted-foreground">
+                              Completed {formatTimestamp(run.completedAt)}
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{run.id.slice(0, 8)}</span>
+                        </div>
+
+                        <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3 lg:grid-cols-4">
+                          <RunMetric label="Fetched Vulns" value={run.fetchedVulnerabilityCount} />
+                          <RunMetric label="Fetched Assets" value={run.fetchedAssetCount} />
+                          <RunMetric label="Fetched SW Links" value={run.fetchedSoftwareInstallationCount} />
+                          <RunMetric label="Staged Vulns" value={run.stagedVulnerabilityCount} />
+                          <RunMetric label="Staged Exposures" value={run.stagedExposureCount} />
+                          <RunMetric label="Merged Exposures" value={run.mergedExposureCount} />
+                          <RunMetric label="Opened Projections" value={run.openedProjectionCount} />
+                          <RunMetric label="Resolved Projections" value={run.resolvedProjectionCount} />
+                          <RunMetric label="Staged Assets" value={run.stagedAssetCount} />
+                          <RunMetric label="Merged Assets" value={run.mergedAssetCount} />
+                          <RunMetric label="Staged SW Links" value={run.stagedSoftwareLinkCount} />
+                          <RunMetric label="Resolved SW Links" value={run.resolvedSoftwareLinkCount} />
+                          <RunMetric label="Installs Created" value={run.installationsCreated} />
+                          <RunMetric label="Installs Touched" value={run.installationsTouched} />
+                          <RunMetric label="Episodes Opened" value={run.installationEpisodesOpened} />
+                          <RunMetric label="Episodes Seen" value={run.installationEpisodesSeen} />
+                          <RunMetric label="Stale Installs" value={run.staleInstallationsMarked} />
+                          <RunMetric label="Installs Removed" value={run.installationsRemoved} />
+                        </div>
+
+                        {run.error ? (
+                          <p className="mt-3 text-xs text-destructive">Error: {run.error}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No ingestion runs have been recorded for this source yet.
+                  </p>
+                )}
+              </div>
               </CardContent>
             ) : null}
           </Card>
@@ -465,6 +558,33 @@ function getSourceStatusTone(source: TenantIngestionSourceDraft): 'neutral' | 's
   }
 
   return 'neutral'
+}
+
+function getRunStatusTone(status: string): 'neutral' | 'success' | 'warning' | 'error' {
+  const normalized = status.toLowerCase()
+
+  if (normalized === 'succeeded') {
+    return 'success'
+  }
+
+  if (normalized === 'running') {
+    return 'warning'
+  }
+
+  if (normalized === 'failed') {
+    return 'error'
+  }
+
+  return 'neutral'
+}
+
+function RunMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-background/35 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
+    </div>
+  )
 }
 
 type TenantIngestionSourceDraft = Omit<TenantIngestionSource, 'credentials'> & {

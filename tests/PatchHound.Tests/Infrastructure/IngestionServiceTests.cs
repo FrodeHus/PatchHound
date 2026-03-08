@@ -22,6 +22,7 @@ public class IngestionServiceTests : IDisposable
     private readonly PatchHoundDbContext _dbContext;
     private readonly IngestionService _service;
     private readonly IVulnerabilitySource _source;
+    private readonly IAssetInventorySource _assetInventorySource;
     private readonly Guid _tenantId = Guid.NewGuid();
 
     public IngestionServiceTests()
@@ -39,21 +40,34 @@ public class IngestionServiceTests : IDisposable
 
         _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(tenantContext));
 
-        _source = Substitute.For<IVulnerabilitySource>();
+        _source = Substitute.For<IVulnerabilitySource, IAssetInventorySource>();
+        _assetInventorySource = (IAssetInventorySource)_source;
         _source.SourceKey.Returns("test-source");
         _source.SourceName.Returns("TestSource");
 
         var logger = Substitute.For<ILogger<IngestionService>>();
+        var taskProjectionService = new RemediationTaskProjectionService(
+            _dbContext,
+            new SlaService()
+        );
         var assessmentService = new VulnerabilityAssessmentService(
             _dbContext,
             new EnvironmentalSeverityCalculator()
         );
+        var stagedMergeService = new StagedVulnerabilityMergeService(
+            _dbContext,
+            assessmentService,
+            taskProjectionService
+        );
+        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         _service = new IngestionService(
             _dbContext,
             new[] { _source },
             [],
-            new SlaService(),
             assessmentService,
+            taskProjectionService,
+            stagedMergeService,
+            stagedAssetMergeService,
             logger
         );
     }
@@ -280,6 +294,73 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessStagedResultsAsync_UsesStagedPayloadsForMerge()
+    {
+        var run = IngestionRun.Start(_tenantId, "test-source", DateTimeOffset.UtcNow);
+        await _dbContext.IngestionRuns.AddAsync(run);
+        await _dbContext.StagedVulnerabilities.AddAsync(
+            StagedVulnerability.Create(
+                run.Id,
+                _tenantId,
+                "test-source",
+                "CVE-2026-STAGE-MERGE-1",
+                "Stage merge title",
+                Severity.Critical,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new IngestionResult(
+                        "CVE-2026-STAGE-MERGE-1",
+                        "Stage merge title",
+                        "From staged payload",
+                        Severity.Critical,
+                        9.9m,
+                        "CVSS:3.1/AV:N",
+                        DateTimeOffset.UtcNow,
+                        [
+                            new IngestionAffectedAsset(
+                                "STAGE-ASSET-1",
+                                "StageAsset",
+                                AssetType.Device
+                            ),
+                        ]
+                    )
+                ),
+                DateTimeOffset.UtcNow
+            )
+        );
+        await _dbContext.StagedVulnerabilityExposures.AddAsync(
+            StagedVulnerabilityExposure.Create(
+                run.Id,
+                _tenantId,
+                "test-source",
+                "CVE-2026-STAGE-MERGE-1",
+                "STAGE-ASSET-1",
+                "StageAsset",
+                AssetType.Device,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new IngestionAffectedAsset("STAGE-ASSET-1", "StageAsset", AssetType.Device)
+                ),
+                DateTimeOffset.UtcNow
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        await _service.ProcessStagedResultsAsync(
+            run.Id,
+            _tenantId,
+            "test-source",
+            "TestSource",
+            CancellationToken.None
+        );
+
+        var vulnerability = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
+            .SingleAsync(item => item.ExternalId == "CVE-2026-STAGE-MERGE-1");
+        vulnerability.Title.Should().Be("Stage merge title");
+        vulnerability.Description.Should().Be("From staged payload");
+        vulnerability.AffectedAssets.Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task RunIngestionAsync_WithConfiguredSource_CreatesCompletedIngestionRunAndClearsLease()
     {
         await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
@@ -319,11 +400,182 @@ public class IngestionServiceTests : IDisposable
         run.Status.Should().Be("Succeeded");
         run.CompletedAt.Should().NotBeNull();
         run.FetchedVulnerabilityCount.Should().Be(1);
+        run.StagedVulnerabilityCount.Should().Be(1);
+        run.StagedExposureCount.Should().Be(0);
+        run.MergedExposureCount.Should().Be(0);
+        run.StagedAssetCount.Should().Be(0);
+        run.StagedSoftwareLinkCount.Should().Be(0);
 
         var source = await _dbContext.TenantSourceConfigurations.IgnoreQueryFilters().SingleAsync();
         source.ActiveIngestionRunId.Should().BeNull();
         source.LeaseAcquiredAt.Should().BeNull();
         source.LeaseExpiresAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ProcessStagedAssetsAsync_UsesStagedSnapshotForMerge()
+    {
+        var run = IngestionRun.Start(_tenantId, "test-source", DateTimeOffset.UtcNow);
+        await _dbContext.IngestionRuns.AddAsync(run);
+        await _dbContext.StagedAssets.AddRangeAsync(
+            StagedAsset.Create(
+                run.Id,
+                _tenantId,
+                "test-source",
+                "DEVICE-STAGE-1",
+                "Device from stage",
+                AssetType.Device,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new IngestionAsset(
+                        "DEVICE-STAGE-1",
+                        "Device from stage",
+                        AssetType.Device,
+                        DeviceComputerDnsName: "device-stage-1.contoso.local"
+                    )
+                ),
+                DateTimeOffset.UtcNow
+            ),
+            StagedAsset.Create(
+                run.Id,
+                _tenantId,
+                "test-source",
+                "SOFTWARE-STAGE-1",
+                "Software from stage",
+                AssetType.Software,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new IngestionAsset(
+                        "SOFTWARE-STAGE-1",
+                        "Software from stage",
+                        AssetType.Software
+                    )
+                ),
+                DateTimeOffset.UtcNow
+            )
+        );
+        await _dbContext.StagedDeviceSoftwareInstallations.AddAsync(
+            StagedDeviceSoftwareInstallation.Create(
+                run.Id,
+                _tenantId,
+                "test-source",
+                "DEVICE-STAGE-1",
+                "SOFTWARE-STAGE-1",
+                DateTimeOffset.UtcNow,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new IngestionDeviceSoftwareLink(
+                        "DEVICE-STAGE-1",
+                        "SOFTWARE-STAGE-1",
+                        DateTimeOffset.UtcNow
+                    )
+                ),
+                DateTimeOffset.UtcNow
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        await _service.ProcessStagedAssetsAsync(
+            run.Id,
+            _tenantId,
+            "test-source",
+            CancellationToken.None
+        );
+
+        var assets = await _dbContext
+            .Assets.IgnoreQueryFilters()
+            .Where(item =>
+                item.ExternalId == "DEVICE-STAGE-1" || item.ExternalId == "SOFTWARE-STAGE-1"
+            )
+            .ToListAsync();
+        var installations = await _dbContext
+            .DeviceSoftwareInstallations.IgnoreQueryFilters()
+            .Where(item => item.TenantId == _tenantId)
+            .ToListAsync();
+
+        assets.Should().HaveCount(2);
+        installations.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task RunIngestionAsync_CreatesStagedSnapshotRowsBeforeMerge()
+    {
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(
+            TenantSourceConfiguration.Create(
+                _tenantId,
+                "test-source",
+                "Test Source",
+                true,
+                "0 * * * *"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        _assetInventorySource
+            .FetchAssetsAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(
+                new IngestionAssetInventorySnapshot(
+                    [
+                        new IngestionAsset("DEVICE-1", "Server01", AssetType.Device),
+                        new IngestionAsset("SOFTWARE-1", "Contoso Agent", AssetType.Software),
+                    ],
+                    [
+                        new IngestionDeviceSoftwareLink(
+                            "DEVICE-1",
+                            "SOFTWARE-1",
+                            DateTimeOffset.UtcNow
+                        ),
+                    ]
+                )
+            );
+        _source
+            .FetchVulnerabilitiesAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(
+                [
+                    new IngestionResult(
+                        "CVE-2026-STAGED-1",
+                        "Staged vuln",
+                        "Description",
+                        Severity.High,
+                        8.0m,
+                        "CVSS:3.1/AV:N",
+                        DateTimeOffset.UtcNow,
+                        [new IngestionAffectedAsset("DEVICE-1", "Server01", AssetType.Device)]
+                    ),
+                ]
+            );
+
+        await _service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        var run = await _dbContext.IngestionRuns.IgnoreQueryFilters().SingleAsync();
+        var stagedVulnerabilities = await _dbContext
+            .StagedVulnerabilities.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == run.Id)
+            .ToListAsync();
+        var stagedExposures = await _dbContext
+            .StagedVulnerabilityExposures.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == run.Id)
+            .ToListAsync();
+        var stagedAssets = await _dbContext
+            .StagedAssets.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == run.Id)
+            .ToListAsync();
+        var stagedLinks = await _dbContext
+            .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == run.Id)
+            .ToListAsync();
+
+        stagedVulnerabilities.Should().ContainSingle();
+        stagedVulnerabilities[0].ExternalId.Should().Be("CVE-2026-STAGED-1");
+        System
+            .Text.Json.JsonSerializer.Deserialize<IngestionResult>(
+                stagedVulnerabilities[0].PayloadJson
+            )!
+            .AffectedAssets.Should()
+            .BeEmpty();
+        stagedExposures.Should().ContainSingle();
+        stagedExposures[0].AssetExternalId.Should().Be("DEVICE-1");
+        stagedAssets.Should().HaveCount(2);
+        stagedLinks.Should().ContainSingle();
+        stagedLinks[0].DeviceExternalId.Should().Be("DEVICE-1");
     }
 
     [Fact]
@@ -353,6 +605,156 @@ public class IngestionServiceTests : IDisposable
             .DidNotReceive()
             .FetchVulnerabilitiesAsync(_tenantId, Arg.Any<CancellationToken>());
         (await _dbContext.IngestionRuns.IgnoreQueryFilters().CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task RunIngestionAsync_PrunesExpiredStagingArtifactsForOldCompletedRuns()
+    {
+        var oldRun = IngestionRun.Start(
+            _tenantId,
+            "test-source",
+            DateTimeOffset.UtcNow.AddDays(-10)
+        );
+        oldRun.CompleteSucceeded(
+            DateTimeOffset.UtcNow.AddDays(-8),
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+        );
+        await _dbContext.IngestionRuns.AddAsync(oldRun);
+        await _dbContext.StagedVulnerabilities.AddAsync(
+            StagedVulnerability.Create(
+                oldRun.Id,
+                _tenantId,
+                "test-source",
+                "CVE-OLD-1",
+                "Old vuln",
+                Severity.Low,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new IngestionResult(
+                        "CVE-OLD-1",
+                        "Old vuln",
+                        null,
+                        Severity.Low,
+                        null,
+                        null,
+                        null,
+                        []
+                    )
+                ),
+                DateTimeOffset.UtcNow.AddDays(-8)
+            )
+        );
+        await _dbContext.StagedVulnerabilityExposures.AddAsync(
+            StagedVulnerabilityExposure.Create(
+                oldRun.Id,
+                _tenantId,
+                "test-source",
+                "CVE-OLD-1",
+                "ASSET-OLD-1",
+                "Old asset",
+                AssetType.Device,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new IngestionAffectedAsset("ASSET-OLD-1", "Old asset", AssetType.Device)
+                ),
+                DateTimeOffset.UtcNow.AddDays(-8)
+            )
+        );
+        await _dbContext.StagedAssets.AddAsync(
+            StagedAsset.Create(
+                oldRun.Id,
+                _tenantId,
+                "test-source",
+                "ASSET-OLD-1",
+                "Old asset",
+                AssetType.Device,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new IngestionAsset("ASSET-OLD-1", "Old asset", AssetType.Device)
+                ),
+                DateTimeOffset.UtcNow.AddDays(-8)
+            )
+        );
+        await _dbContext.StagedDeviceSoftwareInstallations.AddAsync(
+            StagedDeviceSoftwareInstallation.Create(
+                oldRun.Id,
+                _tenantId,
+                "test-source",
+                "ASSET-OLD-1",
+                "SOFTWARE-OLD-1",
+                DateTimeOffset.UtcNow.AddDays(-8),
+                System.Text.Json.JsonSerializer.Serialize(
+                    new IngestionDeviceSoftwareLink(
+                        "ASSET-OLD-1",
+                        "SOFTWARE-OLD-1",
+                        DateTimeOffset.UtcNow.AddDays(-8)
+                    )
+                ),
+                DateTimeOffset.UtcNow.AddDays(-8)
+            )
+        );
+
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(
+            TenantSourceConfiguration.Create(
+                _tenantId,
+                "test-source",
+                "Test Source",
+                true,
+                "0 * * * *"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        _source.FetchVulnerabilitiesAsync(_tenantId, Arg.Any<CancellationToken>()).Returns([]);
+
+        await _service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        (await _dbContext.IngestionRuns.IgnoreQueryFilters().AnyAsync(item => item.Id == oldRun.Id))
+            .Should()
+            .BeFalse();
+        (
+            await _dbContext
+                .StagedVulnerabilities.IgnoreQueryFilters()
+                .AnyAsync(item => item.IngestionRunId == oldRun.Id)
+        )
+            .Should()
+            .BeFalse();
+        (
+            await _dbContext
+                .StagedVulnerabilityExposures.IgnoreQueryFilters()
+                .AnyAsync(item => item.IngestionRunId == oldRun.Id)
+        )
+            .Should()
+            .BeFalse();
+        (
+            await _dbContext
+                .StagedAssets.IgnoreQueryFilters()
+                .AnyAsync(item => item.IngestionRunId == oldRun.Id)
+        )
+            .Should()
+            .BeFalse();
+        (
+            await _dbContext
+                .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
+                .AnyAsync(item => item.IngestionRunId == oldRun.Id)
+        )
+            .Should()
+            .BeFalse();
     }
 
     [Fact]
@@ -1033,8 +1435,17 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             [source],
             [enricher],
-            new SlaService(),
             new VulnerabilityAssessmentService(_dbContext, new EnvironmentalSeverityCalculator()),
+            new RemediationTaskProjectionService(_dbContext, new SlaService()),
+            new StagedVulnerabilityMergeService(
+                _dbContext,
+                new VulnerabilityAssessmentService(
+                    _dbContext,
+                    new EnvironmentalSeverityCalculator()
+                ),
+                new RemediationTaskProjectionService(_dbContext, new SlaService())
+            ),
+            new StagedAssetMergeService(_dbContext),
             Substitute.For<ILogger<IngestionService>>()
         );
 

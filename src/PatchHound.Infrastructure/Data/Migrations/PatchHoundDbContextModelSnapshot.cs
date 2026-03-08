@@ -452,10 +452,52 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<int>("FetchedVulnerabilityCount")
                         .HasColumnType("integer");
 
+                    b.Property<int>("InstallationEpisodesOpened")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("InstallationEpisodesSeen")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("InstallationsCreated")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("InstallationsRemoved")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("InstallationsTouched")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MergedAssetCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MergedExposureCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OpenedProjectionCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ResolvedProjectionCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ResolvedSoftwareLinkCount")
+                        .HasColumnType("integer");
+
                     b.Property<string>("SourceKey")
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<int>("StagedAssetCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StagedExposureCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StagedSoftwareLinkCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StagedVulnerabilityCount")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("timestamp with time zone");
@@ -465,6 +507,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<int>("StaleInstallationsMarked")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -473,6 +518,205 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.HasIndex("TenantId", "SourceKey", "StartedAt");
 
                     b.ToTable("IngestionRuns");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.StagedAsset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("IngestionRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("StagedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngestionRunId");
+
+                    b.HasIndex("TenantId", "SourceKey", "ExternalId");
+
+                    b.ToTable("StagedAssets");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.StagedVulnerabilityExposure", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AssetExternalId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("AssetName")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("IngestionRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("StagedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VulnerabilityExternalId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngestionRunId");
+
+                    b.HasIndex(
+                        "TenantId",
+                        "SourceKey",
+                        "VulnerabilityExternalId",
+                        "AssetExternalId");
+
+                    b.ToTable("StagedVulnerabilityExposures");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.StagedDeviceSoftwareInstallation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DeviceExternalId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("IngestionRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ObservedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("StagedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SoftwareExternalId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngestionRunId");
+
+                    b.HasIndex("TenantId", "SourceKey", "DeviceExternalId", "SoftwareExternalId");
+
+                    b.ToTable("StagedDeviceSoftwareInstallations");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.StagedVulnerability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("IngestionRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("StagedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("VendorSeverity")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngestionRunId");
+
+                    b.HasIndex("TenantId", "SourceKey", "ExternalId");
+
+                    b.ToTable("StagedVulnerabilities");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.Notification", b =>
