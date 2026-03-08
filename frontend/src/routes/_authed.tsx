@@ -6,6 +6,9 @@ export const Route = createFileRoute('/_authed')({
     if (!context.user) {
       throw redirect({ to: '/auth/login' })
     }
+    if (context.user.requiresSetup) {
+      throw redirect({ to: '/setup' })
+    }
     return { user: context.user }
   },
   component: AuthedLayout,

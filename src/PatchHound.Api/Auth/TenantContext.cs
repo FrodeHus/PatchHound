@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
@@ -60,26 +62,57 @@ public class TenantContext : ITenantContext
 
         if (oid is not null && Guid.TryParse(oid, out _))
         {
+            var email =
+                httpContext.User?.FindFirstValue("preferred_username")
+                ?? httpContext.User?.FindFirstValue(ClaimTypes.Upn)
+                ?? httpContext.User?.FindFirstValue(ClaimTypes.Email)
+                ?? httpContext.User?.FindFirstValue("email")
+                ?? $"{oid}@local.patchhound";
+            var displayName =
+                httpContext.User?.FindFirstValue("name")
+                ?? httpContext.User?.FindFirstValue(ClaimTypes.Name)
+                ?? email;
+
             var user = await dbContext
-                .Users.AsNoTracking()
-                .IgnoreQueryFilters()
+                .Users.IgnoreQueryFilters()
                 .FirstOrDefaultAsync(u => u.EntraObjectId == oid);
 
-            if (user is not null)
+            if (user is null)
             {
-                _currentUserId = user.Id;
-
-                var userTenantRoles = await dbContext
-                    .UserTenantRoles.AsNoTracking()
-                    .IgnoreQueryFilters()
-                    .Where(utr => utr.UserId == _currentUserId)
-                    .Select(utr => new { utr.TenantId, utr.Role })
-                    .ToListAsync();
-
-                _rolesByTenantId = userTenantRoles
-                    .GroupBy(r => r.TenantId)
-                    .ToDictionary(g => g.Key, g => g.Select(r => r.Role).Distinct().ToList());
+                user = User.Create(email.Trim(), displayName.Trim(), oid);
+                await dbContext.Users.AddAsync(user);
+                await dbContext.SaveChangesAsync();
             }
+            else
+            {
+                var normalizedEmail = email.Trim();
+                var normalizedDisplayName = displayName.Trim();
+                if (
+                    !string.Equals(user.Email, normalizedEmail, StringComparison.Ordinal)
+                    || !string.Equals(
+                        user.DisplayName,
+                        normalizedDisplayName,
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    user.UpdateProfile(normalizedEmail, normalizedDisplayName);
+                    await dbContext.SaveChangesAsync();
+                }
+            }
+
+            _currentUserId = user.Id;
+
+            var userTenantRoles = await dbContext
+                .UserTenantRoles.AsNoTracking()
+                .IgnoreQueryFilters()
+                .Where(utr => utr.UserId == _currentUserId)
+                .Select(utr => new { utr.TenantId, utr.Role })
+                .ToListAsync();
+
+            _rolesByTenantId = userTenantRoles
+                .GroupBy(r => r.TenantId)
+                .ToDictionary(g => g.Key, g => g.Select(r => r.Role).Distinct().ToList());
         }
 
         if (!string.IsNullOrWhiteSpace(tokenTenantId) && _normalizedClaimRoles.Count > 0)

@@ -8,6 +8,11 @@ type SystemStatus = {
   openBaoSealed: boolean
 }
 
+type SetupStatus = {
+  isInitialized: boolean
+  requiresSetup: boolean
+}
+
 export const getCurrentUser = createServerFn({ method: 'GET' })
   .handler(async () => {
     const session = await getSession()
@@ -17,6 +22,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
     }
 
     let systemStatus: SystemStatus | null = null
+    let setupStatus: SetupStatus | null = null
     try {
       systemStatus = await apiGet<SystemStatus>('/system/status', {
         token: session.accessToken,
@@ -26,6 +32,15 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       systemStatus = null
     }
 
+    try {
+      setupStatus = await apiGet<SetupStatus>('/setup/status', {
+        token: session.accessToken,
+        tenantId: session.tenantId,
+      })
+    } catch {
+      setupStatus = null
+    }
+
     return {
       id: session.userId,
       email: session.email ?? '',
@@ -33,6 +48,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       roles: session.roles ?? [],
       tenantId: session.tenantId,
       tenantIds: session.tenantIds ?? (session.tenantId ? [session.tenantId] : []),
+      requiresSetup: setupStatus?.requiresSetup ?? false,
       systemStatus,
     }
   })

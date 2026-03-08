@@ -6,6 +6,7 @@ using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models.Admin;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
@@ -45,6 +46,18 @@ public class TenantsControllerTests : IDisposable
     [Fact]
     public async Task Create_CreatesTenantWithDefaultSlaAndDefenderSource()
     {
+        var currentUser = User.Create("admin@example.com", "Admin", Guid.NewGuid().ToString());
+        _tenantContext.CurrentUserId.Returns(currentUser.Id);
+        var existingTenant = Tenant.Create("Existing", "existing-tenant");
+        await _dbContext.Tenants.AddAsync(existingTenant);
+        await _dbContext.Users.AddAsync(currentUser);
+        await _dbContext.UserTenantRoles.AddAsync(
+            UserTenantRole.Create(currentUser.Id, existingTenant.Id, RoleName.GlobalAdmin)
+        );
+        await _dbContext.SaveChangesAsync();
+        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { existingTenant.Id });
+        _tenantContext.CurrentTenantId.Returns(existingTenant.Id);
+
         var action = await _controller.Create(
             new CreateTenantRequest("Contoso Production", "11111111-1111-1111-1111-111111111111"),
             CancellationToken.None
@@ -66,6 +79,11 @@ public class TenantsControllerTests : IDisposable
                 && source.Enabled == false
                 && source.Credentials.ApiBaseUrl == "https://api.securitycenter.microsoft.com"
             );
+
+        var role = await _dbContext
+            .UserTenantRoles.IgnoreQueryFilters()
+            .SingleAsync(item => item.TenantId == detail.Id && item.UserId == currentUser.Id);
+        role.Role.Should().Be(RoleName.GlobalAdmin);
     }
 
     [Fact]

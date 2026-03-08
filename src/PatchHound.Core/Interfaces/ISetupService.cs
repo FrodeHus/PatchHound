@@ -7,5 +7,6 @@ namespace PatchHound.Core.Interfaces;
 public interface ISetupService
 {
     Task<bool> IsInitializedAsync(CancellationToken ct);
+    Task<bool> RequiresSetupForTenantAsync(string? entraTenantId, CancellationToken ct);
     Task<Result<Tenant>> CompleteSetupAsync(SetupRequest request, CancellationToken ct);
 }

@@ -116,6 +116,61 @@ public class TenantContextMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_AuthenticatedUserWithoutLocalRecord_CreatesUser()
+    {
+        var tenantContext = new TenantContext();
+        await using var dbContext = CreateDbContext(tenantContext);
+
+        var objectId = Guid.NewGuid().ToString();
+        var httpContext = CreateHttpContext(
+            dbContext,
+            tenantContext,
+            objectId,
+            roles: [],
+            email: "new.user@example.com",
+            displayName: "New User"
+        );
+
+        var middleware = new TenantContextMiddleware(_ => Task.CompletedTask);
+
+        await middleware.InvokeAsync(httpContext);
+
+        var savedUser = await dbContext.Users.SingleAsync(user => user.EntraObjectId == objectId);
+        savedUser.Email.Should().Be("new.user@example.com");
+        savedUser.DisplayName.Should().Be("New User");
+        tenantContext.CurrentUserId.Should().Be(savedUser.Id);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_AuthenticatedUserUpdatesExistingProfile()
+    {
+        var tenantContext = new TenantContext();
+        await using var dbContext = CreateDbContext(tenantContext);
+
+        var objectId = Guid.NewGuid().ToString();
+        var user = User.Create("old@example.com", "Old Name", objectId);
+        await dbContext.Users.AddAsync(user);
+        await dbContext.SaveChangesAsync();
+
+        var httpContext = CreateHttpContext(
+            dbContext,
+            tenantContext,
+            objectId,
+            roles: [],
+            email: "updated@example.com",
+            displayName: "Updated Name"
+        );
+
+        var middleware = new TenantContextMiddleware(_ => Task.CompletedTask);
+
+        await middleware.InvokeAsync(httpContext);
+
+        var savedUser = await dbContext.Users.SingleAsync(item => item.EntraObjectId == objectId);
+        savedUser.Email.Should().Be("updated@example.com");
+        savedUser.DisplayName.Should().Be("Updated Name");
+    }
+
+    [Fact]
     public async Task InvokeAsync_UnauthorizedHeaderDoesNotSetCurrentTenant()
     {
         var tenantContext = new TenantContext();
@@ -164,6 +219,8 @@ public class TenantContextMiddlewareTests
         TenantContext tenantContext,
         string objectId,
         IReadOnlyList<string> roles,
+        string? email = null,
+        string? displayName = null,
         string? tokenTenantId = null,
         string? tenantHeader = null
     )
@@ -176,7 +233,10 @@ public class TenantContextMiddlewareTests
         {
             RequestServices = services.BuildServiceProvider(),
             User = new ClaimsPrincipal(
-                new ClaimsIdentity(BuildClaims(objectId, roles, tokenTenantId), "test")
+                new ClaimsIdentity(
+                    BuildClaims(objectId, roles, email, displayName, tokenTenantId),
+                    "test"
+                )
             ),
         };
 
@@ -191,10 +251,22 @@ public class TenantContextMiddlewareTests
     private static IEnumerable<Claim> BuildClaims(
         string objectId,
         IReadOnlyList<string> roles,
+        string? email,
+        string? displayName,
         string? tokenTenantId
     )
     {
         yield return new Claim("oid", objectId);
+
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            yield return new Claim("preferred_username", email);
+        }
+
+        if (!string.IsNullOrWhiteSpace(displayName))
+        {
+            yield return new Claim("name", displayName);
+        }
 
         if (!string.IsNullOrWhiteSpace(tokenTenantId))
         {

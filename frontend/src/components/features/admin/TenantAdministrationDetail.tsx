@@ -50,7 +50,6 @@ export function TenantAdministrationDetail({
             enabled: source.enabled,
             syncSchedule: source.syncSchedule,
             credentials: {
-              tenantId: source.credentials.tenantId,
               clientId: source.credentials.clientId,
               secret: '',
               apiBaseUrl: source.credentials.apiBaseUrl,
