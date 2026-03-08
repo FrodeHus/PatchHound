@@ -6,10 +6,12 @@ export const auditLogSchema = z.object({
   tenantId: z.string().uuid(),
   entityType: z.string(),
   entityId: z.string().uuid(),
+  entityLabel: z.string().nullable(),
   action: z.string(),
   oldValues: z.string().nullable(),
   newValues: z.string().nullable(),
   userId: z.string().uuid(),
+  userDisplayName: z.string().nullable(),
   timestamp: isoDateTimeSchema,
 })
 

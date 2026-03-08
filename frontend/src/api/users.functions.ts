@@ -15,7 +15,7 @@ export const fetchUsers = createServerFn({ method: 'GET' })
   )
   .handler(async ({ context, data: filters }) => {
     const params = buildFilterParams(filters)
-    const data = await apiGet(`/users?${params.toString()}`, context.token)
+    const data = await apiGet(`/users?${params.toString()}`, context)
     return pagedUsersSchema.parse(data)
   })
 
@@ -29,7 +29,7 @@ export const inviteUser = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ context, data: payload }) => {
-    await apiPost('/users/invite', context.token, payload)
+    await apiPost('/users/invite', context, payload)
   })
 
 export const updateUserRoles = createServerFn({ method: 'POST' })
@@ -41,5 +41,5 @@ export const updateUserRoles = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ context, data: { userId, roles } }) => {
-    await apiPut(`/users/${userId}/roles`, context.token, { roles })
+    await apiPut(`/users/${userId}/roles`, context, { roles })
   })

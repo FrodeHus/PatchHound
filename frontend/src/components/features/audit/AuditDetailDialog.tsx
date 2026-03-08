@@ -1,4 +1,5 @@
 import type { AuditLogItem } from '@/api/audit-log.schemas'
+import { Badge } from '@/components/ui/badge'
 
 type AuditDetailDialogProps = {
   selected: AuditLogItem | null
@@ -12,19 +13,21 @@ export function AuditDetailDialog({ selected, onClose }: AuditDetailDialogProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="max-h-[80vh] w-full max-w-3xl overflow-auto rounded-lg border border-border bg-background p-4 shadow-lg">
+      <div className="max-h-[80vh] w-full max-w-4xl overflow-auto rounded-[28px] border border-border bg-background p-5 shadow-lg">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-lg font-semibold">Audit Entry Detail</h3>
-          <button type="button" className="rounded-md border border-input px-2 py-1 text-sm" onClick={onClose}>
+          <button type="button" className="rounded-full border border-input px-3 py-1.5 text-sm" onClick={onClose}>
             Close
           </button>
         </div>
 
-        <dl className="mb-3 grid gap-2 text-sm md:grid-cols-2">
-          <div><dt className="text-xs text-muted-foreground">Entity Type</dt><dd>{selected.entityType}</dd></div>
-          <div><dt className="text-xs text-muted-foreground">Action</dt><dd>{selected.action}</dd></div>
-          <div><dt className="text-xs text-muted-foreground">Entity ID</dt><dd><code>{selected.entityId}</code></dd></div>
-          <div><dt className="text-xs text-muted-foreground">Timestamp</dt><dd>{new Date(selected.timestamp).toLocaleString()}</dd></div>
+        <dl className="mb-4 grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-3">
+          <div className="rounded-2xl border border-border/70 bg-background/25 p-3"><dt className="text-xs text-muted-foreground">Entity Type</dt><dd className="mt-2 font-medium">{selected.entityType}</dd></div>
+          <div className="rounded-2xl border border-border/70 bg-background/25 p-3"><dt className="text-xs text-muted-foreground">Entity Label</dt><dd className="mt-2 font-medium">{selected.entityLabel ?? '(none)'}</dd></div>
+          <div className="rounded-2xl border border-border/70 bg-background/25 p-3"><dt className="text-xs text-muted-foreground">Action</dt><dd className="mt-2"><Badge>{selected.action}</Badge></dd></div>
+          <div className="rounded-2xl border border-border/70 bg-background/25 p-3"><dt className="text-xs text-muted-foreground">Actor</dt><dd className="mt-2 font-medium">{selected.userDisplayName ?? 'Unknown operator'}</dd></div>
+          <div className="rounded-2xl border border-border/70 bg-background/25 p-3"><dt className="text-xs text-muted-foreground">Entity ID</dt><dd className="mt-2 break-all"><code>{selected.entityId}</code></dd></div>
+          <div className="rounded-2xl border border-border/70 bg-background/25 p-3"><dt className="text-xs text-muted-foreground">Timestamp</dt><dd className="mt-2">{new Date(selected.timestamp).toLocaleString()}</dd></div>
         </dl>
 
         <div className="grid gap-3 md:grid-cols-2">

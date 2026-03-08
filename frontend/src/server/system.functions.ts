@@ -34,14 +34,14 @@ export const unsealOpenBao = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ context, data }) => {
-    const response = await apiPost('/system/openbao/unseal', context.token, data)
+    const response = await apiPost('/system/openbao/unseal', context, data)
     return systemStatusSchema.parse(response)
   })
 
 export const fetchEnrichmentSources = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const response = await apiGet('/system/enrichment-sources', context.token)
+    const response = await apiGet('/system/enrichment-sources', context)
     return z.array(enrichmentSourceSchema).parse(response)
   })
 
@@ -57,7 +57,7 @@ export const updateEnrichmentSources = createServerFn({ method: 'POST' })
     }),
   })))
   .handler(async ({ context, data }) => {
-    await apiPut('/system/enrichment-sources', context.token, data)
+    await apiPut('/system/enrichment-sources', context, data)
   })
 
 export type EnrichmentSource = z.infer<typeof enrichmentSourceSchema>

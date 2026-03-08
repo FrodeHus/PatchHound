@@ -6,13 +6,13 @@ import { dashboardSummarySchema, trendDataSchema } from './dashboard.schemas'
 export const fetchDashboardSummary = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const data = await apiGet('/dashboard/summary', context.token)
+    const data = await apiGet('/dashboard/summary', context)
     return dashboardSummarySchema.parse(data)
   })
 
 export const fetchDashboardTrends = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const data = await apiGet('/dashboard/trends', context.token)
+    const data = await apiGet('/dashboard/trends', context)
     return trendDataSchema.parse(data)
   })

@@ -16,7 +16,7 @@ export const fetchSecurityProfiles = createServerFn({ method: 'GET' })
   )
   .handler(async ({ context, data: filters }) => {
     const params = buildFilterParams(filters)
-    const data = await apiGet(`/security-profiles?${params.toString()}`, context.token)
+    const data = await apiGet(`/security-profiles?${params.toString()}`, context)
     return pagedSecurityProfilesSchema.parse(data)
   })
 
@@ -35,5 +35,5 @@ export const createSecurityProfile = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ context, data }) => {
-    await apiPost('/security-profiles', context.token, data)
+    await apiPost('/security-profiles', context, data)
   })

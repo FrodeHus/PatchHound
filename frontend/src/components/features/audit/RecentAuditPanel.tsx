@@ -40,6 +40,11 @@ export function RecentAuditPanel({
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge className={actionBadgeClassName(item.action)}>{item.action}</Badge>
                     <span className="text-sm font-medium text-foreground">{formatEntityType(item.entityType)}</span>
+                    {item.entityLabel ? (
+                      <Badge variant="outline" className="rounded-full border-border/70 bg-background/60 text-foreground">
+                        {item.entityLabel}
+                      </Badge>
+                    ) : null}
                   </div>
                   <p className="text-sm text-muted-foreground">{summarizeEntry(item)}</p>
                 </div>
@@ -57,14 +62,26 @@ function summarizeEntry(item: AuditLogItem) {
   const newValues = parseValues(item.newValues)
   const oldValues = parseValues(item.oldValues)
   const changedKeys = [...new Set([...Object.keys(newValues), ...Object.keys(oldValues)])]
+  const actor = item.userDisplayName ?? 'Unknown operator'
+  const subject = item.entityLabel
+    ? `${formatEntityType(item.entityType)} ${item.entityLabel}`
+    : formatEntityType(item.entityType)
+
+  if (item.action === 'Created') {
+    return `${actor} created ${subject}.`
+  }
+
+  if (item.action === 'Deleted') {
+    return `${actor} deleted ${subject}.`
+  }
 
   if (!changedKeys.length) {
-    return 'Change recorded without field details.'
+    return `${actor} updated ${subject}.`
   }
 
   const preview = changedKeys.slice(0, 3).map(formatKey).join(', ')
   const suffix = changedKeys.length > 3 ? ` +${changedKeys.length - 3} more` : ''
-  return `Updated fields: ${preview}${suffix}`
+  return `${actor} updated ${subject}: ${preview}${suffix}.`
 }
 
 function parseValues(raw: string | null) {

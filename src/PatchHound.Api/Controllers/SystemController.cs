@@ -32,8 +32,14 @@ public class SystemController : ControllerBase
         _auditLogWriter = auditLogWriter;
     }
 
-    [HttpGet("status")]
+    [HttpGet("/api/health")]
     [AllowAnonymous]
+    public IActionResult Health()
+    {
+        return Ok(new { status = "ok" });
+    }
+
+    [HttpGet("status")]
     public async Task<ActionResult<SystemStatusDto>> GetStatus(CancellationToken ct)
     {
         var status = await _secretStore.GetStatusAsync(ct);

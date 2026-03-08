@@ -16,7 +16,7 @@ export const fetchTeams = createServerFn({ method: 'GET' })
   )
   .handler(async ({ context, data: filters }) => {
     const params = buildFilterParams(filters)
-    const data = await apiGet(`/teams?${params.toString()}`, context.token)
+    const data = await apiGet(`/teams?${params.toString()}`, context)
     return pagedTeamsSchema.parse(data)
   })
 
@@ -24,13 +24,13 @@ export const createTeam = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ name: z.string(), tenantId: z.string() }))
   .handler(async ({ context, data: payload }) => {
-    await apiPost('/teams', context.token, payload)
+    await apiPost('/teams', context, payload)
   })
 
 export const fetchTeamDetail = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ teamId: z.string() }))
   .handler(async ({ context, data: { teamId } }) => {
-    const data = await apiGet(`/teams/${teamId}`, context.token)
+    const data = await apiGet(`/teams/${teamId}`, context)
     return teamDetailSchema.parse(data)
   })

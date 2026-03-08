@@ -16,7 +16,7 @@ export const fetchTasks = createServerFn({ method: 'GET' })
   )
   .handler(async ({ context, data: filters }) => {
     const params = buildFilterParams(filters)
-    const data = await apiGet(`/tasks?${params.toString()}`, context.token)
+    const data = await apiGet(`/tasks?${params.toString()}`, context)
     return pagedTasksSchema.parse(data)
   })
 
@@ -30,5 +30,5 @@ export const updateTaskStatus = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ context, data: { id, status, justification } }) => {
-    await apiPut(`/tasks/${id}/status`, context.token, { status, justification })
+    await apiPut(`/tasks/${id}/status`, context, { status, justification })
   })
