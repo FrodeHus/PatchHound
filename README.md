@@ -114,7 +114,10 @@ Notes:
 
 ## OpenBao Token Setup
 
-PatchHound uses OpenBao for tenant source secrets. The API and worker need an `OPENBAO_TOKEN` with read/write access to `patchhound/data/tenants/*`.
+PatchHound uses OpenBao for tenant source secrets and global enrichment source secrets. The API and worker need an `OPENBAO_TOKEN` with read/write access to:
+
+- `patchhound/data/tenants/*`
+- `patchhound/data/system/enrichment-sources/*`
 
 1. Start and initialize OpenBao:
 
@@ -138,6 +141,9 @@ docker compose exec openbao sh -c 'cat >/tmp/patchhound-policy.hcl <<EOF
 path "patchhound/data/tenants/*" {
   capabilities = ["create", "update", "read"]
 }
+path "patchhound/data/system/enrichment-sources/*" {
+  capabilities = ["create", "update", "read"]
+}
 EOF
 bao policy write patchhound /tmp/patchhound-policy.hcl
 bao token create -policy=patchhound'
@@ -155,7 +161,7 @@ OPENBAO_TOKEN=replace-with-generated-token
 docker compose up -d --build api worker
 ```
 
-If `OPENBAO_TOKEN` is missing, tenant secret writes will fail and the worker will not be able to read tenant ingestion credentials.
+If `OPENBAO_TOKEN` is missing or lacks access to one of the required paths, tenant or enrichment secret writes will fail and the worker will not be able to read protected credentials.
 
 If you run `bao` outside the container or before the container environment is refreshed, use the HTTP address explicitly:
 

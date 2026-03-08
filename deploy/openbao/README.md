@@ -55,6 +55,9 @@ docker compose exec openbao sh -c 'cat >/tmp/patchhound-policy.hcl <<EOF
 path "patchhound/data/tenants/*" {
   capabilities = ["create", "update", "read"]
 }
+path "patchhound/data/system/enrichment-sources/*" {
+  capabilities = ["create", "update", "read"]
+}
 EOF
 bao policy write patchhound /tmp/patchhound-policy.hcl
 bao token create -policy=patchhound'
@@ -76,4 +79,5 @@ docker compose exec openbao bao kv put patchhound/tenants/<tenant-id>/sources/mi
 - The Compose setup uses file storage at `/openbao/file` via the `openbao_data` volume.
 - TLS is disabled in this local self-hosting profile. Put OpenBao behind TLS before exposing it outside a trusted network.
 - PatchHound now stores tenant source secrets in OpenBao and keeps only secret references in tenant settings.
-- If `OPENBAO_TOKEN` is missing, tenant secret writes will fail and worker secret reads will fail for tenant-backed ingestion sources.
+- PatchHound also stores global enrichment source secrets under `patchhound/data/system/enrichment-sources/*`.
+- If `OPENBAO_TOKEN` is missing or lacks access to either secret path, tenant or enrichment secret writes will fail.

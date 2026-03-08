@@ -163,7 +163,7 @@ public class OpenBaoSecretStore : ISecretStore
             );
 
             throw new SecretStoreUnavailableException(
-                $"OpenBao returned {(int)response.StatusCode} {response.ReasonPhrase}.",
+                $"OpenBao returned {(int)response.StatusCode} {response.ReasonPhrase} for {request.RequestUri?.PathAndQuery}.",
                 response.StatusCode
             );
         }
