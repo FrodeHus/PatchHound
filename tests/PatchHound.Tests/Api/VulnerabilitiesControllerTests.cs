@@ -183,6 +183,41 @@ public class VulnerabilitiesControllerTests : IDisposable
         asset.PossibleCorrelatedSoftware.Should().Equal("Contoso Agent", "Nearby Utility", "Legacy Runtime");
     }
 
+    [Fact]
+    public async Task List_ReturnsPaginationMetadata()
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            await _dbContext.Vulnerabilities.AddAsync(
+                Vulnerability.Create(
+                    _tenantId,
+                    $"CVE-2026-100{i}",
+                    $"Vulnerability {i}",
+                    "Desc",
+                    Severity.Medium,
+                    "MicrosoftDefender"
+                )
+            );
+        }
+
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new VulnerabilityFilterQuery(),
+            new PaginationQuery(2, 2),
+            CancellationToken.None
+        );
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<VulnerabilityDto>>().Subject;
+
+        payload.Page.Should().Be(2);
+        payload.PageSize.Should().Be(2);
+        payload.TotalCount.Should().Be(3);
+        payload.TotalPages.Should().Be(2);
+        payload.Items.Should().HaveCount(1);
+    }
+
     public void Dispose() => _dbContext.Dispose();
 
     private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)

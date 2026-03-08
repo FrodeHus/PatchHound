@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 import {
   Table,
   TableBody,
@@ -18,16 +19,26 @@ import {
 type TenantAdministrationListProps = {
   tenants: TenantListItem[]
   totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
   isCreating: boolean
   createError: string | null
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
   onCreate: (payload: { name: string; entraTenantId: string }) => Promise<unknown>
 }
 
 export function TenantAdministrationList({
   tenants,
   totalCount,
+  page,
+  pageSize,
+  totalPages,
   isCreating,
   createError,
+  onPageChange,
+  onPageSizeChange,
   onCreate,
 }: TenantAdministrationListProps) {
   const [name, setName] = useState('')
@@ -221,6 +232,16 @@ export function TenantAdministrationList({
             ))
           )}
         </CardContent>
+        <div className="px-6 pb-6">
+          <PaginationControls
+            page={page}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+          />
+        </div>
       </Card>
     </section>
   )

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { ShieldCheck, Signal, TriangleAlert } from 'lucide-react'
 import { fetchAuditLog } from '@/api/audit-log.functions'
@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { PaginationControls } from '@/components/ui/pagination-controls'
+import { baseListSearchSchema } from '@/routes/-list-search'
 
 const environmentClassOptions = ['Workstation', 'Server', 'JumpHost', 'Lab', 'Kiosk', 'OT'] as const
 const internetReachabilityOptions = ['Internet', 'InternalNetwork', 'AdjacentOnly', 'LocalOnly'] as const
@@ -61,9 +63,11 @@ const environmentHelp: Record<(typeof environmentClassOptions)[number], string> 
 }
 
 export const Route = createFileRoute('/_authed/admin/security-profiles')({
-  loader: async () => {
+  validateSearch: baseListSearchSchema,
+  loaderDeps: ({ search }) => search,
+  loader: async ({ deps }) => {
     const [profiles, tenants] = await Promise.all([
-      fetchSecurityProfiles({ data: {} }),
+      fetchSecurityProfiles({ data: { page: deps.page, pageSize: deps.pageSize } }),
       fetchTenants({ data: { page: 1, pageSize: 100 } }),
     ])
 
@@ -77,6 +81,8 @@ export const Route = createFileRoute('/_authed/admin/security-profiles')({
 
 function SecurityProfilesPage() {
   const router = useRouter()
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
   const { user } = Route.useRouteContext()
   const data = Route.useLoaderData()
   const [tenantId, setTenantId] = useState(data.tenants[0]?.id ?? '')
@@ -88,6 +94,11 @@ function SecurityProfilesPage() {
   const [integrityRequirement, setIntegrityRequirement] = useState<(typeof requirementOptions)[number]>(requirementOptions[1])
   const [availabilityRequirement, setAvailabilityRequirement] = useState<(typeof requirementOptions)[number]>(requirementOptions[1])
   const tenantNames = new Map(data.tenants.map((tenant) => [tenant.id, tenant.name]))
+  const profilesQuery = useQuery({
+    queryKey: ['security-profiles', search.page, search.pageSize],
+    queryFn: () => fetchSecurityProfiles({ data: { page: search.page, pageSize: search.pageSize } }),
+    initialData: data.profiles,
+  })
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -339,16 +350,16 @@ function SecurityProfilesPage() {
                 Review the current severity logic each tenant can apply to devices.
               </p>
             </div>
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{data.profiles.totalCount} total</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{profilesQuery.data.totalCount} total</p>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {data.profiles.items.length === 0 ? (
+          {profilesQuery.data.items.length === 0 ? (
             <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-6 text-sm text-muted-foreground">
               No security profiles found.
             </div>
           ) : (
-            data.profiles.items.map((profile) => (
+            profilesQuery.data.items.map((profile) => (
               <div key={profile.id} className="rounded-[24px] border border-border/70 bg-background/30 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -394,6 +405,22 @@ function SecurityProfilesPage() {
               </div>
             ))
           )}
+          <PaginationControls
+            page={profilesQuery.data.page}
+            pageSize={profilesQuery.data.pageSize}
+            totalCount={profilesQuery.data.totalCount}
+            totalPages={profilesQuery.data.totalPages}
+            onPageChange={(page) => {
+              void navigate({
+                search: (prev) => ({ ...prev, page }),
+              })
+            }}
+            onPageSizeChange={(nextPageSize) => {
+              void navigate({
+                search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
+              })
+            }}
+          />
         </CardContent>
       </Card>
 

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { pagedResponseMetaSchema } from './pagination.schemas'
 
 export const assetSchema = z.object({
   id: z.string().uuid(),
@@ -83,9 +84,8 @@ export const assetDetailSchema = z.object({
   })),
 })
 
-export const pagedAssetsSchema = z.object({
+export const pagedAssetsSchema = pagedResponseMetaSchema.extend({
   items: z.array(assetSchema),
-  totalCount: z.number(),
 })
 
 export type Asset = z.infer<typeof assetSchema>

@@ -74,7 +74,9 @@ public class TenantsController : ControllerBase
                 sourceCounts.Count(source =>
                     source.TenantId == t.Id && TenantSourceCatalog.HasConfiguredCredentials(source))
             )).ToList(),
-            totalCount
+            totalCount,
+            pagination.Page,
+            pagination.BoundedPageSize
         ));
     }
 

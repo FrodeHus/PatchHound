@@ -23,7 +23,11 @@ export function RecentAuditPanel({
           <CardTitle>{title}</CardTitle>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
-        <Link to="/audit-log" className="text-sm font-medium text-primary hover:underline">
+        <Link
+          to="/audit-log"
+          search={{ page: 1, pageSize: 25 }}
+          className="text-sm font-medium text-primary hover:underline"
+        >
           Open audit trail
         </Link>
       </CardHeader>

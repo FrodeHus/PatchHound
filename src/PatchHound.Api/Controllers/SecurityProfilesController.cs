@@ -67,7 +67,7 @@ public class SecurityProfilesController : ControllerBase
             ))
             .ToListAsync(ct);
 
-        return Ok(new PagedResponse<SecurityProfileDto>(items, totalCount));
+        return Ok(new PagedResponse<SecurityProfileDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
     }
 
     [HttpPost]

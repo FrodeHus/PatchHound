@@ -83,7 +83,7 @@ public class AuditLogController : ControllerBase
             ))
             .ToList();
 
-        return Ok(new PagedResponse<AuditLogDto>(items, totalCount));
+        return Ok(new PagedResponse<AuditLogDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
     }
 
     private static string? ResolveEntityLabel(string entityType, string? oldValues, string? newValues)

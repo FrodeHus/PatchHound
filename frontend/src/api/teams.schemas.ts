@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { pagedResponseMetaSchema } from './pagination.schemas'
 
 export const teamSchema = z.object({
   id: z.string().uuid(),
@@ -21,9 +22,8 @@ export const teamDetailSchema = z.object({
   })),
 })
 
-export const pagedTeamsSchema = z.object({
+export const pagedTeamsSchema = pagedResponseMetaSchema.extend({
   items: z.array(teamSchema),
-  totalCount: z.number(),
 })
 
 export type TeamItem = z.infer<typeof teamSchema>

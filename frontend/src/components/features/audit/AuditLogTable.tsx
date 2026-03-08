@@ -3,13 +3,27 @@ import type { AuditLogItem } from '@/api/audit-log.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuditDetailDialog } from '@/components/features/audit/AuditDetailDialog'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 
 type AuditLogTableProps = {
   items: AuditLogItem[]
   totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
 }
 
-export function AuditLogTable({ items, totalCount }: AuditLogTableProps) {
+export function AuditLogTable({
+  items,
+  totalCount,
+  page,
+  pageSize,
+  totalPages,
+  onPageChange,
+  onPageSizeChange,
+}: AuditLogTableProps) {
   const [selected, setSelected] = useState<AuditLogItem | null>(null)
 
   return (
@@ -29,8 +43,8 @@ export function AuditLogTable({ items, totalCount }: AuditLogTableProps) {
           </div>
         </CardHeader>
         <CardContent>
-        <div className="overflow-x-auto rounded-[24px] border border-border/70 bg-background/25">
-          <table className="w-full min-w-[1120px] border-collapse text-sm">
+          <div className="overflow-x-auto rounded-[24px] border border-border/70 bg-background/25">
+            <table className="w-full min-w-[1120px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="px-4 py-3 pr-2">Time</th>
@@ -81,8 +95,16 @@ export function AuditLogTable({ items, totalCount }: AuditLogTableProps) {
                 ))
               )}
             </tbody>
-          </table>
-        </div>
+            </table>
+          </div>
+          <PaginationControls
+            page={page}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+          />
         </CardContent>
       </Card>
 

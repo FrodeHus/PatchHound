@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { bulkAssignAssets, fetchAssets } from '@/api/assets.functions'
 import { fetchTenants } from '@/api/settings.functions'
 import { createTeam, fetchTeamDetail, fetchTeams } from '@/api/teams.functions'
 import { AssignmentGroupDetailView } from '@/components/features/admin/AssignmentGroupDetailView'
 import { CreateTeamDialog } from '@/components/features/admin/CreateTeamDialog'
 import { TeamTable } from '@/components/features/admin/TeamTable'
+import { baseListSearchSchema } from '@/routes/-list-search'
 
 export const Route = createFileRoute('/_authed/admin/teams')({
-  loader: async () => {
+  validateSearch: baseListSearchSchema,
+  loaderDeps: ({ search }) => search,
+  loader: async ({ deps }) => {
     const [teams, tenants] = await Promise.all([
-      fetchTeams({ data: {} }),
+      fetchTeams({ data: { page: deps.page, pageSize: deps.pageSize } }),
       fetchTenants({ data: { page: 1, pageSize: 100 } }),
     ])
 
@@ -26,6 +29,8 @@ export const Route = createFileRoute('/_authed/admin/teams')({
 function TeamsPage() {
   const router = useRouter()
   const data = Route.useLoaderData()
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
   const [createState, setCreateState] = useState<'idle' | 'success' | 'error'>('idle')
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(data.teams.items[0]?.id ?? null)
   const [detailState, setDetailState] = useState<'idle' | 'error'>('idle')
@@ -34,7 +39,14 @@ function TeamsPage() {
     assetType: '',
     criticality: '',
   })
+  const [assetPage, setAssetPage] = useState(1)
+  const [assetPageSize, setAssetPageSize] = useState(25)
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([])
+  const teamsQuery = useQuery({
+    queryKey: ['teams', search.page, search.pageSize],
+    queryFn: () => fetchTeams({ data: { page: search.page, pageSize: search.pageSize } }),
+    initialData: data.teams,
+  })
 
   const createMutation = useMutation({
     mutationFn: async (payload: { name: string; tenantId: string }) => {
@@ -60,15 +72,22 @@ function TeamsPage() {
   })
 
   const assetsMutation = useMutation({
-    mutationFn: async (payload: { tenantId: string; search: string; assetType: string; criticality: string }) =>
+    mutationFn: async (payload: {
+      tenantId: string
+      search: string
+      assetType: string
+      criticality: string
+      page: number
+      pageSize: number
+    }) =>
       fetchAssets({
         data: {
           tenantId: payload.tenantId,
           search: payload.search || undefined,
           assetType: payload.assetType || undefined,
           criticality: payload.criticality || undefined,
-          page: 1,
-          pageSize: 100,
+          page: payload.page,
+          pageSize: payload.pageSize,
         },
       }),
   })
@@ -97,6 +116,7 @@ function TeamsPage() {
     }
 
     setDetailState('idle')
+    setAssetPage(1)
     void detailMutation.mutateAsync(selectedTeamId)
   }, [selectedTeamId])
 
@@ -111,8 +131,16 @@ function TeamsPage() {
       search: filters.search,
       assetType: filters.assetType,
       criticality: filters.criticality,
+      page: assetPage,
+      pageSize: assetPageSize,
     })
-  }, [detailMutation.data?.tenantId, filters.search, filters.assetType, filters.criticality])
+  }, [detailMutation.data?.tenantId, filters.search, filters.assetType, filters.criticality, assetPage, assetPageSize])
+
+  useEffect(() => {
+    if (!selectedTeamId && teamsQuery.data.items[0]?.id) {
+      setSelectedTeamId(teamsQuery.data.items[0].id)
+    }
+  }, [selectedTeamId, teamsQuery.data.items])
 
   return (
     <section className="space-y-4">
@@ -136,9 +164,23 @@ function TeamsPage() {
         <p className="text-sm text-destructive">Failed to create assignment group.</p>
       ) : null}
       <TeamTable
-        teams={data.teams.items}
-        totalCount={data.teams.totalCount}
+        teams={teamsQuery.data.items}
+        totalCount={teamsQuery.data.totalCount}
+        page={teamsQuery.data.page}
+        pageSize={teamsQuery.data.pageSize}
+        totalPages={teamsQuery.data.totalPages}
         selectedTeamId={selectedTeamId}
+        onPageChange={(page) => {
+          void navigate({
+            search: (prev) => ({ ...prev, page }),
+          })
+        }}
+        onPageSizeChange={(nextPageSize) => {
+          void navigate({
+            search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
+          })
+          setSelectedTeamId(null)
+        }}
         onSelectTeam={setSelectedTeamId}
       />
       {detailState === 'error' ? (
@@ -149,11 +191,22 @@ function TeamsPage() {
           team={detailMutation.data}
           assets={assetsMutation.data?.items ?? []}
           totalAssetCount={assetsMutation.data?.totalCount ?? 0}
+          assetPage={assetsMutation.data?.page ?? assetPage}
+          assetPageSize={assetsMutation.data?.pageSize ?? assetPageSize}
+          assetTotalPages={assetsMutation.data?.totalPages ?? 0}
           selectedAssetIds={selectedAssetIds}
           filters={filters}
           isLoadingAssets={detailMutation.isPending || assetsMutation.isPending}
           isAssigningAssets={assignAssetsMutation.isPending}
-          onFilterChange={setFilters}
+          onFilterChange={(next) => {
+            setFilters(next)
+            setAssetPage(1)
+          }}
+          onAssetPageChange={setAssetPage}
+          onAssetPageSizeChange={(nextPageSize) => {
+            setAssetPageSize(nextPageSize)
+            setAssetPage(1)
+          }}
           onToggleAsset={(assetId) => {
             setSelectedAssetIds((current) =>
               current.includes(assetId)

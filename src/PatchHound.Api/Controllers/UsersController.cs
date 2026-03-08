@@ -74,7 +74,7 @@ public class UsersController : ControllerBase
             ))
             .ToList();
 
-        return Ok(new PagedResponse<UserDto>(items, totalCount));
+        return Ok(new PagedResponse<UserDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
     }
 
     [HttpPost("invite")]

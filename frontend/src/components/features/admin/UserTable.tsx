@@ -1,15 +1,32 @@
 import type { UserItem } from '@/api/users.schemas'
 import { ManageRolesDialog } from '@/components/features/admin/ManageRolesDialog'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 
 type UserTableProps = {
   users: UserItem[]
   totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
   isUpdatingRoles: boolean
   tenants: Array<{ id: string; name: string }>
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
   onUpdateRoles: (userId: string, roles: Array<{ tenantId: string; role: string }>) => void
 }
 
-export function UserTable({ users, totalCount, isUpdatingRoles, tenants, onUpdateRoles }: UserTableProps) {
+export function UserTable({
+  users,
+  totalCount,
+  page,
+  pageSize,
+  totalPages,
+  isUpdatingRoles,
+  tenants,
+  onPageChange,
+  onPageSizeChange,
+  onUpdateRoles,
+}: UserTableProps) {
   return (
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="mb-3 flex items-end justify-between">
@@ -57,6 +74,14 @@ export function UserTable({ users, totalCount, isUpdatingRoles, tenants, onUpdat
           </tbody>
         </table>
       </div>
+      <PaginationControls
+        page={page}
+        pageSize={pageSize}
+        totalCount={totalCount}
+        totalPages={totalPages}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </section>
   )
 }

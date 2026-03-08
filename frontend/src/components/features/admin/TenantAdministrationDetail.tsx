@@ -73,7 +73,11 @@ export function TenantAdministrationDetail({
     <section className="space-y-4 pb-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-2">
-          <Link to="/admin/tenants" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            to="/admin/tenants"
+            search={{ page: 1, pageSize: 25 }}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="size-4" />
             Back to tenants
           </Link>
