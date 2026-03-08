@@ -57,7 +57,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
             return;
         }
 
-        var sources = await dbContext.TenantSourceConfigurations.ToListAsync(ct);
+        var sources = await dbContext.TenantSourceConfigurations.AsNoTracking().ToListAsync(ct);
         var tenants = await dbContext
             .Tenants.AsNoTracking()
             .ToDictionaryAsync(tenant => tenant.Id, ct);
@@ -82,15 +82,21 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
                     source.SourceKey
                 );
 
-                source.UpdateRuntime(
-                    null,
-                    source.LastStartedAt,
-                    DateTimeOffset.UtcNow,
-                    source.LastSucceededAt,
-                    "Failed",
-                    "Manual sync skipped because the source is disabled or credentials are incomplete."
-                );
-                await dbContext.SaveChangesAsync(ct);
+                await dbContext
+                    .TenantSourceConfigurations.IgnoreQueryFilters()
+                    .Where(item => item.Id == source.Id)
+                    .ExecuteUpdateAsync(
+                        setters =>
+                            setters
+                                .SetProperty(item => item.ManualRequestedAt, (DateTimeOffset?)null)
+                                .SetProperty(item => item.LastCompletedAt, DateTimeOffset.UtcNow)
+                                .SetProperty(item => item.LastStatus, "Failed")
+                                .SetProperty(
+                                    item => item.LastError,
+                                    "Manual sync skipped because the source is disabled or credentials are incomplete."
+                                ),
+                        ct
+                    );
                 continue;
             }
 

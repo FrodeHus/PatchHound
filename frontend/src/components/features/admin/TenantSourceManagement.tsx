@@ -20,7 +20,7 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
   const [syncingSourceKey, setSyncingSourceKey] = useState<string | null>(null)
   const [syncState, setSyncState] = useState<'idle' | 'success' | 'error'>('idle')
-  const [expandedSourceKey, setExpandedSourceKey] = useState<string | null>(tenant.ingestionSources[0]?.key ?? null)
+  const [expandedSourceKey, setExpandedSourceKey] = useState<string | null>(null)
 
   const mutation = useMutation({
     mutationFn: async () => {

@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Activity, KeyRound, Sparkles } from 'lucide-react'
+import { ChevronDown, Sparkles } from 'lucide-react'
 import { type EnrichmentSource, updateEnrichmentSources } from '@/server/system.functions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 
 type GlobalEnrichmentSourceManagementProps = {
   sources: EnrichmentSource[]
@@ -18,6 +19,7 @@ export function GlobalEnrichmentSourceManagement({
 }: GlobalEnrichmentSourceManagementProps) {
   const [sources, setSources] = useState(() => initialSources.map(mapSourceToDraft))
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
+  const [expandedSourceKey, setExpandedSourceKey] = useState<string | null>(null)
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -122,127 +124,130 @@ export function GlobalEnrichmentSourceManagement({
             </div>
 
             <div className="mt-5 space-y-4">
-              {sources.map((source) => (
-                <Card key={source.key} className="rounded-[26px] border-border/70 bg-card/82 shadow-sm">
-                  <CardHeader className="border-b border-border/60 pb-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex size-9 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+              {sources.map((source) => {
+                const isExpanded = expandedSourceKey === source.key
+
+                return (
+                  <Card key={source.key} className="rounded-[26px] border-border/70 bg-card/82 shadow-sm">
+                    <button
+                      type="button"
+                      className="flex w-full flex-wrap items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-background/25"
+                      onClick={() => {
+                        setExpandedSourceKey((current) => (current === source.key ? null : source.key))
+                      }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex size-8 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
                             <Sparkles className="size-4" />
                           </div>
-                          <CardTitle>{source.displayName}</CardTitle>
+                          <CardTitle className="text-base">{source.displayName}</CardTitle>
                           <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
                             {source.key}
                           </Badge>
                         </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          Shared enrichment used to fill missing CVSS and vulnerability context across tenants.
-                        </p>
                       </div>
-                      <Badge
-                        variant="outline"
-                        className={source.credentials.hasSecret
-                          ? 'rounded-full border-emerald-400/25 bg-emerald-400/10 text-emerald-200'
-                          : 'rounded-full border-border/70 bg-background/60 text-muted-foreground'}
-                      >
-                        {source.credentials.hasSecret ? 'Configured' : 'Needs credentials'}
-                      </Badge>
-                    </div>
-                    <div className="mt-4 grid gap-3 md:grid-cols-3">
-                      <StatusMetric
-                        icon={Activity}
-                        label="Worker Status"
-                        value={source.runtime.lastStatus || 'Unknown'}
-                        helper={getProviderStatusDescription(source)}
-                      />
-                      <StatusMetric
-                        icon={Sparkles}
-                        label="Last Success"
-                        value={formatTimestamp(source.runtime.lastSucceededAt)}
-                        helper={`Last completed run: ${formatTimestamp(source.runtime.lastCompletedAt)}`}
-                      />
-                      <StatusMetric
-                        icon={KeyRound}
-                        label="Credential State"
-                        value={source.credentials.hasSecret ? 'Stored' : 'Missing'}
-                        helper={source.credentials.hasSecret ? 'The provider can authenticate once enabled.' : 'Add an API key before enabling the provider.'}
-                      />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-5 pt-5">
-                    <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={source.enabled}
-                        onChange={(event) =>
-                          updateSource(source.key, (current) => ({
-                            ...current,
-                            enabled: event.target.checked,
-                          }))
-                        }
-                      />
-                      <div>
-                        <p className="text-sm font-medium">Enable provider</p>
-                        <p className="text-xs text-muted-foreground">
-                          When enabled, the worker will invoke this enrichment source during vulnerability processing.
-                        </p>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span className="rounded-full border border-border/70 bg-background/60 px-3 py-1">
+                          Last run {formatTimestamp(source.runtime.lastCompletedAt)}
+                        </span>
+                        <StatusBadge tone={getProviderStatusTone(source)}>
+                          {getProviderStatusLabel(source)}
+                        </StatusBadge>
+                        <span
+                          className={cn(
+                            'inline-flex size-8 items-center justify-center rounded-full border border-border/70 bg-background/60 transition-transform',
+                            isExpanded ? 'rotate-180' : '',
+                          )}
+                        >
+                          <ChevronDown className="size-4" />
+                        </span>
                       </div>
-                    </label>
+                    </button>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <label className="space-y-2">
-                        <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Display Name</span>
-                        <Input
-                          value={source.displayName}
-                          onChange={(event) =>
-                            updateSource(source.key, (current) => ({
-                              ...current,
-                              displayName: event.target.value,
-                            }))
-                          }
-                        />
-                      </label>
-                      <label className="space-y-2">
-                        <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">API Base URL</span>
-                        <Input
-                          value={source.credentials.apiBaseUrl}
-                          onChange={(event) =>
-                            updateSource(source.key, (current) => ({
-                              ...current,
-                              credentials: {
-                                ...current.credentials,
-                                apiBaseUrl: event.target.value,
-                              },
-                            }))
-                          }
-                        />
-                      </label>
-                    </div>
+                    {isExpanded ? (
+                      <CardContent className="space-y-5 border-t border-border/60 pt-5">
+                        <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={source.enabled}
+                            onChange={(event) =>
+                              updateSource(source.key, (current) => ({
+                                ...current,
+                                enabled: event.target.checked,
+                              }))
+                            }
+                          />
+                          <div>
+                            <p className="text-sm font-medium">Enable provider</p>
+                            <p className="text-xs text-muted-foreground">
+                              When enabled, the worker will invoke this enrichment source during vulnerability processing.
+                            </p>
+                          </div>
+                        </label>
 
-                    <label className="space-y-2">
-                      <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">API Key</span>
-                      <Input
-                        type="password"
-                        placeholder={source.credentials.hasSecret ? 'API key stored. Enter a new key to replace it.' : 'Enter API key'}
-                        value={source.credentials.secret}
-                        onChange={(event) =>
-                          updateSource(source.key, (current) => ({
-                            ...current,
-                            credentials: { ...current.credentials, secret: event.target.value },
-                          }))
-                        }
-                      />
-                    </label>
+                        <div className="rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
+                          <p className="text-sm font-medium">{getProviderStatusDescription(source)}</p>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Last success: {formatTimestamp(source.runtime.lastSucceededAt)}
+                          </p>
+                        </div>
 
-                    {source.runtime.lastError ? (
-                      <div className="rounded-2xl border border-destructive/25 bg-destructive/8 px-4 py-3 text-xs text-destructive">
-                        Last error: {source.runtime.lastError}
-                      </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <label className="space-y-2">
+                            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Display Name</span>
+                            <Input
+                              value={source.displayName}
+                              onChange={(event) =>
+                                updateSource(source.key, (current) => ({
+                                  ...current,
+                                  displayName: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                          <label className="space-y-2">
+                            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">API Base URL</span>
+                            <Input
+                              value={source.credentials.apiBaseUrl}
+                              onChange={(event) =>
+                                updateSource(source.key, (current) => ({
+                                  ...current,
+                                  credentials: {
+                                    ...current.credentials,
+                                    apiBaseUrl: event.target.value,
+                                  },
+                                }))
+                              }
+                            />
+                          </label>
+                        </div>
+
+                        <label className="space-y-2">
+                          <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">API Key</span>
+                          <Input
+                            type="password"
+                            placeholder={source.credentials.hasSecret ? 'API key stored. Enter a new key to replace it.' : 'Enter API key'}
+                            value={source.credentials.secret}
+                            onChange={(event) =>
+                              updateSource(source.key, (current) => ({
+                                ...current,
+                                credentials: { ...current.credentials, secret: event.target.value },
+                              }))
+                            }
+                          />
+                        </label>
+
+                        {source.runtime.lastError ? (
+                          <div className="rounded-2xl border border-destructive/25 bg-destructive/8 px-4 py-3 text-xs text-destructive">
+                            Last error: {source.runtime.lastError}
+                          </div>
+                        ) : null}
+                      </CardContent>
                     ) : null}
-                  </CardContent>
-                </Card>
-              ))}
+                  </Card>
+                )
+              })}
             </div>
           </div>
         </CardContent>
@@ -331,25 +336,40 @@ function getProviderStatusBadgeClassName(source: EnrichmentSource) {
   return 'rounded-full border border-emerald-400/25 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/10'
 }
 
-function StatusMetric({
-  icon: Icon,
-  label,
-  value,
-  helper,
+function StatusBadge({
+  children,
+  tone,
 }: {
-  icon: typeof Activity
-  label: string
-  value: string
-  helper: string
+  children: string
+  tone: 'neutral' | 'success' | 'warning' | 'error'
 }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-background/25 p-3">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-        <Icon className="size-4 text-primary" />
-      </div>
-      <p className="mt-3 text-sm font-medium">{value}</p>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">{helper}</p>
-    </div>
+    <span
+      className={cn(
+        'rounded-full border px-3 py-1 text-xs',
+        tone === 'success' && 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300',
+        tone === 'warning' && 'border-amber-400/25 bg-amber-400/10 text-amber-300',
+        tone === 'error' && 'border-destructive/25 bg-destructive/10 text-destructive',
+        tone === 'neutral' && 'border-border/70 bg-background/60 text-muted-foreground',
+      )}
+    >
+      {children}
+    </span>
   )
+}
+
+function getProviderStatusTone(source: EnrichmentSource): 'neutral' | 'success' | 'warning' | 'error' {
+  if (source.runtime.lastError) {
+    return 'error'
+  }
+
+  if (source.runtime.lastStatus?.toLowerCase() === 'running') {
+    return 'warning'
+  }
+
+  if (source.runtime.lastSucceededAt) {
+    return 'success'
+  }
+
+  return 'neutral'
 }

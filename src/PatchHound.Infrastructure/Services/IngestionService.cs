@@ -12,6 +12,8 @@ namespace PatchHound.Infrastructure.Services;
 
 public class IngestionService
 {
+    private const int MaxPersistenceAttempts = 2;
+    private const int MaxSourceAttempts = 2;
     private readonly PatchHoundDbContext _dbContext;
     private readonly IEnumerable<IVulnerabilitySource> _sources;
     private readonly IEnumerable<IVulnerabilityEnricher> _enrichers;
@@ -53,79 +55,141 @@ public class IngestionService
 
         foreach (var source in sources)
         {
-            await UpdateRuntimeStateAsync(
-                tenantId,
-                source.SourceKey,
-                runtime =>
-                {
-                    runtime.ManualRequestedAt = null;
-                    runtime.LastStartedAt = DateTimeOffset.UtcNow;
-                    runtime.LastStatus = "Running";
-                    runtime.LastError = string.Empty;
-                },
-                ct
-            );
-
-            try
+            for (var attempt = 1; attempt <= MaxSourceAttempts; attempt++)
             {
-                _logger.LogInformation(
-                    "Starting ingestion from {Source} for tenant {TenantId}",
-                    source.SourceName,
-                    tenantId
-                );
-
-                if (source is IAssetInventorySource assetInventorySource)
-                {
-                    var assetSnapshot = await assetInventorySource.FetchAssetsAsync(tenantId, ct);
-                    await ProcessAssetsAsync(tenantId, assetSnapshot, ct);
-                }
-
-                var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
-                var enrichedResults = await EnrichResultsAsync(tenantId, results, ct);
-                await ProcessResultsAsync(tenantId, source.SourceName, enrichedResults, ct);
-
-                _logger.LogInformation(
-                    "Completed ingestion from {Source} for tenant {TenantId}: {Count} vulnerabilities",
-                    source.SourceName,
-                    tenantId,
-                    enrichedResults.Count
-                );
-
-                // Update runtime state only after transaction has committed successfully
                 await UpdateRuntimeStateAsync(
                     tenantId,
                     source.SourceKey,
                     runtime =>
                     {
-                        var now = DateTimeOffset.UtcNow;
-                        runtime.LastCompletedAt = now;
-                        runtime.LastSucceededAt = now;
-                        runtime.LastStatus = "Succeeded";
+                        runtime.ManualRequestedAt = null;
+                        runtime.LastStartedAt = DateTimeOffset.UtcNow;
+                        runtime.LastStatus = "Running";
                         runtime.LastError = string.Empty;
                     },
                     ct
                 );
+
+                try
+                {
+                    _logger.LogInformation(
+                        "Starting ingestion from {Source} for tenant {TenantId}",
+                        source.SourceName,
+                        tenantId
+                    );
+
+                    if (source is IAssetInventorySource assetInventorySource)
+                    {
+                        var assetSnapshot = await assetInventorySource.FetchAssetsAsync(
+                            tenantId,
+                            ct
+                        );
+                        await ExecuteWithConcurrencyRetryAsync(
+                            () => ProcessAssetsAsync(tenantId, assetSnapshot, ct),
+                            source.SourceName,
+                            tenantId,
+                            ct
+                        );
+                    }
+
+                    var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
+                    var enrichedResults = await EnrichResultsAsync(tenantId, results, ct);
+                    await ExecuteWithConcurrencyRetryAsync(
+                        () => ProcessResultsAsync(tenantId, source.SourceName, enrichedResults, ct),
+                        source.SourceName,
+                        tenantId,
+                        ct
+                    );
+
+                    _logger.LogInformation(
+                        "Completed ingestion from {Source} for tenant {TenantId}: {Count} vulnerabilities",
+                        source.SourceName,
+                        tenantId,
+                        enrichedResults.Count
+                    );
+
+                    await UpdateRuntimeStateAsync(
+                        tenantId,
+                        source.SourceKey,
+                        runtime =>
+                        {
+                            var now = DateTimeOffset.UtcNow;
+                            runtime.LastCompletedAt = now;
+                            runtime.LastSucceededAt = now;
+                            runtime.LastStatus = "Succeeded";
+                            runtime.LastError = string.Empty;
+                        },
+                        ct
+                    );
+
+                    break;
+                }
+                catch (DbUpdateConcurrencyException ex) when (attempt < MaxSourceAttempts)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Retrying ingestion from {Source} for tenant {TenantId} after concurrency conflict. Attempt {Attempt}/{MaxAttempts}.",
+                        source.SourceName,
+                        tenantId,
+                        attempt + 1,
+                        MaxSourceAttempts
+                    );
+
+                    _dbContext.ChangeTracker.Clear();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Error during ingestion from {Source} for tenant {TenantId}",
+                        source.SourceName,
+                        tenantId
+                    );
+
+                    await UpdateRuntimeStateAsync(
+                        tenantId,
+                        source.SourceKey,
+                        runtime =>
+                        {
+                            runtime.LastCompletedAt = DateTimeOffset.UtcNow;
+                            runtime.LastStatus = "Failed";
+                            runtime.LastError = $"Ingestion failed: {ex.GetType().Name}";
+                        },
+                        ct
+                    );
+
+                    break;
+                }
             }
-            catch (Exception ex)
+        }
+    }
+
+    private async Task ExecuteWithConcurrencyRetryAsync(
+        Func<Task> operation,
+        string sourceName,
+        Guid tenantId,
+        CancellationToken ct
+    )
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
             {
-                _logger.LogError(
+                await operation();
+                return;
+            }
+            catch (DbUpdateConcurrencyException ex) when (attempt < MaxPersistenceAttempts)
+            {
+                _logger.LogWarning(
                     ex,
-                    "Error during ingestion from {Source} for tenant {TenantId}",
-                    source.SourceName,
-                    tenantId
+                    "Retrying ingestion persistence after concurrency conflict for {Source} and tenant {TenantId}. Attempt {Attempt}/{MaxAttempts}.",
+                    sourceName,
+                    tenantId,
+                    attempt + 1,
+                    MaxPersistenceAttempts
                 );
 
-                await UpdateRuntimeStateAsync(
-                    tenantId,
-                    source.SourceKey,
-                    runtime =>
-                    {
-                        runtime.LastCompletedAt = DateTimeOffset.UtcNow;
-                        runtime.LastStatus = "Failed";
-                        runtime.LastError = $"Ingestion failed: {ex.GetType().Name}";
-                    },
-                    ct
-                );
+                _dbContext.ChangeTracker.Clear();
             }
         }
     }
@@ -148,6 +212,7 @@ public class IngestionService
 
         var source = await _dbContext
             .TenantSourceConfigurations.IgnoreQueryFilters()
+            .AsNoTracking()
             .FirstOrDefaultAsync(
                 item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
                 ct
@@ -167,15 +232,20 @@ public class IngestionService
             source.LastError
         );
         update(runtime);
-        source.UpdateRuntime(
-            runtime.ManualRequestedAt,
-            runtime.LastStartedAt,
-            runtime.LastCompletedAt,
-            runtime.LastSucceededAt,
-            runtime.LastStatus,
-            runtime.LastError
-        );
-        await _dbContext.SaveChangesAsync(ct);
+        await _dbContext
+            .TenantSourceConfigurations.IgnoreQueryFilters()
+            .Where(item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey)
+            .ExecuteUpdateAsync(
+                setters =>
+                    setters
+                        .SetProperty(item => item.ManualRequestedAt, runtime.ManualRequestedAt)
+                        .SetProperty(item => item.LastStartedAt, runtime.LastStartedAt)
+                        .SetProperty(item => item.LastCompletedAt, runtime.LastCompletedAt)
+                        .SetProperty(item => item.LastSucceededAt, runtime.LastSucceededAt)
+                        .SetProperty(item => item.LastStatus, runtime.LastStatus)
+                        .SetProperty(item => item.LastError, runtime.LastError),
+                ct
+            );
     }
 
     private async Task<IReadOnlyList<IngestionResult>> EnrichResultsAsync(
@@ -247,6 +317,7 @@ public class IngestionService
         var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
         var source = await _dbContext
             .EnrichmentSourceConfigurations.IgnoreQueryFilters()
+            .AsNoTracking()
             .FirstOrDefaultAsync(item => item.SourceKey == normalizedSourceKey, ct);
 
         if (source is null)
@@ -262,14 +333,19 @@ public class IngestionService
             source.LastError
         );
         update(runtime);
-        source.UpdateRuntime(
-            runtime.LastStartedAt,
-            runtime.LastCompletedAt,
-            runtime.LastSucceededAt,
-            runtime.LastStatus,
-            runtime.LastError
-        );
-        await _dbContext.SaveChangesAsync(ct);
+        await _dbContext
+            .EnrichmentSourceConfigurations.IgnoreQueryFilters()
+            .Where(item => item.SourceKey == normalizedSourceKey)
+            .ExecuteUpdateAsync(
+                setters =>
+                    setters
+                        .SetProperty(item => item.LastStartedAt, runtime.LastStartedAt)
+                        .SetProperty(item => item.LastCompletedAt, runtime.LastCompletedAt)
+                        .SetProperty(item => item.LastSucceededAt, runtime.LastSucceededAt)
+                        .SetProperty(item => item.LastStatus, runtime.LastStatus)
+                        .SetProperty(item => item.LastError, runtime.LastError),
+                ct
+            );
     }
 
     internal async Task ProcessResultsAsync(
