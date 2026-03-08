@@ -9,6 +9,13 @@ namespace PatchHound.Infrastructure.Data;
 
 public class AuditSaveChangesInterceptor : SaveChangesInterceptor
 {
+    private static readonly HashSet<string> ExcludedProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "SecretRef",
+        "ClientSecret",
+        "PasswordHash",
+    };
+
     private readonly ITenantContext _tenantContext;
 
     public AuditSaveChangesInterceptor(ITenantContext tenantContext)
@@ -53,7 +60,8 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
                     ? SerializeValues(
                         entry
                             .Properties.Where(p =>
-                                entry.State == EntityState.Deleted || p.IsModified
+                                (entry.State == EntityState.Deleted || p.IsModified)
+                                && !ExcludedProperties.Contains(p.Metadata.Name)
                             )
                             .ToDictionary(p => p.Metadata.Name, p => p.OriginalValue)
                     )
@@ -63,7 +71,10 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
                 entry.State != EntityState.Deleted
                     ? SerializeValues(
                         entry
-                            .Properties.Where(p => entry.State == EntityState.Added || p.IsModified)
+                            .Properties.Where(p =>
+                                (entry.State == EntityState.Added || p.IsModified)
+                                && !ExcludedProperties.Contains(p.Metadata.Name)
+                            )
                             .ToDictionary(p => p.Metadata.Name, p => p.CurrentValue)
                     )
                     : null;

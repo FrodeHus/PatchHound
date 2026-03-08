@@ -131,6 +131,9 @@ public class SecurityProfilesController : ControllerBase
             return NotFound();
         }
 
+        if (!_tenantContext.HasAccessToTenant(profile.TenantId))
+            return Forbid();
+
         profile.Update(
             request.Name.Trim(),
             request.Description?.Trim(),

@@ -145,9 +145,15 @@ public class OpenBaoSecretStore : ISecretStore
         try
         {
             var response = await _httpClient.SendAsync(request, ct);
+            if (response.IsSuccessStatusCode)
+            {
+                return response;
+            }
+
+            // 404 is a valid "not found" response only for GET requests
             if (
-                response.IsSuccessStatusCode
-                || response.StatusCode == System.Net.HttpStatusCode.NotFound
+                response.StatusCode == System.Net.HttpStatusCode.NotFound
+                && request.Method == HttpMethod.Get
             )
             {
                 return response;

@@ -89,7 +89,7 @@ builder.Services.Configure<JwtBearerOptions>(
                     !string.IsNullOrWhiteSpace(authorizationHeader),
                     string.IsNullOrWhiteSpace(authorizationHeader)
                         ? "<missing>"
-                        : authorizationHeader.Split(' ')[0],
+                        : authorizationHeader.Split(' ')[0][..Math.Min(authorizationHeader.Split(' ')[0].Length, 10)],
                     tokenClaims?.Audience ?? "<unavailable>",
                     tokenClaims?.AuthorizedParty ?? "<unavailable>",
                     tokenClaims?.AppId ?? "<unavailable>",
