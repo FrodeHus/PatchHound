@@ -152,6 +152,31 @@ public class TenantsController : ControllerBase
             await _dbContext.TenantSourceConfigurations.AddAsync(source, ct);
         }
 
+        if (_tenantContext.CurrentUserId != Guid.Empty)
+        {
+            var sourceTenantIds = _tenantContext.CurrentTenantId is Guid currentTenantId
+                ? new[] { currentTenantId }
+                : _tenantContext.AccessibleTenantIds;
+
+            var rolesToCopy = await _dbContext
+                .UserTenantRoles.IgnoreQueryFilters()
+                .Where(role =>
+                    role.UserId == _tenantContext.CurrentUserId
+                    && sourceTenantIds.Contains(role.TenantId)
+                )
+                .Select(role => role.Role)
+                .Distinct()
+                .ToListAsync(ct);
+
+            foreach (var role in rolesToCopy)
+            {
+                await _dbContext.UserTenantRoles.AddAsync(
+                    UserTenantRole.Create(_tenantContext.CurrentUserId, tenant.Id, role),
+                    ct
+                );
+            }
+        }
+
         await _dbContext.SaveChangesAsync(ct);
         var detail = await BuildTenantDetailDto(tenant.Id, ignoreQueryFilters: true, ct);
         return CreatedAtAction(nameof(Get), new { id = tenant.Id }, detail);
@@ -253,7 +278,7 @@ public class TenantsController : ControllerBase
                     source.DisplayName,
                     source.Enabled,
                     source.SyncSchedule,
-                    source.Credentials.TenantId,
+                    tenant.EntraTenantId,
                     source.Credentials.ClientId,
                     secretRef,
                     source.Credentials.ApiBaseUrl,
@@ -268,7 +293,7 @@ public class TenantsController : ControllerBase
                 source.DisplayName,
                 source.Enabled,
                 source.SyncSchedule,
-                source.Credentials.TenantId,
+                tenant.EntraTenantId,
                 source.Credentials.ClientId,
                 secretRef,
                 source.Credentials.ApiBaseUrl,
@@ -393,7 +418,6 @@ public class TenantsController : ControllerBase
             TenantSourceCatalog.SupportsScheduling(source),
             TenantSourceCatalog.SupportsManualSync(source),
             new TenantSourceCredentialsDto(
-                source.CredentialTenantId,
                 source.ClientId,
                 !string.IsNullOrWhiteSpace(source.SecretRef),
                 source.ApiBaseUrl,

@@ -34,7 +34,6 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
             enabled: source.enabled,
             syncSchedule: source.syncSchedule,
             credentials: {
-              tenantId: source.credentials.tenantId,
               clientId: source.credentials.clientId,
               secret: source.credentials.secret,
               apiBaseUrl: source.credentials.apiBaseUrl,
@@ -108,7 +107,7 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
             <div className="rounded-[24px] border border-border/70 bg-background/30 p-4">
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Configured Sources</p>
               <p className="mt-2 text-2xl font-semibold">
-                {sources.filter((source) => source.credentials.tenantId || source.credentials.clientId || source.credentials.hasSecret).length}
+                {sources.filter((source) => source.credentials.clientId || source.credentials.hasSecret).length}
               </p>
             </div>
             <div className="rounded-[24px] border border-border/70 bg-background/30 p-4">
@@ -146,6 +145,7 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
 
             <div className="mt-5 space-y-4">
               <SourceSection
+                tenant={tenant}
                 sources={sources}
                 syncingSourceKey={syncingSourceKey}
                 syncMutation={syncMutation}
@@ -181,11 +181,13 @@ function StatusPill({
 }
 
 function SourceSection({
+  tenant,
   sources,
   syncingSourceKey,
   syncMutation,
   onUpdateSource,
 }: {
+  tenant: TenantDetail
   sources: TenantIngestionSourceDraft[]
   syncingSourceKey: string | null
   syncMutation: ReturnType<typeof useMutation<void, Error, string>>
@@ -206,7 +208,7 @@ function SourceSection({
     <section className="space-y-4">
       {sources.map((source) => {
         const isConfigured = Boolean(
-          source.credentials.tenantId || source.credentials.clientId || source.credentials.hasSecret,
+          source.credentials.clientId || source.credentials.hasSecret,
         )
         const secretLabel = 'Client Secret'
         const sourceSummary = 'Configure API credentials and the schedule string used for tenant ingestion orchestration.'
@@ -336,18 +338,9 @@ function SourceSection({
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Credential Tenant ID</span>
-                  <Input
-                    value={source.credentials.tenantId}
-                    onChange={(event) => {
-                      onUpdateSource(source.key, (current) => ({
-                        ...current,
-                        credentials: { ...current.credentials, tenantId: event.target.value },
-                      }))
-                    }}
-                  />
-                </label>
+                <div className="rounded-2xl border border-dashed border-border/70 bg-background/25 px-4 py-3 text-sm text-muted-foreground md:col-span-2">
+                  This source automatically uses the selected tenant&apos;s Entra tenant ID: <span className="font-medium text-foreground">{tenant.entraTenantId}</span>.
+                </div>
                 <label className="space-y-2">
                   <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Client ID</span>
                   <Input

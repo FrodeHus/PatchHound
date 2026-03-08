@@ -13,7 +13,6 @@ const updateTenantIngestionSourceSchema = z.object({
   enabled: z.boolean(),
   syncSchedule: z.string(),
   credentials: z.object({
-    tenantId: z.string(),
     clientId: z.string(),
     secret: z.string(),
     apiBaseUrl: z.string(),

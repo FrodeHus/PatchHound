@@ -157,8 +157,14 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<Team>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
+            .Entity<TeamMember>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.Team.TenantId));
+        modelBuilder
             .Entity<Tenant>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.Id));
+        modelBuilder
+            .Entity<UserTenantRole>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantSourceConfiguration>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));

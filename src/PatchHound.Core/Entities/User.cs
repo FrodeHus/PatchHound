@@ -22,4 +22,10 @@ public class User
             EntraObjectId = entraObjectId,
         };
     }
+
+    public void UpdateProfile(string email, string displayName)
+    {
+        Email = email;
+        DisplayName = displayName;
+    }
 }

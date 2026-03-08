@@ -42,7 +42,6 @@ public record TenantIngestionSourceDto(
 );
 
 public record TenantSourceCredentialsDto(
-    string TenantId,
     string ClientId,
     bool HasSecret,
     string ApiBaseUrl,
@@ -82,7 +81,6 @@ public record UpdateTenantIngestionSourceRequest(
 );
 
 public record UpdateTenantSourceCredentialsRequest(
-    string TenantId,
     string ClientId,
     string Secret,
     string ApiBaseUrl,

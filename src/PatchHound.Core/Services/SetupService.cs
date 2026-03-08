@@ -37,6 +37,25 @@ public class SetupService : ISetupService
         return await _tenantRepository.AnyExistUnfilteredAsync(ct);
     }
 
+    public async Task<bool> RequiresSetupForTenantAsync(string? entraTenantId, CancellationToken ct)
+    {
+        var isInitialized = await IsInitializedAsync(ct);
+        if (!isInitialized)
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(entraTenantId))
+        {
+            return false;
+        }
+
+        return !await _tenantRepository.ExistsByEntraTenantIdUnfilteredAsync(
+            entraTenantId.Trim(),
+            ct
+        );
+    }
+
     public async Task<Result<Tenant>> CompleteSetupAsync(SetupRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.TenantName))
@@ -66,10 +85,15 @@ public class SetupService : ISetupService
 
         await using var transaction = await _unitOfWork.BeginTransactionAsync(ct);
 
-        // Re-check inside the transaction to prevent TOCTOU race
-        if (await IsInitializedAsync(ct))
+        var appInitialized = await IsInitializedAsync(ct);
+        var tenantExists = await _tenantRepository.ExistsByEntraTenantIdUnfilteredAsync(
+            request.EntraTenantId.Trim(),
+            ct
+        );
+
+        if (appInitialized && tenantExists)
         {
-            return Result<Tenant>.Failure("Application is already initialized");
+            return Result<Tenant>.Failure("Tenant is already initialized");
         }
 
         var existingUser = await _userRepository.GetByEntraObjectIdAsync(
@@ -102,9 +126,21 @@ public class SetupService : ISetupService
         {
             await _tenantSourceRepository.AddAsync(source, ct);
         }
-        foreach (var source in EnrichmentSourceDefaults.CreateDefaults())
+        if (!appInitialized)
         {
-            await _enrichmentSourceRepository.AddAsync(source, ct);
+            var existingEnrichmentSourceKeys = (await _enrichmentSourceRepository.GetAllAsync(ct))
+                .Select(source => source.SourceKey)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var source in EnrichmentSourceDefaults.CreateDefaults())
+            {
+                if (existingEnrichmentSourceKeys.Contains(source.SourceKey))
+                {
+                    continue;
+                }
+
+                await _enrichmentSourceRepository.AddAsync(source, ct);
+            }
         }
         await _tenantSlaRepository.AddAsync(TenantSlaConfiguration.CreateDefault(tenant.Id), ct);
 

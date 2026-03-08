@@ -7,7 +7,7 @@ import { SetupWizard } from '@/components/features/setup/SetupWizard'
 export const Route = createFileRoute('/setup/')({
   loader: async () => {
     const status = await fetchSetupStatus()
-    if (status.isInitialized) {
+    if (!status.requiresSetup) {
       throw redirect({ to: '/' })
     }
     try {

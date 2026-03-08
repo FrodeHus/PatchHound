@@ -24,7 +24,11 @@ public class SetupController : ControllerBase
     public async Task<ActionResult<SetupStatusDto>> GetStatus(CancellationToken ct)
     {
         var isInitialized = await _setupService.IsInitializedAsync(ct);
-        return Ok(new SetupStatusDto(isInitialized));
+        var entraTenantId =
+            User.FindFirstValue("tid")
+            ?? User.FindFirstValue("http://schemas.microsoft.com/identity/claims/tenantid");
+        var requiresSetup = await _setupService.RequiresSetupForTenantAsync(entraTenantId, ct);
+        return Ok(new SetupStatusDto(isInitialized, requiresSetup));
     }
 
     [HttpPost("complete")]
@@ -34,11 +38,6 @@ public class SetupController : ControllerBase
         CancellationToken ct
     )
     {
-        if (await _setupService.IsInitializedAsync(ct))
-        {
-            return Conflict(new ProblemDetails { Title = "Application is already initialized." });
-        }
-
         if (!HasRequiredSetupRole(User))
         {
             return Forbid();
@@ -48,6 +47,11 @@ public class SetupController : ControllerBase
         if (!setupIdentity.IsSuccess)
         {
             return BadRequest(new ProblemDetails { Title = setupIdentity.Error });
+        }
+
+        if (!await _setupService.RequiresSetupForTenantAsync(setupIdentity.Value.EntraTenantId, ct))
+        {
+            return Conflict(new ProblemDetails { Title = "Tenant is already initialized." });
         }
 
         var result = await _setupService.CompleteSetupAsync(

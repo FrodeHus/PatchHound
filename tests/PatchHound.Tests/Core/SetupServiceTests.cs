@@ -57,6 +57,51 @@ public class SetupServiceTests
     }
 
     [Fact]
+    public async Task RequiresSetupForTenantAsync_WhenAppNotInitialized_ReturnsTrue()
+    {
+        _tenantRepository.AnyExistUnfilteredAsync(Arg.Any<CancellationToken>()).Returns(false);
+
+        var result = await _service.RequiresSetupForTenantAsync(
+            "entra-tenant",
+            CancellationToken.None
+        );
+
+        result.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RequiresSetupForTenantAsync_WhenTenantMissing_ReturnsTrue()
+    {
+        _tenantRepository.AnyExistUnfilteredAsync(Arg.Any<CancellationToken>()).Returns(true);
+        _tenantRepository
+            .ExistsByEntraTenantIdUnfilteredAsync("entra-tenant", Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        var result = await _service.RequiresSetupForTenantAsync(
+            "entra-tenant",
+            CancellationToken.None
+        );
+
+        result.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RequiresSetupForTenantAsync_WhenTenantExists_ReturnsFalse()
+    {
+        _tenantRepository.AnyExistUnfilteredAsync(Arg.Any<CancellationToken>()).Returns(true);
+        _tenantRepository
+            .ExistsByEntraTenantIdUnfilteredAsync("entra-tenant", Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var result = await _service.RequiresSetupForTenantAsync(
+            "entra-tenant",
+            CancellationToken.None
+        );
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task CompleteSetupAsync_WhenNotInitialized_CreatesTenantAndAdminRole()
     {
         _tenantRepository.AnyExistUnfilteredAsync(Arg.Any<CancellationToken>()).Returns(false);
@@ -105,6 +150,9 @@ public class SetupServiceTests
     public async Task CompleteSetupAsync_WhenInitialized_ReturnsFailure()
     {
         _tenantRepository.AnyExistUnfilteredAsync(Arg.Any<CancellationToken>()).Returns(true);
+        _tenantRepository
+            .ExistsByEntraTenantIdUnfilteredAsync("entra-tenant", Arg.Any<CancellationToken>())
+            .Returns(true);
 
         var request = new SetupRequest(
             "Acme",
@@ -118,6 +166,82 @@ public class SetupServiceTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("already initialized");
+    }
+
+    [Fact]
+    public async Task CompleteSetupAsync_WhenOtherTenantsExistButCurrentTenantMissing_CreatesTenantWithoutGlobalEnrichmentDefaults()
+    {
+        _tenantRepository.AnyExistUnfilteredAsync(Arg.Any<CancellationToken>()).Returns(true);
+        _tenantRepository
+            .ExistsByEntraTenantIdUnfilteredAsync("entra-tenant", Arg.Any<CancellationToken>())
+            .Returns(false);
+        _userRepository
+            .GetByEntraObjectIdAsync("entra-admin-id", Arg.Any<CancellationToken>())
+            .Returns((User?)null);
+        _userRepository
+            .GetByEmailAsync("admin@example.com", Arg.Any<CancellationToken>())
+            .Returns((User?)null);
+
+        var request = new SetupRequest(
+            "Acme",
+            "entra-tenant",
+            "admin@example.com",
+            "Admin",
+            "entra-admin-id"
+        );
+
+        var result = await _service.CompleteSetupAsync(request, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await _enrichmentSourceRepository
+            .DidNotReceive()
+            .AddAsync(Arg.Any<EnrichmentSourceConfiguration>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CompleteSetupAsync_WhenGlobalEnrichmentDefaultAlreadyExists_DoesNotInsertDuplicate()
+    {
+        _tenantRepository.AnyExistUnfilteredAsync(Arg.Any<CancellationToken>()).Returns(false);
+        _tenantRepository
+            .ExistsByEntraTenantIdUnfilteredAsync("entra-tenant", Arg.Any<CancellationToken>())
+            .Returns(false);
+        _userRepository
+            .GetByEntraObjectIdAsync("entra-admin-id", Arg.Any<CancellationToken>())
+            .Returns((User?)null);
+        _userRepository
+            .GetByEmailAsync("admin@example.com", Arg.Any<CancellationToken>())
+            .Returns((User?)null);
+        _enrichmentSourceRepository
+            .GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns(
+                new List<EnrichmentSourceConfiguration>
+                {
+                    EnrichmentSourceConfiguration.Create(
+                        "nvd",
+                        "NVD API",
+                        false,
+                        apiBaseUrl: "https://services.nvd.nist.gov"
+                    ),
+                }
+            );
+
+        var request = new SetupRequest(
+            "Acme",
+            "entra-tenant",
+            "admin@example.com",
+            "Admin",
+            "entra-admin-id"
+        );
+
+        var result = await _service.CompleteSetupAsync(request, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await _enrichmentSourceRepository
+            .DidNotReceive()
+            .AddAsync(
+                Arg.Is<EnrichmentSourceConfiguration>(source => source.SourceKey == "nvd"),
+                Arg.Any<CancellationToken>()
+            );
     }
 
     [Fact]

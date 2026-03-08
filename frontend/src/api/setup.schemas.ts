@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 export const setupStatusSchema = z.object({
   isInitialized: z.boolean(),
+  requiresSetup: z.boolean(),
 })
 
 export const setupContextSchema = z.object({
