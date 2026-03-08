@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
-import { KeyRound, RotateCw } from 'lucide-react'
+import { ChevronDown, KeyRound, RotateCw } from 'lucide-react'
 import { triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
 import type { TenantDetail, TenantIngestionSource } from '@/api/settings.schemas'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,7 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
   const [syncingSourceKey, setSyncingSourceKey] = useState<string | null>(null)
   const [syncState, setSyncState] = useState<'idle' | 'success' | 'error'>('idle')
+  const [expandedSourceKey, setExpandedSourceKey] = useState<string | null>(tenant.ingestionSources[0]?.key ?? null)
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -147,8 +148,12 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
               <SourceSection
                 tenant={tenant}
                 sources={sources}
+                expandedSourceKey={expandedSourceKey}
                 syncingSourceKey={syncingSourceKey}
                 syncMutation={syncMutation}
+                onToggleExpanded={(sourceKey) => {
+                  setExpandedSourceKey((current) => (current === sourceKey ? null : sourceKey))
+                }}
                 onUpdateSource={updateSource}
               />
             </div>
@@ -183,14 +188,18 @@ function StatusPill({
 function SourceSection({
   tenant,
   sources,
+  expandedSourceKey,
   syncingSourceKey,
   syncMutation,
+  onToggleExpanded,
   onUpdateSource,
 }: {
   tenant: TenantDetail
   sources: TenantIngestionSourceDraft[]
+  expandedSourceKey: string | null
   syncingSourceKey: string | null
   syncMutation: ReturnType<typeof useMutation<void, Error, string>>
+  onToggleExpanded: (sourceKey: string) => void
   onUpdateSource: (
     key: string,
     mutate: (current: TenantIngestionSourceDraft) => TenantIngestionSourceDraft,
@@ -210,44 +219,59 @@ function SourceSection({
         const isConfigured = Boolean(
           source.credentials.clientId || source.credentials.hasSecret,
         )
+        const isExpanded = expandedSourceKey === source.key
         const secretLabel = 'Client Secret'
-        const sourceSummary = 'Configure API credentials and the schedule string used for tenant ingestion orchestration.'
+        const statusTone = getSourceStatusTone(source)
+        const statusLabel = source.runtime.lastStatus ?? (isConfigured ? 'Configured' : 'Needs credentials')
 
         return (
           <Card key={source.key} className="rounded-[26px] border-border/70 bg-card/82 shadow-sm">
-            <CardHeader className="border-b border-border/60 pb-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <CardTitle>{source.displayName}</CardTitle>
-                    <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
-                      {source.key}
-                    </Badge>
-                    <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/10 text-primary">
-                      Ingestion
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{sourceSummary}</p>
-                </div>
-                <Badge
-                  variant="outline"
-                  className={isConfigured
-                    ? 'rounded-full border-emerald-400/25 bg-emerald-400/10 text-emerald-200'
-                    : 'rounded-full border-border/70 bg-background/60 text-muted-foreground'}
-                >
-                  {isConfigured ? 'Configured' : 'Needs credentials'}
-                </Badge>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>Last ingestion: {formatTimestamp(source.runtime.lastCompletedAt)}</span>
-                {source.runtime.lastStatus ? (
-                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/60 text-muted-foreground">
-                    {source.runtime.lastStatus}
+            <button
+              type="button"
+              className="flex w-full flex-wrap items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-background/25"
+              onClick={() => onToggleExpanded(source.key)}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="text-base">{source.displayName}</CardTitle>
+                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
+                    {source.key}
                   </Badge>
-                ) : null}
+                </div>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-5 pt-5">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full border border-border/70 bg-background/60 px-3 py-1">
+                  Last run {formatTimestamp(source.runtime.lastCompletedAt)}
+                </span>
+                <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
+                {source.supportsManualSync ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full"
+                    disabled={syncMutation.isPending || !source.enabled}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      syncMutation.mutate(source.key)
+                    }}
+                  >
+                    <RotateCw className="size-4" />
+                    {syncingSourceKey === source.key ? 'Syncing...' : 'Manual sync'}
+                  </Button>
+                ) : null}
+                <span
+                  className={cn(
+                    'inline-flex size-8 items-center justify-center rounded-full border border-border/70 bg-background/60 transition-transform',
+                    isExpanded ? 'rotate-180' : '',
+                  )}
+                >
+                  <ChevronDown className="size-4" />
+                </span>
+              </div>
+            </button>
+
+            {isExpanded ? (
+              <CardContent className="space-y-5 border-t border-border/60 pt-5">
               {source.supportsManualSync ? (
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
                   <div className="space-y-1">
@@ -396,12 +420,51 @@ function SourceSection({
                   />
                 </label>
               </div>
-            </CardContent>
+              </CardContent>
+            ) : null}
           </Card>
         )
       })}
     </section>
   )
+}
+
+function StatusBadge({
+  children,
+  tone,
+}: {
+  children: string
+  tone: 'neutral' | 'success' | 'warning' | 'error'
+}) {
+  return (
+    <span
+      className={cn(
+        'rounded-full border px-3 py-1 text-xs',
+        tone === 'success' && 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300',
+        tone === 'warning' && 'border-amber-400/25 bg-amber-400/10 text-amber-300',
+        tone === 'error' && 'border-destructive/25 bg-destructive/10 text-destructive',
+        tone === 'neutral' && 'border-border/70 bg-background/60 text-muted-foreground',
+      )}
+    >
+      {children}
+    </span>
+  )
+}
+
+function getSourceStatusTone(source: TenantIngestionSourceDraft): 'neutral' | 'success' | 'warning' | 'error' {
+  if (source.runtime.lastError) {
+    return 'error'
+  }
+
+  if (source.runtime.lastStatus?.toLowerCase() === 'running') {
+    return 'warning'
+  }
+
+  if (source.runtime.lastSucceededAt) {
+    return 'success'
+  }
+
+  return 'neutral'
 }
 
 type TenantIngestionSourceDraft = Omit<TenantIngestionSource, 'credentials'> & {

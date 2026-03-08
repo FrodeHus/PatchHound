@@ -6,6 +6,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.AiProviders;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.ExternalHttp;
 using PatchHound.Infrastructure.Options;
 using PatchHound.Infrastructure.Repositories;
 using PatchHound.Infrastructure.Secrets;
@@ -88,9 +89,13 @@ public static class DependencyInjection
 
         // Vulnerability Sources
         services.AddScoped<IVulnerabilitySource, DefenderVulnerabilitySource>();
-        services.AddHttpClient<DefenderApiClient>();
-        services.AddHttpClient<NvdApiClient>();
-        services.AddHttpClient<ISecretStore, OpenBaoSecretStore>();
+        services
+            .AddHttpClient<DefenderApiClient>()
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
+        services.AddHttpClient<NvdApiClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 1);
+        services
+            .AddHttpClient<ISecretStore, OpenBaoSecretStore>()
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
         services.AddScoped<DefenderTenantConfigurationProvider>();
         services.AddScoped<NvdGlobalConfigurationProvider>();
         services
