@@ -56,21 +56,45 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
         }
 
         var sources = await dbContext
-            .TenantSourceConfigurations.AsNoTracking()
-            .Where(source => source.Enabled)
+            .TenantSourceConfigurations
             .ToListAsync(ct);
         var tenants = await dbContext.Tenants.AsNoTracking().ToDictionaryAsync(tenant => tenant.Id, ct);
         var now = DateTimeOffset.UtcNow;
 
-        foreach (var source in sources.Where(source =>
-            IsManualSyncQueued(source) || IngestionScheduleEvaluator.IsDue(source, now)))
+        foreach (var source in sources)
         {
             if (!tenants.TryGetValue(source.TenantId, out var tenant))
             {
                 continue;
             }
 
+            if (HasBlockedManualSyncRequest(source))
+            {
+                logger.LogWarning(
+                    "Skipping queued manual ingestion for tenant {TenantId} ({TenantName}) and source {SourceKey} because the source is disabled or credentials are missing.",
+                    tenant.Id,
+                    tenant.Name,
+                    source.SourceKey
+                );
+
+                source.UpdateRuntime(
+                    null,
+                    source.LastStartedAt,
+                    DateTimeOffset.UtcNow,
+                    source.LastSucceededAt,
+                    "Failed",
+                    "Manual sync skipped because the source is disabled or credentials are incomplete."
+                );
+                await dbContext.SaveChangesAsync(ct);
+                continue;
+            }
+
             var isManualSync = IsManualSyncQueued(source);
+            if (!isManualSync && !IngestionScheduleEvaluator.IsDue(source, now))
+            {
+                continue;
+            }
+
             logger.LogInformation(
                 "Running {TriggerType} ingestion for tenant {TenantId} ({TenantName}) and source {SourceKey}",
                 isManualSync ? "manual" : "scheduled",
@@ -102,5 +126,17 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
 
         var lastStartedAt = source.LastStartedAt?.ToUniversalTime();
         return !lastStartedAt.HasValue || manualRequestedAt > lastStartedAt;
+    }
+
+    private static bool HasBlockedManualSyncRequest(
+        PatchHound.Core.Entities.TenantSourceConfiguration source
+    )
+    {
+        return source.ManualRequestedAt.HasValue
+            && (
+                !source.Enabled
+                || !TenantSourceCatalog.SupportsManualSync(source)
+                || !TenantSourceCatalog.HasConfiguredCredentials(source)
+            );
     }
 }

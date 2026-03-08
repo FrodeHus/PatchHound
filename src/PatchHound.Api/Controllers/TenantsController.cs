@@ -307,6 +307,16 @@ public class TenantsController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "This source does not support manual sync." });
         }
 
+        if (!configuredSource.Enabled)
+        {
+            return BadRequest(new ProblemDetails { Title = "Enable the source before triggering a manual sync." });
+        }
+
+        if (!TenantSourceCatalog.HasConfiguredCredentials(configuredSource))
+        {
+            return BadRequest(new ProblemDetails { Title = "Configure source credentials before triggering a manual sync." });
+        }
+
         configuredSource.QueueManualSync(DateTimeOffset.UtcNow);
         await _dbContext.SaveChangesAsync(ct);
 

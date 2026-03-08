@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models.Admin;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
@@ -65,6 +66,101 @@ public class TenantsControllerTests : IDisposable
             source.Key == "microsoft-defender"
             && source.Enabled == false
             && source.Credentials.ApiBaseUrl == "https://api.securitycenter.microsoft.com");
+    }
+
+    [Fact]
+    public async Task TriggerSync_WhenSourceDisabled_ReturnsBadRequest()
+    {
+        var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");
+        var source = TenantSourceConfiguration.Create(
+            tenant.Id,
+            "microsoft-defender",
+            "Microsoft Defender",
+            false,
+            "0 */6 * * *",
+            "entra-tenant",
+            "client-id",
+            "tenants/source/secret",
+            "https://api.securitycenter.microsoft.com",
+            "https://api.securitycenter.microsoft.com/.default"
+        );
+
+        await _dbContext.Tenants.AddAsync(tenant);
+        await _dbContext.TenantSourceConfigurations.AddAsync(source);
+        await _dbContext.SaveChangesAsync();
+
+        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
+        _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
+
+        var action = await _controller.TriggerSync(tenant.Id, source.SourceKey, CancellationToken.None);
+
+        var badRequest = action.Should().BeOfType<BadRequestObjectResult>().Subject;
+        var problem = badRequest.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Title.Should().Be("Enable the source before triggering a manual sync.");
+    }
+
+    [Fact]
+    public async Task TriggerSync_WhenCredentialsMissing_ReturnsBadRequest()
+    {
+        var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");
+        var source = TenantSourceConfiguration.Create(
+            tenant.Id,
+            "microsoft-defender",
+            "Microsoft Defender",
+            true,
+            "0 */6 * * *",
+            credentialTenantId: "",
+            clientId: "",
+            secretRef: "",
+            apiBaseUrl: "https://api.securitycenter.microsoft.com",
+            tokenScope: "https://api.securitycenter.microsoft.com/.default"
+        );
+
+        await _dbContext.Tenants.AddAsync(tenant);
+        await _dbContext.TenantSourceConfigurations.AddAsync(source);
+        await _dbContext.SaveChangesAsync();
+
+        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
+        _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
+
+        var action = await _controller.TriggerSync(tenant.Id, source.SourceKey, CancellationToken.None);
+
+        var badRequest = action.Should().BeOfType<BadRequestObjectResult>().Subject;
+        var problem = badRequest.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Title.Should().Be("Configure source credentials before triggering a manual sync.");
+    }
+
+    [Fact]
+    public async Task TriggerSync_WhenSourceIsRunnable_QueuesManualSync()
+    {
+        var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");
+        var source = TenantSourceConfiguration.Create(
+            tenant.Id,
+            "microsoft-defender",
+            "Microsoft Defender",
+            true,
+            "0 */6 * * *",
+            "entra-tenant",
+            "client-id",
+            "tenants/source/secret",
+            "https://api.securitycenter.microsoft.com",
+            "https://api.securitycenter.microsoft.com/.default"
+        );
+
+        await _dbContext.Tenants.AddAsync(tenant);
+        await _dbContext.TenantSourceConfigurations.AddAsync(source);
+        await _dbContext.SaveChangesAsync();
+
+        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
+        _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
+
+        var action = await _controller.TriggerSync(tenant.Id, source.SourceKey, CancellationToken.None);
+
+        action.Should().BeOfType<AcceptedResult>();
+
+        var updatedSource = await _dbContext.TenantSourceConfigurations.SingleAsync(item => item.Id == source.Id);
+        updatedSource.ManualRequestedAt.Should().NotBeNull();
+        updatedSource.LastStatus.Should().Be("Queued");
     }
 
     public void Dispose()
