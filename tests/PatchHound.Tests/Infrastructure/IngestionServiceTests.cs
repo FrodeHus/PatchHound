@@ -10,7 +10,9 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.VulnerabilitySources;
 using System.Text.Json.Nodes;
 
 namespace PatchHound.Tests.Infrastructure;
@@ -710,6 +712,91 @@ public class IngestionServiceTests : IDisposable
         updatedVulnerability.Status.Should().Be(VulnerabilityStatus.Open);
     }
 
+    [Fact]
+    public async Task RunIngestionAsync_WhenNvdConfigured_EnrichesAndPersistsNormalizedVulnerabilityFields()
+    {
+        var source = Substitute.For<IVulnerabilitySource>();
+        source.SourceKey.Returns("test-source");
+        source.SourceName.Returns("TestSource");
+        source
+            .FetchVulnerabilitiesAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(
+                [
+                    new IngestionResult(
+                        "CVE-2026-1234",
+                        "CVE-2026-1234 - Product",
+                        "Defender description",
+                        Severity.High,
+                        8.1m,
+                        null,
+                        null,
+                        [new IngestionAffectedAsset("ASSET-1", "Server1", AssetType.Device)],
+                        "Contoso",
+                        "Contoso Agent",
+                        "1.0"
+                    ),
+                ]
+            );
+
+        var asset = Asset.Create(_tenantId, "ASSET-1", AssetType.Device, "Server1", Criticality.High);
+        await _dbContext.Assets.AddAsync(asset);
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(
+            TenantSourceConfiguration.Create(
+                _tenantId,
+                "test-source",
+                "Test Source",
+                true,
+                string.Empty
+            )
+        );
+        await _dbContext.EnrichmentSourceConfigurations.AddAsync(
+            EnrichmentSourceConfiguration.Create(
+                "nvd",
+                "NVD API",
+                true,
+                "system/enrichment-sources/nvd",
+                apiBaseUrl: "https://services.nvd.nist.gov"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var secretStore = Substitute.For<ISecretStore>();
+        secretStore
+            .GetSecretAsync("system/enrichment-sources/nvd", "apiKey", Arg.Any<CancellationToken>())
+            .Returns("nvd-api-key");
+
+        var provider = new NvdGlobalConfigurationProvider(_dbContext, secretStore);
+        var enricher = new NvdVulnerabilityEnricher(
+            new FakeNvdApiClient(),
+            provider,
+            Substitute.For<ILogger<NvdVulnerabilityEnricher>>()
+        );
+
+        var service = new IngestionService(
+            _dbContext,
+            [source],
+            [enricher],
+            new SlaService(),
+            new VulnerabilityAssessmentService(_dbContext, new EnvironmentalSeverityCalculator()),
+            Substitute.For<ILogger<IngestionService>>()
+        );
+
+        await service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        var vulnerability = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
+            .SingleAsync(item => item.ExternalId == "CVE-2026-1234");
+
+        vulnerability.Description.Should().Be("NVD-enriched description");
+        vulnerability.CvssScore.Should().Be(9.8m);
+        vulnerability.CvssVector.Should().Be("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
+        vulnerability.PublishedDate.Should().Be(new DateTimeOffset(2026, 2, 2, 10, 0, 0, TimeSpan.Zero));
+        vulnerability.ProductVendor.Should().Be("Contoso");
+        vulnerability.ProductName.Should().Be("Contoso Agent");
+        vulnerability.ProductVersion.Should().Be("1.0");
+    }
+
     public void Dispose() => _dbContext.Dispose();
 
     private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
@@ -717,5 +804,51 @@ public class IngestionServiceTests : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton(tenantContext);
         return services.BuildServiceProvider();
+    }
+
+    private sealed class FakeNvdApiClient : NvdApiClient
+    {
+        public FakeNvdApiClient()
+            : base(new HttpClient()) { }
+
+        public override Task<NvdCveResponse> GetCveAsync(
+            NvdClientConfiguration configuration,
+            string cveId,
+            CancellationToken ct
+        )
+        {
+            return Task.FromResult(new NvdCveResponse
+            {
+                Vulnerabilities =
+                [
+                    new NvdCveItem
+                    {
+                        Cve = new NvdCveRecord
+                        {
+                            Id = cveId,
+                            Published = new DateTimeOffset(2026, 2, 2, 10, 0, 0, TimeSpan.Zero),
+                            Descriptions =
+                            [
+                                new NvdDescription { Lang = "en", Value = "NVD-enriched description" },
+                            ],
+                            Metrics = new NvdMetricCollection
+                            {
+                                CvssMetricV31 =
+                                [
+                                    new NvdCvssMetric
+                                    {
+                                        CvssData = new NvdCvssData
+                                        {
+                                            BaseScore = 9.8m,
+                                            VectorString = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                ],
+            });
+        }
     }
 }
