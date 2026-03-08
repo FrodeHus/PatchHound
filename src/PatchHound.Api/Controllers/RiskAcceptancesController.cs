@@ -75,7 +75,7 @@ public class RiskAcceptancesController : ControllerBase
             ))
             .ToListAsync(ct);
 
-        return Ok(new PagedResponse<RiskAcceptanceDto>(items, totalCount));
+        return Ok(new PagedResponse<RiskAcceptanceDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
     }
 
     [HttpGet("{id:guid}")]

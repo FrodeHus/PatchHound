@@ -153,7 +153,7 @@ public class AssetsController : ControllerBase
             ))
             .ToList();
 
-        return Ok(new PagedResponse<AssetDto>(items, totalCount));
+        return Ok(new PagedResponse<AssetDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
     }
 
     [HttpGet("{id:guid}")]

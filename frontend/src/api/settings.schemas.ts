@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { nullableIsoDateTimeSchema } from './common.schemas'
+import { pagedResponseMetaSchema } from './pagination.schemas'
 
 export const tenantCredentialsSchema = z.object({
   tenantId: z.string(),
@@ -55,9 +56,8 @@ export const tenantDetailSchema = z.object({
   ingestionSources: z.array(tenantIngestionSourceSchema),
 })
 
-export const pagedTenantSchema = z.object({
+export const pagedTenantSchema = pagedResponseMetaSchema.extend({
   items: z.array(tenantListItemSchema),
-  totalCount: z.number(),
 })
 
 export type TenantListItem = z.infer<typeof tenantListItemSchema>

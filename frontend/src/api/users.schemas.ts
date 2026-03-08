@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { pagedResponseMetaSchema } from './pagination.schemas'
 
 export const userRoleSchema = z.object({
   tenantId: z.string().uuid(),
@@ -13,9 +14,8 @@ export const userSchema = z.object({
   roles: z.array(userRoleSchema),
 })
 
-export const pagedUsersSchema = z.object({
+export const pagedUsersSchema = pagedResponseMetaSchema.extend({
   items: z.array(userSchema),
-  totalCount: z.number(),
 })
 
 export type UserItem = z.infer<typeof userSchema>

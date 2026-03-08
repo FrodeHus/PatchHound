@@ -1,15 +1,31 @@
 import type { TeamItem } from '@/api/teams.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 
 type TeamTableProps = {
   teams: TeamItem[]
   totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
   selectedTeamId: string | null
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
   onSelectTeam: (teamId: string) => void
 }
 
-export function TeamTable({ teams, totalCount, selectedTeamId, onSelectTeam }: TeamTableProps) {
+export function TeamTable({
+  teams,
+  totalCount,
+  page,
+  pageSize,
+  totalPages,
+  selectedTeamId,
+  onPageChange,
+  onPageSizeChange,
+  onSelectTeam,
+}: TeamTableProps) {
   return (
     <Card className="rounded-[28px] border-border/70 bg-card/82">
       <CardHeader>
@@ -66,6 +82,16 @@ export function TeamTable({ teams, totalCount, selectedTeamId, onSelectTeam }: T
           })
         )}
       </CardContent>
+      <div className="px-6 pb-6">
+        <PaginationControls
+          page={page}
+          pageSize={pageSize}
+          totalCount={totalCount}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+        />
+      </div>
     </Card>
   )
 }

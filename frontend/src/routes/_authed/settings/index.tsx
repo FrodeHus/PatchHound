@@ -11,7 +11,7 @@ function SettingsPage() {
     <section className="space-y-4 pb-4">
       <h1 className="text-2xl font-semibold">Settings</h1>
       <div className="grid gap-4 xl:grid-cols-2">
-        <Link to="/admin/tenants" className="group">
+        <Link to="/admin/tenants" search={{ page: 1, pageSize: 25 }} className="group">
           <Card className="rounded-[28px] border-border/70 bg-card/82 transition-colors group-hover:border-primary/35">
             <CardHeader>
               <div className="flex items-center justify-between">

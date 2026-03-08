@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isoDateTimeSchema } from './common.schemas'
+import { pagedResponseMetaSchema } from './pagination.schemas'
 
 export const securityProfileSchema = z.object({
   id: z.string().uuid(),
@@ -14,9 +15,8 @@ export const securityProfileSchema = z.object({
   updatedAt: isoDateTimeSchema,
 })
 
-export const pagedSecurityProfilesSchema = z.object({
+export const pagedSecurityProfilesSchema = pagedResponseMetaSchema.extend({
   items: z.array(securityProfileSchema),
-  totalCount: z.number(),
 })
 
 export type SecurityProfile = z.infer<typeof securityProfileSchema>

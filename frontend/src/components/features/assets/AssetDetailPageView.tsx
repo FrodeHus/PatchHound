@@ -27,7 +27,11 @@ export function AssetDetailPageView({
       <header className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-3">
-            <Link to="/assets" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link
+              to="/assets"
+              search={{ page: 1, pageSize: 25, assetType: '', unassignedOnly: false }}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
               Back to assets
             </Link>
             <div className="flex flex-wrap gap-2">

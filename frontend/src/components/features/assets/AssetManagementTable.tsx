@@ -1,15 +1,21 @@
 import { useState } from 'react'
 import type { Asset } from '@/api/assets.schemas'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 
 type AssetManagementTableProps = {
   assets: Asset[]
   totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
   isUpdating: boolean
   selectedAssetId: string | null
   assetTypeFilter: string
   unassignedOnly: boolean
   onAssetTypeFilterChange: (assetType: string) => void
   onUnassignedOnlyChange: (value: boolean) => void
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
   onSelectAsset: (assetId: string) => void
   onAssignOwner: (assetId: string, ownerType: 'User' | 'Team', ownerId: string) => void
   onSetCriticality: (assetId: string, criticality: string) => void
@@ -21,12 +27,17 @@ const assetTypeOptions = ['All', 'Device', 'Software', 'CloudResource']
 export function AssetManagementTable({
   assets,
   totalCount,
+  page,
+  pageSize,
+  totalPages,
   isUpdating,
   selectedAssetId,
   assetTypeFilter,
   unassignedOnly,
   onAssetTypeFilterChange,
   onUnassignedOnlyChange,
+  onPageChange,
+  onPageSizeChange,
   onSelectAsset,
   onAssignOwner,
   onSetCriticality,
@@ -185,6 +196,15 @@ export function AssetManagementTable({
           </tbody>
         </table>
       </div>
+
+      <PaginationControls
+        page={page}
+        pageSize={pageSize}
+        totalCount={totalCount}
+        totalPages={totalPages}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </section>
   )
 }

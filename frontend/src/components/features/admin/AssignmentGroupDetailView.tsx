@@ -4,11 +4,15 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 
 type AssignmentGroupDetailViewProps = {
   team: TeamDetail
   assets: Asset[]
   totalAssetCount: number
+  assetPage: number
+  assetPageSize: number
+  assetTotalPages: number
   selectedAssetIds: string[]
   filters: {
     search: string
@@ -18,6 +22,8 @@ type AssignmentGroupDetailViewProps = {
   isLoadingAssets: boolean
   isAssigningAssets: boolean
   onFilterChange: (next: { search: string; assetType: string; criticality: string }) => void
+  onAssetPageChange: (page: number) => void
+  onAssetPageSizeChange: (pageSize: number) => void
   onToggleAsset: (assetId: string) => void
   onToggleAllVisible: () => void
   onAssignSelected: () => void
@@ -27,11 +33,16 @@ export function AssignmentGroupDetailView({
   team,
   assets,
   totalAssetCount,
+  assetPage,
+  assetPageSize,
+  assetTotalPages,
   selectedAssetIds,
   filters,
   isLoadingAssets,
   isAssigningAssets,
   onFilterChange,
+  onAssetPageChange,
+  onAssetPageSizeChange,
   onToggleAsset,
   onToggleAllVisible,
   onAssignSelected,
@@ -145,8 +156,9 @@ export function AssignmentGroupDetailView({
           ) : assets.length === 0 ? (
             <p className="text-sm text-muted-foreground">No assets matched the current filters.</p>
           ) : (
-            <div className="overflow-x-auto rounded-[24px] border border-border/70 bg-background/25">
-              <table className="w-full min-w-[720px] border-collapse text-sm">
+            <div className="space-y-4">
+              <div className="overflow-x-auto rounded-[24px] border border-border/70 bg-background/25">
+                <table className="w-full min-w-[720px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground">
                     <th className="px-4 py-3 pr-2">Select</th>
@@ -188,7 +200,16 @@ export function AssignmentGroupDetailView({
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
+              <PaginationControls
+                page={assetPage}
+                pageSize={assetPageSize}
+                totalCount={totalAssetCount}
+                totalPages={assetTotalPages}
+                onPageChange={onAssetPageChange}
+                onPageSizeChange={onAssetPageSizeChange}
+              />
             </div>
           )}
           </CardContent>

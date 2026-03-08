@@ -1,9 +1,16 @@
 import type { RemediationTask } from '@/api/tasks.schemas'
 import { TaskStatusUpdate } from '@/components/features/tasks/TaskStatusUpdate'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 
 type TaskListProps = {
   tasks: RemediationTask[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
   isUpdating: boolean
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
   onUpdateStatus: (taskId: string, status: string, justification?: string) => void
 }
 
@@ -52,7 +59,17 @@ function groupTasks(tasks: RemediationTask[]): TaskGroup[] {
   ]
 }
 
-export function TaskList({ tasks, isUpdating, onUpdateStatus }: TaskListProps) {
+export function TaskList({
+  tasks,
+  totalCount,
+  page,
+  pageSize,
+  totalPages,
+  isUpdating,
+  onPageChange,
+  onPageSizeChange,
+  onUpdateStatus,
+}: TaskListProps) {
   const groups = groupTasks(tasks)
 
   return (
@@ -91,6 +108,14 @@ export function TaskList({ tasks, isUpdating, onUpdateStatus }: TaskListProps) {
           </div>
         </section>
       ))}
+      <PaginationControls
+        page={page}
+        pageSize={pageSize}
+        totalCount={totalCount}
+        totalPages={totalPages}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </div>
   )
 }

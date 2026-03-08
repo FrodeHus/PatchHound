@@ -86,7 +86,7 @@ public class TasksController : ControllerBase
             ))
             .ToListAsync(ct);
 
-        return Ok(new PagedResponse<RemediationTaskDto>(items, totalCount));
+        return Ok(new PagedResponse<RemediationTaskDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
     }
 
     [HttpGet("{id:guid}")]

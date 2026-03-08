@@ -5,25 +5,43 @@ import { assignAssetOwner, assignAssetSecurityProfile, fetchAssetDetail, fetchAs
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { AssetDetailPane } from '@/components/features/assets/AssetDetailPane'
 import { AssetManagementTable } from '@/components/features/assets/AssetManagementTable'
+import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
+
+const assetsSearchSchema = baseListSearchSchema.extend({
+  assetType: searchStringSchema,
+  unassignedOnly: searchBooleanSchema,
+})
 
 export const Route = createFileRoute('/_authed/assets/')({
-  loader: () => fetchAssets({ data: {} }),
+  validateSearch: assetsSearchSchema,
+  loaderDeps: ({ search }) => search,
+  loader: ({ deps }) =>
+    fetchAssets({
+      data: {
+        ...(deps.assetType ? { assetType: deps.assetType } : {}),
+        ...(deps.unassignedOnly ? { unassignedOnly: true } : {}),
+        page: deps.page,
+        pageSize: deps.pageSize,
+      },
+    }),
   component: AssetsPage,
 })
 
 function AssetsPage() {
   const initialData = Route.useLoaderData()
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
   const router = useRouter()
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
-  const [assetTypeFilter, setAssetTypeFilter] = useState('')
-  const [unassignedOnly, setUnassignedOnly] = useState(false)
   const assetsQuery = useQuery({
-    queryKey: ['assets', assetTypeFilter, unassignedOnly],
+    queryKey: ['assets', search.assetType, search.unassignedOnly, search.page, search.pageSize],
     queryFn: () =>
       fetchAssets({
         data: {
-          ...(assetTypeFilter ? { assetType: assetTypeFilter } : {}),
-          ...(unassignedOnly ? { unassignedOnly: true } : {}),
+          ...(search.assetType ? { assetType: search.assetType } : {}),
+          ...(search.unassignedOnly ? { unassignedOnly: true } : {}),
+          page: search.page,
+          pageSize: search.pageSize,
         },
       }),
     initialData,
@@ -80,14 +98,32 @@ function AssetsPage() {
         totalCount={assetsQuery.data.totalCount}
         isUpdating={ownerMutation.isPending || criticalityMutation.isPending || securityProfileMutation.isPending}
         selectedAssetId={selectedAssetId}
-        assetTypeFilter={assetTypeFilter}
-        unassignedOnly={unassignedOnly}
+        assetTypeFilter={search.assetType}
+        unassignedOnly={search.unassignedOnly}
+        page={assetsQuery.data.page}
+        pageSize={assetsQuery.data.pageSize}
+        totalPages={assetsQuery.data.totalPages}
         onAssetTypeFilterChange={(assetType) => {
-          setAssetTypeFilter(assetType)
+          void navigate({
+            search: (prev) => ({ ...prev, assetType, page: 1 }),
+          })
           setSelectedAssetId(null)
         }}
         onUnassignedOnlyChange={(value) => {
-          setUnassignedOnly(value)
+          void navigate({
+            search: (prev) => ({ ...prev, unassignedOnly: value, page: 1 }),
+          })
+          setSelectedAssetId(null)
+        }}
+        onPageChange={(page) => {
+          void navigate({
+            search: (prev) => ({ ...prev, page }),
+          })
+        }}
+        onPageSizeChange={(nextPageSize) => {
+          void navigate({
+            search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
+          })
           setSelectedAssetId(null)
         }}
         onSelectAsset={setSelectedAssetId}

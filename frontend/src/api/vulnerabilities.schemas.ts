@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isoDateTimeSchema } from './common.schemas'
+import { pagedResponseMetaSchema } from './pagination.schemas'
 
 export const vulnerabilitySchema = z.object({
   id: z.string().uuid(),
@@ -17,9 +18,8 @@ export const vulnerabilitySchema = z.object({
   hasRecentReappearance: z.boolean(),
 })
 
-export const pagedVulnerabilitySchema = z.object({
+export const pagedVulnerabilitySchema = pagedResponseMetaSchema.extend({
   items: z.array(vulnerabilitySchema),
-  totalCount: z.number(),
 })
 
 export const affectedAssetSchema = z.object({

@@ -58,7 +58,7 @@ public class TeamsController : ControllerBase
             ))
             .ToListAsync(ct);
 
-        return Ok(new PagedResponse<TeamDto>(items, totalCount));
+        return Ok(new PagedResponse<TeamDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
     }
 
     [HttpGet("{id:guid}")]

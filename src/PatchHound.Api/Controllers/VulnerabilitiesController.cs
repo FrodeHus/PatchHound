@@ -182,7 +182,7 @@ public class VulnerabilitiesController : ControllerBase
             ))
             .ToList();
 
-        return Ok(new PagedResponse<VulnerabilityDto>(items, totalCount));
+        return Ok(new PagedResponse<VulnerabilityDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
     }
 
     [HttpGet("{id:guid}")]

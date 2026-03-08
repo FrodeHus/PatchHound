@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { pagedResponseMetaSchema } from './pagination.schemas'
 
 export const remediationTaskSchema = z.object({
   id: z.string().uuid(),
@@ -13,9 +14,8 @@ export const remediationTaskSchema = z.object({
   isOverdue: z.boolean(),
 })
 
-export const pagedTasksSchema = z.object({
+export const pagedTasksSchema = pagedResponseMetaSchema.extend({
   items: z.array(remediationTaskSchema),
-  totalCount: z.number(),
 })
 
 export type RemediationTask = z.infer<typeof remediationTaskSchema>
