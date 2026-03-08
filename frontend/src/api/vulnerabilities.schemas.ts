@@ -66,6 +66,11 @@ export const vulnerabilityDetailSchema = z.object({
   cvssScore: z.number().nullable(),
   cvssVector: z.string().nullable(),
   publishedDate: isoDateTimeSchema.nullable(),
+  references: z.array(z.object({
+    url: z.string().url(),
+    source: z.string(),
+    tags: z.array(z.string()),
+  })),
   tenantHistory: z.object({
     firstSeenAt: isoDateTimeSchema.nullable(),
     lastSeenAt: isoDateTimeSchema.nullable(),

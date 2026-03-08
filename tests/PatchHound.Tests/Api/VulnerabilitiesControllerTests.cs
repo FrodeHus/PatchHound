@@ -11,6 +11,9 @@ using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Secrets;
+using PatchHound.Infrastructure.Tenants;
+using PatchHound.Infrastructure.VulnerabilitySources;
 
 namespace PatchHound.Tests.Api;
 
@@ -313,6 +316,156 @@ public class VulnerabilitiesControllerTests : IDisposable
         payload.Items.Should().HaveCount(1);
     }
 
+    [Fact]
+    public async Task Get_FillsMissingDetailFields_FromNvd_WhenConfigured()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        var requestOptions = new DbContextOptionsBuilder<PatchHoundDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        await using var seedContext = new PatchHoundDbContext(
+            requestOptions,
+            BuildServiceProvider(_tenantContext)
+        );
+        var vulnerability = Vulnerability.Create(
+            _tenantId,
+            "CVE-2026-4242",
+            "Missing detail vulnerability",
+            "",
+            Severity.High,
+            "MicrosoftDefender"
+        );
+
+        await seedContext.Vulnerabilities.AddAsync(vulnerability);
+        await seedContext.SaveChangesAsync();
+
+        var configurationOptions = new DbContextOptionsBuilder<PatchHoundDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        using var configurationContext = new PatchHoundDbContext(
+            configurationOptions,
+            BuildServiceProvider(_tenantContext)
+        );
+        await configurationContext.EnrichmentSourceConfigurations.AddAsync(
+            EnrichmentSourceConfiguration.Create(
+                EnrichmentSourceCatalog.NvdSourceKey,
+                "NVD",
+                true,
+                "global/enrichment/nvd",
+                "https://services.nvd.nist.gov"
+            )
+        );
+        await configurationContext.SaveChangesAsync();
+
+        var secretStore = Substitute.For<ISecretStore>();
+        secretStore
+            .GetSecretAsync("global/enrichment/nvd", "apiKey", Arg.Any<CancellationToken>())
+            .Returns("nvd-api-key");
+
+        var configurationProvider = new NvdGlobalConfigurationProvider(
+            configurationContext,
+            secretStore
+        );
+        var nvdApiClient = new StubNvdApiClient(
+            new NvdCveResponse
+            {
+                Vulnerabilities =
+                [
+                    new NvdCveItem
+                    {
+                        Cve = new NvdCveRecord
+                        {
+                            Published = new DateTimeOffset(2026, 1, 15, 0, 0, 0, TimeSpan.Zero),
+                            Descriptions =
+                            [
+                                new NvdDescription
+                                {
+                                    Lang = "en",
+                                    Value = "Enriched description from NVD.",
+                                },
+                            ],
+                            Metrics = new NvdMetricCollection
+                            {
+                                CvssMetricV31 =
+                                [
+                                    new NvdCvssMetric
+                                    {
+                                        CvssData = new NvdCvssData
+                                        {
+                                            BaseScore = 8.8m,
+                                            VectorString =
+                                                "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                                        },
+                                    },
+                                ],
+                            },
+                            References =
+                            [
+                                new NvdReference
+                                {
+                                    Url = "https://nvd.nist.gov/vuln/detail/CVE-2026-4242",
+                                    Source = "nvd@nist.gov",
+                                    Tags = ["Vendor Advisory"],
+                                },
+                            ],
+                        },
+                    },
+                ],
+            }
+        );
+
+        await using var requestContext = new PatchHoundDbContext(
+            requestOptions,
+            BuildServiceProvider(_tenantContext)
+        );
+
+        var controller = new VulnerabilitiesController(
+            requestContext,
+            new VulnerabilityService(
+                Substitute.For<IVulnerabilityRepository>(),
+                Substitute.For<IRepository<OrganizationalSeverity>>(),
+                Substitute.For<IUnitOfWork>(),
+                _tenantContext
+            ),
+            new AiReportService([]),
+            _tenantContext,
+            configurationProvider,
+            nvdApiClient
+        );
+
+        var action = await controller.Get(vulnerability.Id, CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var detail = result.Value.Should().BeOfType<VulnerabilityDetailDto>().Subject;
+
+        detail.Description.Should().Be("Enriched description from NVD.");
+        detail.CvssScore.Should().Be(8.8m);
+        detail.CvssVector.Should().Be("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
+        detail.PublishedDate.Should().Be(new DateTimeOffset(2026, 1, 15, 0, 0, 0, TimeSpan.Zero));
+        detail.References.Should().ContainSingle();
+        detail.References[0].Url.Should().Be("https://nvd.nist.gov/vuln/detail/CVE-2026-4242");
+        detail.References[0].Source.Should().Be("nvd@nist.gov");
+        detail.References[0].Tags.Should().Contain("Vendor Advisory");
+
+        var persisted = await requestContext
+            .Vulnerabilities.Include(v => v.References)
+            .FirstAsync(v => v.Id == vulnerability.Id);
+        persisted.Description.Should().Be("Enriched description from NVD.");
+        persisted.CvssScore.Should().Be(8.8m);
+        persisted.CvssVector.Should().Be("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
+        persisted
+            .PublishedDate.Should()
+            .Be(new DateTimeOffset(2026, 1, 15, 0, 0, 0, TimeSpan.Zero));
+        persisted.References.Should().ContainSingle();
+        persisted
+            .References.First()
+            .Url.Should()
+            .Be("https://nvd.nist.gov/vuln/detail/CVE-2026-4242");
+        persisted.References.First().Source.Should().Be("nvd@nist.gov");
+        persisted.References.First().GetTags().Should().Contain("Vendor Advisory");
+    }
+
     public void Dispose() => _dbContext.Dispose();
 
     private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
@@ -320,5 +473,14 @@ public class VulnerabilitiesControllerTests : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton(tenantContext);
         return services.BuildServiceProvider();
+    }
+
+    private sealed class StubNvdApiClient(NvdCveResponse response) : NvdApiClient(new HttpClient())
+    {
+        public override Task<NvdCveResponse> GetCveAsync(
+            NvdClientConfiguration configuration,
+            string cveId,
+            CancellationToken ct
+        ) => Task.FromResult(response);
     }
 }
