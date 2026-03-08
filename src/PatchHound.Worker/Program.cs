@@ -1,8 +1,6 @@
-using Microsoft.EntityFrameworkCore;
 using PatchHound.Infrastructure;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
-using PatchHound.Infrastructure.Data;
 using PatchHound.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -27,32 +25,15 @@ await host.RunAsync();
 /// </summary>
 internal class WorkerTenantContext : ITenantContext
 {
-    private readonly PatchHoundDbContext _dbContext;
-    private IReadOnlyList<Guid>? _accessibleTenantIds;
-
-    public WorkerTenantContext(PatchHoundDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
     public Guid? CurrentTenantId => null;
-
-    public IReadOnlyList<Guid> AccessibleTenantIds => _accessibleTenantIds ?? Array.Empty<Guid>();
+    public IReadOnlyList<Guid> AccessibleTenantIds => Array.Empty<Guid>();
 
     public Guid CurrentUserId => Guid.Empty;
+    public bool IsSystemContext => true;
 
     public bool HasAccessToTenant(Guid tenantId) => true;
 
     public IReadOnlyList<string> GetRolesForTenant(Guid tenantId) => Array.Empty<string>();
-
-    internal async Task InitializeAsync(CancellationToken ct)
-    {
-        _accessibleTenantIds = await _dbContext.Tenants
-            .AsNoTracking()
-            .IgnoreQueryFilters()
-            .Select(t => t.Id)
-            .ToListAsync(ct);
-    }
 }
 
 /// <summary>
