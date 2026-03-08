@@ -331,14 +331,15 @@ public class IngestionService
                 result.Title,
                 result.Description,
                 result.VendorSeverity,
-                sourceName,
+                BuildSourceSummary(sourceName, result.Sources),
                 result.CvssScore,
                 result.CvssVector,
                 result.PublishedDate,
                 result.ProductVendor,
                 result.ProductName,
                 result.ProductVersion,
-                MapReferences(result.References)
+                MapReferences(result.References),
+                MapAffectedSoftware(result.AffectedSoftware)
             );
 
             await _dbContext.Vulnerabilities.AddAsync(existing, ct);
@@ -349,13 +350,15 @@ public class IngestionService
                 result.Title,
                 result.Description,
                 result.VendorSeverity,
+                BuildSourceSummary(sourceName, result.Sources),
                 result.CvssScore,
                 result.CvssVector,
                 result.PublishedDate,
                 result.ProductVendor,
                 result.ProductName,
                 result.ProductVersion,
-                MapReferences(result.References)
+                MapReferences(result.References),
+                MapAffectedSoftware(result.AffectedSoftware)
             );
         }
 
@@ -384,6 +387,37 @@ public class IngestionService
                     (reference.Url, reference.Source, (IReadOnlyList<string>)reference.Tags)
                 )
                 .ToList() ?? [];
+    }
+
+    private static IReadOnlyList<(
+        bool Vulnerable,
+        string Criteria,
+        string? VersionStartIncluding,
+        string? VersionEndExcluding
+    )> MapAffectedSoftware(IReadOnlyList<IngestionAffectedSoftware>? affectedSoftware)
+    {
+        return affectedSoftware
+                ?.Select(item =>
+                    (
+                        item.Vulnerable,
+                        item.Criteria,
+                        item.VersionStartIncluding,
+                        item.VersionEndExcluding
+                    )
+                )
+                .ToList() ?? [];
+    }
+
+    private static string BuildSourceSummary(string sourceName, IReadOnlyList<string>? sources)
+    {
+        return string.Join(
+            "|",
+            (sources ?? [])
+                .Append(sourceName)
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+        );
     }
 
     private async Task UpsertVulnerabilityAssetAsync(
@@ -563,7 +597,7 @@ public class IngestionService
             .Where(episode =>
                 episode.TenantId == tenantId
                 && episode.Status == VulnerabilityStatus.Open
-                && episode.Vulnerability.Source == sourceName
+                && episode.Vulnerability.Source.Contains(sourceName)
             )
             .ToListAsync(ct);
 
@@ -625,7 +659,7 @@ public class IngestionService
     {
         var vulnerabilities = await _dbContext
             .Vulnerabilities.IgnoreQueryFilters()
-            .Where(v => v.TenantId == tenantId && v.Source == sourceName)
+            .Where(v => v.TenantId == tenantId && v.Source.Contains(sourceName))
             .ToListAsync(ct);
 
         if (vulnerabilities.Count == 0)
