@@ -264,6 +264,29 @@ public class AssetsController : ControllerBase
             )
             .ToListAsync(ct);
 
+        var cpeBindingAssetIds = softwareRows
+            .Select(row => row.Id)
+            .Append(asset.Id)
+            .Distinct()
+            .ToList();
+        var cpeBindingsBySoftwareAssetId = await _dbContext
+            .SoftwareCpeBindings.AsNoTracking()
+            .Where(binding => cpeBindingAssetIds.Contains(binding.SoftwareAssetId))
+            .ToDictionaryAsync(
+                binding => binding.SoftwareAssetId,
+                binding => new SoftwareCpeBindingDto(
+                    binding.Id,
+                    binding.Cpe23Uri,
+                    binding.BindingMethod.ToString(),
+                    binding.Confidence.ToString(),
+                    binding.MatchedVendor,
+                    binding.MatchedProduct,
+                    binding.MatchedVersion,
+                    binding.LastValidatedAt
+                ),
+                ct
+            );
+
         var softwareNamesByAssetId = softwareRows.ToDictionary(row => row.Id, row => row.Name);
 
         var assessmentsByVulnerabilityId = await _dbContext
@@ -353,6 +376,9 @@ public class AssetsController : ControllerBase
                 row.Name,
                 row.ExternalId,
                 row.LastSeenAt,
+                cpeBindingsBySoftwareAssetId.TryGetValue(row.Id, out var cpeBinding)
+                    ? cpeBinding
+                    : null,
                 softwareEpisodesByAssetId.TryGetValue(row.Id, out var episodes)
                     ? episodes.Count
                     : 0,
@@ -383,6 +409,9 @@ public class AssetsController : ControllerBase
                 asset.DeviceLastSeenAt,
                 asset.DeviceLastIpAddress,
                 asset.DeviceAadDeviceId,
+                cpeBindingsBySoftwareAssetId.TryGetValue(asset.Id, out var assetCpeBinding)
+                    ? assetCpeBinding
+                    : null,
                 asset.Metadata,
                 vulnerabilities,
                 softwareInventory

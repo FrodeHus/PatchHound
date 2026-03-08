@@ -71,6 +71,8 @@ export const vulnerabilityDetailSchema = z.object({
     vulnerable: z.boolean(),
     criteria: z.string(),
     versionStartIncluding: z.string().nullable(),
+    versionStartExcluding: z.string().nullable(),
+    versionEndIncluding: z.string().nullable(),
     versionEndExcluding: z.string().nullable(),
   })),
   references: z.array(z.object({

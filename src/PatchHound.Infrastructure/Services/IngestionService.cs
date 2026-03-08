@@ -393,6 +393,8 @@ public class IngestionService
         bool Vulnerable,
         string Criteria,
         string? VersionStartIncluding,
+        string? VersionStartExcluding,
+        string? VersionEndIncluding,
         string? VersionEndExcluding
     )> MapAffectedSoftware(IReadOnlyList<IngestionAffectedSoftware>? affectedSoftware)
     {
@@ -402,6 +404,8 @@ public class IngestionService
                         item.Vulnerable,
                         item.Criteria,
                         item.VersionStartIncluding,
+                        item.VersionStartExcluding,
+                        item.VersionEndIncluding,
                         item.VersionEndExcluding
                     )
                 )

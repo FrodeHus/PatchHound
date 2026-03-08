@@ -67,6 +67,16 @@ export const assetDetailSchema = z.object({
   deviceLastSeenAt: z.string().nullable(),
   deviceLastIpAddress: z.string().nullable(),
   deviceAadDeviceId: z.string().nullable(),
+  softwareCpeBinding: z.object({
+    id: z.string().uuid(),
+    cpe23Uri: z.string(),
+    bindingMethod: z.string(),
+    confidence: z.string(),
+    matchedVendor: z.string().nullable(),
+    matchedProduct: z.string().nullable(),
+    matchedVersion: z.string().nullable(),
+    lastValidatedAt: z.string(),
+  }).nullable(),
   metadata: z.string(),
   vulnerabilities: z.array(assetVulnerabilitySchema),
   softwareInventory: z.array(z.object({
@@ -74,6 +84,16 @@ export const assetDetailSchema = z.object({
     name: z.string(),
     externalId: z.string(),
     lastSeenAt: z.string(),
+    cpeBinding: z.object({
+      id: z.string().uuid(),
+      cpe23Uri: z.string(),
+      bindingMethod: z.string(),
+      confidence: z.string(),
+      matchedVendor: z.string().nullable(),
+      matchedProduct: z.string().nullable(),
+      matchedVersion: z.string().nullable(),
+      lastValidatedAt: z.string(),
+    }).nullable(),
     episodeCount: z.number(),
     episodes: z.array(z.object({
       episodeNumber: z.number(),

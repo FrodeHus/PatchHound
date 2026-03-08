@@ -93,6 +93,14 @@ export function AssetDetailPageView({
                   </div>
                 </section>
               ) : null}
+              {asset.assetType === 'Software' ? (
+                <section className="rounded-2xl border border-border/70 bg-background p-4">
+                  <SectionHeader title="CPE binding" description="Reusable normalized software identity used for NVD-based software correlation." />
+                  <div className="mt-4">
+                    <SoftwareCpeBindingPanel binding={asset.softwareCpeBinding} />
+                  </div>
+                </section>
+              ) : null}
               <section className="rounded-2xl border border-border/70 bg-background p-4">
                 <SectionHeader title="Stored metadata" description="Residual source-specific metadata that has not been normalized into first-class fields." />
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -172,6 +180,9 @@ export function AssetDetailPageView({
                         #{episode.episodeNumber} {episode.removedAt ? 'removed' : 'installed'}
                       </Pill>
                     ))}
+                  </div>
+                  <div className="mt-3">
+                    <SoftwareCpeBindingPanel binding={software.cpeBinding} compact />
                   </div>
                 </div>
               ))}
@@ -299,6 +310,30 @@ function Pill({ children }: { children: ReactNode }) {
     <span className="rounded-full border border-border/70 bg-background px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em]">
       {children}
     </span>
+  )
+}
+
+function SoftwareCpeBindingPanel({
+  binding,
+  compact = false,
+}: {
+  binding: AssetDetail['softwareCpeBinding'] | AssetDetail['softwareInventory'][number]['cpeBinding']
+  compact?: boolean
+}) {
+  if (!binding) {
+    return <p className="text-sm text-muted-foreground">No CPE binding has been recorded for this software asset yet.</p>
+  }
+
+  return (
+    <div className={compact ? 'grid gap-3 md:grid-cols-2' : 'grid gap-3 md:grid-cols-2'}>
+      <MetricCard label="CPE 2.3 URI" value={binding.cpe23Uri} mono />
+      <MetricCard label="Confidence" value={binding.confidence} />
+      <MetricCard label="Binding Method" value={binding.bindingMethod} />
+      <MetricCard label="Matched Vendor" value={binding.matchedVendor ?? 'Unknown'} />
+      <MetricCard label="Matched Product" value={binding.matchedProduct ?? 'Unknown'} />
+      <MetricCard label="Matched Version" value={binding.matchedVersion ?? 'Unknown'} />
+      <MetricCard label="Last Validated" value={new Date(binding.lastValidatedAt).toLocaleString()} />
+    </div>
   )
 }
 

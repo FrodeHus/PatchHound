@@ -313,6 +313,8 @@ public class VulnerabilitiesController : ControllerBase
                     item.Vulnerable,
                     item.Criteria,
                     item.VersionStartIncluding,
+                    item.VersionStartExcluding,
+                    item.VersionEndIncluding,
                     item.VersionEndExcluding
                 ))
                 .ToList(),
@@ -430,6 +432,8 @@ public class VulnerabilitiesController : ControllerBase
                             Vulnerable: item.Vulnerable,
                             Criteria: item.Criteria,
                             VersionStartIncluding: item.VersionStartIncluding,
+                            VersionStartExcluding: item.VersionStartExcluding,
+                            VersionEndIncluding: item.VersionEndIncluding,
                             VersionEndExcluding: item.VersionEndExcluding
                         )
                     )
@@ -442,6 +446,8 @@ public class VulnerabilitiesController : ControllerBase
                             Vulnerable: item.Vulnerable,
                             Criteria: item.Criteria,
                             VersionStartIncluding: item.VersionStartIncluding,
+                            VersionStartExcluding: item.VersionStartExcluding,
+                            VersionEndIncluding: item.VersionEndIncluding,
                             VersionEndExcluding: item.VersionEndExcluding
                         )
                     )
@@ -498,6 +504,8 @@ public class VulnerabilitiesController : ControllerBase
                     item.Vulnerable,
                     item.Criteria,
                     item.VersionStartIncluding,
+                    item.VersionStartExcluding,
+                    item.VersionEndIncluding,
                     item.VersionEndExcluding
                 )
             )
@@ -511,6 +519,8 @@ public class VulnerabilitiesController : ControllerBase
                     item.Vulnerable,
                     item.Criteria,
                     item.VersionStartIncluding,
+                    item.VersionStartExcluding,
+                    item.VersionEndIncluding,
                     item.VersionEndExcluding
                 )
             )
@@ -586,6 +596,8 @@ public class VulnerabilitiesController : ControllerBase
                         item.Vulnerable,
                         item.Criteria,
                         item.VersionStartIncluding,
+                        item.VersionStartExcluding,
+                        item.VersionEndIncluding,
                         item.VersionEndExcluding
                     )
                 ),
