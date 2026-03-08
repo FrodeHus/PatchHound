@@ -91,6 +91,7 @@ public class IngestionService
                     enrichedResults.Count
                 );
 
+                // Update runtime state only after transaction has committed successfully
                 await UpdateRuntimeStateAsync(
                     tenantId,
                     source.SourceKey,

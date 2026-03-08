@@ -149,6 +149,12 @@ public class TeamsController : ControllerBase
         CancellationToken ct
     )
     {
+        var team = await _dbContext.Teams.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (team is null)
+            return NotFound();
+        if (!_tenantContext.HasAccessToTenant(team.TenantId))
+            return Forbid();
+
         var result = request.Action.ToLowerInvariant() switch
         {
             "add" => await _teamService.AddMemberAsync(id, request.UserId, ct),

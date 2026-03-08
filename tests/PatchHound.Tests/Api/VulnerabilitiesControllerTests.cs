@@ -454,9 +454,7 @@ public class VulnerabilitiesControllerTests : IDisposable
                 _tenantContext
             ),
             new AiReportService([]),
-            _tenantContext,
-            configurationProvider,
-            nvdApiClient
+            _tenantContext
         );
 
         var action = await controller.Get(vulnerability.Id, CancellationToken.None);

@@ -168,6 +168,9 @@ public class TasksController : ControllerBase
         if (task is null)
             return NotFound(new ProblemDetails { Title = "Task not found" });
 
+        if (!_tenantContext.HasAccessToTenant(task.TenantId))
+            return Forbid();
+
         var result = await _riskAcceptanceService.RequestAsync(
             task.VulnerabilityId,
             task.TenantId,

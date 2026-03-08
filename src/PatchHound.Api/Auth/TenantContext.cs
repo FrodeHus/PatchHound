@@ -79,9 +79,22 @@ public class TenantContext : ITenantContext
 
             if (user is null)
             {
-                user = User.Create(email.Trim(), displayName.Trim(), oid);
-                await dbContext.Users.AddAsync(user);
-                await dbContext.SaveChangesAsync();
+                try
+                {
+                    user = User.Create(email.Trim(), displayName.Trim(), oid);
+                    await dbContext.Users.AddAsync(user);
+                    await dbContext.SaveChangesAsync();
+                }
+                catch (DbUpdateException)
+                {
+                    // Concurrent request already created this user — reload
+                    dbContext.ChangeTracker.Clear();
+                    user = await dbContext
+                        .Users.IgnoreQueryFilters()
+                        .FirstOrDefaultAsync(u => u.EntraObjectId == oid);
+                    if (user is null)
+                        return;
+                }
             }
             else
             {
