@@ -4,12 +4,10 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Vulnerabilities;
-using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
-using PatchHound.Infrastructure.VulnerabilitySources;
 
 namespace PatchHound.Api.Controllers;
 
@@ -39,24 +37,17 @@ public class VulnerabilitiesController : ControllerBase
     private readonly VulnerabilityService _vulnerabilityService;
     private readonly AiReportService _aiReportService;
     private readonly ITenantContext _tenantContext;
-    private readonly NvdGlobalConfigurationProvider? _nvdConfigurationProvider;
-    private readonly NvdApiClient? _nvdApiClient;
-
     public VulnerabilitiesController(
         PatchHoundDbContext dbContext,
         VulnerabilityService vulnerabilityService,
         AiReportService aiReportService,
-        ITenantContext tenantContext,
-        NvdGlobalConfigurationProvider? nvdConfigurationProvider = null,
-        NvdApiClient? nvdApiClient = null
+        ITenantContext tenantContext
     )
     {
         _dbContext = dbContext;
         _vulnerabilityService = vulnerabilityService;
         _aiReportService = aiReportService;
         _tenantContext = tenantContext;
-        _nvdConfigurationProvider = nvdConfigurationProvider;
-        _nvdApiClient = nvdApiClient;
     }
 
     [HttpGet]
@@ -207,15 +198,14 @@ public class VulnerabilitiesController : ControllerBase
     public async Task<ActionResult<VulnerabilityDetailDto>> Get(Guid id, CancellationToken ct)
     {
         var vulnerability = await _dbContext
-            .Vulnerabilities.Include(v => v.AffectedSoftware)
+            .Vulnerabilities.AsNoTracking()
+            .Include(v => v.AffectedSoftware)
             .Include(v => v.References)
             .Include(v => v.AffectedAssets)
             .FirstOrDefaultAsync(v => v.Id == id, ct);
 
         if (vulnerability is null)
             return NotFound();
-
-        await EnrichVulnerabilityDetailIfNeededAsync(vulnerability, ct);
 
         var orgSeverity = await _dbContext
             .OrganizationalSeverities.AsNoTracking()
@@ -378,246 +368,6 @@ public class VulnerabilitiesController : ControllerBase
         return Ok(detail);
     }
 
-    private async Task EnrichVulnerabilityDetailIfNeededAsync(
-        Vulnerability vulnerability,
-        CancellationToken ct
-    )
-    {
-        if (_nvdConfigurationProvider is null || _nvdApiClient is null)
-        {
-            return;
-        }
-
-        if (
-            !vulnerability.ExternalId.StartsWith("CVE-", StringComparison.OrdinalIgnoreCase)
-            || !NeedsNvdDetailFill(vulnerability)
-        )
-        {
-            return;
-        }
-
-        var configuration = await _nvdConfigurationProvider.GetConfigurationAsync(ct);
-        if (configuration is null)
-        {
-            return;
-        }
-
-        var response = await _nvdApiClient.GetCveAsync(configuration, vulnerability.ExternalId, ct);
-        var cve = response.Vulnerabilities.FirstOrDefault()?.Cve;
-        if (cve is null)
-        {
-            return;
-        }
-
-        var description = cve
-            .Descriptions.FirstOrDefault(item =>
-                string.Equals(item.Lang, "en", StringComparison.OrdinalIgnoreCase)
-            )
-            ?.Value;
-        var cvssMetric =
-            cve.Metrics?.CvssMetricV31?.FirstOrDefault()
-            ?? cve.Metrics?.CvssMetricV30?.FirstOrDefault();
-
-        var nextDescription = string.IsNullOrWhiteSpace(vulnerability.Description)
-            ? description ?? string.Empty
-            : vulnerability.Description;
-        var nextCvssScore = vulnerability.CvssScore ?? cvssMetric?.CvssData?.BaseScore;
-        var nextCvssVector = vulnerability.CvssVector ?? cvssMetric?.CvssData?.VectorString;
-        var nextPublishedDate = vulnerability.PublishedDate ?? cve.Published;
-        var nextAffectedSoftware =
-            vulnerability.AffectedSoftware.Count > 0
-                ? vulnerability
-                    .AffectedSoftware.Select(item =>
-                        (
-                            Vulnerable: item.Vulnerable,
-                            Criteria: item.Criteria,
-                            VersionStartIncluding: item.VersionStartIncluding,
-                            VersionStartExcluding: item.VersionStartExcluding,
-                            VersionEndIncluding: item.VersionEndIncluding,
-                            VersionEndExcluding: item.VersionEndExcluding
-                        )
-                    )
-                    .ToList()
-                : cve
-                    .Configurations.SelectMany(FlattenAffectedSoftware)
-                    .Where(item => !string.IsNullOrWhiteSpace(item.Criteria))
-                    .Select(item =>
-                        (
-                            Vulnerable: item.Vulnerable,
-                            Criteria: item.Criteria,
-                            VersionStartIncluding: item.VersionStartIncluding,
-                            VersionStartExcluding: item.VersionStartExcluding,
-                            VersionEndIncluding: item.VersionEndIncluding,
-                            VersionEndExcluding: item.VersionEndExcluding
-                        )
-                    )
-                    .ToList();
-        var nextReferences =
-            vulnerability.References.Count > 0
-                ? vulnerability
-                    .References.Select(reference =>
-                        (
-                            Url: reference.Url,
-                            Source: reference.Source,
-                            Tags: (IReadOnlyList<string>)reference.GetTags()
-                        )
-                    )
-                    .ToList()
-                : cve
-                    .References.Where(reference => !string.IsNullOrWhiteSpace(reference.Url))
-                    .Select(reference =>
-                        (
-                            Url: reference.Url,
-                            Source: string.IsNullOrWhiteSpace(reference.Source)
-                                ? "Unknown"
-                                : reference.Source,
-                            Tags: (IReadOnlyList<string>)reference.Tags
-                        )
-                    )
-                    .ToList();
-
-        var currentReferences = vulnerability
-            .References.Select(reference =>
-                (
-                    Url: reference.Url,
-                    Source: reference.Source,
-                    Tags: string.Join("|", reference.GetTags())
-                )
-            )
-            .OrderBy(reference => reference.Url)
-            .ThenBy(reference => reference.Source)
-            .ToList();
-        var desiredReferences = nextReferences
-            .Select(reference =>
-                (
-                    Url: reference.Url,
-                    Source: reference.Source,
-                    Tags: string.Join("|", reference.Tags)
-                )
-            )
-            .OrderBy(reference => reference.Url)
-            .ThenBy(reference => reference.Source)
-            .ToList();
-        var currentAffectedSoftware = vulnerability
-            .AffectedSoftware.Select(item =>
-                (
-                    item.Vulnerable,
-                    item.Criteria,
-                    item.VersionStartIncluding,
-                    item.VersionStartExcluding,
-                    item.VersionEndIncluding,
-                    item.VersionEndExcluding
-                )
-            )
-            .OrderBy(item => item.Criteria)
-            .ThenBy(item => item.VersionStartIncluding)
-            .ThenBy(item => item.VersionEndExcluding)
-            .ToList();
-        var desiredAffectedSoftware = nextAffectedSoftware
-            .Select(item =>
-                (
-                    item.Vulnerable,
-                    item.Criteria,
-                    item.VersionStartIncluding,
-                    item.VersionStartExcluding,
-                    item.VersionEndIncluding,
-                    item.VersionEndExcluding
-                )
-            )
-            .OrderBy(item => item.Criteria)
-            .ThenBy(item => item.VersionStartIncluding)
-            .ThenBy(item => item.VersionEndExcluding)
-            .ToList();
-
-        if (
-            string.Equals(vulnerability.Description, nextDescription, StringComparison.Ordinal)
-            && vulnerability.CvssScore == nextCvssScore
-            && string.Equals(vulnerability.CvssVector, nextCvssVector, StringComparison.Ordinal)
-            && vulnerability.PublishedDate == nextPublishedDate
-            && currentAffectedSoftware.SequenceEqual(desiredAffectedSoftware)
-            && currentReferences.SequenceEqual(desiredReferences)
-        )
-        {
-            return;
-        }
-
-        vulnerability.Update(
-            vulnerability.Title,
-            nextDescription,
-            vulnerability.VendorSeverity,
-            MergeSourceSummary(vulnerability.Source, "NVD"),
-            nextCvssScore,
-            nextCvssVector,
-            nextPublishedDate,
-            vulnerability.ProductVendor,
-            vulnerability.ProductName,
-            vulnerability.ProductVersion
-        );
-
-        var existingReferences = await _dbContext
-            .VulnerabilityReferences.Where(reference =>
-                reference.VulnerabilityId == vulnerability.Id
-            )
-            .ToListAsync(ct);
-        if (existingReferences.Count > 0)
-        {
-            _dbContext.VulnerabilityReferences.RemoveRange(existingReferences);
-        }
-
-        if (nextReferences.Count > 0)
-        {
-            await _dbContext.VulnerabilityReferences.AddRangeAsync(
-                nextReferences.Select(reference =>
-                    VulnerabilityReference.Create(
-                        vulnerability.Id,
-                        reference.Url,
-                        reference.Source,
-                        reference.Tags
-                    )
-                ),
-                ct
-            );
-        }
-
-        var existingAffectedSoftware = await _dbContext
-            .VulnerabilityAffectedSoftware.Where(item => item.VulnerabilityId == vulnerability.Id)
-            .ToListAsync(ct);
-        if (existingAffectedSoftware.Count > 0)
-        {
-            _dbContext.VulnerabilityAffectedSoftware.RemoveRange(existingAffectedSoftware);
-        }
-
-        if (nextAffectedSoftware.Count > 0)
-        {
-            await _dbContext.VulnerabilityAffectedSoftware.AddRangeAsync(
-                nextAffectedSoftware.Select(item =>
-                    VulnerabilityAffectedSoftware.Create(
-                        vulnerability.Id,
-                        item.Vulnerable,
-                        item.Criteria,
-                        item.VersionStartIncluding,
-                        item.VersionStartExcluding,
-                        item.VersionEndIncluding,
-                        item.VersionEndExcluding
-                    )
-                ),
-                ct
-            );
-        }
-
-        await _dbContext.SaveChangesAsync(ct);
-    }
-
-    private static bool NeedsNvdDetailFill(Vulnerability vulnerability)
-    {
-        return string.IsNullOrWhiteSpace(vulnerability.Description)
-            || !vulnerability.CvssScore.HasValue
-            || string.IsNullOrWhiteSpace(vulnerability.CvssVector)
-            || !vulnerability.PublishedDate.HasValue
-            || vulnerability.AffectedSoftware.Count == 0
-            || vulnerability.References.Count == 0;
-    }
-
     private static string FormatSourceDisplay(string source)
     {
         return string.Join(
@@ -627,46 +377,6 @@ public class VulnerabilitiesController : ControllerBase
                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
             )
         );
-    }
-
-    private static string MergeSourceSummary(string existingSource, string sourceToAdd)
-    {
-        return string.Join(
-            "|",
-            existingSource
-                .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Append(sourceToAdd)
-                .Where(item => !string.IsNullOrWhiteSpace(item))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
-        );
-    }
-
-    private static IEnumerable<NvdCpeMatch> FlattenAffectedSoftware(NvdConfiguration configuration)
-    {
-        foreach (var node in configuration.Nodes)
-        {
-            foreach (var match in FlattenAffectedSoftware(node))
-            {
-                yield return match;
-            }
-        }
-    }
-
-    private static IEnumerable<NvdCpeMatch> FlattenAffectedSoftware(NvdConfigurationNode node)
-    {
-        foreach (var match in node.CpeMatch)
-        {
-            yield return match;
-        }
-
-        foreach (var child in node.Nodes)
-        {
-            foreach (var match in FlattenAffectedSoftware(child))
-            {
-                yield return match;
-            }
-        }
     }
 
     private static VulnerabilityTenantHistoryDto BuildTenantHistory(
