@@ -17,6 +17,9 @@ public class TenantSourceConfiguration
     public DateTimeOffset? LastStartedAt { get; private set; }
     public DateTimeOffset? LastCompletedAt { get; private set; }
     public DateTimeOffset? LastSucceededAt { get; private set; }
+    public Guid? ActiveIngestionRunId { get; private set; }
+    public DateTimeOffset? LeaseAcquiredAt { get; private set; }
+    public DateTimeOffset? LeaseExpiresAt { get; private set; }
     public string LastStatus { get; private set; } = string.Empty;
     public string LastError { get; private set; } = string.Empty;
 
@@ -117,5 +120,24 @@ public class TenantSourceConfiguration
         LastCompletedAt = completedAt;
         LastStatus = "Failed";
         LastError = error;
+    }
+
+    public void AcquireLease(Guid runId, DateTimeOffset acquiredAt, DateTimeOffset expiresAt)
+    {
+        ActiveIngestionRunId = runId;
+        LeaseAcquiredAt = acquiredAt;
+        LeaseExpiresAt = expiresAt;
+    }
+
+    public void ReleaseLease(Guid runId)
+    {
+        if (ActiveIngestionRunId != runId)
+        {
+            return;
+        }
+
+        ActiveIngestionRunId = null;
+        LeaseAcquiredAt = null;
+        LeaseExpiresAt = null;
     }
 }

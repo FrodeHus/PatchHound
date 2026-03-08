@@ -14,6 +14,9 @@ public class IngestionService
 {
     private const int MaxPersistenceAttempts = 2;
     private const int MaxSourceAttempts = 2;
+    private const int VulnerabilityChunkSize = 250;
+    private const int AssetChunkSize = 500;
+    private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(30);
     private readonly PatchHoundDbContext _dbContext;
     private readonly IEnumerable<IVulnerabilitySource> _sources;
     private readonly IEnumerable<IVulnerabilityEnricher> _enrichers;
@@ -41,20 +44,41 @@ public class IngestionService
         _logger = logger;
     }
 
-    public async Task RunIngestionAsync(Guid tenantId, CancellationToken ct)
+    public async Task<bool> RunIngestionAsync(Guid tenantId, CancellationToken ct)
     {
-        await RunIngestionAsync(tenantId, null, ct);
+        return await RunIngestionAsync(tenantId, null, ct);
     }
 
-    public async Task RunIngestionAsync(Guid tenantId, string? sourceKey, CancellationToken ct)
+    public async Task<bool> RunIngestionAsync(
+        Guid tenantId,
+        string? sourceKey,
+        CancellationToken ct
+    )
     {
         var normalizedSourceKey = sourceKey?.Trim().ToLowerInvariant();
         var sources = string.IsNullOrWhiteSpace(sourceKey)
             ? _sources
             : _sources.Where(source => source.SourceKey == normalizedSourceKey);
+        var startedAny = false;
 
         foreach (var source in sources)
         {
+            var run = await TryAcquireIngestionRunAsync(tenantId, source.SourceKey, ct);
+            if (run is null)
+            {
+                _logger.LogInformation(
+                    "Skipping ingestion from {Source} for tenant {TenantId} because another run already holds the lease.",
+                    source.SourceName,
+                    tenantId
+                );
+                continue;
+            }
+
+            startedAny = true;
+            var fetchedVulnerabilityCount = 0;
+            var fetchedAssetCount = 0;
+            var fetchedSoftwareInstallationCount = 0;
+
             for (var attempt = 1; attempt <= MaxSourceAttempts; attempt++)
             {
                 await UpdateRuntimeStateAsync(
@@ -84,6 +108,8 @@ public class IngestionService
                             tenantId,
                             ct
                         );
+                        fetchedAssetCount = assetSnapshot.Assets.Count;
+                        fetchedSoftwareInstallationCount = assetSnapshot.DeviceSoftwareLinks.Count;
                         await ExecuteWithConcurrencyRetryAsync(
                             () => ProcessAssetsAsync(tenantId, assetSnapshot, ct),
                             source.SourceName,
@@ -93,6 +119,7 @@ public class IngestionService
                     }
 
                     var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
+                    fetchedVulnerabilityCount = results.Count;
                     var enrichedResults = await EnrichResultsAsync(tenantId, results, ct);
                     await ExecuteWithConcurrencyRetryAsync(
                         () => ProcessResultsAsync(tenantId, source.SourceName, enrichedResults, ct),
@@ -119,6 +146,17 @@ public class IngestionService
                             runtime.LastStatus = "Succeeded";
                             runtime.LastError = string.Empty;
                         },
+                        ct
+                    );
+                    await CompleteIngestionRunAsync(
+                        run.Id,
+                        tenantId,
+                        source.SourceKey,
+                        succeeded: true,
+                        error: null,
+                        fetchedVulnerabilityCount,
+                        fetchedAssetCount,
+                        fetchedSoftwareInstallationCount,
                         ct
                     );
 
@@ -157,11 +195,24 @@ public class IngestionService
                         },
                         ct
                     );
+                    await CompleteIngestionRunAsync(
+                        run.Id,
+                        tenantId,
+                        source.SourceKey,
+                        succeeded: false,
+                        error: $"Ingestion failed: {ex.GetType().Name}",
+                        fetchedVulnerabilityCount,
+                        fetchedAssetCount,
+                        fetchedSoftwareInstallationCount,
+                        ct
+                    );
 
                     break;
                 }
             }
         }
+
+        return startedAny;
     }
 
     private async Task ExecuteWithConcurrencyRetryAsync(
@@ -246,6 +297,111 @@ public class IngestionService
                         .SetProperty(item => item.LastError, runtime.LastError),
                 ct
             );
+    }
+
+    private async Task<IngestionRun?> TryAcquireIngestionRunAsync(
+        Guid tenantId,
+        string sourceKey,
+        CancellationToken ct
+    )
+    {
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        var now = DateTimeOffset.UtcNow;
+        var run = IngestionRun.Start(tenantId, normalizedSourceKey, now);
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
+
+        var updatedRows = await _dbContext
+            .TenantSourceConfigurations.IgnoreQueryFilters()
+            .Where(item =>
+                item.TenantId == tenantId
+                && item.SourceKey == normalizedSourceKey
+                && (!item.ActiveIngestionRunId.HasValue || item.LeaseExpiresAt < now)
+            )
+            .ExecuteUpdateAsync(
+                setters =>
+                    setters
+                        .SetProperty(item => item.ActiveIngestionRunId, run.Id)
+                        .SetProperty(item => item.LeaseAcquiredAt, now)
+                        .SetProperty(item => item.LeaseExpiresAt, now.Add(LeaseDuration)),
+                ct
+            );
+
+        if (updatedRows == 0)
+        {
+            await transaction.RollbackAsync(ct);
+            return null;
+        }
+
+        await _dbContext.IngestionRuns.AddAsync(run, ct);
+        await _dbContext.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+
+        return run;
+    }
+
+    private async Task CompleteIngestionRunAsync(
+        Guid runId,
+        Guid tenantId,
+        string sourceKey,
+        bool succeeded,
+        string? error,
+        int fetchedVulnerabilityCount,
+        int fetchedAssetCount,
+        int fetchedSoftwareInstallationCount,
+        CancellationToken ct
+    )
+    {
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        var completedAt = DateTimeOffset.UtcNow;
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
+
+        var run = await _dbContext
+            .IngestionRuns.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item => item.Id == runId, ct);
+        if (run is not null)
+        {
+            if (succeeded)
+            {
+                run.CompleteSucceeded(
+                    completedAt,
+                    fetchedVulnerabilityCount,
+                    fetchedAssetCount,
+                    fetchedSoftwareInstallationCount
+                );
+            }
+            else
+            {
+                run.CompleteFailed(
+                    completedAt,
+                    error ?? "Unknown ingestion failure",
+                    fetchedVulnerabilityCount,
+                    fetchedAssetCount,
+                    fetchedSoftwareInstallationCount
+                );
+            }
+
+            await _dbContext.SaveChangesAsync(ct);
+        }
+
+        await _dbContext
+            .TenantSourceConfigurations.IgnoreQueryFilters()
+            .Where(item =>
+                item.TenantId == tenantId
+                && item.SourceKey == normalizedSourceKey
+                && item.ActiveIngestionRunId == runId
+            )
+            .ExecuteUpdateAsync(
+                setters =>
+                    setters
+                        .SetProperty(item => item.ActiveIngestionRunId, (Guid?)null)
+                        .SetProperty(item => item.LeaseAcquiredAt, (DateTimeOffset?)null)
+                        .SetProperty(item => item.LeaseExpiresAt, (DateTimeOffset?)null),
+                ct
+            );
+
+        await transaction.CommitAsync(ct);
     }
 
     private async Task<IReadOnlyList<IngestionResult>> EnrichResultsAsync(
@@ -355,30 +511,40 @@ public class IngestionService
         CancellationToken ct
     )
     {
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
-
+        var normalizedResults = NormalizeResults(results);
         var seenPairKeys = new HashSet<string>(StringComparer.Ordinal);
-        // Track assets created in this batch to avoid duplicate inserts
-        var pendingAssets = new Dictionary<string, Asset>();
 
-        foreach (var result in results)
+        foreach (var chunk in Chunk(normalizedResults, VulnerabilityChunkSize))
         {
-            await UpsertVulnerabilityAsync(
-                tenantId,
-                sourceName,
-                result,
-                pendingAssets,
-                seenPairKeys,
-                ct
-            );
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
+            var pendingAssets = new Dictionary<string, Asset>();
+
+            foreach (var result in chunk)
+            {
+                await UpsertVulnerabilityAsync(
+                    tenantId,
+                    sourceName,
+                    result,
+                    pendingAssets,
+                    seenPairKeys,
+                    ct
+                );
+            }
+
+            await _dbContext.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            _dbContext.ChangeTracker.Clear();
         }
 
+        await using var reconciliationTransaction = await _dbContext.Database.BeginTransactionAsync(
+            ct
+        );
         await ProcessMissingAssetEpisodesAsync(tenantId, sourceName, seenPairKeys, ct);
         await _dbContext.SaveChangesAsync(ct);
         await UpdateSourceVulnerabilityStatusesAsync(tenantId, sourceName, ct);
-
         await _dbContext.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
+        await reconciliationTransaction.CommitAsync(ct);
+        _dbContext.ChangeTracker.Clear();
     }
 
     private async Task UpsertVulnerabilityAsync(
@@ -704,6 +870,7 @@ public class IngestionService
         var currentProjections = candidateProjections
             .Where(va => episodePairs.Contains(BuildPairKey(va.VulnerabilityId, va.AssetId)))
             .ToDictionary(va => BuildPairKey(va.VulnerabilityId, va.AssetId));
+        var resolvedPairs = new List<(Guid VulnerabilityId, Guid AssetId)>();
 
         foreach (var episode in openEpisodes)
         {
@@ -727,8 +894,13 @@ public class IngestionService
             )
             {
                 projection.Resolve(now);
-                await CloseOpenRemediationTasksAsync(episode.VulnerabilityId, episode.AssetId, ct);
+                resolvedPairs.Add((episode.VulnerabilityId, episode.AssetId));
             }
+        }
+
+        if (resolvedPairs.Count > 0)
+        {
+            await CloseOpenRemediationTasksAsync(resolvedPairs, ct);
         }
     }
 
@@ -762,13 +934,28 @@ public class IngestionService
 
         var openVulnerabilitySet = openVulnerabilityIds.ToHashSet();
 
-        foreach (var vulnerability in vulnerabilities)
+        var resolvedIds = vulnerabilityIds.Where(id => !openVulnerabilitySet.Contains(id)).ToList();
+
+        if (openVulnerabilityIds.Count > 0)
         {
-            vulnerability.UpdateStatus(
-                openVulnerabilitySet.Contains(vulnerability.Id)
-                    ? VulnerabilityStatus.Open
-                    : VulnerabilityStatus.Resolved
-            );
+            await _dbContext
+                .Vulnerabilities.IgnoreQueryFilters()
+                .Where(v => openVulnerabilityIds.Contains(v.Id))
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(v => v.Status, VulnerabilityStatus.Open),
+                    ct
+                );
+        }
+
+        if (resolvedIds.Count > 0)
+        {
+            await _dbContext
+                .Vulnerabilities.IgnoreQueryFilters()
+                .Where(v => resolvedIds.Contains(v.Id))
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(v => v.Status, VulnerabilityStatus.Resolved),
+                    ct
+                );
         }
     }
 
@@ -822,26 +1009,30 @@ public class IngestionService
     }
 
     private async Task CloseOpenRemediationTasksAsync(
-        Guid vulnerabilityId,
-        Guid assetId,
+        IReadOnlyList<(Guid VulnerabilityId, Guid AssetId)> pairs,
         CancellationToken ct
     )
     {
-        var openTasks = await _dbContext
-            .RemediationTasks.IgnoreQueryFilters()
-            .Where(task =>
-                task.VulnerabilityId == vulnerabilityId
-                && task.AssetId == assetId
-                && task.Status != RemediationTaskStatus.Completed
-            )
-            .ToListAsync(ct);
-
-        foreach (var task in openTasks)
+        foreach (var pair in pairs)
         {
-            task.UpdateStatus(
-                RemediationTaskStatus.Completed,
-                "Auto-closed: vulnerability resolved in source"
-            );
+            await _dbContext
+                .RemediationTasks.IgnoreQueryFilters()
+                .Where(task =>
+                    task.VulnerabilityId == pair.VulnerabilityId
+                    && task.AssetId == pair.AssetId
+                    && task.Status != RemediationTaskStatus.Completed
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(task => task.Status, RemediationTaskStatus.Completed)
+                            .SetProperty(
+                                task => task.Justification,
+                                "Auto-closed: vulnerability resolved in source"
+                            )
+                            .SetProperty(task => task.UpdatedAt, DateTimeOffset.UtcNow),
+                    ct
+                );
         }
     }
 
@@ -856,73 +1047,170 @@ public class IngestionService
         CancellationToken ct
     )
     {
-        var assetIdsByExternalId = new Dictionary<string, Guid>(StringComparer.Ordinal);
+        var normalizedSnapshot = NormalizeAssetSnapshot(snapshot);
 
-        foreach (var asset in snapshot.Assets)
+        foreach (var chunk in Chunk(normalizedSnapshot.Assets, AssetChunkSize))
         {
-            var existing = await _dbContext
-                .Assets.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(
-                    current =>
-                        current.ExternalId == asset.ExternalId && current.TenantId == tenantId,
-                    ct
-                );
-
-            if (existing is null)
+            foreach (var asset in chunk)
             {
-                existing = Asset.Create(
-                    tenantId,
-                    asset.ExternalId,
-                    asset.AssetType,
-                    asset.Name,
-                    Criticality.Medium,
-                    asset.Description
-                );
-                if (asset.AssetType == AssetType.Device)
-                {
-                    existing.UpdateDeviceDetails(
-                        asset.DeviceComputerDnsName,
-                        asset.DeviceHealthStatus,
-                        asset.DeviceOsPlatform,
-                        asset.DeviceOsVersion,
-                        asset.DeviceRiskScore,
-                        asset.DeviceLastSeenAt,
-                        asset.DeviceLastIpAddress,
-                        asset.DeviceAadDeviceId
+                var existing = await _dbContext
+                    .Assets.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(
+                        current =>
+                            current.ExternalId == asset.ExternalId && current.TenantId == tenantId,
+                        ct
                     );
+
+                if (existing is null)
+                {
+                    existing = Asset.Create(
+                        tenantId,
+                        asset.ExternalId,
+                        asset.AssetType,
+                        asset.Name,
+                        Criticality.Medium,
+                        asset.Description
+                    );
+                    if (asset.AssetType == AssetType.Device)
+                    {
+                        existing.UpdateDeviceDetails(
+                            asset.DeviceComputerDnsName,
+                            asset.DeviceHealthStatus,
+                            asset.DeviceOsPlatform,
+                            asset.DeviceOsVersion,
+                            asset.DeviceRiskScore,
+                            asset.DeviceLastSeenAt,
+                            asset.DeviceLastIpAddress,
+                            asset.DeviceAadDeviceId
+                        );
+                    }
+                    existing.UpdateMetadata(asset.Metadata);
+                    await _dbContext.Assets.AddAsync(existing, ct);
+                    continue;
                 }
+
+                existing.UpdateDeviceDetails(
+                    asset.AssetType == AssetType.Device
+                        ? asset.DeviceComputerDnsName
+                        : existing.DeviceComputerDnsName,
+                    asset.AssetType == AssetType.Device
+                        ? asset.DeviceHealthStatus
+                        : existing.DeviceHealthStatus,
+                    asset.AssetType == AssetType.Device
+                        ? asset.DeviceOsPlatform
+                        : existing.DeviceOsPlatform,
+                    asset.AssetType == AssetType.Device
+                        ? asset.DeviceOsVersion
+                        : existing.DeviceOsVersion,
+                    asset.AssetType == AssetType.Device
+                        ? asset.DeviceRiskScore
+                        : existing.DeviceRiskScore,
+                    asset.AssetType == AssetType.Device
+                        ? asset.DeviceLastSeenAt
+                        : existing.DeviceLastSeenAt,
+                    asset.AssetType == AssetType.Device
+                        ? asset.DeviceLastIpAddress
+                        : existing.DeviceLastIpAddress,
+                    asset.AssetType == AssetType.Device
+                        ? asset.DeviceAadDeviceId
+                        : existing.DeviceAadDeviceId
+                );
+                existing.UpdateDetails(asset.Name, asset.Description);
                 existing.UpdateMetadata(asset.Metadata);
-                await _dbContext.Assets.AddAsync(existing, ct);
-                assetIdsByExternalId[asset.ExternalId] = existing.Id;
-                continue;
             }
 
-            existing.UpdateDetails(asset.Name, asset.Description);
-            if (asset.AssetType == AssetType.Device)
-            {
-                existing.UpdateDeviceDetails(
-                    asset.DeviceComputerDnsName,
-                    asset.DeviceHealthStatus,
-                    asset.DeviceOsPlatform,
-                    asset.DeviceOsVersion,
-                    asset.DeviceRiskScore,
-                    asset.DeviceLastSeenAt,
-                    asset.DeviceLastIpAddress,
-                    asset.DeviceAadDeviceId
-                );
-            }
-            existing.UpdateMetadata(asset.Metadata);
-            assetIdsByExternalId[asset.ExternalId] = existing.Id;
+            await _dbContext.SaveChangesAsync(ct);
+            _dbContext.ChangeTracker.Clear();
         }
 
         await ProcessDeviceSoftwareLinksAsync(
             tenantId,
-            snapshot.DeviceSoftwareLinks,
-            assetIdsByExternalId,
+            normalizedSnapshot.DeviceSoftwareLinks,
+            new Dictionary<string, Guid>(StringComparer.Ordinal),
             ct
         );
 
         await _dbContext.SaveChangesAsync(ct);
+        _dbContext.ChangeTracker.Clear();
+    }
+
+    private static IReadOnlyList<IngestionResult> NormalizeResults(
+        IReadOnlyList<IngestionResult> results
+    )
+    {
+        return results
+            .GroupBy(result => result.ExternalId, StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var first = group.First();
+                var affectedAssets = group
+                    .SelectMany(item => item.AffectedAssets)
+                    .GroupBy(asset => asset.ExternalAssetId, StringComparer.OrdinalIgnoreCase)
+                    .Select(assetGroup => assetGroup.First())
+                    .ToList();
+                var references = group
+                    .SelectMany(item => item.References ?? [])
+                    .GroupBy(reference => reference.Url, StringComparer.OrdinalIgnoreCase)
+                    .Select(referenceGroup => referenceGroup.First())
+                    .ToList();
+                var affectedSoftware = group
+                    .SelectMany(item => item.AffectedSoftware ?? [])
+                    .GroupBy(
+                        item =>
+                            $"{item.Criteria}|{item.VersionStartIncluding}|{item.VersionStartExcluding}|{item.VersionEndIncluding}|{item.VersionEndExcluding}|{item.Vulnerable}",
+                        StringComparer.OrdinalIgnoreCase
+                    )
+                    .Select(softwareGroup => softwareGroup.First())
+                    .ToList();
+                var sources = group
+                    .SelectMany(item => item.Sources ?? [])
+                    .Where(source => !string.IsNullOrWhiteSpace(source))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return first with
+                {
+                    AffectedAssets = affectedAssets,
+                    References = references,
+                    AffectedSoftware = affectedSoftware,
+                    Sources = sources,
+                };
+            })
+            .ToList();
+    }
+
+    private static IngestionAssetInventorySnapshot NormalizeAssetSnapshot(
+        IngestionAssetInventorySnapshot snapshot
+    )
+    {
+        var assets = snapshot
+            .Assets.GroupBy(asset => asset.ExternalId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
+            .ToList();
+        var deviceSoftwareLinks = snapshot
+            .DeviceSoftwareLinks.GroupBy(
+                link => $"{link.DeviceExternalId}:{link.SoftwareExternalId}",
+                StringComparer.OrdinalIgnoreCase
+            )
+            .Select(group => group.OrderByDescending(link => link.ObservedAt).First())
+            .ToList();
+
+        return new IngestionAssetInventorySnapshot(assets, deviceSoftwareLinks);
+    }
+
+    private static IEnumerable<IReadOnlyList<T>> Chunk<T>(IReadOnlyList<T> items, int size)
+    {
+        for (var index = 0; index < items.Count; index += size)
+        {
+            var count = Math.Min(size, items.Count - index);
+            var chunk = new List<T>(count);
+            for (var offset = 0; offset < count; offset++)
+            {
+                chunk.Add(items[index + offset]);
+            }
+
+            yield return chunk;
+        }
     }
 
     private async Task ProcessDeviceSoftwareLinksAsync(

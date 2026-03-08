@@ -65,6 +65,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
         var runnableSources = 0;
         var dueSources = 0;
         var manualSources = 0;
+        var startedRuns = 0;
 
         foreach (var source in sources)
         {
@@ -127,16 +128,20 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
                 source.SourceKey
             );
 
-            await ingestionService.RunIngestionAsync(tenant.Id, source.SourceKey, ct);
+            if (await ingestionService.RunIngestionAsync(tenant.Id, source.SourceKey, ct))
+            {
+                startedRuns++;
+            }
         }
 
         logger.LogInformation(
-            "Completed ingestion polling cycle at {CycleCompletedAt}. Sources scanned: {SourceCount}. Runnable sources: {RunnableSources}. Due sources: {DueSources}. Manual syncs queued: {ManualSources}.",
+            "Completed ingestion polling cycle at {CycleCompletedAt}. Sources scanned: {SourceCount}. Runnable sources: {RunnableSources}. Due sources: {DueSources}. Manual syncs queued: {ManualSources}. Started runs: {StartedRuns}.",
             DateTimeOffset.UtcNow,
             sources.Count,
             runnableSources,
             dueSources,
-            manualSources
+            manualSources,
+            startedRuns
         );
     }
 
