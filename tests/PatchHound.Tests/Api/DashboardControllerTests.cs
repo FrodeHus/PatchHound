@@ -36,11 +36,41 @@ public class DashboardControllerTests : IDisposable
     [Fact]
     public async Task GetSummary_ComputesRecurringCounts_AndTopRecurringAssets()
     {
-        var recurringAsset = Asset.Create(_tenantId, "device-1", AssetType.Device, "Device 1", Criticality.High);
-        recurringAsset.UpdateDeviceDetails("device-1.contoso.local", "Active", "Windows", "11", "High", DateTimeOffset.UtcNow, "10.0.0.1", "aad-1");
+        var recurringAsset = Asset.Create(
+            _tenantId,
+            "device-1",
+            AssetType.Device,
+            "Device 1",
+            Criticality.High
+        );
+        recurringAsset.UpdateDeviceDetails(
+            "device-1.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "High",
+            DateTimeOffset.UtcNow,
+            "10.0.0.1",
+            "aad-1"
+        );
 
-        var otherAsset = Asset.Create(_tenantId, "device-2", AssetType.Device, "Device 2", Criticality.Medium);
-        otherAsset.UpdateDeviceDetails("device-2.contoso.local", "Active", "Windows", "11", "Medium", DateTimeOffset.UtcNow, "10.0.0.2", "aad-2");
+        var otherAsset = Asset.Create(
+            _tenantId,
+            "device-2",
+            AssetType.Device,
+            "Device 2",
+            Criticality.Medium
+        );
+        otherAsset.UpdateDeviceDetails(
+            "device-2.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "Medium",
+            DateTimeOffset.UtcNow,
+            "10.0.0.2",
+            "aad-2"
+        );
 
         var recurringVulnerability = Vulnerability.Create(
             _tenantId,
@@ -66,8 +96,16 @@ public class DashboardControllerTests : IDisposable
             DateTimeOffset.UtcNow.AddDays(-15)
         );
 
-        var recurringLink = VulnerabilityAsset.Create(recurringVulnerability.Id, recurringAsset.Id, DateTimeOffset.UtcNow.AddDays(-3));
-        var nonRecurringLink = VulnerabilityAsset.Create(nonRecurringVulnerability.Id, otherAsset.Id, DateTimeOffset.UtcNow.AddDays(-2));
+        var recurringLink = VulnerabilityAsset.Create(
+            recurringVulnerability.Id,
+            recurringAsset.Id,
+            DateTimeOffset.UtcNow.AddDays(-3)
+        );
+        var nonRecurringLink = VulnerabilityAsset.Create(
+            nonRecurringVulnerability.Id,
+            otherAsset.Id,
+            DateTimeOffset.UtcNow.AddDays(-2)
+        );
 
         await _dbContext.AddRangeAsync(
             recurringAsset,
@@ -79,9 +117,27 @@ public class DashboardControllerTests : IDisposable
         );
 
         await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(
-            VulnerabilityAssetEpisode.Create(_tenantId, recurringVulnerability.Id, recurringAsset.Id, 1, DateTimeOffset.UtcNow.AddDays(-20)),
-            VulnerabilityAssetEpisode.Create(_tenantId, recurringVulnerability.Id, recurringAsset.Id, 2, DateTimeOffset.UtcNow.AddDays(-3)),
-            VulnerabilityAssetEpisode.Create(_tenantId, nonRecurringVulnerability.Id, otherAsset.Id, 1, DateTimeOffset.UtcNow.AddDays(-2))
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                recurringVulnerability.Id,
+                recurringAsset.Id,
+                1,
+                DateTimeOffset.UtcNow.AddDays(-20)
+            ),
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                recurringVulnerability.Id,
+                recurringAsset.Id,
+                2,
+                DateTimeOffset.UtcNow.AddDays(-3)
+            ),
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                nonRecurringVulnerability.Id,
+                otherAsset.Id,
+                1,
+                DateTimeOffset.UtcNow.AddDays(-2)
+            )
         );
         await _dbContext.SaveChangesAsync();
 

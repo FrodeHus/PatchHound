@@ -20,7 +20,11 @@ public class UsersController : ControllerBase
     private readonly UserService _userService;
     private readonly ITenantContext _tenantContext;
 
-    public UsersController(PatchHoundDbContext dbContext, UserService userService, ITenantContext tenantContext)
+    public UsersController(
+        PatchHoundDbContext dbContext,
+        UserService userService,
+        ITenantContext tenantContext
+    )
     {
         _dbContext = dbContext;
         _userService = userService;
@@ -37,7 +41,8 @@ public class UsersController : ControllerBase
         var accessibleTenantIds = _tenantContext.AccessibleTenantIds;
 
         // Only return users who share at least one tenant with the caller
-        var query = _dbContext.Users.AsNoTracking()
+        var query = _dbContext
+            .Users.AsNoTracking()
             .Where(u => u.TenantRoles.Any(r => accessibleTenantIds.Contains(r.TenantId)));
 
         var totalCount = await query.CountAsync(ct);
@@ -74,7 +79,14 @@ public class UsersController : ControllerBase
             ))
             .ToList();
 
-        return Ok(new PagedResponse<UserDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
+        return Ok(
+            new PagedResponse<UserDto>(
+                items,
+                totalCount,
+                pagination.Page,
+                pagination.BoundedPageSize
+            )
+        );
     }
 
     [HttpPost("invite")]

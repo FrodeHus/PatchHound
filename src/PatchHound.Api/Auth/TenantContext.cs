@@ -39,10 +39,7 @@ public class TenantContext : ITenantContext
 
     internal IReadOnlyList<RoleName> GetAllRoleNames()
     {
-        return _rolesByTenantId.Values
-            .SelectMany(r => r)
-            .Distinct()
-            .ToList();
+        return _rolesByTenantId.Values.SelectMany(r => r).Distinct().ToList();
     }
 
     internal async Task InitializeAsync(HttpContext httpContext, PatchHoundDbContext dbContext)
@@ -53,10 +50,9 @@ public class TenantContext : ITenantContext
         _initialized = true;
 
         var oid =
-            httpContext.User?.FindFirst(
-                "http://schemas.microsoft.com/identity/claims/objectidentifier"
-            )?.Value
-            ?? httpContext.User?.FindFirst("oid")?.Value;
+            httpContext
+                .User?.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")
+                ?.Value ?? httpContext.User?.FindFirst("oid")?.Value;
         var tokenTenantId = httpContext.User?.FindFirst("tid")?.Value;
         _normalizedClaimRoles = EntraRoleNormalizer.Normalize(
             httpContext.User is null ? [] : RoleClaimReader.ReadClaims(httpContext.User)
@@ -82,10 +78,7 @@ public class TenantContext : ITenantContext
 
                 _rolesByTenantId = userTenantRoles
                     .GroupBy(r => r.TenantId)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => g.Select(r => r.Role).Distinct().ToList()
-                    );
+                    .ToDictionary(g => g.Key, g => g.Select(r => r.Role).Distinct().ToList());
             }
         }
 
@@ -116,9 +109,11 @@ public class TenantContext : ITenantContext
         _accessibleTenantIds = _rolesByTenantId.Keys.ToList();
 
         // Resolve current tenant: prefer explicit header, fall back to single-tenant
-        if (httpContext.Request.Headers.TryGetValue("X-Tenant-Id", out var tenantHeader)
+        if (
+            httpContext.Request.Headers.TryGetValue("X-Tenant-Id", out var tenantHeader)
             && Guid.TryParse(tenantHeader.FirstOrDefault(), out var requestedTenantId)
-            && _accessibleTenantIds.Contains(requestedTenantId))
+            && _accessibleTenantIds.Contains(requestedTenantId)
+        )
         {
             _currentTenantId = requestedTenantId;
         }

@@ -16,7 +16,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 table: "DeviceSoftwareInstallations",
                 type: "integer",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 0
+            );
 
             migrationBuilder.CreateTable(
                 name: "DeviceSoftwareInstallationEpisodes",
@@ -27,10 +28,19 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     DeviceAssetId = table.Column<Guid>(type: "uuid", nullable: false),
                     SoftwareAssetId = table.Column<Guid>(type: "uuid", nullable: false),
                     EpisodeNumber = table.Column<int>(type: "integer", nullable: false),
-                    FirstSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    LastSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    RemovedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    MissingSyncCount = table.Column<int>(type: "integer", nullable: false)
+                    FirstSeenAt = table.Column<DateTimeOffset>(
+                        type: "timestamp with time zone",
+                        nullable: false
+                    ),
+                    LastSeenAt = table.Column<DateTimeOffset>(
+                        type: "timestamp with time zone",
+                        nullable: false
+                    ),
+                    RemovedAt = table.Column<DateTimeOffset>(
+                        type: "timestamp with time zone",
+                        nullable: true
+                    ),
+                    MissingSyncCount = table.Column<int>(type: "integer", nullable: false),
                 },
                 constraints: table =>
                 {
@@ -40,30 +50,36 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         column: x => x.DeviceAssetId,
                         principalTable: "Assets",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Cascade
+                    );
                     table.ForeignKey(
                         name: "FK_DeviceSoftwareInstallationEpisodes_Assets_SoftwareAssetId",
                         column: x => x.SoftwareAssetId,
                         principalTable: "Assets",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
+                        onDelete: ReferentialAction.Cascade
+                    );
+                }
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_DeviceSoftwareInstallationEpisodes_DeviceAssetId_SoftwareAs~",
                 table: "DeviceSoftwareInstallationEpisodes",
                 columns: new[] { "DeviceAssetId", "SoftwareAssetId", "EpisodeNumber" },
-                unique: true);
+                unique: true
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_DeviceSoftwareInstallationEpisodes_SoftwareAssetId",
                 table: "DeviceSoftwareInstallationEpisodes",
-                column: "SoftwareAssetId");
+                column: "SoftwareAssetId"
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_DeviceSoftwareInstallationEpisodes_TenantId",
                 table: "DeviceSoftwareInstallationEpisodes",
-                column: "TenantId");
+                column: "TenantId"
+            );
 
             migrationBuilder.Sql(
                 """
@@ -87,12 +103,12 @@ namespace PatchHound.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "DeviceSoftwareInstallationEpisodes");
+            migrationBuilder.DropTable(name: "DeviceSoftwareInstallationEpisodes");
 
             migrationBuilder.DropColumn(
                 name: "MissingSyncCount",
-                table: "DeviceSoftwareInstallations");
+                table: "DeviceSoftwareInstallations"
+            );
         }
     }
 }

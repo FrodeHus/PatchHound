@@ -19,7 +19,11 @@ public class TeamsController : ControllerBase
     private readonly TeamService _teamService;
     private readonly ITenantContext _tenantContext;
 
-    public TeamsController(PatchHoundDbContext dbContext, TeamService teamService, ITenantContext tenantContext)
+    public TeamsController(
+        PatchHoundDbContext dbContext,
+        TeamService teamService,
+        ITenantContext tenantContext
+    )
     {
         _dbContext = dbContext;
         _teamService = teamService;
@@ -52,13 +56,23 @@ public class TeamsController : ControllerBase
             .Select(t => new TeamDto(
                 t.Id,
                 t.TenantId,
-                _dbContext.Tenants.Where(tenant => tenant.Id == t.TenantId).Select(tenant => tenant.Name).FirstOrDefault() ?? "Unknown tenant",
+                _dbContext
+                    .Tenants.Where(tenant => tenant.Id == t.TenantId)
+                    .Select(tenant => tenant.Name)
+                    .FirstOrDefault() ?? "Unknown tenant",
                 t.Name,
                 t.Members.Count
             ))
             .ToListAsync(ct);
 
-        return Ok(new PagedResponse<TeamDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
+        return Ok(
+            new PagedResponse<TeamDto>(
+                items,
+                totalCount,
+                pagination.Page,
+                pagination.BoundedPageSize
+            )
+        );
     }
 
     [HttpGet("{id:guid}")]

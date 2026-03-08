@@ -19,12 +19,13 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     CriticalDays = table.Column<int>(type: "integer", nullable: false),
                     HighDays = table.Column<int>(type: "integer", nullable: false),
                     MediumDays = table.Column<int>(type: "integer", nullable: false),
-                    LowDays = table.Column<int>(type: "integer", nullable: false)
+                    LowDays = table.Column<int>(type: "integer", nullable: false),
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_TenantSlaConfigurations", x => x.TenantId);
-                });
+                }
+            );
 
             migrationBuilder.CreateTable(
                 name: "TenantSourceConfigurations",
@@ -32,38 +33,95 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
-                    SourceKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    DisplayName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    SourceKey = table.Column<string>(
+                        type: "character varying(128)",
+                        maxLength: 128,
+                        nullable: false
+                    ),
+                    DisplayName = table.Column<string>(
+                        type: "character varying(256)",
+                        maxLength: 256,
+                        nullable: false
+                    ),
                     Enabled = table.Column<bool>(type: "boolean", nullable: false),
-                    SyncSchedule = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    CredentialTenantId = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    ClientId = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    SecretRef = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    ApiBaseUrl = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    TokenScope = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    ManualRequestedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    LastStartedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    LastCompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    LastSucceededAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    LastStatus = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    LastError = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false)
+                    SyncSchedule = table.Column<string>(
+                        type: "character varying(128)",
+                        maxLength: 128,
+                        nullable: false
+                    ),
+                    CredentialTenantId = table.Column<string>(
+                        type: "character varying(256)",
+                        maxLength: 256,
+                        nullable: false
+                    ),
+                    ClientId = table.Column<string>(
+                        type: "character varying(256)",
+                        maxLength: 256,
+                        nullable: false
+                    ),
+                    SecretRef = table.Column<string>(
+                        type: "character varying(512)",
+                        maxLength: 512,
+                        nullable: false
+                    ),
+                    ApiBaseUrl = table.Column<string>(
+                        type: "character varying(512)",
+                        maxLength: 512,
+                        nullable: false
+                    ),
+                    TokenScope = table.Column<string>(
+                        type: "character varying(512)",
+                        maxLength: 512,
+                        nullable: false
+                    ),
+                    ManualRequestedAt = table.Column<DateTimeOffset>(
+                        type: "timestamp with time zone",
+                        nullable: true
+                    ),
+                    LastStartedAt = table.Column<DateTimeOffset>(
+                        type: "timestamp with time zone",
+                        nullable: true
+                    ),
+                    LastCompletedAt = table.Column<DateTimeOffset>(
+                        type: "timestamp with time zone",
+                        nullable: true
+                    ),
+                    LastSucceededAt = table.Column<DateTimeOffset>(
+                        type: "timestamp with time zone",
+                        nullable: true
+                    ),
+                    LastStatus = table.Column<string>(
+                        type: "character varying(64)",
+                        maxLength: 64,
+                        nullable: false
+                    ),
+                    LastError = table.Column<string>(
+                        type: "character varying(512)",
+                        maxLength: 512,
+                        nullable: false
+                    ),
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_TenantSourceConfigurations", x => x.Id);
-                });
+                }
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_TenantSourceConfigurations_TenantId_SourceKey",
                 table: "TenantSourceConfigurations",
                 columns: new[] { "TenantId", "SourceKey" },
-                unique: true);
+                unique: true
+            );
 
-            migrationBuilder.Sql("""
+            migrationBuilder.Sql(
+                """
                 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-                """);
+                """
+            );
 
-            migrationBuilder.Sql("""
+            migrationBuilder.Sql(
+                """
                 INSERT INTO "TenantSourceConfigurations" (
                     "Id",
                     "TenantId",
@@ -110,9 +168,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     END
                 ) AS source
                 WHERE source ->> 'key' IN ('microsoft-defender', 'nvd');
-                """);
+                """
+            );
 
-            migrationBuilder.Sql("""
+            migrationBuilder.Sql(
+                """
                 INSERT INTO "TenantSourceConfigurations" (
                     "Id",
                     "TenantId",
@@ -149,9 +209,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     WHERE source."TenantId" = tenant."Id"
                       AND source."SourceKey" = 'microsoft-defender'
                 );
-                """);
+                """
+            );
 
-            migrationBuilder.Sql("""
+            migrationBuilder.Sql(
+                """
                 INSERT INTO "TenantSourceConfigurations" (
                     "Id",
                     "TenantId",
@@ -188,9 +250,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     WHERE source."TenantId" = tenant."Id"
                       AND source."SourceKey" = 'nvd'
                 );
-                """);
+                """
+            );
 
-            migrationBuilder.Sql("""
+            migrationBuilder.Sql(
+                """
                 INSERT INTO "TenantSlaConfigurations" (
                     "TenantId",
                     "CriticalDays",
@@ -205,30 +269,29 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     COALESCE(NULLIF(COALESCE(tenant."Settings", '{}')::jsonb -> 'slaDays' ->> 'Medium', '')::integer, 90),
                     COALESCE(NULLIF(COALESCE(tenant."Settings", '{}')::jsonb -> 'slaDays' ->> 'Low', '')::integer, 180)
                 FROM "Tenants" AS tenant;
-                """);
+                """
+            );
 
-            migrationBuilder.DropColumn(
-                name: "Settings",
-                table: "Tenants");
+            migrationBuilder.DropColumn(name: "Settings", table: "Tenants");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "TenantSlaConfigurations");
+            migrationBuilder.DropTable(name: "TenantSlaConfigurations");
 
-            migrationBuilder.DropTable(
-                name: "TenantSourceConfigurations");
+            migrationBuilder.DropTable(name: "TenantSourceConfigurations");
 
             migrationBuilder.AddColumn<string>(
                 name: "Settings",
                 table: "Tenants",
                 type: "text",
                 nullable: false,
-                defaultValue: "");
+                defaultValue: ""
+            );
 
-            migrationBuilder.Sql("""
+            migrationBuilder.Sql(
+                """
                 UPDATE "Tenants" AS tenant
                 SET "Settings" = jsonb_build_object(
                     'slaDays',
@@ -269,7 +332,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 )::text
                 FROM "TenantSlaConfigurations" AS sla
                 WHERE sla."TenantId" = tenant."Id";
-                """);
+                """
+            );
         }
     }
 }

@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -13,7 +14,6 @@ using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.VulnerabilitySources;
-using System.Text.Json.Nodes;
 
 namespace PatchHound.Tests.Infrastructure;
 
@@ -32,14 +32,16 @@ public class IngestionServiceTests : IDisposable
 
         var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+            .ConfigureWarnings(warnings =>
+                warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning)
+            )
             .Options;
 
         _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(tenantContext));
 
         _source = Substitute.For<IVulnerabilitySource>();
         _source.SourceKey.Returns("test-source");
-       _source.SourceName.Returns("TestSource");
+        _source.SourceName.Returns("TestSource");
 
         var logger = Substitute.For<ILogger<IngestionService>>();
         var assessmentService = new VulnerabilityAssessmentService(
@@ -259,11 +261,19 @@ public class IngestionServiceTests : IDisposable
                 9.8m,
                 "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
                 DateTimeOffset.UtcNow,
-                new List<IngestionAffectedAsset> { new("ASSET-ENV-1", "ServerEnv", AssetType.Device) }
+                new List<IngestionAffectedAsset>
+                {
+                    new("ASSET-ENV-1", "ServerEnv", AssetType.Device),
+                }
             ),
         };
 
-        await _service.ProcessResultsAsync(_tenantId, "TestSource", results, CancellationToken.None);
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "TestSource",
+            results,
+            CancellationToken.None
+        );
 
         var assessment = await _dbContext
             .VulnerabilityAssetAssessments.IgnoreQueryFilters()
@@ -469,9 +479,7 @@ public class IngestionServiceTests : IDisposable
                 new("machine-1", "server01.contoso.local", AssetType.Device),
                 new("software-1", "Contoso Agent 1.0", AssetType.Software),
             ],
-            [
-                new("machine-1", "software-1", observedAt),
-            ]
+            [new("machine-1", "software-1", observedAt)]
         );
 
         await _service.ProcessAssetsAsync(_tenantId, snapshot, CancellationToken.None);
@@ -520,7 +528,12 @@ public class IngestionServiceTests : IDisposable
             ),
         };
 
-        await _service.ProcessResultsAsync(_tenantId, "TestSource", results, CancellationToken.None);
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "TestSource",
+            results,
+            CancellationToken.None
+        );
 
         var updatedAsset = await _dbContext
             .Assets.IgnoreQueryFilters()
@@ -540,22 +553,44 @@ public class IngestionServiceTests : IDisposable
             Severity.High,
             "TestSource"
         );
-        var asset = Asset.Create(_tenantId, "asset-1", AssetType.Device, "Server1", Criticality.Medium);
+        var asset = Asset.Create(
+            _tenantId,
+            "asset-1",
+            AssetType.Device,
+            "Server1",
+            Criticality.Medium
+        );
         await _dbContext.Vulnerabilities.AddAsync(vulnerability);
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
-        var episode = VulnerabilityAssetEpisode.Create(_tenantId, vulnerability.Id, asset.Id, 1, DateTimeOffset.UtcNow.AddHours(-2));
-        var projection = VulnerabilityAsset.Create(vulnerability.Id, asset.Id, DateTimeOffset.UtcNow.AddHours(-2));
+        var episode = VulnerabilityAssetEpisode.Create(
+            _tenantId,
+            vulnerability.Id,
+            asset.Id,
+            1,
+            DateTimeOffset.UtcNow.AddHours(-2)
+        );
+        var projection = VulnerabilityAsset.Create(
+            vulnerability.Id,
+            asset.Id,
+            DateTimeOffset.UtcNow.AddHours(-2)
+        );
         await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
         await _dbContext.VulnerabilityAssets.AddAsync(projection);
         await _dbContext.SaveChangesAsync();
 
         await _service.ProcessResultsAsync(_tenantId, "TestSource", [], CancellationToken.None);
 
-        var updatedEpisode = await _dbContext.VulnerabilityAssetEpisodes.IgnoreQueryFilters().FirstAsync();
-        var updatedProjection = await _dbContext.VulnerabilityAssets.IgnoreQueryFilters().FirstAsync();
-        var updatedVulnerability = await _dbContext.Vulnerabilities.IgnoreQueryFilters().FirstAsync();
+        var updatedEpisode = await _dbContext
+            .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
+            .FirstAsync();
+        var updatedProjection = await _dbContext
+            .VulnerabilityAssets.IgnoreQueryFilters()
+            .FirstAsync();
+        var updatedVulnerability = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
+            .FirstAsync();
 
         updatedEpisode.Status.Should().Be(VulnerabilityStatus.Open);
         updatedEpisode.MissingSyncCount.Should().Be(1);
@@ -575,23 +610,45 @@ public class IngestionServiceTests : IDisposable
             Severity.High,
             "TestSource"
         );
-        var asset = Asset.Create(_tenantId, "asset-1", AssetType.Device, "Server1", Criticality.Medium);
+        var asset = Asset.Create(
+            _tenantId,
+            "asset-1",
+            AssetType.Device,
+            "Server1",
+            Criticality.Medium
+        );
         await _dbContext.Vulnerabilities.AddAsync(vulnerability);
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
-        var episode = VulnerabilityAssetEpisode.Create(_tenantId, vulnerability.Id, asset.Id, 1, DateTimeOffset.UtcNow.AddHours(-2));
+        var episode = VulnerabilityAssetEpisode.Create(
+            _tenantId,
+            vulnerability.Id,
+            asset.Id,
+            1,
+            DateTimeOffset.UtcNow.AddHours(-2)
+        );
         episode.MarkMissing();
-        var projection = VulnerabilityAsset.Create(vulnerability.Id, asset.Id, DateTimeOffset.UtcNow.AddHours(-2));
+        var projection = VulnerabilityAsset.Create(
+            vulnerability.Id,
+            asset.Id,
+            DateTimeOffset.UtcNow.AddHours(-2)
+        );
         await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
         await _dbContext.VulnerabilityAssets.AddAsync(projection);
         await _dbContext.SaveChangesAsync();
 
         await _service.ProcessResultsAsync(_tenantId, "TestSource", [], CancellationToken.None);
 
-        var updatedEpisode = await _dbContext.VulnerabilityAssetEpisodes.IgnoreQueryFilters().FirstAsync();
-        var updatedProjection = await _dbContext.VulnerabilityAssets.IgnoreQueryFilters().FirstAsync();
-        var updatedVulnerability = await _dbContext.Vulnerabilities.IgnoreQueryFilters().FirstAsync();
+        var updatedEpisode = await _dbContext
+            .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
+            .FirstAsync();
+        var updatedProjection = await _dbContext
+            .VulnerabilityAssets.IgnoreQueryFilters()
+            .FirstAsync();
+        var updatedVulnerability = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
+            .FirstAsync();
 
         updatedEpisode.Status.Should().Be(VulnerabilityStatus.Resolved);
         updatedEpisode.MissingSyncCount.Should().Be(2);
@@ -612,13 +669,25 @@ public class IngestionServiceTests : IDisposable
             Severity.High,
             "TestSource"
         );
-        var asset = Asset.Create(_tenantId, "asset-1", AssetType.Device, "Server1", Criticality.Medium);
+        var asset = Asset.Create(
+            _tenantId,
+            "asset-1",
+            AssetType.Device,
+            "Server1",
+            Criticality.Medium
+        );
         await _dbContext.Vulnerabilities.AddAsync(vulnerability);
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
         var firstSeenAt = DateTimeOffset.UtcNow.AddHours(-2);
-        var episode = VulnerabilityAssetEpisode.Create(_tenantId, vulnerability.Id, asset.Id, 1, firstSeenAt);
+        var episode = VulnerabilityAssetEpisode.Create(
+            _tenantId,
+            vulnerability.Id,
+            asset.Id,
+            1,
+            firstSeenAt
+        );
         episode.MarkMissing();
         var projection = VulnerabilityAsset.Create(vulnerability.Id, asset.Id, firstSeenAt);
         await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
@@ -643,7 +712,9 @@ public class IngestionServiceTests : IDisposable
             CancellationToken.None
         );
 
-        var episodes = await _dbContext.VulnerabilityAssetEpisodes.IgnoreQueryFilters().ToListAsync();
+        var episodes = await _dbContext
+            .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
+            .ToListAsync();
         episodes.Should().HaveCount(1);
         episodes[0].EpisodeNumber.Should().Be(1);
         episodes[0].MissingSyncCount.Should().Be(0);
@@ -661,13 +732,25 @@ public class IngestionServiceTests : IDisposable
             Severity.High,
             "TestSource"
         );
-        var asset = Asset.Create(_tenantId, "asset-1", AssetType.Device, "Server1", Criticality.Medium);
+        var asset = Asset.Create(
+            _tenantId,
+            "asset-1",
+            AssetType.Device,
+            "Server1",
+            Criticality.Medium
+        );
         await _dbContext.Vulnerabilities.AddAsync(vulnerability);
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
         var firstSeenAt = DateTimeOffset.UtcNow.AddDays(-1);
-        var firstEpisode = VulnerabilityAssetEpisode.Create(_tenantId, vulnerability.Id, asset.Id, 1, firstSeenAt);
+        var firstEpisode = VulnerabilityAssetEpisode.Create(
+            _tenantId,
+            vulnerability.Id,
+            asset.Id,
+            1,
+            firstSeenAt
+        );
         firstEpisode.MarkMissing();
         firstEpisode.MarkMissing();
         firstEpisode.Resolve(DateTimeOffset.UtcNow.AddHours(-2));
@@ -700,8 +783,12 @@ public class IngestionServiceTests : IDisposable
             .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
             .OrderBy(episode => episode.EpisodeNumber)
             .ToListAsync();
-        var updatedProjection = await _dbContext.VulnerabilityAssets.IgnoreQueryFilters().FirstAsync();
-        var updatedVulnerability = await _dbContext.Vulnerabilities.IgnoreQueryFilters().FirstAsync();
+        var updatedProjection = await _dbContext
+            .VulnerabilityAssets.IgnoreQueryFilters()
+            .FirstAsync();
+        var updatedVulnerability = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
+            .FirstAsync();
 
         episodes.Should().HaveCount(2);
         episodes[0].Status.Should().Be(VulnerabilityStatus.Resolved);
@@ -738,7 +825,13 @@ public class IngestionServiceTests : IDisposable
                 ]
             );
 
-        var asset = Asset.Create(_tenantId, "ASSET-1", AssetType.Device, "Server1", Criticality.High);
+        var asset = Asset.Create(
+            _tenantId,
+            "ASSET-1",
+            AssetType.Device,
+            "Server1",
+            Criticality.High
+        );
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
         await _dbContext.TenantSourceConfigurations.AddAsync(
@@ -791,7 +884,9 @@ public class IngestionServiceTests : IDisposable
         vulnerability.Description.Should().Be("NVD-enriched description");
         vulnerability.CvssScore.Should().Be(9.8m);
         vulnerability.CvssVector.Should().Be("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
-        vulnerability.PublishedDate.Should().Be(new DateTimeOffset(2026, 2, 2, 10, 0, 0, TimeSpan.Zero));
+        vulnerability
+            .PublishedDate.Should()
+            .Be(new DateTimeOffset(2026, 2, 2, 10, 0, 0, TimeSpan.Zero));
         vulnerability.ProductVendor.Should().Be("Contoso");
         vulnerability.ProductName.Should().Be("Contoso Agent");
         vulnerability.ProductVersion.Should().Be("1.0");
@@ -817,38 +912,45 @@ public class IngestionServiceTests : IDisposable
             CancellationToken ct
         )
         {
-            return Task.FromResult(new NvdCveResponse
-            {
-                Vulnerabilities =
-                [
-                    new NvdCveItem
-                    {
-                        Cve = new NvdCveRecord
+            return Task.FromResult(
+                new NvdCveResponse
+                {
+                    Vulnerabilities =
+                    [
+                        new NvdCveItem
                         {
-                            Id = cveId,
-                            Published = new DateTimeOffset(2026, 2, 2, 10, 0, 0, TimeSpan.Zero),
-                            Descriptions =
-                            [
-                                new NvdDescription { Lang = "en", Value = "NVD-enriched description" },
-                            ],
-                            Metrics = new NvdMetricCollection
+                            Cve = new NvdCveRecord
                             {
-                                CvssMetricV31 =
+                                Id = cveId,
+                                Published = new DateTimeOffset(2026, 2, 2, 10, 0, 0, TimeSpan.Zero),
+                                Descriptions =
                                 [
-                                    new NvdCvssMetric
+                                    new NvdDescription
                                     {
-                                        CvssData = new NvdCvssData
-                                        {
-                                            BaseScore = 9.8m,
-                                            VectorString = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
-                                        },
+                                        Lang = "en",
+                                        Value = "NVD-enriched description",
                                     },
                                 ],
+                                Metrics = new NvdMetricCollection
+                                {
+                                    CvssMetricV31 =
+                                    [
+                                        new NvdCvssMetric
+                                        {
+                                            CvssData = new NvdCvssData
+                                            {
+                                                BaseScore = 9.8m,
+                                                VectorString =
+                                                    "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                                            },
+                                        },
+                                    ],
+                                },
                             },
                         },
-                    },
-                ],
-            });
+                    ],
+                }
+            );
         }
     }
 }

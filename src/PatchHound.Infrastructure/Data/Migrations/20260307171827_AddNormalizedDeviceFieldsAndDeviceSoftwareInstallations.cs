@@ -16,48 +16,55 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 table: "Assets",
                 type: "character varying(128)",
                 maxLength: 128,
-                nullable: true);
+                nullable: true
+            );
 
             migrationBuilder.AddColumn<string>(
                 name: "DeviceHealthStatus",
                 table: "Assets",
                 type: "character varying(64)",
                 maxLength: 64,
-                nullable: true);
+                nullable: true
+            );
 
             migrationBuilder.AddColumn<string>(
                 name: "DeviceLastIpAddress",
                 table: "Assets",
                 type: "character varying(128)",
                 maxLength: 128,
-                nullable: true);
+                nullable: true
+            );
 
             migrationBuilder.AddColumn<DateTimeOffset>(
                 name: "DeviceLastSeenAt",
                 table: "Assets",
                 type: "timestamp with time zone",
-                nullable: true);
+                nullable: true
+            );
 
             migrationBuilder.AddColumn<string>(
                 name: "DeviceOsPlatform",
                 table: "Assets",
                 type: "character varying(128)",
                 maxLength: 128,
-                nullable: true);
+                nullable: true
+            );
 
             migrationBuilder.AddColumn<string>(
                 name: "DeviceOsVersion",
                 table: "Assets",
                 type: "character varying(128)",
                 maxLength: 128,
-                nullable: true);
+                nullable: true
+            );
 
             migrationBuilder.AddColumn<string>(
                 name: "DeviceRiskScore",
                 table: "Assets",
                 type: "character varying(64)",
                 maxLength: 64,
-                nullable: true);
+                nullable: true
+            );
 
             migrationBuilder.CreateTable(
                 name: "DeviceSoftwareInstallations",
@@ -67,7 +74,10 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
                     DeviceAssetId = table.Column<Guid>(type: "uuid", nullable: false),
                     SoftwareAssetId = table.Column<Guid>(type: "uuid", nullable: false),
-                    LastSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    LastSeenAt = table.Column<DateTimeOffset>(
+                        type: "timestamp with time zone",
+                        nullable: false
+                    ),
                 },
                 constraints: table =>
                 {
@@ -77,65 +87,56 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         column: x => x.DeviceAssetId,
                         principalTable: "Assets",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Cascade
+                    );
                     table.ForeignKey(
                         name: "FK_DeviceSoftwareInstallations_Assets_SoftwareAssetId",
                         column: x => x.SoftwareAssetId,
                         principalTable: "Assets",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
+                        onDelete: ReferentialAction.Cascade
+                    );
+                }
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_DeviceSoftwareInstallations_DeviceAssetId_SoftwareAssetId",
                 table: "DeviceSoftwareInstallations",
                 columns: new[] { "DeviceAssetId", "SoftwareAssetId" },
-                unique: true);
+                unique: true
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_DeviceSoftwareInstallations_SoftwareAssetId",
                 table: "DeviceSoftwareInstallations",
-                column: "SoftwareAssetId");
+                column: "SoftwareAssetId"
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_DeviceSoftwareInstallations_TenantId",
                 table: "DeviceSoftwareInstallations",
-                column: "TenantId");
+                column: "TenantId"
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "DeviceSoftwareInstallations");
+            migrationBuilder.DropTable(name: "DeviceSoftwareInstallations");
 
-            migrationBuilder.DropColumn(
-                name: "DeviceAadDeviceId",
-                table: "Assets");
+            migrationBuilder.DropColumn(name: "DeviceAadDeviceId", table: "Assets");
 
-            migrationBuilder.DropColumn(
-                name: "DeviceHealthStatus",
-                table: "Assets");
+            migrationBuilder.DropColumn(name: "DeviceHealthStatus", table: "Assets");
 
-            migrationBuilder.DropColumn(
-                name: "DeviceLastIpAddress",
-                table: "Assets");
+            migrationBuilder.DropColumn(name: "DeviceLastIpAddress", table: "Assets");
 
-            migrationBuilder.DropColumn(
-                name: "DeviceLastSeenAt",
-                table: "Assets");
+            migrationBuilder.DropColumn(name: "DeviceLastSeenAt", table: "Assets");
 
-            migrationBuilder.DropColumn(
-                name: "DeviceOsPlatform",
-                table: "Assets");
+            migrationBuilder.DropColumn(name: "DeviceOsPlatform", table: "Assets");
 
-            migrationBuilder.DropColumn(
-                name: "DeviceOsVersion",
-                table: "Assets");
+            migrationBuilder.DropColumn(name: "DeviceOsVersion", table: "Assets");
 
-            migrationBuilder.DropColumn(
-                name: "DeviceRiskScore",
-                table: "Assets");
+            migrationBuilder.DropColumn(name: "DeviceRiskScore", table: "Assets");
         }
     }
 }

@@ -8,10 +8,7 @@ public record EnrichmentSourceDto(
     EnrichmentSourceRuntimeDto Runtime
 );
 
-public record EnrichmentSourceCredentialsDto(
-    bool HasSecret,
-    string ApiBaseUrl
-);
+public record EnrichmentSourceCredentialsDto(bool HasSecret, string ApiBaseUrl);
 
 public record EnrichmentSourceRuntimeDto(
     DateTimeOffset? LastStartedAt,
@@ -28,7 +25,4 @@ public record UpdateEnrichmentSourceRequest(
     UpdateEnrichmentSourceCredentialsRequest Credentials
 );
 
-public record UpdateEnrichmentSourceCredentialsRequest(
-    string Secret,
-    string ApiBaseUrl
-);
+public record UpdateEnrichmentSourceCredentialsRequest(string Secret, string ApiBaseUrl);

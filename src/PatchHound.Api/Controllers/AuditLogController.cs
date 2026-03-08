@@ -1,7 +1,7 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Audit;
@@ -83,22 +83,38 @@ public class AuditLogController : ControllerBase
             ))
             .ToList();
 
-        return Ok(new PagedResponse<AuditLogDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
+        return Ok(
+            new PagedResponse<AuditLogDto>(
+                items,
+                totalCount,
+                pagination.Page,
+                pagination.BoundedPageSize
+            )
+        );
     }
 
-    private static string? ResolveEntityLabel(string entityType, string? oldValues, string? newValues)
+    private static string? ResolveEntityLabel(
+        string entityType,
+        string? oldValues,
+        string? newValues
+    )
     {
-        var values = ParseValues(newValues).Count > 0 ? ParseValues(newValues) : ParseValues(oldValues);
+        var values =
+            ParseValues(newValues).Count > 0 ? ParseValues(newValues) : ParseValues(oldValues);
 
         return entityType switch
         {
             "Tenant" => GetValue(values, "Name"),
-            "TenantSourceConfiguration" => GetValue(values, "DisplayName") ?? GetValue(values, "SourceKey"),
-            "EnrichmentSourceConfiguration" => GetValue(values, "DisplayName") ?? GetValue(values, "SourceKey"),
+            "TenantSourceConfiguration" => GetValue(values, "DisplayName")
+                ?? GetValue(values, "SourceKey"),
+            "EnrichmentSourceConfiguration" => GetValue(values, "DisplayName")
+                ?? GetValue(values, "SourceKey"),
             "AssetSecurityProfile" => GetValue(values, "Name"),
             "Team" => GetValue(values, "Name"),
             "UserTenantRole" => GetValue(values, "Role"),
-            _ => GetValue(values, "Name") ?? GetValue(values, "DisplayName") ?? GetValue(values, "Title"),
+            _ => GetValue(values, "Name")
+                ?? GetValue(values, "DisplayName")
+                ?? GetValue(values, "Title"),
         };
     }
 

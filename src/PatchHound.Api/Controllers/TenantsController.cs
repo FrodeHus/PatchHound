@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Admin;
-using PatchHound.Core.Enums;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
@@ -66,18 +66,24 @@ public class TenantsController : ControllerBase
             .Where(source => tenantIds.Contains(source.TenantId))
             .ToListAsync(ct);
 
-        return Ok(new PagedResponse<TenantListItemDto>(
-            items.Select(t => new TenantListItemDto(
-                t.Id,
-                t.Name,
-                t.EntraTenantId,
-                sourceCounts.Count(source =>
-                    source.TenantId == t.Id && TenantSourceCatalog.HasConfiguredCredentials(source))
-            )).ToList(),
-            totalCount,
-            pagination.Page,
-            pagination.BoundedPageSize
-        ));
+        return Ok(
+            new PagedResponse<TenantListItemDto>(
+                items
+                    .Select(t => new TenantListItemDto(
+                        t.Id,
+                        t.Name,
+                        t.EntraTenantId,
+                        sourceCounts.Count(source =>
+                            source.TenantId == t.Id
+                            && TenantSourceCatalog.HasConfiguredCredentials(source)
+                        )
+                    ))
+                    .ToList(),
+                totalCount,
+                pagination.Page,
+                pagination.BoundedPageSize
+            )
+        );
     }
 
     [HttpGet("{id:guid}")]
@@ -87,7 +93,9 @@ public class TenantsController : ControllerBase
         if (!_tenantContext.HasAccessToTenant(id))
             return Forbid();
 
-        var tenant = await _dbContext.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
+        var tenant = await _dbContext
+            .Tenants.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tenant is null)
             return NotFound();
 
@@ -111,7 +119,8 @@ public class TenantsController : ControllerBase
             return ValidationProblem("Entra tenant ID is required.");
 
         var normalizedEntraTenantId = entraTenantId.ToLowerInvariant();
-        var existingTenant = await _dbContext.Tenants.IgnoreQueryFilters()
+        var existingTenant = await _dbContext
+            .Tenants.IgnoreQueryFilters()
             .AnyAsync(
                 tenant =>
                     tenant.Name == name
@@ -121,16 +130,22 @@ public class TenantsController : ControllerBase
 
         if (existingTenant)
         {
-            return Conflict(new ProblemDetails
-            {
-                Title = "Tenant already exists",
-                Detail = "A tenant with the same name or Entra tenant ID is already registered.",
-            });
+            return Conflict(
+                new ProblemDetails
+                {
+                    Title = "Tenant already exists",
+                    Detail =
+                        "A tenant with the same name or Entra tenant ID is already registered.",
+                }
+            );
         }
 
         var tenant = Tenant.Create(name, entraTenantId);
         await _dbContext.Tenants.AddAsync(tenant, ct);
-        await _dbContext.TenantSlaConfigurations.AddAsync(TenantSlaConfiguration.CreateDefault(tenant.Id), ct);
+        await _dbContext.TenantSlaConfigurations.AddAsync(
+            TenantSlaConfiguration.CreateDefault(tenant.Id),
+            ct
+        );
 
         foreach (var source in TenantSourceCatalog.CreateDefaults(tenant.Id))
         {
@@ -159,7 +174,12 @@ public class TenantsController : ControllerBase
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return ValidationProblem("Tenant name is required.");
-        if (request.Sla.CriticalDays <= 0 || request.Sla.HighDays <= 0 || request.Sla.MediumDays <= 0 || request.Sla.LowDays <= 0)
+        if (
+            request.Sla.CriticalDays <= 0
+            || request.Sla.HighDays <= 0
+            || request.Sla.MediumDays <= 0
+            || request.Sla.LowDays <= 0
+        )
             return ValidationProblem("SLA days must be positive integers.");
 
         tenant.UpdateName(request.Name.Trim());
@@ -179,12 +199,20 @@ public class TenantsController : ControllerBase
             request.Sla.LowDays
         );
         var existingSources = await _dbContext
-            .TenantSourceConfigurations
-            .Where(source => source.TenantId == tenant.Id)
+            .TenantSourceConfigurations.Where(source => source.TenantId == tenant.Id)
             .ToDictionaryAsync(source => source.SourceKey, StringComparer.OrdinalIgnoreCase, ct);
 
         // Collect pending secret writes — vault writes happen after DB commit
-        var pendingSecretWrites = new List<(string Path, string Key, string Value, Guid SourceId, bool HadSecret, string OldSecretRef, string SourceKey)>();
+        var pendingSecretWrites =
+            new List<(
+                string Path,
+                string Key,
+                string Value,
+                Guid SourceId,
+                bool HadSecret,
+                string OldSecretRef,
+                string SourceKey
+            )>();
 
         foreach (var source in request.IngestionSources)
         {
@@ -204,15 +232,17 @@ public class TenantsController : ControllerBase
                 secretRef = $"tenants/{tenant.Id}/sources/{source.Key}";
 
                 // Defer the actual vault write
-                pendingSecretWrites.Add((
-                    secretRef,
-                    TenantSourceCatalog.GetSecretKeyName(source.Key),
-                    secretValue,
-                    existingSource?.Id ?? Guid.Empty,
-                    hadSecret,
-                    oldSecretRef,
-                    source.Key
-                ));
+                pendingSecretWrites.Add(
+                    (
+                        secretRef,
+                        TenantSourceCatalog.GetSecretKeyName(source.Key),
+                        secretValue,
+                        existingSource?.Id ?? Guid.Empty,
+                        hadSecret,
+                        oldSecretRef,
+                        source.Key
+                    )
+                );
             }
 
             if (existingSource is null)
@@ -249,7 +279,17 @@ public class TenantsController : ControllerBase
         await _dbContext.SaveChangesAsync(ct);
 
         // Write secrets to vault after DB commit succeeds
-        foreach (var (path, key, value, sourceId, hadSecret, oldSecretRef, sourceKey) in pendingSecretWrites)
+        foreach (
+            var (
+                path,
+                key,
+                value,
+                sourceId,
+                hadSecret,
+                oldSecretRef,
+                sourceKey
+            ) in pendingSecretWrites
+        )
         {
             await _secretStore.PutSecretAsync(
                 path,
@@ -266,8 +306,20 @@ public class TenantsController : ControllerBase
                     "TenantSourceSecret",
                     auditEntityId,
                     hadSecret ? AuditAction.Updated : AuditAction.Created,
-                    hadSecret ? new { Key = sourceKey, HasSecret = true, SecretRef = oldSecretRef } : null,
-                    new { Key = sourceKey, HasSecret = true, SecretRef = path },
+                    hadSecret
+                        ? new
+                        {
+                            Key = sourceKey,
+                            HasSecret = true,
+                            SecretRef = oldSecretRef,
+                        }
+                        : null,
+                    new
+                    {
+                        Key = sourceKey,
+                        HasSecret = true,
+                        SecretRef = path,
+                    },
                     ct
                 );
             }
@@ -291,11 +343,10 @@ public class TenantsController : ControllerBase
         if (tenant is null)
             return NotFound();
 
-        var configuredSource = await _dbContext
-            .TenantSourceConfigurations
-            .FirstOrDefaultAsync(source =>
-                source.TenantId == tenant.Id
-                && source.SourceKey == normalizedSourceKey, ct);
+        var configuredSource = await _dbContext.TenantSourceConfigurations.FirstOrDefaultAsync(
+            source => source.TenantId == tenant.Id && source.SourceKey == normalizedSourceKey,
+            ct
+        );
 
         if (configuredSource is null)
         {
@@ -304,17 +355,26 @@ public class TenantsController : ControllerBase
 
         if (!TenantSourceCatalog.SupportsManualSync(configuredSource))
         {
-            return BadRequest(new ProblemDetails { Title = "This source does not support manual sync." });
+            return BadRequest(
+                new ProblemDetails { Title = "This source does not support manual sync." }
+            );
         }
 
         if (!configuredSource.Enabled)
         {
-            return BadRequest(new ProblemDetails { Title = "Enable the source before triggering a manual sync." });
+            return BadRequest(
+                new ProblemDetails { Title = "Enable the source before triggering a manual sync." }
+            );
         }
 
         if (!TenantSourceCatalog.HasConfiguredCredentials(configuredSource))
         {
-            return BadRequest(new ProblemDetails { Title = "Configure source credentials before triggering a manual sync." });
+            return BadRequest(
+                new ProblemDetails
+                {
+                    Title = "Configure source credentials before triggering a manual sync.",
+                }
+            );
         }
 
         configuredSource.QueueManualSync(DateTimeOffset.UtcNow);
@@ -362,8 +422,7 @@ public class TenantsController : ControllerBase
             tenantQuery = tenantQuery.IgnoreQueryFilters();
         }
 
-        var tenant = await tenantQuery
-            .SingleAsync(t => t.Id == tenantId, ct);
+        var tenant = await tenantQuery.SingleAsync(t => t.Id == tenantId, ct);
 
         var assetsQuery = _dbContext.Assets.AsNoTracking();
         if (ignoreQueryFilters)
@@ -381,7 +440,8 @@ public class TenantsController : ControllerBase
             assetCounts.Sum(item => item.Count),
             assetCounts.FirstOrDefault(item => item.AssetType == AssetType.Device)?.Count ?? 0,
             assetCounts.FirstOrDefault(item => item.AssetType == AssetType.Software)?.Count ?? 0,
-            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.CloudResource)?.Count ?? 0
+            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.CloudResource)?.Count
+                ?? 0
         );
         var slaQuery = _dbContext.TenantSlaConfigurations.AsNoTracking();
         if (ignoreQueryFilters)
@@ -389,8 +449,7 @@ public class TenantsController : ControllerBase
             slaQuery = slaQuery.IgnoreQueryFilters();
         }
 
-        var sla = await slaQuery
-            .FirstOrDefaultAsync(config => config.TenantId == tenantId, ct);
+        var sla = await slaQuery.FirstOrDefaultAsync(config => config.TenantId == tenantId, ct);
         var slaDto = new TenantSlaConfigurationDto(
             sla?.CriticalDays ?? 7,
             sla?.HighDays ?? 30,

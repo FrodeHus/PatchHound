@@ -42,7 +42,10 @@ public class TenantContextMiddlewareTests
 
         tenantContext.AccessibleTenantIds.Should().ContainSingle().Which.Should().Be(tenant.Id);
         tenantContext.CurrentTenantId.Should().Be(tenant.Id);
-        tenantContext.GetRolesForTenant(tenant.Id).Should().Contain(RoleName.SecurityManager.ToString());
+        tenantContext
+            .GetRolesForTenant(tenant.Id)
+            .Should()
+            .Contain(RoleName.SecurityManager.ToString());
     }
 
     [Fact]
@@ -76,7 +79,10 @@ public class TenantContextMiddlewareTests
 
         tenantContext.AccessibleTenantIds.Should().BeEquivalentTo([tenantA.Id, tenantB.Id]);
         tenantContext.CurrentTenantId.Should().Be(tenantB.Id);
-        tenantContext.GetRolesForTenant(tenantB.Id).Should().Contain(RoleName.AssetOwner.ToString());
+        tenantContext
+            .GetRolesForTenant(tenantB.Id)
+            .Should()
+            .Contain(RoleName.AssetOwner.ToString());
     }
 
     [Fact]
@@ -103,7 +109,10 @@ public class TenantContextMiddlewareTests
 
         tenantContext.AccessibleTenantIds.Should().ContainSingle().Which.Should().Be(tenant.Id);
         tenantContext.CurrentTenantId.Should().Be(tenant.Id);
-        tenantContext.GetRolesForTenant(tenant.Id).Should().Contain(RoleName.GlobalAdmin.ToString());
+        tenantContext
+            .GetRolesForTenant(tenant.Id)
+            .Should()
+            .Contain(RoleName.GlobalAdmin.ToString());
     }
 
     [Fact]

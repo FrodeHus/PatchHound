@@ -26,8 +26,9 @@ public class AuditLogControllerTests : IDisposable
         _tenantContext.CurrentTenantId.Returns(_tenantId);
         _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { _tenantId });
         _tenantContext.CurrentUserId.Returns(_userId);
-        _tenantContext.HasAccessToTenant(Arg.Any<Guid>()).Returns(callInfo =>
-            new List<Guid> { _tenantId }.Contains(callInfo.Arg<Guid>()));
+        _tenantContext
+            .HasAccessToTenant(Arg.Any<Guid>())
+            .Returns(callInfo => new List<Guid> { _tenantId }.Contains(callInfo.Arg<Guid>()));
 
         var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())

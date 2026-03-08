@@ -15,15 +15,14 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 table: "Assets",
                 type: "character varying(256)",
                 maxLength: 256,
-                nullable: true);
+                nullable: true
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "DeviceComputerDnsName",
-                table: "Assets");
+            migrationBuilder.DropColumn(name: "DeviceComputerDnsName", table: "Assets");
         }
     }
 }

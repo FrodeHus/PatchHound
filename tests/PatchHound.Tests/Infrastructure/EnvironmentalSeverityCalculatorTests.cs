@@ -22,7 +22,13 @@ public class EnvironmentalSeverityCalculatorTests
             9.8m,
             "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
         );
-        var asset = Asset.Create(Guid.NewGuid(), "device-1", AssetType.Device, "Device", Criticality.High);
+        var asset = Asset.Create(
+            Guid.NewGuid(),
+            "device-1",
+            AssetType.Device,
+            "Device",
+            Criticality.High
+        );
         var profile = AssetSecurityProfile.Create(
             asset.TenantId,
             "Isolated device",
@@ -54,7 +60,13 @@ public class EnvironmentalSeverityCalculatorTests
             5.5m,
             "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:L"
         );
-        var asset = Asset.Create(Guid.NewGuid(), "device-2", AssetType.Device, "Device", Criticality.High);
+        var asset = Asset.Create(
+            Guid.NewGuid(),
+            "device-2",
+            AssetType.Device,
+            "Device",
+            Criticality.High
+        );
         var profile = AssetSecurityProfile.Create(
             asset.TenantId,
             "High trust system",
@@ -69,6 +81,8 @@ public class EnvironmentalSeverityCalculatorTests
         var result = _calculator.Calculate(vulnerability, asset, profile);
 
         result.EffectiveScore.Should().BeGreaterThan(vulnerability.CvssScore!.Value);
-        result.EffectiveSeverity.Should().BeOneOf(Severity.Medium, Severity.High, Severity.Critical);
+        result
+            .EffectiveSeverity.Should()
+            .BeOneOf(Severity.Medium, Severity.High, Severity.Critical);
     }
 }

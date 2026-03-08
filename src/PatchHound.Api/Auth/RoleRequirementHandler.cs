@@ -18,7 +18,9 @@ public class RoleRequirementHandler : AuthorizationHandler<RoleRequirement>
         RoleRequirement requirement
     )
     {
-        var normalizedClaimRoles = EntraRoleNormalizer.Normalize(RoleClaimReader.ReadClaims(context.User));
+        var normalizedClaimRoles = EntraRoleNormalizer.Normalize(
+            RoleClaimReader.ReadClaims(context.User)
+        );
 
         if (normalizedClaimRoles.Any(role => requirement.AllowedRoles.Contains(role)))
         {
@@ -34,9 +36,12 @@ public class RoleRequirementHandler : AuthorizationHandler<RoleRequirement>
         if (_tenantContext.CurrentTenantId is Guid currentTenantId)
         {
             var tenantRoles = _tenantContext.GetRolesForTenant(currentTenantId);
-            if (tenantRoles.Any(role =>
-                Enum.TryParse<RoleName>(role, out var roleName)
-                && requirement.AllowedRoles.Contains(roleName)))
+            if (
+                tenantRoles.Any(role =>
+                    Enum.TryParse<RoleName>(role, out var roleName)
+                    && requirement.AllowedRoles.Contains(roleName)
+                )
+            )
             {
                 context.Succeed(requirement);
             }
@@ -47,9 +52,12 @@ public class RoleRequirementHandler : AuthorizationHandler<RoleRequirement>
             foreach (var tenantId in _tenantContext.AccessibleTenantIds)
             {
                 var tenantRoles = _tenantContext.GetRolesForTenant(tenantId);
-                if (tenantRoles.Any(role =>
-                    Enum.TryParse<RoleName>(role, out var roleName)
-                    && requirement.AllowedRoles.Contains(roleName)))
+                if (
+                    tenantRoles.Any(role =>
+                        Enum.TryParse<RoleName>(role, out var roleName)
+                        && requirement.AllowedRoles.Contains(roleName)
+                    )
+                )
                 {
                     context.Succeed(requirement);
                     break;

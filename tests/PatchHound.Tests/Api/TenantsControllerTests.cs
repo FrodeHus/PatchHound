@@ -46,10 +46,7 @@ public class TenantsControllerTests : IDisposable
     public async Task Create_CreatesTenantWithDefaultSlaAndDefenderSource()
     {
         var action = await _controller.Create(
-            new CreateTenantRequest(
-                "Contoso Production",
-                "11111111-1111-1111-1111-111111111111"
-            ),
+            new CreateTenantRequest("Contoso Production", "11111111-1111-1111-1111-111111111111"),
             CancellationToken.None
         );
 
@@ -62,10 +59,13 @@ public class TenantsControllerTests : IDisposable
         detail.Sla.HighDays.Should().Be(30);
         detail.Sla.MediumDays.Should().Be(90);
         detail.Sla.LowDays.Should().Be(180);
-        detail.IngestionSources.Should().ContainSingle(source =>
-            source.Key == "microsoft-defender"
-            && source.Enabled == false
-            && source.Credentials.ApiBaseUrl == "https://api.securitycenter.microsoft.com");
+        detail
+            .IngestionSources.Should()
+            .ContainSingle(source =>
+                source.Key == "microsoft-defender"
+                && source.Enabled == false
+                && source.Credentials.ApiBaseUrl == "https://api.securitycenter.microsoft.com"
+            );
     }
 
     [Fact]
@@ -92,7 +92,11 @@ public class TenantsControllerTests : IDisposable
         _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
         _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
 
-        var action = await _controller.TriggerSync(tenant.Id, source.SourceKey, CancellationToken.None);
+        var action = await _controller.TriggerSync(
+            tenant.Id,
+            source.SourceKey,
+            CancellationToken.None
+        );
 
         var badRequest = action.Should().BeOfType<BadRequestObjectResult>().Subject;
         var problem = badRequest.Value.Should().BeOfType<ProblemDetails>().Subject;
@@ -123,7 +127,11 @@ public class TenantsControllerTests : IDisposable
         _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
         _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
 
-        var action = await _controller.TriggerSync(tenant.Id, source.SourceKey, CancellationToken.None);
+        var action = await _controller.TriggerSync(
+            tenant.Id,
+            source.SourceKey,
+            CancellationToken.None
+        );
 
         var badRequest = action.Should().BeOfType<BadRequestObjectResult>().Subject;
         var problem = badRequest.Value.Should().BeOfType<ProblemDetails>().Subject;
@@ -154,11 +162,17 @@ public class TenantsControllerTests : IDisposable
         _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
         _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
 
-        var action = await _controller.TriggerSync(tenant.Id, source.SourceKey, CancellationToken.None);
+        var action = await _controller.TriggerSync(
+            tenant.Id,
+            source.SourceKey,
+            CancellationToken.None
+        );
 
         action.Should().BeOfType<AcceptedResult>();
 
-        var updatedSource = await _dbContext.TenantSourceConfigurations.SingleAsync(item => item.Id == source.Id);
+        var updatedSource = await _dbContext.TenantSourceConfigurations.SingleAsync(item =>
+            item.Id == source.Id
+        );
         updatedSource.ManualRequestedAt.Should().NotBeNull();
         updatedSource.LastStatus.Should().Be("Queued");
     }

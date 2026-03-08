@@ -9,15 +9,20 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
 {
     private readonly IServiceProvider _serviceProvider;
 
-    public PatchHoundDbContext(DbContextOptions<PatchHoundDbContext> options, IServiceProvider serviceProvider)
+    public PatchHoundDbContext(
+        DbContextOptions<PatchHoundDbContext> options,
+        IServiceProvider serviceProvider
+    )
         : base(options)
     {
         _serviceProvider = serviceProvider;
     }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
-    public DbSet<TenantSourceConfiguration> TenantSourceConfigurations => Set<TenantSourceConfiguration>();
-    public DbSet<EnrichmentSourceConfiguration> EnrichmentSourceConfigurations => Set<EnrichmentSourceConfiguration>();
+    public DbSet<TenantSourceConfiguration> TenantSourceConfigurations =>
+        Set<TenantSourceConfiguration>();
+    public DbSet<EnrichmentSourceConfiguration> EnrichmentSourceConfigurations =>
+        Set<EnrichmentSourceConfiguration>();
     public DbSet<TenantSlaConfiguration> TenantSlaConfigurations => Set<TenantSlaConfiguration>();
     public DbSet<User> Users => Set<User>();
     public DbSet<UserTenantRole> UserTenantRoles => Set<UserTenantRole>();
@@ -25,13 +30,16 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<AssetSecurityProfile> AssetSecurityProfiles => Set<AssetSecurityProfile>();
-    public DbSet<DeviceSoftwareInstallation> DeviceSoftwareInstallations => Set<DeviceSoftwareInstallation>();
+    public DbSet<DeviceSoftwareInstallation> DeviceSoftwareInstallations =>
+        Set<DeviceSoftwareInstallation>();
     public DbSet<DeviceSoftwareInstallationEpisode> DeviceSoftwareInstallationEpisodes =>
         Set<DeviceSoftwareInstallationEpisode>();
     public DbSet<Vulnerability> Vulnerabilities => Set<Vulnerability>();
     public DbSet<VulnerabilityAsset> VulnerabilityAssets => Set<VulnerabilityAsset>();
-    public DbSet<VulnerabilityAssetEpisode> VulnerabilityAssetEpisodes => Set<VulnerabilityAssetEpisode>();
-    public DbSet<VulnerabilityAssetAssessment> VulnerabilityAssetAssessments => Set<VulnerabilityAssetAssessment>();
+    public DbSet<VulnerabilityAssetEpisode> VulnerabilityAssetEpisodes =>
+        Set<VulnerabilityAssetEpisode>();
+    public DbSet<VulnerabilityAssetAssessment> VulnerabilityAssetAssessments =>
+        Set<VulnerabilityAssetAssessment>();
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
     public DbSet<RemediationTask> RemediationTasks => Set<RemediationTask>();
     public DbSet<Comment> Comments => Set<Comment>();
@@ -46,9 +54,12 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         return new EfTransaction(transaction);
     }
 
-    private sealed class EfTransaction(Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction inner) : IUnitOfWorkTransaction
+    private sealed class EfTransaction(
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction inner
+    ) : IUnitOfWorkTransaction
     {
         public Task CommitAsync(CancellationToken ct = default) => inner.CommitAsync(ct);
+
         public ValueTask DisposeAsync() => inner.DisposeAsync();
     }
 
@@ -70,7 +81,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
 
         // Global query filters for tenant isolation.
         // Referencing the instance property ensures EF Core re-evaluates per query.
-        modelBuilder.Entity<Asset>().HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<Asset>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<AssetSecurityProfile>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
@@ -90,7 +103,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
                 || (
                     AccessibleTenantIds.Contains(e.Vulnerability.TenantId)
                     && AccessibleTenantIds.Contains(e.Asset.TenantId)
-                ));
+                )
+            );
         modelBuilder
             .Entity<VulnerabilityAssetEpisode>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
@@ -111,7 +125,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e =>
                 IsSystemContext
                 || e.TenantId == Guid.Empty
-                || AccessibleTenantIds.Contains(e.TenantId));
+                || AccessibleTenantIds.Contains(e.TenantId)
+            );
         modelBuilder
             .Entity<Notification>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));

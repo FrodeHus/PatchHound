@@ -134,9 +134,10 @@ public class DashboardController : ControllerBase
             .Distinct()
             .ToList();
 
-        var recurrenceRatePercent = recurrenceRows.Count == 0
-            ? 0
-            : Math.Round((decimal)recurringPairs.Count / recurrenceRows.Count * 100m, 1);
+        var recurrenceRatePercent =
+            recurrenceRows.Count == 0
+                ? 0
+                : Math.Round((decimal)recurringPairs.Count / recurrenceRows.Count * 100m, 1);
 
         var topRecurringVulnerabilityCounts = recurringPairs
             .GroupBy(row => row.VulnerabilityId)
@@ -236,17 +237,19 @@ public class DashboardController : ControllerBase
                 _dbContext.Vulnerabilities.AsNoTracking(),
                 episode => episode.VulnerabilityId,
                 vulnerability => vulnerability.Id,
-                (episode, vulnerability) => new
-                {
-                    episode.VulnerabilityId,
-                    vulnerability.VendorSeverity,
-                    episode.FirstSeenAt,
-                    episode.ResolvedAt,
-                }
+                (episode, vulnerability) =>
+                    new
+                    {
+                        episode.VulnerabilityId,
+                        vulnerability.VendorSeverity,
+                        episode.FirstSeenAt,
+                        episode.ResolvedAt,
+                    }
             )
             .Where(row =>
                 DateOnly.FromDateTime(row.FirstSeenAt.UtcDateTime) <= today
-                && DateOnly.FromDateTime((row.ResolvedAt ?? DateTimeOffset.UtcNow).UtcDateTime) >= startDate
+                && DateOnly.FromDateTime((row.ResolvedAt ?? DateTimeOffset.UtcNow).UtcDateTime)
+                    >= startDate
             )
             .ToListAsync(ct);
 
@@ -255,7 +258,9 @@ public class DashboardController : ControllerBase
         foreach (var row in episodeRows)
         {
             var firstSeenDate = DateOnly.FromDateTime(row.FirstSeenAt.UtcDateTime);
-            var resolvedDate = DateOnly.FromDateTime((row.ResolvedAt ?? DateTimeOffset.UtcNow).UtcDateTime);
+            var resolvedDate = DateOnly.FromDateTime(
+                (row.ResolvedAt ?? DateTimeOffset.UtcNow).UtcDateTime
+            );
             var effectiveStart = firstSeenDate < startDate ? startDate : firstSeenDate;
             var effectiveEnd = resolvedDate > today ? today : resolvedDate;
 

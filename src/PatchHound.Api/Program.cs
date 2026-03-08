@@ -4,8 +4,8 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Logging;
 using Microsoft.Identity.Web;
+using Microsoft.IdentityModel.Logging;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Hubs;
 using PatchHound.Api.Middleware;
@@ -25,9 +25,7 @@ if (jwtLogPii)
 }
 
 // Authentication - Entra ID multi-tenant
-builder
-    .Services.AddAuthentication()
-    .AddMicrosoftIdentityWebApi(azureAdConfig);
+builder.Services.AddAuthentication().AddMicrosoftIdentityWebApi(azureAdConfig);
 
 builder.Services.Configure<JwtBearerOptions>(
     JwtBearerDefaults.AuthenticationScheme,
@@ -50,8 +48,8 @@ builder.Services.Configure<JwtBearerOptions>(
         {
             OnTokenValidated = async context =>
             {
-                var logger = context.HttpContext.RequestServices
-                    .GetRequiredService<ILoggerFactory>()
+                var logger = context
+                    .HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
                     .CreateLogger("AuthDiagnostics");
 
                 if (existingEvents?.OnTokenValidated is not null)
@@ -59,8 +57,8 @@ builder.Services.Configure<JwtBearerOptions>(
                     await existingEvents.OnTokenValidated(context);
                 }
 
-                var audiences = context.Principal?
-                    .Claims.Where(claim => claim.Type == "aud")
+                var audiences = context
+                    .Principal?.Claims.Where(claim => claim.Type == "aud")
                     .Select(claim => claim.Value)
                     .ToArray();
 
@@ -72,8 +70,8 @@ builder.Services.Configure<JwtBearerOptions>(
             },
             OnAuthenticationFailed = async context =>
             {
-                var logger = context.HttpContext.RequestServices
-                    .GetRequiredService<ILoggerFactory>()
+                var logger = context
+                    .HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
                     .CreateLogger("AuthDiagnostics");
 
                 if (existingEvents?.OnAuthenticationFailed is not null)
@@ -100,8 +98,8 @@ builder.Services.Configure<JwtBearerOptions>(
             },
             OnChallenge = async context =>
             {
-                var logger = context.HttpContext.RequestServices
-                    .GetRequiredService<ILoggerFactory>()
+                var logger = context
+                    .HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
                     .CreateLogger("AuthDiagnostics");
 
                 if (existingEvents?.OnChallenge is not null)
@@ -303,10 +301,8 @@ if (!string.IsNullOrWhiteSpace(frontendOrigin))
     builder.Services.AddCors(options =>
     {
         options.AddDefaultPolicy(policy =>
-            policy.WithOrigins(frontendOrigin)
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .AllowCredentials());
+            policy.WithOrigins(frontendOrigin).AllowAnyHeader().AllowAnyMethod().AllowCredentials()
+        );
     });
 }
 
@@ -340,17 +336,19 @@ app.UseMiddleware<ExceptionHandlerMiddleware>();
 app.UseHttpsRedirection();
 
 // Security headers
-app.Use(async (context, next) =>
-{
-    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
-    context.Response.Headers["X-Frame-Options"] = "DENY";
-    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-    await next();
-});
+app.Use(
+    async (context, next) =>
+    {
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers["X-Frame-Options"] = "DENY";
+        context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        await next();
+    }
+);
 
 if (!string.IsNullOrWhiteSpace(frontendOrigin))
 {
-app.UseCors();
+    app.UseCors();
 }
 
 app.UseAuthentication();
@@ -383,9 +381,7 @@ static TokenDiagnostics? TryReadBearerTokenClaims(string authorizationHeader)
 
     try
     {
-        var payload = segments[1]
-            .Replace('-', '+')
-            .Replace('_', '/');
+        var payload = segments[1].Replace('-', '+').Replace('_', '/');
 
         payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
         var json = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
