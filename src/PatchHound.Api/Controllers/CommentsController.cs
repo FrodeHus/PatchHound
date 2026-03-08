@@ -78,10 +78,11 @@ public class CommentsController : ControllerBase
         // Verify the referenced entity exists within the caller's tenant scope
         var entityExists = internalEntityType switch
         {
-            "Vulnerability" => await _dbContext.Vulnerabilities.AnyAsync(
-                v => v.Id == entityId, ct),
+            "Vulnerability" => await _dbContext.Vulnerabilities.AnyAsync(v => v.Id == entityId, ct),
             "RemediationTask" => await _dbContext.RemediationTasks.AnyAsync(
-                t => t.Id == entityId, ct),
+                t => t.Id == entityId,
+                ct
+            ),
             _ => false,
         };
 

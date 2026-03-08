@@ -9,7 +9,9 @@ namespace PatchHound.Infrastructure.Data;
 
 public class AuditSaveChangesInterceptor : SaveChangesInterceptor
 {
-    private static readonly HashSet<string> ExcludedProperties = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> ExcludedProperties = new(
+        StringComparer.OrdinalIgnoreCase
+    )
     {
         "SecretRef",
         "ClientSecret",
