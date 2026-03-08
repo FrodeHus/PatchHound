@@ -1,3 +1,4 @@
+using Cronos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PatchHound.Core.Interfaces;
@@ -40,71 +41,32 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
             cycleStartedAt
         );
 
-        using var scope = scopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
-        var ingestionService = scope.ServiceProvider.GetRequiredService<IngestionService>();
-        var secretStore = scope.ServiceProvider.GetRequiredService<ISecretStore>();
-
-        var openBaoStatus = await secretStore.GetStatusAsync(ct);
-        if (!openBaoStatus.IsAvailable || !openBaoStatus.IsInitialized || openBaoStatus.IsSealed)
-        {
-            logger.LogWarning(
-                "Skipping ingestion cycle because OpenBao is not ready. Available: {IsAvailable}. Initialized: {IsInitialized}. Sealed: {IsSealed}",
-                openBaoStatus.IsAvailable,
-                openBaoStatus.IsInitialized,
-                openBaoStatus.IsSealed
-            );
-            return;
-        }
-
-        var sources = await dbContext.TenantSourceConfigurations.AsNoTracking().ToListAsync(ct);
-        var tenants = await dbContext
-            .Tenants.AsNoTracking()
-            .ToDictionaryAsync(tenant => tenant.Id, ct);
+        var scheduledSources = await LoadScheduledSourcesAsync(ct);
         var now = DateTimeOffset.UtcNow;
         var runnableSources = 0;
         var dueSources = 0;
         var manualSources = 0;
         var startedRuns = 0;
 
-        foreach (var source in sources)
+        foreach (var source in scheduledSources)
         {
-            if (!tenants.TryGetValue(source.TenantId, out var tenant))
-            {
-                continue;
-            }
-
             if (HasBlockedManualSyncRequest(source))
             {
                 logger.LogWarning(
                     "Skipping queued manual ingestion for tenant {TenantId} ({TenantName}) and source {SourceKey} because the source is disabled or credentials are missing.",
-                    tenant.Id,
-                    tenant.Name,
+                    source.TenantId,
+                    source.TenantName,
                     source.SourceKey
                 );
 
-                await dbContext
-                    .TenantSourceConfigurations.IgnoreQueryFilters()
-                    .Where(item => item.Id == source.Id)
-                    .ExecuteUpdateAsync(
-                        setters =>
-                            setters
-                                .SetProperty(item => item.ManualRequestedAt, (DateTimeOffset?)null)
-                                .SetProperty(item => item.LastCompletedAt, DateTimeOffset.UtcNow)
-                                .SetProperty(item => item.LastStatus, "Failed")
-                                .SetProperty(
-                                    item => item.LastError,
-                                    "Manual sync skipped because the source is disabled or credentials are incomplete."
-                                ),
-                        ct
-                    );
+                await ClearBlockedManualSyncRequestAsync(source.Id, ct);
                 continue;
             }
 
             var isManualSync = IsManualSyncQueued(source);
-            var isDue = IngestionScheduleEvaluator.IsDue(source, now);
+            var isDue = IsDue(source, now);
 
-            if (source.Enabled && TenantSourceCatalog.HasConfiguredCredentials(source))
+            if (source.Enabled && HasConfiguredCredentials(source))
             {
                 runnableSources++;
             }
@@ -123,12 +85,12 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
             logger.LogInformation(
                 "Running {TriggerType} ingestion for tenant {TenantId} ({TenantName}) and source {SourceKey}",
                 isManualSync ? "manual" : "scheduled",
-                tenant.Id,
-                tenant.Name,
+                source.TenantId,
+                source.TenantName,
                 source.SourceKey
             );
 
-            if (await ingestionService.RunIngestionAsync(tenant.Id, source.SourceKey, ct))
+            if (await RunSourceIngestionAsync(source.TenantId, source.SourceKey, ct))
             {
                 startedRuns++;
             }
@@ -137,7 +99,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
         logger.LogInformation(
             "Completed ingestion polling cycle at {CycleCompletedAt}. Sources scanned: {SourceCount}. Runnable sources: {RunnableSources}. Due sources: {DueSources}. Manual syncs queued: {ManualSources}. Started runs: {StartedRuns}.",
             DateTimeOffset.UtcNow,
-            sources.Count,
+            scheduledSources.Count,
             runnableSources,
             dueSources,
             manualSources,
@@ -145,15 +107,85 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
         );
     }
 
-    private static bool IsManualSyncQueued(
-        PatchHound.Core.Entities.TenantSourceConfiguration source
+    private async Task<List<ScheduledSource>> LoadScheduledSourcesAsync(CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
+        var secretStore = scope.ServiceProvider.GetRequiredService<ISecretStore>();
+
+        var openBaoStatus = await secretStore.GetStatusAsync(ct);
+        if (!openBaoStatus.IsAvailable || !openBaoStatus.IsInitialized || openBaoStatus.IsSealed)
+        {
+            logger.LogWarning(
+                "Skipping ingestion cycle because OpenBao is not ready. Available: {IsAvailable}. Initialized: {IsInitialized}. Sealed: {IsSealed}",
+                openBaoStatus.IsAvailable,
+                openBaoStatus.IsInitialized,
+                openBaoStatus.IsSealed
+            );
+            return [];
+        }
+
+        var tenantNames = await dbContext
+            .Tenants.AsNoTracking()
+            .ToDictionaryAsync(tenant => tenant.Id, tenant => tenant.Name, ct);
+        var sources = await dbContext.TenantSourceConfigurations.AsNoTracking().ToListAsync(ct);
+
+        return sources
+            .Where(source => tenantNames.ContainsKey(source.TenantId))
+            .Select(source => new ScheduledSource(
+                source.Id,
+                source.TenantId,
+                tenantNames[source.TenantId],
+                source.SourceKey,
+                source.Enabled,
+                source.CredentialTenantId,
+                source.ClientId,
+                source.SecretRef,
+                source.ApiBaseUrl,
+                source.TokenScope,
+                source.SyncSchedule,
+                source.ManualRequestedAt,
+                source.LastStartedAt
+            ))
+            .ToList();
+    }
+
+    private async Task ClearBlockedManualSyncRequestAsync(Guid sourceId, CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
+
+        await dbContext
+            .TenantSourceConfigurations.IgnoreQueryFilters()
+            .Where(item => item.Id == sourceId)
+            .ExecuteUpdateAsync(
+                setters =>
+                    setters
+                        .SetProperty(item => item.ManualRequestedAt, (DateTimeOffset?)null)
+                        .SetProperty(item => item.LastCompletedAt, DateTimeOffset.UtcNow)
+                        .SetProperty(item => item.LastStatus, "Failed")
+                        .SetProperty(
+                            item => item.LastError,
+                            "Manual sync skipped because the source is disabled or credentials are incomplete."
+                        ),
+                ct
+            );
+    }
+
+    private async Task<bool> RunSourceIngestionAsync(
+        Guid tenantId,
+        string sourceKey,
+        CancellationToken ct
     )
     {
-        if (
-            !source.Enabled
-            || !TenantSourceCatalog.SupportsManualSync(source)
-            || !TenantSourceCatalog.HasConfiguredCredentials(source)
-        )
+        using var scope = scopeFactory.CreateScope();
+        var ingestionService = scope.ServiceProvider.GetRequiredService<IngestionService>();
+        return await ingestionService.RunIngestionAsync(tenantId, sourceKey, ct);
+    }
+
+    private static bool IsManualSyncQueued(ScheduledSource source)
+    {
+        if (!source.Enabled || !SupportsManualSync(source) || !HasConfiguredCredentials(source))
         {
             return false;
         }
@@ -168,15 +200,75 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
         return !lastStartedAt.HasValue || manualRequestedAt > lastStartedAt;
     }
 
-    private static bool HasBlockedManualSyncRequest(
-        PatchHound.Core.Entities.TenantSourceConfiguration source
-    )
+    private static bool HasBlockedManualSyncRequest(ScheduledSource source)
     {
         return source.ManualRequestedAt.HasValue
             && (
-                !source.Enabled
-                || !TenantSourceCatalog.SupportsManualSync(source)
-                || !TenantSourceCatalog.HasConfiguredCredentials(source)
+                !source.Enabled || !SupportsManualSync(source) || !HasConfiguredCredentials(source)
             );
     }
+
+    private static bool HasConfiguredCredentials(ScheduledSource source)
+    {
+        return !string.IsNullOrWhiteSpace(source.CredentialTenantId)
+            && !string.IsNullOrWhiteSpace(source.ClientId)
+            && !string.IsNullOrWhiteSpace(source.SecretRef);
+    }
+
+    private static bool SupportsManualSync(ScheduledSource source)
+    {
+        return string.Equals(
+            source.SourceKey,
+            TenantSourceCatalog.DefenderSourceKey,
+            StringComparison.OrdinalIgnoreCase
+        );
+    }
+
+    private static bool IsDue(ScheduledSource source, DateTimeOffset nowUtc)
+    {
+        if (!source.Enabled || !SupportsManualSync(source) || !HasConfiguredCredentials(source))
+        {
+            return false;
+        }
+
+        CronExpression expression;
+        try
+        {
+            expression = CronExpression.Parse(source.SyncSchedule, CronFormat.Standard);
+        }
+        catch (CronFormatException)
+        {
+            return false;
+        }
+
+        var lastStartedAt = source.LastStartedAt?.ToUniversalTime();
+        if (!lastStartedAt.HasValue)
+        {
+            var firstOccurrence = expression.GetNextOccurrence(
+                nowUtc.UtcDateTime.AddYears(-1),
+                true
+            );
+            return firstOccurrence.HasValue && firstOccurrence.Value <= nowUtc.UtcDateTime;
+        }
+
+        var nextOccurrence = expression.GetNextOccurrence(lastStartedAt.Value.UtcDateTime, false);
+
+        return nextOccurrence.HasValue && nextOccurrence.Value <= nowUtc.UtcDateTime;
+    }
+
+    private sealed record ScheduledSource(
+        Guid Id,
+        Guid TenantId,
+        string TenantName,
+        string SourceKey,
+        bool Enabled,
+        string CredentialTenantId,
+        string ClientId,
+        string SecretRef,
+        string ApiBaseUrl,
+        string TokenScope,
+        string SyncSchedule,
+        DateTimeOffset? ManualRequestedAt,
+        DateTimeOffset? LastStartedAt
+    );
 }

@@ -240,6 +240,59 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ExistingVulnerability_PreservesCatalogFieldsWhenIncomingValuesAreEmpty()
+    {
+        var existing = Vulnerability.Create(
+            _tenantId,
+            "CVE-2026-PRESERVE-1",
+            "Catalog Title",
+            "Catalog Description",
+            Severity.High,
+            "MicrosoftDefender",
+            9.4m,
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            DateTimeOffset.UtcNow.AddDays(-10),
+            "Contoso",
+            "Contoso Agent",
+            "2.0"
+        );
+        await _dbContext.Vulnerabilities.AddAsync(existing);
+        await _dbContext.SaveChangesAsync();
+
+        var results = new List<IngestionResult>
+        {
+            new(
+                "CVE-2026-PRESERVE-1",
+                "Catalog Title",
+                "Catalog Description",
+                Severity.High,
+                null,
+                null,
+                null,
+                []
+            ),
+        };
+
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "MicrosoftDefender",
+            results,
+            CancellationToken.None
+        );
+
+        var updated = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
+            .SingleAsync(v => v.ExternalId == "CVE-2026-PRESERVE-1");
+
+        updated.CvssScore.Should().Be(9.4m);
+        updated.CvssVector.Should().Be("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
+        updated.PublishedDate.Should().Be(existing.PublishedDate);
+        updated.ProductVendor.Should().Be("Contoso");
+        updated.ProductName.Should().Be("Contoso Agent");
+        updated.ProductVersion.Should().Be("2.0");
+    }
+
+    [Fact]
     public async Task ProcessResultsAsync_DeduplicatesDuplicateVulnerabilityRowsBeforePersistence()
     {
         var results = new List<IngestionResult>
