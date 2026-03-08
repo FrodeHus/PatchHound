@@ -226,6 +226,136 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessResultsAsync_DeduplicatesDuplicateVulnerabilityRowsBeforePersistence()
+    {
+        var results = new List<IngestionResult>
+        {
+            new(
+                "CVE-2026-DUPE-1",
+                "Duplicate Vuln",
+                "Description",
+                Severity.High,
+                8.5m,
+                null,
+                null,
+                [new IngestionAffectedAsset("ASSET-D1", "Server01", AssetType.Device)],
+                References: [new IngestionReference("https://ref-1", "nvd", ["advisory"])],
+                Sources: ["MicrosoftDefender"]
+            ),
+            new(
+                "CVE-2026-DUPE-1",
+                "Duplicate Vuln",
+                "Description",
+                Severity.High,
+                8.5m,
+                null,
+                null,
+                [new IngestionAffectedAsset("ASSET-D2", "Server02", AssetType.Device)],
+                References: [new IngestionReference("https://ref-1", "nvd", ["advisory"])],
+                Sources: ["NVD"]
+            ),
+        };
+
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "TestSource",
+            results,
+            CancellationToken.None
+        );
+
+        var vulnerabilities = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
+            .Where(v => v.ExternalId == "CVE-2026-DUPE-1")
+            .Include(v => v.References)
+            .Include(v => v.AffectedAssets)
+            .ToListAsync();
+
+        vulnerabilities.Should().ContainSingle();
+        vulnerabilities[0].AffectedAssets.Should().HaveCount(2);
+        vulnerabilities[0].References.Should().ContainSingle();
+        vulnerabilities[0]
+            .GetSources()
+            .Should()
+            .Contain(["MicrosoftDefender", "NVD", "TestSource"]);
+    }
+
+    [Fact]
+    public async Task RunIngestionAsync_WithConfiguredSource_CreatesCompletedIngestionRunAndClearsLease()
+    {
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(
+            TenantSourceConfiguration.Create(
+                _tenantId,
+                "test-source",
+                "Test Source",
+                true,
+                "0 * * * *"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        _source
+            .FetchVulnerabilitiesAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(
+                [
+                    new IngestionResult(
+                        "CVE-2026-0001",
+                        "Test Vuln",
+                        "Description",
+                        Severity.High,
+                        8.0m,
+                        null,
+                        null,
+                        []
+                    ),
+                ]
+            );
+
+        var started = await _service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        started.Should().BeTrue();
+
+        var run = await _dbContext.IngestionRuns.IgnoreQueryFilters().SingleAsync();
+        run.Status.Should().Be("Succeeded");
+        run.CompletedAt.Should().NotBeNull();
+        run.FetchedVulnerabilityCount.Should().Be(1);
+
+        var source = await _dbContext.TenantSourceConfigurations.IgnoreQueryFilters().SingleAsync();
+        source.ActiveIngestionRunId.Should().BeNull();
+        source.LeaseAcquiredAt.Should().BeNull();
+        source.LeaseExpiresAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task RunIngestionAsync_WhenLeaseAlreadyActive_SkipsRun()
+    {
+        var source = TenantSourceConfiguration.Create(
+            _tenantId,
+            "test-source",
+            "Test Source",
+            true,
+            "0 * * * *"
+        );
+        source.AcquireLease(
+            Guid.NewGuid(),
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddMinutes(5)
+        );
+
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(source);
+        await _dbContext.SaveChangesAsync();
+
+        var started = await _service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        started.Should().BeFalse();
+        await _source
+            .DidNotReceive()
+            .FetchVulnerabilitiesAsync(_tenantId, Arg.Any<CancellationToken>());
+        (await _dbContext.IngestionRuns.IgnoreQueryFilters().CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task ProcessResults_WithSecurityProfile_CreatesAssessment()
     {
         var profile = AssetSecurityProfile.Create(
@@ -496,6 +626,39 @@ public class IngestionServiceTests : IDisposable
         episode.Should().NotBeNull();
         episode!.EpisodeNumber.Should().Be(1);
         episode.RemovedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ProcessAssetsAsync_DeduplicatesDuplicateAssetsAndSoftwareLinks()
+    {
+        var observedAt = DateTimeOffset.UtcNow;
+        var snapshot = new IngestionAssetInventorySnapshot(
+            [
+                new IngestionAsset("device-1", "Server01", AssetType.Device),
+                new IngestionAsset("device-1", "Server01 updated", AssetType.Device),
+                new IngestionAsset("software-1", "Contoso Agent 1.0", AssetType.Software),
+            ],
+            [
+                new IngestionDeviceSoftwareLink(
+                    "device-1",
+                    "software-1",
+                    observedAt.AddMinutes(-2)
+                ),
+                new IngestionDeviceSoftwareLink("device-1", "software-1", observedAt),
+            ]
+        );
+
+        await _service.ProcessAssetsAsync(_tenantId, snapshot, CancellationToken.None);
+
+        var assets = await _dbContext.Assets.IgnoreQueryFilters().ToListAsync();
+        assets.Should().HaveCount(2);
+        assets.Single(asset => asset.ExternalId == "device-1").Name.Should().Be("Server01 updated");
+
+        var installations = await _dbContext
+            .DeviceSoftwareInstallations.IgnoreQueryFilters()
+            .ToListAsync();
+        installations.Should().ContainSingle();
+        installations[0].LastSeenAt.Should().Be(observedAt);
     }
 
     [Fact]

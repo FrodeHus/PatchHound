@@ -429,6 +429,52 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("EnrichmentSourceConfigurations");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.IngestionRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Error")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<int>("FetchedAssetCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("FetchedSoftwareInstallationCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("FetchedVulnerabilityCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "SourceKey", "StartedAt");
+
+                    b.ToTable("IngestionRuns");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -786,6 +832,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("PatchHound.Core.Entities.TenantSourceConfiguration", b =>
                 {
+                    b.Property<Guid?>("ActiveIngestionRunId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
@@ -820,6 +869,12 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
+
+                    b.Property<DateTimeOffset?>("LeaseAcquiredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("LastStartedAt")
                         .HasColumnType("timestamp with time zone");
