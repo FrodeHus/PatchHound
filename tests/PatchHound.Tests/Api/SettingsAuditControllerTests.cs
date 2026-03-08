@@ -92,7 +92,6 @@ public class SettingsAuditControllerTests : IDisposable
                         true,
                         "0 */12 * * *",
                         new UpdateTenantSourceCredentialsRequest(
-                            "tenant",
                             "client",
                             "new-secret",
                             "https://api.security.microsoft.com",
