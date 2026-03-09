@@ -8,6 +8,9 @@ public class EnrichmentSourceConfiguration
     public bool Enabled { get; private set; }
     public string SecretRef { get; private set; } = string.Empty;
     public string ApiBaseUrl { get; private set; } = string.Empty;
+    public Guid? ActiveEnrichmentRunId { get; private set; }
+    public DateTimeOffset? LeaseAcquiredAt { get; private set; }
+    public DateTimeOffset? LeaseExpiresAt { get; private set; }
     public DateTimeOffset? LastStartedAt { get; private set; }
     public DateTimeOffset? LastCompletedAt { get; private set; }
     public DateTimeOffset? LastSucceededAt { get; private set; }
@@ -61,5 +64,19 @@ public class EnrichmentSourceConfiguration
         LastSucceededAt = lastSucceededAt;
         LastStatus = lastStatus;
         LastError = lastError;
+    }
+
+    public void AcquireLease(Guid runId, DateTimeOffset acquiredAt, DateTimeOffset expiresAt)
+    {
+        ActiveEnrichmentRunId = runId;
+        LeaseAcquiredAt = acquiredAt;
+        LeaseExpiresAt = expiresAt;
+    }
+
+    public void ReleaseLease()
+    {
+        ActiveEnrichmentRunId = null;
+        LeaseAcquiredAt = null;
+        LeaseExpiresAt = null;
     }
 }

@@ -75,6 +75,17 @@ export const vulnerabilityDetailSchema = z.object({
     versionEndIncluding: z.string().nullable(),
     versionEndExcluding: z.string().nullable(),
   })),
+  matchedSoftware: z.array(z.object({
+    softwareAssetId: z.string().uuid(),
+    name: z.string(),
+    externalId: z.string(),
+    matchMethod: z.string(),
+    confidence: z.string(),
+    evidence: z.string(),
+    firstSeenAt: isoDateTimeSchema,
+    lastSeenAt: isoDateTimeSchema,
+    resolvedAt: isoDateTimeSchema.nullable(),
+  })),
   references: z.array(z.object({
     url: z.string().url(),
     source: z.string(),

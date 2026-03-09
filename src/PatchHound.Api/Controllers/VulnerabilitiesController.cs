@@ -284,6 +284,29 @@ public class VulnerabilitiesController : ControllerBase
             )
             .ToListAsync(ct);
 
+        var matchedSoftware = await _dbContext
+            .SoftwareVulnerabilityMatches.AsNoTracking()
+            .Where(match => match.VulnerabilityId == id && match.ResolvedAt == null)
+            .Join(
+                _dbContext.Assets.AsNoTracking(),
+                match => match.SoftwareAssetId,
+                software => software.Id,
+                (match, software) =>
+                    new MatchedSoftwareDto(
+                        software.Id,
+                        software.Name,
+                        software.ExternalId,
+                        match.MatchMethod.ToString(),
+                        match.Confidence.ToString(),
+                        match.Evidence,
+                        match.FirstSeenAt,
+                        match.LastSeenAt,
+                        match.ResolvedAt
+                    )
+            )
+            .OrderBy(item => item.Name)
+            .ToListAsync(ct);
+
         var tenantHistory = BuildTenantHistory(episodeRows);
 
         var detail = new VulnerabilityDetailDto(
@@ -309,6 +332,7 @@ public class VulnerabilitiesController : ControllerBase
                     item.VersionEndExcluding
                 ))
                 .ToList(),
+            matchedSoftware,
             vulnerability
                 .References.OrderBy(reference => reference.Source)
                 .ThenBy(reference => reference.Url)

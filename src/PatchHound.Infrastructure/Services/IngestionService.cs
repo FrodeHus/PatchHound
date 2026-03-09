@@ -22,8 +22,9 @@ public class IngestionService
     );
     private readonly PatchHoundDbContext _dbContext;
     private readonly IEnumerable<IVulnerabilitySource> _sources;
-    private readonly IEnumerable<IVulnerabilityEnricher> _enrichers;
+    private readonly EnrichmentJobEnqueuer _enrichmentJobEnqueuer;
     private readonly VulnerabilityAssessmentService _assessmentService;
+    private readonly SoftwareVulnerabilityMatchService _softwareVulnerabilityMatchService;
     private readonly RemediationTaskProjectionService _remediationTaskProjectionService;
     private readonly StagedVulnerabilityMergeService _stagedVulnerabilityMergeService;
     private readonly StagedAssetMergeService _stagedAssetMergeService;
@@ -32,8 +33,9 @@ public class IngestionService
     public IngestionService(
         PatchHoundDbContext dbContext,
         IEnumerable<IVulnerabilitySource> sources,
-        IEnumerable<IVulnerabilityEnricher> enrichers,
+        EnrichmentJobEnqueuer enrichmentJobEnqueuer,
         VulnerabilityAssessmentService assessmentService,
+        SoftwareVulnerabilityMatchService softwareVulnerabilityMatchService,
         RemediationTaskProjectionService remediationTaskProjectionService,
         StagedVulnerabilityMergeService stagedVulnerabilityMergeService,
         StagedAssetMergeService stagedAssetMergeService,
@@ -42,8 +44,9 @@ public class IngestionService
     {
         _dbContext = dbContext;
         _sources = sources;
-        _enrichers = enrichers;
+        _enrichmentJobEnqueuer = enrichmentJobEnqueuer;
         _assessmentService = assessmentService;
+        _softwareVulnerabilityMatchService = softwareVulnerabilityMatchService;
         _remediationTaskProjectionService = remediationTaskProjectionService;
         _stagedVulnerabilityMergeService = stagedVulnerabilityMergeService;
         _stagedAssetMergeService = stagedAssetMergeService;
@@ -164,8 +167,7 @@ public class IngestionService
 
                         var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
                         fetchedVulnerabilityCount = results.Count;
-                        var enrichedResults = await EnrichResultsAsync(tenantId, results, ct);
-                        var normalizedResults = NormalizeResults(enrichedResults);
+                        var normalizedResults = NormalizeResults(results);
                         await StageVulnerabilitiesAsync(
                             run.Id,
                             tenantId,
@@ -186,6 +188,20 @@ public class IngestionService
                             tenantId,
                             ct
                         );
+                        await EnqueueEnrichmentJobsForRunAsync(run.Id, tenantId, ct);
+                        await ExecuteWithConcurrencyRetryAsync(
+                            async () =>
+                            {
+                                await _softwareVulnerabilityMatchService.SyncForTenantAsync(
+                                    tenantId,
+                                    ct
+                                );
+                                return true;
+                            },
+                            source.SourceName,
+                            tenantId,
+                            ct
+                        );
                         _logger.LogInformation(
                             "Vulnerability merge for {Source} tenant {TenantId}: stagedVulnerabilities={StagedVulnerabilityCount} stagedExposures={StagedExposureCount} mergedExposures={MergedExposureCount} openedProjections={OpenedProjectionCount} resolvedProjections={ResolvedProjectionCount}",
                             source.SourceName,
@@ -201,7 +217,7 @@ public class IngestionService
                             "Completed ingestion from {Source} for tenant {TenantId}: {Count} vulnerabilities",
                             source.SourceName,
                             tenantId,
-                            enrichedResults.Count
+                            results.Count
                         );
 
                         await UpdateRuntimeStateAsync(
@@ -749,66 +765,6 @@ public class IngestionService
             .ExecuteDeleteAsync(ct);
     }
 
-    private async Task<IReadOnlyList<IngestionResult>> EnrichResultsAsync(
-        Guid tenantId,
-        IReadOnlyList<IngestionResult> results,
-        CancellationToken ct
-    )
-    {
-        var current = results;
-        foreach (var enricher in _enrichers)
-        {
-            await UpdateEnrichmentRuntimeStateAsync(
-                enricher.SourceKey,
-                runtime =>
-                {
-                    runtime.LastStartedAt = DateTimeOffset.UtcNow;
-                    runtime.LastStatus = "Running";
-                    runtime.LastError = string.Empty;
-                },
-                ct
-            );
-
-            try
-            {
-                current = await enricher.EnrichAsync(tenantId, current, ct);
-                await UpdateEnrichmentRuntimeStateAsync(
-                    enricher.SourceKey,
-                    runtime =>
-                    {
-                        var now = DateTimeOffset.UtcNow;
-                        runtime.LastCompletedAt = now;
-                        runtime.LastSucceededAt = now;
-                        runtime.LastStatus = "Succeeded";
-                        runtime.LastError = string.Empty;
-                    },
-                    ct
-                );
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Error during enrichment from {Source} for tenant {TenantId}",
-                    enricher.SourceKey,
-                    tenantId
-                );
-                await UpdateEnrichmentRuntimeStateAsync(
-                    enricher.SourceKey,
-                    runtime =>
-                    {
-                        runtime.LastCompletedAt = DateTimeOffset.UtcNow;
-                        runtime.LastStatus = "Failed";
-                        runtime.LastError = $"Enrichment failed: {ex.GetType().Name}";
-                    },
-                    ct
-                );
-            }
-        }
-
-        return current;
-    }
-
     private async Task StageVulnerabilitiesAsync(
         Guid ingestionRunId,
         Guid tenantId,
@@ -912,44 +868,31 @@ public class IngestionService
         _dbContext.ChangeTracker.Clear();
     }
 
-    private async Task UpdateEnrichmentRuntimeStateAsync(
-        string sourceKey,
-        Action<GlobalEnrichmentRuntimeState> update,
+    private async Task EnqueueEnrichmentJobsForRunAsync(
+        Guid ingestionRunId,
+        Guid tenantId,
         CancellationToken ct
     )
     {
-        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var source = await _dbContext
-            .EnrichmentSourceConfigurations.IgnoreQueryFilters()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.SourceKey == normalizedSourceKey, ct);
+        var externalIds = await _dbContext
+            .StagedVulnerabilities.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == ingestionRunId)
+            .Select(item => item.ExternalId)
+            .Distinct()
+            .ToListAsync(ct);
 
-        if (source is null)
+        if (externalIds.Count == 0)
         {
             return;
         }
 
-        var runtime = new GlobalEnrichmentRuntimeState(
-            source.LastStartedAt,
-            source.LastCompletedAt,
-            source.LastSucceededAt,
-            source.LastStatus,
-            source.LastError
-        );
-        update(runtime);
-        await _dbContext
-            .EnrichmentSourceConfigurations.IgnoreQueryFilters()
-            .Where(item => item.SourceKey == normalizedSourceKey)
-            .ExecuteUpdateAsync(
-                setters =>
-                    setters
-                        .SetProperty(item => item.LastStartedAt, runtime.LastStartedAt)
-                        .SetProperty(item => item.LastCompletedAt, runtime.LastCompletedAt)
-                        .SetProperty(item => item.LastSucceededAt, runtime.LastSucceededAt)
-                        .SetProperty(item => item.LastStatus, runtime.LastStatus)
-                        .SetProperty(item => item.LastError, runtime.LastError),
-                ct
-            );
+        var vulnerabilityIds = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
+            .Where(item => item.TenantId == tenantId && externalIds.Contains(item.ExternalId))
+            .Select(item => item.Id)
+            .ToListAsync(ct);
+
+        await _enrichmentJobEnqueuer.EnqueueVulnerabilityJobsAsync(tenantId, vulnerabilityIds, ct);
     }
 
     internal async Task ProcessResultsAsync(

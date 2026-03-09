@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
+using PatchHound.Api.Models;
 using PatchHound.Api.Models.System;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
@@ -78,7 +79,101 @@ public class SystemController : ControllerBase
             .OrderBy(source => source.DisplayName)
             .ToListAsync(ct);
 
-        return Ok(sources.Select(MapEnrichmentSourceDto).ToList());
+        var sourceKeys = sources.Select(source => source.SourceKey).ToList();
+        var queueRows = await _dbContext
+            .EnrichmentJobs.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(job => sourceKeys.Contains(job.SourceKey))
+            .Select(job => new
+            {
+                job.SourceKey,
+                job.Status,
+                job.NextAttemptAt,
+            })
+            .ToListAsync(ct);
+        var queueBySourceKey = queueRows
+            .GroupBy(row => row.SourceKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                {
+                    var pendingRows = group
+                        .Where(row =>
+                            row.Status == EnrichmentJobStatus.Pending
+                            || row.Status == EnrichmentJobStatus.RetryScheduled
+                        )
+                        .ToList();
+                    return new EnrichmentSourceQueueDto(
+                        group.Count(row => row.Status == EnrichmentJobStatus.Pending),
+                        group.Count(row => row.Status == EnrichmentJobStatus.RetryScheduled),
+                        group.Count(row => row.Status == EnrichmentJobStatus.Running),
+                        group.Count(row => row.Status == EnrichmentJobStatus.Failed),
+                        pendingRows.Count == 0 ? null : pendingRows.Min(row => row.NextAttemptAt)
+                    );
+                },
+                StringComparer.OrdinalIgnoreCase
+            );
+
+        var recentRuns = await _dbContext
+            .EnrichmentRuns.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(run => sourceKeys.Contains(run.SourceKey))
+            .OrderByDescending(run => run.StartedAt)
+            .ToListAsync(ct);
+        var recentRunsBySourceKey = recentRuns
+            .GroupBy(run => run.SourceKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Take(5).Select(MapRunDto).ToList().AsReadOnly(),
+                StringComparer.OrdinalIgnoreCase
+            );
+
+        return Ok(
+            sources
+                .Select(source =>
+                    MapEnrichmentSourceDto(
+                        source,
+                        queueBySourceKey.GetValueOrDefault(
+                            source.SourceKey,
+                            new EnrichmentSourceQueueDto(0, 0, 0, 0, null)
+                        ),
+                        recentRunsBySourceKey.GetValueOrDefault(source.SourceKey, [])
+                    )
+                )
+                .ToList()
+        );
+    }
+
+    [HttpGet("enrichment-sources/{sourceKey}/runs")]
+    [Authorize(Policy = Policies.ManageUsers)]
+    public async Task<ActionResult<PagedResponse<EnrichmentRunDto>>> GetEnrichmentRuns(
+        string sourceKey,
+        [FromQuery] PaginationQuery pagination,
+        CancellationToken ct
+    )
+    {
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        var query = _dbContext
+            .EnrichmentRuns.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(run => run.SourceKey == normalizedSourceKey);
+
+        var totalCount = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(run => run.StartedAt)
+            .Skip(pagination.Skip)
+            .Take(pagination.BoundedPageSize)
+            .Select(run => MapRunDto(run))
+            .ToListAsync(ct);
+
+        return Ok(
+            new PagedResponse<EnrichmentRunDto>(
+                items,
+                totalCount,
+                pagination.Page,
+                pagination.BoundedPageSize
+            )
+        );
     }
 
     [HttpPut("enrichment-sources")]
@@ -192,7 +287,11 @@ public class SystemController : ControllerBase
         return NoContent();
     }
 
-    private static EnrichmentSourceDto MapEnrichmentSourceDto(EnrichmentSourceConfiguration source)
+    private static EnrichmentSourceDto MapEnrichmentSourceDto(
+        EnrichmentSourceConfiguration source,
+        EnrichmentSourceQueueDto queue,
+        IReadOnlyList<EnrichmentRunDto> recentRuns
+    )
     {
         return new EnrichmentSourceDto(
             source.SourceKey,
@@ -208,7 +307,25 @@ public class SystemController : ControllerBase
                 source.LastSucceededAt,
                 source.LastStatus,
                 source.LastError
-            )
+            ),
+            queue,
+            recentRuns
+        );
+    }
+
+    private static EnrichmentRunDto MapRunDto(EnrichmentRun run)
+    {
+        return new EnrichmentRunDto(
+            run.Id,
+            run.StartedAt,
+            run.CompletedAt,
+            run.Status.ToString(),
+            run.JobsClaimed,
+            run.JobsSucceeded,
+            run.JobsNoData,
+            run.JobsFailed,
+            run.JobsRetried,
+            run.LastError
         );
     }
 }

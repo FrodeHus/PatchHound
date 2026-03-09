@@ -79,13 +79,15 @@ public static class DependencyInjection
         services.AddScoped<TeamService>();
         services.AddScoped<SlaService>();
         services.AddScoped<RemediationTaskProjectionService>();
+        services.AddScoped<SoftwareVulnerabilityMatchService>();
+        services.AddScoped<EnrichmentJobEnqueuer>();
         services.AddScoped<StagedVulnerabilityMergeService>();
         services.AddScoped<StagedAssetMergeService>();
+        services.AddScoped<IEnrichmentSourceRunner, NvdVulnerabilityEnrichmentRunner>();
         services.AddScoped<AiReportService>();
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<EnvironmentalSeverityCalculator>();
         services.AddScoped<VulnerabilityAssessmentService>();
-        services.AddScoped<IVulnerabilityEnricher, NvdVulnerabilityEnricher>();
         services.AddScoped<AuditLogWriter>();
 
         // Notifications & Email

@@ -104,6 +104,20 @@ export const assetDetailSchema = z.object({
       removedAt: z.string().nullable(),
     })),
   })),
+  knownSoftwareVulnerabilities: z.array(z.object({
+    vulnerabilityId: z.string().uuid(),
+    externalId: z.string(),
+    title: z.string(),
+    vendorSeverity: z.string(),
+    cvssScore: z.number().nullable(),
+    cvssVector: z.string().nullable(),
+    matchMethod: z.string(),
+    confidence: z.string(),
+    evidence: z.string(),
+    firstSeenAt: z.string(),
+    lastSeenAt: z.string(),
+    resolvedAt: z.string().nullable(),
+  })),
 })
 
 export const pagedAssetsSchema = pagedResponseMetaSchema.extend({

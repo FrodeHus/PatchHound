@@ -37,7 +37,8 @@ public record AssetDetailDto(
     SoftwareCpeBindingDto? SoftwareCpeBinding,
     string Metadata,
     IReadOnlyList<AssetVulnerabilityDto> Vulnerabilities,
-    IReadOnlyList<AssetSoftwareInstallationDto> SoftwareInventory
+    IReadOnlyList<AssetSoftwareInstallationDto> SoftwareInventory,
+    IReadOnlyList<AssetKnownSoftwareVulnerabilityDto> KnownSoftwareVulnerabilities
 );
 
 public record AssetVulnerabilityDto(
@@ -83,6 +84,21 @@ public record AssetSoftwareInstallationEpisodeDto(
     DateTimeOffset FirstSeenAt,
     DateTimeOffset LastSeenAt,
     DateTimeOffset? RemovedAt
+);
+
+public record AssetKnownSoftwareVulnerabilityDto(
+    Guid VulnerabilityId,
+    string ExternalId,
+    string Title,
+    string VendorSeverity,
+    decimal? CvssScore,
+    string? CvssVector,
+    string MatchMethod,
+    string Confidence,
+    string Evidence,
+    DateTimeOffset FirstSeenAt,
+    DateTimeOffset LastSeenAt,
+    DateTimeOffset? ResolvedAt
 );
 
 public record SoftwareCpeBindingDto(
