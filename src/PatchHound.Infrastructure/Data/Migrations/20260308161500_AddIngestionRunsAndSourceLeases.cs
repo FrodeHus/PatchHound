@@ -13,93 +13,76 @@ namespace PatchHound.Infrastructure.Data.Migrations
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<Guid>(
-                name: "ActiveIngestionRunId",
-                table: "TenantSourceConfigurations",
-                type: "uuid",
-                nullable: true
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE "TenantSourceConfigurations"
+                ADD COLUMN IF NOT EXISTS "ActiveIngestionRunId" uuid;
+                """
             );
 
-            migrationBuilder.AddColumn<DateTimeOffset>(
-                name: "LeaseAcquiredAt",
-                table: "TenantSourceConfigurations",
-                type: "timestamp with time zone",
-                nullable: true
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE "TenantSourceConfigurations"
+                ADD COLUMN IF NOT EXISTS "LeaseAcquiredAt" timestamp with time zone;
+                """
             );
 
-            migrationBuilder.AddColumn<DateTimeOffset>(
-                name: "LeaseExpiresAt",
-                table: "TenantSourceConfigurations",
-                type: "timestamp with time zone",
-                nullable: true
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE "TenantSourceConfigurations"
+                ADD COLUMN IF NOT EXISTS "LeaseExpiresAt" timestamp with time zone;
+                """
             );
 
-            migrationBuilder.CreateTable(
-                name: "IngestionRuns",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
-                    SourceKey = table.Column<string>(
-                        type: "character varying(128)",
-                        maxLength: 128,
-                        nullable: false
-                    ),
-                    StartedAt = table.Column<DateTimeOffset>(
-                        type: "timestamp with time zone",
-                        nullable: false
-                    ),
-                    CompletedAt = table.Column<DateTimeOffset>(
-                        type: "timestamp with time zone",
-                        nullable: true
-                    ),
-                    Status = table.Column<string>(
-                        type: "character varying(64)",
-                        maxLength: 64,
-                        nullable: false
-                    ),
-                    FetchedVulnerabilityCount = table.Column<int>(type: "integer", nullable: false),
-                    FetchedAssetCount = table.Column<int>(type: "integer", nullable: false),
-                    FetchedSoftwareInstallationCount = table.Column<int>(
-                        type: "integer",
-                        nullable: false
-                    ),
-                    Error = table.Column<string>(
-                        type: "character varying(512)",
-                        maxLength: 512,
-                        nullable: false
-                    ),
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_IngestionRuns", x => x.Id);
-                }
+            migrationBuilder.Sql(
+                """
+                CREATE TABLE IF NOT EXISTS "IngestionRuns" (
+                    "Id" uuid NOT NULL,
+                    "TenantId" uuid NOT NULL,
+                    "SourceKey" character varying(128) NOT NULL,
+                    "StartedAt" timestamp with time zone NOT NULL,
+                    "CompletedAt" timestamp with time zone NULL,
+                    "Status" character varying(64) NOT NULL,
+                    "FetchedVulnerabilityCount" integer NOT NULL,
+                    "FetchedAssetCount" integer NOT NULL,
+                    "FetchedSoftwareInstallationCount" integer NOT NULL,
+                    "Error" character varying(512) NOT NULL,
+                    CONSTRAINT "PK_IngestionRuns" PRIMARY KEY ("Id")
+                );
+                """
             );
 
-            migrationBuilder.CreateIndex(
-                name: "IX_IngestionRuns_TenantId_SourceKey_StartedAt",
-                table: "IngestionRuns",
-                columns: new[] { "TenantId", "SourceKey", "StartedAt" }
+            migrationBuilder.Sql(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_IngestionRuns_TenantId_SourceKey_StartedAt"
+                ON "IngestionRuns" ("TenantId", "SourceKey", "StartedAt");
+                """
             );
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(name: "IngestionRuns");
+            migrationBuilder.Sql("""DROP TABLE IF EXISTS "IngestionRuns";""");
 
-            migrationBuilder.DropColumn(
-                name: "ActiveIngestionRunId",
-                table: "TenantSourceConfigurations"
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE "TenantSourceConfigurations"
+                DROP COLUMN IF EXISTS "ActiveIngestionRunId";
+                """
             );
 
-            migrationBuilder.DropColumn(
-                name: "LeaseAcquiredAt",
-                table: "TenantSourceConfigurations"
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE "TenantSourceConfigurations"
+                DROP COLUMN IF EXISTS "LeaseAcquiredAt";
+                """
             );
 
-            migrationBuilder.DropColumn(
-                name: "LeaseExpiresAt",
-                table: "TenantSourceConfigurations"
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE "TenantSourceConfigurations"
+                DROP COLUMN IF EXISTS "LeaseExpiresAt";
+                """
             );
         }
     }

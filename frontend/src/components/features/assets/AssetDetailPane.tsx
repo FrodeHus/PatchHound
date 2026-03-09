@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { AssetDetail } from '@/api/assets.schemas'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
@@ -15,8 +15,10 @@ type AssetDetailPaneProps = {
   securityProfiles: SecurityProfile[]
   isLoading: boolean
   isAssigningSecurityProfile: boolean
+  isAssigningSoftwareCpeBinding: boolean
   isOpen: boolean
   onAssignSecurityProfile: (assetId: string, securityProfileId: string | null) => void
+  onAssignSoftwareCpeBinding: (assetId: string, cpe23Uri: string | null) => void
   onOpenChange: (open: boolean) => void
 }
 
@@ -27,8 +29,10 @@ export function AssetDetailPane({
   securityProfiles,
   isLoading,
   isAssigningSecurityProfile,
+  isAssigningSoftwareCpeBinding,
   isOpen,
   onAssignSecurityProfile,
+  onAssignSoftwareCpeBinding,
   onOpenChange,
 }: AssetDetailPaneProps) {
   const metadata = useMemo(() => parseMetadata(asset?.metadata), [asset?.metadata])
@@ -295,7 +299,12 @@ function SoftwareSection({ asset, metadata }: { asset: AssetDetail; metadata: Me
           title="Normalized product identity"
           description="The reusable CPE identity PatchHound will use for NVD-based software matching."
         />
-        <SoftwareCpeBindingSummary binding={asset.softwareCpeBinding} />
+        <SoftwareCpeBindingSummary
+          binding={asset.softwareCpeBinding}
+          canEdit
+          isSaving={isAssigningSoftwareCpeBinding}
+          onSave={(cpe23Uri) => onAssignSoftwareCpeBinding(asset.id, cpe23Uri)}
+        />
       </div>
       <div className="mt-4">
         <SectionHeader
@@ -424,30 +433,106 @@ function DeviceSection({
 function SoftwareCpeBindingSummary({
   binding,
   compact = false,
+  canEdit = false,
+  isSaving = false,
+  onSave,
 }: {
   binding: AssetDetail['softwareCpeBinding'] | AssetDetail['softwareInventory'][number]['cpeBinding']
   compact?: boolean
+  canEdit?: boolean
+  isSaving?: boolean
+  onSave?: (cpe23Uri: string | null) => void
 }) {
+  const [value, setValue] = useState(binding?.cpe23Uri ?? '')
+
   if (!binding) {
     return (
-      <p className="text-sm text-muted-foreground">
-        No CPE binding has been recorded for this software asset yet.
-      </p>
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          No CPE binding has been recorded for this software asset yet.
+        </p>
+        {canEdit && onSave ? (
+          <SoftwareCpeBindingEditor
+            value={value}
+            isSaving={isSaving}
+            onValueChange={setValue}
+            onSave={() => onSave(value.trim() ? value.trim() : null)}
+          />
+        ) : null}
+      </div>
     )
   }
 
   return (
-    <div className={compact ? 'grid gap-3 md:grid-cols-2' : 'grid gap-3 md:grid-cols-2'}>
-      <DataCard label="CPE 2.3 URI" value={binding.cpe23Uri} mono />
-      <DataCard label="Confidence" value={binding.confidence} />
-      <DataCard label="Binding Method" value={binding.bindingMethod} />
-      <DataCard label="Matched Vendor" value={binding.matchedVendor ?? 'Unknown'} />
-      <DataCard label="Matched Product" value={binding.matchedProduct ?? 'Unknown'} />
-      <DataCard label="Matched Version" value={binding.matchedVersion ?? 'Unknown'} />
-      <DataCard
-        label="Last Validated"
-        value={new Date(binding.lastValidatedAt).toLocaleString()}
-      />
+    <div className="space-y-3">
+      <div className={compact ? 'grid gap-3 md:grid-cols-2' : 'grid gap-3 md:grid-cols-2'}>
+        <DataCard label="CPE 2.3 URI" value={binding.cpe23Uri} mono />
+        <DataCard label="Confidence" value={binding.confidence} />
+        <DataCard label="Binding Method" value={binding.bindingMethod} />
+        <DataCard label="Matched Vendor" value={binding.matchedVendor ?? 'Unknown'} />
+        <DataCard label="Matched Product" value={binding.matchedProduct ?? 'Unknown'} />
+        <DataCard label="Matched Version" value={binding.matchedVersion ?? 'Unknown'} />
+        <DataCard
+          label="Last Validated"
+          value={new Date(binding.lastValidatedAt).toLocaleString()}
+        />
+      </div>
+      {canEdit && onSave ? (
+        <SoftwareCpeBindingEditor
+          value={value}
+          isSaving={isSaving}
+          onValueChange={setValue}
+          onSave={() => onSave(value.trim() ? value.trim() : null)}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function SoftwareCpeBindingEditor({
+  value,
+  isSaving,
+  onValueChange,
+  onSave,
+}: {
+  value: string
+  isSaving: boolean
+  onValueChange: (value: string) => void
+  onSave: () => void
+}) {
+  return (
+    <div className="rounded-xl border border-border/70 bg-background p-3">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Manual binding</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Override or clear the software asset’s normalized CPE identity.
+      </p>
+      <div className="mt-3 flex flex-col gap-2">
+        <input
+          className="rounded-md border border-input bg-card px-3 py-2 text-sm"
+          placeholder="cpe:2.3:a:vendor:product:version:*:*:*:*:*:*:*"
+          value={value}
+          onChange={(event) => onValueChange(event.target.value)}
+          disabled={isSaving}
+        />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={isSaving}
+            className="rounded-full border border-border/70 bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted/20 disabled:opacity-60"
+          >
+            {isSaving ? 'Saving…' : 'Save binding'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onValueChange('')}
+            disabled={isSaving}
+            className="rounded-full border border-border/70 bg-background px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted/20 disabled:opacity-60"
+          >
+            Clear value
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
