@@ -17,58 +17,38 @@ public class DefenderApiClientTests
     );
 
     [Fact]
-    public async Task GetVulnerabilityCatalogAsync_FollowsAllPagedResponses()
+    public async Task GetVulnerabilityAsync_ReturnsSingleVulnerabilityDetail()
     {
         var handler = new SequenceHttpMessageHandler(
             CreateJsonResponse(
                 """
                 {
-                  "value": [
-                    {
-                      "id": "CVE-2026-0001",
-                      "name": "Contoso vulnerability",
-                      "description": "Catalog description",
-                      "severity": "High",
-                      "cvssV3": 8.1,
-                      "cvssVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
-                    }
-                  ],
-                  "@odata.nextLink": "https://api.securitycenter.microsoft.com/api/vulnerabilities?$skip=1"
-                }
-                """
-            ),
-            CreateJsonResponse(
-                """
-                {
-                  "value": [
-                    {
-                      "id": "CVE-2026-0002",
-                      "name": "Contoso vulnerability 2",
-                      "description": "Catalog description 2",
-                      "severity": "Medium"
-                    }
-                  ]
+                  "id": "CVE-2026-0001",
+                  "name": "Contoso vulnerability",
+                  "description": "Catalog description",
+                  "severity": "High",
+                  "cvssV3": 8.1,
+                  "cvssVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
                 }
                 """
             )
         );
         var client = new TestDefenderApiClient(new HttpClient(handler));
 
-        var response = await client.GetVulnerabilityCatalogAsync(
+        var response = await client.GetVulnerabilityAsync(
             Configuration,
+            "CVE-2026-0001",
             CancellationToken.None
         );
 
-        response.Value.Should().HaveCount(2);
-        response
-            .Value.Select(entry => entry.Id)
-            .Should()
-            .ContainInOrder("CVE-2026-0001", "CVE-2026-0002");
+        response.Should().NotBeNull();
+        response!.Id.Should().Be("CVE-2026-0001");
+        response.Name.Should().Be("Contoso vulnerability");
+        response.Description.Should().Be("Catalog description");
         handler
             .RequestUris.Should()
-            .ContainInOrder(
-                "https://api.securitycenter.microsoft.com/api/vulnerabilities?$top=8000",
-                "https://api.securitycenter.microsoft.com/api/vulnerabilities?$skip=1"
+            .ContainSingle(
+                "https://api.securitycenter.microsoft.com/api/vulnerability/CVE-2026-0001"
             );
         handler.AuthorizationHeaders.Should().OnlyContain(value => value == "Bearer test-token");
     }
