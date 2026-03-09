@@ -5,6 +5,7 @@ using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Assets;
 using PatchHound.Api.Models.SecurityProfiles;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
@@ -25,6 +26,8 @@ public class AssetsController : ControllerBase
         DateTimeOffset LastSeenAt,
         DateTimeOffset? RemovedAt
     );
+
+    private sealed record ParsedCpeComponents(string Vendor, string Product, string? Version);
 
     private readonly PatchHoundDbContext _dbContext;
     private readonly AssetService _assetService;
@@ -528,6 +531,83 @@ public class AssetsController : ControllerBase
         return NoContent();
     }
 
+    [HttpPut("{id:guid}/software-cpe-binding")]
+    [Authorize(Policy = Policies.ModifyVulnerabilities)]
+    public async Task<IActionResult> AssignSoftwareCpeBinding(
+        Guid id,
+        [FromBody] AssignSoftwareCpeBindingRequest request,
+        CancellationToken ct
+    )
+    {
+        var asset = await _dbContext.Assets.FirstOrDefaultAsync(current => current.Id == id, ct);
+        if (asset is null)
+        {
+            return NotFound(new ProblemDetails { Title = "Asset not found" });
+        }
+
+        if (asset.AssetType != AssetType.Software)
+        {
+            return BadRequest(
+                new ProblemDetails { Title = "Only software assets support CPE bindings" }
+            );
+        }
+
+        var existingBinding = await _dbContext.SoftwareCpeBindings.FirstOrDefaultAsync(
+            binding => binding.SoftwareAssetId == id,
+            ct
+        );
+
+        if (string.IsNullOrWhiteSpace(request.Cpe23Uri))
+        {
+            if (existingBinding is not null)
+            {
+                _dbContext.SoftwareCpeBindings.Remove(existingBinding);
+                await _dbContext.SaveChangesAsync(ct);
+            }
+
+            return NoContent();
+        }
+
+        if (!TryParseCpe23(request.Cpe23Uri, out var cpe))
+        {
+            return BadRequest(new ProblemDetails { Title = "Invalid CPE 2.3 URI" });
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if (existingBinding is null)
+        {
+            await _dbContext.SoftwareCpeBindings.AddAsync(
+                SoftwareCpeBinding.Create(
+                    asset.TenantId,
+                    asset.Id,
+                    request.Cpe23Uri.Trim(),
+                    CpeBindingMethod.Manual,
+                    MatchConfidence.High,
+                    cpe.Vendor,
+                    cpe.Product,
+                    cpe.Version,
+                    now
+                ),
+                ct
+            );
+        }
+        else
+        {
+            existingBinding.Update(
+                request.Cpe23Uri.Trim(),
+                CpeBindingMethod.Manual,
+                MatchConfidence.High,
+                cpe.Vendor,
+                cpe.Product,
+                cpe.Version,
+                now
+            );
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
     [HttpPost("bulk-assign")]
     [Authorize(Policy = Policies.ModifyVulnerabilities)]
     public async Task<ActionResult<BulkAssignResponse>> BulkAssign(
@@ -617,5 +697,47 @@ public class AssetsController : ControllerBase
             .ThenBy(item => item!.Age)
             .Select(item => item!.Name)
             .ToList();
+    }
+
+    private static bool TryParseCpe23(string? cpe23Uri, out ParsedCpeComponents components)
+    {
+        components = default!;
+        if (string.IsNullOrWhiteSpace(cpe23Uri))
+        {
+            return false;
+        }
+
+        var parts = cpe23Uri.Split(':');
+        if (parts.Length < 6 || !string.Equals(parts[0], "cpe", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        components = new ParsedCpeComponents(
+            NormalizeToken(parts[3]),
+            NormalizeToken(parts[4]),
+            NormalizeVersion(parts[5])
+        );
+
+        return !string.IsNullOrWhiteSpace(components.Vendor)
+            && !string.IsNullOrWhiteSpace(components.Product);
+    }
+
+    private static string NormalizeToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var chars = value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray();
+        return new string(chars);
+    }
+
+    private static string? NormalizeVersion(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) || value is "*" or "-"
+            ? null
+            : value.Trim().ToLowerInvariant();
     }
 }

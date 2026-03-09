@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { assignAssetSecurityProfile, fetchAssetDetail } from '@/api/assets.functions'
+import { assignAssetSecurityProfile, assignSoftwareCpeBinding, fetchAssetDetail } from '@/api/assets.functions'
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { AssetDetailPageView } from '@/components/features/assets/AssetDetailPageView'
 
@@ -32,14 +32,27 @@ function AssetDetailPage() {
       await assetQuery.refetch()
     },
   })
+  const softwareCpeBindingMutation = useMutation({
+    mutationFn: async (cpe23Uri: string | null) => {
+      await assignSoftwareCpeBinding({ data: { assetId: id, cpe23Uri } })
+    },
+    onSuccess: async () => {
+      await router.invalidate()
+      await assetQuery.refetch()
+    },
+  })
 
   return (
     <AssetDetailPageView
       asset={assetQuery.data}
       securityProfiles={securityProfilesQuery.data?.items ?? []}
       isAssigningSecurityProfile={securityProfileMutation.isPending}
+      isAssigningSoftwareCpeBinding={softwareCpeBindingMutation.isPending}
       onAssignSecurityProfile={(_, securityProfileId) => {
         securityProfileMutation.mutate(securityProfileId)
+      }}
+      onAssignSoftwareCpeBinding={(_, cpe23Uri) => {
+        softwareCpeBindingMutation.mutate(cpe23Uri)
       }}
     />
   )

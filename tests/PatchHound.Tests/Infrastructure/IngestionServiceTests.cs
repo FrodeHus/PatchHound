@@ -708,7 +708,7 @@ public class IngestionServiceTests : IDisposable
                     new IngestionResult(
                         "CVE-OLD-1",
                         "Old vuln",
-                        null,
+                        string.Empty,
                         Severity.Low,
                         null,
                         null,
@@ -1147,6 +1147,83 @@ public class IngestionServiceTests : IDisposable
         match.Vulnerability.ExternalId.Should().Be("CVE-2026-0001");
         match.SoftwareAsset.ExternalId.Should().Be("software-1");
         match.Evidence.Should().Contain("defender-direct");
+    }
+
+    [Fact]
+    public async Task ProcessResultsAsync_CreatesSoftwareVulnerabilityMatches_FromCpeAffectedSoftwareAndAutoBinding()
+    {
+        var observedAt = DateTimeOffset.UtcNow;
+        var snapshot = new IngestionAssetInventorySnapshot(
+            [
+                new IngestionAsset("machine-1", "server01.contoso.local", AssetType.Device),
+                new IngestionAsset(
+                    "7-zip-_-7-zip",
+                    "7-Zip 9.20",
+                    AssetType.Software,
+                    Metadata: """{"name":"7-Zip","vendor":"7-zip","version":"9.20"}"""
+                ),
+            ],
+            [new("machine-1", "7-zip-_-7-zip", observedAt)]
+        );
+
+        await _service.ProcessAssetsAsync(_tenantId, snapshot, CancellationToken.None);
+
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "NVD",
+            [
+                new IngestionResult(
+                    "CVE-2026-0002",
+                    "7-Zip overflow",
+                    "Desc",
+                    Severity.High,
+                    8.4m,
+                    "CVSS:3.1/AV:N",
+                    DateTimeOffset.UtcNow,
+                    [
+                        new IngestionAffectedAsset(
+                            "machine-1",
+                            "server01.contoso.local",
+                            AssetType.Device
+                        ),
+                    ],
+                    AffectedSoftware:
+                    [
+                        new IngestionAffectedSoftware(
+                            true,
+                            "cpe:2.3:a:7-zip:7zip:9.20:*:*:*:*:*:*:*",
+                            null,
+                            null,
+                            null,
+                            null
+                        ),
+                    ],
+                    Sources: ["NVD"]
+                ),
+            ],
+            CancellationToken.None
+        );
+
+        var match = await _dbContext
+            .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
+            .Include(item => item.Vulnerability)
+            .Include(item => item.SoftwareAsset)
+            .SingleAsync();
+
+        match.MatchMethod.Should().Be(SoftwareVulnerabilityMatchMethod.CpeBinding);
+        match.Confidence.Should().Be(MatchConfidence.High);
+        match.Vulnerability.ExternalId.Should().Be("CVE-2026-0002");
+        match.SoftwareAsset.ExternalId.Should().Be("7-zip-_-7-zip");
+        match.Evidence.Should().Contain("cpe-binding");
+        match.Evidence.Should().Contain("cpe:2.3:a:7-zip:7zip:9.20");
+
+        var binding = await _dbContext
+            .SoftwareCpeBindings.IgnoreQueryFilters()
+            .SingleAsync(current => current.SoftwareAssetId == match.SoftwareAssetId);
+
+        binding.BindingMethod.Should().Be(CpeBindingMethod.DefenderDerived);
+        binding.Confidence.Should().Be(MatchConfidence.High);
+        binding.Cpe23Uri.Should().Be("cpe:2.3:a:7-zip:7zip:9.20:*:*:*:*:*:*:*");
     }
 
     [Fact]

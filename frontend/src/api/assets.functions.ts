@@ -65,6 +65,18 @@ export const setAssetCriticality = createServerFn({ method: 'POST' })
     await apiPut(`/assets/${assetId}/criticality`, context, { criticality })
   })
 
+export const assignSoftwareCpeBinding = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      assetId: z.string(),
+      cpe23Uri: z.string().trim().nullable(),
+    }),
+  )
+  .handler(async ({ context, data: { assetId, cpe23Uri } }) => {
+    await apiPut(`/assets/${assetId}/software-cpe-binding`, context, { cpe23Uri })
+  })
+
 export const bulkAssignAssets = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(z.object({

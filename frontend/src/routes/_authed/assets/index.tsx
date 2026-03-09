@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { assignAssetOwner, assignAssetSecurityProfile, fetchAssetDetail, fetchAssets, setAssetCriticality } from '@/api/assets.functions'
+import { assignAssetOwner, assignAssetSecurityProfile, assignSoftwareCpeBinding, fetchAssetDetail, fetchAssets, setAssetCriticality } from '@/api/assets.functions'
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { AssetDetailPane } from '@/components/features/assets/AssetDetailPane'
 import { AssetManagementTable } from '@/components/features/assets/AssetManagementTable'
@@ -81,6 +81,17 @@ function AssetsPage() {
   const securityProfileMutation = useMutation({
     mutationFn: async (payload: { assetId: string; securityProfileId: string | null }) => {
       await assignAssetSecurityProfile({ data: payload })
+    },
+    onSuccess: async () => {
+      await router.invalidate()
+      if (selectedAssetId) {
+        await assetDetailQuery.refetch()
+      }
+    },
+  })
+  const softwareCpeBindingMutation = useMutation({
+    mutationFn: async (payload: { assetId: string; cpe23Uri: string | null }) => {
+      await assignSoftwareCpeBinding({ data: payload })
     },
     onSuccess: async () => {
       await router.invalidate()
@@ -183,9 +194,13 @@ function AssetsPage() {
         securityProfiles={securityProfilesQuery.data?.items ?? []}
         isLoading={assetDetailQuery.isLoading}
         isAssigningSecurityProfile={securityProfileMutation.isPending}
+        isAssigningSoftwareCpeBinding={softwareCpeBindingMutation.isPending}
         isOpen={selectedAssetId !== null}
         onAssignSecurityProfile={(assetId, securityProfileId) => {
           securityProfileMutation.mutate({ assetId, securityProfileId })
+        }}
+        onAssignSoftwareCpeBinding={(assetId, cpe23Uri) => {
+          softwareCpeBindingMutation.mutate({ assetId, cpe23Uri })
         }}
         onOpenChange={(open) => {
           if (!open) {
