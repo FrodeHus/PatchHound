@@ -297,6 +297,48 @@ function SoftwareSection({ asset, metadata }: { asset: AssetDetail; metadata: Me
         />
         <SoftwareCpeBindingSummary binding={asset.softwareCpeBinding} />
       </div>
+      <div className="mt-4">
+        <SectionHeader
+          eyebrow="Known vulnerabilities"
+          title="Matched software vulnerabilities"
+          description="Derived software-level matches for this software asset based on direct Defender correlation."
+        />
+        {asset.knownSoftwareVulnerabilities.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No known vulnerabilities are currently linked to this software asset.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {asset.knownSoftwareVulnerabilities.map((item) => (
+              <Link
+                key={item.vulnerabilityId}
+                to="/vulnerabilities/$id"
+                params={{ id: item.vulnerabilityId }}
+                className="block rounded-xl border border-border/70 bg-background px-3 py-3 transition hover:border-foreground/20 hover:bg-muted/20"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{item.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {item.externalId} • {item.vendorSeverity}
+                      {item.cvssScore !== null ? ` • CVSS ${item.cvssScore.toFixed(1)}` : ''}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">{item.evidence}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="rounded-full border border-emerald-300/60 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-emerald-950">
+                      {item.matchMethod}
+                    </span>
+                    <span className="rounded-full border border-sky-300/60 bg-sky-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-sky-900">
+                      {item.confidence}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   )
 }

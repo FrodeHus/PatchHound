@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { ChevronDown, Sparkles } from 'lucide-react'
 import { type EnrichmentSource, updateEnrichmentSources } from '@/server/system.functions'
+import { EnrichmentRunHistorySheet } from '@/components/features/admin/EnrichmentRunHistorySheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,6 +21,7 @@ export function GlobalEnrichmentSourceManagement({
   const [sources, setSources] = useState(() => initialSources.map(mapSourceToDraft))
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
   const [expandedSourceKey, setExpandedSourceKey] = useState<string | null>(null)
+  const [historySource, setHistorySource] = useState<{ key: string; displayName: string } | null>(null)
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -54,6 +56,17 @@ export function GlobalEnrichmentSourceManagement({
 
   return (
     <section className="space-y-5">
+      <EnrichmentRunHistorySheet
+        sourceKey={historySource?.key ?? null}
+        sourceDisplayName={historySource?.displayName ?? null}
+        isOpen={historySource !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setHistorySource(null)
+          }
+        }}
+      />
+
       <Card className="rounded-[30px] border-border/70 bg-card/82 shadow-sm">
         <CardHeader className="border-b border-border/60 pb-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -193,6 +206,57 @@ export function GlobalEnrichmentSourceManagement({
                           </p>
                         </div>
 
+                        <div className="grid gap-3 sm:grid-cols-5">
+                          <QueueMetric label="Pending" value={source.queue.pendingCount} tone="warning" />
+                          <QueueMetric label="Retry" value={source.queue.retryScheduledCount} tone="warning" />
+                          <QueueMetric label="Running" value={source.queue.runningCount} tone="info" />
+                          <QueueMetric label="Failed" value={source.queue.failedCount} tone={source.queue.failedCount > 0 ? 'error' : 'neutral'} />
+                          <QueueMetric label="Oldest Due" value={formatTimestamp(source.queue.oldestPendingAt)} tone="neutral" />
+                        </div>
+
+                        <div className="rounded-2xl border border-border/70 bg-background/20 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-medium">Recent enrichment runs</p>
+                              <p className="text-xs text-muted-foreground">
+                                Latest queue-processing outcomes for this provider.
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="rounded-full"
+                              onClick={() => setHistorySource({ key: source.key, displayName: source.displayName })}
+                            >
+                              View full history
+                            </Button>
+                          </div>
+
+                          {source.recentRuns.length ? (
+                            <div className="mt-4 space-y-2">
+                              {source.recentRuns.map((run) => (
+                                <div
+                                  key={run.id}
+                                  className="grid gap-2 rounded-2xl border border-border/60 bg-background/35 px-4 py-3 text-xs text-muted-foreground sm:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]"
+                                >
+                                  <div>
+                                    <p className="font-medium text-foreground">{run.status}</p>
+                                    <p>Started {formatTimestamp(run.startedAt)}</p>
+                                  </div>
+                                  <RunStat label="Claimed" value={run.jobsClaimed} />
+                                  <RunStat label="Succeeded" value={run.jobsSucceeded} />
+                                  <RunStat label="No Data" value={run.jobsNoData} />
+                                  <RunStat label="Failed" value={run.jobsFailed} />
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-4 text-xs text-muted-foreground">
+                              No enrichment runs have been recorded yet.
+                            </p>
+                          )}
+                        </div>
+
                         <div className="grid gap-4 md:grid-cols-2">
                           <label className="space-y-2">
                             <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Display Name</span>
@@ -253,6 +317,40 @@ export function GlobalEnrichmentSourceManagement({
         </CardContent>
       </Card>
     </section>
+  )
+}
+
+function QueueMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string | number
+  tone: 'neutral' | 'warning' | 'error' | 'info'
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-2xl border px-4 py-3',
+        tone === 'warning' && 'border-amber-400/25 bg-amber-400/10',
+        tone === 'error' && 'border-destructive/25 bg-destructive/10',
+        tone === 'info' && 'border-primary/20 bg-primary/10',
+        tone === 'neutral' && 'border-border/70 bg-background/35',
+      )}
+    >
+      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="mt-2 text-sm font-semibold text-foreground">{value}</p>
+    </div>
+  )
+}
+
+function RunStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-background/30 px-3 py-2 text-center">
+      <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
+    </div>
   )
 }
 

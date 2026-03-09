@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost, apiPut } from '@/server/api'
+import { pagedResponseMetaSchema } from '@/api/pagination.schemas'
 import { z } from 'zod'
 
 const systemStatusSchema = z.object({
@@ -24,6 +25,40 @@ const enrichmentSourceSchema = z.object({
     lastStatus: z.string(),
     lastError: z.string(),
   }),
+  queue: z.object({
+    pendingCount: z.number(),
+    retryScheduledCount: z.number(),
+    runningCount: z.number(),
+    failedCount: z.number(),
+    oldestPendingAt: z.string().nullable(),
+  }),
+  recentRuns: z.array(z.object({
+    id: z.string().uuid(),
+    startedAt: z.string(),
+    completedAt: z.string().nullable(),
+    status: z.string(),
+    jobsClaimed: z.number(),
+    jobsSucceeded: z.number(),
+    jobsNoData: z.number(),
+    jobsFailed: z.number(),
+    jobsRetried: z.number(),
+    lastError: z.string(),
+  })),
+})
+
+const pagedEnrichmentRunSchema = pagedResponseMetaSchema.extend({
+  items: z.array(z.object({
+    id: z.string().uuid(),
+    startedAt: z.string(),
+    completedAt: z.string().nullable(),
+    status: z.string(),
+    jobsClaimed: z.number(),
+    jobsSucceeded: z.number(),
+    jobsNoData: z.number(),
+    jobsFailed: z.number(),
+    jobsRetried: z.number(),
+    lastError: z.string(),
+  })),
 })
 
 export const unsealOpenBao = createServerFn({ method: 'POST' })
@@ -60,4 +95,22 @@ export const updateEnrichmentSources = createServerFn({ method: 'POST' })
     await apiPut('/system/enrichment-sources', context, data)
   })
 
+export const fetchEnrichmentRuns = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({
+    sourceKey: z.string(),
+    page: z.number().optional(),
+    pageSize: z.number().optional(),
+  }))
+  .handler(async ({ context, data: { sourceKey, page, pageSize } }) => {
+    const queryPage = page ?? 1
+    const queryPageSize = pageSize ?? 10
+    const response = await apiGet(
+      `/system/enrichment-sources/${sourceKey}/runs?page=${queryPage}&pageSize=${queryPageSize}`,
+      context,
+    )
+    return pagedEnrichmentRunSchema.parse(response)
+  })
+
 export type EnrichmentSource = z.infer<typeof enrichmentSourceSchema>
+export type EnrichmentRun = z.infer<typeof pagedEnrichmentRunSchema>['items'][number]

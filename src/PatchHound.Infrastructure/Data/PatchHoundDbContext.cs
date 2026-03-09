@@ -30,6 +30,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         Set<StagedDeviceSoftwareInstallation>();
     public DbSet<EnrichmentSourceConfiguration> EnrichmentSourceConfigurations =>
         Set<EnrichmentSourceConfiguration>();
+    public DbSet<EnrichmentJob> EnrichmentJobs => Set<EnrichmentJob>();
+    public DbSet<EnrichmentRun> EnrichmentRuns => Set<EnrichmentRun>();
     public DbSet<TenantSlaConfiguration> TenantSlaConfigurations => Set<TenantSlaConfiguration>();
     public DbSet<User> Users => Set<User>();
     public DbSet<UserTenantRole> UserTenantRoles => Set<UserTenantRole>();
@@ -38,6 +40,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<AssetSecurityProfile> AssetSecurityProfiles => Set<AssetSecurityProfile>();
     public DbSet<SoftwareCpeBinding> SoftwareCpeBindings => Set<SoftwareCpeBinding>();
+    public DbSet<SoftwareVulnerabilityMatch> SoftwareVulnerabilityMatches =>
+        Set<SoftwareVulnerabilityMatch>();
     public DbSet<DeviceSoftwareInstallation> DeviceSoftwareInstallations =>
         Set<DeviceSoftwareInstallation>();
     public DbSet<DeviceSoftwareInstallationEpisode> DeviceSoftwareInstallationEpisodes =>
@@ -100,6 +104,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<SoftwareCpeBinding>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<SoftwareVulnerabilityMatch>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<DeviceSoftwareInstallation>()
@@ -189,6 +196,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<StagedDeviceSoftwareInstallation>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<EnrichmentJob>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantSlaConfiguration>()

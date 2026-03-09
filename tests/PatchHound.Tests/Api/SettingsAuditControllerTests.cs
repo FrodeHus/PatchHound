@@ -168,6 +168,118 @@ public class SettingsAuditControllerTests : IDisposable
         secretAudit.NewValues.Should().Contain("system/enrichment-sources/nvd");
     }
 
+    [Fact]
+    public async Task GetEnrichmentSources_ReturnsQueueSummaryAndRecentRuns()
+    {
+        var source = EnrichmentSourceConfiguration.Create(
+            "nvd",
+            "NVD API",
+            true,
+            "system/enrichment-sources/nvd",
+            "https://services.nvd.nist.gov"
+        );
+        source.UpdateRuntime(
+            DateTimeOffset.UtcNow.AddMinutes(-10),
+            DateTimeOffset.UtcNow.AddMinutes(-9),
+            DateTimeOffset.UtcNow.AddMinutes(-9),
+            "Succeeded",
+            string.Empty
+        );
+
+        var runningJob = EnrichmentJob.Create(
+            _tenantId,
+            "nvd",
+            EnrichmentTargetModel.Vulnerability,
+            Guid.NewGuid(),
+            "CVE-2026-1000",
+            100,
+            DateTimeOffset.UtcNow.AddMinutes(-5)
+        );
+        runningJob.Start(
+            "worker",
+            DateTimeOffset.UtcNow.AddMinutes(-4),
+            DateTimeOffset.UtcNow.AddMinutes(10)
+        );
+
+        var pendingJob = EnrichmentJob.Create(
+            _tenantId,
+            "nvd",
+            EnrichmentTargetModel.Vulnerability,
+            Guid.NewGuid(),
+            "CVE-2026-1001",
+            100,
+            DateTimeOffset.UtcNow.AddMinutes(-6)
+        );
+
+        var run = EnrichmentRun.Start("nvd", DateTimeOffset.UtcNow.AddMinutes(-8));
+        run.Complete(
+            EnrichmentRunStatus.Succeeded,
+            2,
+            1,
+            0,
+            0,
+            1,
+            DateTimeOffset.UtcNow.AddMinutes(-7)
+        );
+
+        await _dbContext.EnrichmentSourceConfigurations.AddAsync(source);
+        await _dbContext.EnrichmentJobs.AddRangeAsync(runningJob, pendingJob);
+        await _dbContext.EnrichmentRuns.AddAsync(run);
+        await _dbContext.SaveChangesAsync();
+
+        var controller = new SystemController(
+            _secretStore,
+            _dbContext,
+            new AuditLogWriter(_dbContext, _tenantContext)
+        );
+
+        var action = await controller.GetEnrichmentSources(CancellationToken.None);
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var sources = ok
+            .Value.Should()
+            .BeAssignableTo<IReadOnlyList<EnrichmentSourceDto>>()
+            .Subject;
+        var dto = sources.Should().ContainSingle().Subject;
+        dto.Queue.PendingCount.Should().Be(1);
+        dto.Queue.RunningCount.Should().Be(1);
+        dto.RecentRuns.Should().ContainSingle();
+        dto.RecentRuns[0].JobsClaimed.Should().Be(2);
+        dto.RecentRuns[0].JobsRetried.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetEnrichmentRuns_ReturnsPagedHistory()
+    {
+        await _dbContext.EnrichmentRuns.AddRangeAsync(
+            CreateCompletedRun("nvd", 3),
+            CreateCompletedRun("nvd", 2),
+            CreateCompletedRun("nvd", 1)
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var controller = new SystemController(
+            _secretStore,
+            _dbContext,
+            new AuditLogWriter(_dbContext, _tenantContext)
+        );
+
+        var action = await controller.GetEnrichmentRuns(
+            "nvd",
+            new PatchHound.Api.Models.PaginationQuery(1, 2),
+            CancellationToken.None
+        );
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var page = ok
+            .Value.Should()
+            .BeOfType<PatchHound.Api.Models.PagedResponse<EnrichmentRunDto>>()
+            .Subject;
+        page.TotalCount.Should().Be(3);
+        page.PageSize.Should().Be(2);
+        page.Items.Should().HaveCount(2);
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();
@@ -178,5 +290,20 @@ public class SettingsAuditControllerTests : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton(tenantContext);
         return services.BuildServiceProvider();
+    }
+
+    private static EnrichmentRun CreateCompletedRun(string sourceKey, int jobsClaimed)
+    {
+        var run = EnrichmentRun.Start(sourceKey, DateTimeOffset.UtcNow.AddMinutes(-jobsClaimed));
+        run.Complete(
+            EnrichmentRunStatus.Succeeded,
+            jobsClaimed,
+            jobsClaimed,
+            0,
+            0,
+            0,
+            DateTimeOffset.UtcNow.AddMinutes(-(jobsClaimed - 1))
+        );
+        return run;
     }
 }

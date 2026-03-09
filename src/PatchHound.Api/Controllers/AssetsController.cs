@@ -342,6 +342,35 @@ public class AssetsController : ControllerBase
             )
             .ToListAsync(ct);
 
+        var softwareVulnerabilityRows =
+            asset.AssetType == AssetType.Software
+                ? await _dbContext
+                    .SoftwareVulnerabilityMatches.AsNoTracking()
+                    .Where(match => match.SoftwareAssetId == id && match.ResolvedAt == null)
+                    .Join(
+                        _dbContext.Vulnerabilities.AsNoTracking(),
+                        match => match.VulnerabilityId,
+                        vulnerability => vulnerability.Id,
+                        (match, vulnerability) =>
+                            new AssetKnownSoftwareVulnerabilityDto(
+                                vulnerability.Id,
+                                vulnerability.ExternalId,
+                                vulnerability.Title,
+                                vulnerability.VendorSeverity.ToString(),
+                                vulnerability.CvssScore,
+                                vulnerability.CvssVector,
+                                match.MatchMethod.ToString(),
+                                match.Confidence.ToString(),
+                                match.Evidence,
+                                match.FirstSeenAt,
+                                match.LastSeenAt,
+                                match.ResolvedAt
+                            )
+                    )
+                    .OrderBy(item => item.ExternalId)
+                    .ToListAsync(ct)
+                : [];
+
         var vulnerabilities = vulnerabilityRows
             .Select(row =>
             {
@@ -418,7 +447,8 @@ public class AssetsController : ControllerBase
                     : null,
                 asset.Metadata,
                 vulnerabilities,
-                softwareInventory
+                softwareInventory,
+                softwareVulnerabilityRows
             )
         );
     }

@@ -17,6 +17,7 @@ public class EnrichmentSourceConfigurationConfiguration
         builder.Property(source => source.DisplayName).HasMaxLength(256).IsRequired();
         builder.Property(source => source.SecretRef).HasMaxLength(512).IsRequired();
         builder.Property(source => source.ApiBaseUrl).HasMaxLength(512).IsRequired();
+        builder.HasIndex(source => source.ActiveEnrichmentRunId);
         builder.Property(source => source.LastStatus).HasMaxLength(64).IsRequired();
         builder.Property(source => source.LastError).HasMaxLength(512).IsRequired();
     }

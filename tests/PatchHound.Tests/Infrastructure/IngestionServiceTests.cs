@@ -54,6 +54,11 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             new EnvironmentalSeverityCalculator()
         );
+        var softwareMatchService = new SoftwareVulnerabilityMatchService(_dbContext);
+        var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
+            _dbContext,
+            Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
+        );
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
             assessmentService,
@@ -63,8 +68,9 @@ public class IngestionServiceTests : IDisposable
         _service = new IngestionService(
             _dbContext,
             new[] { _source },
-            [],
+            enrichmentJobEnqueuer,
             assessmentService,
+            softwareMatchService,
             taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
@@ -1084,6 +1090,66 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessResultsAsync_CreatesSoftwareVulnerabilityMatches_FromDefenderDirectCorrelation()
+    {
+        var observedAt = DateTimeOffset.UtcNow;
+        var snapshot = new IngestionAssetInventorySnapshot(
+            [
+                new IngestionAsset("machine-1", "server01.contoso.local", AssetType.Device),
+                new IngestionAsset(
+                    "software-1",
+                    "7-Zip 9.20",
+                    AssetType.Software,
+                    Metadata: """{"name":"7-Zip","vendor":"7-zip","version":"9.20"}"""
+                ),
+            ],
+            [new("machine-1", "software-1", observedAt)]
+        );
+
+        await _service.ProcessAssetsAsync(_tenantId, snapshot, CancellationToken.None);
+
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "MicrosoftDefender",
+            [
+                new IngestionResult(
+                    "CVE-2026-0001",
+                    "7-Zip issue",
+                    "Desc",
+                    Severity.High,
+                    8.1m,
+                    "CVSS:3.1/AV:N",
+                    DateTimeOffset.UtcNow,
+                    [
+                        new IngestionAffectedAsset(
+                            "machine-1",
+                            "server01.contoso.local",
+                            AssetType.Device
+                        ),
+                    ],
+                    "7-zip",
+                    "7zip",
+                    "9.20",
+                    Sources: ["MicrosoftDefender"]
+                ),
+            ],
+            CancellationToken.None
+        );
+
+        var match = await _dbContext
+            .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
+            .Include(item => item.Vulnerability)
+            .Include(item => item.SoftwareAsset)
+            .SingleAsync();
+
+        match.MatchMethod.Should().Be(SoftwareVulnerabilityMatchMethod.DefenderDirect);
+        match.Confidence.Should().Be(MatchConfidence.High);
+        match.Vulnerability.ExternalId.Should().Be("CVE-2026-0001");
+        match.SoftwareAsset.ExternalId.Should().Be("software-1");
+        match.Evidence.Should().Contain("defender-direct");
+    }
+
+    [Fact]
     public async Task ProcessAssetsAsync_DeduplicatesDuplicateAssetsAndSoftwareLinks()
     {
         var observedAt = DateTimeOffset.UtcNow;
@@ -1418,7 +1484,7 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RunIngestionAsync_WhenNvdConfigured_EnrichesAndPersistsNormalizedVulnerabilityFields()
+    public async Task RunIngestionAsync_WhenNvdConfigured_QueuesEnrichmentJobsForMergedVulnerabilities()
     {
         var source = Substitute.For<IVulnerabilitySource>();
         source.SourceKey.Returns("test-source");
@@ -1472,23 +1538,12 @@ public class IngestionServiceTests : IDisposable
         );
         await _dbContext.SaveChangesAsync();
 
-        var secretStore = Substitute.For<ISecretStore>();
-        secretStore
-            .GetSecretAsync("system/enrichment-sources/nvd", "apiKey", Arg.Any<CancellationToken>())
-            .Returns("nvd-api-key");
-
-        var provider = new NvdGlobalConfigurationProvider(_dbContext, secretStore);
-        var enricher = new NvdVulnerabilityEnricher(
-            new FakeNvdApiClient(),
-            provider,
-            Substitute.For<ILogger<NvdVulnerabilityEnricher>>()
-        );
-
         var service = new IngestionService(
             _dbContext,
             [source],
-            [enricher],
+            new EnrichmentJobEnqueuer(_dbContext, Substitute.For<ILogger<EnrichmentJobEnqueuer>>()),
             new VulnerabilityAssessmentService(_dbContext, new EnvironmentalSeverityCalculator()),
+            new SoftwareVulnerabilityMatchService(_dbContext),
             new RemediationTaskProjectionService(_dbContext, new SlaService()),
             new StagedVulnerabilityMergeService(
                 _dbContext,
@@ -1507,16 +1562,17 @@ public class IngestionServiceTests : IDisposable
         var vulnerability = await _dbContext
             .Vulnerabilities.IgnoreQueryFilters()
             .SingleAsync(item => item.ExternalId == "CVE-2026-1234");
+        var enrichmentJob = await _dbContext
+            .EnrichmentJobs.IgnoreQueryFilters()
+            .SingleAsync(item => item.TargetId == vulnerability.Id);
 
-        vulnerability.Description.Should().Be("NVD-enriched description");
-        vulnerability.CvssScore.Should().Be(9.8m);
-        vulnerability.CvssVector.Should().Be("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
-        vulnerability
-            .PublishedDate.Should()
-            .Be(new DateTimeOffset(2026, 2, 2, 10, 0, 0, TimeSpan.Zero));
         vulnerability.ProductVendor.Should().Be("Contoso");
         vulnerability.ProductName.Should().Be("Contoso Agent");
         vulnerability.ProductVersion.Should().Be("1.0");
+        enrichmentJob.SourceKey.Should().Be("nvd");
+        enrichmentJob.TargetModel.Should().Be(EnrichmentTargetModel.Vulnerability);
+        enrichmentJob.ExternalKey.Should().Be("CVE-2026-1234");
+        enrichmentJob.Status.Should().Be(EnrichmentJobStatus.Pending);
     }
 
     public void Dispose() => _dbContext.Dispose();

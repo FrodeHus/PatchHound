@@ -107,6 +107,38 @@ export function AssetDetailPageView({
                   <div className="mt-4">
                     <SoftwareCpeBindingPanel binding={asset.softwareCpeBinding} />
                   </div>
+                  <div className="mt-4">
+                    <SectionHeader title="Known vulnerabilities" description="Derived software-level matches for this software asset." />
+                    {asset.knownSoftwareVulnerabilities.length === 0 ? (
+                      <p className="mt-4 text-sm text-muted-foreground">No known vulnerabilities are currently linked to this software asset.</p>
+                    ) : (
+                      <div className="mt-4 space-y-3">
+                        {asset.knownSoftwareVulnerabilities.map((item) => (
+                          <Link
+                            key={item.vulnerabilityId}
+                            to="/vulnerabilities/$id"
+                            params={{ id: item.vulnerabilityId }}
+                            className="block rounded-xl border border-border/70 bg-card px-3 py-3 transition hover:border-foreground/20 hover:bg-muted/20"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="font-medium">{item.title}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {item.externalId} • {item.vendorSeverity}
+                                  {item.cvssScore !== null ? ` • CVSS ${item.cvssScore.toFixed(1)}` : ''}
+                                </p>
+                                <p className="mt-2 text-xs text-muted-foreground">{item.evidence}</p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Pill>{item.matchMethod}</Pill>
+                                <Pill>{item.confidence}</Pill>
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </section>
               ) : null}
               <section className="rounded-2xl border border-border/70 bg-background p-4">
