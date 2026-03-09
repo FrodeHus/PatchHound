@@ -48,9 +48,31 @@ public class DefenderApiClientTests
         handler
             .RequestUris.Should()
             .ContainSingle(
-                "https://api.securitycenter.microsoft.com/api/vulnerability/CVE-2026-0001"
+                "https://api.securitycenter.microsoft.com/api/vulnerabilities/CVE-2026-0001"
             );
         handler.AuthorizationHeaders.Should().OnlyContain(value => value == "Bearer test-token");
+    }
+
+    [Fact]
+    public async Task GetVulnerabilityAsync_ReturnsNullOnNotFound()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.NotFound)
+        );
+        var client = new TestDefenderApiClient(new HttpClient(handler));
+
+        var response = await client.GetVulnerabilityAsync(
+            Configuration,
+            "CVE-2026-4040",
+            CancellationToken.None
+        );
+
+        response.Should().BeNull();
+        handler
+            .RequestUris.Should()
+            .ContainSingle(
+                "https://api.securitycenter.microsoft.com/api/vulnerabilities/CVE-2026-4040"
+            );
     }
 
     [Fact]
