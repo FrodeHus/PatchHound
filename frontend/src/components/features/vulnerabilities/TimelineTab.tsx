@@ -5,18 +5,59 @@ type TimelineTabProps = {
 }
 
 export function TimelineTab({ items }: TimelineTabProps) {
+  const summary = {
+    total: items.length,
+    latest: items[0]?.timestamp ?? null,
+  }
+
   return (
     <section className="rounded-lg border border-border bg-card p-4">
-      <h3 className="mb-3 text-lg font-semibold">Timeline</h3>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Audit timeline</p>
+          <h3 className="text-lg font-semibold">Recorded activity</h3>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <SummaryMetric label="Events" value={String(summary.total)} />
+          <SummaryMetric label="Latest" value={summary.latest ? new Date(summary.latest).toLocaleString() : 'None'} />
+        </div>
+      </div>
+
       <ol className="space-y-3">
-        {items.length === 0 ? <li className="text-sm text-muted-foreground">No audit events found.</li> : null}
+        {items.length === 0 ? <li className="rounded-xl border border-border/70 bg-background px-4 py-4 text-sm text-muted-foreground">No audit events found.</li> : null}
         {items.map((item) => (
-          <li key={item.id} className="rounded-md border border-border/70 p-3">
-            <p className="text-sm font-medium">{item.action}</p>
-            <p className="text-xs text-muted-foreground">{new Date(item.timestamp).toLocaleString()}</p>
+          <li key={item.id} className="rounded-xl border border-border/70 bg-background px-4 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-sky-300/70 bg-sky-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-sky-900">
+                    {item.action}
+                  </span>
+                  {item.entityLabel ? (
+                    <span className="rounded-full border border-border/70 bg-card px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      {item.entityLabel}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-sm text-foreground">
+                  {item.userDisplayName ?? 'Unknown actor'} changed {item.entityType}
+                  {item.entityLabel ? ` ${item.entityLabel}` : ''}.
+                </p>
+              </div>
+              <span className="text-xs text-muted-foreground">{new Date(item.timestamp).toLocaleString()}</span>
+            </div>
           </li>
         ))}
       </ol>
     </section>
+  )
+}
+
+function SummaryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-[120px] rounded-xl border border-border/70 bg-background px-3 py-3">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
+    </div>
   )
 }

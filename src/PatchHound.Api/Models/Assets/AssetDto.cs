@@ -7,6 +7,8 @@ public record AssetDto(
     string AssetType,
     string Criticality,
     string OwnerType,
+    Guid? OwnerUserId,
+    Guid? OwnerTeamId,
     string? SecurityProfileName,
     int VulnerabilityCount,
     int RecurringVulnerabilityCount

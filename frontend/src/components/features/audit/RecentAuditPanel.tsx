@@ -25,7 +25,7 @@ export function RecentAuditPanel({
         </div>
         <Link
           to="/audit-log"
-          search={{ page: 1, pageSize: 25 }}
+          search={{ page: 1, pageSize: 25, action: '', entityType: '' }}
           className="text-sm font-medium text-primary hover:underline"
         >
           Open audit trail

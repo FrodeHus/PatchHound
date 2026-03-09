@@ -1,6 +1,27 @@
+import { useMemo } from 'react'
+import type { ColumnDef } from '@tanstack/react-table'
 import type { RemediationTask } from '@/api/tasks.schemas'
 import { TaskStatusUpdate } from '@/components/features/tasks/TaskStatusUpdate'
+import { Badge } from '@/components/ui/badge'
+import { DataTable } from '@/components/ui/data-table'
+import {
+  DataTableActiveFilters,
+  DataTableEmptyState,
+  DataTableField,
+  DataTableFilterBar,
+  DataTableSummaryStrip,
+  DataTableToolbar,
+  DataTableToolbarRow,
+  DataTableWorkbench,
+} from '@/components/ui/data-table-workbench'
 import { PaginationControls } from '@/components/ui/pagination-controls'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 type TaskListProps = {
   tasks: RemediationTask[]
@@ -8,18 +29,16 @@ type TaskListProps = {
   page: number
   pageSize: number
   totalPages: number
+  statusFilter: string
   isUpdating: boolean
+  onStatusFilterChange: (value: string) => void
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
+  onClearFilters: () => void
   onUpdateStatus: (taskId: string, status: string, justification?: string) => void
 }
 
-type TaskGroup = {
-  title: string
-  description: string
-  className: string
-  items: RemediationTask[]
-}
+const statusOptions = ['Open', 'InProgress', 'Completed', 'RiskAccepted']
 
 function getDueSoon(task: RemediationTask): boolean {
   if (task.isOverdue) {
@@ -32,82 +51,178 @@ function getDueSoon(task: RemediationTask): boolean {
   return diffDays <= 7
 }
 
-function groupTasks(tasks: RemediationTask[]): TaskGroup[] {
-  const overdue = tasks.filter((task) => task.isOverdue)
-  const dueSoon = tasks.filter((task) => !task.isOverdue && getDueSoon(task))
-  const onTrack = tasks.filter((task) => !task.isOverdue && !getDueSoon(task))
-
-  return [
-    {
-      title: 'Overdue',
-      description: 'Past due date and not completed/accepted.',
-      className: 'border-destructive/40 bg-destructive/5',
-      items: overdue,
-    },
-    {
-      title: 'Due Soon',
-      description: 'Due in the next 7 days.',
-      className: 'border-amber-500/40 bg-amber-500/5',
-      items: dueSoon,
-    },
-    {
-      title: 'On Track',
-      description: 'Due date is more than 7 days away.',
-      className: 'border-emerald-600/40 bg-emerald-600/5',
-      items: onTrack,
-    },
-  ]
-}
-
 export function TaskList({
   tasks,
   totalCount,
   page,
   pageSize,
   totalPages,
+  statusFilter,
   isUpdating,
+  onStatusFilterChange,
   onPageChange,
   onPageSizeChange,
+  onClearFilters,
   onUpdateStatus,
 }: TaskListProps) {
-  const groups = groupTasks(tasks)
+  const summaryItems = useMemo(() => {
+    const overdue = tasks.filter((task) => task.isOverdue).length
+    const dueSoon = tasks.filter((task) => !task.isOverdue && getDueSoon(task)).length
+    const completed = tasks.filter((task) => task.status === 'Completed').length
 
-  return (
-    <div className="space-y-4">
-      {groups.map((group) => (
-        <section key={group.title} className={['rounded-lg border p-4', group.className].join(' ')}>
-          <div className="mb-3">
-            <h2 className="text-lg font-semibold">{group.title}</h2>
-            <p className="text-xs text-muted-foreground">{group.description}</p>
+    return [
+      { label: 'Rows on page', value: tasks.length.toString(), tone: 'accent' as const },
+      { label: 'Overdue', value: overdue.toString(), tone: 'warning' as const },
+      { label: 'Due soon', value: dueSoon.toString() },
+      { label: 'Completed', value: completed.toString() },
+    ]
+  }, [tasks])
+
+  const columns = useMemo<ColumnDef<RemediationTask>[]>(
+    () => [
+      {
+        accessorKey: 'vulnerabilityTitle',
+        header: 'Task',
+        cell: ({ row }) => (
+          <div className="space-y-1">
+            <p className="font-medium tracking-tight">{row.original.vulnerabilityTitle}</p>
+            <p className="text-xs text-muted-foreground">Asset: {row.original.assetName}</p>
           </div>
-
-          <div className="space-y-3">
-            {group.items.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No tasks in this category.</p>
+        ),
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }) => (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
+              {row.original.status}
+            </Badge>
+            {row.original.isOverdue ? (
+              <Badge className="rounded-full border border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/10">
+                Overdue
+              </Badge>
+            ) : getDueSoon(row.original) ? (
+              <Badge className="rounded-full border border-amber-300/70 bg-amber-50 text-amber-900 hover:bg-amber-50">
+                Due soon
+              </Badge>
             ) : (
-              group.items.map((task) => (
-                <article key={task.id} className="rounded-md border border-border bg-card p-3">
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="font-medium">{task.vulnerabilityTitle}</p>
-                      <p className="text-xs text-muted-foreground">Asset: {task.assetName}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Due: {new Date(task.dueDate).toLocaleString()}</p>
-                  </div>
-
-                  <TaskStatusUpdate
-                    currentStatus={task.status}
-                    isSubmitting={isUpdating}
-                    onSubmit={(status, justification) => {
-                      onUpdateStatus(task.id, status, justification)
-                    }}
-                  />
-                </article>
-              ))
+              <Badge className="rounded-full border border-emerald-300/70 bg-emerald-50 text-emerald-900 hover:bg-emerald-50">
+                On track
+              </Badge>
             )}
           </div>
-        </section>
-      ))}
+        ),
+      },
+      {
+        accessorKey: 'dueDate',
+        header: 'Due',
+        cell: ({ row }) => (
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">{new Date(row.original.dueDate).toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">
+              Created {new Date(row.original.createdAt).toLocaleDateString()}
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: 'justification',
+        header: 'Context',
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {row.original.justification?.trim() || 'No justification recorded'}
+          </span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: () => <div className="text-right">Update</div>,
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <div className="min-w-[220px] rounded-2xl border border-border/60 bg-background/40 p-3">
+              <TaskStatusUpdate
+                currentStatus={row.original.status}
+                isSubmitting={isUpdating}
+                onSubmit={(status, justification) => {
+                  onUpdateStatus(row.original.id, status, justification)
+                }}
+              />
+            </div>
+          </div>
+        ),
+      },
+    ],
+    [isUpdating, onUpdateStatus],
+  )
+
+  const activeFilters = useMemo(
+    () =>
+      [
+        statusFilter
+          ? {
+              key: 'status',
+              label: `Status: ${statusFilter}`,
+              onClear: () => {
+                onStatusFilterChange('')
+              },
+            }
+          : null,
+      ].filter((value): value is NonNullable<typeof value> => value !== null),
+    [onStatusFilterChange, statusFilter],
+  )
+
+  return (
+    <DataTableWorkbench
+      title="Remediation Tasks"
+      description="Work the active remediation queue, then move tasks across statuses without leaving the list."
+      totalCount={totalCount}
+    >
+      <DataTableToolbar>
+        <DataTableToolbarRow>
+          <DataTableSummaryStrip items={summaryItems} className="flex-1" />
+        </DataTableToolbarRow>
+
+        <DataTableFilterBar className="lg:grid-cols-[minmax(220px,0.8fr)]">
+          <DataTableField label="Status">
+            <Select
+              value={statusFilter || 'all'}
+              onValueChange={(value) => {
+                const nextValue = value ?? 'all'
+                onStatusFilterChange(nextValue === 'all' ? '' : nextValue)
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any status" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any status</SelectItem>
+                {statusOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
+        </DataTableFilterBar>
+
+        <DataTableToolbarRow>
+          <DataTableActiveFilters filters={activeFilters} onClearAll={onClearFilters} className="flex-1" />
+        </DataTableToolbarRow>
+      </DataTableToolbar>
+
+      {tasks.length === 0 ? (
+        <DataTableEmptyState
+          title="No remediation tasks match the current view"
+          description="Try widening the task status filter to bring more of the queue into scope."
+        />
+      ) : (
+        <div className="overflow-hidden rounded-[24px] border border-border/70 bg-background/30">
+          <DataTable columns={columns} data={tasks} getRowId={(row) => row.id} className="min-w-[1220px]" />
+        </div>
+      )}
+
       <PaginationControls
         page={page}
         pageSize={pageSize}
@@ -116,6 +231,6 @@ export function TaskList({
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
       />
-    </div>
+    </DataTableWorkbench>
   )
 }

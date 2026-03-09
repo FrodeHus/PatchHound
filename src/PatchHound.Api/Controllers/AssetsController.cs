@@ -127,6 +127,8 @@ public class AssetsController : ControllerBase
                 AssetType = a.AssetType.ToString(),
                 Criticality = a.Criticality.ToString(),
                 OwnerType = a.OwnerType.ToString(),
+                a.OwnerUserId,
+                a.OwnerTeamId,
                 SecurityProfileName = _dbContext
                     .AssetSecurityProfiles.Where(profile => profile.Id == a.SecurityProfileId)
                     .Select(profile => profile.Name)
@@ -143,6 +145,8 @@ public class AssetsController : ControllerBase
                 a.AssetType,
                 a.Criticality,
                 a.OwnerType,
+                a.OwnerUserId,
+                a.OwnerTeamId,
                 a.SecurityProfileName,
                 a.VulnerabilityCount,
                 recurringCountsByAssetId.TryGetValue(a.Id, out var recurringCount)

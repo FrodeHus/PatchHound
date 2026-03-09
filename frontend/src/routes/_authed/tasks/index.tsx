@@ -3,12 +3,23 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { fetchTasks } from '@/api/tasks.functions'
 import { updateTaskStatus } from '@/api/tasks.functions'
 import { TaskList } from '@/components/features/tasks/TaskList'
-import { baseListSearchSchema } from '@/routes/-list-search'
+import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
+
+const tasksSearchSchema = baseListSearchSchema.extend({
+  status: searchStringSchema,
+})
 
 export const Route = createFileRoute('/_authed/tasks/')({
-  validateSearch: baseListSearchSchema,
+  validateSearch: tasksSearchSchema,
   loaderDeps: ({ search }) => search,
-  loader: ({ deps }) => fetchTasks({ data: { page: deps.page, pageSize: deps.pageSize } }),
+  loader: ({ deps }) =>
+    fetchTasks({
+      data: {
+        ...(deps.status ? { status: deps.status } : {}),
+        page: deps.page,
+        pageSize: deps.pageSize,
+      },
+    }),
   component: TasksPage,
 })
 
@@ -18,8 +29,15 @@ function TasksPage() {
   const navigate = Route.useNavigate()
   const router = useRouter()
   const query = useQuery({
-    queryKey: ['tasks', search.page, search.pageSize],
-    queryFn: () => fetchTasks({ data: { page: search.page, pageSize: search.pageSize } }),
+    queryKey: ['tasks', search.status, search.page, search.pageSize],
+    queryFn: () =>
+      fetchTasks({
+        data: {
+          ...(search.status ? { status: search.status } : {}),
+          page: search.page,
+          pageSize: search.pageSize,
+        },
+      }),
     initialData,
   })
   const mutation = useMutation({
@@ -44,7 +62,13 @@ function TasksPage() {
         page={query.data.page}
         pageSize={query.data.pageSize}
         totalPages={query.data.totalPages}
+        statusFilter={search.status}
         isUpdating={mutation.isPending}
+        onStatusFilterChange={(value) => {
+          void navigate({
+            search: (prev) => ({ ...prev, status: value, page: 1 }),
+          })
+        }}
         onPageChange={(page) => {
           void navigate({
             search: (prev) => ({ ...prev, page }),
@@ -53,6 +77,11 @@ function TasksPage() {
         onPageSizeChange={(nextPageSize) => {
           void navigate({
             search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
+          })
+        }}
+        onClearFilters={() => {
+          void navigate({
+            search: (prev) => ({ ...prev, status: '', page: 1 }),
           })
         }}
         onUpdateStatus={(taskId, status, justification) => {

@@ -1,19 +1,44 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import type { ColumnDef } from '@tanstack/react-table'
 import type { AuditLogItem } from '@/api/audit-log.schemas'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuditDetailDialog } from '@/components/features/audit/AuditDetailDialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { DataTable } from '@/components/ui/data-table'
+import {
+  DataTableActiveFilters,
+  DataTableEmptyState,
+  DataTableField,
+  DataTableFilterBar,
+  DataTableSummaryStrip,
+  DataTableToolbar,
+  DataTableToolbarRow,
+  DataTableWorkbench,
+} from '@/components/ui/data-table-workbench'
 import { PaginationControls } from '@/components/ui/pagination-controls'
-
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 type AuditLogTableProps = {
   items: AuditLogItem[]
   totalCount: number
   page: number
   pageSize: number
   totalPages: number
+  actionFilter: string
+  entityTypeFilter: string
+  onActionFilterChange: (action: string) => void
+  onEntityTypeFilterChange: (entityType: string) => void
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
+  onClearFilters: () => void
 }
+
+const actionOptions = ['Created', 'Updated', 'Deleted']
 
 export function AuditLogTable({
   items,
@@ -21,92 +46,205 @@ export function AuditLogTable({
   page,
   pageSize,
   totalPages,
+  actionFilter,
+  entityTypeFilter,
+  onActionFilterChange,
+  onEntityTypeFilterChange,
   onPageChange,
   onPageSizeChange,
+  onClearFilters,
 }: AuditLogTableProps) {
   const [selected, setSelected] = useState<AuditLogItem | null>(null)
 
+  const entityTypeOptions = useMemo(
+    () => Array.from(new Set(items.map((item) => item.entityType))).sort((left, right) => left.localeCompare(right)),
+    [items],
+  )
+
+  const summaryItems = useMemo(() => {
+    const createdCount = items.filter((item) => item.action === 'Created').length
+    const updatedCount = items.filter((item) => item.action === 'Updated').length
+    const deletedCount = items.filter((item) => item.action === 'Deleted').length
+
+    return [
+      { label: 'Rows on page', value: items.length.toString(), tone: 'accent' as const },
+      { label: 'Created', value: createdCount.toString() },
+      { label: 'Updated', value: updatedCount.toString() },
+      { label: 'Deleted', value: deletedCount.toString(), tone: 'warning' as const },
+    ]
+  }, [items])
+
+  const activeFilters = useMemo(
+    () =>
+      [
+        actionFilter
+          ? {
+              key: 'action',
+              label: `Action: ${actionFilter}`,
+              onClear: () => {
+                onActionFilterChange('')
+              },
+            }
+          : null,
+        entityTypeFilter
+          ? {
+              key: 'entityType',
+              label: `Entity: ${formatEntityType(entityTypeFilter)}`,
+              onClear: () => {
+                onEntityTypeFilterChange('')
+              },
+            }
+          : null,
+      ].filter((value): value is NonNullable<typeof value> => value !== null),
+    [actionFilter, entityTypeFilter, onActionFilterChange, onEntityTypeFilterChange],
+  )
+
+  const columns = useMemo<ColumnDef<AuditLogItem>[]>(
+    () => [
+      {
+        accessorKey: 'timestamp',
+        header: 'Time',
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {new Date(row.original.timestamp).toLocaleString()}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'action',
+        header: 'Action',
+        cell: ({ row }) => <Badge className={actionBadgeClassName(row.original.action)}>{row.original.action}</Badge>,
+      },
+      {
+        accessorKey: 'entityType',
+        header: 'Entity',
+        cell: ({ row }) => (
+          <div className="space-y-1">
+            <p className="font-medium">{formatEntityType(row.original.entityType)}</p>
+            <p className="text-xs text-muted-foreground">{row.original.entityLabel ?? row.original.entityId}</p>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'userDisplayName',
+        header: 'Actor',
+        cell: ({ row }) => (
+          <div className="space-y-1">
+            <p className="font-medium">{row.original.userDisplayName ?? 'Unknown operator'}</p>
+            <p className="text-xs text-muted-foreground">{row.original.userId}</p>
+          </div>
+        ),
+      },
+      {
+        id: 'summary',
+        header: 'Summary',
+        cell: ({ row }) => <span className="text-sm text-muted-foreground">{summarizeEntry(row.original)}</span>,
+      },
+      {
+        id: 'details',
+        header: () => <div className="text-right">Details</div>,
+        cell: ({ row }) => (
+          <div className="text-right">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelected(row.original)
+              }}
+            >
+              View JSON
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [],
+  )
+
   return (
     <>
-      <Card className="rounded-[28px] border-border/70 bg-card/82">
-        <CardHeader>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <CardTitle>Audit Trail</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Review configuration and administrative changes with actor and entity context.
-              </p>
-            </div>
-            <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
-              {totalCount} total
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto rounded-[24px] border border-border/70 bg-background/25">
-            <table className="w-full min-w-[1120px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="px-4 py-3 pr-2">Time</th>
-                <th className="px-4 py-3 pr-2">Action</th>
-                <th className="px-4 py-3 pr-2">Entity</th>
-                <th className="px-4 py-3 pr-2">Actor</th>
-                <th className="px-4 py-3 pr-2">Summary</th>
-                <th className="px-4 py-3 pr-4">Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-muted-foreground">No audit entries found.</td>
-                </tr>
-              ) : (
-                items.map((item) => (
-                  <tr key={item.id} className="border-b border-border/60">
-                    <td className="px-4 py-3 pr-2 text-muted-foreground">{new Date(item.timestamp).toLocaleString()}</td>
-                    <td className="px-4 py-3 pr-2">
-                      <Badge className={actionBadgeClassName(item.action)}>{item.action}</Badge>
-                    </td>
-                    <td className="px-4 py-3 pr-2">
-                      <div>
-                        <p className="font-medium">{formatEntityType(item.entityType)}</p>
-                        <p className="text-xs text-muted-foreground">{item.entityLabel ?? item.entityId}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 pr-2">
-                      <div>
-                        <p className="font-medium">{item.userDisplayName ?? 'Unknown operator'}</p>
-                        <p className="text-xs text-muted-foreground">{item.userId}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 pr-2 text-muted-foreground">{summarizeEntry(item)}</td>
-                    <td className="px-4 py-3 pr-4">
-                      <button
-                        type="button"
-                        className="rounded-full border border-input px-3 py-1.5 text-xs hover:bg-muted"
-                        onClick={() => {
-                          setSelected(item)
-                        }}
-                      >
-                        View JSON
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-            </table>
-          </div>
-          <PaginationControls
-            page={page}
-            pageSize={pageSize}
-            totalCount={totalCount}
-            totalPages={totalPages}
-            onPageChange={onPageChange}
-            onPageSizeChange={onPageSizeChange}
+      <DataTableWorkbench
+        title="Audit Trail"
+        description="Review administrative and configuration changes with actor, entity, and change-summary context."
+        totalCount={totalCount}
+      >
+        <DataTableToolbar>
+          <DataTableToolbarRow>
+            <DataTableSummaryStrip items={summaryItems} className="flex-1" />
+          </DataTableToolbarRow>
+
+          <DataTableFilterBar className="lg:grid-cols-[repeat(2,minmax(220px,0.8fr))]">
+            <DataTableField label="Action">
+              <Select
+                value={actionFilter || 'all'}
+                onValueChange={(value) => {
+                  const nextValue = value ?? 'all'
+                  onActionFilterChange(nextValue === 'all' ? '' : nextValue)
+                }}
+              >
+                <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                  <SelectValue placeholder="Any action" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                  <SelectItem value="all">Any action</SelectItem>
+                  {actionOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </DataTableField>
+
+            <DataTableField label="Entity type">
+              <Select
+                value={entityTypeFilter || 'all'}
+                onValueChange={(value) => {
+                  const nextValue = value ?? 'all'
+                  onEntityTypeFilterChange(nextValue === 'all' ? '' : nextValue)
+                }}
+              >
+                <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                  <SelectValue placeholder="Any entity" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                  <SelectItem value="all">Any entity</SelectItem>
+                  {entityTypeOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {formatEntityType(option)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </DataTableField>
+          </DataTableFilterBar>
+
+          <DataTableToolbarRow>
+            <DataTableActiveFilters filters={activeFilters} onClearAll={onClearFilters} className="flex-1" />
+          </DataTableToolbarRow>
+        </DataTableToolbar>
+
+        {items.length === 0 ? (
+          <DataTableEmptyState
+            title="No audit entries match the current view"
+            description="Try widening the action or entity-type filter to bring more history into scope."
           />
-        </CardContent>
-      </Card>
+        ) : (
+          <div className="overflow-hidden rounded-[24px] border border-border/70 bg-background/30">
+            <DataTable columns={columns} data={items} getRowId={(row) => row.id} className="min-w-[1120px]" />
+          </div>
+        )}
+
+        <PaginationControls
+          page={page}
+          pageSize={pageSize}
+          totalCount={totalCount}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+        />
+      </DataTableWorkbench>
 
       <AuditDetailDialog
         selected={selected}
@@ -164,7 +302,7 @@ function formatKey(value: string) {
 function actionBadgeClassName(action: string) {
   switch (action) {
     case 'Created':
-      return 'rounded-full border border-emerald-400/25 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/10'
+      return 'rounded-full border border-emerald-300/70 bg-emerald-50 text-emerald-900 hover:bg-emerald-50'
     case 'Updated':
       return 'rounded-full border border-primary/20 bg-primary/10 text-primary hover:bg-primary/10'
     case 'Deleted':

@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { useState } from 'react'
 import type { AffectedAsset } from '@/api/vulnerabilities.schemas'
 
 type AffectedAssetsTabProps = {
@@ -8,123 +8,179 @@ type AffectedAssetsTabProps = {
 export function AffectedAssetsTab({ assets }: AffectedAssetsTabProps) {
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(assets[0]?.assetId ?? null)
 
+  if (assets.length === 0) {
+    return (
+      <section className="rounded-lg border border-border bg-card p-4">
+        <div className="space-y-1">
+          <h3 className="text-lg font-semibold">Affected Assets</h3>
+          <p className="text-sm text-muted-foreground">No affected assets are currently linked to this vulnerability.</p>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="rounded-lg border border-border bg-card p-4">
-      <h3 className="mb-3 text-lg font-semibold">Affected Assets</h3>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-muted-foreground">
-              <th className="py-2 pr-2">Asset</th>
-              <th className="py-2 pr-2">Type</th>
-              <th className="py-2 pr-2">Profile</th>
-              <th className="py-2 pr-2">Status</th>
-              <th className="py-2 pr-2">Effective Severity</th>
-              <th className="py-2 pr-2">Episodes</th>
-              <th className="py-2 pr-2">Detected</th>
-              <th className="py-2 pr-2">Resolved</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assets.map((asset) => {
-              const isExpanded = expandedAssetId === asset.assetId
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-1">
+          <h3 className="text-lg font-semibold">Affected Assets</h3>
+          <p className="text-sm text-muted-foreground">
+            Review where the vulnerability is present, how severe it is in context, and whether it has recurred.
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground">{assets.length} linked assets</p>
+      </div>
 
-              return (
-                <Fragment key={asset.assetId}>
-                  <tr
-                    className="cursor-pointer border-b border-border/60 hover:bg-muted/20"
-                    onClick={() => {
-                      setExpandedAssetId((current) => current === asset.assetId ? null : asset.assetId)
-                    }}
-                  >
-                    <td className="py-2 pr-2">
+      <div className="space-y-3">
+        {assets.map((asset) => {
+          const isExpanded = expandedAssetId === asset.assetId
+
+          return (
+            <article key={asset.assetId} className="rounded-xl border border-border/70 bg-background">
+              <button
+                type="button"
+                className="w-full px-4 py-4 text-left"
+                onClick={() => {
+                  setExpandedAssetId((current) => (current === asset.assetId ? null : asset.assetId))
+                }}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground">{asset.assetName}</p>
+                      <Badge tone="slate" label={asset.assetType} />
+                      <Badge tone={asset.status === 'Open' ? 'blue' : 'muted'} label={asset.status} />
+                      {asset.episodeCount > 1 ? (
+                        <Badge tone="amber" label={`Recurred ${asset.episodeCount}x`} />
+                      ) : null}
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <Metric label="Effective severity" value={formatSeverity(asset.effectiveSeverity, asset.effectiveScore)} />
+                      <Metric label="Security profile" value={asset.securityProfileName ?? 'No profile'} />
+                      <Metric label="Detected" value={new Date(asset.detectedDate).toLocaleString()} />
+                      <Metric label="Resolved" value={asset.resolvedDate ? new Date(asset.resolvedDate).toLocaleString() : 'Still open'} />
+                    </div>
+
+                    {asset.assessmentReasonSummary ? (
+                      <div className="rounded-lg border border-sky-200/70 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+                        {asset.assessmentReasonSummary}
+                      </div>
+                    ) : null}
+
+                    {asset.possibleCorrelatedSoftware.length > 0 ? (
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{asset.assetName}</span>
-                          <span className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
-                            {isExpanded ? 'Hide timeline' : 'Show timeline'}
-                          </span>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Likely overlapping software</p>
+                        <div className="flex flex-wrap gap-2">
+                          {asset.possibleCorrelatedSoftware.map((software) => (
+                            <span
+                              key={software}
+                              className="rounded-full border border-amber-300/70 bg-amber-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-amber-900"
+                            >
+                              {software}
+                            </span>
+                          ))}
                         </div>
-                        {asset.possibleCorrelatedSoftware.length > 0 ? (
-                          <p className="text-xs text-amber-700">
-                            Likely overlap: {asset.possibleCorrelatedSoftware.join(', ')}
-                          </p>
-                        ) : null}
                       </div>
-                    </td>
-                    <td className="py-2 pr-2">{asset.assetType}</td>
-                    <td className="py-2 pr-2">{asset.securityProfileName ?? '-'}</td>
-                    <td className="py-2 pr-2">{asset.status}</td>
-                    <td className="py-2 pr-2">
-                      <div className="space-y-1">
-                        <p>
-                          {asset.effectiveScore
-                            ? `${asset.effectiveSeverity} (${asset.effectiveScore.toFixed(1)})`
-                            : asset.effectiveSeverity}
-                        </p>
-                        {asset.assessmentReasonSummary ? (
-                          <p className="text-xs text-sky-700">{asset.assessmentReasonSummary}</p>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="py-2 pr-2">
-                      <div className="flex flex-wrap gap-1">
-                        {asset.episodes.map((episode) => (
-                          <span key={episode.episodeNumber} className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-xs">
-                            #{episode.episodeNumber} {episode.status === 'Open' ? 'Open' : 'Closed'}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="py-2 pr-2">{new Date(asset.detectedDate).toLocaleString()}</td>
-                    <td className="py-2 pr-2">{asset.resolvedDate ? new Date(asset.resolvedDate).toLocaleString() : '-'}</td>
-                  </tr>
-                  {isExpanded ? (
-                    <tr className="border-b border-border/60 bg-muted/10">
-                      <td colSpan={8} className="px-0 py-0">
-                        <div className="space-y-3 p-4">
-                          <div>
-                            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Episode timeline</p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              Each episode represents a continuous period where the vulnerability remained present on this asset.
+                    ) : null}
+                  </div>
+
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {asset.episodes.map((episode) => (
+                        <span
+                          key={episode.episodeNumber}
+                          className="rounded-full border border-border/70 bg-card px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+                        >
+                          #{episode.episodeNumber} {episode.status}
+                        </span>
+                      ))}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {isExpanded ? 'Hide recurrence timeline' : 'Show recurrence timeline'}
+                    </span>
+                  </div>
+                </div>
+              </button>
+
+              {isExpanded ? (
+                <div className="border-t border-border/70 px-4 py-4">
+                  <div className="mb-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Episode timeline</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Each episode represents a continuous period where this vulnerability remained present on the asset.
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    {[...asset.episodes]
+                      .sort((left, right) => new Date(right.firstSeenAt).getTime() - new Date(left.firstSeenAt).getTime())
+                      .map((episode, index) => (
+                        <div key={episode.episodeNumber} className="flex gap-3">
+                          <div className="flex w-5 flex-col items-center">
+                            <span
+                              className={`mt-1 h-2.5 w-2.5 rounded-full ${
+                                episode.episodeNumber > 1 ? 'bg-amber-500' : 'bg-sky-500'
+                              }`}
+                            />
+                            {index < asset.episodes.length - 1 ? <span className="mt-1 h-full w-px bg-border/80" /> : null}
+                          </div>
+                          <div className="flex-1 rounded-xl border border-border/70 bg-card px-3 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-medium">
+                                Episode #{episode.episodeNumber} {episode.episodeNumber > 1 ? 'reappeared' : 'detected'}
+                              </p>
+                              <span className="text-xs text-muted-foreground">{new Date(episode.firstSeenAt).toLocaleString()}</span>
+                            </div>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              Last seen {new Date(episode.lastSeenAt).toLocaleString()}
+                              {episode.resolvedAt ? `, resolved ${new Date(episode.resolvedAt).toLocaleString()}.` : ', still open.'}
                             </p>
                           </div>
-                          <div className="space-y-3">
-                            {[...asset.episodes]
-                              .sort((left, right) => new Date(right.firstSeenAt).getTime() - new Date(left.firstSeenAt).getTime())
-                              .map((episode, index) => (
-                                <div key={episode.episodeNumber} className="flex gap-3">
-                                  <div className="flex w-5 flex-col items-center">
-                                    <span className={`mt-1 h-2.5 w-2.5 rounded-full ${episode.episodeNumber > 1 ? 'bg-amber-500' : 'bg-sky-500'}`} />
-                                    {index < asset.episodes.length - 1 ? <span className="mt-1 h-full w-px bg-border/80" /> : null}
-                                  </div>
-                                  <div className="flex-1 rounded-xl border border-border/70 bg-background px-3 py-3">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <p className="text-sm font-medium">
-                                        Episode #{episode.episodeNumber} {episode.episodeNumber > 1 ? 'reappeared' : 'detected'}
-                                      </p>
-                                      <span className="text-xs text-muted-foreground">
-                                        {new Date(episode.firstSeenAt).toLocaleString()}
-                                      </span>
-                                    </div>
-                                    <p className="mt-2 text-sm text-muted-foreground">
-                                      Last seen {new Date(episode.lastSeenAt).toLocaleString()}
-                                      {episode.resolvedAt ? `, resolved ${new Date(episode.resolvedAt).toLocaleString()}.` : ', still open.'}
-                                    </p>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  ) : null}
-                </Fragment>
-              )
-            })}
-          </tbody>
-        </table>
+                      ))}
+                  </div>
+                </div>
+              ) : null}
+            </article>
+          )
+        })}
       </div>
     </section>
   )
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+      <p className="text-sm text-foreground">{value}</p>
+    </div>
+  )
+}
+
+function Badge({
+  label,
+  tone,
+}: {
+  label: string
+  tone: 'slate' | 'blue' | 'amber' | 'muted'
+}) {
+  const className =
+    tone === 'amber'
+      ? 'border-amber-300/70 bg-amber-50 text-amber-900'
+      : tone === 'blue'
+        ? 'border-sky-300/70 bg-sky-50 text-sky-900'
+        : tone === 'muted'
+          ? 'border-border/70 bg-card text-muted-foreground'
+          : 'border-border/70 bg-card text-foreground'
+
+  return (
+    <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${className}`}>
+      {label}
+    </span>
+  )
+}
+
+function formatSeverity(severity: string, score: number | null) {
+  return score ? `${severity} (${score.toFixed(1)})` : severity
 }
