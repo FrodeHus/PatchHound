@@ -12,8 +12,8 @@ using PatchHound.Infrastructure.Data;
 namespace PatchHound.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(PatchHoundDbContext))]
-    [Migration("20260309074613_AddEnrichmentJobsAndRuns")]
-    partial class AddEnrichmentJobsAndRuns
+    [Migration("20260309083508_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -501,7 +501,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("StartedAt");
 
-                    b.ToTable("EnrichmentRun");
+                    b.ToTable("EnrichmentRun", (string)null);
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.EnrichmentSourceConfiguration", b =>

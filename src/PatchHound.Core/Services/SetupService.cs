@@ -83,8 +83,6 @@ public class SetupService : ISetupService
             return Result<Tenant>.Failure("Admin Entra object ID is required");
         }
 
-        await using var transaction = await _unitOfWork.BeginTransactionAsync(ct);
-
         var appInitialized = await IsInitializedAsync(ct);
         var tenantExists = await _tenantRepository.ExistsByEntraTenantIdUnfilteredAsync(
             request.EntraTenantId.Trim(),
@@ -109,6 +107,14 @@ public class SetupService : ISetupService
             return Result<Tenant>.Failure("Admin email already exists");
         }
 
+        var existingEnrichmentSourceKeys = !appInitialized
+            ? (await _enrichmentSourceRepository.GetAllAsync(ct))
+                .Select(source => source.SourceKey)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : null;
+
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(ct);
+
         var tenant = Tenant.Create(request.TenantName.Trim(), request.EntraTenantId.Trim());
 
         var user =
@@ -128,13 +134,9 @@ public class SetupService : ISetupService
         }
         if (!appInitialized)
         {
-            var existingEnrichmentSourceKeys = (await _enrichmentSourceRepository.GetAllAsync(ct))
-                .Select(source => source.SourceKey)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
             foreach (var source in EnrichmentSourceDefaults.CreateDefaults())
             {
-                if (existingEnrichmentSourceKeys.Contains(source.SourceKey))
+                if (existingEnrichmentSourceKeys!.Contains(source.SourceKey))
                 {
                     continue;
                 }

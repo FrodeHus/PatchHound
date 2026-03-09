@@ -498,7 +498,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("StartedAt");
 
-                    b.ToTable("EnrichmentRun");
+                    b.ToTable("EnrichmentRun", (string)null);
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.EnrichmentSourceConfiguration", b =>
