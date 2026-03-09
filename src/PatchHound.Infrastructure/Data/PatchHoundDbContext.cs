@@ -69,6 +69,15 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         return new EfTransaction(transaction);
     }
 
+    public Task ExecuteResilientAsync(
+        Func<CancellationToken, Task> operation,
+        CancellationToken ct = default
+    )
+    {
+        var strategy = Database.CreateExecutionStrategy();
+        return strategy.ExecuteAsync(async innerCt => await operation(innerCt), ct);
+    }
+
     private sealed class EfTransaction(
         Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction inner
     ) : IUnitOfWorkTransaction

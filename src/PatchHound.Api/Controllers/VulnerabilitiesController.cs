@@ -284,7 +284,7 @@ public class VulnerabilitiesController : ControllerBase
             )
             .ToListAsync(ct);
 
-        var matchedSoftware = await _dbContext
+        var matchedSoftwareRows = await _dbContext
             .SoftwareVulnerabilityMatches.AsNoTracking()
             .Where(match => match.VulnerabilityId == id && match.ResolvedAt == null)
             .Join(
@@ -292,20 +292,35 @@ public class VulnerabilitiesController : ControllerBase
                 match => match.SoftwareAssetId,
                 software => software.Id,
                 (match, software) =>
-                    new MatchedSoftwareDto(
+                    new
+                    {
                         software.Id,
                         software.Name,
                         software.ExternalId,
-                        match.MatchMethod.ToString(),
-                        match.Confidence.ToString(),
+                        MatchMethod = match.MatchMethod.ToString(),
+                        Confidence = match.Confidence.ToString(),
                         match.Evidence,
                         match.FirstSeenAt,
                         match.LastSeenAt,
-                        match.ResolvedAt
-                    )
+                        match.ResolvedAt,
+                    }
             )
             .OrderBy(item => item.Name)
             .ToListAsync(ct);
+
+        var matchedSoftware = matchedSoftwareRows
+            .Select(item => new MatchedSoftwareDto(
+                item.Id,
+                item.Name,
+                item.ExternalId,
+                item.MatchMethod,
+                item.Confidence,
+                item.Evidence,
+                item.FirstSeenAt,
+                item.LastSeenAt,
+                item.ResolvedAt
+            ))
+            .ToList();
 
         var tenantHistory = BuildTenantHistory(episodeRows);
 

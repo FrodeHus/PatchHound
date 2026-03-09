@@ -113,46 +113,56 @@ public class SetupService : ISetupService
                 .ToHashSet(StringComparer.OrdinalIgnoreCase)
             : null;
 
-        await using var transaction = await _unitOfWork.BeginTransactionAsync(ct);
-
-        var tenant = Tenant.Create(request.TenantName.Trim(), request.EntraTenantId.Trim());
-
-        var user =
-            existingUser
-            ?? User.Create(
-                request.AdminEmail.Trim(),
-                request.AdminDisplayName.Trim(),
-                request.AdminEntraObjectId.Trim()
-            );
-
-        var role = UserTenantRole.Create(user.Id, tenant.Id, RoleName.GlobalAdmin);
-
-        await _tenantRepository.AddAsync(tenant, ct);
-        foreach (var source in TenantSourceDefaults.CreateDefaults(tenant.Id))
-        {
-            await _tenantSourceRepository.AddAsync(source, ct);
-        }
-        if (!appInitialized)
-        {
-            foreach (var source in EnrichmentSourceDefaults.CreateDefaults())
+        Tenant tenant = null!;
+        await _unitOfWork.ExecuteResilientAsync(
+            async innerCt =>
             {
-                if (existingEnrichmentSourceKeys!.Contains(source.SourceKey))
+                await using var transaction = await _unitOfWork.BeginTransactionAsync(innerCt);
+
+                tenant = Tenant.Create(request.TenantName.Trim(), request.EntraTenantId.Trim());
+
+                var user =
+                    existingUser
+                    ?? User.Create(
+                        request.AdminEmail.Trim(),
+                        request.AdminDisplayName.Trim(),
+                        request.AdminEntraObjectId.Trim()
+                    );
+
+                var role = UserTenantRole.Create(user.Id, tenant.Id, RoleName.GlobalAdmin);
+
+                await _tenantRepository.AddAsync(tenant, innerCt);
+                foreach (var source in TenantSourceDefaults.CreateDefaults(tenant.Id))
                 {
-                    continue;
+                    await _tenantSourceRepository.AddAsync(source, innerCt);
                 }
+                if (!appInitialized)
+                {
+                    foreach (var source in EnrichmentSourceDefaults.CreateDefaults())
+                    {
+                        if (existingEnrichmentSourceKeys!.Contains(source.SourceKey))
+                        {
+                            continue;
+                        }
 
-                await _enrichmentSourceRepository.AddAsync(source, ct);
-            }
-        }
-        await _tenantSlaRepository.AddAsync(TenantSlaConfiguration.CreateDefault(tenant.Id), ct);
+                        await _enrichmentSourceRepository.AddAsync(source, innerCt);
+                    }
+                }
+                await _tenantSlaRepository.AddAsync(
+                    TenantSlaConfiguration.CreateDefault(tenant.Id),
+                    innerCt
+                );
 
-        if (existingUser is null)
-        {
-            await _userRepository.AddAsync(user, ct);
-        }
-        await _userRepository.AddRoleAsync(role, ct);
-        await _unitOfWork.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
+                if (existingUser is null)
+                {
+                    await _userRepository.AddAsync(user, innerCt);
+                }
+                await _userRepository.AddRoleAsync(role, innerCt);
+                await _unitOfWork.SaveChangesAsync(innerCt);
+                await transaction.CommitAsync(innerCt);
+            },
+            ct
+        );
 
         return Result<Tenant>.Success(tenant);
     }
