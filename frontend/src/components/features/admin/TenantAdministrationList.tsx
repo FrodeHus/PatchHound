@@ -1,20 +1,21 @@
 import { Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import type { ColumnDef } from '@tanstack/react-table'
 import { ArrowRight, BadgeCheck, Building2, DatabaseZap, KeyRound, ShieldCheck } from 'lucide-react'
 import type { TenantListItem } from '@/api/settings.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { DataTable } from '@/components/ui/data-table'
 import { Input } from '@/components/ui/input'
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+  DataTableEmptyState,
+  DataTableSummaryStrip,
+  DataTableToolbar,
+  DataTableToolbarRow,
+  DataTableWorkbench,
+} from '@/components/ui/data-table-workbench'
 
 type TenantAdministrationListProps = {
   tenants: TenantListItem[]
@@ -43,6 +44,71 @@ export function TenantAdministrationList({
 }: TenantAdministrationListProps) {
   const [name, setName] = useState('')
   const [entraTenantId, setEntraTenantId] = useState('')
+  const summaryItems = useMemo(
+    () => [
+      { label: 'Tenants on page', value: tenants.length.toString(), tone: 'accent' as const },
+      {
+        label: 'Configured sources',
+        value: tenants.reduce((sum, tenant) => sum + tenant.configuredIngestionSourceCount, 0).toString(),
+      },
+      {
+        label: 'Ready to connect',
+        value: tenants.filter((tenant) => tenant.configuredIngestionSourceCount === 0).length.toString(),
+      },
+    ],
+    [tenants],
+  )
+
+  const columns = useMemo<ColumnDef<TenantListItem>[]>(
+    () => [
+      {
+        accessorKey: 'name',
+        header: 'Tenant',
+        cell: ({ row }) => (
+          <div className="space-y-1">
+            <Link
+              to="/admin/tenants/$id"
+              params={{ id: row.original.id }}
+              className="font-medium tracking-tight underline decoration-border/70 underline-offset-4 transition hover:decoration-foreground"
+            >
+              {row.original.name}
+            </Link>
+            <p className="font-mono text-[11px] text-muted-foreground">{row.original.entraTenantId}</p>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'entraTenantId',
+        header: 'Entra tenant ID',
+        cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.entraTenantId}</span>,
+      },
+      {
+        accessorKey: 'configuredIngestionSourceCount',
+        header: 'Configured sources',
+        cell: ({ row }) => (
+          <Badge variant="outline" className="rounded-full border-border/70 bg-background/70 text-foreground">
+            {row.original.configuredIngestionSourceCount}
+          </Badge>
+        ),
+      },
+      {
+        id: 'open',
+        header: () => <div className="text-right">Open</div>,
+        cell: ({ row }) => (
+          <div className="text-right">
+            <Link
+              to="/admin/tenants/$id"
+              params={{ id: row.original.id }}
+              className="text-sm font-medium text-primary underline decoration-primary/30 underline-offset-4 transition hover:decoration-primary"
+            >
+              Open detail
+            </Link>
+          </div>
+        ),
+      },
+    ],
+    [],
+  )
 
   return (
     <section className="space-y-4">
@@ -187,62 +253,37 @@ export function TenantAdministrationList({
         </CardContent>
       </Card>
 
-      <Card className="rounded-[28px] border-border/70 bg-card/82">
-        <CardHeader>
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <CardTitle>Tenant Directory</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Select a tenant to review identity, SLA, inventory footprint, and source readiness.
-              </p>
-            </div>
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{totalCount} total</p>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {tenants.length === 0 ? (
-            <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-6 text-sm text-muted-foreground">
-              No tenants found.
-            </div>
-          ) : (
-            tenants.map((tenant) => (
-              <Link
-                key={tenant.id}
-                to="/admin/tenants/$id"
-                params={{ id: tenant.id }}
-                className="group rounded-[24px] border border-border/70 bg-background/30 p-4 transition hover:border-primary/20 hover:bg-background/45"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-lg font-semibold tracking-tight">{tenant.name}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">Entra Tenant</p>
-                  </div>
-                  <ArrowRight className="size-4 text-muted-foreground transition group-hover:text-primary" />
-                </div>
-                <code className="mt-3 block rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-xs text-muted-foreground">
-                  {tenant.entraTenantId}
-                </code>
-                <div className="mt-4 flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2">
-                  <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Configured Sources</span>
-                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/70 text-foreground">
-                    {tenant.configuredIngestionSourceCount}
-                  </Badge>
-                </div>
-              </Link>
-            ))
-          )}
-        </CardContent>
-        <div className="px-6 pb-6">
-          <PaginationControls
-            page={page}
-            pageSize={pageSize}
-            totalCount={totalCount}
-            totalPages={totalPages}
-            onPageChange={onPageChange}
-            onPageSizeChange={onPageSizeChange}
+      <DataTableWorkbench
+        title="Tenant Directory"
+        description="Select a tenant to review identity, SLA, inventory footprint, and source readiness."
+        totalCount={totalCount}
+      >
+        <DataTableToolbar>
+          <DataTableToolbarRow>
+            <DataTableSummaryStrip items={summaryItems} className="grid-cols-1 sm:grid-cols-3" />
+          </DataTableToolbarRow>
+        </DataTableToolbar>
+
+        {tenants.length === 0 ? (
+          <DataTableEmptyState
+            title="No tenants found"
+            description="Create the first tenant to start configuring ingestion sources and inventory policy."
           />
-        </div>
-      </Card>
+        ) : (
+          <div className="overflow-hidden rounded-[24px] border border-border/70 bg-background/30">
+            <DataTable columns={columns} data={tenants} getRowId={(row) => row.id} className="min-w-[980px]" />
+          </div>
+        )}
+
+        <PaginationControls
+          page={page}
+          pageSize={pageSize}
+          totalCount={totalCount}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+        />
+      </DataTableWorkbench>
     </section>
   )
 }

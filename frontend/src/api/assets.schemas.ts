@@ -8,6 +8,8 @@ export const assetSchema = z.object({
   assetType: z.string(),
   criticality: z.string(),
   ownerType: z.string(),
+  ownerUserId: z.string().uuid().nullable(),
+  ownerTeamId: z.string().uuid().nullable(),
   securityProfileName: z.string().nullable(),
   vulnerabilityCount: z.number(),
   recurringVulnerabilityCount: z.number(),

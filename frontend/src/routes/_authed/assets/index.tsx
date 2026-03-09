@@ -8,7 +8,10 @@ import { AssetManagementTable } from '@/components/features/assets/AssetManageme
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
 
 const assetsSearchSchema = baseListSearchSchema.extend({
+  search: searchStringSchema,
   assetType: searchStringSchema,
+  criticality: searchStringSchema,
+  ownerType: searchStringSchema,
   unassignedOnly: searchBooleanSchema,
 })
 
@@ -18,7 +21,10 @@ export const Route = createFileRoute('/_authed/assets/')({
   loader: ({ deps }) =>
     fetchAssets({
       data: {
+        ...(deps.search ? { search: deps.search } : {}),
         ...(deps.assetType ? { assetType: deps.assetType } : {}),
+        ...(deps.criticality ? { criticality: deps.criticality } : {}),
+        ...(deps.ownerType ? { ownerType: deps.ownerType } : {}),
         ...(deps.unassignedOnly ? { unassignedOnly: true } : {}),
         page: deps.page,
         pageSize: deps.pageSize,
@@ -34,11 +40,14 @@ function AssetsPage() {
   const router = useRouter()
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
   const assetsQuery = useQuery({
-    queryKey: ['assets', search.assetType, search.unassignedOnly, search.page, search.pageSize],
+    queryKey: ['assets', search.search, search.assetType, search.criticality, search.ownerType, search.unassignedOnly, search.page, search.pageSize],
     queryFn: () =>
       fetchAssets({
         data: {
+          ...(search.search ? { search: search.search } : {}),
           ...(search.assetType ? { assetType: search.assetType } : {}),
+          ...(search.criticality ? { criticality: search.criticality } : {}),
+          ...(search.ownerType ? { ownerType: search.ownerType } : {}),
           ...(search.unassignedOnly ? { unassignedOnly: true } : {}),
           page: search.page,
           pageSize: search.pageSize,
@@ -98,14 +107,35 @@ function AssetsPage() {
         totalCount={assetsQuery.data.totalCount}
         isUpdating={ownerMutation.isPending || criticalityMutation.isPending || securityProfileMutation.isPending}
         selectedAssetId={selectedAssetId}
+        searchValue={search.search}
         assetTypeFilter={search.assetType}
+        criticalityFilter={search.criticality}
+        ownerTypeFilter={search.ownerType}
         unassignedOnly={search.unassignedOnly}
         page={assetsQuery.data.page}
         pageSize={assetsQuery.data.pageSize}
         totalPages={assetsQuery.data.totalPages}
+        onSearchChange={(searchValue) => {
+          void navigate({
+            search: (prev) => ({ ...prev, search: searchValue, page: 1 }),
+          })
+          setSelectedAssetId(null)
+        }}
         onAssetTypeFilterChange={(assetType) => {
           void navigate({
             search: (prev) => ({ ...prev, assetType, page: 1 }),
+          })
+          setSelectedAssetId(null)
+        }}
+        onCriticalityFilterChange={(criticality) => {
+          void navigate({
+            search: (prev) => ({ ...prev, criticality, page: 1 }),
+          })
+          setSelectedAssetId(null)
+        }}
+        onOwnerTypeFilterChange={(ownerType) => {
+          void navigate({
+            search: (prev) => ({ ...prev, ownerType, page: 1 }),
           })
           setSelectedAssetId(null)
         }}
@@ -123,6 +153,20 @@ function AssetsPage() {
         onPageSizeChange={(nextPageSize) => {
           void navigate({
             search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
+          })
+          setSelectedAssetId(null)
+        }}
+        onClearFilters={() => {
+          void navigate({
+            search: (prev) => ({
+              ...prev,
+              search: '',
+              assetType: '',
+              criticality: '',
+              ownerType: '',
+              unassignedOnly: false,
+              page: 1,
+            }),
           })
           setSelectedAssetId(null)
         }}

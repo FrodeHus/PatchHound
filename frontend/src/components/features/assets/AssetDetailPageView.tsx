@@ -29,7 +29,15 @@ export function AssetDetailPageView({
           <div className="space-y-3">
             <Link
               to="/assets"
-              search={{ page: 1, pageSize: 25, assetType: '', unassignedOnly: false }}
+              search={{
+                page: 1,
+                pageSize: 25,
+                search: '',
+                assetType: '',
+                criticality: '',
+                ownerType: '',
+                unassignedOnly: false,
+              }}
               className="text-sm text-muted-foreground hover:text-foreground"
             >
               Back to assets
