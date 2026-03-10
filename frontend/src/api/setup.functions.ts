@@ -45,15 +45,12 @@ export const fetchSetupContext = createServerFn({ method: 'GET' })
 export const completeSetup = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(setupPayloadSchema)
-  .handler(async ({ context }) => {
+  .handler(async ({ data, context }) => {
     const status = await apiGet('/setup/status', { token: '' })
     const { isInitialized } = setupStatusSchema.parse(status)
     if (isInitialized && !(await fetchSetupStatus()).requiresSetup) {
       throw new Error('Setup has already been completed')
     }
 
-    const setupContext = await fetchSetupContext()
-    await apiPost('/setup/complete', context, {
-      tenantName: setupContext.tenantName,
-    })
+    await apiPost('/setup/complete', context, data)
   })
