@@ -63,9 +63,12 @@ function SourcesAdministrationPage() {
   return (
     <section className="space-y-6 pb-4">
       <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-[-0.04em]">Sources Console</h1>
+        <h1 className="text-3xl font-semibold tracking-[-0.04em]">
+          Sources Console
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Manage tenant-specific ingestion separately from shared global enrichment, with a cleaner operational split between the two.
+          Manage tenant-specific ingestion separately from shared global
+          enrichment, with a cleaner operational split between the two.
         </p>
       </div>
 
@@ -73,59 +76,68 @@ function SourcesAdministrationPage() {
         <div className="inline-flex rounded-[20px] border border-border/70 bg-card/70 p-1">
           <button
             type="button"
-            className={viewToggleClassName(activeView === 'tenant')}
-            onClick={() => setActiveView('tenant')}
+            className={viewToggleClassName(activeView === "tenant")}
+            onClick={() => setActiveView("tenant")}
           >
             Tenant Sources
           </button>
           <button
             type="button"
-            className={viewToggleClassName(activeView === 'global-enrichment')}
-            onClick={() => setActiveView('global-enrichment')}
+            className={viewToggleClassName(activeView === "global-enrichment")}
+            onClick={() => setActiveView("global-enrichment")}
           >
             Global Enrichment
           </button>
         </div>
       ) : null}
 
-      {activeView === 'tenant' ? (
+      {activeView === "tenant" ? (
         <Card className="rounded-[30px] border-border/70 bg-card/82 shadow-sm">
           <CardHeader className="border-b border-border/60 pb-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-1">
                 <CardTitle>Tenant Context</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  The top bar controls which tenant's ingestion credentials, schedules, and manual sync controls are active here.
+                  The top bar controls which tenant's ingestion credentials,
+                  schedules, and manual sync controls are active here.
                 </p>
               </div>
               {tenant ? (
-                <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/10 px-3 py-1 text-primary">
+                <Badge
+                  variant="outline"
+                  className="rounded-full border-primary/20 bg-primary/10 px-3 py-1 text-primary"
+                >
                   {tenant.name}
                 </Badge>
               ) : null}
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 pt-5 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:items-end">
-            <div className="space-y-2 rounded-[24px] border border-border/70 bg-background/30 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Active Tenant</p>
-              <p className="text-lg font-semibold">{tenant?.name ?? tenants.find((tenantItem) => tenantItem.id === selectedTenantId)?.name ?? 'No tenant selected'}</p>
-              <p className="text-sm text-muted-foreground">
-                Change tenant scope from the top navigation to inspect another environment.
-              </p>
-            </div>
             {tenant ? (
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Assets</p>
-                  <p className="mt-1 text-xl font-semibold">{tenant.assets.totalCount}</p>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Assets
+                  </p>
+                  <p className="mt-1 text-xl font-semibold">
+                    {tenant.assets.totalCount}
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Devices</p>
-                  <p className="mt-1 text-xl font-semibold">{tenant.assets.deviceCount}</p>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Devices
+                  </p>
+                  <p className="mt-1 text-xl font-semibold">
+                    {tenant.assets.deviceCount}
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Software</p>
-                  <p className="mt-1 text-xl font-semibold">{tenant.assets.softwareCount}</p>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Software
+                  </p>
+                  <p className="mt-1 text-xl font-semibold">
+                    {tenant.assets.softwareCount}
+                  </p>
                 </div>
               </div>
             ) : null}
@@ -133,14 +145,16 @@ function SourcesAdministrationPage() {
           {tenant ? (
             <CardContent className="pt-0">
               <div className="rounded-2xl border border-dashed border-border/60 bg-background/20 px-4 py-3 text-sm text-muted-foreground">
-                Cloud resources: {tenant.assets.cloudResourceCount}. Global enrichment is managed separately and applied automatically during worker processing.
+                Cloud resources: {tenant.assets.cloudResourceCount}. Global
+                enrichment is managed separately and applied automatically
+                during worker processing.
               </div>
             </CardContent>
           ) : null}
         </Card>
       ) : null}
 
-      {activeView === 'tenant' && !tenants.length ? (
+      {activeView === "tenant" && !tenants.length ? (
         <Card className="rounded-[28px] border-border/70 bg-card/82">
           <CardContent className="py-8 text-sm text-muted-foreground">
             No tenants are registered yet.
@@ -148,7 +162,7 @@ function SourcesAdministrationPage() {
         </Card>
       ) : null}
 
-      {activeView === 'tenant' && tenants.length > 0 && !selectedTenantId ? (
+      {activeView === "tenant" && tenants.length > 0 && !selectedTenantId ? (
         <Card className="rounded-[28px] border-border/70 bg-card/82">
           <CardContent className="py-8 text-sm text-muted-foreground">
             No tenant scope is active. Choose a tenant from the top bar.
@@ -156,7 +170,7 @@ function SourcesAdministrationPage() {
         </Card>
       ) : null}
 
-      {activeView === 'tenant' && selectedTenantId && tenantQuery.isPending ? (
+      {activeView === "tenant" && selectedTenantId && tenantQuery.isPending ? (
         <Card className="rounded-[28px] border-border/70 bg-card/82">
           <CardContent className="py-8 text-sm text-muted-foreground">
             Loading tenant source configuration...
@@ -164,9 +178,11 @@ function SourcesAdministrationPage() {
         </Card>
       ) : null}
 
-      {activeView === 'tenant' && tenant ? <TenantSourceManagement key={tenant.id} tenant={tenant} /> : null}
+      {activeView === "tenant" && tenant ? (
+        <TenantSourceManagement key={tenant.id} tenant={tenant} />
+      ) : null}
 
-      {activeView === 'tenant' && tenant && canViewAudit ? (
+      {activeView === "tenant" && tenant && canViewAudit ? (
         <RecentAuditPanel
           title="Source Activity"
           description="Recent ingestion source configuration changes for the selected tenant."
@@ -175,16 +191,16 @@ function SourcesAdministrationPage() {
         />
       ) : null}
 
-      {activeView === 'global-enrichment' && canManageEnrichment ? (
+      {activeView === "global-enrichment" && canManageEnrichment ? (
         enrichmentQuery.data ? (
           <div className="space-y-6">
             <GlobalEnrichmentSourceManagement
-              key={enrichmentSources.map((source) => source.key).join(':')}
+              key={enrichmentSources.map((source) => source.key).join(":")}
               sources={enrichmentSources}
               onSaved={async () => {
-                await enrichmentQuery.refetch()
+                await enrichmentQuery.refetch();
                 if (canViewAudit) {
-                  await enrichmentAuditQuery.refetch()
+                  await enrichmentAuditQuery.refetch();
                 }
               }}
             />
@@ -206,7 +222,7 @@ function SourcesAdministrationPage() {
         )
       ) : null}
     </section>
-  )
+  );
 }
 
 function hasGlobalEnrichmentAccess(roles: string[]) {

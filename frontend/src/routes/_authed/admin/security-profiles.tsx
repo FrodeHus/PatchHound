@@ -371,7 +371,7 @@ function SecurityProfilesPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline" className="rounded-full border-border/70 bg-background/60 text-foreground">
-                      {tenantNames.get(profile.tenantId) ?? profile.tenantId}
+                      {tenantNames.get(profile.tenantId) ?? 'Unknown tenant'}
                     </Badge>
                     <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/10 text-primary">
                       {profile.environmentClass}
