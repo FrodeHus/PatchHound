@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { fetchVulnerabilities } from '@/api/vulnerabilities.functions'
-import { useTenantScope } from '@/components/layout/tenant-scope'
 import { VulnerabilityTable } from '@/components/features/vulnerabilities/VulnerabilityTable'
 import { buildVulnerabilitiesListRequest, vulnerabilityQueryKeys } from '@/features/vulnerabilities/list-state'
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
@@ -27,10 +26,9 @@ function VulnerabilitiesPage() {
   const initialData = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  const { selectedTenantId } = useTenantScope()
   const searchActions = createListSearchUpdater<typeof search>(navigate)
   const query = useQuery({
-    queryKey: vulnerabilityQueryKeys.list(selectedTenantId, search),
+    queryKey: vulnerabilityQueryKeys.list(search),
     queryFn: () => fetchVulnerabilities({ data: buildVulnerabilitiesListRequest(search) }),
     initialData,
   })
