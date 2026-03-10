@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { taskListStatusOptions } from '@/lib/options/tasks'
 
 type TaskListProps = {
   tasks: RemediationTask[]
@@ -37,8 +38,6 @@ type TaskListProps = {
   onClearFilters: () => void
   onUpdateStatus: (taskId: string, status: string, justification?: string) => void
 }
-
-const statusOptions = ['Open', 'InProgress', 'Completed', 'RiskAccepted']
 
 function getDueSoon(task: RemediationTask): boolean {
   if (task.isOverdue) {
@@ -197,7 +196,7 @@ export function TaskList({
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
                 <SelectItem value="all">Any status</SelectItem>
-                {statusOptions.map((option) => (
+                {taskListStatusOptions.map((option) => (
                   <SelectItem key={option} value={option}>
                     {option}
                   </SelectItem>

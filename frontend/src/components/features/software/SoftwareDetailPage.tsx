@@ -5,6 +5,7 @@ import type {
   NormalizedSoftwareVulnerability,
   PagedNormalizedSoftwareInstallations,
 } from '@/api/software.schemas'
+import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 
 type SoftwareDetailPageProps = {
   detail: NormalizedSoftwareDetail
@@ -351,20 +352,4 @@ function normalizeVersion(version: string | null) {
 
 function formatVersion(version: string | null) {
   return version && version.trim().length > 0 ? version : 'Unknown version'
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString()
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString()
-}
-
-function startCase(value: string) {
-  return value
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase())
 }

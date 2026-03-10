@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { formatAuditEntityType, formatAuditKey, parseAuditValues } from '@/lib/audit'
 type AuditLogTableProps = {
   items: AuditLogItem[]
   totalCount: number
@@ -89,7 +90,7 @@ export function AuditLogTable({
         entityTypeFilter
           ? {
               key: 'entityType',
-              label: `Entity: ${formatEntityType(entityTypeFilter)}`,
+              label: `Entity: ${formatAuditEntityType(entityTypeFilter)}`,
               onClear: () => {
                 onEntityTypeFilterChange('')
               },
@@ -120,7 +121,7 @@ export function AuditLogTable({
         header: 'Entity',
         cell: ({ row }) => (
           <div className="space-y-1">
-            <p className="font-medium">{formatEntityType(row.original.entityType)}</p>
+            <p className="font-medium">{formatAuditEntityType(row.original.entityType)}</p>
             <p className="text-xs text-muted-foreground">{row.original.entityLabel ?? row.original.entityId}</p>
           </div>
         ),
@@ -212,7 +213,7 @@ export function AuditLogTable({
                   <SelectItem value="all">Any entity</SelectItem>
                   {entityTypeOptions.map((option) => (
                     <SelectItem key={option} value={option}>
-                      {formatEntityType(option)}
+                      {formatAuditEntityType(option)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -257,8 +258,8 @@ export function AuditLogTable({
 }
 
 function summarizeEntry(item: AuditLogItem) {
-  const values = parseValues(item.newValues)
-  const previous = parseValues(item.oldValues)
+  const values = parseAuditValues(item.newValues)
+  const previous = parseAuditValues(item.oldValues)
   const changedKeys = [...new Set([...Object.keys(values), ...Object.keys(previous)])]
 
   if (item.action === 'Created') {
@@ -273,30 +274,9 @@ function summarizeEntry(item: AuditLogItem) {
     return 'Updated entry.'
   }
 
-  const preview = changedKeys.slice(0, 3).map(formatKey).join(', ')
+  const preview = changedKeys.slice(0, 3).map(formatAuditKey).join(', ')
   const suffix = changedKeys.length > 3 ? ` +${changedKeys.length - 3} more` : ''
   return `Changed ${preview}${suffix}`
-}
-
-function parseValues(raw: string | null) {
-  if (!raw) {
-    return {}
-  }
-
-  try {
-    const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
-  } catch {
-    return {}
-  }
-}
-
-function formatEntityType(value: string) {
-  return value.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/Id\b/g, 'ID')
-}
-
-function formatKey(value: string) {
-  return value.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/Id\b/g, 'ID').toLowerCase()
 }
 
 function actionBadgeClassName(action: string) {

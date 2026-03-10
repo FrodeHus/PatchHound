@@ -3,11 +3,28 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchTenants } from '@/api/settings.functions'
 import type { TenantListItem } from '@/api/settings.schemas'
 import type { CurrentUser } from '@/server/auth.functions'
-import { selectedTenantStorageKey, TenantScopeContext, type TenantScopeContextValue } from '@/components/layout/tenant-scope'
+import {
+  persistSelectedTenant,
+  selectedTenantCookieKey,
+  selectedTenantStorageKey,
+  TenantScopeContext,
+  type TenantScopeContextValue,
+} from '@/components/layout/tenant-scope'
 
 function getInitialTenantId(): string | null {
   if (typeof window === 'undefined') return null
-  return window.localStorage.getItem(selectedTenantStorageKey)
+
+  const storedTenantId = window.localStorage.getItem(selectedTenantStorageKey)
+  if (storedTenantId) {
+    return storedTenantId
+  }
+
+  const cookieValue = document.cookie
+    .split('; ')
+    .find((entry) => entry.startsWith(`${selectedTenantCookieKey}=`))
+    ?.slice(selectedTenantCookieKey.length + 1)
+
+  return cookieValue ? decodeURIComponent(cookieValue) : null
 }
 
 function buildTenantOptions(user: CurrentUser, tenantItems: TenantListItem[] | undefined) {
@@ -51,16 +68,7 @@ export function TenantScopeProvider({ user, children }: TenantScopeProviderProps
   }, [storedTenantId, tenants])
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
-
-    if (effectiveSelectedTenantId) {
-      window.localStorage.setItem(selectedTenantStorageKey, effectiveSelectedTenantId)
-      return
-    }
-
-    window.localStorage.removeItem(selectedTenantStorageKey)
+    persistSelectedTenant(effectiveSelectedTenantId)
   }, [effectiveSelectedTenantId])
 
   const value = useMemo<TenantScopeContextValue>(() => ({
@@ -69,9 +77,7 @@ export function TenantScopeProvider({ user, children }: TenantScopeProviderProps
     isLoadingTenants: tenantQuery.isPending,
     setSelectedTenantId: (tenantId: string) => {
       setStoredTenantId(tenantId)
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(selectedTenantStorageKey, tenantId)
-      }
+      persistSelectedTenant(tenantId)
     },
   }), [effectiveSelectedTenantId, tenantQuery.isPending, tenants])
 

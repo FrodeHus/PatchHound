@@ -1,9 +1,10 @@
-import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { fetchVulnerabilities } from '@/api/vulnerabilities.functions'
 import { VulnerabilityTable } from '@/components/features/vulnerabilities/VulnerabilityTable'
+import { buildVulnerabilitiesListRequest, vulnerabilityQueryKeys } from '@/features/vulnerabilities/list-state'
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
+import { createListSearchUpdater } from '@/routes/list-search-helpers'
 
 const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
@@ -17,19 +18,7 @@ const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
 export const Route = createFileRoute('/_authed/vulnerabilities/')({
   validateSearch: vulnerabilitiesSearchSchema,
   loaderDeps: ({ search }) => search,
-  loader: ({ deps }) =>
-    fetchVulnerabilities({
-      data: {
-        ...(deps.search ? { search: deps.search } : {}),
-        ...(deps.severity ? { severity: deps.severity } : {}),
-        ...(deps.status ? { status: deps.status } : {}),
-        ...(deps.source ? { source: deps.source } : {}),
-        ...(deps.presentOnly ? { presentOnly: true } : { presentOnly: false }),
-        ...(deps.recurrenceOnly ? { recurrenceOnly: true } : {}),
-        page: deps.page,
-        pageSize: deps.pageSize,
-      },
-    }),
+  loader: ({ deps }) => fetchVulnerabilities({ data: buildVulnerabilitiesListRequest(deps) }),
   component: VulnerabilitiesPage,
 })
 
@@ -37,21 +26,10 @@ function VulnerabilitiesPage() {
   const initialData = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
+  const searchActions = createListSearchUpdater<typeof search>(navigate)
   const query = useQuery({
-    queryKey: ['vulnerabilities', search.search, search.severity, search.status, search.source, search.presentOnly, search.recurrenceOnly, search.page, search.pageSize],
-    queryFn: () =>
-      fetchVulnerabilities({
-        data: {
-          ...(search.search ? { search: search.search } : {}),
-          ...(search.severity ? { severity: search.severity } : {}),
-          ...(search.status ? { status: search.status } : {}),
-          ...(search.source ? { source: search.source } : {}),
-          ...(search.presentOnly ? { presentOnly: true } : { presentOnly: false }),
-          ...(search.recurrenceOnly ? { recurrenceOnly: true } : {}),
-          page: search.page,
-          pageSize: search.pageSize,
-        },
-      }),
+    queryKey: vulnerabilityQueryKeys.list(search),
+    queryFn: () => fetchVulnerabilities({ data: buildVulnerabilitiesListRequest(search) }),
     initialData,
   })
 
@@ -71,57 +49,37 @@ function VulnerabilitiesPage() {
         presentOnly={search.presentOnly}
         recurrenceOnly={search.recurrenceOnly}
         onSearchChange={(value) => {
-          void navigate({
-            search: (prev) => ({ ...prev, search: value, page: 1 }),
-          })
+          searchActions.updateField('search', value)
         }}
         onSeverityFilterChange={(value) => {
-          void navigate({
-            search: (prev) => ({ ...prev, severity: value, page: 1 }),
-          })
+          searchActions.updateField('severity', value)
         }}
         onStatusFilterChange={(value) => {
-          void navigate({
-            search: (prev) => ({ ...prev, status: value, page: 1 }),
-          })
+          searchActions.updateField('status', value)
         }}
         onSourceFilterChange={(value) => {
-          void navigate({
-            search: (prev) => ({ ...prev, source: value, page: 1 }),
-          })
+          searchActions.updateField('source', value)
         }}
         onPageChange={(page) => {
-          void navigate({
-            search: (prev) => ({ ...prev, page }),
-          })
+          searchActions.updatePage(page)
         }}
         onPageSizeChange={(nextPageSize) => {
-          void navigate({
-            search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
-          })
+          searchActions.updatePageSize(nextPageSize)
         }}
         onRecurrenceOnlyChange={(value) => {
-          void navigate({
-            search: (prev) => ({ ...prev, recurrenceOnly: value, page: 1 }),
-          })
+          searchActions.updateField('recurrenceOnly', value)
         }}
         onPresentOnlyChange={(value) => {
-          void navigate({
-            search: (prev) => ({ ...prev, presentOnly: value, page: 1 }),
-          })
+          searchActions.updateField('presentOnly', value)
         }}
         onClearFilters={() => {
-          void navigate({
-            search: (prev) => ({
-              ...prev,
-              search: '',
-              severity: '',
-              status: '',
-              source: '',
-              recurrenceOnly: false,
-              presentOnly: true,
-              page: 1,
-            }),
+          searchActions.updateFields({
+            search: '',
+            severity: '',
+            status: '',
+            source: '',
+            recurrenceOnly: false,
+            presentOnly: true,
           })
         }}
       />

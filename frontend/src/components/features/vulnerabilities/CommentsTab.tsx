@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { CommentItem } from '@/api/vulnerabilities.schemas'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 
 type CommentsTabProps = {
   comments: CommentItem[]
@@ -26,17 +28,17 @@ export function CommentsTab({ comments, isSubmitting, onSubmit }: CommentsTabPro
 
       <label className="block space-y-1 text-sm">
         <span>Add comment</span>
-        <textarea
-          className="min-h-24 w-full rounded-md border border-input bg-background px-2 py-1.5"
+        <Textarea
+          className="min-h-24 rounded-md bg-background"
           value={content}
           onChange={(event) => {
             setContent(event.target.value)
           }}
         />
       </label>
-      <button
+      <Button
         type="button"
-        className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50"
+        className="w-fit rounded-md"
         disabled={isSubmitting || content.trim().length === 0}
         onClick={() => {
           const trimmed = content.trim()
@@ -45,7 +47,7 @@ export function CommentsTab({ comments, isSubmitting, onSubmit }: CommentsTabPro
         }}
       >
         {isSubmitting ? 'Saving...' : 'Post comment'}
-      </button>
+      </Button>
     </section>
   )
 }

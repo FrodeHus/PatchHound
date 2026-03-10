@@ -2,7 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchNormalizedSoftware } from '@/api/software.functions'
 import { SoftwareTable } from '@/components/features/software/SoftwareTable'
+import { buildSoftwareListRequest, softwareQueryKeys } from '@/features/software/list-state'
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
+import { createListSearchUpdater } from '@/routes/list-search-helpers'
 
 const softwareSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
@@ -14,17 +16,7 @@ const softwareSearchSchema = baseListSearchSchema.extend({
 export const Route = createFileRoute('/_authed/software/')({
   validateSearch: softwareSearchSchema,
   loaderDeps: ({ search }) => search,
-  loader: ({ deps }) =>
-    fetchNormalizedSoftware({
-      data: {
-        ...(deps.search ? { search: deps.search } : {}),
-        ...(deps.confidence ? { confidence: deps.confidence } : {}),
-        ...(deps.vulnerableOnly ? { vulnerableOnly: true } : {}),
-        ...(deps.boundOnly ? { boundOnly: true } : {}),
-        page: deps.page,
-        pageSize: deps.pageSize,
-      },
-    }),
+  loader: ({ deps }) => fetchNormalizedSoftware({ data: buildSoftwareListRequest(deps) }),
   component: SoftwareIndexPage,
 })
 
@@ -32,19 +24,10 @@ function SoftwareIndexPage() {
   const initialData = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
+  const searchActions = createListSearchUpdater<typeof search>(navigate)
   const query = useQuery({
-    queryKey: ['normalized-software-list', search.search, search.confidence, search.vulnerableOnly, search.boundOnly, search.page, search.pageSize],
-    queryFn: () =>
-      fetchNormalizedSoftware({
-        data: {
-          ...(search.search ? { search: search.search } : {}),
-          ...(search.confidence ? { confidence: search.confidence } : {}),
-          ...(search.vulnerableOnly ? { vulnerableOnly: true } : {}),
-          ...(search.boundOnly ? { boundOnly: true } : {}),
-          page: search.page,
-          pageSize: search.pageSize,
-        },
-      }),
+    queryKey: softwareQueryKeys.list(search),
+    queryFn: () => fetchNormalizedSoftware({ data: buildSoftwareListRequest(search) }),
     initialData,
   })
 
@@ -62,33 +45,29 @@ function SoftwareIndexPage() {
         vulnerableOnly={search.vulnerableOnly}
         boundOnly={search.boundOnly}
         onSearchChange={(value) => {
-          void navigate({ search: (prev) => ({ ...prev, search: value, page: 1 }) })
+          searchActions.updateField('search', value)
         }}
         onConfidenceFilterChange={(value) => {
-          void navigate({ search: (prev) => ({ ...prev, confidence: value, page: 1 }) })
+          searchActions.updateField('confidence', value)
         }}
         onVulnerableOnlyChange={(value) => {
-          void navigate({ search: (prev) => ({ ...prev, vulnerableOnly: value, page: 1 }) })
+          searchActions.updateField('vulnerableOnly', value)
         }}
         onBoundOnlyChange={(value) => {
-          void navigate({ search: (prev) => ({ ...prev, boundOnly: value, page: 1 }) })
+          searchActions.updateField('boundOnly', value)
         }}
         onPageChange={(page) => {
-          void navigate({ search: (prev) => ({ ...prev, page }) })
+          searchActions.updatePage(page)
         }}
         onPageSizeChange={(pageSize) => {
-          void navigate({ search: (prev) => ({ ...prev, pageSize, page: 1 }) })
+          searchActions.updatePageSize(pageSize)
         }}
         onClearFilters={() => {
-          void navigate({
-            search: (prev) => ({
-              ...prev,
-              search: '',
-              confidence: '',
-              vulnerableOnly: false,
-              boundOnly: false,
-              page: 1,
-            }),
+          searchActions.updateFields({
+            search: '',
+            confidence: '',
+            vulnerableOnly: false,
+            boundOnly: false,
           })
         }}
       />

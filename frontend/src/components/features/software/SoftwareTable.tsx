@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import { Badge } from '@/components/ui/badge'
+import { formatDate, startCase } from '@/lib/formatting'
 import { SearchIcon } from 'lucide-react'
 
 type SoftwareTableProps = {
@@ -133,14 +134,14 @@ export function SoftwareTable({
         ),
       },
       {
-        accessorKey: 'lastSeenAt',
-        header: 'Last seen',
-        cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground">
-            {row.original.lastSeenAt ? new Date(row.original.lastSeenAt).toLocaleDateString() : 'Unknown'}
-          </span>
-        ),
-      },
+          accessorKey: 'lastSeenAt',
+          header: 'Last seen',
+          cell: ({ row }) => (
+            <span className="text-sm text-muted-foreground">
+              {row.original.lastSeenAt ? formatDate(row.original.lastSeenAt) : 'Unknown'}
+            </span>
+          ),
+        },
     ],
     [],
   )
@@ -210,12 +211,4 @@ export function SoftwareTable({
       </div>
     </DataTableWorkbench>
   )
-}
-
-function startCase(value: string) {
-  return value
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase())
 }

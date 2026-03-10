@@ -13,6 +13,10 @@ type SetupStatus = {
   requiresSetup: boolean
 }
 
+type TenantListResponse = {
+  items: Array<{ id: string }>
+}
+
 export const getCurrentUser = createServerFn({ method: 'GET' })
   .handler(async () => {
     const session = await getSession()
@@ -23,6 +27,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
 
     let systemStatus: SystemStatus | null = null
     let setupStatus: SetupStatus | null = null
+    let tenantIds = session.tenantIds ?? (session.tenantId ? [session.tenantId] : [])
     try {
       systemStatus = await apiGet<SystemStatus>('/system/status', {
         token: session.accessToken,
@@ -41,13 +46,28 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       setupStatus = null
     }
 
+    try {
+      const tenantResponse = await apiGet<TenantListResponse>('/tenants?page=1&pageSize=100', {
+        token: session.accessToken,
+        tenantId: session.tenantId,
+      })
+      const nextTenantIds = tenantResponse.items.map((tenant) => tenant.id)
+      if (nextTenantIds.length > 0) {
+        tenantIds = nextTenantIds
+        session.tenantIds = nextTenantIds
+        await session.save()
+      }
+    } catch {
+      tenantIds = session.tenantIds ?? (session.tenantId ? [session.tenantId] : [])
+    }
+
     return {
       id: session.userId,
       email: session.email ?? '',
       displayName: session.displayName ?? '',
       roles: session.roles ?? [],
       tenantId: session.tenantId,
-      tenantIds: session.tenantIds ?? (session.tenantId ? [session.tenantId] : []),
+      tenantIds,
       requiresSetup: setupStatus?.requiresSetup ?? false,
       systemStatus,
     }
