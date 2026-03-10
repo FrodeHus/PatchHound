@@ -22,9 +22,10 @@ export function buildAssetsListRequest(search: AssetsListSearch) {
 
 export const assetQueryKeys = {
   all: ['assets'] as const,
-  list: (search: AssetsListSearch) => [
+  list: (tenantId: string | null, search: AssetsListSearch) => [
     ...assetQueryKeys.all,
     'list',
+    tenantId,
     search.search,
     search.assetType,
     search.criticality,
@@ -33,5 +34,5 @@ export const assetQueryKeys = {
     search.page,
     search.pageSize,
   ] as const,
-  detail: (assetId: string | null) => [...assetQueryKeys.all, 'detail', assetId] as const,
+  detail: (tenantId: string | null, assetId: string | null) => [...assetQueryKeys.all, 'detail', tenantId, assetId] as const,
 }

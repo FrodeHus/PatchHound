@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchNormalizedSoftware } from '@/api/software.functions'
 import { SoftwareTable } from '@/components/features/software/SoftwareTable'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 import { buildSoftwareListRequest, softwareQueryKeys } from '@/features/software/list-state'
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
 import { createListSearchUpdater } from '@/routes/list-search-helpers'
@@ -24,9 +25,10 @@ function SoftwareIndexPage() {
   const initialData = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
+  const { selectedTenantId } = useTenantScope()
   const searchActions = createListSearchUpdater<typeof search>(navigate)
   const query = useQuery({
-    queryKey: softwareQueryKeys.list(search),
+    queryKey: softwareQueryKeys.list(selectedTenantId, search),
     queryFn: () => fetchNormalizedSoftware({ data: buildSoftwareListRequest(search) }),
     initialData,
   })
