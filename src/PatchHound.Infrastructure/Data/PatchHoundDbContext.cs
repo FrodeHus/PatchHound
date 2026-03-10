@@ -42,6 +42,14 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<SoftwareCpeBinding> SoftwareCpeBindings => Set<SoftwareCpeBinding>();
     public DbSet<SoftwareVulnerabilityMatch> SoftwareVulnerabilityMatches =>
         Set<SoftwareVulnerabilityMatch>();
+    public DbSet<NormalizedSoftware> NormalizedSoftware => Set<NormalizedSoftware>();
+    public DbSet<NormalizedSoftwareAlias> NormalizedSoftwareAliases =>
+        Set<NormalizedSoftwareAlias>();
+    public DbSet<NormalizedSoftwareInstallation> NormalizedSoftwareInstallations =>
+        Set<NormalizedSoftwareInstallation>();
+    public DbSet<NormalizedSoftwareVulnerabilityProjection>
+        NormalizedSoftwareVulnerabilityProjections =>
+            Set<NormalizedSoftwareVulnerabilityProjection>();
     public DbSet<DeviceSoftwareInstallation> DeviceSoftwareInstallations =>
         Set<DeviceSoftwareInstallation>();
     public DbSet<DeviceSoftwareInstallationEpisode> DeviceSoftwareInstallationEpisodes =>
@@ -116,6 +124,18 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<SoftwareVulnerabilityMatch>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<NormalizedSoftware>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<NormalizedSoftwareAlias>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<NormalizedSoftwareInstallation>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<NormalizedSoftwareVulnerabilityProjection>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<DeviceSoftwareInstallation>()
