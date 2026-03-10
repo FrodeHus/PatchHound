@@ -308,9 +308,36 @@ public class VulnerabilitiesController : ControllerBase
             .OrderBy(item => item.Name)
             .ToListAsync(ct);
 
+        var matchedSoftwareExternalIds = matchedSoftwareRows
+            .Select(item => item.ExternalId)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var normalizedSoftwareIdsByExternalId = matchedSoftwareExternalIds.Count == 0
+            ? new Dictionary<string, Guid?>(StringComparer.Ordinal)
+            : await _dbContext
+                .NormalizedSoftwareAliases.AsNoTracking()
+                .Where(alias =>
+                    alias.SourceSystem == SoftwareIdentitySourceSystem.Defender
+                    && matchedSoftwareExternalIds.Contains(alias.ExternalSoftwareId)
+                )
+                .GroupBy(alias => alias.ExternalSoftwareId)
+                .Select(group => new
+                {
+                    ExternalSoftwareId = group.Key,
+                    NormalizedSoftwareId = group.Select(alias => alias.NormalizedSoftwareId).First(),
+                })
+                .ToDictionaryAsync(
+                    item => item.ExternalSoftwareId,
+                    item => (Guid?)item.NormalizedSoftwareId,
+                    ct
+                );
+
         var matchedSoftware = matchedSoftwareRows
             .Select(item => new MatchedSoftwareDto(
                 item.Id,
+                normalizedSoftwareIdsByExternalId.TryGetValue(item.ExternalId, out var normalizedSoftwareId)
+                    ? normalizedSoftwareId
+                    : null,
                 item.Name,
                 item.ExternalId,
                 item.MatchMethod,

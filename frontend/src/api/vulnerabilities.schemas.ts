@@ -77,6 +77,7 @@ export const vulnerabilityDetailSchema = z.object({
   })),
   matchedSoftware: z.array(z.object({
     softwareAssetId: z.string().uuid(),
+    normalizedSoftwareId: z.string().uuid().nullable(),
     name: z.string(),
     externalId: z.string(),
     matchMethod: z.string(),

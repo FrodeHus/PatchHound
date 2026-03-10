@@ -43,6 +43,7 @@ export const assetVulnerabilitySchema = z.object({
 
 export const assetDetailSchema = z.object({
   id: z.string().uuid(),
+  normalizedSoftwareId: z.string().uuid().nullable(),
   externalId: z.string(),
   name: z.string(),
   description: z.string().nullable(),
@@ -83,6 +84,7 @@ export const assetDetailSchema = z.object({
   vulnerabilities: z.array(assetVulnerabilitySchema),
   softwareInventory: z.array(z.object({
     softwareAssetId: z.string().uuid(),
+    normalizedSoftwareId: z.string().uuid().nullable(),
     name: z.string(),
     externalId: z.string(),
     lastSeenAt: z.string(),

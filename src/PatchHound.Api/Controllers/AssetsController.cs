@@ -274,6 +274,38 @@ public class AssetsController : ControllerBase
             )
             .ToListAsync(ct);
 
+        var relevantSoftwareAssets = softwareRows
+            .Select(row => new { row.Id, row.ExternalId })
+            .ToList();
+        if (asset.AssetType == AssetType.Software)
+        {
+            relevantSoftwareAssets.Add(new { Id = asset.Id, asset.ExternalId });
+        }
+
+        var relevantSoftwareExternalIds = relevantSoftwareAssets
+            .Select(item => item.ExternalId)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var normalizedSoftwareIdsByExternalId = relevantSoftwareExternalIds.Count == 0
+            ? new Dictionary<string, Guid?>(StringComparer.Ordinal)
+            : await _dbContext
+                .NormalizedSoftwareAliases.AsNoTracking()
+                .Where(alias =>
+                    alias.SourceSystem == SoftwareIdentitySourceSystem.Defender
+                    && relevantSoftwareExternalIds.Contains(alias.ExternalSoftwareId)
+                )
+                .GroupBy(alias => alias.ExternalSoftwareId)
+                .Select(group => new
+                {
+                    ExternalSoftwareId = group.Key,
+                    NormalizedSoftwareId = group.Select(alias => alias.NormalizedSoftwareId).First(),
+                })
+                .ToDictionaryAsync(
+                    item => item.ExternalSoftwareId,
+                    item => (Guid?)item.NormalizedSoftwareId,
+                    ct
+                );
+
         var cpeBindingAssetIds = softwareRows
             .Select(row => row.Id)
             .Append(asset.Id)
@@ -412,6 +444,9 @@ public class AssetsController : ControllerBase
         var softwareInventory = softwareRows
             .Select(row => new AssetSoftwareInstallationDto(
                 row.Id,
+                normalizedSoftwareIdsByExternalId.TryGetValue(row.ExternalId, out var normalizedSoftwareId)
+                    ? normalizedSoftwareId
+                    : null,
                 row.Name,
                 row.ExternalId,
                 row.LastSeenAt,
@@ -430,6 +465,10 @@ public class AssetsController : ControllerBase
         return Ok(
             new AssetDetailDto(
                 asset.Id,
+                asset.AssetType == AssetType.Software
+                    && normalizedSoftwareIdsByExternalId.TryGetValue(asset.ExternalId, out var assetNormalizedSoftwareId)
+                    ? assetNormalizedSoftwareId
+                    : null,
                 asset.ExternalId,
                 asset.Name,
                 asset.Description,
