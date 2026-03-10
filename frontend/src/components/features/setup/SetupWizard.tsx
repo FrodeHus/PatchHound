@@ -80,20 +80,20 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
 
   return (
     <section className="mx-auto w-full max-w-4xl px-6 py-10">
-      <Card className="border-slate-200 bg-white py-0 text-slate-950 shadow-[0_30px_80px_-35px_rgba(15,23,42,0.3)]">
-        <CardHeader className="gap-4 border-b border-slate-200 bg-slate-50/70 pb-5">
+      <Card className="border-border/70 bg-card py-0 text-card-foreground shadow-[0_30px_80px_-35px_rgba(15,23,42,0.3)]">
+        <CardHeader className="gap-4 border-b border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_65%),color-mix(in_oklab,var(--card)_94%,transparent)] pb-5">
           <div className="space-y-2">
             <Badge
               variant="outline"
-              className="rounded-full border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-700"
+              className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]"
             >
               Tenant onboarding
             </Badge>
             <div className="space-y-1">
-              <CardTitle className="text-2xl tracking-[-0.04em] text-slate-950">
+              <CardTitle className="text-2xl tracking-[-0.04em] text-foreground">
                 Stand up a tenant in three short steps
               </CardTitle>
-              <CardDescription className="text-sm leading-6 text-slate-600">
+              <CardDescription className="text-sm leading-6 text-muted-foreground">
                 Only onboarding fields are shown here. Admin identity and defaults are provisioned automatically.
               </CardDescription>
             </div>
@@ -113,10 +113,10 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
                   className={cn(
                     'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors disabled:cursor-default disabled:opacity-100',
                     isActive
-                      ? 'border-slate-900 bg-slate-900 text-white'
+                      ? 'border-primary bg-primary text-primary-foreground'
                       : isComplete
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                        : 'border-slate-200 bg-white text-slate-500',
+                        ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                        : 'border-border bg-background text-muted-foreground',
                   )}
                   onClick={() => {
                     if (isAccessible) {
@@ -128,10 +128,10 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
                     className={cn(
                       'flex size-5 items-center justify-center rounded-full text-[11px] font-semibold',
                       isActive
-                        ? 'bg-white text-slate-950'
+                        ? 'bg-background text-foreground'
                         : isComplete
                           ? 'bg-emerald-600 text-white'
-                          : 'bg-slate-100 text-slate-500',
+                          : 'bg-muted text-muted-foreground',
                     )}
                   >
                     {index + 1}
@@ -146,25 +146,25 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
         <CardContent className="space-y-6 px-6 py-6 sm:px-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 {currentStep.label}
               </p>
-              <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
+              <h2 className="text-xl font-semibold tracking-[-0.03em] text-foreground">
                 {currentStep.title}
               </h2>
-              <p className="max-w-2xl text-sm leading-6 text-slate-600">{currentStep.description}</p>
+              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{currentStep.description}</p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-              <p className="font-medium text-slate-900">{setupContext.adminDisplayName}</p>
-              <p className="text-slate-600">{setupContext.adminEmail}</p>
+            <div className="rounded-2xl border border-border/70 bg-muted/40 px-4 py-3 text-sm">
+              <p className="font-medium text-foreground">{setupContext.adminDisplayName}</p>
+              <p className="text-muted-foreground">{setupContext.adminEmail}</p>
             </div>
           </div>
 
           {stepIndex === 0 ? (
             <div className="space-y-4">
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-800" htmlFor="tenant-name">
+                <label className="text-sm font-medium text-foreground" htmlFor="tenant-name">
                   Workspace name
                 </label>
                 <Input
@@ -174,12 +174,12 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
                     setTenantName(event.target.value)
                   }}
                   placeholder="Acme Production"
-                  className="h-11 rounded-xl border-slate-300 bg-white px-3 text-sm text-slate-950 placeholder:text-slate-400"
+                  className="h-11 rounded-xl px-3 text-sm"
                 />
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                Entra tenant: <span className="font-medium text-slate-900">{setupContext.entraTenantId}</span>
+              <div className="rounded-2xl border border-border/70 bg-muted/40 p-4 text-sm text-muted-foreground">
+                Entra tenant: <span className="font-medium text-foreground">{setupContext.entraTenantId}</span>
               </div>
 
               {tenantValidationMessage ? (
@@ -190,15 +190,15 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
 
           {stepIndex === 1 ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-muted/40 p-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-slate-900">Set up Microsoft Defender now</p>
-                    <Badge variant="outline" className="rounded-full border-slate-300 bg-white text-slate-700">
+                    <p className="font-medium text-foreground">Set up Microsoft Defender now</p>
+                    <Badge variant="outline" className="rounded-full">
                       Optional
                     </Badge>
                   </div>
-                  <p className="text-sm leading-6 text-slate-600">
+                  <p className="text-sm leading-6 text-muted-foreground">
                     Skip this if you want to configure the source later from Sources.
                   </p>
                 </div>
@@ -214,40 +214,46 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium text-slate-800" htmlFor="defender-client-id">
+                  <label className="text-sm font-medium text-foreground" htmlFor="defender-client-id">
                     Client ID
                   </label>
                   <Input
                     id="defender-client-id"
                     value={defenderClientId}
-                    disabled={!defenderEnabled}
                     onChange={(event) => {
-                      setDefenderClientId(event.target.value)
+                      const value = event.target.value
+                      setDefenderClientId(value)
+                      if (value.trim()) {
+                        setDefenderEnabled(true)
+                      }
                     }}
                     placeholder="Application (client) ID"
-                    className="h-11 rounded-xl border-slate-300 bg-white px-3 text-sm text-slate-950 placeholder:text-slate-400 disabled:bg-slate-100"
+                    className="h-11 rounded-xl px-3 text-sm"
                   />
                 </div>
 
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium text-slate-800" htmlFor="defender-client-secret">
+                  <label className="text-sm font-medium text-foreground" htmlFor="defender-client-secret">
                     Client secret
                   </label>
                   <Input
                     id="defender-client-secret"
                     type="password"
                     value={defenderClientSecret}
-                    disabled={!defenderEnabled}
                     onChange={(event) => {
-                      setDefenderClientSecret(event.target.value)
+                      const value = event.target.value
+                      setDefenderClientSecret(value)
+                      if (value.trim()) {
+                        setDefenderEnabled(true)
+                      }
                     }}
                     placeholder="Paste the secret value"
-                    className="h-11 rounded-xl border-slate-300 bg-white px-3 text-sm text-slate-950 placeholder:text-slate-400 disabled:bg-slate-100"
+                    className="h-11 rounded-xl px-3 text-sm"
                   />
                 </div>
               </div>
 
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted-foreground">
                 If enabled, PatchHound uses the default Defender schedule and your current Entra tenant ID.
               </p>
 
@@ -259,34 +265,34 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
 
           {stepIndex === 2 ? (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-2xl border border-border/70 bg-muted/40 p-4">
                 <dl className="grid gap-4 text-sm sm:grid-cols-2">
                   <div>
-                    <dt className="text-slate-500">Workspace name</dt>
-                    <dd className="mt-1 font-medium text-slate-900">{tenantName.trim()}</dd>
+                    <dt className="text-muted-foreground">Workspace name</dt>
+                    <dd className="mt-1 font-medium text-foreground">{tenantName.trim()}</dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500">Defender</dt>
-                    <dd className="mt-1 font-medium text-slate-900">
+                    <dt className="text-muted-foreground">Defender</dt>
+                    <dd className="mt-1 font-medium text-foreground">
                       {defenderEnabled ? 'Configure on launch' : 'Skip for now'}
                     </dd>
                   </div>
                 </dl>
               </div>
 
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted-foreground">
                 PatchHound will still create the initial admin assignment, default SLA, and baseline source records automatically.
               </p>
             </div>
           ) : null}
 
-          <Separator className="bg-slate-200" />
+          <Separator className="bg-border/70" />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Button
               type="button"
               variant="outline"
-              className="border-slate-300 bg-white text-slate-900 hover:bg-slate-100"
+              className="border-border bg-background text-foreground hover:bg-muted"
               disabled={stepIndex === 0 || isSubmitting}
               onClick={() => {
                 setStepIndex((current) => Math.max(0, current - 1))
@@ -297,7 +303,7 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
 
             <div className="flex flex-col items-start gap-2 sm:items-end">
               {stepIndex === 1 && !defenderEnabled ? (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted-foreground">
                   You can set up Defender later from Sources.
                 </p>
               ) : null}
@@ -305,7 +311,6 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
               {stepIndex < steps.length - 1 ? (
                 <Button
                   type="button"
-                  className="bg-slate-900 text-white hover:bg-slate-800"
                   disabled={!canContinue || isSubmitting}
                   onClick={() => {
                     setStepIndex((current) => Math.min(steps.length - 1, current + 1))
@@ -317,7 +322,6 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
               ) : (
                 <Button
                   type="button"
-                  className="bg-slate-900 text-white hover:bg-slate-800"
                   disabled={isSubmitting || !tenantName.trim() || !!defenderValidationMessage}
                   onClick={() => {
                     onComplete({

@@ -98,12 +98,14 @@ public class SetupController : ControllerBase
             }
 
             var tenant = result.Value;
-            var source = await _dbContext.TenantSourceConfigurations.FirstOrDefaultAsync(
-                candidate =>
-                    candidate.TenantId == tenant.Id
-                    && candidate.SourceKey == TenantSourceCatalog.DefenderSourceKey,
-                ct
-            );
+            var source = await _dbContext
+                .TenantSourceConfigurations.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(
+                    candidate =>
+                        candidate.TenantId == tenant.Id
+                        && candidate.SourceKey == TenantSourceCatalog.DefenderSourceKey,
+                    ct
+                );
 
             if (source is null)
             {
