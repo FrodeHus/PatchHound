@@ -5,6 +5,7 @@ import { assignAssetOwner, assignAssetSecurityProfile, assignSoftwareCpeBinding,
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { AssetDetailPane } from '@/components/features/assets/AssetDetailPane'
 import { AssetManagementTable } from '@/components/features/assets/AssetManagementTable'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 import { assetQueryKeys, buildAssetsListRequest } from '@/features/assets/list-state'
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
 import { createListSearchUpdater } from '@/routes/list-search-helpers'
@@ -28,11 +29,12 @@ function AssetsPage() {
   const initialData = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
+  const { selectedTenantId } = useTenantScope()
   const searchActions = createListSearchUpdater<typeof search>(navigate)
   const queryClient = useQueryClient()
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
   const assetsQuery = useQuery({
-    queryKey: assetQueryKeys.list(search),
+    queryKey: assetQueryKeys.list(selectedTenantId, search),
     queryFn: () => fetchAssets({ data: buildAssetsListRequest(search) }),
     initialData,
   })
@@ -69,7 +71,7 @@ function AssetsPage() {
     },
     onSuccess: async () => {
       if (selectedAssetId) {
-        await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedAssetId) })
+        await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, selectedAssetId) })
       }
       await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
     },
@@ -80,18 +82,18 @@ function AssetsPage() {
     },
     onSuccess: async () => {
       if (selectedAssetId) {
-        await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedAssetId) })
+        await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, selectedAssetId) })
       }
       await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
     },
   })
   const assetDetailQuery = useQuery({
-    queryKey: assetQueryKeys.detail(selectedAssetId),
+    queryKey: assetQueryKeys.detail(selectedTenantId, selectedAssetId),
     queryFn: () => fetchAssetDetail({ data: { assetId: selectedAssetId! } }),
     enabled: Boolean(selectedAssetId),
   })
   const securityProfilesQuery = useQuery({
-    queryKey: ['security-profiles'],
+    queryKey: ['security-profiles', selectedTenantId],
     queryFn: () => fetchSecurityProfiles({ data: {} }),
   })
 

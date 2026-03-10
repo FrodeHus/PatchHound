@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
 import { AlertTriangle, Menu, LogOut, ShieldCheck } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -44,6 +44,7 @@ export function TopNav({
   onLogout,
 }: TopNavProps) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [isUnsealDialogOpen, setIsUnsealDialogOpen] = useState(false)
   const { selectedTenantId, setSelectedTenantId, tenants } = useTenantScope()
   const canUnsealOpenBao = user.roles.includes('GlobalAdmin')
@@ -126,7 +127,15 @@ export function TopNav({
             <TenantSelector
               tenants={tenants}
               selectedTenantId={selectedTenantId}
-              onSelectTenant={setSelectedTenantId}
+              onSelectTenant={(tenantId) => {
+                if (tenantId === selectedTenantId) {
+                  return
+                }
+
+                setSelectedTenantId(tenantId)
+                void queryClient.invalidateQueries()
+                void router.invalidate()
+              }}
             />
             <NotificationBell />
             <DropdownMenu>

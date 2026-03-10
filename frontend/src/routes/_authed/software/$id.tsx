@@ -6,6 +6,7 @@ import {
   fetchNormalizedSoftwareVulnerabilities,
 } from '@/api/software.functions'
 import { SoftwareDetailPage } from '@/components/features/software/SoftwareDetailPage'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 import { softwareQueryKeys } from '@/features/software/list-state'
 import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
 
@@ -42,9 +43,10 @@ function SoftwareDetailRoute() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const initialData = Route.useLoaderData()
+  const { selectedTenantId } = useTenantScope()
 
   const detailQuery = useQuery({
-    queryKey: softwareQueryKeys.detail(id),
+    queryKey: softwareQueryKeys.detail(selectedTenantId, id),
     queryFn: () => fetchNormalizedSoftwareDetail({ data: { id } }),
     initialData: initialData.detail,
   })
@@ -53,7 +55,7 @@ function SoftwareDetailRoute() {
     search.version || normalizeVersion(detailQuery.data.versionCohorts[0]?.version ?? null)
 
   const installationsQuery = useQuery({
-    queryKey: softwareQueryKeys.installations(id, selectedVersion, search.page, search.pageSize),
+    queryKey: softwareQueryKeys.installations(selectedTenantId, id, selectedVersion, search.page, search.pageSize),
     queryFn: () =>
       fetchNormalizedSoftwareInstallations({
         data: {
@@ -73,7 +75,7 @@ function SoftwareDetailRoute() {
   })
 
   const vulnerabilitiesQuery = useQuery({
-    queryKey: softwareQueryKeys.vulnerabilities(id),
+    queryKey: softwareQueryKeys.vulnerabilities(selectedTenantId, id),
     queryFn: () => fetchNormalizedSoftwareVulnerabilities({ data: { id } }),
     initialData: initialData.vulnerabilities,
   })

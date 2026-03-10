@@ -20,9 +20,10 @@ export function buildSoftwareListRequest(search: SoftwareListSearch) {
 
 export const softwareQueryKeys = {
   all: ['normalized-software'] as const,
-  list: (search: SoftwareListSearch) => [
+  list: (tenantId: string | null, search: SoftwareListSearch) => [
     ...softwareQueryKeys.all,
     'list',
+    tenantId,
     search.search,
     search.confidence,
     search.vulnerableOnly,
@@ -30,14 +31,15 @@ export const softwareQueryKeys = {
     search.page,
     search.pageSize,
   ] as const,
-  detail: (id: string) => [...softwareQueryKeys.all, 'detail', id] as const,
-  installations: (id: string, version: string, page: number, pageSize: number) => [
+  detail: (tenantId: string | null, id: string) => [...softwareQueryKeys.all, 'detail', tenantId, id] as const,
+  installations: (tenantId: string | null, id: string, version: string, page: number, pageSize: number) => [
     ...softwareQueryKeys.all,
     'installations',
+    tenantId,
     id,
     version,
     page,
     pageSize,
   ] as const,
-  vulnerabilities: (id: string) => [...softwareQueryKeys.all, 'vulnerabilities', id] as const,
+  vulnerabilities: (tenantId: string | null, id: string) => [...softwareQueryKeys.all, 'vulnerabilities', tenantId, id] as const,
 }

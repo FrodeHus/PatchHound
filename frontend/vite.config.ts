@@ -6,18 +6,22 @@ import tsConfigPaths from 'vite-tsconfig-paths'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import { nitro } from 'nitro/vite'
 
-export default defineConfig({
-  server: { port: 3000 },
-  plugins: [
-    tsConfigPaths({ projects: ['./tsconfig.json'] }),
-    tanstackStart(),
-    react(),
-    tailwindcss(),
-    nitro(),
-  ],
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/test-setup.ts'],
-  },
+export default defineConfig(({ mode }) => {
+  const isTest = mode === 'test' || process.env.VITEST === 'true'
+
+  return {
+    server: { port: 3000 },
+    plugins: [
+      tsConfigPaths({ projects: ['./tsconfig.json'] }),
+      ...(!isTest ? [tanstackStart()] : []),
+      react(),
+      tailwindcss(),
+      ...(!isTest ? [nitro()] : []),
+    ],
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: ['./src/test-setup.ts'],
+    },
+  }
 })

@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { assignAssetSecurityProfile, fetchAssetDetail } from '@/api/assets.functions'
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { AssetDetailPageView } from '@/components/features/assets/AssetDetailPageView'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 import { assetQueryKeys } from '@/features/assets/list-state'
 
 export const Route = createFileRoute('/_authed/assets/$id')({
@@ -13,15 +14,16 @@ export const Route = createFileRoute('/_authed/assets/$id')({
 function AssetDetailPage() {
   const initialAsset = Route.useLoaderData()
   const { id } = Route.useParams()
+  const { selectedTenantId } = useTenantScope()
   const queryClient = useQueryClient()
 
   const assetQuery = useQuery({
-    queryKey: assetQueryKeys.detail(id),
+    queryKey: assetQueryKeys.detail(selectedTenantId, id),
     queryFn: () => fetchAssetDetail({ data: { assetId: id } }),
     initialData: initialAsset,
   })
   const securityProfilesQuery = useQuery({
-    queryKey: ['security-profiles'],
+    queryKey: ['security-profiles', selectedTenantId],
     queryFn: () => fetchSecurityProfiles({ data: {} }),
   })
   const securityProfileMutation = useMutation({
@@ -29,7 +31,7 @@ function AssetDetailPage() {
       await assignAssetSecurityProfile({ data: { assetId: id, securityProfileId } })
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(id) })
+      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, id) })
       await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
     },
   })

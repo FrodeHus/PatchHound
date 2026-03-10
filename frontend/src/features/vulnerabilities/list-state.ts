@@ -24,9 +24,10 @@ export function buildVulnerabilitiesListRequest(search: VulnerabilitiesListSearc
 
 export const vulnerabilityQueryKeys = {
   all: ['vulnerabilities'] as const,
-  list: (search: VulnerabilitiesListSearch) => [
+  list: (tenantId: string | null, search: VulnerabilitiesListSearch) => [
     ...vulnerabilityQueryKeys.all,
     'list',
+    tenantId,
     search.search,
     search.severity,
     search.status,
@@ -36,7 +37,7 @@ export const vulnerabilityQueryKeys = {
     search.page,
     search.pageSize,
   ] as const,
-  detail: (id: string) => [...vulnerabilityQueryKeys.all, 'detail', id] as const,
-  comments: (id: string) => [...vulnerabilityQueryKeys.detail(id), 'comments'] as const,
-  timeline: (id: string) => [...vulnerabilityQueryKeys.detail(id), 'timeline'] as const,
+  detail: (tenantId: string | null, id: string) => [...vulnerabilityQueryKeys.all, 'detail', tenantId, id] as const,
+  comments: (tenantId: string | null, id: string) => [...vulnerabilityQueryKeys.detail(tenantId, id), 'comments'] as const,
+  timeline: (tenantId: string | null, id: string) => [...vulnerabilityQueryKeys.detail(tenantId, id), 'timeline'] as const,
 }
