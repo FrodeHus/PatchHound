@@ -99,9 +99,6 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
                 Configure ingestion connectors, credentials, schedules, and manual sync for the selected tenant.
               </p>
             </div>
-            <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="rounded-full px-5">
-              {mutation.isPending ? 'Saving...' : 'Save source changes'}
-            </Button>
           </div>
         </CardHeader>
 
@@ -152,7 +149,9 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
                 sources={sources}
                 expandedSourceKey={expandedSourceKey}
                 syncingSourceKey={syncingSourceKey}
+                isSaving={mutation.isPending}
                 syncMutation={syncMutation}
+                onSave={() => mutation.mutate()}
                 onOpenHistory={setHistorySourceKey}
                 onToggleExpanded={(sourceKey) => {
                   setExpandedSourceKey((current) => (current === sourceKey ? null : sourceKey))
@@ -204,7 +203,9 @@ function SourceSection({
   sources,
   expandedSourceKey,
   syncingSourceKey,
+  isSaving,
   syncMutation,
+  onSave,
   onOpenHistory,
   onToggleExpanded,
   onUpdateSource,
@@ -213,7 +214,9 @@ function SourceSection({
   sources: TenantIngestionSourceDraft[]
   expandedSourceKey: string | null
   syncingSourceKey: string | null
+  isSaving: boolean
   syncMutation: ReturnType<typeof useMutation<void, Error, string>>
+  onSave: () => void
   onOpenHistory: (sourceKey: string) => void
   onToggleExpanded: (sourceKey: string) => void
   onUpdateSource: (
@@ -512,6 +515,12 @@ function SourceSection({
                     No ingestion runs have been recorded for this source yet.
                   </p>
                 )}
+              </div>
+
+              <div className="flex justify-end border-t border-border/60 pt-4">
+                <Button onClick={onSave} disabled={isSaving} className="rounded-full px-5">
+                  {isSaving ? 'Saving...' : `Save ${source.displayName}`}
+                </Button>
               </div>
               </CardContent>
             ) : null}
