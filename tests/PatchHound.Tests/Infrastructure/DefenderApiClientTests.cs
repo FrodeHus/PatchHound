@@ -181,7 +181,7 @@ public class DefenderApiClientTests
     }
 
     [Fact]
-    public async Task GetMachineSoftwareInventoryAsync_FollowsAllPagedResponses()
+    public async Task GetSoftwareAsync_FollowsAllPagedResponses()
     {
         var handler = new SequenceHttpMessageHandler(
             CreateJsonResponse(
@@ -195,7 +195,7 @@ public class DefenderApiClientTests
                       "version": "1.0"
                     }
                   ],
-                  "@odata.nextLink": "https://api.securitycenter.microsoft.com/api/machines/machine-1/software?$skip=1"
+                  "@odata.nextLink": "https://api.securitycenter.microsoft.com/api/software?$skip=1"
                 }
                 """
             ),
@@ -216,11 +216,7 @@ public class DefenderApiClientTests
         );
         var client = new TestDefenderApiClient(new HttpClient(handler));
 
-        var response = await client.GetMachineSoftwareInventoryAsync(
-            Configuration,
-            "machine-1",
-            CancellationToken.None
-        );
+        var response = await client.GetSoftwareAsync(Configuration, CancellationToken.None);
 
         response.Value.Should().HaveCount(2);
         response
@@ -230,8 +226,56 @@ public class DefenderApiClientTests
         handler
             .RequestUris.Should()
             .ContainInOrder(
-                "https://api.securitycenter.microsoft.com/api/machines/machine-1/software",
-                "https://api.securitycenter.microsoft.com/api/machines/machine-1/software?$skip=1"
+                "https://api.securitycenter.microsoft.com/api/software?$top=10000",
+                "https://api.securitycenter.microsoft.com/api/software?$skip=1"
+            );
+    }
+
+    [Fact]
+    public async Task GetSoftwareMachineReferencesAsync_FollowsAllPagedResponses()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            CreateJsonResponse(
+                """
+                {
+                  "value": [
+                    {
+                      "id": "machine-1",
+                      "computerDnsName": "server-1.contoso.local"
+                    }
+                  ],
+                  "@odata.nextLink": "https://api.securitycenter.microsoft.com/api/software/software-1/machineReferences?$skip=1"
+                }
+                """
+            ),
+            CreateJsonResponse(
+                """
+                {
+                  "value": [
+                    {
+                      "id": "machine-2",
+                      "computerDnsName": "server-2.contoso.local"
+                    }
+                  ]
+                }
+                """
+            )
+        );
+        var client = new TestDefenderApiClient(new HttpClient(handler));
+
+        var response = await client.GetSoftwareMachineReferencesAsync(
+            Configuration,
+            "software-1",
+            CancellationToken.None
+        );
+
+        response.Value.Should().HaveCount(2);
+        response.Value.Select(entry => entry.Id).Should().ContainInOrder("machine-1", "machine-2");
+        handler
+            .RequestUris.Should()
+            .ContainInOrder(
+                "https://api.securitycenter.microsoft.com/api/software/software-1/machineReferences?$top=10000",
+                "https://api.securitycenter.microsoft.com/api/software/software-1/machineReferences?$skip=1"
             );
     }
 
