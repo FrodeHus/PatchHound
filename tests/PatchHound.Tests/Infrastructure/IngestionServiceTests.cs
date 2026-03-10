@@ -54,7 +54,15 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             new EnvironmentalSeverityCalculator()
         );
-        var softwareMatchService = new SoftwareVulnerabilityMatchService(_dbContext);
+        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
+        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
+            _dbContext,
+            normalizedSoftwareResolver
+        );
+        var softwareMatchService = new SoftwareVulnerabilityMatchService(
+            _dbContext,
+            normalizedSoftwareProjectionService
+        );
         var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
@@ -71,6 +79,7 @@ public class IngestionServiceTests : IDisposable
             enrichmentJobEnqueuer,
             assessmentService,
             softwareMatchService,
+            normalizedSoftwareProjectionService,
             taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
@@ -1620,7 +1629,17 @@ public class IngestionServiceTests : IDisposable
             [source],
             new EnrichmentJobEnqueuer(_dbContext, Substitute.For<ILogger<EnrichmentJobEnqueuer>>()),
             new VulnerabilityAssessmentService(_dbContext, new EnvironmentalSeverityCalculator()),
-            new SoftwareVulnerabilityMatchService(_dbContext),
+            new SoftwareVulnerabilityMatchService(
+                _dbContext,
+                new NormalizedSoftwareProjectionService(
+                    _dbContext,
+                    new NormalizedSoftwareResolver(_dbContext)
+                )
+            ),
+            new NormalizedSoftwareProjectionService(
+                _dbContext,
+                new NormalizedSoftwareResolver(_dbContext)
+            ),
             new RemediationTaskProjectionService(_dbContext, new SlaService()),
             new StagedVulnerabilityMergeService(
                 _dbContext,

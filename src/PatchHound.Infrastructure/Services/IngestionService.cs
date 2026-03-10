@@ -25,6 +25,7 @@ public class IngestionService
     private readonly EnrichmentJobEnqueuer _enrichmentJobEnqueuer;
     private readonly VulnerabilityAssessmentService _assessmentService;
     private readonly SoftwareVulnerabilityMatchService _softwareVulnerabilityMatchService;
+    private readonly NormalizedSoftwareProjectionService _normalizedSoftwareProjectionService;
     private readonly RemediationTaskProjectionService _remediationTaskProjectionService;
     private readonly StagedVulnerabilityMergeService _stagedVulnerabilityMergeService;
     private readonly StagedAssetMergeService _stagedAssetMergeService;
@@ -36,6 +37,7 @@ public class IngestionService
         EnrichmentJobEnqueuer enrichmentJobEnqueuer,
         VulnerabilityAssessmentService assessmentService,
         SoftwareVulnerabilityMatchService softwareVulnerabilityMatchService,
+        NormalizedSoftwareProjectionService normalizedSoftwareProjectionService,
         RemediationTaskProjectionService remediationTaskProjectionService,
         StagedVulnerabilityMergeService stagedVulnerabilityMergeService,
         StagedAssetMergeService stagedAssetMergeService,
@@ -47,6 +49,7 @@ public class IngestionService
         _enrichmentJobEnqueuer = enrichmentJobEnqueuer;
         _assessmentService = assessmentService;
         _softwareVulnerabilityMatchService = softwareVulnerabilityMatchService;
+        _normalizedSoftwareProjectionService = normalizedSoftwareProjectionService;
         _remediationTaskProjectionService = remediationTaskProjectionService;
         _stagedVulnerabilityMergeService = stagedVulnerabilityMergeService;
         _stagedAssetMergeService = stagedAssetMergeService;
@@ -960,7 +963,14 @@ public class IngestionService
         CancellationToken ct
     )
     {
-        return await _stagedAssetMergeService.ProcessAsync(ingestionRunId, tenantId, sourceKey, ct);
+        var summary = await _stagedAssetMergeService.ProcessAsync(
+            ingestionRunId,
+            tenantId,
+            sourceKey,
+            ct
+        );
+        await _normalizedSoftwareProjectionService.SyncTenantAsync(tenantId, ct);
+        return summary;
     }
 
     private static IReadOnlyList<IngestionResult> NormalizeResults(
