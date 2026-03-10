@@ -1,59 +1,53 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { useMutation } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { fetchAuditLog } from '@/api/audit-log.functions'
-import { fetchTenantDetail, fetchTenants } from '@/api/settings.functions'
+import { fetchTenantDetail } from '@/api/settings.functions'
 import { RecentAuditPanel } from '@/components/features/audit/RecentAuditPanel'
 import { GlobalEnrichmentSourceManagement } from '@/components/features/admin/GlobalEnrichmentSourceManagement'
 import { TenantSourceManagement } from '@/components/features/admin/TenantSourceManagement'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchEnrichmentSources } from '@/server/system.functions'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/_authed/admin/sources')({
-  loader: async () => {
-    const tenants = await fetchTenants({ data: { page: 1, pageSize: 100 } })
-    const initialTenantId = tenants.items[0]?.id
-    const initialTenant = initialTenantId
-      ? await fetchTenantDetail({ data: { tenantId: initialTenantId } })
-      : null
-
-    return {
-      tenants: tenants.items,
-      initialTenant,
-    }
-  },
   component: SourcesAdministrationPage,
 })
 
 function SourcesAdministrationPage() {
   const { user } = Route.useRouteContext()
-  const { tenants, initialTenant } = Route.useLoaderData()
-  const [selectedTenantId, setSelectedTenantId] = useState(initialTenant?.id ?? '')
+  const { selectedTenantId, tenants } = useTenantScope()
   const [activeView, setActiveView] = useState<'tenant' | 'global-enrichment'>('tenant')
-
-  const tenantMutation = useMutation({
-    mutationFn: async (tenantId: string) => fetchTenantDetail({ data: { tenantId } }),
+  const canManageEnrichment = hasGlobalEnrichmentAccess(user.roles)
+  const tenantQuery = useQuery({
+    queryKey: ['tenant-detail', selectedTenantId],
+    queryFn: () => fetchTenantDetail({ data: { tenantId: selectedTenantId! } }),
+    enabled: activeView === 'tenant' && Boolean(selectedTenantId),
   })
-  const enrichmentMutation = useMutation({
-    mutationFn: async () => fetchEnrichmentSources(),
+  const enrichmentQuery = useQuery({
+    queryKey: ['enrichment-sources'],
+    queryFn: () => fetchEnrichmentSources(),
+    enabled: canManageEnrichment,
   })
-  const canManageGlobalEnrichment = user.roles.includes('GlobalAdmin')
   const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
-  const tenantAuditMutation = useMutation({
-    mutationFn: async (tenantId: string) =>
+  const tenantAuditQuery = useQuery({
+    queryKey: ['tenant-source-audit', selectedTenantId],
+    queryFn: () =>
       fetchAuditLog({
         data: {
-          tenantId,
+          tenantId: selectedTenantId!,
           entityType: 'TenantSourceConfiguration',
           page: 1,
           pageSize: 5,
         },
       }),
+    enabled: canViewAudit && activeView === 'tenant' && Boolean(selectedTenantId),
   })
-  const enrichmentAuditMutation = useMutation({
-    mutationFn: async () =>
+  const enrichmentAuditQuery = useQuery({
+    queryKey: ['enrichment-source-audit'],
+    queryFn: () =>
       fetchAuditLog({
         data: {
           entityType: 'EnrichmentSourceConfiguration',
@@ -61,50 +55,10 @@ function SourcesAdministrationPage() {
           pageSize: 5,
         },
       }),
+    enabled: canViewAudit && activeView === 'global-enrichment' && canManageEnrichment,
   })
-
-  useEffect(() => {
-    if (!selectedTenantId || initialTenant?.id === selectedTenantId) {
-      return
-    }
-
-    void tenantMutation.mutateAsync(selectedTenantId)
-  }, [initialTenant?.id, selectedTenantId])
-
-  useEffect(() => {
-    if (!canManageGlobalEnrichment) {
-      return
-    }
-
-    if (enrichmentMutation.data || enrichmentMutation.isPending) {
-      return
-    }
-
-    void enrichmentMutation.mutateAsync()
-  }, [canManageGlobalEnrichment, enrichmentMutation])
-
-  useEffect(() => {
-    if (!canViewAudit || activeView !== 'tenant' || !selectedTenantId) {
-      return
-    }
-
-    void tenantAuditMutation.mutateAsync(selectedTenantId)
-  }, [activeView, canViewAudit, selectedTenantId])
-
-  useEffect(() => {
-    if (!canViewAudit || activeView !== 'global-enrichment' || enrichmentAuditMutation.isPending) {
-      return
-    }
-
-    if (enrichmentAuditMutation.data) {
-      return
-    }
-
-    void enrichmentAuditMutation.mutateAsync()
-  }, [activeView, canViewAudit, enrichmentAuditMutation])
-
-  const tenant = tenantMutation.data ?? (initialTenant?.id === selectedTenantId ? initialTenant : null)
-  const enrichmentSources = enrichmentMutation.data ?? []
+  const tenant = tenantQuery.data ?? null
+  const enrichmentSources = enrichmentQuery.data ?? []
 
   return (
     <section className="space-y-6 pb-4">
@@ -115,7 +69,7 @@ function SourcesAdministrationPage() {
         </p>
       </div>
 
-      {canManageGlobalEnrichment ? (
+      {canManageEnrichment ? (
         <div className="inline-flex rounded-[20px] border border-border/70 bg-card/70 p-1">
           <button
             type="button"
@@ -141,7 +95,7 @@ function SourcesAdministrationPage() {
               <div className="space-y-1">
                 <CardTitle>Tenant Context</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Pick the tenant whose ingestion credentials, schedules, and manual sync controls you want to manage.
+                  The top bar controls which tenant's ingestion credentials, schedules, and manual sync controls are active here.
                 </p>
               </div>
               {tenant ? (
@@ -152,20 +106,13 @@ function SourcesAdministrationPage() {
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 pt-5 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:items-end">
-            <label className="space-y-2">
-              <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Selected Tenant</span>
-              <select
-                className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
-                value={selectedTenantId}
-                onChange={(event) => setSelectedTenantId(event.target.value)}
-              >
-                {tenants.map((tenantItem) => (
-                  <option key={tenantItem.id} value={tenantItem.id}>
-                    {tenantItem.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="space-y-2 rounded-[24px] border border-border/70 bg-background/30 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Active Tenant</p>
+              <p className="text-lg font-semibold">{tenant?.name ?? tenants.find((tenantItem) => tenantItem.id === selectedTenantId)?.name ?? 'No tenant selected'}</p>
+              <p className="text-sm text-muted-foreground">
+                Change tenant scope from the top navigation to inspect another environment.
+              </p>
+            </div>
             {tenant ? (
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
@@ -201,27 +148,43 @@ function SourcesAdministrationPage() {
         </Card>
       ) : null}
 
+      {activeView === 'tenant' && tenants.length > 0 && !selectedTenantId ? (
+        <Card className="rounded-[28px] border-border/70 bg-card/82">
+          <CardContent className="py-8 text-sm text-muted-foreground">
+            No tenant scope is active. Choose a tenant from the top bar.
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {activeView === 'tenant' && selectedTenantId && tenantQuery.isPending ? (
+        <Card className="rounded-[28px] border-border/70 bg-card/82">
+          <CardContent className="py-8 text-sm text-muted-foreground">
+            Loading tenant source configuration...
+          </CardContent>
+        </Card>
+      ) : null}
+
       {activeView === 'tenant' && tenant ? <TenantSourceManagement key={tenant.id} tenant={tenant} /> : null}
 
       {activeView === 'tenant' && tenant && canViewAudit ? (
         <RecentAuditPanel
           title="Source Activity"
           description="Recent ingestion source configuration changes for the selected tenant."
-          items={tenantAuditMutation.data?.items ?? []}
+          items={tenantAuditQuery.data?.items ?? []}
           emptyMessage="No recent tenant source changes have been recorded for this tenant."
         />
       ) : null}
 
-      {activeView === 'global-enrichment' && canManageGlobalEnrichment ? (
-        enrichmentMutation.data ? (
+      {activeView === 'global-enrichment' && canManageEnrichment ? (
+        enrichmentQuery.data ? (
           <div className="space-y-6">
             <GlobalEnrichmentSourceManagement
               key={enrichmentSources.map((source) => source.key).join(':')}
               sources={enrichmentSources}
               onSaved={async () => {
-                await enrichmentMutation.mutateAsync()
+                await enrichmentQuery.refetch()
                 if (canViewAudit) {
-                  await enrichmentAuditMutation.mutateAsync()
+                  await enrichmentAuditQuery.refetch()
                 }
               }}
             />
@@ -229,7 +192,7 @@ function SourcesAdministrationPage() {
               <RecentAuditPanel
                 title="Enrichment Activity"
                 description="Recent changes to shared enrichment providers such as NVD."
-                items={enrichmentAuditMutation.data?.items ?? []}
+                items={enrichmentAuditQuery.data?.items ?? []}
                 emptyMessage="No recent enrichment source changes have been recorded."
               />
             ) : null}
@@ -244,6 +207,10 @@ function SourcesAdministrationPage() {
       ) : null}
     </section>
   )
+}
+
+function hasGlobalEnrichmentAccess(roles: string[]) {
+  return roles.includes('GlobalAdmin')
 }
 
 function viewToggleClassName(isActive: boolean) {

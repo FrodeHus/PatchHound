@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { ShieldCheck, Signal, TriangleAlert } from 'lucide-react'
 import { fetchAuditLog } from '@/api/audit-log.functions'
 import { createSecurityProfile, fetchSecurityProfiles } from '@/api/security-profiles.functions'
-import { fetchTenants } from '@/api/settings.functions'
 import { RecentAuditPanel } from '@/components/features/audit/RecentAuditPanel'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -65,27 +65,25 @@ const environmentHelp: Record<(typeof environmentClassOptions)[number], string> 
 export const Route = createFileRoute('/_authed/admin/security-profiles')({
   validateSearch: baseListSearchSchema,
   loaderDeps: ({ search }) => search,
-  loader: async ({ deps }) => {
-    const [profiles, tenants] = await Promise.all([
-      fetchSecurityProfiles({ data: { page: deps.page, pageSize: deps.pageSize } }),
-      fetchTenants({ data: { page: 1, pageSize: 100 } }),
-    ])
-
-    return {
-      profiles,
-      tenants: tenants.items,
-    }
+  loader: async ({ deps, context }) => {
+    return fetchSecurityProfiles({
+      data: {
+        tenantId: context.user?.tenantIds[0] ?? undefined,
+        page: deps.page,
+        pageSize: deps.pageSize,
+      },
+    })
   },
   component: SecurityProfilesPage,
 })
 
 function SecurityProfilesPage() {
-  const router = useRouter()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const { user } = Route.useRouteContext()
-  const data = Route.useLoaderData()
-  const [tenantId, setTenantId] = useState(data.tenants[0]?.id ?? '')
+  const initialProfiles = Route.useLoaderData()
+  const { selectedTenantId, tenants } = useTenantScope()
+  const defaultTenantId = user.tenantIds[0] ?? null
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [environmentClass, setEnvironmentClass] = useState<(typeof environmentClassOptions)[number]>(environmentClassOptions[0])
@@ -93,18 +91,19 @@ function SecurityProfilesPage() {
   const [confidentialityRequirement, setConfidentialityRequirement] = useState<(typeof requirementOptions)[number]>(requirementOptions[1])
   const [integrityRequirement, setIntegrityRequirement] = useState<(typeof requirementOptions)[number]>(requirementOptions[1])
   const [availabilityRequirement, setAvailabilityRequirement] = useState<(typeof requirementOptions)[number]>(requirementOptions[1])
-  const tenantNames = new Map(data.tenants.map((tenant) => [tenant.id, tenant.name]))
+  const tenantNames = new Map(tenants.map((tenant) => [tenant.id, tenant.name]))
   const profilesQuery = useQuery({
-    queryKey: ['security-profiles', search.page, search.pageSize],
-    queryFn: () => fetchSecurityProfiles({ data: { page: search.page, pageSize: search.pageSize } }),
-    initialData: data.profiles,
+    queryKey: ['security-profiles', selectedTenantId, search.page, search.pageSize],
+    queryFn: () => fetchSecurityProfiles({ data: { tenantId: selectedTenantId ?? undefined, page: search.page, pageSize: search.pageSize } }),
+    enabled: Boolean(selectedTenantId),
+    initialData: selectedTenantId === defaultTenantId ? initialProfiles : undefined,
   })
 
   const mutation = useMutation({
     mutationFn: async () => {
       await createSecurityProfile({
         data: {
-          tenantId,
+          tenantId: selectedTenantId!,
           name,
           description,
           environmentClass,
@@ -123,7 +122,10 @@ function SecurityProfilesPage() {
       setConfidentialityRequirement(requirementOptions[1])
       setIntegrityRequirement(requirementOptions[1])
       setAvailabilityRequirement(requirementOptions[1])
-      await router.invalidate()
+      await profilesQuery.refetch()
+      if (canViewAudit) {
+        await recentAuditMutation.mutateAsync()
+      }
     },
   })
   const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
@@ -137,12 +139,17 @@ function SecurityProfilesPage() {
         },
       }),
   })
+  const recentAuditItems = recentAuditMutation.data?.items ?? []
+  const isRecentAuditPending = recentAuditMutation.isPending
+  const loadRecentAudit = recentAuditMutation.mutateAsync
 
   useEffect(() => {
-    if (canViewAudit && !recentAuditMutation.data && !recentAuditMutation.isPending) {
-      void recentAuditMutation.mutateAsync()
+    if (canViewAudit && recentAuditItems.length === 0 && !isRecentAuditPending) {
+      void loadRecentAudit()
     }
-  }, [canViewAudit, recentAuditMutation.data, recentAuditMutation.isPending, recentAuditMutation.mutateAsync])
+  }, [canViewAudit, isRecentAuditPending, loadRecentAudit, recentAuditItems.length])
+
+  const profilePage = profilesQuery.data
 
   return (
     <section className="space-y-4 pb-4">
@@ -182,27 +189,15 @@ function SecurityProfilesPage() {
         <CardHeader>
           <CardTitle>Create Security Profile</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Define the device environment once, then assign it to assets that should share the same severity logic.
+            Define the device environment once for the tenant selected in the top bar, then assign it to assets that should share the same severity logic.
           </p>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2">
             <FieldBlock
-              label="Tenant"
-              description="Choose which tenant can assign and use this profile."
-              control={(
-                <select
-                  className="rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
-                  value={tenantId}
-                  onChange={(event) => setTenantId(event.target.value)}
-                >
-                  {data.tenants.map((tenant) => (
-                    <option key={tenant.id} value={tenant.id}>
-                      {tenant.name}
-                    </option>
-                  ))}
-                </select>
-              )}
+              label="Active Tenant"
+              description="This form follows the tenant scope in the top navigation."
+              control={<div className="rounded-xl border border-input bg-background px-3 py-2.5 text-sm font-medium">{tenantNames.get(selectedTenantId ?? '') ?? 'No tenant selected'}</div>}
             />
             <FieldBlock
               label="Profile Name"
@@ -327,7 +322,7 @@ function SecurityProfilesPage() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Button
-              disabled={mutation.isPending || !tenantId.trim() || !name.trim()}
+              disabled={mutation.isPending || !selectedTenantId?.trim() || !name.trim()}
               onClick={() => {
                 mutation.mutate()
               }}
@@ -347,19 +342,27 @@ function SecurityProfilesPage() {
             <div>
               <CardTitle>Profiles</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                Review the current severity logic each tenant can apply to devices.
+                Review the current severity logic for the tenant selected in the top bar.
               </p>
             </div>
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{profilesQuery.data.totalCount} total</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{profilePage?.totalCount ?? 0} total</p>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {profilesQuery.data.items.length === 0 ? (
+          {!selectedTenantId ? (
+            <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-6 text-sm text-muted-foreground">
+              Choose a tenant from the top bar to review security profiles.
+            </div>
+          ) : profilesQuery.isPending && !profilePage ? (
+            <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-6 text-sm text-muted-foreground">
+              Loading security profiles...
+            </div>
+          ) : profilePage && profilePage.items.length === 0 ? (
             <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-6 text-sm text-muted-foreground">
               No security profiles found.
             </div>
           ) : (
-            profilesQuery.data.items.map((profile) => (
+            profilePage?.items.map((profile) => (
               <div key={profile.id} className="rounded-[24px] border border-border/70 bg-background/30 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -405,22 +408,24 @@ function SecurityProfilesPage() {
               </div>
             ))
           )}
-          <PaginationControls
-            page={profilesQuery.data.page}
-            pageSize={profilesQuery.data.pageSize}
-            totalCount={profilesQuery.data.totalCount}
-            totalPages={profilesQuery.data.totalPages}
-            onPageChange={(page) => {
-              void navigate({
-                search: (prev) => ({ ...prev, page }),
-              })
-            }}
-            onPageSizeChange={(nextPageSize) => {
-              void navigate({
-                search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
-              })
-            }}
-          />
+          {profilePage ? (
+            <PaginationControls
+              page={profilePage.page}
+              pageSize={profilePage.pageSize}
+              totalCount={profilePage.totalCount}
+              totalPages={profilePage.totalPages}
+              onPageChange={(page) => {
+                void navigate({
+                  search: (prev) => ({ ...prev, page }),
+                })
+              }}
+              onPageSizeChange={(nextPageSize) => {
+                void navigate({
+                  search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
+                })
+              }}
+            />
+          ) : null}
         </CardContent>
       </Card>
 
@@ -428,7 +433,7 @@ function SecurityProfilesPage() {
         <RecentAuditPanel
           title="Profile Activity"
           description="Recent profile changes are shown here so security teams can see when severity logic changed."
-          items={recentAuditMutation.data?.items ?? []}
+          items={recentAuditItems}
           emptyMessage="No recent security profile changes have been recorded."
         />
       ) : null}

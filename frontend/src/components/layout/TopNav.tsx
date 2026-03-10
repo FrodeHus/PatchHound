@@ -17,6 +17,7 @@ import {
 import { NotificationBell } from '@/components/layout/NotificationBell'
 import { OpenBaoUnsealDialog } from '@/components/layout/OpenBaoUnsealDialog'
 import { TenantSelector } from '@/components/layout/TenantSelector'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 import type { CurrentUser } from '@/server/auth.functions'
 import { unsealOpenBao } from '@/server/system.functions'
 import { ThemeSelector } from '@/components/layout/ThemeSelector'
@@ -24,8 +25,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 type TopNavProps = {
   user: CurrentUser
-  selectedTenantId: string | null
-  onSelectTenant: (tenantId: string) => void
   onToggleSidebar: () => void
   onLogout: () => void
 }
@@ -41,14 +40,12 @@ function getInitials(displayName: string, email: string) {
 
 export function TopNav({
   user,
-  selectedTenantId,
-  onSelectTenant,
   onToggleSidebar,
   onLogout,
 }: TopNavProps) {
   const router = useRouter()
   const [isUnsealDialogOpen, setIsUnsealDialogOpen] = useState(false)
-  const tenants = user.tenantIds.map((tenantId) => ({ id: tenantId, name: tenantId }))
+  const { selectedTenantId, setSelectedTenantId, tenants } = useTenantScope()
   const canUnsealOpenBao = user.roles.includes('GlobalAdmin')
   const unsealMutation = useMutation({
     mutationFn: (keys: [string, string, string]) => unsealOpenBao({ data: { keys } }),
@@ -129,7 +126,7 @@ export function TopNav({
             <TenantSelector
               tenants={tenants}
               selectedTenantId={selectedTenantId}
-              onSelectTenant={onSelectTenant}
+              onSelectTenant={setSelectedTenantId}
             />
             <NotificationBell />
             <DropdownMenu>
