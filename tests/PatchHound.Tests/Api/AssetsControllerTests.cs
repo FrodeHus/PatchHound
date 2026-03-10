@@ -43,11 +43,16 @@ public class AssetsControllerTests : IDisposable
             _dbContext,
             new EnvironmentalSeverityCalculator()
         );
+        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
+            _dbContext,
+            new NormalizedSoftwareResolver(_dbContext)
+        );
 
         _controller = new AssetsController(
             _dbContext,
             assetService,
             assessmentService,
+            normalizedSoftwareProjectionService,
             _tenantContext
         );
     }

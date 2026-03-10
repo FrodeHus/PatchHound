@@ -80,6 +80,8 @@ public static class DependencyInjection
         services.AddScoped<SlaService>();
         services.AddScoped<RemediationTaskProjectionService>();
         services.AddScoped<SoftwareVulnerabilityMatchService>();
+        services.AddScoped<NormalizedSoftwareResolver>();
+        services.AddScoped<NormalizedSoftwareProjectionService>();
         services.AddScoped<EnrichmentJobEnqueuer>();
         services.AddScoped<StagedVulnerabilityMergeService>();
         services.AddScoped<StagedAssetMergeService>();

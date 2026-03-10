@@ -32,18 +32,21 @@ public class AssetsController : ControllerBase
     private readonly PatchHoundDbContext _dbContext;
     private readonly AssetService _assetService;
     private readonly VulnerabilityAssessmentService _assessmentService;
+    private readonly NormalizedSoftwareProjectionService _normalizedSoftwareProjectionService;
     private readonly ITenantContext _tenantContext;
 
     public AssetsController(
         PatchHoundDbContext dbContext,
         AssetService assetService,
         VulnerabilityAssessmentService assessmentService,
+        NormalizedSoftwareProjectionService normalizedSoftwareProjectionService,
         ITenantContext tenantContext
     )
     {
         _dbContext = dbContext;
         _assetService = assetService;
         _assessmentService = assessmentService;
+        _normalizedSoftwareProjectionService = normalizedSoftwareProjectionService;
         _tenantContext = tenantContext;
     }
 
@@ -563,6 +566,7 @@ public class AssetsController : ControllerBase
             {
                 _dbContext.SoftwareCpeBindings.Remove(existingBinding);
                 await _dbContext.SaveChangesAsync(ct);
+                await _normalizedSoftwareProjectionService.SyncTenantAsync(asset.TenantId, ct);
             }
 
             return NoContent();
@@ -605,6 +609,7 @@ public class AssetsController : ControllerBase
         }
 
         await _dbContext.SaveChangesAsync(ct);
+        await _normalizedSoftwareProjectionService.SyncTenantAsync(asset.TenantId, ct);
         return NoContent();
     }
 
