@@ -5,6 +5,7 @@ import { apiGet } from '@/server/api'
 import {
   normalizedSoftwareDetailSchema,
   normalizedSoftwareVulnerabilitySchema,
+  pagedNormalizedSoftwareSchema,
   pagedNormalizedSoftwareInstallationsSchema,
 } from './software.schemas'
 import { buildFilterParams } from './utils'
@@ -15,6 +16,24 @@ export const fetchNormalizedSoftwareDetail = createServerFn({ method: 'GET' })
   .handler(async ({ context, data: { id } }) => {
     const data = await apiGet(`/software/${id}`, context)
     return normalizedSoftwareDetailSchema.parse(data)
+  })
+
+export const fetchNormalizedSoftware = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      search: z.string().optional(),
+      confidence: z.string().optional(),
+      vulnerableOnly: z.boolean().optional(),
+      boundOnly: z.boolean().optional(),
+      page: z.number().optional(),
+      pageSize: z.number().optional(),
+    }),
+  )
+  .handler(async ({ context, data: filters }) => {
+    const params = buildFilterParams(filters, { pageSize: 25 })
+    const data = await apiGet(`/software?${params.toString()}`, context)
+    return pagedNormalizedSoftwareSchema.parse(data)
   })
 
 export const fetchNormalizedSoftwareInstallations = createServerFn({ method: 'GET' })

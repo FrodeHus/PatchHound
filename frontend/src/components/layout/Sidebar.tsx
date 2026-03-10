@@ -8,6 +8,7 @@ import {
   Server,
   Shield,
   ShieldCheck,
+  Boxes,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -39,6 +40,7 @@ const navItems: NavItem[] = [
   { to: '/vulnerabilities', label: 'Vulnerabilities', icon: Bug },
   { to: '/tasks', label: 'Remediation', icon: CheckSquare },
   { to: '/assets', label: 'Assets', icon: Server },
+  { to: '/software', label: 'Software', icon: Boxes },
   { to: '/audit-log', label: 'Audit Trail', icon: ScrollText, roles: ['Auditor', 'GlobalAdmin'] },
   { to: '/admin', label: 'Admin Console', icon: ShieldCheck, roles: ['GlobalAdmin', 'SecurityManager'] },
 ]

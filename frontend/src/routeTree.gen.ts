@@ -19,6 +19,7 @@ import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as AuthedVulnerabilitiesIndexRouteImport } from './routes/_authed/vulnerabilities/index'
 import { Route as AuthedTasksIndexRouteImport } from './routes/_authed/tasks/index'
+import { Route as AuthedSoftwareIndexRouteImport } from './routes/_authed/software/index'
 import { Route as AuthedSettingsIndexRouteImport } from './routes/_authed/settings/index'
 import { Route as AuthedAuditLogIndexRouteImport } from './routes/_authed/audit-log/index'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
@@ -82,6 +83,11 @@ const AuthedVulnerabilitiesIndexRoute =
 const AuthedTasksIndexRoute = AuthedTasksIndexRouteImport.update({
   id: '/tasks/',
   path: '/tasks/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedSoftwareIndexRoute = AuthedSoftwareIndexRouteImport.update({
+  id: '/software/',
+  path: '/software/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedSettingsIndexRoute = AuthedSettingsIndexRouteImport.update({
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/assets/': typeof AuthedAssetsIndexRoute
   '/audit-log/': typeof AuthedAuditLogIndexRoute
   '/settings/': typeof AuthedSettingsIndexRoute
+  '/software/': typeof AuthedSoftwareIndexRoute
   '/tasks/': typeof AuthedTasksIndexRoute
   '/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/assets': typeof AuthedAssetsIndexRoute
   '/audit-log': typeof AuthedAuditLogIndexRoute
   '/settings': typeof AuthedSettingsIndexRoute
+  '/software': typeof AuthedSoftwareIndexRoute
   '/tasks': typeof AuthedTasksIndexRoute
   '/vulnerabilities': typeof AuthedVulnerabilitiesIndexRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
@@ -228,6 +236,7 @@ export interface FileRoutesById {
   '/_authed/assets/': typeof AuthedAssetsIndexRoute
   '/_authed/audit-log/': typeof AuthedAuditLogIndexRoute
   '/_authed/settings/': typeof AuthedSettingsIndexRoute
+  '/_authed/software/': typeof AuthedSoftwareIndexRoute
   '/_authed/tasks/': typeof AuthedTasksIndexRoute
   '/_authed/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/_authed/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
@@ -255,6 +264,7 @@ export interface FileRouteTypes {
     | '/assets/'
     | '/audit-log/'
     | '/settings/'
+    | '/software/'
     | '/tasks/'
     | '/vulnerabilities/'
     | '/admin/tenants/$id'
@@ -280,6 +290,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/audit-log'
     | '/settings'
+    | '/software'
     | '/tasks'
     | '/vulnerabilities'
     | '/admin/tenants/$id'
@@ -306,6 +317,7 @@ export interface FileRouteTypes {
     | '/_authed/assets/'
     | '/_authed/audit-log/'
     | '/_authed/settings/'
+    | '/_authed/software/'
     | '/_authed/tasks/'
     | '/_authed/vulnerabilities/'
     | '/_authed/admin/tenants/$id'
@@ -393,6 +405,13 @@ declare module '@tanstack/react-router' {
       path: '/tasks'
       fullPath: '/tasks/'
       preLoaderRoute: typeof AuthedTasksIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/software/': {
+      id: '/_authed/software/'
+      path: '/software'
+      fullPath: '/software/'
+      preLoaderRoute: typeof AuthedSoftwareIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/settings/': {
@@ -509,6 +528,7 @@ interface AuthedRouteChildren {
   AuthedAssetsIndexRoute: typeof AuthedAssetsIndexRoute
   AuthedAuditLogIndexRoute: typeof AuthedAuditLogIndexRoute
   AuthedSettingsIndexRoute: typeof AuthedSettingsIndexRoute
+  AuthedSoftwareIndexRoute: typeof AuthedSoftwareIndexRoute
   AuthedTasksIndexRoute: typeof AuthedTasksIndexRoute
   AuthedVulnerabilitiesIndexRoute: typeof AuthedVulnerabilitiesIndexRoute
   AuthedAdminTenantsIdRoute: typeof AuthedAdminTenantsIdRoute
@@ -528,6 +548,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAssetsIndexRoute: AuthedAssetsIndexRoute,
   AuthedAuditLogIndexRoute: AuthedAuditLogIndexRoute,
   AuthedSettingsIndexRoute: AuthedSettingsIndexRoute,
+  AuthedSoftwareIndexRoute: AuthedSoftwareIndexRoute,
   AuthedTasksIndexRoute: AuthedTasksIndexRoute,
   AuthedVulnerabilitiesIndexRoute: AuthedVulnerabilitiesIndexRoute,
   AuthedAdminTenantsIdRoute: AuthedAdminTenantsIdRoute,

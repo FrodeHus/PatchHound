@@ -92,6 +92,27 @@ public class SoftwareControllerTests : IDisposable
         payload[0].Evidence[0].Method.Should().Be("CpeBinding");
     }
 
+    [Fact]
+    public async Task List_ReturnsPagedNormalizedSoftwareItems()
+    {
+        var normalizedSoftware = await SeedNormalizedSoftwareGraphAsync();
+
+        var action = await _controller.List(
+            new NormalizedSoftwareFilterQuery(Search: "agent", VulnerableOnly: true),
+            new PaginationQuery(1, 10),
+            CancellationToken.None
+        );
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<NormalizedSoftwareListItemDto>>().Subject;
+
+        payload.TotalCount.Should().Be(1);
+        payload.Items.Should().ContainSingle();
+        payload.Items[0].Id.Should().Be(normalizedSoftware.Id);
+        payload.Items[0].ActiveInstallCount.Should().Be(2);
+        payload.Items[0].ActiveVulnerabilityCount.Should().Be(1);
+        payload.Items[0].VersionCount.Should().Be(2);
+    }
+
     private async Task<NormalizedSoftware> SeedNormalizedSoftwareGraphAsync()
     {
         var normalizedSoftware = NormalizedSoftware.Create(
