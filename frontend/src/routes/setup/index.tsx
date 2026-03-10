@@ -40,7 +40,7 @@ function SetupPage() {
   })
 
   return (
-    <section className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#eef2f7_100%)]">
+    <section className="min-h-screen bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_92%,var(--primary)_8%),var(--background))]">
       {setupContext ? (
         <SetupWizard
           setupContext={setupContext}
