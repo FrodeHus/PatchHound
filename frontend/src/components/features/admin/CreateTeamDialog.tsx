@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 type CreateTeamDialogProps = {
   isSubmitting: boolean
@@ -39,18 +40,23 @@ export function CreateTeamDialog({ isSubmitting, tenants, onCreate }: CreateTeam
           </label>
           <label className="space-y-2">
             <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Tenant</span>
-            <select
-              className="rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
+            <Select
               value={tenantId}
-              onChange={(event) => setTenantId(event.target.value)}
+              onValueChange={(value) => {
+                setTenantId(value ?? '')
+              }}
             >
-              <option value="">Select tenant</option>
-              {tenants.map((tenant) => (
-                <option key={tenant.id} value={tenant.id}>
-                  {tenant.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-10 w-full rounded-xl bg-background px-3">
+                <SelectValue placeholder="Select tenant" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                {tenants.map((tenant) => (
+                  <SelectItem key={tenant.id} value={tenant.id}>
+                    {tenant.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           <div className="md:col-span-2 flex flex-wrap items-center gap-3">
             <Button

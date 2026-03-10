@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { AssetDetail } from '@/api/assets.schemas'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
+import { formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import {
   Sheet,
   SheetContent,
@@ -703,7 +704,7 @@ function KeyValueGrid({ metadata }: { metadata: MetadataRecord }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
       {Object.entries(metadata).map(([key, value]) => (
-        <DataCard key={key} label={startCase(key)} value={formatValue(value)} mono={typeof value === 'string' && looksLikeId(value)} />
+        <DataCard key={key} label={startCase(key)} value={formatUnknownValue(value)} mono={typeof value === 'string' && looksLikeOpaqueId(value)} />
       ))}
     </div>
   )
@@ -782,33 +783,6 @@ function parseMetadata(metadata: string | undefined): MetadataRecord {
   } catch {
     return {}
   }
-}
-
-function formatValue(value: unknown): string {
-  if (typeof value === 'string') {
-    return value
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value)
-  }
-
-  if (value === null || value === undefined) {
-    return '-'
-  }
-
-  return JSON.stringify(value)
-}
-
-function startCase(value: string): string {
-  return value
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (match) => match.toUpperCase())
-}
-
-function looksLikeId(value: string): boolean {
-  return value.length > 24 || value.includes('-')
 }
 
 function readString(value: unknown): string | null {

@@ -1,9 +1,11 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { createFileRoute } from '@tanstack/react-router'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchTasks } from '@/api/tasks.functions'
 import { updateTaskStatus } from '@/api/tasks.functions'
 import { TaskList } from '@/components/features/tasks/TaskList'
+import { buildTasksListRequest, taskQueryKeys } from '@/features/tasks/list-state'
 import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
+import { createListSearchUpdater } from '@/routes/list-search-helpers'
 
 const tasksSearchSchema = baseListSearchSchema.extend({
   status: searchStringSchema,
@@ -12,14 +14,7 @@ const tasksSearchSchema = baseListSearchSchema.extend({
 export const Route = createFileRoute('/_authed/tasks/')({
   validateSearch: tasksSearchSchema,
   loaderDeps: ({ search }) => search,
-  loader: ({ deps }) =>
-    fetchTasks({
-      data: {
-        ...(deps.status ? { status: deps.status } : {}),
-        page: deps.page,
-        pageSize: deps.pageSize,
-      },
-    }),
+  loader: ({ deps }) => fetchTasks({ data: buildTasksListRequest(deps) }),
   component: TasksPage,
 })
 
@@ -27,17 +22,11 @@ function TasksPage() {
   const initialData = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  const router = useRouter()
+  const searchActions = createListSearchUpdater<typeof search>(navigate)
+  const queryClient = useQueryClient()
   const query = useQuery({
-    queryKey: ['tasks', search.status, search.page, search.pageSize],
-    queryFn: () =>
-      fetchTasks({
-        data: {
-          ...(search.status ? { status: search.status } : {}),
-          page: search.page,
-          pageSize: search.pageSize,
-        },
-      }),
+    queryKey: taskQueryKeys.list(search),
+    queryFn: () => fetchTasks({ data: buildTasksListRequest(search) }),
     initialData,
   })
   const mutation = useMutation({
@@ -50,7 +39,9 @@ function TasksPage() {
         },
       })
     },
-    onSuccess: () => { void router.invalidate() },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: taskQueryKeys.all })
+    },
   })
 
   return (
@@ -65,24 +56,16 @@ function TasksPage() {
         statusFilter={search.status}
         isUpdating={mutation.isPending}
         onStatusFilterChange={(value) => {
-          void navigate({
-            search: (prev) => ({ ...prev, status: value, page: 1 }),
-          })
+          searchActions.updateField('status', value)
         }}
         onPageChange={(page) => {
-          void navigate({
-            search: (prev) => ({ ...prev, page }),
-          })
+          searchActions.updatePage(page)
         }}
         onPageSizeChange={(nextPageSize) => {
-          void navigate({
-            search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
-          })
+          searchActions.updatePageSize(nextPageSize)
         }}
         onClearFilters={() => {
-          void navigate({
-            search: (prev) => ({ ...prev, status: '', page: 1 }),
-          })
+          searchActions.updateFields({ status: '' })
         }}
         onUpdateStatus={(taskId, status, justification) => {
           mutation.mutate({ taskId, status, justification })

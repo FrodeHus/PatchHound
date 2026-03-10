@@ -1,6 +1,8 @@
 import { createContext, useContext } from 'react'
 
 export const selectedTenantStorageKey = 'patchhound:selected-tenant'
+export const selectedTenantCookieKey = 'patchhound-selected-tenant'
+const selectedTenantCookieMaxAgeSeconds = 60 * 60 * 24 * 365
 
 export type TenantScopeContextValue = {
   selectedTenantId: string | null
@@ -19,4 +21,29 @@ export function useTenantScope() {
   }
 
   return context
+}
+
+export function persistSelectedTenant(tenantId: string | null) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  if (tenantId) {
+    window.localStorage.setItem(selectedTenantStorageKey, tenantId)
+    document.cookie = [
+      `${selectedTenantCookieKey}=${encodeURIComponent(tenantId)}`,
+      'Path=/',
+      `Max-Age=${selectedTenantCookieMaxAgeSeconds}`,
+      'SameSite=Lax',
+    ].join('; ')
+    return
+  }
+
+  window.localStorage.removeItem(selectedTenantStorageKey)
+  document.cookie = [
+    `${selectedTenantCookieKey}=`,
+    'Path=/',
+    'Max-Age=0',
+    'SameSite=Lax',
+  ].join('; ')
 }

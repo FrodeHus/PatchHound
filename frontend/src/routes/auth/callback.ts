@@ -43,6 +43,7 @@ export const Route = createFileRoute('/auth/callback')({
         session.email = claims.preferred_username
         session.displayName = claims.name
         session.tenantId = claims.tid
+        session.tenantIds = claims.tid ? [claims.tid] : []
         session.tenantName = getClaimString(claims, ['tenant_display_name', 'tenant_name'])
         session.entraRoles = claims.roles ?? []
         session.roles = normalizeRoles(claims.roles)

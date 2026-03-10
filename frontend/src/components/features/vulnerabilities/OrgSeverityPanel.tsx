@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { updateOrganizationalSeverity } from '@/api/vulnerabilities.functions'
 import type { VulnerabilityDetail } from '@/api/vulnerabilities.schemas'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { vulnerabilitySeverityOptions } from '@/lib/options/vulnerabilities'
 
 type OrgSeverityPanelProps = {
   vulnerability: VulnerabilityDetail
 }
-
-const severityOptions = ['Low', 'Medium', 'High', 'Critical']
 
 export function OrgSeverityPanel({ vulnerability }: OrgSeverityPanelProps) {
   const mutation = useMutation({
@@ -48,25 +50,31 @@ export function OrgSeverityPanel({ vulnerability }: OrgSeverityPanelProps) {
       <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
         <label className="space-y-1.5 text-sm">
           <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Adjusted severity</span>
-          <select
-            className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm"
+          <Select
             value={adjustedSeverity}
-            onChange={(event) => {
-              setAdjustedSeverity(event.target.value)
+            onValueChange={(value) => {
+              if (value) {
+                setAdjustedSeverity(value)
+              }
             }}
           >
-            {severityOptions.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="h-10 w-full rounded-lg bg-card px-3">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {vulnerabilitySeverityOptions.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {value}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
 
         <label className="space-y-1.5 text-sm">
           <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Justification</span>
-          <textarea
-            className="min-h-28 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm leading-6"
+          <Textarea
+            className="min-h-28 rounded-lg bg-card leading-6"
             value={justification}
             placeholder="Explain why the effective severity should differ from the vendor severity in this organization."
             onChange={(event) => {
@@ -80,9 +88,9 @@ export function OrgSeverityPanel({ vulnerability }: OrgSeverityPanelProps) {
         <p className="text-xs text-muted-foreground">
           This adjustment is used as the tenant-specific analyst view of the vulnerability.
         </p>
-        <button
+        <Button
           type="button"
-          className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          className="rounded-lg"
           disabled={mutation.isPending || justification.trim().length === 0}
           onClick={() => {
             mutation.mutate({
@@ -92,7 +100,7 @@ export function OrgSeverityPanel({ vulnerability }: OrgSeverityPanelProps) {
           }}
         >
           {mutation.isPending ? 'Saving...' : 'Save adjustment'}
-        </button>
+        </Button>
       </div>
 
       {mutation.isError ? <p className="text-sm text-destructive">Unable to save severity adjustment.</p> : null}

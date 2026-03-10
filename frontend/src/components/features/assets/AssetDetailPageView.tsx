@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { AssetDetail } from '@/api/assets.schemas'
+import { formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
 
 type AssetDetailPageViewProps = {
@@ -158,7 +159,7 @@ export function AssetDetailPageView({
                     <p className="text-sm text-muted-foreground">No extra metadata is stored for this asset.</p>
                   ) : (
                     Object.entries(metadata).map(([key, value]) => (
-                      <MetricCard key={key} label={startCase(key)} value={formatValue(value)} mono={typeof value === 'string' && looksLikeId(value)} />
+                      <MetricCard key={key} label={startCase(key)} value={formatUnknownValue(value)} mono={typeof value === 'string' && looksLikeOpaqueId(value)} />
                     ))
                   )}
                 </div>
@@ -455,21 +456,6 @@ function parseMetadata(metadata: string): Record<string, unknown> {
   } catch {
     return {}
   }
-}
-
-function startCase(value: string) {
-  return value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
-}
-
-function formatValue(value: unknown): string {
-  if (typeof value === 'string') return value
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  if (value === null || value === undefined) return '-'
-  return JSON.stringify(value)
-}
-
-function looksLikeId(value: string) {
-  return value.length > 24 || value.includes('-')
 }
 
 function getDefaultDescription(assetType: string): string {

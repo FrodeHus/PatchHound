@@ -2,6 +2,8 @@ import { Link } from '@tanstack/react-router'
 import type { AuditLogItem } from '@/api/audit-log.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatAuditEntityType, formatAuditKey, parseAuditValues } from '@/lib/audit'
+import { formatDateTime } from '@/lib/formatting'
 
 type RecentAuditPanelProps = {
   title?: string
@@ -43,7 +45,7 @@ export function RecentAuditPanel({
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge className={actionBadgeClassName(item.action)}>{item.action}</Badge>
-                    <span className="text-sm font-medium text-foreground">{formatEntityType(item.entityType)}</span>
+                    <span className="text-sm font-medium text-foreground">{formatAuditEntityType(item.entityType)}</span>
                     {item.entityLabel ? (
                       <Badge variant="outline" className="rounded-full border-border/70 bg-background/60 text-foreground">
                         {item.entityLabel}
@@ -63,13 +65,13 @@ export function RecentAuditPanel({
 }
 
 function summarizeEntry(item: AuditLogItem) {
-  const newValues = parseValues(item.newValues)
-  const oldValues = parseValues(item.oldValues)
+  const newValues = parseAuditValues(item.newValues)
+  const oldValues = parseAuditValues(item.oldValues)
   const changedKeys = [...new Set([...Object.keys(newValues), ...Object.keys(oldValues)])]
   const actor = item.userDisplayName ?? 'Unknown operator'
   const subject = item.entityLabel
-    ? `${formatEntityType(item.entityType)} ${item.entityLabel}`
-    : formatEntityType(item.entityType)
+    ? `${formatAuditEntityType(item.entityType)} ${item.entityLabel}`
+    : formatAuditEntityType(item.entityType)
 
   if (item.action === 'Created') {
     return `${actor} created ${subject}.`
@@ -83,39 +85,13 @@ function summarizeEntry(item: AuditLogItem) {
     return `${actor} updated ${subject}.`
   }
 
-  const preview = changedKeys.slice(0, 3).map(formatKey).join(', ')
+  const preview = changedKeys.slice(0, 3).map(formatAuditKey).join(', ')
   const suffix = changedKeys.length > 3 ? ` +${changedKeys.length - 3} more` : ''
   return `${actor} updated ${subject}: ${preview}${suffix}.`
 }
 
-function parseValues(raw: string | null) {
-  if (!raw) {
-    return {}
-  }
-
-  try {
-    const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
-  } catch {
-    return {}
-  }
-}
-
-function formatEntityType(value: string) {
-  return value
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/Id\b/g, 'ID')
-}
-
-function formatKey(value: string) {
-  return value
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/Id\b/g, 'ID')
-    .toLowerCase()
-}
-
 function formatTimestamp(value: string) {
-  return new Date(value).toLocaleString()
+  return formatDateTime(value)
 }
 
 function actionBadgeClassName(action: string) {

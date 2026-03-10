@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { ShieldCheck, Signal, TriangleAlert } from 'lucide-react'
 import { fetchAuditLog } from '@/api/audit-log.functions'
@@ -10,65 +10,25 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PaginationControls } from '@/components/ui/pagination-controls'
+import {
+  securityProfileEnvironmentClassOptions,
+  securityProfileEnvironmentHelp,
+  securityProfileFieldGuidance,
+  securityProfileInternetReachabilityHelp,
+  securityProfileInternetReachabilityOptions,
+  securityProfileRequirementHelp,
+  securityProfileRequirementOptions,
+} from '@/lib/options/security-profiles'
 import { baseListSearchSchema } from '@/routes/-list-search'
-
-const environmentClassOptions = ['Workstation', 'Server', 'JumpHost', 'Lab', 'Kiosk', 'OT'] as const
-const internetReachabilityOptions = ['Internet', 'InternalNetwork', 'AdjacentOnly', 'LocalOnly'] as const
-const requirementOptions = ['Low', 'Medium', 'High'] as const
-
-const fieldGuidance = {
-  environmentClass: {
-    label: 'Environment Class',
-    description: 'Use this to describe the device role. It helps people understand why the profile exists and what kind of endpoint it should be assigned to.',
-  },
-  internetReachability: {
-    label: 'Internet Reachability',
-    description: 'This affects exploitability. Devices reachable from the internet should keep more severe network-based exposure than devices limited to internal, adjacent, or local access.',
-  },
-  confidentialityRequirement: {
-    label: 'Confidentiality Requirement',
-    description: 'Raise this when data disclosure matters more for this device. Higher values increase the impact of vulnerabilities that expose data.',
-  },
-  integrityRequirement: {
-    label: 'Integrity Requirement',
-    description: 'Raise this when unauthorized changes would be especially harmful. Higher values increase the impact of tampering-oriented vulnerabilities.',
-  },
-  availabilityRequirement: {
-    label: 'Availability Requirement',
-    description: 'Raise this when uptime matters. Higher values increase the impact of denial-of-service or outage-causing vulnerabilities.',
-  },
-} as const
-
-const internetReachabilityHelp: Record<(typeof internetReachabilityOptions)[number], string> = {
-  Internet: 'Use for externally reachable systems. Network-exploitable vulnerabilities stay highly exposed.',
-  InternalNetwork: 'Use for assets only reachable inside your organization. This still allows network exposure, but removes direct internet reachability.',
-  AdjacentOnly: 'Use for segmented or same-network access only. This reduces exposure for broader network attack paths.',
-  LocalOnly: 'Use for tightly isolated devices that require local presence or an already established foothold.',
-}
-
-const requirementHelp: Record<(typeof requirementOptions)[number], string> = {
-  Low: 'The business impact is lower for this dimension, so PatchHound reduces how much this factor increases severity.',
-  Medium: 'Balanced default. Use when this device does not need special weighting.',
-  High: 'The business impact is high for this dimension, so PatchHound increases how much this factor affects severity.',
-}
-
-const environmentHelp: Record<(typeof environmentClassOptions)[number], string> = {
-  Workstation: 'General user endpoint profile.',
-  Server: 'Service-hosting system where confidentiality, integrity, or uptime may matter more.',
-  JumpHost: 'Access broker or admin system with elevated exposure and importance.',
-  Lab: 'Test or isolated environment where some impact dimensions may be lower.',
-  Kiosk: 'Locked-down interactive endpoint with constrained user behavior.',
-  OT: 'Operational technology or production control environment where availability often matters more.',
-}
 
 export const Route = createFileRoute('/_authed/admin/security-profiles')({
   validateSearch: baseListSearchSchema,
   loaderDeps: ({ search }) => search,
-  loader: async ({ deps, context }) => {
+  loader: async ({ deps }) => {
     return fetchSecurityProfiles({
       data: {
-        tenantId: context.user?.tenantIds[0] ?? undefined,
         page: deps.page,
         pageSize: deps.pageSize,
       },
@@ -82,28 +42,26 @@ function SecurityProfilesPage() {
   const navigate = Route.useNavigate()
   const { user } = Route.useRouteContext()
   const initialProfiles = Route.useLoaderData()
+  const queryClient = useQueryClient()
   const { selectedTenantId, tenants } = useTenantScope()
-  const defaultTenantId = user.tenantIds[0] ?? null
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [environmentClass, setEnvironmentClass] = useState<(typeof environmentClassOptions)[number]>(environmentClassOptions[0])
-  const [internetReachability, setInternetReachability] = useState<(typeof internetReachabilityOptions)[number]>(internetReachabilityOptions[0])
-  const [confidentialityRequirement, setConfidentialityRequirement] = useState<(typeof requirementOptions)[number]>(requirementOptions[1])
-  const [integrityRequirement, setIntegrityRequirement] = useState<(typeof requirementOptions)[number]>(requirementOptions[1])
-  const [availabilityRequirement, setAvailabilityRequirement] = useState<(typeof requirementOptions)[number]>(requirementOptions[1])
+  const [environmentClass, setEnvironmentClass] = useState<(typeof securityProfileEnvironmentClassOptions)[number]>(securityProfileEnvironmentClassOptions[0])
+  const [internetReachability, setInternetReachability] = useState<(typeof securityProfileInternetReachabilityOptions)[number]>(securityProfileInternetReachabilityOptions[0])
+  const [confidentialityRequirement, setConfidentialityRequirement] = useState<(typeof securityProfileRequirementOptions)[number]>(securityProfileRequirementOptions[1])
+  const [integrityRequirement, setIntegrityRequirement] = useState<(typeof securityProfileRequirementOptions)[number]>(securityProfileRequirementOptions[1])
+  const [availabilityRequirement, setAvailabilityRequirement] = useState<(typeof securityProfileRequirementOptions)[number]>(securityProfileRequirementOptions[1])
   const tenantNames = new Map(tenants.map((tenant) => [tenant.id, tenant.name]))
   const profilesQuery = useQuery({
     queryKey: ['security-profiles', selectedTenantId, search.page, search.pageSize],
-    queryFn: () => fetchSecurityProfiles({ data: { tenantId: selectedTenantId ?? undefined, page: search.page, pageSize: search.pageSize } }),
-    enabled: Boolean(selectedTenantId),
-    initialData: selectedTenantId === defaultTenantId ? initialProfiles : undefined,
+    queryFn: () => fetchSecurityProfiles({ data: { page: search.page, pageSize: search.pageSize } }),
+    initialData: initialProfiles,
   })
 
   const mutation = useMutation({
     mutationFn: async () => {
       await createSecurityProfile({
         data: {
-          tenantId: selectedTenantId!,
           name,
           description,
           environmentClass,
@@ -117,12 +75,12 @@ function SecurityProfilesPage() {
     onSuccess: async () => {
       setName('')
       setDescription('')
-      setEnvironmentClass(environmentClassOptions[0])
-      setInternetReachability(internetReachabilityOptions[0])
-      setConfidentialityRequirement(requirementOptions[1])
-      setIntegrityRequirement(requirementOptions[1])
-      setAvailabilityRequirement(requirementOptions[1])
-      await profilesQuery.refetch()
+      setEnvironmentClass(securityProfileEnvironmentClassOptions[0])
+      setInternetReachability(securityProfileInternetReachabilityOptions[0])
+      setConfidentialityRequirement(securityProfileRequirementOptions[1])
+      setIntegrityRequirement(securityProfileRequirementOptions[1])
+      setAvailabilityRequirement(securityProfileRequirementOptions[1])
+      await queryClient.invalidateQueries({ queryKey: ['security-profiles'] })
       if (canViewAudit) {
         await recentAuditMutation.mutateAsync()
       }
@@ -226,96 +184,136 @@ function SecurityProfilesPage() {
 
           <div className="grid gap-4 xl:grid-cols-2">
             <FieldBlock
-              label={fieldGuidance.environmentClass.label}
-              description={fieldGuidance.environmentClass.description}
-              helper={environmentHelp[environmentClass]}
+              label={securityProfileFieldGuidance.environmentClass.label}
+              description={securityProfileFieldGuidance.environmentClass.description}
+              helper={securityProfileEnvironmentHelp[environmentClass]}
               control={(
-                <select
-                  className="rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
+                <Select
                   value={environmentClass}
-                  onChange={(event) => setEnvironmentClass(event.target.value as (typeof environmentClassOptions)[number])}
+                  onValueChange={(value) => {
+                    if (value) {
+                      setEnvironmentClass(value)
+                    }
+                  }}
                 >
-                  {environmentClassOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-10 w-full rounded-xl bg-background px-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                    {securityProfileEnvironmentClassOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             />
             <FieldBlock
-              label={fieldGuidance.internetReachability.label}
-              description={fieldGuidance.internetReachability.description}
-              helper={internetReachabilityHelp[internetReachability]}
+              label={securityProfileFieldGuidance.internetReachability.label}
+              description={securityProfileFieldGuidance.internetReachability.description}
+              helper={securityProfileInternetReachabilityHelp[internetReachability]}
               control={(
-                <select
-                  className="rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
+                <Select
                   value={internetReachability}
-                  onChange={(event) => setInternetReachability(event.target.value as (typeof internetReachabilityOptions)[number])}
+                  onValueChange={(value) => {
+                    if (value) {
+                      setInternetReachability(value)
+                    }
+                  }}
                 >
-                  {internetReachabilityOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-10 w-full rounded-xl bg-background px-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                    {securityProfileInternetReachabilityOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             />
           </div>
 
           <div className="grid gap-4 xl:grid-cols-3">
             <FieldBlock
-              label={fieldGuidance.confidentialityRequirement.label}
-              description={fieldGuidance.confidentialityRequirement.description}
-              helper={requirementHelp[confidentialityRequirement]}
+              label={securityProfileFieldGuidance.confidentialityRequirement.label}
+              description={securityProfileFieldGuidance.confidentialityRequirement.description}
+              helper={securityProfileRequirementHelp[confidentialityRequirement]}
               control={(
-                <select
-                  className="rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
+                <Select
                   value={confidentialityRequirement}
-                  onChange={(event) => setConfidentialityRequirement(event.target.value as (typeof requirementOptions)[number])}
+                  onValueChange={(value) => {
+                    if (value) {
+                      setConfidentialityRequirement(value)
+                    }
+                  }}
                 >
-                  {requirementOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-10 w-full rounded-xl bg-background px-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                    {securityProfileRequirementOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             />
             <FieldBlock
-              label={fieldGuidance.integrityRequirement.label}
-              description={fieldGuidance.integrityRequirement.description}
-              helper={requirementHelp[integrityRequirement]}
+              label={securityProfileFieldGuidance.integrityRequirement.label}
+              description={securityProfileFieldGuidance.integrityRequirement.description}
+              helper={securityProfileRequirementHelp[integrityRequirement]}
               control={(
-                <select
-                  className="rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
+                <Select
                   value={integrityRequirement}
-                  onChange={(event) => setIntegrityRequirement(event.target.value as (typeof requirementOptions)[number])}
+                  onValueChange={(value) => {
+                    if (value) {
+                      setIntegrityRequirement(value)
+                    }
+                  }}
                 >
-                  {requirementOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-10 w-full rounded-xl bg-background px-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                    {securityProfileRequirementOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             />
             <FieldBlock
-              label={fieldGuidance.availabilityRequirement.label}
-              description={fieldGuidance.availabilityRequirement.description}
-              helper={requirementHelp[availabilityRequirement]}
+              label={securityProfileFieldGuidance.availabilityRequirement.label}
+              description={securityProfileFieldGuidance.availabilityRequirement.description}
+              helper={securityProfileRequirementHelp[availabilityRequirement]}
               control={(
-                <select
-                  className="rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
+                <Select
                   value={availabilityRequirement}
-                  onChange={(event) => setAvailabilityRequirement(event.target.value as (typeof requirementOptions)[number])}
+                  onValueChange={(value) => {
+                    if (value) {
+                      setAvailabilityRequirement(value)
+                    }
+                  }}
                 >
-                  {requirementOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-10 w-full rounded-xl bg-background px-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                    {securityProfileRequirementOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             />
           </div>
@@ -383,22 +381,38 @@ function SecurityProfilesPage() {
                   <ProfileMetric
                     label="Reachability"
                     value={profile.internetReachability}
-                    explanation={internetReachabilityHelp[profile.internetReachability as (typeof internetReachabilityOptions)[number]]}
+                    explanation={
+                      securityProfileInternetReachabilityHelp[
+                        profile.internetReachability as (typeof securityProfileInternetReachabilityOptions)[number]
+                      ]
+                    }
                   />
                   <ProfileMetric
                     label="Confidentiality"
                     value={profile.confidentialityRequirement}
-                    explanation={requirementHelp[profile.confidentialityRequirement as (typeof requirementOptions)[number]]}
+                    explanation={
+                      securityProfileRequirementHelp[
+                        profile.confidentialityRequirement as (typeof securityProfileRequirementOptions)[number]
+                      ]
+                    }
                   />
                   <ProfileMetric
                     label="Integrity"
                     value={profile.integrityRequirement}
-                    explanation={requirementHelp[profile.integrityRequirement as (typeof requirementOptions)[number]]}
+                    explanation={
+                      securityProfileRequirementHelp[
+                        profile.integrityRequirement as (typeof securityProfileRequirementOptions)[number]
+                      ]
+                    }
                   />
                   <ProfileMetric
                     label="Availability"
                     value={profile.availabilityRequirement}
-                    explanation={requirementHelp[profile.availabilityRequirement as (typeof requirementOptions)[number]]}
+                    explanation={
+                      securityProfileRequirementHelp[
+                        profile.availabilityRequirement as (typeof securityProfileRequirementOptions)[number]
+                      ]
+                    }
                   />
                 </div>
 

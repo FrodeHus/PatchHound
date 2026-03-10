@@ -9,7 +9,6 @@ export const fetchSecurityProfiles = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(
     z.object({
-      tenantId: z.string().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
     }),
@@ -24,7 +23,6 @@ export const createSecurityProfile = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(
     z.object({
-      tenantId: z.string(),
       name: z.string(),
       description: z.string().optional(),
       environmentClass: z.string(),
@@ -34,6 +32,14 @@ export const createSecurityProfile = createServerFn({ method: 'POST' })
       availabilityRequirement: z.string(),
     }),
   )
-  .handler(async ({ context, data }) => {
-    await apiPost('/security-profiles', context, data)
+  .handler(async ({ context, data: { name, description, environmentClass, internetReachability, confidentialityRequirement, integrityRequirement, availabilityRequirement } }) => {
+    await apiPost('/security-profiles', context, {
+      name,
+      description,
+      environmentClass,
+      internetReachability,
+      confidentialityRequirement,
+      integrityRequirement,
+      availabilityRequirement,
+    })
   })

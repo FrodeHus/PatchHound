@@ -6,6 +6,7 @@ import {
   fetchNormalizedSoftwareVulnerabilities,
 } from '@/api/software.functions'
 import { SoftwareDetailPage } from '@/components/features/software/SoftwareDetailPage'
+import { softwareQueryKeys } from '@/features/software/list-state'
 import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
 
 const softwareDetailSearchSchema = baseListSearchSchema.extend({
@@ -43,7 +44,7 @@ function SoftwareDetailRoute() {
   const initialData = Route.useLoaderData()
 
   const detailQuery = useQuery({
-    queryKey: ['normalized-software', id],
+    queryKey: softwareQueryKeys.detail(id),
     queryFn: () => fetchNormalizedSoftwareDetail({ data: { id } }),
     initialData: initialData.detail,
   })
@@ -52,7 +53,7 @@ function SoftwareDetailRoute() {
     search.version || normalizeVersion(detailQuery.data.versionCohorts[0]?.version ?? null)
 
   const installationsQuery = useQuery({
-    queryKey: ['normalized-software-installations', id, selectedVersion, search.page, search.pageSize],
+    queryKey: softwareQueryKeys.installations(id, selectedVersion, search.page, search.pageSize),
     queryFn: () =>
       fetchNormalizedSoftwareInstallations({
         data: {
@@ -72,7 +73,7 @@ function SoftwareDetailRoute() {
   })
 
   const vulnerabilitiesQuery = useQuery({
-    queryKey: ['normalized-software-vulnerabilities', id],
+    queryKey: softwareQueryKeys.vulnerabilities(id),
     queryFn: () => fetchNormalizedSoftwareVulnerabilities({ data: { id } }),
     initialData: initialData.vulnerabilities,
   })
