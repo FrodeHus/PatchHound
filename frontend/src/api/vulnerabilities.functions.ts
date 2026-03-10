@@ -84,7 +84,7 @@ export const fetchVulnerabilityTimeline = createServerFn({ method: 'GET' })
   .inputValidator(z.object({ id: z.string() }))
   .handler(async ({ context, data: { id } }) => {
     const params = new URLSearchParams({
-      entityType: 'Vulnerability',
+      entityType: 'TenantVulnerability',
       entityId: id,
       page: '1',
       pageSize: '50',

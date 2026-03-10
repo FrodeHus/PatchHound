@@ -12,8 +12,7 @@ public class EnvironmentalSeverityCalculatorTests
     [Fact]
     public void Calculate_LocalOnlyProfile_DowngradesNetworkReachability()
     {
-        var vulnerability = Vulnerability.Create(
-            Guid.NewGuid(),
+        var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2026-4000",
             "Remote issue",
             "Desc",
@@ -50,8 +49,7 @@ public class EnvironmentalSeverityCalculatorTests
     [Fact]
     public void Calculate_HighRequirements_CanIncreaseEffectiveScore()
     {
-        var vulnerability = Vulnerability.Create(
-            Guid.NewGuid(),
+        var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2026-4001",
             "Sensitive data issue",
             "Desc",

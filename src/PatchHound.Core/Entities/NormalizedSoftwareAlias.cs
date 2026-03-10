@@ -5,7 +5,6 @@ namespace PatchHound.Core.Entities;
 public class NormalizedSoftwareAlias
 {
     public Guid Id { get; private set; }
-    public Guid TenantId { get; private set; }
     public Guid NormalizedSoftwareId { get; private set; }
     public SoftwareIdentitySourceSystem SourceSystem { get; private set; }
     public string ExternalSoftwareId { get; private set; } = null!;
@@ -22,7 +21,6 @@ public class NormalizedSoftwareAlias
     private NormalizedSoftwareAlias() { }
 
     public static NormalizedSoftwareAlias Create(
-        Guid tenantId,
         Guid normalizedSoftwareId,
         SoftwareIdentitySourceSystem sourceSystem,
         string externalSoftwareId,
@@ -37,7 +35,6 @@ public class NormalizedSoftwareAlias
         return new NormalizedSoftwareAlias
         {
             Id = Guid.NewGuid(),
-            TenantId = tenantId,
             NormalizedSoftwareId = normalizedSoftwareId,
             SourceSystem = sourceSystem,
             ExternalSoftwareId = externalSoftwareId.Trim(),

@@ -3,7 +3,7 @@ import { pagedResponseMetaSchema } from './pagination.schemas'
 
 export const remediationTaskSchema = z.object({
   id: z.string().uuid(),
-  vulnerabilityId: z.string().uuid(),
+  tenantVulnerabilityId: z.string().uuid(),
   assetId: z.string().uuid(),
   vulnerabilityTitle: z.string(),
   assetName: z.string(),

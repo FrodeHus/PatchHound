@@ -16,7 +16,7 @@ public record AssetDto(
 
 public record AssetDetailDto(
     Guid Id,
-    Guid? NormalizedSoftwareId,
+    Guid? TenantSoftwareId,
     string ExternalId,
     string Name,
     string? Description,
@@ -72,7 +72,7 @@ public record AssetVulnerabilityEpisodeDto(
 
 public record AssetSoftwareInstallationDto(
     Guid SoftwareAssetId,
-    Guid? NormalizedSoftwareId,
+    Guid? TenantSoftwareId,
     string Name,
     string ExternalId,
     DateTimeOffset LastSeenAt,

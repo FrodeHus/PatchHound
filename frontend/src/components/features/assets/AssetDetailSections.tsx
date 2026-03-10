@@ -215,10 +215,10 @@ export function DeviceSection({
               <div key={software.softwareAssetId} className="rounded-xl border border-border/70 bg-background px-3 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    {software.normalizedSoftwareId ? (
+                    {software.tenantSoftwareId ? (
                       <Link
                         to="/software/$id"
-                        params={{ id: software.normalizedSoftwareId }}
+                        params={{ id: software.tenantSoftwareId }}
                         search={{ page: 1, pageSize: 25, version: '' }}
                         className="font-medium hover:text-primary"
                       >

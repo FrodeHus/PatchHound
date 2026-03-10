@@ -48,15 +48,8 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             })
             .ToListAsync(ct);
 
-        var bindings = await dbContext
-            .SoftwareCpeBindings.IgnoreQueryFilters()
-            .Where(binding => binding.TenantId == tenantId)
-            .ToListAsync(ct);
-        var bindingsBySoftwareAssetId = bindings.ToDictionary(binding => binding.SoftwareAssetId);
-
         var aliases = await dbContext
             .NormalizedSoftwareAliases.IgnoreQueryFilters()
-            .Where(alias => alias.TenantId == tenantId)
             .ToListAsync(ct);
         var aliasesBySourceKey = aliases.ToDictionary(
             alias => BuildAliasKey(alias.SourceSystem, alias.ExternalSoftwareId),
@@ -65,7 +58,6 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
 
         var normalizedSoftware = await dbContext
             .NormalizedSoftware.IgnoreQueryFilters()
-            .Where(item => item.TenantId == tenantId)
             .ToListAsync(ct);
         var normalizedById = normalizedSoftware.ToDictionary(item => item.Id);
         var normalizedByProductKey = normalizedSoftware.ToDictionary(
@@ -78,8 +70,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
 
         foreach (var asset in softwareAssets)
         {
-            var binding = bindingsBySoftwareAssetId.GetValueOrDefault(asset.Id);
-            var identity = BuildIdentity(asset.Id, asset.ExternalId, asset.Name, asset.Metadata, binding);
+            var identity = BuildIdentity(asset.Id, asset.ExternalId, asset.Name, asset.Metadata);
             if (identity is null)
             {
                 continue;
@@ -113,7 +104,6 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             if (normalized is null)
             {
                 normalized = NormalizedSoftware.Create(
-                    tenantId,
                     identity.CanonicalName,
                     identity.CanonicalVendor,
                     identity.CanonicalProductKey,
@@ -129,12 +119,12 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             else
             {
                 normalized.UpdateIdentity(
-                    identity.CanonicalName,
-                    identity.CanonicalVendor,
-                    identity.CanonicalProductKey,
-                    identity.PrimaryCpe23Uri,
-                    identity.NormalizationMethod,
-                    identity.Confidence,
+                    normalized.PrimaryCpe23Uri is null ? identity.CanonicalName : normalized.CanonicalName,
+                    normalized.PrimaryCpe23Uri is null ? identity.CanonicalVendor : normalized.CanonicalVendor,
+                    normalized.PrimaryCpe23Uri is null ? identity.CanonicalProductKey : normalized.CanonicalProductKey,
+                    normalized.PrimaryCpe23Uri ?? identity.PrimaryCpe23Uri,
+                    normalized.PrimaryCpe23Uri is null ? identity.NormalizationMethod : SoftwareNormalizationMethod.ExplicitCpe,
+                    normalized.PrimaryCpe23Uri is null ? identity.Confidence : SoftwareNormalizationConfidence.High,
                     now
                 );
                 normalizedByProductKey[normalized.CanonicalProductKey] = normalized;
@@ -143,7 +133,6 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             if (existingAlias is null)
             {
                 existingAlias = NormalizedSoftwareAlias.Create(
-                    tenantId,
                     normalized.Id,
                     identity.SourceSystem,
                     identity.ExternalSoftwareId,
@@ -196,8 +185,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
         Guid softwareAssetId,
         string externalSoftwareId,
         string assetName,
-        string metadataJson,
-        SoftwareCpeBinding? binding
+        string metadataJson
     )
     {
         var metadata = ParseMetadata(metadataJson);
@@ -205,30 +193,6 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
         var rawName = ReadMetadataValue(metadata, "name") ?? assetName;
         var rawVendor = ReadMetadataValue(metadata, "vendor");
         var rawVersion = ReadMetadataValue(metadata, "version");
-
-        if (binding is not null)
-        {
-            var vendor = FirstNonEmpty(binding.MatchedVendor, rawVendor);
-            var product = FirstNonEmpty(binding.MatchedProduct, rawName);
-            var version = FirstNonEmpty(binding.MatchedVersion, rawVersion);
-
-            if (!string.IsNullOrWhiteSpace(product))
-            {
-                return new SoftwareIdentitySnapshot(
-                    softwareAssetId,
-                    externalSoftwareId,
-                    SoftwareIdentitySourceSystem.Defender,
-                    product.Trim(),
-                    string.IsNullOrWhiteSpace(vendor) ? null : vendor.Trim(),
-                    BuildCanonicalProductKey(vendor, product, binding.Cpe23Uri),
-                    binding.Cpe23Uri,
-                    string.IsNullOrWhiteSpace(version) ? null : version.Trim(),
-                    SoftwareNormalizationMethod.ExplicitCpe,
-                    MapConfidence(binding.Confidence),
-                    "Resolved via software CPE binding."
-                );
-            }
-        }
 
         if (!string.IsNullOrWhiteSpace(rawName))
         {

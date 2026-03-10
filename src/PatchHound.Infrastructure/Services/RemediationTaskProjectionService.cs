@@ -12,7 +12,8 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
 
     public async Task EnsureOpenTaskAsync(
         Guid tenantId,
-        Vulnerability vulnerability,
+        TenantVulnerability tenantVulnerability,
+        VulnerabilityDefinition definition,
         Asset asset,
         CancellationToken ct
     )
@@ -22,7 +23,7 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
             .FirstOrDefaultAsync(
                 task =>
                     task.TenantId == tenantId
-                    && task.VulnerabilityId == vulnerability.Id
+                    && task.TenantVulnerabilityId == tenantVulnerability.Id
                     && task.AssetId == asset.Id
                     && task.Status != RemediationTaskStatus.Completed,
                 ct
@@ -44,13 +45,13 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
             .FirstOrDefaultAsync(config => config.TenantId == tenantId, ct);
 
         var task = RemediationTask.Create(
-            vulnerability.Id,
+            tenantVulnerability.Id,
             asset.Id,
             tenantId,
             assigneeId.Value,
             SystemUserId,
             slaService.CalculateDueDate(
-                vulnerability.VendorSeverity,
+                definition.VendorSeverity,
                 DateTimeOffset.UtcNow,
                 tenantSla
             )
@@ -61,7 +62,11 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
 
     public async Task EnsureOpenTasksAsync(
         Guid tenantId,
-        IReadOnlyList<(Vulnerability Vulnerability, Asset Asset)> openedProjectionPairs,
+        IReadOnlyList<(
+            TenantVulnerability TenantVulnerability,
+            VulnerabilityDefinition Definition,
+            Asset Asset
+        )> openedProjectionPairs,
         HashSet<string> openTaskPairKeys,
         CancellationToken ct
     )
@@ -76,9 +81,9 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
             .FirstOrDefaultAsync(config => config.TenantId == tenantId, ct);
         var tasksToCreate = new List<RemediationTask>();
 
-        foreach (var (vulnerability, asset) in openedProjectionPairs)
+        foreach (var (tenantVulnerability, definition, asset) in openedProjectionPairs)
         {
-            var pairKey = BuildPairKey(vulnerability.Id, asset.Id);
+            var pairKey = BuildPairKey(tenantVulnerability.Id, asset.Id);
             if (openTaskPairKeys.Contains(pairKey))
             {
                 continue;
@@ -92,13 +97,13 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
 
             tasksToCreate.Add(
                 RemediationTask.Create(
-                    vulnerability.Id,
+                    tenantVulnerability.Id,
                     asset.Id,
                     tenantId,
                     assigneeId.Value,
                     SystemUserId,
                     slaService.CalculateDueDate(
-                        vulnerability.VendorSeverity,
+                        definition.VendorSeverity,
                         DateTimeOffset.UtcNow,
                         tenantSla
                     )
@@ -114,7 +119,7 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
     }
 
     public async Task CloseOpenTasksAsync(
-        IReadOnlyList<(Guid VulnerabilityId, Guid AssetId)> pairs,
+        IReadOnlyList<(Guid TenantVulnerabilityId, Guid AssetId)> pairs,
         CancellationToken ct
     )
     {
@@ -124,15 +129,18 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
         }
 
         var pairKeys = pairs
-            .Select(pair => BuildPairKey(pair.VulnerabilityId, pair.AssetId))
+            .Select(pair => BuildPairKey(pair.TenantVulnerabilityId, pair.AssetId))
             .ToHashSet(StringComparer.Ordinal);
-        var vulnerabilityIds = pairs.Select(pair => pair.VulnerabilityId).Distinct().ToList();
+        var tenantVulnerabilityIds = pairs
+            .Select(pair => pair.TenantVulnerabilityId)
+            .Distinct()
+            .ToList();
         var assetIds = pairs.Select(pair => pair.AssetId).Distinct().ToList();
 
         var tasks = await dbContext
             .RemediationTasks.IgnoreQueryFilters()
             .Where(task =>
-                vulnerabilityIds.Contains(task.VulnerabilityId)
+                tenantVulnerabilityIds.Contains(task.TenantVulnerabilityId)
                 && assetIds.Contains(task.AssetId)
                 && task.Status != RemediationTaskStatus.Completed
             )
@@ -140,7 +148,7 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
 
         foreach (var task in tasks)
         {
-            if (!pairKeys.Contains(BuildPairKey(task.VulnerabilityId, task.AssetId)))
+            if (!pairKeys.Contains(BuildPairKey(task.TenantVulnerabilityId, task.AssetId)))
             {
                 continue;
             }
@@ -167,8 +175,8 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
         return null;
     }
 
-    private static string BuildPairKey(Guid vulnerabilityId, Guid assetId)
+    private static string BuildPairKey(Guid tenantVulnerabilityId, Guid assetId)
     {
-        return $"{vulnerabilityId:N}:{assetId:N}";
+        return $"{tenantVulnerabilityId:N}:{assetId:N}";
     }
 }

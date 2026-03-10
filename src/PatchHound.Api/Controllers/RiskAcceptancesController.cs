@@ -61,7 +61,7 @@ public class RiskAcceptancesController : ControllerBase
             .Take(pagination.BoundedPageSize)
             .Select(r => new RiskAcceptanceDto(
                 r.Id,
-                r.VulnerabilityId,
+                r.TenantVulnerabilityId,
                 r.AssetId,
                 r.Status.ToString(),
                 r.Justification,
@@ -98,7 +98,7 @@ public class RiskAcceptancesController : ControllerBase
         return Ok(
             new RiskAcceptanceDto(
                 r.Id,
-                r.VulnerabilityId,
+                r.TenantVulnerabilityId,
                 r.AssetId,
                 r.Status.ToString(),
                 r.Justification,

@@ -5,7 +5,6 @@ namespace PatchHound.Core.Entities;
 public class NormalizedSoftware
 {
     public Guid Id { get; private set; }
-    public Guid TenantId { get; private set; }
     public string CanonicalName { get; private set; } = null!;
     public string? CanonicalVendor { get; private set; }
     public string CanonicalProductKey { get; private set; } = null!;
@@ -19,7 +18,6 @@ public class NormalizedSoftware
     private NormalizedSoftware() { }
 
     public static NormalizedSoftware Create(
-        Guid tenantId,
         string canonicalName,
         string? canonicalVendor,
         string canonicalProductKey,
@@ -32,7 +30,6 @@ public class NormalizedSoftware
         return new NormalizedSoftware
         {
             Id = Guid.NewGuid(),
-            TenantId = tenantId,
             CanonicalName = canonicalName.Trim(),
             CanonicalVendor = string.IsNullOrWhiteSpace(canonicalVendor) ? null : canonicalVendor.Trim(),
             CanonicalProductKey = canonicalProductKey.Trim(),

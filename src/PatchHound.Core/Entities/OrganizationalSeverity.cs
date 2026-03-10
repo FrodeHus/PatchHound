@@ -5,7 +5,7 @@ namespace PatchHound.Core.Entities;
 public class OrganizationalSeverity
 {
     public Guid Id { get; private set; }
-    public Guid VulnerabilityId { get; private set; }
+    public Guid TenantVulnerabilityId { get; private set; }
     public Guid TenantId { get; private set; }
     public Severity AdjustedSeverity { get; private set; }
     public string Justification { get; private set; } = null!;
@@ -15,10 +15,12 @@ public class OrganizationalSeverity
     public Guid AdjustedBy { get; private set; }
     public DateTimeOffset AdjustedAt { get; private set; }
 
+    public TenantVulnerability TenantVulnerability { get; private set; } = null!;
+
     private OrganizationalSeverity() { }
 
     public static OrganizationalSeverity Create(
-        Guid vulnerabilityId,
+        Guid tenantVulnerabilityId,
         Guid tenantId,
         Severity adjustedSeverity,
         string justification,
@@ -31,7 +33,7 @@ public class OrganizationalSeverity
         return new OrganizationalSeverity
         {
             Id = Guid.NewGuid(),
-            VulnerabilityId = vulnerabilityId,
+            TenantVulnerabilityId = tenantVulnerabilityId,
             TenantId = tenantId,
             AdjustedSeverity = adjustedSeverity,
             Justification = justification,

@@ -68,39 +68,27 @@ public class NormalizedSoftwareProjectionServiceTests : IDisposable
         );
         softwareTwo.UpdateMetadata("""{"name":"Contoso Agent","vendor":"Contoso","version":"2.0"}""");
 
-        var vulnerability = Vulnerability.Create(
-            _tenantId,
+        var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2026-0001",
             "Contoso Agent issue",
             "Description",
             Severity.High,
             "NVD"
         );
+        var tenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            vulnerability.Id,
+            VulnerabilityStatus.Open,
+            observedAt
+        );
 
-        await _dbContext.AddRangeAsync(deviceOne, deviceTwo, softwareOne, softwareTwo, vulnerability);
-        await _dbContext.SoftwareCpeBindings.AddRangeAsync(
-            SoftwareCpeBinding.Create(
-                _tenantId,
-                softwareOne.Id,
-                "cpe:2.3:a:contoso:agent:1.0:*:*:*:*:*:*:*",
-                CpeBindingMethod.Manual,
-                MatchConfidence.High,
-                "contoso",
-                "agent",
-                "1.0",
-                observedAt
-            ),
-            SoftwareCpeBinding.Create(
-                _tenantId,
-                softwareTwo.Id,
-                "cpe:2.3:a:contoso:agent:2.0:*:*:*:*:*:*:*",
-                CpeBindingMethod.Manual,
-                MatchConfidence.High,
-                "contoso",
-                "agent",
-                "2.0",
-                observedAt
-            )
+        await _dbContext.AddRangeAsync(
+            deviceOne,
+            deviceTwo,
+            softwareOne,
+            softwareTwo,
+            vulnerability,
+            tenantVulnerability
         );
         await _dbContext.DeviceSoftwareInstallations.AddRangeAsync(
             DeviceSoftwareInstallation.Create(_tenantId, deviceOne.Id, softwareOne.Id, observedAt),
@@ -148,19 +136,23 @@ public class NormalizedSoftwareProjectionServiceTests : IDisposable
 
         var normalizedSoftware = await _dbContext
             .NormalizedSoftware.IgnoreQueryFilters()
-            .Where(item => item.TenantId == _tenantId)
             .ToListAsync();
         normalizedSoftware.Should().ContainSingle();
-        normalizedSoftware[0].CanonicalVendor.Should().Be("contoso");
-        normalizedSoftware[0].CanonicalName.Should().Be("agent");
-        normalizedSoftware[0].NormalizationMethod.Should().Be(SoftwareNormalizationMethod.ExplicitCpe);
+        normalizedSoftware[0].CanonicalVendor.Should().Be("Contoso");
+        normalizedSoftware[0].CanonicalName.Should().Be("Contoso Agent");
+        normalizedSoftware[0].NormalizationMethod.Should().Be(SoftwareNormalizationMethod.Heuristic);
 
         var aliases = await _dbContext
             .NormalizedSoftwareAliases.IgnoreQueryFilters()
-            .Where(item => item.TenantId == _tenantId)
             .ToListAsync();
         aliases.Should().HaveCount(2);
         aliases.Select(item => item.NormalizedSoftwareId).Distinct().Should().ContainSingle();
+
+        var tenantSoftware = await _dbContext
+            .TenantSoftware.IgnoreQueryFilters()
+            .Where(item => item.TenantId == _tenantId)
+            .ToListAsync();
+        tenantSoftware.Should().ContainSingle();
 
         var installations = await _dbContext
             .NormalizedSoftwareInstallations.IgnoreQueryFilters()
@@ -175,6 +167,7 @@ public class NormalizedSoftwareProjectionServiceTests : IDisposable
             .Where(item => item.TenantId == _tenantId)
             .ToListAsync();
         projections.Should().ContainSingle();
+        projections[0].TenantSoftwareId.Should().Be(tenantSoftware[0].Id);
         projections[0].AffectedInstallCount.Should().Be(2);
         projections[0].AffectedDeviceCount.Should().Be(2);
         projections[0].AffectedVersionCount.Should().Be(2);

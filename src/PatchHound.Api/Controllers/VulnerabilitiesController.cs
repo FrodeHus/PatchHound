@@ -59,23 +59,24 @@ public class VulnerabilitiesController : ControllerBase
         CancellationToken ct
     )
     {
-        var query = _dbContext.Vulnerabilities.AsNoTracking().AsQueryable();
+        var query = _dbContext.TenantVulnerabilities.AsNoTracking().AsQueryable();
 
         if (
             !string.IsNullOrEmpty(filter.Severity)
             && Enum.TryParse<Severity>(filter.Severity, out var severity)
         )
-            query = query.Where(v => v.VendorSeverity == severity);
+            query = query.Where(v => v.VulnerabilityDefinition.VendorSeverity == severity);
         if (
             !string.IsNullOrEmpty(filter.Status)
             && Enum.TryParse<VulnerabilityStatus>(filter.Status, out var status)
         )
             query = query.Where(v => v.Status == status);
         if (!string.IsNullOrEmpty(filter.Source))
-            query = query.Where(v => v.Source.Contains(filter.Source));
+            query = query.Where(v => v.VulnerabilityDefinition.Source.Contains(filter.Source));
         if (!string.IsNullOrEmpty(filter.Search))
             query = query.Where(v =>
-                v.Title.Contains(filter.Search) || v.ExternalId.Contains(filter.Search)
+                v.VulnerabilityDefinition.Title.Contains(filter.Search)
+                || v.VulnerabilityDefinition.ExternalId.Contains(filter.Search)
             );
         if (filter.TenantId.HasValue)
         {
@@ -89,19 +90,21 @@ public class VulnerabilitiesController : ControllerBase
         }
         if (filter.RecurrenceOnly == true)
         {
-            query = query.Where(v =>
-                _dbContext
-                    .VulnerabilityAssetEpisodes.Where(e => e.VulnerabilityId == v.Id)
-                    .GroupBy(e => e.AssetId)
-                    .Any(g => g.Count() > 1)
-            );
+            var recurringTenantVulnerabilityIds = await _dbContext
+                .VulnerabilityAssetEpisodes.AsNoTracking()
+                .GroupBy(episode => new { episode.TenantVulnerabilityId, episode.AssetId })
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key.TenantVulnerabilityId)
+                .Distinct()
+                .ToListAsync(ct);
+            query = query.Where(v => recurringTenantVulnerabilityIds.Contains(v.Id));
         }
 
         var totalCount = await query.CountAsync(ct);
 
-        var vulnerabilityIds = await query
-            .OrderByDescending(v => v.CvssScore)
-            .ThenByDescending(v => v.PublishedDate)
+        var tenantVulnerabilityIds = await query
+            .OrderByDescending(v => v.VulnerabilityDefinition.CvssScore)
+            .ThenByDescending(v => v.VulnerabilityDefinition.PublishedDate)
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
             .Select(v => v.Id)
@@ -109,12 +112,19 @@ public class VulnerabilitiesController : ControllerBase
 
         var episodeRows = await _dbContext
             .VulnerabilityAssetEpisodes.AsNoTracking()
-            .Where(episode => vulnerabilityIds.Contains(episode.VulnerabilityId))
+            .Where(episode => tenantVulnerabilityIds.Contains(episode.TenantVulnerabilityId))
+            .Select(episode => new
+            {
+                episode.TenantVulnerabilityId,
+                episode.AssetId,
+                episode.EpisodeNumber,
+                episode.FirstSeenAt,
+            })
             .ToListAsync(ct);
 
         var recentReappearanceThreshold = DateTimeOffset.UtcNow.AddDays(-30);
         var episodeCountsByVulnerabilityId = episodeRows
-            .GroupBy(episode => episode.VulnerabilityId)
+            .GroupBy(episode => episode.TenantVulnerabilityId)
             .ToDictionary(
                 group => group.Key,
                 group =>
@@ -138,23 +148,25 @@ public class VulnerabilitiesController : ControllerBase
             );
 
         var itemRows = await query
-            .OrderByDescending(v => v.CvssScore)
-            .ThenByDescending(v => v.PublishedDate)
+            .OrderByDescending(v => v.VulnerabilityDefinition.CvssScore)
+            .ThenByDescending(v => v.VulnerabilityDefinition.PublishedDate)
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
             .Select(v => new
             {
                 v.Id,
-                v.ExternalId,
-                v.Title,
-                VendorSeverity = v.VendorSeverity.ToString(),
+                v.VulnerabilityDefinition.ExternalId,
+                Title = v.VulnerabilityDefinition.Title,
+                VendorSeverity = v.VulnerabilityDefinition.VendorSeverity.ToString(),
                 Status = v.Status.ToString(),
-                v.Source,
-                v.CvssScore,
-                v.PublishedDate,
-                AffectedAssetCount = v.AffectedAssets.Count,
+                Source = v.VulnerabilityDefinition.Source,
+                CvssScore = v.VulnerabilityDefinition.CvssScore,
+                PublishedDate = v.VulnerabilityDefinition.PublishedDate,
+                AffectedAssetCount = _dbContext
+                    .VulnerabilityAssets.Where(link => link.TenantVulnerabilityId == v.Id)
+                    .Count(),
                 AdjustedSeverity = _dbContext
-                    .OrganizationalSeverities.Where(os => os.VulnerabilityId == v.Id)
+                    .OrganizationalSeverities.Where(os => os.TenantVulnerabilityId == v.Id)
                     .OrderByDescending(os => os.AdjustedAt)
                     .Select(os => os.AdjustedSeverity.ToString())
                     .FirstOrDefault(),
@@ -198,24 +210,31 @@ public class VulnerabilitiesController : ControllerBase
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<VulnerabilityDetailDto>> Get(Guid id, CancellationToken ct)
     {
-        var vulnerability = await _dbContext
-            .Vulnerabilities.AsNoTracking()
-            .Include(v => v.AffectedSoftware)
-            .Include(v => v.References)
-            .Include(v => v.AffectedAssets)
-            .FirstOrDefaultAsync(v => v.Id == id, ct);
+        var tenantVulnerability = await _dbContext
+            .TenantVulnerabilities.AsNoTracking()
+            .Include(tv => tv.VulnerabilityDefinition)
+            .ThenInclude(definition => definition.AffectedSoftware)
+            .Include(tv => tv.VulnerabilityDefinition)
+            .ThenInclude(definition => definition.References)
+            .FirstOrDefaultAsync(tv => tv.Id == id, ct);
 
-        if (vulnerability is null)
+        if (tenantVulnerability is null)
             return NotFound();
+        var definition = tenantVulnerability.VulnerabilityDefinition;
 
         var orgSeverity = await _dbContext
             .OrganizationalSeverities.AsNoTracking()
-            .Where(os => os.VulnerabilityId == id)
+            .Where(os => os.TenantVulnerabilityId == tenantVulnerability.Id)
             .OrderByDescending(os => os.AdjustedAt)
             .FirstOrDefaultAsync(ct);
 
+        var vulnerabilityAssets = await _dbContext
+            .VulnerabilityAssets.AsNoTracking()
+            .Where(link => link.TenantVulnerabilityId == tenantVulnerability.Id)
+            .ToListAsync(ct);
+
         // Get asset names for affected assets
-        var assetIds = vulnerability.AffectedAssets.Select(a => a.AssetId).ToList();
+        var assetIds = vulnerabilityAssets.Select(a => a.AssetId).ToList();
         var assets = await _dbContext
             .Assets.AsNoTracking()
             .Where(a => assetIds.Contains(a.Id))
@@ -232,12 +251,12 @@ public class VulnerabilitiesController : ControllerBase
 
         var assessmentsByAssetId = await _dbContext
             .VulnerabilityAssetAssessments.AsNoTracking()
-            .Where(assessment => assessment.VulnerabilityId == id)
+            .Where(assessment => assessment.TenantVulnerabilityId == tenantVulnerability.Id)
             .ToDictionaryAsync(assessment => assessment.AssetId, ct);
 
         var episodeRows = await _dbContext
             .VulnerabilityAssetEpisodes.AsNoTracking()
-            .Where(episode => episode.VulnerabilityId == id)
+            .Where(episode => episode.TenantVulnerabilityId == tenantVulnerability.Id)
             .OrderBy(episode => episode.AssetId)
             .ThenBy(episode => episode.EpisodeNumber)
             .Select(episode => new VulnerabilityEpisodeHistoryRow(
@@ -286,7 +305,7 @@ public class VulnerabilitiesController : ControllerBase
 
         var matchedSoftwareRows = await _dbContext
             .SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(match => match.VulnerabilityId == id && match.ResolvedAt == null)
+            .Where(match => match.VulnerabilityDefinitionId == tenantVulnerability.VulnerabilityDefinitionId && match.ResolvedAt == null)
             .Join(
                 _dbContext.Assets.AsNoTracking(),
                 match => match.SoftwareAssetId,
@@ -312,31 +331,40 @@ public class VulnerabilitiesController : ControllerBase
             .Select(item => item.ExternalId)
             .Distinct(StringComparer.Ordinal)
             .ToList();
-        var normalizedSoftwareIdsByExternalId = matchedSoftwareExternalIds.Count == 0
+        var tenantSoftwareIdsByExternalId = matchedSoftwareExternalIds.Count == 0
             ? new Dictionary<string, Guid?>(StringComparer.Ordinal)
             : await _dbContext
-                .NormalizedSoftwareAliases.AsNoTracking()
-                .Where(alias =>
-                    alias.SourceSystem == SoftwareIdentitySourceSystem.Defender
-                    && matchedSoftwareExternalIds.Contains(alias.ExternalSoftwareId)
+                .TenantSoftware.AsNoTracking()
+                .Join(
+                    _dbContext.NormalizedSoftwareAliases.AsNoTracking(),
+                    tenantSoftware => tenantSoftware.NormalizedSoftwareId,
+                    alias => alias.NormalizedSoftwareId,
+                    (tenantSoftware, alias) => new
+                    {
+                        tenantSoftware.Id,
+                        tenantSoftware.TenantId,
+                        alias.SourceSystem,
+                        alias.ExternalSoftwareId,
+                    }
                 )
-                .GroupBy(alias => alias.ExternalSoftwareId)
-                .Select(group => new
-                {
-                    ExternalSoftwareId = group.Key,
-                    NormalizedSoftwareId = group.Select(alias => alias.NormalizedSoftwareId).First(),
-                })
+                .Where(item =>
+                    item.TenantId == tenantVulnerability.TenantId
+                    && item.SourceSystem == SoftwareIdentitySourceSystem.Defender
+                    && matchedSoftwareExternalIds.Contains(item.ExternalSoftwareId)
+                )
+                .GroupBy(item => item.ExternalSoftwareId)
+                .Select(group => new { ExternalSoftwareId = group.Key, TenantSoftwareId = group.Select(item => item.Id).First() })
                 .ToDictionaryAsync(
                     item => item.ExternalSoftwareId,
-                    item => (Guid?)item.NormalizedSoftwareId,
+                    item => (Guid?)item.TenantSoftwareId,
                     ct
                 );
 
         var matchedSoftware = matchedSoftwareRows
             .Select(item => new MatchedSoftwareDto(
                 item.Id,
-                normalizedSoftwareIdsByExternalId.TryGetValue(item.ExternalId, out var normalizedSoftwareId)
-                    ? normalizedSoftwareId
+                tenantSoftwareIdsByExternalId.TryGetValue(item.ExternalId, out var tenantSoftwareId)
+                    ? tenantSoftwareId
                     : null,
                 item.Name,
                 item.ExternalId,
@@ -352,18 +380,18 @@ public class VulnerabilitiesController : ControllerBase
         var tenantHistory = BuildTenantHistory(episodeRows);
 
         var detail = new VulnerabilityDetailDto(
-            vulnerability.Id,
-            vulnerability.ExternalId,
-            vulnerability.Title,
-            vulnerability.Description,
-            vulnerability.VendorSeverity.ToString(),
-            vulnerability.Status.ToString(),
-            FormatSourceDisplay(vulnerability.Source),
-            vulnerability.GetSources(),
-            vulnerability.CvssScore,
-            vulnerability.CvssVector,
-            vulnerability.PublishedDate,
-            vulnerability
+            tenantVulnerability.Id,
+            definition.ExternalId,
+            definition.Title,
+            definition.Description,
+            definition.VendorSeverity.ToString(),
+            tenantVulnerability.Status.ToString(),
+            FormatSourceDisplay(definition.Source),
+            definition.GetSources(),
+            definition.CvssScore,
+            definition.CvssVector,
+            definition.PublishedDate,
+            definition
                 .AffectedSoftware.OrderBy(item => item.Criteria)
                 .Select(item => new VulnerabilityAffectedSoftwareDto(
                     item.Vulnerable,
@@ -375,7 +403,7 @@ public class VulnerabilitiesController : ControllerBase
                 ))
                 .ToList(),
             matchedSoftware,
-            vulnerability
+            definition
                 .References.OrderBy(reference => reference.Source)
                 .ThenBy(reference => reference.Url)
                 .Select(reference => new VulnerabilityReferenceDto(
@@ -385,8 +413,8 @@ public class VulnerabilitiesController : ControllerBase
                 ))
                 .ToList(),
             tenantHistory,
-            vulnerability
-                .AffectedAssets.Select(va =>
+            vulnerabilityAssets
+                .Select(va =>
                 {
                     assets.TryGetValue(va.AssetId, out var asset);
                     assessmentsByAssetId.TryGetValue(va.AssetId, out var assessment);
@@ -401,11 +429,11 @@ public class VulnerabilitiesController : ControllerBase
                             ? profileName
                             : null,
                         va.Status.ToString(),
-                        vulnerability.VendorSeverity.ToString(),
-                        assessment?.BaseScore ?? vulnerability.CvssScore,
+                        definition.VendorSeverity.ToString(),
+                        assessment?.BaseScore ?? definition.CvssScore,
                         assessment?.EffectiveSeverity.ToString()
-                            ?? vulnerability.VendorSeverity.ToString(),
-                        assessment?.EffectiveScore ?? vulnerability.CvssScore,
+                            ?? definition.VendorSeverity.ToString(),
+                        assessment?.EffectiveScore ?? definition.CvssScore,
                         assessment?.ReasonSummary,
                         va.DetectedDate,
                         va.ResolvedDate,
@@ -591,8 +619,17 @@ public class VulnerabilitiesController : ControllerBase
         if (!Enum.TryParse<Severity>(request.AdjustedSeverity, out var severity))
             return BadRequest(new ProblemDetails { Title = "Invalid severity value" });
 
+        var tenantVulnerabilityId = await _dbContext
+            .TenantVulnerabilities.AsNoTracking()
+            .Where(item => item.Id == id)
+            .Select(item => (Guid?)item.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (!tenantVulnerabilityId.HasValue)
+            return NotFound(new ProblemDetails { Title = "Tenant vulnerability not found" });
+
         var result = await _vulnerabilityService.UpdateOrganizationalSeverityAsync(
-            id,
+            tenantVulnerabilityId.Value,
             severity,
             request.Justification,
             request.AssetCriticalityFactor,
@@ -615,27 +652,32 @@ public class VulnerabilitiesController : ControllerBase
         CancellationToken ct
     )
     {
-        var vulnerability = await _dbContext
-            .Vulnerabilities.AsNoTracking()
-            .Include(v => v.AffectedAssets)
-            .FirstOrDefaultAsync(v => v.Id == id, ct);
+        var tenantVulnerability = await _dbContext
+            .TenantVulnerabilities.AsNoTracking()
+            .Include(item => item.VulnerabilityDefinition)
+            .FirstOrDefaultAsync(item => item.Id == id, ct);
 
-        if (vulnerability is null)
-            return NotFound(new ProblemDetails { Title = "Vulnerability not found" });
+        if (tenantVulnerability is null)
+            return NotFound(new ProblemDetails { Title = "Tenant vulnerability not found" });
 
-        if (!_tenantContext.HasAccessToTenant(vulnerability.TenantId))
+        if (!_tenantContext.HasAccessToTenant(tenantVulnerability.TenantId))
             return Forbid();
 
-        var assetIds = vulnerability.AffectedAssets.Select(a => a.AssetId).ToList();
+        var assetIds = await _dbContext
+            .VulnerabilityAssets.AsNoTracking()
+            .Where(item => item.TenantVulnerabilityId == tenantVulnerability.Id)
+            .Select(item => item.AssetId)
+            .ToListAsync(ct);
         var affectedAssets = await _dbContext
             .Assets.AsNoTracking()
             .Where(a => assetIds.Contains(a.Id))
             .ToListAsync(ct);
 
         var result = await _aiReportService.GenerateReportAsync(
-            vulnerability,
+            tenantVulnerability.VulnerabilityDefinition,
+            tenantVulnerability.Id,
             affectedAssets,
-            vulnerability.TenantId,
+            tenantVulnerability.TenantId,
             _tenantContext.CurrentUserId,
             request.ProviderName,
             ct
@@ -651,7 +693,7 @@ public class VulnerabilitiesController : ControllerBase
         return Ok(
             new AiReportDto(
                 report.Id,
-                report.VulnerabilityId,
+                report.TenantVulnerabilityId,
                 report.Content,
                 report.Provider,
                 report.GeneratedAt

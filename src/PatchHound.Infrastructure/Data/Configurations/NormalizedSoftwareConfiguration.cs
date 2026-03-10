@@ -10,10 +10,7 @@ public class NormalizedSoftwareConfiguration : IEntityTypeConfiguration<Normaliz
     {
         builder.HasKey(item => item.Id);
 
-        builder.HasIndex(item => item.TenantId);
-        builder
-            .HasIndex(item => new { item.TenantId, item.CanonicalProductKey })
-            .IsUnique();
+        builder.HasIndex(item => item.CanonicalProductKey).IsUnique();
 
         builder.Property(item => item.CanonicalName).HasMaxLength(512).IsRequired();
         builder.Property(item => item.CanonicalVendor).HasMaxLength(256);

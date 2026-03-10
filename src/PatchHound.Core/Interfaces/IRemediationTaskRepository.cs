@@ -8,8 +8,8 @@ public interface IRemediationTaskRepository : IRepository<RemediationTask>
         Guid assigneeId,
         CancellationToken ct = default
     );
-    Task<IReadOnlyList<RemediationTask>> GetByVulnerabilityAsync(
-        Guid vulnerabilityId,
+    Task<IReadOnlyList<RemediationTask>> GetByTenantVulnerabilityAsync(
+        Guid tenantVulnerabilityId,
         CancellationToken ct = default
     );
     Task<IReadOnlyList<RemediationTask>> GetOverdueAsync(

@@ -28,6 +28,8 @@ public class NormalizedSoftwareProjectionService(
         CancellationToken ct
     )
     {
+        var tenantSoftwareRows = await UpsertTenantSoftwareAsync(tenantId, resolutions, ct);
+
         var existingInstallations = await dbContext
             .NormalizedSoftwareInstallations.IgnoreQueryFilters()
             .Where(item => item.TenantId == tenantId)
@@ -75,10 +77,11 @@ public class NormalizedSoftwareProjectionService(
                 var key = BuildPairKey(episode.DeviceAssetId, episode.SoftwareAssetId);
                 currentInstallationsByPair.TryGetValue(key, out var currentInstallation);
                 var resolution = resolutions[episode.SoftwareAssetId];
+                var tenantSoftware = tenantSoftwareRows[resolution.NormalizedSoftwareId];
 
                 return NormalizedSoftwareInstallation.Create(
                     tenantId,
-                    resolution.NormalizedSoftwareId,
+                    tenantSoftware.Id,
                     episode.SoftwareAssetId,
                     episode.DeviceAssetId,
                     SoftwareIdentitySourceSystem.Defender,
@@ -139,8 +142,11 @@ public class NormalizedSoftwareProjectionService(
         var grouped = matches
             .GroupBy(match => new
             {
-                NormalizedSoftwareId = resolutions[match.SoftwareAssetId].NormalizedSoftwareId,
-                match.VulnerabilityId,
+                TenantSoftwareId = activeInstallations
+                    .Where(item => item.SoftwareAssetId == match.SoftwareAssetId)
+                    .Select(item => item.TenantSoftwareId)
+                    .First(),
+                match.VulnerabilityDefinitionId,
             })
             .ToList();
 
@@ -159,7 +165,7 @@ public class NormalizedSoftwareProjectionService(
                 .ToHashSet();
             var relatedInstallations = activeInstallations
                 .Where(item =>
-                    item.NormalizedSoftwareId == group.Key.NormalizedSoftwareId
+                    item.TenantSoftwareId == group.Key.TenantSoftwareId
                     && relatedSoftwareAssetIds.Contains(item.SoftwareAssetId)
                 )
                 .ToList();
@@ -180,8 +186,8 @@ public class NormalizedSoftwareProjectionService(
             projections.Add(
                 NormalizedSoftwareVulnerabilityProjection.Create(
                     tenantId,
-                    group.Key.NormalizedSoftwareId,
-                    group.Key.VulnerabilityId,
+                    group.Key.TenantSoftwareId,
+                    group.Key.VulnerabilityDefinitionId,
                     orderedMatches[0].MatchMethod,
                     orderedMatches[0].Confidence,
                     relatedInstallations.Count,
@@ -205,6 +211,53 @@ public class NormalizedSoftwareProjectionService(
                 ct
             );
         }
+    }
+
+    private async Task<Dictionary<Guid, TenantSoftware>> UpsertTenantSoftwareAsync(
+        Guid tenantId,
+        IReadOnlyDictionary<Guid, NormalizedSoftwareResolver.ResolutionResult> resolutions,
+        CancellationToken ct
+    )
+    {
+        var normalizedSoftwareIds = resolutions
+            .Values.Select(item => item.NormalizedSoftwareId)
+            .Distinct()
+            .ToList();
+
+        var existingRows = await dbContext
+            .TenantSoftware.IgnoreQueryFilters()
+            .Where(item => item.TenantId == tenantId)
+            .ToListAsync(ct);
+
+        var existingByNormalizedId = existingRows.ToDictionary(item => item.NormalizedSoftwareId);
+        var rowsByNormalizedId = new Dictionary<Guid, TenantSoftware>();
+        var now = DateTimeOffset.UtcNow;
+
+        foreach (var normalizedSoftwareId in normalizedSoftwareIds)
+        {
+            if (!existingByNormalizedId.TryGetValue(normalizedSoftwareId, out var row))
+            {
+                row = TenantSoftware.Create(tenantId, normalizedSoftwareId, now, now);
+                await dbContext.TenantSoftware.AddAsync(row, ct);
+            }
+            else
+            {
+                row.UpdateObservationWindow(row.FirstSeenAt, now);
+            }
+
+            rowsByNormalizedId[normalizedSoftwareId] = row;
+        }
+
+        var staleRows = existingRows
+            .Where(item => !normalizedSoftwareIds.Contains(item.NormalizedSoftwareId))
+            .ToList();
+        if (staleRows.Count > 0)
+        {
+            dbContext.TenantSoftware.RemoveRange(staleRows);
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        return rowsByNormalizedId;
     }
 
     private static string BuildPairKey(Guid deviceAssetId, Guid softwareAssetId)

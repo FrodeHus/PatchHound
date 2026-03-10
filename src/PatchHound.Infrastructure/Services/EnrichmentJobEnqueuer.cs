@@ -13,11 +13,11 @@ public class EnrichmentJobEnqueuer(
 {
     public async Task EnqueueVulnerabilityJobsAsync(
         Guid tenantId,
-        IReadOnlyList<Guid> vulnerabilityIds,
+        IReadOnlyList<Guid> vulnerabilityDefinitionIds,
         CancellationToken ct
     )
     {
-        if (vulnerabilityIds.Count == 0)
+        if (vulnerabilityDefinitionIds.Count == 0)
         {
             return;
         }
@@ -34,27 +34,25 @@ public class EnrichmentJobEnqueuer(
             return;
         }
 
-        var vulnerabilities = await dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
+        var definitions = await dbContext
+            .VulnerabilityDefinitions.IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(vulnerability =>
-                vulnerability.TenantId == tenantId && vulnerabilityIds.Contains(vulnerability.Id)
-            )
-            .Select(vulnerability => new
+            .Where(definition => vulnerabilityDefinitionIds.Contains(definition.Id))
+            .Select(definition => new
             {
-                vulnerability.Id,
-                vulnerability.ExternalId,
-                vulnerability.Source,
-                vulnerability.Description,
-                vulnerability.CvssScore,
-                vulnerability.CvssVector,
-                vulnerability.PublishedDate,
-                ReferenceCount = vulnerability.References.Count,
-                AffectedSoftwareCount = vulnerability.AffectedSoftware.Count,
+                definition.Id,
+                definition.ExternalId,
+                definition.Source,
+                definition.Description,
+                definition.CvssScore,
+                definition.CvssVector,
+                definition.PublishedDate,
+                ReferenceCount = definition.References.Count,
+                AffectedSoftwareCount = definition.AffectedSoftware.Count,
             })
             .ToListAsync(ct);
 
-        if (vulnerabilities.Count == 0)
+        if (definitions.Count == 0)
         {
             return;
         }
@@ -65,25 +63,25 @@ public class EnrichmentJobEnqueuer(
             .Where(job =>
                 job.TenantId == tenantId
                 && job.TargetModel == EnrichmentTargetModel.Vulnerability
-                && vulnerabilityIds.Contains(job.TargetId)
+                && vulnerabilityDefinitionIds.Contains(job.TargetId)
             )
             .ToDictionaryAsync(job => (job.SourceKey, job.TargetId), ct);
 
         var createdCount = 0;
         var refreshedCount = 0;
 
-        foreach (var vulnerability in vulnerabilities)
+        foreach (var definition in definitions)
         {
             if (
                 !ShouldEnqueueVulnerability(
-                    vulnerability.ExternalId,
-                    vulnerability.Source,
-                    vulnerability.Description,
-                    vulnerability.CvssScore,
-                    vulnerability.CvssVector,
-                    vulnerability.PublishedDate,
-                    vulnerability.ReferenceCount,
-                    vulnerability.AffectedSoftwareCount
+                    definition.ExternalId,
+                    definition.Source,
+                    definition.Description,
+                    definition.CvssScore,
+                    definition.CvssVector,
+                    definition.PublishedDate,
+                    definition.ReferenceCount,
+                    definition.AffectedSoftwareCount
                 )
             )
             {
@@ -93,7 +91,7 @@ public class EnrichmentJobEnqueuer(
             foreach (var sourceKey in enabledSourceKeys)
             {
                 var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-                var key = (normalizedSourceKey, vulnerability.Id);
+                var key = (normalizedSourceKey, definition.Id);
 
                 if (existingJobs.TryGetValue(key, out var existingJob))
                 {
@@ -111,8 +109,8 @@ public class EnrichmentJobEnqueuer(
                     tenantId,
                     normalizedSourceKey,
                     EnrichmentTargetModel.Vulnerability,
-                    vulnerability.Id,
-                    vulnerability.ExternalId,
+                    definition.Id,
+                    definition.ExternalId,
                     priority: 100,
                     queuedAt: now
                 );

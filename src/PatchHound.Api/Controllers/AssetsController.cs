@@ -109,7 +109,7 @@ public class AssetsController : ControllerBase
         var recurringCounts = await _dbContext
             .VulnerabilityAssetEpisodes.AsNoTracking()
             .Where(episode => assetIds.Contains(episode.AssetId))
-            .GroupBy(episode => new { episode.AssetId, episode.VulnerabilityId })
+            .GroupBy(episode => new { episode.AssetId, episode.TenantVulnerabilityId })
             .Select(group => new { group.Key.AssetId, IsRecurring = group.Count() > 1 })
             .Where(item => item.IsRecurring)
             .GroupBy(item => item.AssetId)
@@ -198,11 +198,11 @@ public class AssetsController : ControllerBase
         var episodeRows = await _dbContext
             .VulnerabilityAssetEpisodes.AsNoTracking()
             .Where(episode => episode.AssetId == id)
-            .OrderBy(episode => episode.VulnerabilityId)
+            .OrderBy(episode => episode.TenantVulnerabilityId)
             .ThenBy(episode => episode.EpisodeNumber)
             .Select(episode => new
             {
-                episode.VulnerabilityId,
+                VulnerabilityId = episode.TenantVulnerabilityId,
                 episode.EpisodeNumber,
                 episode.Status,
                 episode.FirstSeenAt,
@@ -286,36 +286,65 @@ public class AssetsController : ControllerBase
             .Select(item => item.ExternalId)
             .Distinct(StringComparer.Ordinal)
             .ToList();
-        var normalizedSoftwareIdsByExternalId = relevantSoftwareExternalIds.Count == 0
+        var tenantSoftwareIdsByExternalId = relevantSoftwareExternalIds.Count == 0
             ? new Dictionary<string, Guid?>(StringComparer.Ordinal)
             : await _dbContext
-                .NormalizedSoftwareAliases.AsNoTracking()
-                .Where(alias =>
-                    alias.SourceSystem == SoftwareIdentitySourceSystem.Defender
-                    && relevantSoftwareExternalIds.Contains(alias.ExternalSoftwareId)
+                .TenantSoftware.AsNoTracking()
+                .Join(
+                    _dbContext.NormalizedSoftwareAliases.AsNoTracking(),
+                    tenantSoftware => tenantSoftware.NormalizedSoftwareId,
+                    alias => alias.NormalizedSoftwareId,
+                    (tenantSoftware, alias) => new
+                    {
+                        tenantSoftware.Id,
+                        tenantSoftware.TenantId,
+                        alias.SourceSystem,
+                        alias.ExternalSoftwareId,
+                    }
                 )
-                .GroupBy(alias => alias.ExternalSoftwareId)
-                .Select(group => new
-                {
-                    ExternalSoftwareId = group.Key,
-                    NormalizedSoftwareId = group.Select(alias => alias.NormalizedSoftwareId).First(),
-                })
+                .Where(item =>
+                    item.TenantId == asset.TenantId
+                    && item.SourceSystem == SoftwareIdentitySourceSystem.Defender
+                    && relevantSoftwareExternalIds.Contains(item.ExternalSoftwareId)
+                )
+                .GroupBy(item => item.ExternalSoftwareId)
+                .Select(group => new { ExternalSoftwareId = group.Key, TenantSoftwareId = group.Select(item => item.Id).First() })
                 .ToDictionaryAsync(
                     item => item.ExternalSoftwareId,
-                    item => (Guid?)item.NormalizedSoftwareId,
+                    item => (Guid?)item.TenantSoftwareId,
                     ct
                 );
+        var normalizedSoftwareIdsByExternalId = relevantSoftwareExternalIds.Count == 0
+            ? new Dictionary<string, Guid>(StringComparer.Ordinal)
+            : await _dbContext
+                .TenantSoftware.AsNoTracking()
+                .Join(
+                    _dbContext.NormalizedSoftwareAliases.AsNoTracking(),
+                    tenantSoftware => tenantSoftware.NormalizedSoftwareId,
+                    alias => alias.NormalizedSoftwareId,
+                    (tenantSoftware, alias) => new
+                    {
+                        tenantSoftware.NormalizedSoftwareId,
+                        tenantSoftware.TenantId,
+                        alias.SourceSystem,
+                        alias.ExternalSoftwareId,
+                    }
+                )
+                .Where(item =>
+                    item.TenantId == asset.TenantId
+                    && item.SourceSystem == SoftwareIdentitySourceSystem.Defender
+                    && relevantSoftwareExternalIds.Contains(item.ExternalSoftwareId)
+                )
+                .GroupBy(item => item.ExternalSoftwareId)
+                .Select(group => new { ExternalSoftwareId = group.Key, NormalizedSoftwareId = group.Select(item => item.NormalizedSoftwareId).First() })
+                .ToDictionaryAsync(item => item.ExternalSoftwareId, item => item.NormalizedSoftwareId, ct);
 
-        var cpeBindingAssetIds = softwareRows
-            .Select(row => row.Id)
-            .Append(asset.Id)
-            .Distinct()
-            .ToList();
-        var cpeBindingsBySoftwareAssetId = await _dbContext
+        var normalizedSoftwareIds = normalizedSoftwareIdsByExternalId.Values.Distinct().ToList();
+        var cpeBindingsByNormalizedSoftwareId = await _dbContext
             .SoftwareCpeBindings.AsNoTracking()
-            .Where(binding => cpeBindingAssetIds.Contains(binding.SoftwareAssetId))
+            .Where(binding => normalizedSoftwareIds.Contains(binding.NormalizedSoftwareId))
             .ToDictionaryAsync(
-                binding => binding.SoftwareAssetId,
+                binding => binding.NormalizedSoftwareId,
                 binding => new SoftwareCpeBindingDto(
                     binding.Id,
                     binding.Cpe23Uri,
@@ -334,7 +363,7 @@ public class AssetsController : ControllerBase
         var assessmentsByVulnerabilityId = await _dbContext
             .VulnerabilityAssetAssessments.AsNoTracking()
             .Where(assessment => assessment.AssetId == id)
-            .ToDictionaryAsync(assessment => assessment.VulnerabilityId, ct);
+            .ToDictionaryAsync(assessment => assessment.TenantVulnerabilityId, ct);
 
         var possibleCorrelationsByVulnerabilityId = episodeRows
             .GroupBy(row => row.VulnerabilityId)
@@ -360,19 +389,19 @@ public class AssetsController : ControllerBase
             .VulnerabilityAssets.AsNoTracking()
             .Where(va => va.AssetId == id)
             .Join(
-                _dbContext.Vulnerabilities,
-                va => va.VulnerabilityId,
-                v => v.Id,
-                (va, v) =>
+                _dbContext.TenantVulnerabilities.AsNoTracking(),
+                va => va.TenantVulnerabilityId,
+                tv => tv.Id,
+                (va, tv) =>
                     new
                     {
-                        v.Id,
-                        v.ExternalId,
-                        v.Title,
-                        v.Description,
-                        VendorSeverity = v.VendorSeverity.ToString(),
-                        v.CvssVector,
-                        v.PublishedDate,
+                        Id = tv.Id,
+                        ExternalId = tv.VulnerabilityDefinition.ExternalId,
+                        Title = tv.VulnerabilityDefinition.Title,
+                        Description = tv.VulnerabilityDefinition.Description,
+                        VendorSeverity = tv.VulnerabilityDefinition.VendorSeverity.ToString(),
+                        CvssVector = tv.VulnerabilityDefinition.CvssVector,
+                        PublishedDate = tv.VulnerabilityDefinition.PublishedDate,
                         Status = va.Status.ToString(),
                         va.DetectedDate,
                         va.ResolvedDate,
@@ -387,8 +416,8 @@ public class AssetsController : ControllerBase
                 .SoftwareVulnerabilityMatches.AsNoTracking()
                 .Where(match => match.SoftwareAssetId == id && match.ResolvedAt == null)
                 .Join(
-                    _dbContext.Vulnerabilities.AsNoTracking(),
-                    match => match.VulnerabilityId,
+                    _dbContext.VulnerabilityDefinitions.AsNoTracking(),
+                    match => match.VulnerabilityDefinitionId,
                     vulnerability => vulnerability.Id,
                     (match, vulnerability) =>
                         new
@@ -463,14 +492,14 @@ public class AssetsController : ControllerBase
         var softwareInventory = softwareRows
             .Select(row => new AssetSoftwareInstallationDto(
                 row.Id,
-                normalizedSoftwareIdsByExternalId.TryGetValue(row.ExternalId, out var normalizedSoftwareId)
-                    ? normalizedSoftwareId
+                tenantSoftwareIdsByExternalId.TryGetValue(row.ExternalId, out var tenantSoftwareId)
+                    ? tenantSoftwareId
                     : null,
                 row.Name,
                 row.ExternalId,
                 row.LastSeenAt,
-                cpeBindingsBySoftwareAssetId.TryGetValue(row.Id, out var cpeBinding)
-                    ? cpeBinding
+                normalizedSoftwareIdsByExternalId.TryGetValue(row.ExternalId, out var normalizedSoftwareId)
+                    ? cpeBindingsByNormalizedSoftwareId.GetValueOrDefault(normalizedSoftwareId)
                     : null,
                 softwareEpisodesByAssetId.TryGetValue(row.Id, out var episodes)
                     ? episodes.Count
@@ -485,8 +514,8 @@ public class AssetsController : ControllerBase
             new AssetDetailDto(
                 asset.Id,
                 asset.AssetType == AssetType.Software
-                    && normalizedSoftwareIdsByExternalId.TryGetValue(asset.ExternalId, out var assetNormalizedSoftwareId)
-                    ? assetNormalizedSoftwareId
+                    && tenantSoftwareIdsByExternalId.TryGetValue(asset.ExternalId, out var assetTenantSoftwareId)
+                    ? assetTenantSoftwareId
                     : null,
                 asset.ExternalId,
                 asset.Name,
@@ -506,8 +535,9 @@ public class AssetsController : ControllerBase
                 asset.DeviceLastSeenAt,
                 asset.DeviceLastIpAddress,
                 asset.DeviceAadDeviceId,
-                cpeBindingsBySoftwareAssetId.TryGetValue(asset.Id, out var assetCpeBinding)
-                    ? assetCpeBinding
+                asset.AssetType == AssetType.Software
+                    && normalizedSoftwareIdsByExternalId.TryGetValue(asset.ExternalId, out var assetNormalizedSoftwareId)
+                    ? cpeBindingsByNormalizedSoftwareId.GetValueOrDefault(assetNormalizedSoftwareId)
                     : null,
                 asset.Metadata,
                 vulnerabilities,
@@ -613,8 +643,42 @@ public class AssetsController : ControllerBase
             );
         }
 
+        await _normalizedSoftwareProjectionService.SyncTenantAsync(asset.TenantId, ct);
+
+        var tenantSoftware = await _dbContext
+            .TenantSoftware.AsNoTracking()
+            .Join(
+                _dbContext.NormalizedSoftwareAliases.AsNoTracking(),
+                current => current.NormalizedSoftwareId,
+                alias => alias.NormalizedSoftwareId,
+                (current, alias) => new
+                {
+                    current.NormalizedSoftwareId,
+                    current.TenantId,
+                    alias.SourceSystem,
+                    alias.ExternalSoftwareId,
+                }
+            )
+            .Where(item =>
+                item.TenantId == asset.TenantId
+                && item.SourceSystem == SoftwareIdentitySourceSystem.Defender
+                && item.ExternalSoftwareId == asset.ExternalId
+            )
+            .Select(item => item.NormalizedSoftwareId)
+            .FirstOrDefaultAsync(ct);
+        if (tenantSoftware == Guid.Empty)
+        {
+            return BadRequest(
+                new ProblemDetails { Title = "Software asset is not linked to a normalized software definition" }
+            );
+        }
+
         var existingBinding = await _dbContext.SoftwareCpeBindings.FirstOrDefaultAsync(
-            binding => binding.SoftwareAssetId == id,
+            binding => binding.NormalizedSoftwareId == tenantSoftware,
+            ct
+        );
+        var normalizedSoftware = await _dbContext.NormalizedSoftware.FirstAsync(
+            item => item.Id == tenantSoftware,
             ct
         );
 
@@ -623,6 +687,19 @@ public class AssetsController : ControllerBase
             if (existingBinding is not null)
             {
                 _dbContext.SoftwareCpeBindings.Remove(existingBinding);
+                normalizedSoftware.UpdateIdentity(
+                    normalizedSoftware.CanonicalName,
+                    normalizedSoftware.CanonicalVendor,
+                    BuildCanonicalProductKey(
+                        normalizedSoftware.CanonicalVendor,
+                        normalizedSoftware.CanonicalName,
+                        null
+                    ),
+                    null,
+                    SoftwareNormalizationMethod.Heuristic,
+                    normalizedSoftware.Confidence,
+                    DateTimeOffset.UtcNow
+                );
                 await _dbContext.SaveChangesAsync(ct);
                 await _normalizedSoftwareProjectionService.SyncTenantAsync(asset.TenantId, ct);
             }
@@ -640,8 +717,7 @@ public class AssetsController : ControllerBase
         {
             await _dbContext.SoftwareCpeBindings.AddAsync(
                 SoftwareCpeBinding.Create(
-                    asset.TenantId,
-                    asset.Id,
+                    tenantSoftware,
                     request.Cpe23Uri.Trim(),
                     CpeBindingMethod.Manual,
                     MatchConfidence.High,
@@ -665,6 +741,16 @@ public class AssetsController : ControllerBase
                 now
             );
         }
+
+        normalizedSoftware.UpdateIdentity(
+            cpe.Product,
+            cpe.Vendor,
+            BuildCanonicalProductKey(cpe.Vendor, cpe.Product, request.Cpe23Uri.Trim()),
+            request.Cpe23Uri.Trim(),
+            SoftwareNormalizationMethod.ExplicitCpe,
+            SoftwareNormalizationConfidence.High,
+            now
+        );
 
         await _dbContext.SaveChangesAsync(ct);
         await _normalizedSoftwareProjectionService.SyncTenantAsync(asset.TenantId, ct);
@@ -802,5 +888,19 @@ public class AssetsController : ControllerBase
         return string.IsNullOrWhiteSpace(value) || value is "*" or "-"
             ? null
             : value.Trim().ToLowerInvariant();
+    }
+
+    private static string BuildCanonicalProductKey(
+        string? vendor,
+        string product,
+        string? cpe23Uri
+    )
+    {
+        if (!string.IsNullOrWhiteSpace(cpe23Uri) && TryParseCpe23(cpe23Uri, out var cpe))
+        {
+            return $"cpe:{NormalizeToken(cpe.Vendor)}:{NormalizeToken(cpe.Product)}";
+        }
+
+        return $"{NormalizeToken(vendor)}|{NormalizeToken(product)}";
     }
 }

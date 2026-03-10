@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
-import type { NormalizedSoftwareListItem } from '@/api/software.schemas'
+import type { TenantSoftwareListItem } from '@/api/software.schemas'
 import { DataTable } from '@/components/ui/data-table'
 import {
   DataTableActiveFilters,
@@ -19,7 +19,7 @@ import { formatDate, startCase } from '@/lib/formatting'
 import { SearchIcon } from 'lucide-react'
 
 type SoftwareTableProps = {
-  items: NormalizedSoftwareListItem[]
+  items: TenantSoftwareListItem[]
   totalCount: number
   page: number
   pageSize: number
@@ -68,7 +68,7 @@ export function SoftwareTable({
     [boundOnly, confidenceFilter, onBoundOnlyChange, onConfidenceFilterChange, onSearchChange, onVulnerableOnlyChange, searchValue, vulnerableOnly],
   )
 
-  const columns = useMemo<ColumnDef<NormalizedSoftwareListItem>[]>(
+  const columns = useMemo<ColumnDef<TenantSoftwareListItem>[]>(
     () => [
       {
         accessorKey: 'canonicalName',

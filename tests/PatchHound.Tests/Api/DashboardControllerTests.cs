@@ -72,8 +72,7 @@ public class DashboardControllerTests : IDisposable
             "aad-2"
         );
 
-        var recurringVulnerability = Vulnerability.Create(
-            _tenantId,
+        var recurringDefinition = VulnerabilityDefinition.Create(
             "CVE-2026-1000",
             "Recurring vulnerability",
             "Desc",
@@ -83,9 +82,14 @@ public class DashboardControllerTests : IDisposable
             null,
             DateTimeOffset.UtcNow.AddDays(-30)
         );
-
-        var nonRecurringVulnerability = Vulnerability.Create(
+        var recurringTenantVulnerability = TenantVulnerability.Create(
             _tenantId,
+            recurringDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow
+        );
+
+        var nonRecurringDefinition = VulnerabilityDefinition.Create(
             "CVE-2026-1001",
             "Single episode vulnerability",
             "Desc",
@@ -95,14 +99,20 @@ public class DashboardControllerTests : IDisposable
             null,
             DateTimeOffset.UtcNow.AddDays(-15)
         );
+        var nonRecurringTenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            nonRecurringDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow
+        );
 
         var recurringLink = VulnerabilityAsset.Create(
-            recurringVulnerability.Id,
+            recurringTenantVulnerability.Id,
             recurringAsset.Id,
             DateTimeOffset.UtcNow.AddDays(-3)
         );
         var nonRecurringLink = VulnerabilityAsset.Create(
-            nonRecurringVulnerability.Id,
+            nonRecurringTenantVulnerability.Id,
             otherAsset.Id,
             DateTimeOffset.UtcNow.AddDays(-2)
         );
@@ -110,8 +120,10 @@ public class DashboardControllerTests : IDisposable
         await _dbContext.AddRangeAsync(
             recurringAsset,
             otherAsset,
-            recurringVulnerability,
-            nonRecurringVulnerability,
+            recurringDefinition,
+            nonRecurringDefinition,
+            recurringTenantVulnerability,
+            nonRecurringTenantVulnerability,
             recurringLink,
             nonRecurringLink
         );
@@ -119,21 +131,21 @@ public class DashboardControllerTests : IDisposable
         await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(
             VulnerabilityAssetEpisode.Create(
                 _tenantId,
-                recurringVulnerability.Id,
+                recurringTenantVulnerability.Id,
                 recurringAsset.Id,
                 1,
                 DateTimeOffset.UtcNow.AddDays(-20)
             ),
             VulnerabilityAssetEpisode.Create(
                 _tenantId,
-                recurringVulnerability.Id,
+                recurringTenantVulnerability.Id,
                 recurringAsset.Id,
                 2,
                 DateTimeOffset.UtcNow.AddDays(-3)
             ),
             VulnerabilityAssetEpisode.Create(
                 _tenantId,
-                nonRecurringVulnerability.Id,
+                nonRecurringTenantVulnerability.Id,
                 otherAsset.Id,
                 1,
                 DateTimeOffset.UtcNow.AddDays(-2)
@@ -159,25 +171,39 @@ public class DashboardControllerTests : IDisposable
     [Fact]
     public async Task GetSummary_SeverityCounts_ExcludeResolvedVulnerabilities()
     {
-        var openVulnerability = Vulnerability.Create(
-            _tenantId,
+        var openDefinition = VulnerabilityDefinition.Create(
             "CVE-2026-2000",
             "Open vulnerability",
             "Desc",
             Severity.Critical,
             "MicrosoftDefender"
         );
-        var resolvedVulnerability = Vulnerability.Create(
+        var openTenantVulnerability = TenantVulnerability.Create(
             _tenantId,
+            openDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow
+        );
+        var resolvedDefinition = VulnerabilityDefinition.Create(
             "CVE-2026-2001",
             "Resolved vulnerability",
             "Desc",
             Severity.Critical,
             "MicrosoftDefender"
         );
-        resolvedVulnerability.UpdateStatus(VulnerabilityStatus.Resolved);
+        var resolvedTenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            resolvedDefinition.Id,
+            VulnerabilityStatus.Resolved,
+            DateTimeOffset.UtcNow
+        );
 
-        await _dbContext.AddRangeAsync(openVulnerability, resolvedVulnerability);
+        await _dbContext.AddRangeAsync(
+            openDefinition,
+            resolvedDefinition,
+            openTenantVulnerability,
+            resolvedTenantVulnerability
+        );
         await _dbContext.SaveChangesAsync();
 
         var action = await _controller.GetSummary(CancellationToken.None);
@@ -192,13 +218,18 @@ public class DashboardControllerTests : IDisposable
     [Fact]
     public async Task GetTrends_ExcludesResolvedVulnerabilities_OnResolutionDay()
     {
-        var vulnerability = Vulnerability.Create(
-            _tenantId,
+        var definition = VulnerabilityDefinition.Create(
             "CVE-2026-3000",
             "Recently resolved vulnerability",
             "Desc",
             Severity.High,
             "MicrosoftDefender"
+        );
+        var tenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            definition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow
         );
         var asset = Asset.Create(
             _tenantId,
@@ -217,11 +248,11 @@ public class DashboardControllerTests : IDisposable
             TimeSpan.Zero
         );
 
-        await _dbContext.AddRangeAsync(vulnerability, asset);
+        await _dbContext.AddRangeAsync(definition, tenantVulnerability, asset);
         await _dbContext.VulnerabilityAssetEpisodes.AddAsync(
             VulnerabilityAssetEpisode.Create(
                 _tenantId,
-                vulnerability.Id,
+                tenantVulnerability.Id,
                 asset.Id,
                 1,
                 firstSeenAt

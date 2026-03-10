@@ -25,29 +25,42 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
 
     [HttpGet("{id:guid}")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
-    public async Task<ActionResult<NormalizedSoftwareDetailDto>> Get(
+    public async Task<ActionResult<TenantSoftwareDetailDto>> Get(
         Guid id,
         CancellationToken ct
     )
     {
-        var software = await dbContext
-            .NormalizedSoftware.AsNoTracking()
-            .FirstOrDefaultAsync(item => item.Id == id, ct);
-        if (software is null)
+        var tenantSoftware = await dbContext
+            .TenantSoftware.AsNoTracking()
+            .Where(item => item.Id == id)
+            .Select(item => new
+            {
+                item.Id,
+                item.NormalizedSoftwareId,
+                item.FirstSeenAt,
+                item.LastSeenAt,
+                item.NormalizedSoftware.CanonicalName,
+                item.NormalizedSoftware.CanonicalVendor,
+                item.NormalizedSoftware.PrimaryCpe23Uri,
+                NormalizationMethod = item.NormalizedSoftware.NormalizationMethod.ToString(),
+                Confidence = item.NormalizedSoftware.Confidence.ToString(),
+            })
+            .FirstOrDefaultAsync(ct);
+        if (tenantSoftware is null)
         {
             return NotFound();
         }
 
         var aliases = await dbContext
             .NormalizedSoftwareAliases.AsNoTracking()
-            .Where(item => item.NormalizedSoftwareId == id)
+            .Where(item => item.NormalizedSoftwareId == tenantSoftware.NormalizedSoftwareId)
             .OrderBy(item => item.SourceSystem)
             .ThenBy(item => item.ExternalSoftwareId)
             .ToListAsync(ct);
 
         var installations = await dbContext
             .NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.NormalizedSoftwareId == id)
+            .Where(item => item.TenantSoftwareId == id)
             .ToListAsync(ct);
 
         var activeInstallations = installations.Where(item => item.IsActive).ToList();
@@ -56,7 +69,7 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
         var openMatches = await dbContext
             .SoftwareVulnerabilityMatches.AsNoTracking()
             .Where(match => match.ResolvedAt == null && softwareAssetIds.Contains(match.SoftwareAssetId))
-            .Select(match => new { match.SoftwareAssetId, match.VulnerabilityId })
+            .Select(match => new { match.SoftwareAssetId, match.VulnerabilityDefinitionId })
             .Distinct()
             .ToListAsync(ct);
         var openMatchSoftwareAssetIds = openMatches
@@ -68,7 +81,7 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
             .Select(group =>
             {
                 var groupSoftwareAssetIds = group.Select(item => item.SoftwareAssetId).ToHashSet();
-                return new NormalizedSoftwareVersionCohortDto(
+                return new TenantSoftwareVersionCohortDto(
                     RestoreVersion(group.Key),
                     group.Count(),
                     group.Select(item => item.DeviceAssetId).Distinct().Count(),
@@ -83,15 +96,16 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
             .ToList();
 
         return Ok(
-            new NormalizedSoftwareDetailDto(
-                software.Id,
-                software.CanonicalName,
-                software.CanonicalVendor,
-                software.PrimaryCpe23Uri,
-                software.NormalizationMethod.ToString(),
-                software.Confidence.ToString(),
-                installations.Count == 0 ? null : installations.Min(item => item.FirstSeenAt),
-                installations.Count == 0 ? null : installations.Max(item => item.LastSeenAt),
+            new TenantSoftwareDetailDto(
+                tenantSoftware.Id,
+                tenantSoftware.NormalizedSoftwareId,
+                tenantSoftware.CanonicalName,
+                tenantSoftware.CanonicalVendor,
+                tenantSoftware.PrimaryCpe23Uri,
+                tenantSoftware.NormalizationMethod,
+                tenantSoftware.Confidence,
+                installations.Count == 0 ? tenantSoftware.FirstSeenAt : installations.Min(item => item.FirstSeenAt),
+                installations.Count == 0 ? tenantSoftware.LastSeenAt : installations.Max(item => item.LastSeenAt),
                 activeInstallations.Count,
                 activeInstallations.Select(item => item.DeviceAssetId).Distinct().Count(),
                 activeInstallations.Count(item =>
@@ -99,11 +113,11 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
                 ),
                 await dbContext
                     .NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
-                    .CountAsync(item => item.NormalizedSoftwareId == id && item.ResolvedAt == null, ct),
+                    .CountAsync(item => item.TenantSoftwareId == id && item.ResolvedAt == null, ct),
                 versionCohorts.Count,
                 versionCohorts,
                 aliases
-                    .Select(item => new NormalizedSoftwareSourceAliasDto(
+                    .Select(item => new TenantSoftwareSourceAliasDto(
                         item.SourceSystem.ToString(),
                         item.ExternalSoftwareId,
                         item.RawName,
@@ -119,87 +133,98 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
 
     [HttpGet]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
-    public async Task<ActionResult<PagedResponse<NormalizedSoftwareListItemDto>>> List(
-        [FromQuery] NormalizedSoftwareFilterQuery filter,
+    public async Task<ActionResult<PagedResponse<TenantSoftwareListItemDto>>> List(
+        [FromQuery] TenantSoftwareFilterQuery filter,
         [FromQuery] PaginationQuery pagination,
         CancellationToken ct
     )
     {
-        var query = dbContext.NormalizedSoftware.AsNoTracking().AsQueryable();
+        var query = dbContext.TenantSoftware.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             query = query.Where(item =>
-                item.CanonicalName.Contains(filter.Search)
-                || (item.CanonicalVendor != null && item.CanonicalVendor.Contains(filter.Search))
+                item.NormalizedSoftware.CanonicalName.Contains(filter.Search)
+                || (
+                    item.NormalizedSoftware.CanonicalVendor != null
+                    && item.NormalizedSoftware.CanonicalVendor.Contains(filter.Search)
+                )
             );
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Confidence))
         {
-            query = query.Where(item => item.Confidence.ToString() == filter.Confidence);
+            query = query.Where(item =>
+                item.NormalizedSoftware.Confidence.ToString() == filter.Confidence
+            );
         }
 
         if (filter.BoundOnly == true)
         {
-            query = query.Where(item => item.PrimaryCpe23Uri != null && item.PrimaryCpe23Uri != "");
+            query = query.Where(item =>
+                item.NormalizedSoftware.PrimaryCpe23Uri != null
+                && item.NormalizedSoftware.PrimaryCpe23Uri != ""
+            );
         }
 
         if (filter.VulnerableOnly == true)
         {
             query = query.Where(item =>
                 dbContext.NormalizedSoftwareVulnerabilityProjections.Any(projection =>
-                    projection.NormalizedSoftwareId == item.Id && projection.ResolvedAt == null
+                    projection.TenantSoftwareId == item.Id && projection.ResolvedAt == null
                 )
             );
         }
 
         var totalCount = await query.CountAsync(ct);
         var rows = await query
-            .OrderBy(item => item.CanonicalName)
+            .OrderBy(item => item.NormalizedSoftware.CanonicalName)
+            .ThenBy(item => item.Id)
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
             .Select(item => new
             {
                 item.Id,
-                item.CanonicalName,
-                item.CanonicalVendor,
-                Confidence = item.Confidence.ToString(),
-                NormalizationMethod = item.NormalizationMethod.ToString(),
-                item.PrimaryCpe23Uri,
+                item.NormalizedSoftwareId,
+                CanonicalName = item.NormalizedSoftware.CanonicalName,
+                CanonicalVendor = item.NormalizedSoftware.CanonicalVendor,
+                Confidence = item.NormalizedSoftware.Confidence.ToString(),
+                NormalizationMethod = item.NormalizedSoftware.NormalizationMethod.ToString(),
+                PrimaryCpe23Uri = item.NormalizedSoftware.PrimaryCpe23Uri,
                 ActiveInstallCount = dbContext
                     .NormalizedSoftwareInstallations
-                    .Where(installation => installation.NormalizedSoftwareId == item.Id && installation.IsActive)
+                    .Where(installation => installation.TenantSoftwareId == item.Id && installation.IsActive)
                     .Count(),
                 UniqueDeviceCount = dbContext
                     .NormalizedSoftwareInstallations
-                    .Where(installation => installation.NormalizedSoftwareId == item.Id && installation.IsActive)
+                    .Where(installation => installation.TenantSoftwareId == item.Id && installation.IsActive)
                     .Select(installation => installation.DeviceAssetId)
                     .Distinct()
                     .Count(),
                 ActiveVulnerabilityCount = dbContext
                     .NormalizedSoftwareVulnerabilityProjections
-                    .Where(projection => projection.NormalizedSoftwareId == item.Id && projection.ResolvedAt == null)
+                    .Where(projection => projection.TenantSoftwareId == item.Id && projection.ResolvedAt == null)
                     .Count(),
                 VersionCount = dbContext
                     .NormalizedSoftwareInstallations
-                    .Where(installation => installation.NormalizedSoftwareId == item.Id && installation.IsActive)
+                    .Where(installation => installation.TenantSoftwareId == item.Id && installation.IsActive)
                     .Select(installation => installation.DetectedVersion ?? string.Empty)
                     .Distinct()
                     .Count(version => version != string.Empty),
                 LastSeenAt = dbContext
                     .NormalizedSoftwareInstallations
-                    .Where(installation => installation.NormalizedSoftwareId == item.Id)
+                    .Where(installation => installation.TenantSoftwareId == item.Id)
                     .Select(installation => (DateTimeOffset?)installation.LastSeenAt)
                     .Max(),
             })
             .ToListAsync(ct);
 
         return Ok(
-            new PagedResponse<NormalizedSoftwareListItemDto>(
+            new PagedResponse<TenantSoftwareListItemDto>(
                 rows
-                    .Select(item => new NormalizedSoftwareListItemDto(
+                    .Select(item => new TenantSoftwareListItemDto(
                         item.Id,
+                        item.NormalizedSoftwareId,
                         item.CanonicalName,
                         item.CanonicalVendor,
                         item.Confidence,
@@ -221,24 +246,26 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
 
     [HttpGet("{id:guid}/installations")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
-    public async Task<ActionResult<PagedResponse<NormalizedSoftwareInstallationDto>>> GetInstallations(
+    public async Task<ActionResult<PagedResponse<TenantSoftwareInstallationDto>>> GetInstallations(
         Guid id,
-        [FromQuery] NormalizedSoftwareInstallationQuery query,
+        [FromQuery] TenantSoftwareInstallationQuery query,
         [FromQuery] PaginationQuery pagination,
         CancellationToken ct
     )
     {
-        var softwareExists = await dbContext
-            .NormalizedSoftware.AsNoTracking()
-            .AnyAsync(item => item.Id == id, ct);
-        if (!softwareExists)
+        var tenantSoftware = await dbContext
+            .TenantSoftware.AsNoTracking()
+            .Where(item => item.Id == id)
+            .Select(item => new { item.Id, item.TenantId })
+            .FirstOrDefaultAsync(ct);
+        if (tenantSoftware is null)
         {
             return NotFound();
         }
 
         var installationsQuery = dbContext
             .NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.NormalizedSoftwareId == id);
+            .Where(item => item.TenantSoftwareId == id);
 
         if (query.ActiveOnly)
         {
@@ -296,9 +323,10 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
             .ToListAsync(ct);
 
         return Ok(
-            new PagedResponse<NormalizedSoftwareInstallationDto>(
+            new PagedResponse<TenantSoftwareInstallationDto>(
                 rows
-                    .Select(item => new NormalizedSoftwareInstallationDto(
+                    .Select(item => new TenantSoftwareInstallationDto(
+                        id,
                         item.DeviceAssetId,
                         item.DeviceName,
                         item.DeviceCriticality,
@@ -325,35 +353,42 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
 
     [HttpGet("{id:guid}/vulnerabilities")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
-    public async Task<ActionResult<IReadOnlyList<NormalizedSoftwareVulnerabilityDto>>> GetVulnerabilities(
+    public async Task<ActionResult<IReadOnlyList<TenantSoftwareVulnerabilityDto>>> GetVulnerabilities(
         Guid id,
         CancellationToken ct
     )
     {
-        var softwareExists = await dbContext
-            .NormalizedSoftware.AsNoTracking()
-            .AnyAsync(item => item.Id == id, ct);
-        if (!softwareExists)
+        var tenantSoftware = await dbContext
+            .TenantSoftware.AsNoTracking()
+            .Where(item => item.Id == id)
+            .Select(item => new { item.Id, item.TenantId })
+            .FirstOrDefaultAsync(ct);
+        if (tenantSoftware is null)
         {
             return NotFound();
         }
 
         var projections = await dbContext
             .NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
-            .Where(item => item.NormalizedSoftwareId == id)
+            .Where(item => item.TenantSoftwareId == id)
             .Join(
-                dbContext.Vulnerabilities.AsNoTracking(),
-                projection => projection.VulnerabilityId,
-                vulnerability => vulnerability.Id,
-                (projection, vulnerability) => new { projection, vulnerability }
+                dbContext.VulnerabilityDefinitions.AsNoTracking(),
+                projection => projection.VulnerabilityDefinitionId,
+                vulnerabilityDefinition => vulnerabilityDefinition.Id,
+                (projection, vulnerabilityDefinition) => new { projection, vulnerabilityDefinition }
             )
-            .OrderByDescending(item => item.vulnerability.CvssScore)
-            .ThenByDescending(item => item.vulnerability.PublishedDate)
+            .OrderByDescending(item => item.vulnerabilityDefinition.CvssScore)
+            .ThenByDescending(item => item.vulnerabilityDefinition.PublishedDate)
             .ToListAsync(ct);
+
+        var tenantVulnerabilityIdsByDefinitionId = await dbContext
+            .TenantVulnerabilities.AsNoTracking()
+            .Where(item => item.TenantId == tenantSoftware.TenantId)
+            .ToDictionaryAsync(item => item.VulnerabilityDefinitionId, item => item.Id, ct);
 
         var activeInstallations = await dbContext
             .NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.NormalizedSoftwareId == id && item.IsActive)
+            .Where(item => item.TenantSoftwareId == id && item.IsActive)
             .ToListAsync(ct);
         var relevantSoftwareAssetIds = activeInstallations
             .Select(item => item.SoftwareAssetId)
@@ -363,7 +398,7 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
         var openMatches = await dbContext
             .SoftwareVulnerabilityMatches.AsNoTracking()
             .Where(match => relevantSoftwareAssetIds.Contains(match.SoftwareAssetId))
-            .Select(match => new { match.SoftwareAssetId, match.VulnerabilityId, match.ResolvedAt })
+            .Select(match => new { match.SoftwareAssetId, match.VulnerabilityDefinitionId, match.ResolvedAt })
             .ToListAsync(ct);
 
         return Ok(
@@ -371,7 +406,7 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
                 .Select(item =>
                 {
                     var relatedSoftwareAssetIds = openMatches
-                        .Where(match => match.VulnerabilityId == item.projection.VulnerabilityId)
+                        .Where(match => match.VulnerabilityDefinitionId == item.projection.VulnerabilityDefinitionId)
                         .Where(match =>
                             item.projection.ResolvedAt is null || match.ResolvedAt is null
                         )
@@ -388,14 +423,19 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
                         .OrderBy(version => version, StringComparer.OrdinalIgnoreCase)
                         .ToList();
 
-                    return new NormalizedSoftwareVulnerabilityDto(
-                        item.vulnerability.Id,
-                        item.vulnerability.ExternalId,
-                        item.vulnerability.Title,
-                        item.vulnerability.VendorSeverity.ToString(),
-                        item.vulnerability.CvssScore,
-                        item.vulnerability.PublishedDate,
-                        item.vulnerability.Source,
+                    var tenantVulnerabilityId = tenantVulnerabilityIdsByDefinitionId[
+                        item.projection.VulnerabilityDefinitionId
+                    ];
+
+                    return new TenantSoftwareVulnerabilityDto(
+                        tenantVulnerabilityId,
+                        item.vulnerabilityDefinition.Id,
+                        item.vulnerabilityDefinition.ExternalId,
+                        item.vulnerabilityDefinition.Title,
+                        item.vulnerabilityDefinition.VendorSeverity.ToString(),
+                        item.vulnerabilityDefinition.CvssScore,
+                        item.vulnerabilityDefinition.PublishedDate,
+                        item.vulnerabilityDefinition.Source,
                         item.projection.BestMatchMethod.ToString(),
                         item.projection.BestConfidence.ToString(),
                         item.projection.AffectedInstallCount,
@@ -412,7 +452,7 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
         );
     }
 
-    private static IReadOnlyList<NormalizedSoftwareVulnerabilityEvidenceDto> ParseEvidence(
+    private static IReadOnlyList<TenantSoftwareVulnerabilityEvidenceDto> ParseEvidence(
         string evidenceJson
     )
     {
@@ -423,7 +463,7 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)
             );
             return (rows ?? [])
-                .Select(item => new NormalizedSoftwareVulnerabilityEvidenceDto(
+                .Select(item => new TenantSoftwareVulnerabilityEvidenceDto(
                     item.Method,
                     item.Confidence,
                     item.Evidence,

@@ -14,7 +14,8 @@ public class AiReportService
     }
 
     public async Task<Result<AIReport>> GenerateReportAsync(
-        Vulnerability vulnerability,
+        VulnerabilityDefinition vulnerabilityDefinition,
+        Guid tenantVulnerabilityId,
         IReadOnlyList<Asset> affectedAssets,
         Guid tenantId,
         Guid userId,
@@ -29,8 +30,18 @@ public class AiReportService
         if (provider is null)
             return Result<AIReport>.Failure($"Unknown AI provider: {providerName}");
 
-        var content = await provider.GenerateReportAsync(vulnerability, affectedAssets, ct);
-        var report = AIReport.Create(vulnerability.Id, tenantId, content, providerName, userId);
+        var content = await provider.GenerateReportAsync(
+            vulnerabilityDefinition,
+            affectedAssets,
+            ct
+        );
+        var report = AIReport.Create(
+            tenantVulnerabilityId,
+            tenantId,
+            content,
+            providerName,
+            userId
+        );
 
         return Result<AIReport>.Success(report);
     }

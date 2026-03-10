@@ -11,6 +11,7 @@ public class RiskAcceptanceConfiguration : IEntityTypeConfiguration<RiskAcceptan
         builder.HasKey(ra => ra.Id);
 
         builder.HasIndex(ra => ra.TenantId);
+        builder.HasIndex(ra => ra.TenantVulnerabilityId);
         builder.HasIndex(ra => ra.Status);
 
         builder.Property(ra => ra.Status).HasConversion<string>().HasMaxLength(32);

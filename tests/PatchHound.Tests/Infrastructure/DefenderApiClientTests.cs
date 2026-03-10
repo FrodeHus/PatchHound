@@ -279,6 +279,30 @@ public class DefenderApiClientTests
             );
     }
 
+    [Fact]
+    public async Task GetSoftwareMachineReferencesAsync_WhenSoftwareIsMissing_ReturnsEmptyResponse()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.NotFound)
+        );
+        var client = new TestDefenderApiClient(new HttpClient(handler));
+
+        var response = await client.GetSoftwareMachineReferencesAsync(
+            Configuration,
+            "missing-software",
+            CancellationToken.None
+        );
+
+        response.Value.Should().BeEmpty();
+        handler.RequestUris.Should().ContainSingle();
+        handler
+            .RequestUris[0]
+            .Should()
+            .Be(
+                "https://api.securitycenter.microsoft.com/api/software/missing-software/machineReferences?$top=10000"
+            );
+    }
+
     private static HttpResponseMessage CreateJsonResponse(string json)
     {
         return new HttpResponseMessage(HttpStatusCode.OK)

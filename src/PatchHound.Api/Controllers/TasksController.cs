@@ -68,11 +68,16 @@ public class TasksController : ControllerBase
             .Take(pagination.BoundedPageSize)
             .Select(t => new RemediationTaskDto(
                 t.Id,
-                t.VulnerabilityId,
+                t.TenantVulnerabilityId,
                 t.AssetId,
                 _dbContext
-                    .Vulnerabilities.Where(v => v.Id == t.VulnerabilityId)
-                    .Select(v => v.Title)
+                    .TenantVulnerabilities.Where(v => v.Id == t.TenantVulnerabilityId)
+                    .Join(
+                        _dbContext.VulnerabilityDefinitions,
+                        tenantVulnerability => tenantVulnerability.VulnerabilityDefinitionId,
+                        definition => definition.Id,
+                        (_, definition) => definition.Title
+                    )
                     .FirstOrDefault() ?? "",
                 _dbContext.Assets.Where(a => a.Id == t.AssetId).Select(a => a.Name).FirstOrDefault()
                     ?? "",
@@ -108,8 +113,13 @@ public class TasksController : ControllerBase
 
         var vulnTitle =
             await _dbContext
-                .Vulnerabilities.Where(v => v.Id == task.VulnerabilityId)
-                .Select(v => v.Title)
+                .TenantVulnerabilities.Where(v => v.Id == task.TenantVulnerabilityId)
+                .Join(
+                    _dbContext.VulnerabilityDefinitions,
+                    tenantVulnerability => tenantVulnerability.VulnerabilityDefinitionId,
+                    definition => definition.Id,
+                    (_, definition) => definition.Title
+                )
                 .FirstOrDefaultAsync(ct) ?? "";
         var assetName =
             await _dbContext
@@ -121,7 +131,7 @@ public class TasksController : ControllerBase
         return Ok(
             new RemediationTaskDto(
                 task.Id,
-                task.VulnerabilityId,
+                task.TenantVulnerabilityId,
                 task.AssetId,
                 vulnTitle,
                 assetName,
@@ -172,7 +182,7 @@ public class TasksController : ControllerBase
             return Forbid();
 
         var result = await _riskAcceptanceService.RequestAsync(
-            task.VulnerabilityId,
+            task.TenantVulnerabilityId,
             task.TenantId,
             _tenantContext.CurrentUserId,
             request.Justification,
@@ -193,7 +203,7 @@ public class TasksController : ControllerBase
             new { id = acceptance.Id },
             new RiskAcceptanceDto(
                 acceptance.Id,
-                acceptance.VulnerabilityId,
+                acceptance.TenantVulnerabilityId,
                 acceptance.AssetId,
                 acceptance.Status.ToString(),
                 acceptance.Justification,

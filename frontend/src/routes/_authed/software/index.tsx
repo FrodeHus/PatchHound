@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchNormalizedSoftware } from '@/api/software.functions'
+import { fetchTenantSoftware } from '@/api/software.functions'
 import { SoftwareTable } from '@/components/features/software/SoftwareTable'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { buildSoftwareListRequest, softwareQueryKeys } from '@/features/software/list-state'
@@ -17,7 +17,7 @@ const softwareSearchSchema = baseListSearchSchema.extend({
 export const Route = createFileRoute('/_authed/software/')({
   validateSearch: softwareSearchSchema,
   loaderDeps: ({ search }) => search,
-  loader: ({ deps }) => fetchNormalizedSoftware({ data: buildSoftwareListRequest(deps) }),
+  loader: ({ deps }) => fetchTenantSoftware({ data: buildSoftwareListRequest(deps) }),
   component: SoftwareIndexPage,
 })
 
@@ -29,7 +29,7 @@ function SoftwareIndexPage() {
   const searchActions = createListSearchUpdater<typeof search>(navigate)
   const query = useQuery({
     queryKey: softwareQueryKeys.list(selectedTenantId, search),
-    queryFn: () => fetchNormalizedSoftware({ data: buildSoftwareListRequest(search) }),
+    queryFn: () => fetchTenantSoftware({ data: buildSoftwareListRequest(search) }),
     initialData,
   })
 

@@ -99,10 +99,10 @@ export function AssetDetailPane({
                       >
                         Open detail view
                       </Link>
-                      {asset.assetType === 'Software' && asset.normalizedSoftwareId ? (
+                      {asset.assetType === 'Software' && asset.tenantSoftwareId ? (
                         <Link
                           to="/software/$id"
-                          params={{ id: asset.normalizedSoftwareId }}
+                          params={{ id: asset.tenantSoftwareId }}
                           search={{ page: 1, pageSize: 25, version: '' }}
                           className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
                         >

@@ -82,7 +82,63 @@ public class AssetsControllerTests : IDisposable
             Criticality.Low
         );
 
+        var normalizedAgent = NormalizedSoftware.Create(
+            "agent",
+            "contoso",
+            "cpe:contoso:agent",
+            "cpe:2.3:a:contoso:agent:*:*:*:*:*:*:*:*",
+            SoftwareNormalizationMethod.ExplicitCpe,
+            SoftwareNormalizationConfidence.High,
+            new DateTimeOffset(2026, 3, 8, 9, 0, 0, TimeSpan.Zero)
+        );
+        var normalizedRuntime = NormalizedSoftware.Create(
+            "runtime",
+            "legacy",
+            "cpe:legacy:runtime",
+            "cpe:2.3:a:legacy:runtime:*:*:*:*:*:*:*:*",
+            SoftwareNormalizationMethod.ExplicitCpe,
+            SoftwareNormalizationConfidence.High,
+            new DateTimeOffset(2026, 3, 8, 9, 30, 0, TimeSpan.Zero)
+        );
+        var tenantAgent = TenantSoftware.Create(
+            _tenantId,
+            normalizedAgent.Id,
+            new DateTimeOffset(2026, 3, 8, 9, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 3, 8, 10, 0, 0, TimeSpan.Zero)
+        );
+        var tenantRuntime = TenantSoftware.Create(
+            _tenantId,
+            normalizedRuntime.Id,
+            new DateTimeOffset(2026, 3, 8, 9, 30, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 3, 8, 10, 0, 0, TimeSpan.Zero)
+        );
+
         await _dbContext.AddRangeAsync(device, software, standaloneSoftware);
+        await _dbContext.AddRangeAsync(normalizedAgent, normalizedRuntime, tenantAgent, tenantRuntime);
+        await _dbContext.NormalizedSoftwareAliases.AddRangeAsync(
+            NormalizedSoftwareAlias.Create(
+                normalizedAgent.Id,
+                SoftwareIdentitySourceSystem.Defender,
+                software.ExternalId,
+                "Contoso Agent",
+                "Contoso",
+                "1.0",
+                SoftwareNormalizationConfidence.High,
+                "Resolved via software CPE binding.",
+                new DateTimeOffset(2026, 3, 8, 9, 0, 0, TimeSpan.Zero)
+            ),
+            NormalizedSoftwareAlias.Create(
+                normalizedRuntime.Id,
+                SoftwareIdentitySourceSystem.Defender,
+                standaloneSoftware.ExternalId,
+                "Legacy Runtime",
+                "Legacy",
+                "5.2",
+                SoftwareNormalizationConfidence.High,
+                "Resolved via software CPE binding.",
+                new DateTimeOffset(2026, 3, 8, 9, 30, 0, 0, TimeSpan.Zero)
+            )
+        );
         await _dbContext.DeviceSoftwareInstallations.AddAsync(
             DeviceSoftwareInstallation.Create(
                 _tenantId,
@@ -93,8 +149,7 @@ public class AssetsControllerTests : IDisposable
         );
         await _dbContext.SoftwareCpeBindings.AddRangeAsync(
             SoftwareCpeBinding.Create(
-                _tenantId,
-                software.Id,
+                normalizedAgent.Id,
                 "cpe:2.3:a:contoso:agent:1.0:*:*:*:*:*:*:*",
                 CpeBindingMethod.DefenderDerived,
                 MatchConfidence.High,
@@ -104,8 +159,7 @@ public class AssetsControllerTests : IDisposable
                 new DateTimeOffset(2026, 3, 8, 9, 0, 0, TimeSpan.Zero)
             ),
             SoftwareCpeBinding.Create(
-                _tenantId,
-                standaloneSoftware.Id,
+                normalizedRuntime.Id,
                 "cpe:2.3:a:legacy:runtime:5.2:*:*:*:*:*:*:*",
                 CpeBindingMethod.Manual,
                 MatchConfidence.Medium,
