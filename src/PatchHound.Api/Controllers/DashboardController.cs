@@ -27,6 +27,10 @@ public class DashboardController : ControllerBase
         // Vulnerability counts by severity
         var bySeverity = await _dbContext
             .Vulnerabilities.AsNoTracking()
+            .Where(v =>
+                v.Status == VulnerabilityStatus.Open
+                || v.Status == VulnerabilityStatus.InRemediation
+            )
             .GroupBy(v => v.VendorSeverity)
             .Select(g => new { Severity = g.Key, Count = g.Count() })
             .ToListAsync(ct);
@@ -258,11 +262,16 @@ public class DashboardController : ControllerBase
         foreach (var row in episodeRows)
         {
             var firstSeenDate = DateOnly.FromDateTime(row.FirstSeenAt.UtcDateTime);
-            var resolvedDate = DateOnly.FromDateTime(
-                (row.ResolvedAt ?? DateTimeOffset.UtcNow).UtcDateTime
-            );
+            var resolvedDate = row.ResolvedAt.HasValue
+                ? DateOnly.FromDateTime(row.ResolvedAt.Value.UtcDateTime).AddDays(-1)
+                : today;
             var effectiveStart = firstSeenDate < startDate ? startDate : firstSeenDate;
             var effectiveEnd = resolvedDate > today ? today : resolvedDate;
+
+            if (effectiveEnd < effectiveStart)
+            {
+                continue;
+            }
 
             for (var date = effectiveStart; date <= effectiveEnd; date = date.AddDays(1))
             {
