@@ -11,6 +11,13 @@ namespace PatchHound.Worker;
 public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<EnrichmentWorker> logger)
     : BackgroundService
 {
+    private sealed record EnrichmentSourceSnapshot(
+        Guid Id,
+        string SourceKey,
+        string DisplayName,
+        bool HasConfiguredCredentials
+    );
+
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(15);
     private const int MaxJobsPerCycle = 10;
@@ -71,7 +78,7 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
         );
     }
 
-    private async Task<List<EnrichmentSourceConfiguration>> LoadEnabledSourcesAsync(
+    private async Task<List<EnrichmentSourceSnapshot>> LoadEnabledSourcesAsync(
         CancellationToken ct
     )
     {
@@ -95,11 +102,17 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
             .EnrichmentSourceConfigurations.AsNoTracking()
             .Where(source => source.Enabled)
             .OrderBy(source => source.DisplayName)
+            .Select(source => new EnrichmentSourceSnapshot(
+                source.Id,
+                source.SourceKey,
+                source.DisplayName,
+                !string.IsNullOrWhiteSpace(source.SecretRef)
+            ))
             .ToListAsync(ct);
     }
 
     private async Task<bool> RunSourceCycleAsync(
-        EnrichmentSourceConfiguration source,
+        EnrichmentSourceSnapshot source,
         CancellationToken ct
     )
     {
@@ -132,6 +145,10 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
             return false;
         }
 
+        var trackedSource = await dbContext
+            .EnrichmentSourceConfigurations.IgnoreQueryFilters()
+            .FirstAsync(item => item.Id == source.Id, ct);
+
         var runCompleted = false;
 
         try
@@ -143,7 +160,7 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
 
             await UpdateRuntimeAsync(
                 dbContext,
-                source.Id,
+                trackedSource,
                 runtime =>
                     runtime.UpdateRuntime(
                         leaseAcquiredAt,
@@ -164,7 +181,7 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
 
                 await UpdateRuntimeAsync(
                     dbContext,
-                    source.Id,
+                    trackedSource,
                     runtime =>
                         runtime.UpdateRuntime(
                             leaseAcquiredAt,
@@ -248,7 +265,7 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
 
             await UpdateRuntimeAsync(
                 dbContext,
-                source.Id,
+                trackedSource,
                 runtime =>
                     runtime.UpdateRuntime(
                         leaseAcquiredAt,
@@ -277,7 +294,7 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
 
             await UpdateRuntimeAsync(
                 dbContext,
-                source.Id,
+                trackedSource,
                 runtime =>
                     runtime.UpdateRuntime(
                         leaseAcquiredAt,
@@ -405,14 +422,11 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
 
     private async Task UpdateRuntimeAsync(
         PatchHoundDbContext dbContext,
-        Guid sourceId,
+        EnrichmentSourceConfiguration source,
         Action<EnrichmentSourceConfiguration> update,
         CancellationToken ct
     )
     {
-        var source = await dbContext
-            .EnrichmentSourceConfigurations.IgnoreQueryFilters()
-            .FirstAsync(item => item.Id == sourceId, ct);
         update(source);
         await dbContext.SaveChangesAsync(ct);
     }
@@ -440,8 +454,8 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
             );
     }
 
-    private static bool HasConfiguredCredentials(EnrichmentSourceConfiguration source)
+    private static bool HasConfiguredCredentials(EnrichmentSourceSnapshot source)
     {
-        return !string.IsNullOrWhiteSpace(source.SecretRef);
+        return source.HasConfiguredCredentials;
     }
 }
