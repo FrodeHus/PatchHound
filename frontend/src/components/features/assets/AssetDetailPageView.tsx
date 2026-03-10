@@ -52,6 +52,16 @@ export function AssetDetailPageView({
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 {asset.description ?? getDefaultDescription(asset.assetType)}
               </p>
+              {asset.assetType === 'Software' && asset.normalizedSoftwareId ? (
+                <Link
+                  to="/software/$id"
+                  params={{ id: asset.normalizedSoftwareId }}
+                  search={{ page: 1, pageSize: 25, version: '' }}
+                  className="mt-3 inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
+                >
+                  Open software workspace
+                </Link>
+              ) : null}
             </div>
           </div>
           <div className="rounded-2xl border border-border/70 bg-background/45 p-4 text-right">
@@ -209,7 +219,18 @@ export function AssetDetailPageView({
                 <div key={software.softwareAssetId} className="rounded-2xl border border-border/70 bg-background p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-medium">{software.name}</p>
+                      {software.normalizedSoftwareId ? (
+                        <Link
+                          to="/software/$id"
+                          params={{ id: software.normalizedSoftwareId }}
+                          search={{ page: 1, pageSize: 25, version: '' }}
+                          className="font-medium hover:text-primary"
+                        >
+                          {software.name}
+                        </Link>
+                      ) : (
+                        <p className="font-medium">{software.name}</p>
+                      )}
                       <p className="mt-1 text-xs text-muted-foreground">{software.externalId}</p>
                     </div>
                     <p className="text-xs text-muted-foreground">Last seen {new Date(software.lastSeenAt).toLocaleDateString()}</p>
