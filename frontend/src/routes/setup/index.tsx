@@ -33,13 +33,14 @@ function SetupPage() {
   const router = useRouter()
   const mutation = useMutation({
     mutationFn: completeSetup,
-    onSuccess: () => {
-      void router.navigate({ to: '/' })
+    onSuccess: async () => {
+      await router.invalidate()
+      await router.navigate({ to: '/' })
     },
   })
 
   return (
-    <section className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.14),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.12),_transparent_28%),linear-gradient(180deg,_rgba(248,250,252,1),_rgba(241,245,249,0.92))]">
+    <section className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#eef2f7_100%)]">
       {setupContext ? (
         <SetupWizard
           setupContext={setupContext}

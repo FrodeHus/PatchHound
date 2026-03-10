@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, CheckCircle2, Shield, Sparkles } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import type { SetupContext, SetupPayload } from '@/api/setup.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -7,17 +7,13 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import {
-  Progress,
-  ProgressLabel,
-} from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 
 type SetupWizardProps = {
   setupContext: SetupContext
@@ -28,21 +24,21 @@ type SetupWizardProps = {
 const steps = [
   {
     id: 'workspace',
-    eyebrow: 'Step 1',
-    title: 'Name the tenant workspace',
-    description: 'Set the name your operators will see across PatchHound.',
+    label: 'Workspace',
+    title: 'Create the tenant workspace',
+    description: 'Set the tenant name operators will see in PatchHound.',
   },
   {
     id: 'defender',
-    eyebrow: 'Step 2',
-    title: 'Optional Defender connection',
-    description: 'Add credentials now, or skip this and configure Defender later from Sources.',
+    label: 'Defender',
+    title: 'Optional Defender setup',
+    description: 'Add Defender credentials now or skip and configure them later from Sources.',
   },
   {
     id: 'review',
-    eyebrow: 'Step 3',
+    label: 'Review',
     title: 'Review and launch',
-    description: 'Confirm the onboarding scope before PatchHound creates the tenant workspace.',
+    description: 'Confirm the onboarding choices before PatchHound creates the tenant.',
   },
 ] as const
 
@@ -53,8 +49,11 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
   const [defenderClientId, setDefenderClientId] = useState('')
   const [defenderClientSecret, setDefenderClientSecret] = useState('')
 
-  const progress = ((stepIndex + 1) / steps.length) * 100
   const currentStep = steps[stepIndex]
+
+  const tenantValidationMessage = tenantName.trim()
+    ? null
+    : 'Workspace name is required.'
 
   const defenderValidationMessage = useMemo(() => {
     if (!defenderEnabled) {
@@ -62,19 +61,15 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
     }
 
     if (!defenderClientId.trim()) {
-      return 'Client ID is required to enable Defender during onboarding.'
+      return 'Client ID is required when Defender setup is enabled.'
     }
 
     if (!defenderClientSecret.trim()) {
-      return 'Client secret is required to enable Defender during onboarding.'
+      return 'Client secret is required when Defender setup is enabled.'
     }
 
     return null
   }, [defenderClientId, defenderClientSecret, defenderEnabled])
-
-  const tenantValidationMessage = tenantName.trim()
-    ? null
-    : 'Workspace name is required to continue.'
 
   const canContinue =
     stepIndex === 0
@@ -84,285 +79,214 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
         : true
 
   return (
-    <section className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-6 py-10">
-      <div className="grid w-full gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <Card className="border-border/70 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.08),_transparent_55%),linear-gradient(180deg,_rgba(255,255,255,0.9),_rgba(248,250,252,0.96))] shadow-sm">
-          <CardHeader>
-            <div className="space-y-3">
-              <Badge variant="outline" className="w-fit rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em]">
-                Tenant onboarding
-              </Badge>
-              <div className="space-y-1">
-                <CardTitle className="text-xl tracking-[-0.03em]">
-                  Stand up a tenant in one pass
-                </CardTitle>
-                <CardDescription className="text-sm leading-6">
-                  PatchHound will create the tenant workspace, assign the first admin, and optionally
-                  prepare Microsoft Defender ingestion.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <Progress value={progress}>
-              <div className="flex w-full items-end justify-between">
-                <ProgressLabel>Onboarding progress</ProgressLabel>
-                <span className="ml-auto text-sm text-muted-foreground tabular-nums">
-                  {stepIndex + 1} / {steps.length}
-                </span>
-              </div>
-            </Progress>
-
-            <div className="space-y-3">
-              {steps.map((step, index) => {
-                const state =
-                  index < stepIndex ? 'done' : index === stepIndex ? 'active' : 'upcoming'
-
-                return (
-                  <button
-                    key={step.id}
-                    type="button"
-                    className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
-                      state === 'active'
-                        ? 'border-foreground/15 bg-background shadow-sm'
-                        : state === 'done'
-                          ? 'border-emerald-200 bg-emerald-50/60'
-                          : 'border-transparent bg-muted/45 hover:border-border/60'
-                    }`}
-                    onClick={() => {
-                      if (index <= stepIndex) {
-                        setStepIndex(index)
-                      }
-                    }}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`mt-0.5 flex size-7 items-center justify-center rounded-full text-xs font-semibold ${
-                          state === 'done'
-                            ? 'bg-emerald-600 text-white'
-                            : state === 'active'
-                              ? 'bg-foreground text-background'
-                              : 'bg-background text-muted-foreground ring-1 ring-border'
-                        }`}
-                      >
-                        {state === 'done' ? <CheckCircle2 className="size-4" /> : index + 1}
-                      </div>
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          {step.eyebrow}
-                        </p>
-                        <p className="font-medium tracking-[-0.02em]">{step.title}</p>
-                        <p className="text-sm leading-5 text-muted-foreground">{step.description}</p>
-                      </div>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="rounded-2xl border border-dashed border-border/70 bg-background/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Included automatically
-              </p>
-              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <Sparkles className="mt-0.5 size-4 text-primary" />
-                  The first admin account is created from your current Entra sign-in.
-                </li>
-                <li className="flex items-start gap-2">
-                  <Shield className="mt-0.5 size-4 text-primary" />
-                  Default SLA and enrichment defaults are provisioned without extra fields.
-                </li>
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-border/70 shadow-sm">
-          <CardHeader className="border-b bg-[linear-gradient(180deg,_rgba(15,23,42,0.03),_transparent)] pb-5">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                {currentStep.eyebrow}
-              </p>
-              <CardTitle className="text-3xl tracking-[-0.04em]">{currentStep.title}</CardTitle>
-              <CardDescription className="max-w-2xl text-sm leading-6">
-                {currentStep.description}
+    <section className="mx-auto w-full max-w-4xl px-6 py-10">
+      <Card className="border-slate-200 bg-white py-0 text-slate-950 shadow-[0_30px_80px_-35px_rgba(15,23,42,0.3)]">
+        <CardHeader className="gap-4 border-b border-slate-200 bg-slate-50/70 pb-5">
+          <div className="space-y-2">
+            <Badge
+              variant="outline"
+              className="rounded-full border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-700"
+            >
+              Tenant onboarding
+            </Badge>
+            <div className="space-y-1">
+              <CardTitle className="text-2xl tracking-[-0.04em] text-slate-950">
+                Stand up a tenant in three short steps
+              </CardTitle>
+              <CardDescription className="text-sm leading-6 text-slate-600">
+                Only onboarding fields are shown here. Admin identity and defaults are provisioned automatically.
               </CardDescription>
             </div>
-          </CardHeader>
+          </div>
 
-          <CardContent className="space-y-6 py-6">
-            {stepIndex === 0 ? (
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px]">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="tenant-name">
-                      Tenant workspace name
-                    </label>
-                    <Input
-                      id="tenant-name"
-                      value={tenantName}
-                      onChange={(event) => {
-                        setTenantName(event.target.value)
-                      }}
-                      placeholder="Acme Production"
-                      className="h-11 rounded-xl px-3 text-sm"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      This is the only editable tenant field during onboarding. Everything else is
-                      derived from your current identity.
-                    </p>
-                    {tenantValidationMessage ? (
-                      <p className="text-sm text-destructive">{tenantValidationMessage}</p>
-                    ) : null}
-                  </div>
-                </div>
+          <div className="flex flex-wrap gap-2">
+            {steps.map((step, index) => {
+              const isActive = index === stepIndex
+              const isComplete = index < stepIndex
+              const isAccessible = index <= stepIndex
 
-                <div className="rounded-2xl border bg-muted/35 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Identity source
-                  </p>
-                  <dl className="mt-3 space-y-3 text-sm">
-                    <div>
-                      <dt className="text-muted-foreground">Entra tenant</dt>
-                      <dd className="font-medium">{setupContext.entraTenantId}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Initial admin</dt>
-                      <dd className="font-medium">{setupContext.adminDisplayName}</dd>
-                      <dd className="text-muted-foreground">{setupContext.adminEmail}</dd>
-                    </div>
-                  </dl>
-                </div>
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  disabled={!isAccessible}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors disabled:cursor-default disabled:opacity-100',
+                    isActive
+                      ? 'border-slate-900 bg-slate-900 text-white'
+                      : isComplete
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                        : 'border-slate-200 bg-white text-slate-500',
+                  )}
+                  onClick={() => {
+                    if (isAccessible) {
+                      setStepIndex(index)
+                    }
+                  }}
+                >
+                  <span
+                    className={cn(
+                      'flex size-5 items-center justify-center rounded-full text-[11px] font-semibold',
+                      isActive
+                        ? 'bg-white text-slate-950'
+                        : isComplete
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-100 text-slate-500',
+                    )}
+                  >
+                    {index + 1}
+                  </span>
+                  <span>{step.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-6 px-6 py-6 sm:px-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                {currentStep.label}
+              </p>
+              <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                {currentStep.title}
+              </h2>
+              <p className="max-w-2xl text-sm leading-6 text-slate-600">{currentStep.description}</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+              <p className="font-medium text-slate-900">{setupContext.adminDisplayName}</p>
+              <p className="text-slate-600">{setupContext.adminEmail}</p>
+            </div>
+          </div>
+
+          {stepIndex === 0 ? (
+            <div className="space-y-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-800" htmlFor="tenant-name">
+                  Workspace name
+                </label>
+                <Input
+                  id="tenant-name"
+                  value={tenantName}
+                  onChange={(event) => {
+                    setTenantName(event.target.value)
+                  }}
+                  placeholder="Acme Production"
+                  className="h-11 rounded-xl border-slate-300 bg-white px-3 text-sm text-slate-950 placeholder:text-slate-400"
+                />
               </div>
-            ) : null}
 
-            {stepIndex === 1 ? (
-              <div className="space-y-5">
-                <div className="flex items-start justify-between gap-4 rounded-2xl border bg-muted/30 p-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium tracking-[-0.02em]">Configure Microsoft Defender now</p>
-                      <Badge variant="outline" className="rounded-full">Optional</Badge>
-                    </div>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      If you skip this, the tenant will still be created and you can configure
-                      Defender later from <span className="font-medium text-foreground">Sources</span>.
-                    </p>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                Entra tenant: <span className="font-medium text-slate-900">{setupContext.entraTenantId}</span>
+              </div>
+
+              {tenantValidationMessage ? (
+                <p className="text-sm text-rose-600">{tenantValidationMessage}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {stepIndex === 1 ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-slate-900">Set up Microsoft Defender now</p>
+                    <Badge variant="outline" className="rounded-full border-slate-300 bg-white text-slate-700">
+                      Optional
+                    </Badge>
                   </div>
-                  <Checkbox
-                    checked={defenderEnabled}
-                    onCheckedChange={(checked) => {
-                      setDefenderEnabled(Boolean(checked))
+                  <p className="text-sm leading-6 text-slate-600">
+                    Skip this if you want to configure the source later from Sources.
+                  </p>
+                </div>
+
+                <Checkbox
+                  checked={defenderEnabled}
+                  onCheckedChange={(checked) => {
+                    setDefenderEnabled(Boolean(checked))
+                  }}
+                  aria-label="Enable Defender during onboarding"
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium text-slate-800" htmlFor="defender-client-id">
+                    Client ID
+                  </label>
+                  <Input
+                    id="defender-client-id"
+                    value={defenderClientId}
+                    disabled={!defenderEnabled}
+                    onChange={(event) => {
+                      setDefenderClientId(event.target.value)
                     }}
-                    aria-label="Enable Defender during onboarding"
+                    placeholder="Application (client) ID"
+                    className="h-11 rounded-xl border-slate-300 bg-white px-3 text-sm text-slate-950 placeholder:text-slate-400 disabled:bg-slate-100"
                   />
                 </div>
 
-                <div className={`grid gap-4 transition-opacity ${defenderEnabled ? 'opacity-100' : 'opacity-60'}`}>
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium" htmlFor="defender-client-id">
-                      Client ID
-                    </label>
-                    <Input
-                      id="defender-client-id"
-                      value={defenderClientId}
-                      disabled={!defenderEnabled}
-                      onChange={(event) => {
-                        setDefenderClientId(event.target.value)
-                      }}
-                      placeholder="Application (client) ID"
-                      className="h-11 rounded-xl px-3 text-sm"
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium" htmlFor="defender-client-secret">
-                      Client secret
-                    </label>
-                    <Input
-                      id="defender-client-secret"
-                      type="password"
-                      value={defenderClientSecret}
-                      disabled={!defenderEnabled}
-                      onChange={(event) => {
-                        setDefenderClientSecret(event.target.value)
-                      }}
-                      placeholder="Paste the secret value"
-                      className="h-11 rounded-xl px-3 text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-dashed border-border/70 bg-background p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Applied automatically if enabled
-                  </p>
-                  <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                    <li>PatchHound will keep the default Defender schedule and token scope.</li>
-                    <li>Your current Entra tenant ID will be used as the credential tenant.</li>
-                    <li>You can revisit and rotate these credentials later from tenant settings.</li>
-                  </ul>
-                </div>
-
-                {defenderValidationMessage ? (
-                  <p className="text-sm text-destructive">{defenderValidationMessage}</p>
-                ) : null}
-              </div>
-            ) : null}
-
-            {stepIndex === 2 ? (
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-                <div className="space-y-5">
-                  <div className="rounded-2xl border bg-muted/25 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Tenant workspace
-                    </p>
-                    <p className="mt-2 text-lg font-medium tracking-[-0.03em]">{tenantName.trim()}</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      The first Global Admin will be {setupContext.adminDisplayName} ({setupContext.adminEmail}).
-                    </p>
-                  </div>
-
-                  <Separator />
-
-                  <div className="rounded-2xl border bg-muted/25 p-4">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Defender ingestion
-                      </p>
-                      {defenderEnabled ? (
-                        <Badge className="rounded-full">Will be configured</Badge>
-                      ) : (
-                        <Badge variant="outline" className="rounded-full">Skipped for now</Badge>
-                      )}
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {defenderEnabled
-                        ? 'The default Microsoft Defender source will be enabled immediately after tenant creation.'
-                        : 'The tenant will launch without Defender credentials. You can configure the source later from Sources.'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border bg-[linear-gradient(180deg,_rgba(15,23,42,0.04),_transparent)] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Launch result
-                  </p>
-                  <ul className="mt-3 space-y-3 text-sm text-muted-foreground">
-                    <li>Tenant workspace is created and linked to your Entra tenant.</li>
-                    <li>Default SLA and enrichment sources are provisioned automatically.</li>
-                    <li>You land in the main app immediately after setup completes.</li>
-                  </ul>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium text-slate-800" htmlFor="defender-client-secret">
+                    Client secret
+                  </label>
+                  <Input
+                    id="defender-client-secret"
+                    type="password"
+                    value={defenderClientSecret}
+                    disabled={!defenderEnabled}
+                    onChange={(event) => {
+                      setDefenderClientSecret(event.target.value)
+                    }}
+                    placeholder="Paste the secret value"
+                    className="h-11 rounded-xl border-slate-300 bg-white px-3 text-sm text-slate-950 placeholder:text-slate-400 disabled:bg-slate-100"
+                  />
                 </div>
               </div>
-            ) : null}
-          </CardContent>
 
-          <CardFooter className="justify-between gap-3">
+              <p className="text-sm text-slate-600">
+                If enabled, PatchHound uses the default Defender schedule and your current Entra tenant ID.
+              </p>
+
+              {defenderValidationMessage ? (
+                <p className="text-sm text-rose-600">{defenderValidationMessage}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {stepIndex === 2 ? (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <dl className="grid gap-4 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-slate-500">Workspace name</dt>
+                    <dd className="mt-1 font-medium text-slate-900">{tenantName.trim()}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Defender</dt>
+                    <dd className="mt-1 font-medium text-slate-900">
+                      {defenderEnabled ? 'Configure on launch' : 'Skip for now'}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              <p className="text-sm text-slate-600">
+                PatchHound will still create the initial admin assignment, default SLA, and baseline source records automatically.
+              </p>
+            </div>
+          ) : null}
+
+          <Separator className="bg-slate-200" />
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Button
               type="button"
               variant="outline"
+              className="border-slate-300 bg-white text-slate-900 hover:bg-slate-100"
               disabled={stepIndex === 0 || isSubmitting}
               onClick={() => {
                 setStepIndex((current) => Math.max(0, current - 1))
@@ -371,15 +295,17 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
               Back
             </Button>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col items-start gap-2 sm:items-end">
               {stepIndex === 1 && !defenderEnabled ? (
-                <span className="text-sm text-muted-foreground">
-                  Skipping Defender is fine. You can configure it later.
-                </span>
+                <p className="text-sm text-slate-500">
+                  You can set up Defender later from Sources.
+                </p>
               ) : null}
+
               {stepIndex < steps.length - 1 ? (
                 <Button
                   type="button"
+                  className="bg-slate-900 text-white hover:bg-slate-800"
                   disabled={!canContinue || isSubmitting}
                   onClick={() => {
                     setStepIndex((current) => Math.min(steps.length - 1, current + 1))
@@ -391,6 +317,7 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
               ) : (
                 <Button
                   type="button"
+                  className="bg-slate-900 text-white hover:bg-slate-800"
                   disabled={isSubmitting || !tenantName.trim() || !!defenderValidationMessage}
                   onClick={() => {
                     onComplete({
@@ -403,13 +330,13 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
                     })
                   }}
                 >
-                  {isSubmitting ? 'Creating tenant...' : 'Create tenant workspace'}
+                  {isSubmitting ? 'Creating tenant...' : 'Create tenant'}
                 </Button>
               )}
             </div>
-          </CardFooter>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </section>
   )
 }
