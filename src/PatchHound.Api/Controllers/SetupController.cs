@@ -1,10 +1,14 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Models.Setup;
 using PatchHound.Core.Common;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
+using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Secrets;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Api.Controllers;
 
@@ -13,10 +17,18 @@ namespace PatchHound.Api.Controllers;
 public class SetupController : ControllerBase
 {
     private readonly ISetupService _setupService;
+    private readonly PatchHoundDbContext _dbContext;
+    private readonly ISecretStore _secretStore;
 
-    public SetupController(ISetupService setupService)
+    public SetupController(
+        ISetupService setupService,
+        PatchHoundDbContext dbContext,
+        ISecretStore secretStore
+    )
     {
         _setupService = setupService;
+        _dbContext = dbContext;
+        _secretStore = secretStore;
     }
 
     [HttpGet("status")]
@@ -68,6 +80,65 @@ public class SetupController : ControllerBase
         if (!result.IsSuccess)
         {
             return BadRequest(new ProblemDetails { Title = result.Error });
+        }
+
+        if (request.Defender.Enabled)
+        {
+            var clientId = request.Defender.ClientId.Trim();
+            var clientSecret = request.Defender.ClientSecret.Trim();
+
+            if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
+            {
+                return BadRequest(
+                    new ProblemDetails
+                    {
+                        Title = "Client ID and client secret are required when Defender setup is enabled.",
+                    }
+                );
+            }
+
+            var tenant = result.Value;
+            var source = await _dbContext.TenantSourceConfigurations.FirstOrDefaultAsync(
+                candidate =>
+                    candidate.TenantId == tenant.Id
+                    && candidate.SourceKey == TenantSourceCatalog.DefenderSourceKey,
+                ct
+            );
+
+            if (source is null)
+            {
+                return BadRequest(
+                    new ProblemDetails { Title = "Default Defender ingestion source was not created." }
+                );
+            }
+
+            var secretRef =
+                string.IsNullOrWhiteSpace(source.SecretRef)
+                    ? $"tenants/{tenant.Id}/sources/{TenantSourceCatalog.DefenderSourceKey}"
+                    : source.SecretRef;
+
+            source.UpdateConfiguration(
+                source.DisplayName,
+                true,
+                TenantSourceCatalog.DefaultDefenderSchedule,
+                tenant.EntraTenantId,
+                clientId,
+                secretRef,
+                TenantSourceCatalog.DefaultDefenderApiBaseUrl,
+                TenantSourceCatalog.DefaultDefenderTokenScope
+            );
+
+            await _dbContext.SaveChangesAsync(ct);
+
+            await _secretStore.PutSecretAsync(
+                secretRef,
+                new Dictionary<string, string>
+                {
+                    [TenantSourceCatalog.GetSecretKeyName(TenantSourceCatalog.DefenderSourceKey)] =
+                        clientSecret,
+                },
+                ct
+            );
         }
 
         return Ok();
