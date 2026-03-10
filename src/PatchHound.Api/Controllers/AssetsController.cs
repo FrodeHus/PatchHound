@@ -380,34 +380,53 @@ public class AssetsController : ControllerBase
             )
             .ToListAsync(ct);
 
-        var softwareVulnerabilityRows =
-            asset.AssetType == AssetType.Software
-                ? await _dbContext
-                    .SoftwareVulnerabilityMatches.AsNoTracking()
-                    .Where(match => match.SoftwareAssetId == id && match.ResolvedAt == null)
-                    .Join(
-                        _dbContext.Vulnerabilities.AsNoTracking(),
-                        match => match.VulnerabilityId,
-                        vulnerability => vulnerability.Id,
-                        (match, vulnerability) =>
-                            new AssetKnownSoftwareVulnerabilityDto(
-                                vulnerability.Id,
-                                vulnerability.ExternalId,
-                                vulnerability.Title,
-                                vulnerability.VendorSeverity.ToString(),
-                                vulnerability.CvssScore,
-                                vulnerability.CvssVector,
-                                match.MatchMethod.ToString(),
-                                match.Confidence.ToString(),
-                                match.Evidence,
-                                match.FirstSeenAt,
-                                match.LastSeenAt,
-                                match.ResolvedAt
-                            )
-                    )
-                    .OrderBy(item => item.ExternalId)
-                    .ToListAsync(ct)
-                : [];
+        IReadOnlyList<AssetKnownSoftwareVulnerabilityDto> softwareVulnerabilityRows = [];
+        if (asset.AssetType == AssetType.Software)
+        {
+            var softwareVulnerabilityItems = await _dbContext
+                .SoftwareVulnerabilityMatches.AsNoTracking()
+                .Where(match => match.SoftwareAssetId == id && match.ResolvedAt == null)
+                .Join(
+                    _dbContext.Vulnerabilities.AsNoTracking(),
+                    match => match.VulnerabilityId,
+                    vulnerability => vulnerability.Id,
+                    (match, vulnerability) =>
+                        new
+                        {
+                            vulnerability.Id,
+                            vulnerability.ExternalId,
+                            vulnerability.Title,
+                            VendorSeverity = vulnerability.VendorSeverity.ToString(),
+                            vulnerability.CvssScore,
+                            vulnerability.CvssVector,
+                            MatchMethod = match.MatchMethod.ToString(),
+                            Confidence = match.Confidence.ToString(),
+                            match.Evidence,
+                            match.FirstSeenAt,
+                            match.LastSeenAt,
+                            match.ResolvedAt,
+                        }
+                )
+                .OrderBy(item => item.ExternalId)
+                .ToListAsync(ct);
+
+            softwareVulnerabilityRows = softwareVulnerabilityItems
+                .Select(item => new AssetKnownSoftwareVulnerabilityDto(
+                    item.Id,
+                    item.ExternalId,
+                    item.Title,
+                    item.VendorSeverity,
+                    item.CvssScore,
+                    item.CvssVector,
+                    item.MatchMethod,
+                    item.Confidence,
+                    item.Evidence,
+                    item.FirstSeenAt,
+                    item.LastSeenAt,
+                    item.ResolvedAt
+                ))
+                .ToList();
+        }
 
         var vulnerabilities = vulnerabilityRows
             .Select(row =>
