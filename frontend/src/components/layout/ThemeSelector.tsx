@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Palette } from 'lucide-react'
 import { applyTheme, defaultThemeId, getTheme, themeOptions, themeStorageKey } from '@/lib/themes'
 import {
@@ -11,15 +11,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-export function ThemeSelector() {
-  const [themeId, setThemeId] = useState(defaultThemeId)
+function getInitialThemeId() {
+  if (typeof window === 'undefined') {
+    return defaultThemeId
+  }
 
-  useEffect(() => {
-    const storedTheme = window.localStorage.getItem(themeStorageKey)
-    const resolvedTheme = getTheme(storedTheme)
-    setThemeId(resolvedTheme.id)
-    applyTheme(resolvedTheme.id)
-  }, [])
+  return getTheme(window.localStorage.getItem(themeStorageKey)).id
+}
+
+export function ThemeSelector() {
+  const [themeId, setThemeId] = useState(getInitialThemeId)
 
   return (
     <Select

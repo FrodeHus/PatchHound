@@ -11,14 +11,18 @@ function getInitialTenantId(): string | null {
 }
 
 function buildTenantOptions(user: CurrentUser, tenantItems: TenantListItem[] | undefined) {
-  const allowedIds = user.tenantIds.length
-    ? user.tenantIds
-    : (tenantItems?.map((tenant) => tenant.id) ?? [])
-  const nameById = new Map((tenantItems ?? []).map((tenant) => [tenant.id, tenant.name]))
+  if (tenantItems && tenantItems.length > 0) {
+    return tenantItems.map((tenant) => ({
+      id: tenant.id,
+      name: tenant.name,
+    }))
+  }
 
-  return allowedIds.map((tenantId) => ({
+  const allowedIds = user.tenantIds.length ? user.tenantIds : []
+
+  return allowedIds.map((tenantId, index) => ({
     id: tenantId,
-    name: nameById.get(tenantId) ?? tenantId,
+    name: `Tenant ${index + 1}`,
   }))
 }
 

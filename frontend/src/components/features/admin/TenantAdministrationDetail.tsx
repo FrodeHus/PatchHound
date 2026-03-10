@@ -124,7 +124,7 @@ export function TenantAdministrationDetail({
             <CardTitle>Tenant Assets</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <SnapshotRow icon={Landmark} label="Tenant ID" value={tenant.id} />
+            <SnapshotRow icon={Landmark} label="Tenant Name" value={tenant.name} />
             <div className="rounded-2xl border border-border/70 bg-background/35 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
