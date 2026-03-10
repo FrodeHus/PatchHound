@@ -117,6 +117,108 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
         );
     }
 
+    [HttpGet]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
+    public async Task<ActionResult<PagedResponse<NormalizedSoftwareListItemDto>>> List(
+        [FromQuery] NormalizedSoftwareFilterQuery filter,
+        [FromQuery] PaginationQuery pagination,
+        CancellationToken ct
+    )
+    {
+        var query = dbContext.NormalizedSoftware.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            query = query.Where(item =>
+                item.CanonicalName.Contains(filter.Search)
+                || (item.CanonicalVendor != null && item.CanonicalVendor.Contains(filter.Search))
+            );
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Confidence))
+        {
+            query = query.Where(item => item.Confidence.ToString() == filter.Confidence);
+        }
+
+        if (filter.BoundOnly == true)
+        {
+            query = query.Where(item => item.PrimaryCpe23Uri != null && item.PrimaryCpe23Uri != "");
+        }
+
+        if (filter.VulnerableOnly == true)
+        {
+            query = query.Where(item =>
+                dbContext.NormalizedSoftwareVulnerabilityProjections.Any(projection =>
+                    projection.NormalizedSoftwareId == item.Id && projection.ResolvedAt == null
+                )
+            );
+        }
+
+        var totalCount = await query.CountAsync(ct);
+        var rows = await query
+            .OrderBy(item => item.CanonicalName)
+            .Skip(pagination.Skip)
+            .Take(pagination.BoundedPageSize)
+            .Select(item => new
+            {
+                item.Id,
+                item.CanonicalName,
+                item.CanonicalVendor,
+                Confidence = item.Confidence.ToString(),
+                NormalizationMethod = item.NormalizationMethod.ToString(),
+                item.PrimaryCpe23Uri,
+                ActiveInstallCount = dbContext
+                    .NormalizedSoftwareInstallations
+                    .Where(installation => installation.NormalizedSoftwareId == item.Id && installation.IsActive)
+                    .Count(),
+                UniqueDeviceCount = dbContext
+                    .NormalizedSoftwareInstallations
+                    .Where(installation => installation.NormalizedSoftwareId == item.Id && installation.IsActive)
+                    .Select(installation => installation.DeviceAssetId)
+                    .Distinct()
+                    .Count(),
+                ActiveVulnerabilityCount = dbContext
+                    .NormalizedSoftwareVulnerabilityProjections
+                    .Where(projection => projection.NormalizedSoftwareId == item.Id && projection.ResolvedAt == null)
+                    .Count(),
+                VersionCount = dbContext
+                    .NormalizedSoftwareInstallations
+                    .Where(installation => installation.NormalizedSoftwareId == item.Id && installation.IsActive)
+                    .Select(installation => installation.DetectedVersion ?? string.Empty)
+                    .Distinct()
+                    .Count(version => version != string.Empty),
+                LastSeenAt = dbContext
+                    .NormalizedSoftwareInstallations
+                    .Where(installation => installation.NormalizedSoftwareId == item.Id)
+                    .Select(installation => (DateTimeOffset?)installation.LastSeenAt)
+                    .Max(),
+            })
+            .ToListAsync(ct);
+
+        return Ok(
+            new PagedResponse<NormalizedSoftwareListItemDto>(
+                rows
+                    .Select(item => new NormalizedSoftwareListItemDto(
+                        item.Id,
+                        item.CanonicalName,
+                        item.CanonicalVendor,
+                        item.Confidence,
+                        item.NormalizationMethod,
+                        item.PrimaryCpe23Uri,
+                        item.ActiveInstallCount,
+                        item.UniqueDeviceCount,
+                        item.ActiveVulnerabilityCount,
+                        item.VersionCount,
+                        item.LastSeenAt
+                    ))
+                    .ToList(),
+                totalCount,
+                pagination.Page,
+                pagination.BoundedPageSize
+            )
+        );
+    }
+
     [HttpGet("{id:guid}/installations")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<PagedResponse<NormalizedSoftwareInstallationDto>>> GetInstallations(

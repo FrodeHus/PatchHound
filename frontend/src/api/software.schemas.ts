@@ -39,6 +39,20 @@ export const normalizedSoftwareDetailSchema = z.object({
   sourceAliases: z.array(normalizedSoftwareSourceAliasSchema),
 })
 
+export const normalizedSoftwareListItemSchema = z.object({
+  id: z.string().uuid(),
+  canonicalName: z.string(),
+  canonicalVendor: z.string().nullable(),
+  confidence: z.string(),
+  normalizationMethod: z.string(),
+  primaryCpe23Uri: z.string().nullable(),
+  activeInstallCount: z.number(),
+  uniqueDeviceCount: z.number(),
+  activeVulnerabilityCount: z.number(),
+  versionCount: z.number(),
+  lastSeenAt: isoDateTimeSchema.nullable(),
+})
+
 export const normalizedSoftwareInstallationSchema = z.object({
   deviceAssetId: z.string().uuid(),
   deviceName: z.string(),
@@ -59,6 +73,10 @@ export const normalizedSoftwareInstallationSchema = z.object({
 
 export const pagedNormalizedSoftwareInstallationsSchema = pagedResponseMetaSchema.extend({
   items: z.array(normalizedSoftwareInstallationSchema),
+})
+
+export const pagedNormalizedSoftwareSchema = pagedResponseMetaSchema.extend({
+  items: z.array(normalizedSoftwareListItemSchema),
 })
 
 export const normalizedSoftwareVulnerabilityEvidenceSchema = z.object({
@@ -91,6 +109,7 @@ export const normalizedSoftwareVulnerabilitySchema = z.object({
 })
 
 export type NormalizedSoftwareDetail = z.infer<typeof normalizedSoftwareDetailSchema>
+export type NormalizedSoftwareListItem = z.infer<typeof normalizedSoftwareListItemSchema>
 export type NormalizedSoftwareVersionCohort = z.infer<typeof normalizedSoftwareVersionCohortSchema>
 export type NormalizedSoftwareInstallation = z.infer<typeof normalizedSoftwareInstallationSchema>
 export type PagedNormalizedSoftwareInstallations = z.infer<typeof pagedNormalizedSoftwareInstallationsSchema>
