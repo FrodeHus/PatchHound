@@ -44,7 +44,6 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<PatchHoundDbContext>());
 
         // Repositories
-        services.AddScoped<IVulnerabilityRepository, VulnerabilityRepository>();
         services.AddScoped<IAssetRepository, AssetRepository>();
         services.AddScoped<IRemediationTaskRepository, RemediationTaskRepository>();
         services.AddScoped<IRiskAcceptanceRepository, RiskAcceptanceRepository>();
@@ -68,6 +67,7 @@ public static class DependencyInjection
             IRepository<OrganizationalSeverity>,
             RepositoryBase<OrganizationalSeverity>
         >();
+        services.AddScoped<IRepository<TenantVulnerability>, RepositoryBase<TenantVulnerability>>();
 
         // Application services
         services.AddScoped<VulnerabilityService>();

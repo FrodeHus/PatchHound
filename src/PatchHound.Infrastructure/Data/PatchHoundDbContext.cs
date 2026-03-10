@@ -43,6 +43,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<SoftwareVulnerabilityMatch> SoftwareVulnerabilityMatches =>
         Set<SoftwareVulnerabilityMatch>();
     public DbSet<NormalizedSoftware> NormalizedSoftware => Set<NormalizedSoftware>();
+    public DbSet<TenantSoftware> TenantSoftware => Set<TenantSoftware>();
     public DbSet<NormalizedSoftwareAlias> NormalizedSoftwareAliases =>
         Set<NormalizedSoftwareAlias>();
     public DbSet<NormalizedSoftwareInstallation> NormalizedSoftwareInstallations =>
@@ -54,10 +55,12 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         Set<DeviceSoftwareInstallation>();
     public DbSet<DeviceSoftwareInstallationEpisode> DeviceSoftwareInstallationEpisodes =>
         Set<DeviceSoftwareInstallationEpisode>();
-    public DbSet<Vulnerability> Vulnerabilities => Set<Vulnerability>();
-    public DbSet<VulnerabilityAffectedSoftware> VulnerabilityAffectedSoftware =>
-        Set<VulnerabilityAffectedSoftware>();
-    public DbSet<VulnerabilityReference> VulnerabilityReferences => Set<VulnerabilityReference>();
+    public DbSet<VulnerabilityDefinition> VulnerabilityDefinitions => Set<VulnerabilityDefinition>();
+    public DbSet<VulnerabilityDefinitionAffectedSoftware> VulnerabilityDefinitionAffectedSoftware =>
+        Set<VulnerabilityDefinitionAffectedSoftware>();
+    public DbSet<VulnerabilityDefinitionReference> VulnerabilityDefinitionReferences =>
+        Set<VulnerabilityDefinitionReference>();
+    public DbSet<TenantVulnerability> TenantVulnerabilities => Set<TenantVulnerability>();
     public DbSet<VulnerabilityAsset> VulnerabilityAssets => Set<VulnerabilityAsset>();
     public DbSet<VulnerabilityAssetEpisode> VulnerabilityAssetEpisodes =>
         Set<VulnerabilityAssetEpisode>();
@@ -120,16 +123,10 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<AssetSecurityProfile>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
-            .Entity<SoftwareCpeBinding>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
             .Entity<SoftwareVulnerabilityMatch>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
-            .Entity<NormalizedSoftware>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<NormalizedSoftwareAlias>()
+            .Entity<TenantSoftware>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<NormalizedSoftwareInstallation>()
@@ -144,24 +141,14 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<DeviceSoftwareInstallationEpisode>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
-            .Entity<Vulnerability>()
+            .Entity<TenantVulnerability>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<VulnerabilityAffectedSoftware>()
-            .HasQueryFilter(e =>
-                IsSystemContext || AccessibleTenantIds.Contains(e.Vulnerability.TenantId)
-            );
-        modelBuilder
-            .Entity<VulnerabilityReference>()
-            .HasQueryFilter(e =>
-                IsSystemContext || AccessibleTenantIds.Contains(e.Vulnerability.TenantId)
-            );
         modelBuilder
             .Entity<VulnerabilityAsset>()
             .HasQueryFilter(e =>
                 IsSystemContext
                 || (
-                    AccessibleTenantIds.Contains(e.Vulnerability.TenantId)
+                    AccessibleTenantIds.Contains(e.TenantVulnerability.TenantId)
                     && AccessibleTenantIds.Contains(e.Asset.TenantId)
                 )
             );

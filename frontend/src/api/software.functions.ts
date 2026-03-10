@@ -3,22 +3,22 @@ import { z } from 'zod'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet } from '@/server/api'
 import {
-  normalizedSoftwareDetailSchema,
-  normalizedSoftwareVulnerabilitySchema,
-  pagedNormalizedSoftwareSchema,
-  pagedNormalizedSoftwareInstallationsSchema,
+  tenantSoftwareDetailSchema,
+  tenantSoftwareVulnerabilitySchema,
+  pagedTenantSoftwareSchema,
+  pagedTenantSoftwareInstallationsSchema,
 } from './software.schemas'
 import { buildFilterParams } from './utils'
 
-export const fetchNormalizedSoftwareDetail = createServerFn({ method: 'GET' })
+export const fetchTenantSoftwareDetail = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ id: z.string() }))
   .handler(async ({ context, data: { id } }) => {
     const data = await apiGet(`/software/${id}`, context)
-    return normalizedSoftwareDetailSchema.parse(data)
+    return tenantSoftwareDetailSchema.parse(data)
   })
 
-export const fetchNormalizedSoftware = createServerFn({ method: 'GET' })
+export const fetchTenantSoftware = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(
     z.object({
@@ -33,10 +33,10 @@ export const fetchNormalizedSoftware = createServerFn({ method: 'GET' })
   .handler(async ({ context, data: filters }) => {
     const params = buildFilterParams(filters, { pageSize: 25 })
     const data = await apiGet(`/software?${params.toString()}`, context)
-    return pagedNormalizedSoftwareSchema.parse(data)
+    return pagedTenantSoftwareSchema.parse(data)
   })
 
-export const fetchNormalizedSoftwareInstallations = createServerFn({ method: 'GET' })
+export const fetchTenantSoftwareInstallations = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(
     z.object({
@@ -51,13 +51,13 @@ export const fetchNormalizedSoftwareInstallations = createServerFn({ method: 'GE
     const { id, ...query } = filters
     const params = buildFilterParams(query, { pageSize: 25 })
     const data = await apiGet(`/software/${id}/installations?${params.toString()}`, context)
-    return pagedNormalizedSoftwareInstallationsSchema.parse(data)
+    return pagedTenantSoftwareInstallationsSchema.parse(data)
   })
 
-export const fetchNormalizedSoftwareVulnerabilities = createServerFn({ method: 'GET' })
+export const fetchTenantSoftwareVulnerabilities = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ id: z.string() }))
   .handler(async ({ context, data: { id } }) => {
     const data = await apiGet(`/software/${id}/vulnerabilities`, context)
-    return z.array(normalizedSoftwareVulnerabilitySchema).parse(data)
+    return z.array(tenantSoftwareVulnerabilitySchema).parse(data)
   })

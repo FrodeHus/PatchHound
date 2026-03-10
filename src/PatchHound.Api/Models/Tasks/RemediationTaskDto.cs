@@ -2,7 +2,7 @@ namespace PatchHound.Api.Models.Tasks;
 
 public record RemediationTaskDto(
     Guid Id,
-    Guid VulnerabilityId,
+    Guid TenantVulnerabilityId,
     Guid AssetId,
     string VulnerabilityTitle,
     string AssetName,

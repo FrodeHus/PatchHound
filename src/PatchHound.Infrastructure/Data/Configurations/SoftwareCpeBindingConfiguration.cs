@@ -10,8 +10,7 @@ public class SoftwareCpeBindingConfiguration : IEntityTypeConfiguration<Software
     {
         builder.HasKey(binding => binding.Id);
 
-        builder.HasIndex(binding => binding.TenantId);
-        builder.HasIndex(binding => binding.SoftwareAssetId).IsUnique();
+        builder.HasIndex(binding => binding.NormalizedSoftwareId).IsUnique();
 
         builder.Property(binding => binding.Cpe23Uri).HasMaxLength(2048).IsRequired();
         builder.Property(binding => binding.BindingMethod).HasConversion<string>().HasMaxLength(32);
@@ -21,9 +20,9 @@ public class SoftwareCpeBindingConfiguration : IEntityTypeConfiguration<Software
         builder.Property(binding => binding.MatchedVersion).HasMaxLength(256);
 
         builder
-            .HasOne(binding => binding.SoftwareAsset)
+            .HasOne(binding => binding.NormalizedSoftware)
             .WithMany()
-            .HasForeignKey(binding => binding.SoftwareAssetId)
+            .HasForeignKey(binding => binding.NormalizedSoftwareId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

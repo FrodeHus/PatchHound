@@ -26,12 +26,12 @@ public class DashboardController : ControllerBase
     {
         // Vulnerability counts by severity
         var bySeverity = await _dbContext
-            .Vulnerabilities.AsNoTracking()
+            .TenantVulnerabilities.AsNoTracking()
             .Where(v =>
                 v.Status == VulnerabilityStatus.Open
                 || v.Status == VulnerabilityStatus.InRemediation
             )
-            .GroupBy(v => v.VendorSeverity)
+            .GroupBy(v => v.VulnerabilityDefinition.VendorSeverity)
             .Select(g => new { Severity = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 
@@ -43,7 +43,7 @@ public class DashboardController : ControllerBase
 
         // Vulnerability counts by status
         var byStatus = await _dbContext
-            .Vulnerabilities.AsNoTracking()
+            .TenantVulnerabilities.AsNoTracking()
             .GroupBy(v => v.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToListAsync(ct);
@@ -82,10 +82,10 @@ public class DashboardController : ControllerBase
             .VulnerabilityAssets.AsNoTracking()
             .Where(va => va.Status != VulnerabilityStatus.Resolved)
             .Join(
-                _dbContext.Vulnerabilities,
-                va => va.VulnerabilityId,
+                _dbContext.TenantVulnerabilities.AsNoTracking(),
+                va => va.TenantVulnerabilityId,
                 v => v.Id,
-                (va, v) => new { v.VendorSeverity, va.AssetId }
+                (va, v) => new { v.VulnerabilityDefinition.VendorSeverity, va.AssetId }
             )
             .Join(
                 _dbContext.Assets,
@@ -102,31 +102,33 @@ public class DashboardController : ControllerBase
 
         // Top 10 most urgent vulnerabilities (highest severity × oldest)
         var topVulns = await _dbContext
-            .Vulnerabilities.AsNoTracking()
+            .TenantVulnerabilities.AsNoTracking()
             .Where(v =>
                 v.Status == VulnerabilityStatus.Open
                 || v.Status == VulnerabilityStatus.InRemediation
             )
-            .OrderByDescending(v => v.VendorSeverity)
-            .ThenBy(v => v.PublishedDate)
+            .OrderByDescending(v => v.VulnerabilityDefinition.VendorSeverity)
+            .ThenBy(v => v.VulnerabilityDefinition.PublishedDate)
             .Take(10)
             .Select(v => new TopVulnerabilityDto(
                 v.Id,
-                v.ExternalId,
-                v.Title,
-                v.VendorSeverity.ToString(),
-                v.CvssScore,
-                v.AffectedAssets.Count,
-                v.PublishedDate.HasValue ? (int)(now - v.PublishedDate.Value).TotalDays : 0
+                v.VulnerabilityDefinition.ExternalId,
+                v.VulnerabilityDefinition.Title,
+                v.VulnerabilityDefinition.VendorSeverity.ToString(),
+                v.VulnerabilityDefinition.CvssScore,
+                _dbContext.VulnerabilityAssets.Count(va => va.TenantVulnerabilityId == v.Id),
+                v.VulnerabilityDefinition.PublishedDate.HasValue
+                    ? (int)(now - v.VulnerabilityDefinition.PublishedDate.Value).TotalDays
+                    : 0
             ))
             .ToListAsync(ct);
 
         var recurrenceRows = await _dbContext
             .VulnerabilityAssetEpisodes.AsNoTracking()
-            .GroupBy(episode => new { episode.VulnerabilityId, episode.AssetId })
+            .GroupBy(episode => new { episode.TenantVulnerabilityId, episode.AssetId })
             .Select(group => new
             {
-                group.Key.VulnerabilityId,
+                VulnerabilityId = group.Key.TenantVulnerabilityId,
                 group.Key.AssetId,
                 EpisodeCount = group.Count(),
             })
@@ -161,8 +163,14 @@ public class DashboardController : ControllerBase
             .ToList();
 
         var recurringVulnerabilities = await _dbContext
-            .Vulnerabilities.AsNoTracking()
+            .TenantVulnerabilities.AsNoTracking()
             .Where(v => topRecurringVulnerabilityIds.Contains(v.Id))
+            .Select(v => new
+            {
+                v.Id,
+                v.VulnerabilityDefinition.ExternalId,
+                v.VulnerabilityDefinition.Title,
+            })
             .ToDictionaryAsync(v => v.Id, ct);
 
         var topRecurringVulnerabilities = topRecurringVulnerabilityCounts
@@ -238,14 +246,14 @@ public class DashboardController : ControllerBase
         var episodeRows = await _dbContext
             .VulnerabilityAssetEpisodes.AsNoTracking()
             .Join(
-                _dbContext.Vulnerabilities.AsNoTracking(),
-                episode => episode.VulnerabilityId,
+                _dbContext.TenantVulnerabilities.AsNoTracking(),
+                episode => episode.TenantVulnerabilityId,
                 vulnerability => vulnerability.Id,
                 (episode, vulnerability) =>
                     new
                     {
-                        episode.VulnerabilityId,
-                        vulnerability.VendorSeverity,
+                        VulnerabilityId = episode.TenantVulnerabilityId,
+                        vulnerability.VulnerabilityDefinition.VendorSeverity,
                         episode.FirstSeenAt,
                         episode.ResolvedAt,
                     }

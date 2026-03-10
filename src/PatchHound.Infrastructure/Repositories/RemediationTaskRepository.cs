@@ -16,11 +16,14 @@ public class RemediationTaskRepository : RepositoryBase<RemediationTask>, IRemed
         CancellationToken ct = default
     ) => await DbSet.AsNoTracking().Where(t => t.AssigneeId == assigneeId).ToListAsync(ct);
 
-    public async Task<IReadOnlyList<RemediationTask>> GetByVulnerabilityAsync(
-        Guid vulnerabilityId,
+    public async Task<IReadOnlyList<RemediationTask>> GetByTenantVulnerabilityAsync(
+        Guid tenantVulnerabilityId,
         CancellationToken ct = default
     ) =>
-        await DbSet.AsNoTracking().Where(t => t.VulnerabilityId == vulnerabilityId).ToListAsync(ct);
+        await DbSet
+            .AsNoTracking()
+            .Where(t => t.TenantVulnerabilityId == tenantVulnerabilityId)
+            .ToListAsync(ct);
 
     public async Task<IReadOnlyList<RemediationTask>> GetOverdueAsync(
         Guid tenantId,

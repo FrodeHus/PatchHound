@@ -20,7 +20,7 @@ public class RiskAcceptanceService
     }
 
     public async Task<Result<RiskAcceptance>> RequestAsync(
-        Guid vulnerabilityId,
+        Guid tenantVulnerabilityId,
         Guid tenantId,
         Guid requestedBy,
         string justification,
@@ -35,7 +35,7 @@ public class RiskAcceptanceService
             return Result<RiskAcceptance>.Failure("Justification is required");
 
         var acceptance = RiskAcceptance.Create(
-            vulnerabilityId,
+            tenantVulnerabilityId,
             tenantId,
             requestedBy,
             justification,

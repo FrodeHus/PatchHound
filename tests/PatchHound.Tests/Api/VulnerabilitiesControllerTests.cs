@@ -38,7 +38,7 @@ public class VulnerabilitiesControllerTests : IDisposable
         _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(_tenantContext));
 
         var vulnerabilityService = new VulnerabilityService(
-            Substitute.For<IVulnerabilityRepository>(),
+            Substitute.For<IRepository<TenantVulnerability>>(),
             Substitute.For<IRepository<OrganizationalSeverity>>(),
             Substitute.For<IUnitOfWork>(),
             _tenantContext
@@ -55,14 +55,14 @@ public class VulnerabilitiesControllerTests : IDisposable
     [Fact]
     public async Task List_RecurrenceOnly_ReturnsOnlyPerAssetRecurringVulnerabilities()
     {
-        var recurringVulnerability = Vulnerability.Create(
-            _tenantId,
+        var recurringDefinition = VulnerabilityDefinition.Create(
             "CVE-2026-0001",
             "Recurring vulnerability",
             "Desc",
             Severity.High,
             "MicrosoftDefender"
         );
+        var recurringProjection = CreateTenantVulnerability(recurringDefinition);
         var recurringAsset = Asset.Create(
             _tenantId,
             "device-1",
@@ -71,19 +71,19 @@ public class VulnerabilitiesControllerTests : IDisposable
             Criticality.High
         );
         var recurringLink = VulnerabilityAsset.Create(
-            recurringVulnerability.Id,
+            recurringProjection.TenantVulnerability.Id,
             recurringAsset.Id,
             DateTimeOffset.UtcNow.AddDays(-10)
         );
 
-        var nonRecurringAcrossAssets = Vulnerability.Create(
-            _tenantId,
+        var nonRecurringDefinition = VulnerabilityDefinition.Create(
             "CVE-2026-0002",
             "Multi asset no recurrence",
             "Desc",
             Severity.High,
             "MicrosoftDefender"
         );
+        var nonRecurringProjection = CreateTenantVulnerability(nonRecurringDefinition);
         var assetTwo = Asset.Create(
             _tenantId,
             "device-2",
@@ -99,21 +99,23 @@ public class VulnerabilitiesControllerTests : IDisposable
             Criticality.Medium
         );
         var linkTwo = VulnerabilityAsset.Create(
-            nonRecurringAcrossAssets.Id,
+            nonRecurringProjection.TenantVulnerability.Id,
             assetTwo.Id,
             DateTimeOffset.UtcNow.AddDays(-6)
         );
         var linkThree = VulnerabilityAsset.Create(
-            nonRecurringAcrossAssets.Id,
+            nonRecurringProjection.TenantVulnerability.Id,
             assetThree.Id,
             DateTimeOffset.UtcNow.AddDays(-5)
         );
 
         await _dbContext.AddRangeAsync(
-            recurringVulnerability,
+            recurringProjection.Definition,
+            recurringProjection.TenantVulnerability,
             recurringAsset,
             recurringLink,
-            nonRecurringAcrossAssets,
+            nonRecurringProjection.Definition,
+            nonRecurringProjection.TenantVulnerability,
             assetTwo,
             assetThree,
             linkTwo,
@@ -123,28 +125,28 @@ public class VulnerabilitiesControllerTests : IDisposable
         await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(
             VulnerabilityAssetEpisode.Create(
                 _tenantId,
-                recurringVulnerability.Id,
+                recurringProjection.TenantVulnerability.Id,
                 recurringAsset.Id,
                 1,
                 DateTimeOffset.UtcNow.AddDays(-20)
             ),
             VulnerabilityAssetEpisode.Create(
                 _tenantId,
-                recurringVulnerability.Id,
+                recurringProjection.TenantVulnerability.Id,
                 recurringAsset.Id,
                 2,
                 DateTimeOffset.UtcNow.AddDays(-3)
             ),
             VulnerabilityAssetEpisode.Create(
                 _tenantId,
-                nonRecurringAcrossAssets.Id,
+                nonRecurringProjection.TenantVulnerability.Id,
                 assetTwo.Id,
                 1,
                 DateTimeOffset.UtcNow.AddDays(-6)
             ),
             VulnerabilityAssetEpisode.Create(
                 _tenantId,
-                nonRecurringAcrossAssets.Id,
+                nonRecurringProjection.TenantVulnerability.Id,
                 assetThree.Id,
                 1,
                 DateTimeOffset.UtcNow.AddDays(-5)
@@ -178,16 +180,16 @@ public class VulnerabilitiesControllerTests : IDisposable
             "Device 1",
             Criticality.High
         );
-        var vulnerability = Vulnerability.Create(
-            _tenantId,
+        var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2026-0100",
             "Contoso app vulnerability",
             "Desc",
             Severity.Critical,
             "MicrosoftDefender"
         );
+        var projection = CreateTenantVulnerability(vulnerability);
         var link = VulnerabilityAsset.Create(
-            vulnerability.Id,
+            projection.TenantVulnerability.Id,
             device.Id,
             new DateTimeOffset(2026, 2, 10, 12, 0, 0, TimeSpan.Zero)
         );
@@ -216,7 +218,8 @@ public class VulnerabilitiesControllerTests : IDisposable
 
         await _dbContext.AddRangeAsync(
             device,
-            vulnerability,
+            projection.Definition,
+            projection.TenantVulnerability,
             link,
             closeReinstall,
             closeInstall,
@@ -225,7 +228,7 @@ public class VulnerabilitiesControllerTests : IDisposable
 
         var firstEpisode = VulnerabilityAssetEpisode.Create(
             _tenantId,
-            vulnerability.Id,
+            projection.TenantVulnerability.Id,
             device.Id,
             1,
             new DateTimeOffset(2026, 1, 10, 9, 0, 0, TimeSpan.Zero)
@@ -234,7 +237,7 @@ public class VulnerabilitiesControllerTests : IDisposable
 
         var secondEpisode = VulnerabilityAssetEpisode.Create(
             _tenantId,
-            vulnerability.Id,
+            projection.TenantVulnerability.Id,
             device.Id,
             2,
             new DateTimeOffset(2026, 2, 10, 9, 0, 0, TimeSpan.Zero)
@@ -270,7 +273,7 @@ public class VulnerabilitiesControllerTests : IDisposable
         );
         await _dbContext.SaveChangesAsync();
 
-        var action = await _controller.Get(vulnerability.Id, CancellationToken.None);
+        var action = await _controller.Get(projection.TenantVulnerability.Id, CancellationToken.None);
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<VulnerabilityDetailDto>().Subject;
@@ -286,16 +289,16 @@ public class VulnerabilitiesControllerTests : IDisposable
     {
         for (var i = 0; i < 3; i++)
         {
-            await _dbContext.Vulnerabilities.AddAsync(
-                Vulnerability.Create(
-                    _tenantId,
-                    $"CVE-2026-100{i}",
-                    $"Vulnerability {i}",
-                    "Desc",
-                    Severity.Medium,
-                    "MicrosoftDefender"
-                )
+            var vulnerability = VulnerabilityDefinition.Create(
+                $"CVE-2026-100{i}",
+                $"Vulnerability {i}",
+                "Desc",
+                Severity.Medium,
+                "MicrosoftDefender"
             );
+            var projection = CreateTenantVulnerability(vulnerability);
+            await _dbContext.VulnerabilityDefinitions.AddAsync(projection.Definition);
+            await _dbContext.TenantVulnerabilities.AddAsync(projection.TenantVulnerability);
         }
 
         await _dbContext.SaveChangesAsync();
@@ -323,6 +326,20 @@ public class VulnerabilitiesControllerTests : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton(tenantContext);
         return services.BuildServiceProvider();
+    }
+
+    private (VulnerabilityDefinition Definition, TenantVulnerability TenantVulnerability)
+        CreateTenantVulnerability(VulnerabilityDefinition vulnerability)
+    {
+        return (
+            vulnerability,
+            TenantVulnerability.Create(
+                _tenantId,
+                vulnerability.Id,
+                VulnerabilityStatus.Open,
+                DateTimeOffset.UtcNow
+            )
+        );
     }
 
     private sealed class StubNvdApiClient(NvdCveResponse response) : NvdApiClient(new HttpClient())

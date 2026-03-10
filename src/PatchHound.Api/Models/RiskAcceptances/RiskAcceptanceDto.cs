@@ -2,7 +2,7 @@ namespace PatchHound.Api.Models.RiskAcceptances;
 
 public record RiskAcceptanceDto(
     Guid Id,
-    Guid VulnerabilityId,
+    Guid TenantVulnerabilityId,
     Guid? AssetId,
     string Status,
     string Justification,

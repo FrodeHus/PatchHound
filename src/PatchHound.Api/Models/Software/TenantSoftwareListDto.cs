@@ -1,7 +1,8 @@
 namespace PatchHound.Api.Models.Software;
 
-public record NormalizedSoftwareListItemDto(
+public record TenantSoftwareListItemDto(
     Guid Id,
+    Guid NormalizedSoftwareId,
     string CanonicalName,
     string? CanonicalVendor,
     string Confidence,
@@ -14,7 +15,7 @@ public record NormalizedSoftwareListItemDto(
     DateTimeOffset? LastSeenAt
 );
 
-public record NormalizedSoftwareFilterQuery(
+public record TenantSoftwareFilterQuery(
     string? Search = null,
     string? Confidence = null,
     bool? VulnerableOnly = null,

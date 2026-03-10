@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import {
-  fetchNormalizedSoftwareDetail,
-  fetchNormalizedSoftwareInstallations,
-  fetchNormalizedSoftwareVulnerabilities,
+  fetchTenantSoftwareDetail,
+  fetchTenantSoftwareInstallations,
+  fetchTenantSoftwareVulnerabilities,
 } from '@/api/software.functions'
 import { SoftwareDetailPage } from '@/components/features/software/SoftwareDetailPage'
 import { useTenantScope } from '@/components/layout/tenant-scope'
@@ -18,10 +18,10 @@ export const Route = createFileRoute('/_authed/software/$id')({
   validateSearch: softwareDetailSearchSchema,
   loaderDeps: ({ search }) => search,
   loader: async ({ params, deps }) => {
-    const detail = await fetchNormalizedSoftwareDetail({ data: { id: params.id } })
+    const detail = await fetchTenantSoftwareDetail({ data: { id: params.id } })
     const selectedVersion = deps.version || normalizeVersion(detail.versionCohorts[0]?.version ?? null)
     const [installations, vulnerabilities] = await Promise.all([
-      fetchNormalizedSoftwareInstallations({
+      fetchTenantSoftwareInstallations({
         data: {
           id: params.id,
           version: selectedVersion || undefined,
@@ -30,7 +30,7 @@ export const Route = createFileRoute('/_authed/software/$id')({
           pageSize: deps.pageSize,
         },
       }),
-      fetchNormalizedSoftwareVulnerabilities({ data: { id: params.id } }),
+      fetchTenantSoftwareVulnerabilities({ data: { id: params.id } }),
     ])
 
     return { detail, installations, vulnerabilities, selectedVersion }
@@ -47,7 +47,7 @@ function SoftwareDetailRoute() {
 
   const detailQuery = useQuery({
     queryKey: softwareQueryKeys.detail(selectedTenantId, id),
-    queryFn: () => fetchNormalizedSoftwareDetail({ data: { id } }),
+    queryFn: () => fetchTenantSoftwareDetail({ data: { id } }),
     initialData: initialData.detail,
   })
 
@@ -57,7 +57,7 @@ function SoftwareDetailRoute() {
   const installationsQuery = useQuery({
     queryKey: softwareQueryKeys.installations(selectedTenantId, id, selectedVersion, search.page, search.pageSize),
     queryFn: () =>
-      fetchNormalizedSoftwareInstallations({
+      fetchTenantSoftwareInstallations({
         data: {
           id,
           version: selectedVersion || undefined,
@@ -76,7 +76,7 @@ function SoftwareDetailRoute() {
 
   const vulnerabilitiesQuery = useQuery({
     queryKey: softwareQueryKeys.vulnerabilities(selectedTenantId, id),
-    queryFn: () => fetchNormalizedSoftwareVulnerabilities({ data: { id } }),
+    queryFn: () => fetchTenantSoftwareVulnerabilities({ data: { id } }),
     initialData: initialData.vulnerabilities,
   })
 

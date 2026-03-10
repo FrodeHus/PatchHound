@@ -26,8 +26,7 @@ public class AiReportServiceTests
     [Fact]
     public async Task GenerateReport_ProviderFound_ReturnsAIReport()
     {
-        var vulnerability = Vulnerability.Create(
-            _tenantId,
+        var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-1234",
             "Test Vulnerability",
             "A critical vulnerability",
@@ -51,6 +50,7 @@ public class AiReportServiceTests
 
         var result = await _service.GenerateReportAsync(
             vulnerability,
+            Guid.NewGuid(),
             assets,
             _tenantId,
             _userId,
@@ -59,7 +59,7 @@ public class AiReportServiceTests
         );
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.VulnerabilityId.Should().Be(vulnerability.Id);
+        result.Value.TenantVulnerabilityId.Should().NotBeEmpty();
         result.Value.TenantId.Should().Be(_tenantId);
         result.Value.GeneratedBy.Should().Be(_userId);
         result.Value.Provider.Should().Be("AzureOpenAI");
@@ -71,8 +71,7 @@ public class AiReportServiceTests
     [Fact]
     public async Task GenerateReport_UnknownProvider_ReturnsFailure()
     {
-        var vulnerability = Vulnerability.Create(
-            _tenantId,
+        var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-1234",
             "Test Vulnerability",
             "A critical vulnerability",
@@ -82,6 +81,7 @@ public class AiReportServiceTests
 
         var result = await _service.GenerateReportAsync(
             vulnerability,
+            Guid.NewGuid(),
             new List<Asset>(),
             _tenantId,
             _userId,
@@ -97,8 +97,7 @@ public class AiReportServiceTests
     [Fact]
     public async Task GenerateReport_ProviderNameIsCaseInsensitive()
     {
-        var vulnerability = Vulnerability.Create(
-            _tenantId,
+        var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-5678",
             "Another Vulnerability",
             "Description",
@@ -116,6 +115,7 @@ public class AiReportServiceTests
 
         var result = await _service.GenerateReportAsync(
             vulnerability,
+            Guid.NewGuid(),
             new List<Asset>(),
             _tenantId,
             _userId,
@@ -134,7 +134,7 @@ public class AiReportServiceTests
         anthropicProvider.ProviderName.Returns("Anthropic");
         anthropicProvider
             .GenerateReportAsync(
-                Arg.Any<Vulnerability>(),
+                Arg.Any<VulnerabilityDefinition>(),
                 Arg.Any<IReadOnlyList<Asset>>(),
                 Arg.Any<CancellationToken>()
             )
@@ -142,7 +142,7 @@ public class AiReportServiceTests
 
         _azureProvider
             .GenerateReportAsync(
-                Arg.Any<Vulnerability>(),
+                Arg.Any<VulnerabilityDefinition>(),
                 Arg.Any<IReadOnlyList<Asset>>(),
                 Arg.Any<CancellationToken>()
             )
@@ -150,8 +150,7 @@ public class AiReportServiceTests
 
         var service = new AiReportService(new[] { _azureProvider, anthropicProvider });
 
-        var vulnerability = Vulnerability.Create(
-            _tenantId,
+        var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-9999",
             "Test",
             "Desc",
@@ -161,6 +160,7 @@ public class AiReportServiceTests
 
         var result = await service.GenerateReportAsync(
             vulnerability,
+            Guid.NewGuid(),
             new List<Asset>(),
             _tenantId,
             _userId,

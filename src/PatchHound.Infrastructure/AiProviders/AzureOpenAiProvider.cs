@@ -18,22 +18,22 @@ public class AzureOpenAiProvider : IAiReportProvider
     public string ProviderName => "AzureOpenAI";
 
     public Task<string> GenerateReportAsync(
-        Vulnerability vulnerability,
+        VulnerabilityDefinition vulnerabilityDefinition,
         IReadOnlyList<Asset> affectedAssets,
         CancellationToken ct
     )
     {
         // Stub implementation - replace with actual Azure OpenAI API call
         var sb = new StringBuilder();
-        sb.AppendLine($"# AI Vulnerability Report: {vulnerability.Title}");
+        sb.AppendLine($"# AI Vulnerability Report: {vulnerabilityDefinition.Title}");
         sb.AppendLine();
         sb.AppendLine($"**Provider:** Azure OpenAI ({_options.ModelId ?? "gpt-4o"})");
-        sb.AppendLine($"**Vulnerability:** {vulnerability.ExternalId}");
-        sb.AppendLine($"**Severity:** {vulnerability.VendorSeverity}");
-        sb.AppendLine($"**CVSS Score:** {vulnerability.CvssScore?.ToString("F1") ?? "N/A"}");
+        sb.AppendLine($"**Vulnerability:** {vulnerabilityDefinition.ExternalId}");
+        sb.AppendLine($"**Severity:** {vulnerabilityDefinition.VendorSeverity}");
+        sb.AppendLine($"**CVSS Score:** {vulnerabilityDefinition.CvssScore?.ToString("F1") ?? "N/A"}");
         sb.AppendLine();
         sb.AppendLine("## Description");
-        sb.AppendLine(vulnerability.Description);
+        sb.AppendLine(vulnerabilityDefinition.Description);
         sb.AppendLine();
         sb.AppendLine("## Affected Assets");
         foreach (var asset in affectedAssets)

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { isoDateTimeSchema } from './common.schemas'
 import { pagedResponseMetaSchema } from './pagination.schemas'
 
-export const normalizedSoftwareVersionCohortSchema = z.object({
+export const tenantSoftwareVersionCohortSchema = z.object({
   version: z.string().nullable(),
   activeInstallCount: z.number(),
   deviceCount: z.number(),
@@ -11,7 +11,7 @@ export const normalizedSoftwareVersionCohortSchema = z.object({
   lastSeenAt: isoDateTimeSchema,
 })
 
-export const normalizedSoftwareSourceAliasSchema = z.object({
+export const tenantSoftwareSourceAliasSchema = z.object({
   sourceSystem: z.string(),
   externalSoftwareId: z.string(),
   rawName: z.string(),
@@ -21,8 +21,9 @@ export const normalizedSoftwareSourceAliasSchema = z.object({
   matchReason: z.string(),
 })
 
-export const normalizedSoftwareDetailSchema = z.object({
+export const tenantSoftwareDetailSchema = z.object({
   id: z.string().uuid(),
+  normalizedSoftwareId: z.string().uuid(),
   canonicalName: z.string(),
   canonicalVendor: z.string().nullable(),
   primaryCpe23Uri: z.string().nullable(),
@@ -35,12 +36,13 @@ export const normalizedSoftwareDetailSchema = z.object({
   vulnerableInstallCount: z.number(),
   activeVulnerabilityCount: z.number(),
   versionCount: z.number(),
-  versionCohorts: z.array(normalizedSoftwareVersionCohortSchema),
-  sourceAliases: z.array(normalizedSoftwareSourceAliasSchema),
+  versionCohorts: z.array(tenantSoftwareVersionCohortSchema),
+  sourceAliases: z.array(tenantSoftwareSourceAliasSchema),
 })
 
-export const normalizedSoftwareListItemSchema = z.object({
+export const tenantSoftwareListItemSchema = z.object({
   id: z.string().uuid(),
+  normalizedSoftwareId: z.string().uuid(),
   canonicalName: z.string(),
   canonicalVendor: z.string().nullable(),
   confidence: z.string(),
@@ -53,7 +55,8 @@ export const normalizedSoftwareListItemSchema = z.object({
   lastSeenAt: isoDateTimeSchema.nullable(),
 })
 
-export const normalizedSoftwareInstallationSchema = z.object({
+export const tenantSoftwareInstallationSchema = z.object({
+  tenantSoftwareId: z.string().uuid(),
   deviceAssetId: z.string().uuid(),
   deviceName: z.string(),
   deviceCriticality: z.string(),
@@ -71,15 +74,15 @@ export const normalizedSoftwareInstallationSchema = z.object({
   openVulnerabilityCount: z.number(),
 })
 
-export const pagedNormalizedSoftwareInstallationsSchema = pagedResponseMetaSchema.extend({
-  items: z.array(normalizedSoftwareInstallationSchema),
+export const pagedTenantSoftwareInstallationsSchema = pagedResponseMetaSchema.extend({
+  items: z.array(tenantSoftwareInstallationSchema),
 })
 
-export const pagedNormalizedSoftwareSchema = pagedResponseMetaSchema.extend({
-  items: z.array(normalizedSoftwareListItemSchema),
+export const pagedTenantSoftwareSchema = pagedResponseMetaSchema.extend({
+  items: z.array(tenantSoftwareListItemSchema),
 })
 
-export const normalizedSoftwareVulnerabilityEvidenceSchema = z.object({
+export const tenantSoftwareVulnerabilityEvidenceSchema = z.object({
   method: z.string(),
   confidence: z.string(),
   evidence: z.string(),
@@ -88,8 +91,9 @@ export const normalizedSoftwareVulnerabilityEvidenceSchema = z.object({
   resolvedAt: isoDateTimeSchema.nullable(),
 })
 
-export const normalizedSoftwareVulnerabilitySchema = z.object({
-  vulnerabilityId: z.string().uuid(),
+export const tenantSoftwareVulnerabilitySchema = z.object({
+  tenantVulnerabilityId: z.string().uuid(),
+  vulnerabilityDefinitionId: z.string().uuid(),
   externalId: z.string(),
   title: z.string(),
   vendorSeverity: z.string(),
@@ -105,12 +109,12 @@ export const normalizedSoftwareVulnerabilitySchema = z.object({
   firstSeenAt: isoDateTimeSchema,
   lastSeenAt: isoDateTimeSchema,
   resolvedAt: isoDateTimeSchema.nullable(),
-  evidence: z.array(normalizedSoftwareVulnerabilityEvidenceSchema),
+  evidence: z.array(tenantSoftwareVulnerabilityEvidenceSchema),
 })
 
-export type NormalizedSoftwareDetail = z.infer<typeof normalizedSoftwareDetailSchema>
-export type NormalizedSoftwareListItem = z.infer<typeof normalizedSoftwareListItemSchema>
-export type NormalizedSoftwareVersionCohort = z.infer<typeof normalizedSoftwareVersionCohortSchema>
-export type NormalizedSoftwareInstallation = z.infer<typeof normalizedSoftwareInstallationSchema>
-export type PagedNormalizedSoftwareInstallations = z.infer<typeof pagedNormalizedSoftwareInstallationsSchema>
-export type NormalizedSoftwareVulnerability = z.infer<typeof normalizedSoftwareVulnerabilitySchema>
+export type TenantSoftwareDetail = z.infer<typeof tenantSoftwareDetailSchema>
+export type TenantSoftwareListItem = z.infer<typeof tenantSoftwareListItemSchema>
+export type TenantSoftwareVersionCohort = z.infer<typeof tenantSoftwareVersionCohortSchema>
+export type TenantSoftwareInstallation = z.infer<typeof tenantSoftwareInstallationSchema>
+export type PagedTenantSoftwareInstallations = z.infer<typeof pagedTenantSoftwareInstallationsSchema>
+export type TenantSoftwareVulnerability = z.infer<typeof tenantSoftwareVulnerabilitySchema>

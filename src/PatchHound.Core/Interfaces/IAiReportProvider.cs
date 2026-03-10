@@ -6,7 +6,7 @@ public interface IAiReportProvider
 {
     string ProviderName { get; }
     Task<string> GenerateReportAsync(
-        Vulnerability vulnerability,
+        VulnerabilityDefinition vulnerabilityDefinition,
         IReadOnlyList<Asset> affectedAssets,
         CancellationToken ct
     );

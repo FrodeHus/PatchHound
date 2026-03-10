@@ -11,10 +11,7 @@ public class NormalizedSoftwareAliasConfiguration
     {
         builder.HasKey(item => item.Id);
 
-        builder.HasIndex(item => item.TenantId);
-        builder
-            .HasIndex(item => new { item.TenantId, item.SourceSystem, item.ExternalSoftwareId })
-            .IsUnique();
+        builder.HasIndex(item => new { item.SourceSystem, item.ExternalSoftwareId }).IsUnique();
         builder.HasIndex(item => item.NormalizedSoftwareId);
 
         builder.Property(item => item.SourceSystem).HasConversion<string>().HasMaxLength(32);

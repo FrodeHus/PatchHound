@@ -889,13 +889,18 @@ public class IngestionService
             return;
         }
 
-        var vulnerabilityIds = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
-            .Where(item => item.TenantId == tenantId && externalIds.Contains(item.ExternalId))
-            .Select(item => item.Id)
+        var vulnerabilityDefinitionIds = await _dbContext
+            .TenantVulnerabilities.IgnoreQueryFilters()
+            .Where(item => item.TenantId == tenantId && externalIds.Contains(item.VulnerabilityDefinition.ExternalId))
+            .Select(item => item.VulnerabilityDefinitionId)
+            .Distinct()
             .ToListAsync(ct);
 
-        await _enrichmentJobEnqueuer.EnqueueVulnerabilityJobsAsync(tenantId, vulnerabilityIds, ct);
+        await _enrichmentJobEnqueuer.EnqueueVulnerabilityJobsAsync(
+            tenantId,
+            vulnerabilityDefinitionIds,
+            ct
+        );
     }
 
     internal async Task ProcessResultsAsync(
@@ -916,6 +921,7 @@ public class IngestionService
         var normalizedResults = NormalizeResults(results);
         await StageVulnerabilitiesAsync(run.Id, tenantId, run.SourceKey, normalizedResults, ct);
         await ProcessStagedResultsAsync(run.Id, tenantId, run.SourceKey, sourceName, ct);
+        await _softwareVulnerabilityMatchService.SyncForTenantAsync(tenantId, ct);
     }
 
     internal async Task<StagedVulnerabilityMergeSummary> ProcessStagedResultsAsync(

@@ -6,7 +6,7 @@ public class NormalizedSoftwareInstallation
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
-    public Guid NormalizedSoftwareId { get; private set; }
+    public Guid TenantSoftwareId { get; private set; }
     public Guid SoftwareAssetId { get; private set; }
     public Guid DeviceAssetId { get; private set; }
     public SoftwareIdentitySourceSystem SourceSystem { get; private set; }
@@ -17,7 +17,7 @@ public class NormalizedSoftwareInstallation
     public bool IsActive { get; private set; }
     public int CurrentEpisodeNumber { get; private set; }
 
-    public NormalizedSoftware NormalizedSoftware { get; private set; } = null!;
+    public TenantSoftware TenantSoftware { get; private set; } = null!;
     public Asset SoftwareAsset { get; private set; } = null!;
     public Asset DeviceAsset { get; private set; } = null!;
 
@@ -25,7 +25,7 @@ public class NormalizedSoftwareInstallation
 
     public static NormalizedSoftwareInstallation Create(
         Guid tenantId,
-        Guid normalizedSoftwareId,
+        Guid tenantSoftwareId,
         Guid softwareAssetId,
         Guid deviceAssetId,
         SoftwareIdentitySourceSystem sourceSystem,
@@ -41,7 +41,7 @@ public class NormalizedSoftwareInstallation
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            NormalizedSoftwareId = normalizedSoftwareId,
+            TenantSoftwareId = tenantSoftwareId,
             SoftwareAssetId = softwareAssetId,
             DeviceAssetId = deviceAssetId,
             SourceSystem = sourceSystem,
@@ -55,7 +55,7 @@ public class NormalizedSoftwareInstallation
     }
 
     public void UpdateProjection(
-        Guid normalizedSoftwareId,
+        Guid tenantSoftwareId,
         SoftwareIdentitySourceSystem sourceSystem,
         string? detectedVersion,
         DateTimeOffset firstSeenAt,
@@ -65,7 +65,7 @@ public class NormalizedSoftwareInstallation
         int currentEpisodeNumber
     )
     {
-        NormalizedSoftwareId = normalizedSoftwareId;
+        TenantSoftwareId = tenantSoftwareId;
         SourceSystem = sourceSystem;
         DetectedVersion = string.IsNullOrWhiteSpace(detectedVersion) ? null : detectedVersion.Trim();
         FirstSeenAt = firstSeenAt;

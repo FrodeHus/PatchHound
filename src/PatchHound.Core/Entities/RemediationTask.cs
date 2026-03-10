@@ -5,7 +5,7 @@ namespace PatchHound.Core.Entities;
 public class RemediationTask
 {
     public Guid Id { get; private set; }
-    public Guid VulnerabilityId { get; private set; }
+    public Guid TenantVulnerabilityId { get; private set; }
     public Guid AssetId { get; private set; }
     public Guid TenantId { get; private set; }
     public Guid AssigneeId { get; private set; }
@@ -20,7 +20,7 @@ public class RemediationTask
     private RemediationTask() { }
 
     public static RemediationTask Create(
-        Guid vulnerabilityId,
+        Guid tenantVulnerabilityId,
         Guid assetId,
         Guid tenantId,
         Guid assigneeId,
@@ -32,7 +32,7 @@ public class RemediationTask
         return new RemediationTask
         {
             Id = Guid.NewGuid(),
-            VulnerabilityId = vulnerabilityId,
+            TenantVulnerabilityId = tenantVulnerabilityId,
             AssetId = assetId,
             TenantId = tenantId,
             AssigneeId = assigneeId,

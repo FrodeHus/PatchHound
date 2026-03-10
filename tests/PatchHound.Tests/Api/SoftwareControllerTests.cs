@@ -34,15 +34,15 @@ public class SoftwareControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task Get_ReturnsNormalizedSoftwareDetailWithCohortsAndAliases()
+    public async Task Get_ReturnsTenantSoftwareDetailWithCohortsAndAliases()
     {
-        var normalizedSoftware = await SeedNormalizedSoftwareGraphAsync();
+        var tenantSoftware = await SeedNormalizedSoftwareGraphAsync();
 
-        var action = await _controller.Get(normalizedSoftware.Id, CancellationToken.None);
+        var action = await _controller.Get(tenantSoftware.Id, CancellationToken.None);
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var payload = result.Value.Should().BeOfType<NormalizedSoftwareDetailDto>().Subject;
+        var payload = result.Value.Should().BeOfType<TenantSoftwareDetailDto>().Subject;
 
-        payload.Id.Should().Be(normalizedSoftware.Id);
+        payload.Id.Should().Be(tenantSoftware.Id);
         payload.CanonicalName.Should().Be("agent");
         payload.ActiveInstallCount.Should().Be(2);
         payload.UniqueDeviceCount.Should().Be(2);
@@ -57,16 +57,16 @@ public class SoftwareControllerTests : IDisposable
     [Fact]
     public async Task GetInstallations_FiltersByVersionAndReturnsPagedRows()
     {
-        var normalizedSoftware = await SeedNormalizedSoftwareGraphAsync();
+        var tenantSoftware = await SeedNormalizedSoftwareGraphAsync();
 
         var action = await _controller.GetInstallations(
-            normalizedSoftware.Id,
-            new NormalizedSoftwareInstallationQuery("2.0"),
+            tenantSoftware.Id,
+            new TenantSoftwareInstallationQuery("2.0"),
             new PaginationQuery(1, 10),
             CancellationToken.None
         );
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var payload = result.Value.Should().BeOfType<PagedResponse<NormalizedSoftwareInstallationDto>>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<TenantSoftwareInstallationDto>>().Subject;
 
         payload.TotalCount.Should().Be(1);
         payload.Items.Should().ContainSingle();
@@ -78,11 +78,11 @@ public class SoftwareControllerTests : IDisposable
     [Fact]
     public async Task GetVulnerabilities_ReturnsAffectedVersionsAndEvidence()
     {
-        var normalizedSoftware = await SeedNormalizedSoftwareGraphAsync();
+        var tenantSoftware = await SeedNormalizedSoftwareGraphAsync();
 
-        var action = await _controller.GetVulnerabilities(normalizedSoftware.Id, CancellationToken.None);
+        var action = await _controller.GetVulnerabilities(tenantSoftware.Id, CancellationToken.None);
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var payload = result.Value.Should().BeAssignableTo<IReadOnlyList<NormalizedSoftwareVulnerabilityDto>>().Subject;
+        var payload = result.Value.Should().BeAssignableTo<IReadOnlyList<TenantSoftwareVulnerabilityDto>>().Subject;
 
         payload.Should().ContainSingle();
         payload[0].ExternalId.Should().Be("CVE-2026-1000");
@@ -95,28 +95,27 @@ public class SoftwareControllerTests : IDisposable
     [Fact]
     public async Task List_ReturnsPagedNormalizedSoftwareItems()
     {
-        var normalizedSoftware = await SeedNormalizedSoftwareGraphAsync();
+        var tenantSoftware = await SeedNormalizedSoftwareGraphAsync();
 
         var action = await _controller.List(
-            new NormalizedSoftwareFilterQuery(Search: "agent", VulnerableOnly: true),
+            new TenantSoftwareFilterQuery(Search: "agent", VulnerableOnly: true),
             new PaginationQuery(1, 10),
             CancellationToken.None
         );
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var payload = result.Value.Should().BeOfType<PagedResponse<NormalizedSoftwareListItemDto>>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<TenantSoftwareListItemDto>>().Subject;
 
         payload.TotalCount.Should().Be(1);
         payload.Items.Should().ContainSingle();
-        payload.Items[0].Id.Should().Be(normalizedSoftware.Id);
+        payload.Items[0].Id.Should().Be(tenantSoftware.Id);
         payload.Items[0].ActiveInstallCount.Should().Be(2);
         payload.Items[0].ActiveVulnerabilityCount.Should().Be(1);
         payload.Items[0].VersionCount.Should().Be(2);
     }
 
-    private async Task<NormalizedSoftware> SeedNormalizedSoftwareGraphAsync()
+    private async Task<TenantSoftware> SeedNormalizedSoftwareGraphAsync()
     {
         var normalizedSoftware = NormalizedSoftware.Create(
-            _tenantId,
             "agent",
             "contoso",
             "cpe:contoso:agent",
@@ -124,6 +123,12 @@ public class SoftwareControllerTests : IDisposable
             SoftwareNormalizationMethod.ExplicitCpe,
             SoftwareNormalizationConfidence.High,
             new DateTimeOffset(2026, 3, 10, 10, 0, 0, TimeSpan.Zero)
+        );
+        var tenantSoftware = TenantSoftware.Create(
+            _tenantId,
+            normalizedSoftware.Id,
+            new DateTimeOffset(2026, 2, 10, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
         );
 
         var deviceOne = Asset.Create(_tenantId, "device-1", AssetType.Device, "Device 1", Criticality.High);
@@ -144,8 +149,7 @@ public class SoftwareControllerTests : IDisposable
         );
         deviceOne.AssignSecurityProfile(profile.Id);
 
-        var vulnerability = Vulnerability.Create(
-            _tenantId,
+        var definition = VulnerabilityDefinition.Create(
             "CVE-2026-1000",
             "Contoso Agent vulnerability",
             "Description",
@@ -155,11 +159,26 @@ public class SoftwareControllerTests : IDisposable
             null,
             new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero)
         );
+        var tenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            definition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow
+        );
 
-        await _dbContext.AddRangeAsync(normalizedSoftware, deviceOne, deviceTwo, softwareOne, softwareTwo, profile, vulnerability);
+        await _dbContext.AddRangeAsync(
+            normalizedSoftware,
+            tenantSoftware,
+            deviceOne,
+            deviceTwo,
+            softwareOne,
+            softwareTwo,
+            profile,
+            definition,
+            tenantVulnerability
+        );
         await _dbContext.NormalizedSoftwareAliases.AddRangeAsync(
             NormalizedSoftwareAlias.Create(
-                _tenantId,
                 normalizedSoftware.Id,
                 SoftwareIdentitySourceSystem.Defender,
                 "software-1",
@@ -171,7 +190,6 @@ public class SoftwareControllerTests : IDisposable
                 DateTimeOffset.UtcNow
             ),
             NormalizedSoftwareAlias.Create(
-                _tenantId,
                 normalizedSoftware.Id,
                 SoftwareIdentitySourceSystem.Defender,
                 "software-2",
@@ -186,7 +204,7 @@ public class SoftwareControllerTests : IDisposable
         await _dbContext.NormalizedSoftwareInstallations.AddRangeAsync(
             NormalizedSoftwareInstallation.Create(
                 _tenantId,
-                normalizedSoftware.Id,
+                tenantSoftware.Id,
                 softwareOne.Id,
                 deviceOne.Id,
                 SoftwareIdentitySourceSystem.Defender,
@@ -199,7 +217,7 @@ public class SoftwareControllerTests : IDisposable
             ),
             NormalizedSoftwareInstallation.Create(
                 _tenantId,
-                normalizedSoftware.Id,
+                tenantSoftware.Id,
                 softwareTwo.Id,
                 deviceTwo.Id,
                 SoftwareIdentitySourceSystem.Defender,
@@ -215,7 +233,7 @@ public class SoftwareControllerTests : IDisposable
             SoftwareVulnerabilityMatch.Create(
                 _tenantId,
                 softwareOne.Id,
-                vulnerability.Id,
+                definition.Id,
                 SoftwareVulnerabilityMatchMethod.CpeBinding,
                 MatchConfidence.High,
                 "match-one",
@@ -224,7 +242,7 @@ public class SoftwareControllerTests : IDisposable
             SoftwareVulnerabilityMatch.Create(
                 _tenantId,
                 softwareTwo.Id,
-                vulnerability.Id,
+                definition.Id,
                 SoftwareVulnerabilityMatchMethod.CpeBinding,
                 MatchConfidence.High,
                 "match-two",
@@ -234,8 +252,8 @@ public class SoftwareControllerTests : IDisposable
         await _dbContext.NormalizedSoftwareVulnerabilityProjections.AddAsync(
             NormalizedSoftwareVulnerabilityProjection.Create(
                 _tenantId,
-                normalizedSoftware.Id,
-                vulnerability.Id,
+                tenantSoftware.Id,
+                definition.Id,
                 SoftwareVulnerabilityMatchMethod.CpeBinding,
                 MatchConfidence.High,
                 2,
@@ -251,19 +269,19 @@ public class SoftwareControllerTests : IDisposable
         );
         await _dbContext.VulnerabilityAssets.AddRangeAsync(
             VulnerabilityAsset.Create(
-                vulnerability.Id,
+                tenantVulnerability.Id,
                 deviceOne.Id,
                 new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
             ),
             VulnerabilityAsset.Create(
-                vulnerability.Id,
+                tenantVulnerability.Id,
                 deviceTwo.Id,
                 new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
             )
         );
         await _dbContext.SaveChangesAsync();
 
-        return normalizedSoftware;
+        return tenantSoftware;
     }
 
     public void Dispose()

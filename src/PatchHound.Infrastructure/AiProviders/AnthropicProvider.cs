@@ -18,27 +18,27 @@ public class AnthropicProvider : IAiReportProvider
     public string ProviderName => "Anthropic";
 
     public Task<string> GenerateReportAsync(
-        Vulnerability vulnerability,
+        VulnerabilityDefinition vulnerabilityDefinition,
         IReadOnlyList<Asset> affectedAssets,
         CancellationToken ct
     )
     {
         // Stub implementation - replace with actual Anthropic API call
         var sb = new StringBuilder();
-        sb.AppendLine($"# AI Vulnerability Report: {vulnerability.Title}");
+        sb.AppendLine($"# AI Vulnerability Report: {vulnerabilityDefinition.Title}");
         sb.AppendLine();
         sb.AppendLine($"**Provider:** Anthropic ({_options.ModelId ?? "claude-sonnet"})");
-        sb.AppendLine($"**Vulnerability:** {vulnerability.ExternalId}");
-        sb.AppendLine($"**Severity:** {vulnerability.VendorSeverity}");
-        sb.AppendLine($"**CVSS Score:** {vulnerability.CvssScore?.ToString("F1") ?? "N/A"}");
+        sb.AppendLine($"**Vulnerability:** {vulnerabilityDefinition.ExternalId}");
+        sb.AppendLine($"**Severity:** {vulnerabilityDefinition.VendorSeverity}");
+        sb.AppendLine($"**CVSS Score:** {vulnerabilityDefinition.CvssScore?.ToString("F1") ?? "N/A"}");
         sb.AppendLine();
         sb.AppendLine("## Executive Summary");
         sb.AppendLine(
-            $"This report analyzes {vulnerability.ExternalId} affecting {affectedAssets.Count} asset(s)."
+            $"This report analyzes {vulnerabilityDefinition.ExternalId} affecting {affectedAssets.Count} asset(s)."
         );
         sb.AppendLine();
         sb.AppendLine("## Technical Analysis");
-        sb.AppendLine(vulnerability.Description);
+        sb.AppendLine(vulnerabilityDefinition.Description);
         sb.AppendLine();
         sb.AppendLine("## Impact Assessment");
         foreach (var asset in affectedAssets)

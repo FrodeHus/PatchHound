@@ -14,7 +14,7 @@ public class RiskAcceptanceServiceTests
     private readonly RiskAcceptanceService _service;
     private readonly Guid _tenantId = Guid.NewGuid();
     private readonly Guid _requestedBy = Guid.NewGuid();
-    private readonly Guid _vulnerabilityId = Guid.NewGuid();
+    private readonly Guid _tenantVulnerabilityId = Guid.NewGuid();
 
     public RiskAcceptanceServiceTests()
     {
@@ -27,7 +27,7 @@ public class RiskAcceptanceServiceTests
     public async Task RequestAsync_Creates_Pending_Record()
     {
         var result = await _service.RequestAsync(
-            _vulnerabilityId,
+            _tenantVulnerabilityId,
             _tenantId,
             _requestedBy,
             "Risk is acceptable",
@@ -40,7 +40,7 @@ public class RiskAcceptanceServiceTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be(RiskAcceptanceStatus.Pending);
-        result.Value.VulnerabilityId.Should().Be(_vulnerabilityId);
+        result.Value.TenantVulnerabilityId.Should().Be(_tenantVulnerabilityId);
         result.Value.TenantId.Should().Be(_tenantId);
         result.Value.RequestedBy.Should().Be(_requestedBy);
         result.Value.Justification.Should().Be("Risk is acceptable");
@@ -55,7 +55,7 @@ public class RiskAcceptanceServiceTests
     public async Task RequestAsync_Without_Justification_Fails()
     {
         var result = await _service.RequestAsync(
-            _vulnerabilityId,
+            _tenantVulnerabilityId,
             _tenantId,
             _requestedBy,
             "",
@@ -74,7 +74,7 @@ public class RiskAcceptanceServiceTests
     public async Task RequestAsync_With_Null_Justification_Fails()
     {
         var result = await _service.RequestAsync(
-            _vulnerabilityId,
+            _tenantVulnerabilityId,
             _tenantId,
             _requestedBy,
             null!,
@@ -93,7 +93,7 @@ public class RiskAcceptanceServiceTests
     public async Task ApproveAsync_Transitions_To_Approved()
     {
         var acceptance = RiskAcceptance.Create(
-            _vulnerabilityId,
+            _tenantVulnerabilityId,
             _tenantId,
             _requestedBy,
             "Justified"
@@ -126,7 +126,7 @@ public class RiskAcceptanceServiceTests
     public async Task RejectAsync_Transitions_To_Rejected()
     {
         var acceptance = RiskAcceptance.Create(
-            _vulnerabilityId,
+            _tenantVulnerabilityId,
             _tenantId,
             _requestedBy,
             "Justified"
@@ -149,7 +149,7 @@ public class RiskAcceptanceServiceTests
     public async Task ApproveAsync_NonPending_Fails()
     {
         var acceptance = RiskAcceptance.Create(
-            _vulnerabilityId,
+            _tenantVulnerabilityId,
             _tenantId,
             _requestedBy,
             "Justified"
@@ -176,7 +176,7 @@ public class RiskAcceptanceServiceTests
     public async Task RejectAsync_NonPending_Fails()
     {
         var acceptance = RiskAcceptance.Create(
-            _vulnerabilityId,
+            _tenantVulnerabilityId,
             _tenantId,
             _requestedBy,
             "Justified"
@@ -240,7 +240,7 @@ public class RiskAcceptanceServiceTests
         var expiryDate = DateTimeOffset.UtcNow.AddMonths(6);
 
         var result = await _service.RequestAsync(
-            _vulnerabilityId,
+            _tenantVulnerabilityId,
             _tenantId,
             _requestedBy,
             "Risk is acceptable",

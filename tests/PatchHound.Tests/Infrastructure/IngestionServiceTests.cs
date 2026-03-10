@@ -130,7 +130,7 @@ public class IngestionServiceTests : IDisposable
 
         // Assert
         var vuln = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
+            .VulnerabilityDefinitions.IgnoreQueryFilters()
             .FirstOrDefaultAsync(v => v.ExternalId == "CVE-2025-0001");
         vuln.Should().NotBeNull();
         vuln!.Title.Should().Be("Test Vuln");
@@ -140,15 +140,21 @@ public class IngestionServiceTests : IDisposable
         vuln.ProductName.Should().Be("Windows Server");
         vuln.ProductVersion.Should().Be("2022");
 
+        var tenantVulnerability = await _dbContext
+            .TenantVulnerabilities.IgnoreQueryFilters()
+            .FirstAsync(tv =>
+                tv.TenantId == _tenantId && tv.VulnerabilityDefinitionId == vuln.Id
+            );
+
         var va = await _dbContext
             .VulnerabilityAssets.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(va => va.VulnerabilityId == vuln.Id);
+            .FirstOrDefaultAsync(va => va.TenantVulnerabilityId == tenantVulnerability.Id);
         va.Should().NotBeNull();
         va!.Status.Should().Be(VulnerabilityStatus.Open);
 
         var task = await _dbContext
             .RemediationTasks.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(t => t.VulnerabilityId == vuln.Id);
+            .FirstOrDefaultAsync(t => t.TenantVulnerabilityId == tenantVulnerability.Id);
         task.Should().NotBeNull();
         task!.AssigneeId.Should().Be(ownerId);
         task.Status.Should().Be(RemediationTaskStatus.Pending);
@@ -192,13 +198,16 @@ public class IngestionServiceTests : IDisposable
 
         // Assert
         var vuln = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
+            .VulnerabilityDefinitions.IgnoreQueryFilters()
             .FirstOrDefaultAsync(v => v.ExternalId == "CVE-2025-0002");
         vuln.Should().NotBeNull();
+        var tenantVulnerability = await _dbContext
+            .TenantVulnerabilities.IgnoreQueryFilters()
+            .FirstAsync(tv => tv.TenantId == _tenantId && tv.VulnerabilityDefinitionId == vuln!.Id);
 
         var tasks = await _dbContext
             .RemediationTasks.IgnoreQueryFilters()
-            .Where(t => t.VulnerabilityId == vuln!.Id)
+            .Where(t => t.TenantVulnerabilityId == tenantVulnerability!.Id)
             .ToListAsync();
         tasks.Should().BeEmpty();
     }
@@ -207,8 +216,7 @@ public class IngestionServiceTests : IDisposable
     public async Task ExistingVulnerability_UpdatesWithoutDuplication()
     {
         // Arrange: pre-existing vulnerability
-        var existing = Vulnerability.Create(
-            _tenantId,
+        var existing = VulnerabilityDefinition.Create(
             "CVE-2025-0003",
             "Old Title",
             "Old Desc",
@@ -218,7 +226,15 @@ public class IngestionServiceTests : IDisposable
             null,
             null
         );
-        await _dbContext.Vulnerabilities.AddAsync(existing);
+        await _dbContext.VulnerabilityDefinitions.AddAsync(existing);
+        await _dbContext.TenantVulnerabilities.AddAsync(
+            TenantVulnerability.Create(
+                _tenantId,
+                existing.Id,
+                VulnerabilityStatus.Open,
+                DateTimeOffset.UtcNow
+            )
+        );
         await _dbContext.SaveChangesAsync();
 
         var results = new List<IngestionResult>
@@ -245,8 +261,8 @@ public class IngestionServiceTests : IDisposable
 
         // Assert: should be exactly one vulnerability with this external ID
         var vulns = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
-            .Where(v => v.ExternalId == "CVE-2025-0003" && v.TenantId == _tenantId)
+            .VulnerabilityDefinitions.IgnoreQueryFilters()
+            .Where(v => v.ExternalId == "CVE-2025-0003")
             .ToListAsync();
         vulns.Should().ContainSingle();
         vulns[0].Title.Should().Be("Updated Title");
@@ -257,8 +273,7 @@ public class IngestionServiceTests : IDisposable
     [Fact]
     public async Task ExistingVulnerability_PreservesCatalogFieldsWhenIncomingValuesAreEmpty()
     {
-        var existing = Vulnerability.Create(
-            _tenantId,
+        var existing = VulnerabilityDefinition.Create(
             "CVE-2026-PRESERVE-1",
             "Catalog Title",
             "Catalog Description",
@@ -271,7 +286,15 @@ public class IngestionServiceTests : IDisposable
             "Contoso Agent",
             "2.0"
         );
-        await _dbContext.Vulnerabilities.AddAsync(existing);
+        await _dbContext.VulnerabilityDefinitions.AddAsync(existing);
+        await _dbContext.TenantVulnerabilities.AddAsync(
+            TenantVulnerability.Create(
+                _tenantId,
+                existing.Id,
+                VulnerabilityStatus.Open,
+                DateTimeOffset.UtcNow
+            )
+        );
         await _dbContext.SaveChangesAsync();
 
         var results = new List<IngestionResult>
@@ -296,7 +319,7 @@ public class IngestionServiceTests : IDisposable
         );
 
         var updated = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
+            .VulnerabilityDefinitions.IgnoreQueryFilters()
             .SingleAsync(v => v.ExternalId == "CVE-2026-PRESERVE-1");
 
         updated.CvssScore.Should().Be(9.4m);
@@ -346,19 +369,27 @@ public class IngestionServiceTests : IDisposable
         );
 
         var vulnerabilities = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
+            .VulnerabilityDefinitions.IgnoreQueryFilters()
             .Where(v => v.ExternalId == "CVE-2026-DUPE-1")
             .Include(v => v.References)
-            .Include(v => v.AffectedAssets)
             .ToListAsync();
 
         vulnerabilities.Should().ContainSingle();
-        vulnerabilities[0].AffectedAssets.Should().HaveCount(2);
         vulnerabilities[0].References.Should().ContainSingle();
         vulnerabilities[0]
             .GetSources()
             .Should()
             .Contain(["MicrosoftDefender", "NVD", "TestSource"]);
+        (
+            await _dbContext
+                .TenantVulnerabilities.IgnoreQueryFilters()
+                .CountAsync(v => v.TenantId == _tenantId && v.VulnerabilityDefinitionId == vulnerabilities[0].Id)
+        ).Should().Be(1);
+        (
+            await _dbContext
+                .VulnerabilityAssets.IgnoreQueryFilters()
+                .CountAsync()
+        ).Should().Be(2);
     }
 
     [Fact]
@@ -421,11 +452,18 @@ public class IngestionServiceTests : IDisposable
         );
 
         var vulnerability = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
+            .VulnerabilityDefinitions.IgnoreQueryFilters()
             .SingleAsync(item => item.ExternalId == "CVE-2026-STAGE-MERGE-1");
         vulnerability.Title.Should().Be("Stage merge title");
         vulnerability.Description.Should().Be("From staged payload");
-        vulnerability.AffectedAssets.Should().ContainSingle();
+        var tenantVulnerability = await _dbContext
+            .TenantVulnerabilities.IgnoreQueryFilters()
+            .SingleAsync(item => item.TenantId == _tenantId && item.VulnerabilityDefinitionId == vulnerability.Id);
+        (
+            await _dbContext
+                .VulnerabilityAssets.IgnoreQueryFilters()
+                .CountAsync(item => item.TenantVulnerabilityId == tenantVulnerability.Id)
+        ).Should().Be(1);
     }
 
     [Fact]
@@ -887,15 +925,15 @@ public class IngestionServiceTests : IDisposable
     public async Task ResolvedVulnerability_SecondMissingSync_MarksVulnerabilityAssetResolved()
     {
         // Arrange: existing open vulnerability with asset
-        var vuln = Vulnerability.Create(
-            _tenantId,
+        var vuln = VulnerabilityDefinition.Create(
             "CVE-2025-0004",
             "Will Resolve",
             "Desc",
             Severity.Low,
             "TestSource"
         );
-        await _dbContext.Vulnerabilities.AddAsync(vuln);
+        await _dbContext.VulnerabilityDefinitions.AddAsync(vuln);
+        var tenantVulnerability = await CreateTenantVulnerabilityAsync(vuln);
 
         var asset = Asset.Create(
             _tenantId,
@@ -907,10 +945,14 @@ public class IngestionServiceTests : IDisposable
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
-        var va = VulnerabilityAsset.Create(vuln.Id, asset.Id, DateTimeOffset.UtcNow);
+        var va = VulnerabilityAsset.Create(
+            tenantVulnerability.Id,
+            asset.Id,
+            DateTimeOffset.UtcNow
+        );
         var episode = VulnerabilityAssetEpisode.Create(
             _tenantId,
-            vuln.Id,
+            tenantVulnerability.Id,
             asset.Id,
             1,
             va.DetectedDate
@@ -920,7 +962,7 @@ public class IngestionServiceTests : IDisposable
         await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
 
         var task = RemediationTask.Create(
-            vuln.Id,
+            tenantVulnerability.Id,
             asset.Id,
             _tenantId,
             Guid.NewGuid(),
@@ -941,8 +983,8 @@ public class IngestionServiceTests : IDisposable
 
         // Assert
         var updatedVuln = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
-            .FirstAsync(v => v.Id == vuln.Id);
+            .TenantVulnerabilities.IgnoreQueryFilters()
+            .FirstAsync(v => v.Id == tenantVulnerability.Id);
         updatedVuln.Status.Should().Be(VulnerabilityStatus.Resolved);
 
         var updatedVa = await _dbContext
@@ -1147,13 +1189,13 @@ public class IngestionServiceTests : IDisposable
 
         var match = await _dbContext
             .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
-            .Include(item => item.Vulnerability)
+            .Include(item => item.VulnerabilityDefinition)
             .Include(item => item.SoftwareAsset)
             .SingleAsync();
 
         match.MatchMethod.Should().Be(SoftwareVulnerabilityMatchMethod.DefenderDirect);
         match.Confidence.Should().Be(MatchConfidence.High);
-        match.Vulnerability.ExternalId.Should().Be("CVE-2026-0001");
+        match.VulnerabilityDefinition.ExternalId.Should().Be("CVE-2026-0001");
         match.SoftwareAsset.ExternalId.Should().Be("software-1");
         match.Evidence.Should().Contain("defender-direct");
     }
@@ -1215,24 +1257,19 @@ public class IngestionServiceTests : IDisposable
 
         var match = await _dbContext
             .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
-            .Include(item => item.Vulnerability)
+            .Include(item => item.VulnerabilityDefinition)
             .Include(item => item.SoftwareAsset)
             .SingleAsync();
 
         match.MatchMethod.Should().Be(SoftwareVulnerabilityMatchMethod.CpeBinding);
         match.Confidence.Should().Be(MatchConfidence.High);
-        match.Vulnerability.ExternalId.Should().Be("CVE-2026-0002");
+        match.VulnerabilityDefinition.ExternalId.Should().Be("CVE-2026-0002");
         match.SoftwareAsset.ExternalId.Should().Be("7-zip-_-7-zip");
         match.Evidence.Should().Contain("cpe-binding");
         match.Evidence.Should().Contain("cpe:2.3:a:7-zip:7zip:9.20");
 
-        var binding = await _dbContext
-            .SoftwareCpeBindings.IgnoreQueryFilters()
-            .SingleAsync(current => current.SoftwareAssetId == match.SoftwareAssetId);
-
-        binding.BindingMethod.Should().Be(CpeBindingMethod.DefenderDerived);
-        binding.Confidence.Should().Be(MatchConfidence.High);
-        binding.Cpe23Uri.Should().Be("cpe:2.3:a:7-zip:7zip:9.20:*:*:*:*:*:*:*");
+        var bindings = await _dbContext.SoftwareCpeBindings.IgnoreQueryFilters().ToListAsync();
+        bindings.Should().BeEmpty();
     }
 
     [Fact]
@@ -1315,8 +1352,7 @@ public class IngestionServiceTests : IDisposable
     [Fact]
     public async Task ProcessResultsAsync_FirstMissingSync_DoesNotResolveEpisode()
     {
-        var vulnerability = Vulnerability.Create(
-            _tenantId,
+        var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-2001",
             "Recurring vulnerability",
             "Desc",
@@ -1330,19 +1366,20 @@ public class IngestionServiceTests : IDisposable
             "Server1",
             Criticality.Medium
         );
-        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
+        await _dbContext.VulnerabilityDefinitions.AddAsync(vulnerability);
+        var tenantVulnerability = await CreateTenantVulnerabilityAsync(vulnerability);
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
         var episode = VulnerabilityAssetEpisode.Create(
             _tenantId,
-            vulnerability.Id,
+            tenantVulnerability.Id,
             asset.Id,
             1,
             DateTimeOffset.UtcNow.AddHours(-2)
         );
         var projection = VulnerabilityAsset.Create(
-            vulnerability.Id,
+            tenantVulnerability.Id,
             asset.Id,
             DateTimeOffset.UtcNow.AddHours(-2)
         );
@@ -1359,7 +1396,7 @@ public class IngestionServiceTests : IDisposable
             .VulnerabilityAssets.IgnoreQueryFilters()
             .FirstAsync();
         var updatedVulnerability = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
+            .TenantVulnerabilities.IgnoreQueryFilters()
             .FirstAsync();
 
         updatedEpisode.Status.Should().Be(VulnerabilityStatus.Open);
@@ -1372,8 +1409,7 @@ public class IngestionServiceTests : IDisposable
     [Fact]
     public async Task ProcessResultsAsync_SecondMissingSync_ResolvesEpisodeAndProjection()
     {
-        var vulnerability = Vulnerability.Create(
-            _tenantId,
+        var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-2002",
             "Recurring vulnerability",
             "Desc",
@@ -1387,20 +1423,21 @@ public class IngestionServiceTests : IDisposable
             "Server1",
             Criticality.Medium
         );
-        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
+        await _dbContext.VulnerabilityDefinitions.AddAsync(vulnerability);
+        var tenantVulnerability = await CreateTenantVulnerabilityAsync(vulnerability);
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
         var episode = VulnerabilityAssetEpisode.Create(
             _tenantId,
-            vulnerability.Id,
+            tenantVulnerability.Id,
             asset.Id,
             1,
             DateTimeOffset.UtcNow.AddHours(-2)
         );
         episode.MarkMissing();
         var projection = VulnerabilityAsset.Create(
-            vulnerability.Id,
+            tenantVulnerability.Id,
             asset.Id,
             DateTimeOffset.UtcNow.AddHours(-2)
         );
@@ -1417,7 +1454,7 @@ public class IngestionServiceTests : IDisposable
             .VulnerabilityAssets.IgnoreQueryFilters()
             .FirstAsync();
         var updatedVulnerability = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
+            .TenantVulnerabilities.IgnoreQueryFilters()
             .FirstAsync();
 
         updatedEpisode.Status.Should().Be(VulnerabilityStatus.Resolved);
@@ -1431,8 +1468,7 @@ public class IngestionServiceTests : IDisposable
     [Fact]
     public async Task ProcessResultsAsync_ReappearanceBeforeSecondMiss_ContinuesSameEpisode()
     {
-        var vulnerability = Vulnerability.Create(
-            _tenantId,
+        var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-2003",
             "Recurring vulnerability",
             "Desc",
@@ -1446,20 +1482,25 @@ public class IngestionServiceTests : IDisposable
             "Server1",
             Criticality.Medium
         );
-        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
+        await _dbContext.VulnerabilityDefinitions.AddAsync(vulnerability);
+        var tenantVulnerability = await CreateTenantVulnerabilityAsync(vulnerability);
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
         var firstSeenAt = DateTimeOffset.UtcNow.AddHours(-2);
         var episode = VulnerabilityAssetEpisode.Create(
             _tenantId,
-            vulnerability.Id,
+            tenantVulnerability.Id,
             asset.Id,
             1,
             firstSeenAt
         );
         episode.MarkMissing();
-        var projection = VulnerabilityAsset.Create(vulnerability.Id, asset.Id, firstSeenAt);
+        var projection = VulnerabilityAsset.Create(
+            tenantVulnerability.Id,
+            asset.Id,
+            firstSeenAt
+        );
         await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
         await _dbContext.VulnerabilityAssets.AddAsync(projection);
         await _dbContext.SaveChangesAsync();
@@ -1494,8 +1535,7 @@ public class IngestionServiceTests : IDisposable
     [Fact]
     public async Task ProcessResultsAsync_ReappearanceAfterResolution_CreatesNewEpisode()
     {
-        var vulnerability = Vulnerability.Create(
-            _tenantId,
+        var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-2004",
             "Recurring vulnerability",
             "Desc",
@@ -1509,14 +1549,15 @@ public class IngestionServiceTests : IDisposable
             "Server1",
             Criticality.Medium
         );
-        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
+        await _dbContext.VulnerabilityDefinitions.AddAsync(vulnerability);
+        var tenantVulnerability = await CreateTenantVulnerabilityAsync(vulnerability);
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
         var firstSeenAt = DateTimeOffset.UtcNow.AddDays(-1);
         var firstEpisode = VulnerabilityAssetEpisode.Create(
             _tenantId,
-            vulnerability.Id,
+            tenantVulnerability.Id,
             asset.Id,
             1,
             firstSeenAt
@@ -1524,9 +1565,13 @@ public class IngestionServiceTests : IDisposable
         firstEpisode.MarkMissing();
         firstEpisode.MarkMissing();
         firstEpisode.Resolve(DateTimeOffset.UtcNow.AddHours(-2));
-        var projection = VulnerabilityAsset.Create(vulnerability.Id, asset.Id, firstSeenAt);
+        var projection = VulnerabilityAsset.Create(
+            tenantVulnerability.Id,
+            asset.Id,
+            firstSeenAt
+        );
         projection.Resolve(DateTimeOffset.UtcNow.AddHours(-2));
-        vulnerability.UpdateStatus(VulnerabilityStatus.Resolved);
+        tenantVulnerability.UpdateStatus(VulnerabilityStatus.Resolved, DateTimeOffset.UtcNow.AddHours(-2));
         await _dbContext.VulnerabilityAssetEpisodes.AddAsync(firstEpisode);
         await _dbContext.VulnerabilityAssets.AddAsync(projection);
         await _dbContext.SaveChangesAsync();
@@ -1557,7 +1602,7 @@ public class IngestionServiceTests : IDisposable
             .VulnerabilityAssets.IgnoreQueryFilters()
             .FirstAsync();
         var updatedVulnerability = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
+            .TenantVulnerabilities.IgnoreQueryFilters()
             .FirstAsync();
 
         episodes.Should().HaveCount(2);
@@ -1656,7 +1701,7 @@ public class IngestionServiceTests : IDisposable
         await service.RunIngestionAsync(_tenantId, CancellationToken.None);
 
         var vulnerability = await _dbContext
-            .Vulnerabilities.IgnoreQueryFilters()
+            .VulnerabilityDefinitions.IgnoreQueryFilters()
             .SingleAsync(item => item.ExternalId == "CVE-2026-1234");
         var enrichmentJob = await _dbContext
             .EnrichmentJobs.IgnoreQueryFilters()
@@ -1678,6 +1723,22 @@ public class IngestionServiceTests : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton(tenantContext);
         return services.BuildServiceProvider();
+    }
+
+    private async Task<TenantVulnerability> CreateTenantVulnerabilityAsync(
+        VulnerabilityDefinition vulnerability,
+        VulnerabilityStatus status = VulnerabilityStatus.Open
+    )
+    {
+        var tenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            vulnerability.Id,
+            status,
+            DateTimeOffset.UtcNow
+        );
+
+        await _dbContext.TenantVulnerabilities.AddAsync(tenantVulnerability);
+        return tenantVulnerability;
     }
 
     private sealed class FakeNvdApiClient : NvdApiClient

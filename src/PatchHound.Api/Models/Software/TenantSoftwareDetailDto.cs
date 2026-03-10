@@ -1,7 +1,8 @@
 namespace PatchHound.Api.Models.Software;
 
-public record NormalizedSoftwareDetailDto(
+public record TenantSoftwareDetailDto(
     Guid Id,
+    Guid NormalizedSoftwareId,
     string CanonicalName,
     string? CanonicalVendor,
     string? PrimaryCpe23Uri,
@@ -14,11 +15,11 @@ public record NormalizedSoftwareDetailDto(
     int VulnerableInstallCount,
     int ActiveVulnerabilityCount,
     int VersionCount,
-    IReadOnlyList<NormalizedSoftwareVersionCohortDto> VersionCohorts,
-    IReadOnlyList<NormalizedSoftwareSourceAliasDto> SourceAliases
+    IReadOnlyList<TenantSoftwareVersionCohortDto> VersionCohorts,
+    IReadOnlyList<TenantSoftwareSourceAliasDto> SourceAliases
 );
 
-public record NormalizedSoftwareVersionCohortDto(
+public record TenantSoftwareVersionCohortDto(
     string? Version,
     int ActiveInstallCount,
     int DeviceCount,
@@ -27,7 +28,7 @@ public record NormalizedSoftwareVersionCohortDto(
     DateTimeOffset LastSeenAt
 );
 
-public record NormalizedSoftwareSourceAliasDto(
+public record TenantSoftwareSourceAliasDto(
     string SourceSystem,
     string ExternalSoftwareId,
     string RawName,
@@ -37,7 +38,8 @@ public record NormalizedSoftwareSourceAliasDto(
     string MatchReason
 );
 
-public record NormalizedSoftwareInstallationDto(
+public record TenantSoftwareInstallationDto(
+    Guid TenantSoftwareId,
     Guid DeviceAssetId,
     string DeviceName,
     string DeviceCriticality,
@@ -55,8 +57,9 @@ public record NormalizedSoftwareInstallationDto(
     int OpenVulnerabilityCount
 );
 
-public record NormalizedSoftwareVulnerabilityDto(
-    Guid VulnerabilityId,
+public record TenantSoftwareVulnerabilityDto(
+    Guid TenantVulnerabilityId,
+    Guid VulnerabilityDefinitionId,
     string ExternalId,
     string Title,
     string VendorSeverity,
@@ -72,10 +75,10 @@ public record NormalizedSoftwareVulnerabilityDto(
     DateTimeOffset FirstSeenAt,
     DateTimeOffset LastSeenAt,
     DateTimeOffset? ResolvedAt,
-    IReadOnlyList<NormalizedSoftwareVulnerabilityEvidenceDto> Evidence
+    IReadOnlyList<TenantSoftwareVulnerabilityEvidenceDto> Evidence
 );
 
-public record NormalizedSoftwareVulnerabilityEvidenceDto(
+public record TenantSoftwareVulnerabilityEvidenceDto(
     string Method,
     string Confidence,
     string Evidence,

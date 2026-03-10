@@ -5,7 +5,7 @@ namespace PatchHound.Core.Entities;
 public class RiskAcceptance
 {
     public Guid Id { get; private set; }
-    public Guid VulnerabilityId { get; private set; }
+    public Guid TenantVulnerabilityId { get; private set; }
     public Guid? AssetId { get; private set; }
     public Guid TenantId { get; private set; }
     public Guid RequestedBy { get; private set; }
@@ -22,7 +22,7 @@ public class RiskAcceptance
     private RiskAcceptance() { }
 
     public static RiskAcceptance Create(
-        Guid vulnerabilityId,
+        Guid tenantVulnerabilityId,
         Guid tenantId,
         Guid requestedBy,
         string justification,
@@ -36,7 +36,7 @@ public class RiskAcceptance
         return new RiskAcceptance
         {
             Id = Guid.NewGuid(),
-            VulnerabilityId = vulnerabilityId,
+            TenantVulnerabilityId = tenantVulnerabilityId,
             TenantId = tenantId,
             RequestedBy = requestedBy,
             RequestedAt = DateTimeOffset.UtcNow,

@@ -10,7 +10,7 @@ vi.mock('@tanstack/react-router', () => ({
 
 const assetFixture: AssetDetail = {
   id: '11111111-1111-1111-1111-111111111111',
-  normalizedSoftwareId: '22222222-2222-2222-2222-222222222222',
+  tenantSoftwareId: '22222222-2222-2222-2222-222222222222',
   externalId: 'soft-123',
   name: 'Contoso Agent',
   description: 'Endpoint agent',
@@ -72,7 +72,7 @@ const assetFixture: AssetDetail = {
   softwareInventory: [
     {
       softwareAssetId: '66666666-6666-6666-6666-666666666666',
-      normalizedSoftwareId: null,
+      tenantSoftwareId: null,
       name: 'Legacy Tool',
       externalId: 'legacy-42',
       lastSeenAt: '2026-03-09T00:00:00Z',

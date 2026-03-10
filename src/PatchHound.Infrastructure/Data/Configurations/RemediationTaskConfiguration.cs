@@ -11,6 +11,7 @@ public class RemediationTaskConfiguration : IEntityTypeConfiguration<Remediation
         builder.HasKey(rt => rt.Id);
 
         builder.HasIndex(rt => rt.TenantId);
+        builder.HasIndex(rt => rt.TenantVulnerabilityId);
         builder.HasIndex(rt => rt.Status);
         builder.HasIndex(rt => rt.AssigneeId);
 

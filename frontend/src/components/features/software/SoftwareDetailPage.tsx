@@ -1,17 +1,17 @@
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import type {
-  NormalizedSoftwareDetail,
-  NormalizedSoftwareVulnerability,
-  PagedNormalizedSoftwareInstallations,
+  TenantSoftwareDetail,
+  TenantSoftwareVulnerability,
+  PagedTenantSoftwareInstallations,
 } from '@/api/software.schemas'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 
 type SoftwareDetailPageProps = {
-  detail: NormalizedSoftwareDetail
+  detail: TenantSoftwareDetail
   selectedVersion: string
-  installations: PagedNormalizedSoftwareInstallations
-  vulnerabilities: NormalizedSoftwareVulnerability[]
+  installations: PagedTenantSoftwareInstallations
+  vulnerabilities: TenantSoftwareVulnerability[]
   onSelectVersion: (version: string) => void
   onPageChange: (page: number) => void
 }
@@ -209,9 +209,9 @@ export function SoftwareDetailPage({
               <div className="mt-5 space-y-3">
                 {vulnerabilities.map((item) => (
                   <Link
-                    key={item.vulnerabilityId}
+                    key={item.tenantVulnerabilityId}
                     to="/vulnerabilities/$id"
-                    params={{ id: item.vulnerabilityId }}
+                    params={{ id: item.tenantVulnerabilityId }}
                     className="block rounded-3xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">

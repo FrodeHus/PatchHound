@@ -12,14 +12,14 @@ public class NormalizedSoftwareInstallationConfiguration
         builder.HasKey(item => item.Id);
 
         builder.HasIndex(item => item.TenantId);
-        builder.HasIndex(item => item.NormalizedSoftwareId);
+        builder.HasIndex(item => item.TenantSoftwareId);
         builder.HasIndex(item => item.SoftwareAssetId);
         builder.HasIndex(item => item.DeviceAssetId);
         builder
             .HasIndex(item => new
             {
                 item.TenantId,
-                item.NormalizedSoftwareId,
+                item.TenantSoftwareId,
                 item.DetectedVersion,
                 item.LastSeenAt,
             });
@@ -31,9 +31,9 @@ public class NormalizedSoftwareInstallationConfiguration
         builder.Property(item => item.DetectedVersion).HasMaxLength(256);
 
         builder
-            .HasOne(item => item.NormalizedSoftware)
+            .HasOne(item => item.TenantSoftware)
             .WithMany()
-            .HasForeignKey(item => item.NormalizedSoftwareId)
+            .HasForeignKey(item => item.TenantSoftwareId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder
