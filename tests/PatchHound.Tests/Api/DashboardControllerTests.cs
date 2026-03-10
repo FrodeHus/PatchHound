@@ -156,6 +156,100 @@ public class DashboardControllerTests : IDisposable
         payload.TopRecurringAssets[0].RecurringVulnerabilityCount.Should().Be(1);
     }
 
+    [Fact]
+    public async Task GetSummary_SeverityCounts_ExcludeResolvedVulnerabilities()
+    {
+        var openVulnerability = Vulnerability.Create(
+            _tenantId,
+            "CVE-2026-2000",
+            "Open vulnerability",
+            "Desc",
+            Severity.Critical,
+            "MicrosoftDefender"
+        );
+        var resolvedVulnerability = Vulnerability.Create(
+            _tenantId,
+            "CVE-2026-2001",
+            "Resolved vulnerability",
+            "Desc",
+            Severity.Critical,
+            "MicrosoftDefender"
+        );
+        resolvedVulnerability.UpdateStatus(VulnerabilityStatus.Resolved);
+
+        await _dbContext.AddRangeAsync(openVulnerability, resolvedVulnerability);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetSummary(CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
+
+        payload.VulnerabilitiesBySeverity["Critical"].Should().Be(1);
+        payload.VulnerabilitiesByStatus["Resolved"].Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetTrends_ExcludesResolvedVulnerabilities_OnResolutionDay()
+    {
+        var vulnerability = Vulnerability.Create(
+            _tenantId,
+            "CVE-2026-3000",
+            "Recently resolved vulnerability",
+            "Desc",
+            Severity.High,
+            "MicrosoftDefender"
+        );
+        var asset = Asset.Create(
+            _tenantId,
+            "device-trend-1",
+            AssetType.Device,
+            "Device Trend 1",
+            Criticality.High
+        );
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var firstSeenAt = new DateTimeOffset(
+            today.AddDays(-2).ToDateTime(TimeOnly.MinValue),
+            TimeSpan.Zero
+        );
+        var resolvedAt = new DateTimeOffset(
+            today.ToDateTime(new TimeOnly(8, 0)),
+            TimeSpan.Zero
+        );
+
+        await _dbContext.AddRangeAsync(vulnerability, asset);
+        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                vulnerability.Id,
+                asset.Id,
+                1,
+                firstSeenAt
+            ),
+            CancellationToken.None
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var episode = await _dbContext.VulnerabilityAssetEpisodes.SingleAsync();
+        episode.Resolve(resolvedAt);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetTrends(CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<TrendDataDto>().Subject;
+
+        var todayPoint = payload.Items.Single(item =>
+            item.Date == today && item.Severity == Severity.High.ToString()
+        );
+        var yesterdayPoint = payload.Items.Single(item =>
+            item.Date == today.AddDays(-1) && item.Severity == Severity.High.ToString()
+        );
+
+        todayPoint.Count.Should().Be(0);
+        yesterdayPoint.Count.Should().Be(1);
+    }
+
     public void Dispose() => _dbContext.Dispose();
 
     private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
