@@ -49,6 +49,12 @@ export const tenantAiProfileValidationSchema = z.object({
   lastValidatedAt: nullableIsoDateTimeSchema,
 })
 
+export const tenantAiProfileModelsSchema = z.object({
+  id: z.string().uuid(),
+  models: z.array(z.string()),
+})
+
 export type TenantAiProfile = z.infer<typeof tenantAiProfileSchema>
 export type SaveTenantAiProfile = z.infer<typeof saveTenantAiProfileSchema>
 export type TenantAiProfileValidation = z.infer<typeof tenantAiProfileValidationSchema>
+export type TenantAiProfileModels = z.infer<typeof tenantAiProfileModelsSchema>

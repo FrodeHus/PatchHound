@@ -1,6 +1,8 @@
-using System.Text;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using PatchHound.Core.Common;
 using PatchHound.Core.Enums;
-using PatchHound.Core.Entities;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 
@@ -8,78 +10,137 @@ namespace PatchHound.Infrastructure.AiProviders;
 
 public class AzureOpenAiProvider : IAiReportProvider
 {
+    private readonly HttpClient _httpClient;
+
+    public AzureOpenAiProvider(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+    }
+
     public TenantAiProviderType ProviderType => TenantAiProviderType.AzureOpenAi;
 
     public Task<string> GenerateReportAsync(
         AiReportGenerationRequest request,
         TenantAiProfileResolved profile,
         CancellationToken ct
-    )
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine($"# AI Vulnerability Report: {request.VulnerabilityDefinition.Title}");
-        sb.AppendLine();
-        sb.AppendLine($"**Provider:** Azure OpenAI ({profile.Profile.Model})");
-        sb.AppendLine($"**Vulnerability:** {request.VulnerabilityDefinition.ExternalId}");
-        sb.AppendLine($"**Severity:** {request.VulnerabilityDefinition.VendorSeverity}");
-        sb.AppendLine($"**CVSS Score:** {request.VulnerabilityDefinition.CvssScore?.ToString("F1") ?? "N/A"}");
-        sb.AppendLine();
-        sb.AppendLine("## Description");
-        sb.AppendLine(request.VulnerabilityDefinition.Description);
-        sb.AppendLine();
-        sb.AppendLine("## Affected Assets");
-        foreach (var asset in request.AffectedAssets)
-        {
-            sb.AppendLine(
-                $"- **{asset.Name}** ({asset.AssetType}, Criticality: {asset.Criticality})"
-            );
-        }
-        sb.AppendLine();
-        sb.AppendLine("## Recommendations");
-        sb.AppendLine("- Review and apply vendor patches as soon as possible.");
-        sb.AppendLine("- Assess compensating controls for high-criticality assets.");
-        sb.AppendLine("- Monitor affected assets for indicators of compromise.");
-        sb.AppendLine();
-        sb.AppendLine(
-            "*This is a stub report. Connect to Azure OpenAI for real AI-generated analysis.*"
-        );
+    ) => SendChatCompletionAsync(
+        profile,
+        profile.Profile.SystemPrompt,
+        AiProviderPromptBuilder.BuildReportPrompt(request),
+        profile.Profile.MaxOutputTokens,
+        ct
+    );
 
-        return Task.FromResult(sb.ToString());
-    }
-
-    public Task<AiProviderValidationResult> ValidateAsync(
+    public async Task<AiProviderValidationResult> ValidateAsync(
         TenantAiProfileResolved profile,
         CancellationToken ct
     )
     {
         if (string.IsNullOrWhiteSpace(profile.Profile.BaseUrl))
         {
-            return Task.FromResult(
-                AiProviderValidationResult.Failure("Endpoint is required for Azure OpenAI.")
-            );
+            return AiProviderValidationResult.Failure("Endpoint is required for Azure OpenAI.");
         }
 
         if (string.IsNullOrWhiteSpace(profile.Profile.DeploymentName))
         {
-            return Task.FromResult(
-                AiProviderValidationResult.Failure("Deployment name is required for Azure OpenAI.")
-            );
+            return AiProviderValidationResult.Failure("Deployment name is required for Azure OpenAI.");
         }
 
         if (string.IsNullOrWhiteSpace(profile.Profile.ApiVersion))
         {
-            return Task.FromResult(
-                AiProviderValidationResult.Failure("API version is required for Azure OpenAI.")
-            );
+            return AiProviderValidationResult.Failure("API version is required for Azure OpenAI.");
         }
 
         if (string.IsNullOrWhiteSpace(profile.ApiKey))
         {
-            return Task.FromResult(
-                AiProviderValidationResult.Failure("API key is required for Azure OpenAI.")
+            return AiProviderValidationResult.Failure("API key is required for Azure OpenAI.");
+        }
+
+        try
+        {
+            var content = await SendChatCompletionAsync(
+                profile,
+                "You are validating an Azure OpenAI integration.",
+                AiProviderPromptBuilder.BuildValidationPrompt(),
+                16,
+                ct
+            );
+
+            return string.IsNullOrWhiteSpace(content)
+                ? AiProviderValidationResult.Failure("Azure OpenAI validation returned an empty response.")
+                : AiProviderValidationResult.Success();
+        }
+        catch (Exception ex)
+        {
+            return AiProviderValidationResult.Failure($"Azure OpenAI validation failed: {ex.Message}");
+        }
+    }
+
+    public Task<Result<IReadOnlyList<string>>> ListAvailableModelsAsync(
+        TenantAiProfileResolved profile,
+        CancellationToken ct
+    )
+    {
+        return Task.FromResult(
+            Result<IReadOnlyList<string>>.Failure(
+                "Azure OpenAI model discovery is not supported here. Enter the deployment name configured in Azure."
+            )
+        );
+    }
+
+    private async Task<string> SendChatCompletionAsync(
+        TenantAiProfileResolved profile,
+        string systemPrompt,
+        string userPrompt,
+        int maxTokens,
+        CancellationToken ct
+    )
+    {
+        var endpoint =
+            $"{profile.Profile.BaseUrl.TrimEnd('/')}/openai/deployments/{profile.Profile.DeploymentName}/chat/completions?api-version={Uri.EscapeDataString(profile.Profile.ApiVersion)}";
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        request.Headers.Add("api-key", profile.ApiKey);
+        request.Content = JsonContent.Create(
+            new
+            {
+                messages = new[]
+                {
+                    new { role = "system", content = systemPrompt },
+                    new { role = "user", content = userPrompt },
+                },
+                temperature = decimal.ToDouble(profile.Profile.Temperature),
+                top_p = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
+                max_tokens = maxTokens,
+            }
+        );
+
+        using var response = await _httpClient.SendAsync(request, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException(
+                AiProviderErrorParser.FormatHttpError(
+                    "Azure OpenAI",
+                    (int)response.StatusCode,
+                    response.ReasonPhrase,
+                    body
+                )
             );
         }
 
-        return Task.FromResult(AiProviderValidationResult.Success());
+        using var document = JsonDocument.Parse(body);
+        var content = document.RootElement
+            .GetProperty("choices")[0]
+            .GetProperty("message")
+            .GetProperty("content")
+            .GetString();
+
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            throw new InvalidOperationException("Azure OpenAI response did not contain message content.");
+        }
+
+        return content.Trim();
     }
 }

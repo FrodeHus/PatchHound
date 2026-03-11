@@ -100,9 +100,18 @@ public static class DependencyInjection
         services.Configure<SmtpOptions>(configuration.GetSection("Smtp"));
 
         // AI Report Providers
-        services.AddScoped<IAiReportProvider, OllamaAiProvider>();
-        services.AddScoped<IAiReportProvider, AzureOpenAiProvider>();
-        services.AddScoped<IAiReportProvider, OpenAiProvider>();
+        services
+            .AddHttpClient<OllamaAiProvider>()
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
+        services
+            .AddHttpClient<AzureOpenAiProvider>()
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
+        services
+            .AddHttpClient<OpenAiProvider>()
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
+        services.AddScoped<IAiReportProvider>(sp => sp.GetRequiredService<OllamaAiProvider>());
+        services.AddScoped<IAiReportProvider>(sp => sp.GetRequiredService<AzureOpenAiProvider>());
+        services.AddScoped<IAiReportProvider>(sp => sp.GetRequiredService<OpenAiProvider>());
 
         // Vulnerability Sources
         services.AddScoped<IVulnerabilitySource, DefenderVulnerabilitySource>();

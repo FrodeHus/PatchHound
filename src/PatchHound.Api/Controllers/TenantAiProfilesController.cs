@@ -315,6 +315,36 @@ public class TenantAiProfilesController : ControllerBase
         return Ok(MapValidationDto(profile));
     }
 
+    [HttpPost("profiles/{id:guid}/models")]
+    public async Task<ActionResult<TenantAiProfileModelsDto>> ListAvailableModels(Guid id, CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var resolveResult = await _resolver.ResolveByIdAsync(tenantId, id, ct);
+        if (!resolveResult.IsSuccess)
+        {
+            return NotFound(new ProblemDetails { Title = resolveResult.Error });
+        }
+
+        var resolved = resolveResult.Value;
+        var provider = _providers.FirstOrDefault(item => item.ProviderType == resolved.Profile.ProviderType);
+        if (provider is null)
+        {
+            return BadRequest(new ProblemDetails { Title = "No provider implementation is registered for this AI profile." });
+        }
+
+        var modelsResult = await provider.ListAvailableModelsAsync(resolved, ct);
+        if (!modelsResult.IsSuccess)
+        {
+            return BadRequest(new ProblemDetails { Title = modelsResult.Error });
+        }
+
+        return Ok(new TenantAiProfileModelsDto(id, modelsResult.Value));
+    }
+
     private async Task ClearDefaultAsync(Guid tenantId, CancellationToken ct, Guid? exceptId = null)
     {
         var profiles = await _dbContext.TenantAiProfiles

@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost, apiPut } from '@/server/api'
 import {
+  tenantAiProfileModelsSchema,
   saveTenantAiProfileSchema,
   tenantAiProfileSchema,
   tenantAiProfileValidationSchema,
@@ -40,4 +41,12 @@ export const setDefaultTenantAiProfile = createServerFn({ method: 'POST' })
   .handler(async ({ context, data: { id } }) => {
     const data = await apiPost(`/settings/ai/profiles/${id}/set-default`, context)
     return tenantAiProfileSchema.parse(data)
+  })
+
+export const fetchTenantAiProfileModels = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ context, data: { id } }) => {
+    const data = await apiPost(`/settings/ai/profiles/${id}/models`, context)
+    return tenantAiProfileModelsSchema.parse(data)
   })

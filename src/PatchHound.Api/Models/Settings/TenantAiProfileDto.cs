@@ -46,3 +46,8 @@ public record TenantAiProfileValidationResultDto(
     string ValidationError,
     DateTimeOffset? LastValidatedAt
 );
+
+public record TenantAiProfileModelsDto(
+    Guid Id,
+    IReadOnlyList<string> Models
+);
