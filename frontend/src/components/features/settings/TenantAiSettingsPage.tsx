@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import {
+  fetchTenantAiProfileModels,
   fetchTenantAiProfiles,
   saveTenantAiProfile,
   setDefaultTenantAiProfile,
@@ -150,6 +151,14 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+function extractMissingOllamaModel(errorMessage: string, model: string) {
+  if (!errorMessage || !model) {
+    return null
+  }
+
+  return errorMessage.toLowerCase().includes('not found') && errorMessage.includes(model) ? model : null
+}
+
 export function TenantAiSettingsPage() {
   const queryClient = useQueryClient()
   const { selectedTenantId, tenants } = useTenantScope()
@@ -189,6 +198,15 @@ export function TenantAiSettingsPage() {
       setSelectedProfileId(profile.id)
       setDraft(toDraft(profile))
       await queryClient.invalidateQueries({ queryKey: ['tenant-ai-profiles', selectedTenantId] })
+    },
+  })
+
+  const modelsMutation = useMutation({
+    mutationFn: (id: string) => fetchTenantAiProfileModels({ data: { id } }),
+    onSuccess: (result) => {
+      if (result.models.length === 1) {
+        setDraft((current) => ({ ...current, model: result.models[0] }))
+      }
     },
   })
 
@@ -273,6 +291,9 @@ export function TenantAiSettingsPage() {
                         <p className="font-medium">{profile.name}</p>
                         {profile.isDefault ? <Badge>Default</Badge> : null}
                         {!profile.isEnabled ? <Badge variant="outline">Disabled</Badge> : null}
+                        {profile.isDefault && profile.lastValidationStatus !== 'Valid' ? (
+                          <Badge variant="destructive">Blocked</Badge>
+                        ) : null}
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {getProviderLabel(profile.providerType)} · {profile.model}
@@ -364,10 +385,69 @@ export function TenantAiSettingsPage() {
                     />
                   </Field>
                   <Field label="Model">
-                    <Input
-                      value={draft.model}
-                      onChange={(event) => setDraft((current) => ({ ...current, model: event.target.value }))}
-                    />
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <Input
+                          value={draft.model}
+                          onChange={(event) => setDraft((current) => ({ ...current, model: event.target.value }))}
+                        />
+                        {selectedProfileId ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={modelsMutation.isPending}
+                            onClick={() => {
+                              modelsMutation.mutate(selectedProfileId)
+                            }}
+                          >
+                            {modelsMutation.isPending ? 'Listing...' : 'List available models'}
+                          </Button>
+                        ) : null}
+                      </div>
+
+                      {modelsMutation.data?.id === selectedProfileId && modelsMutation.data.models.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {modelsMutation.data.models.map((model) => (
+                            <button
+                              key={model}
+                              type="button"
+                              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                                draft.model === model
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : 'border-border bg-background text-foreground hover:bg-muted'
+                              }`}
+                              onClick={() => setDraft((current) => ({ ...current, model }))}
+                            >
+                              {model}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {modelsMutation.data?.id === selectedProfileId && modelsMutation.data.models.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No models were returned by this provider.</p>
+                      ) : null}
+
+                      {modelsMutation.isError ? (
+                        <p className="text-xs text-destructive">
+                          {getErrorMessage(modelsMutation.error, 'Failed to list available models.')}
+                        </p>
+                      ) : null}
+
+                      {draft.providerType === 'Ollama' && (
+                        <p className="text-xs text-muted-foreground">
+                          Local Ollama models must exist on the target runtime. Example: <code>ollama pull {draft.model || 'llama3.1:8b'}</code>
+                        </p>
+                      )}
+
+                      {selectedProfile?.lastValidationStatus === 'Invalid' &&
+                      draft.providerType === 'Ollama' &&
+                      extractMissingOllamaModel(selectedProfile.lastValidationError, draft.model) ? (
+                        <div className="rounded-[16px] border border-amber-300/25 bg-amber-500/8 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+                          Ollama could not find <code>{draft.model}</code>. Run <code>ollama pull {draft.model}</code> on the Ollama host, then validate again.
+                        </div>
+                      ) : null}
+                    </div>
                   </Field>
                 </div>
               </section>

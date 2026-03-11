@@ -40,6 +40,8 @@ public class TenantAiProfilesControllerTests : IDisposable
         _resolver = Substitute.For<ITenantAiConfigurationResolver>();
         _provider = Substitute.For<IAiReportProvider>();
         _provider.ProviderType.Returns(TenantAiProviderType.OpenAi);
+        _provider.ListAvailableModelsAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
+            .Returns(Result<IReadOnlyList<string>>.Success(["gpt-4.1-mini", "gpt-4o"]));
 
         _controller = new TenantAiProfilesController(
             _dbContext,
@@ -167,6 +169,39 @@ public class TenantAiProfilesControllerTests : IDisposable
         var updated = await _dbContext.TenantAiProfiles.SingleAsync();
         updated.LastValidationStatus.Should().Be(TenantAiProfileValidationStatus.Valid);
         updated.LastValidatedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task ListAvailableModels_ReturnsProviderModels()
+    {
+        var profile = TenantAiProfile.Create(
+            _tenantId,
+            "Default",
+            TenantAiProviderType.OpenAi,
+            true,
+            true,
+            "gpt-4.1-mini",
+            "Prompt",
+            0.2m,
+            null,
+            1200,
+            60,
+            "https://api.openai.com/v1",
+            secretRef: "tenants/test/ai/default"
+        );
+
+        await _dbContext.TenantAiProfiles.AddAsync(profile);
+        await _dbContext.SaveChangesAsync();
+
+        _resolver
+            .ResolveByIdAsync(_tenantId, profile.Id, Arg.Any<CancellationToken>())
+            .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, "secret")));
+
+        var action = await _controller.ListAvailableModels(profile.Id, CancellationToken.None);
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var dto = ok.Value.Should().BeOfType<TenantAiProfileModelsDto>().Subject;
+        dto.Models.Should().ContainInOrder("gpt-4.1-mini", "gpt-4o");
     }
 
     [Fact]

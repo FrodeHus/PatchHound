@@ -21,6 +21,7 @@ export function AiReportTab({ vulnerabilityId }: AiReportTabProps) {
     enabled: !!selectedTenantId,
   })
   const defaultProfile = (profilesQuery.data ?? []).find((profile) => profile.isDefault && profile.isEnabled) ?? null
+  const defaultProfileIsUsable = defaultProfile?.lastValidationStatus === 'Valid'
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -31,7 +32,7 @@ export function AiReportTab({ vulnerabilityId }: AiReportTabProps) {
       }),
   })
 
-  const canGenerate = !profilesQuery.isLoading && !!defaultProfile
+  const canGenerate = !profilesQuery.isLoading && !!defaultProfile && defaultProfileIsUsable
 
   return (
     <section className="space-y-4 rounded-[22px] border border-border bg-card p-4">
@@ -74,12 +75,18 @@ export function AiReportTab({ vulnerabilityId }: AiReportTabProps) {
             <p className="mt-1 text-sm text-muted-foreground">
               {defaultProfile.lastValidatedAt
                 ? `Last checked ${formatDateTime(defaultProfile.lastValidatedAt)}`
-                : 'Not validated yet. You can still generate a report, but validating the profile first is recommended.'}
+                : 'Not validated yet.'}
             </p>
             {defaultProfile.lastValidationStatus === 'Invalid' ? (
               <div className="mt-3 flex items-start gap-2 rounded-[16px] border border-destructive/25 bg-destructive/8 px-3 py-2 text-sm text-destructive">
                 <CircleAlert className="mt-0.5 size-4 shrink-0" />
                 <p>{defaultProfile.lastValidationError || 'The last validation attempt failed.'}</p>
+              </div>
+            ) : null}
+            {defaultProfile.lastValidationStatus !== 'Valid' ? (
+              <div className="mt-3 flex items-start gap-2 rounded-[16px] border border-amber-300/25 bg-amber-500/8 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+                <CircleAlert className="mt-0.5 size-4 shrink-0" />
+                <p>AI report generation is disabled until the default profile validates successfully.</p>
               </div>
             ) : null}
           </div>

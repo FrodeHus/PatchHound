@@ -53,17 +53,34 @@ public class AiReportService
             );
         }
 
-        var validationResult = await provider.ValidateAsync(resolvedProfile, ct);
+        AiProviderValidationResult validationResult;
+        try
+        {
+            validationResult = await provider.ValidateAsync(resolvedProfile, ct);
+        }
+        catch (Exception ex)
+        {
+            return Result<AIReport>.Failure($"AI provider validation failed: {ex.Message}");
+        }
+
         if (!validationResult.IsSuccess)
         {
             return Result<AIReport>.Failure(validationResult.Error);
         }
 
-        var content = await provider.GenerateReportAsync(
-            new AiReportGenerationRequest(vulnerabilityDefinition, affectedAssets),
-            resolvedProfile,
-            ct
-        );
+        string content;
+        try
+        {
+            content = await provider.GenerateReportAsync(
+                new AiReportGenerationRequest(vulnerabilityDefinition, affectedAssets),
+                resolvedProfile,
+                ct
+            );
+        }
+        catch (Exception ex)
+        {
+            return Result<AIReport>.Failure($"AI report generation failed: {ex.Message}");
+        }
 
         var report = AIReport.Create(
             tenantVulnerabilityId,
