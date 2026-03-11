@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models.Assets;
@@ -12,6 +11,7 @@ using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Repositories;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
 
@@ -33,7 +33,10 @@ public class AssetsControllerTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(_tenantContext));
+        _dbContext = new PatchHoundDbContext(
+            options,
+            TestServiceProviderFactory.Create(_tenantContext)
+        );
 
         var assetService = new AssetService(
             new AssetRepository(_dbContext),
@@ -192,12 +195,5 @@ public class AssetsControllerTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-    }
-
-    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(tenantContext);
-        return services.BuildServiceProvider();
     }
 }

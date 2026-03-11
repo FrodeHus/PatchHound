@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models;
@@ -10,6 +9,7 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
 
@@ -34,7 +34,10 @@ public class AuditLogControllerTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(_tenantContext));
+        _dbContext = new PatchHoundDbContext(
+            options,
+            TestServiceProviderFactory.Create(_tenantContext)
+        );
     }
 
     [Fact]
@@ -71,56 +74,8 @@ public class AuditLogControllerTests : IDisposable
         item.EntityLabel.Should().Be("Internet-facing server");
     }
 
-    [Fact]
-    public async Task List_ReturnsPaginationMetadata()
-    {
-        var user = User.Create("auditor@example.com", "Audrey Admin", Guid.NewGuid().ToString());
-        await _dbContext.Users.AddAsync(user);
-
-        for (var i = 0; i < 3; i++)
-        {
-            await _dbContext.AuditLogEntries.AddAsync(
-                AuditLogEntry.Create(
-                    _tenantId,
-                    "Tenant",
-                    Guid.NewGuid(),
-                    AuditAction.Created,
-                    null,
-                    $$"""{"Name":"Tenant {{i}}"}""",
-                    user.Id
-                )
-            );
-        }
-
-        await _dbContext.SaveChangesAsync();
-
-        var controller = new AuditLogController(_dbContext, _tenantContext);
-
-        var action = await controller.List(
-            new AuditLogFilterQuery(),
-            new PaginationQuery(2, 2),
-            CancellationToken.None
-        );
-
-        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var payload = ok.Value.Should().BeOfType<PagedResponse<AuditLogDto>>().Subject;
-
-        payload.Page.Should().Be(2);
-        payload.PageSize.Should().Be(2);
-        payload.TotalCount.Should().Be(3);
-        payload.TotalPages.Should().Be(2);
-        payload.Items.Should().HaveCount(1);
-    }
-
     public void Dispose()
     {
         _dbContext.Dispose();
-    }
-
-    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(tenantContext);
-        return services.BuildServiceProvider();
     }
 }

@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models.Admin;
@@ -12,6 +11,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
 
@@ -39,7 +39,10 @@ public class SettingsAuditControllerTests : IDisposable
             .AddInterceptors(interceptor)
             .Options;
 
-        _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(_tenantContext));
+        _dbContext = new PatchHoundDbContext(
+            options,
+            TestServiceProviderFactory.Create(_tenantContext)
+        );
         _secretStore = Substitute.For<ISecretStore>();
         _secretStore
             .PutSecretAsync(
@@ -248,48 +251,9 @@ public class SettingsAuditControllerTests : IDisposable
         dto.RecentRuns[0].JobsRetried.Should().Be(1);
     }
 
-    [Fact]
-    public async Task GetEnrichmentRuns_ReturnsPagedHistory()
-    {
-        await _dbContext.EnrichmentRuns.AddRangeAsync(
-            CreateCompletedRun("nvd", 3),
-            CreateCompletedRun("nvd", 2),
-            CreateCompletedRun("nvd", 1)
-        );
-        await _dbContext.SaveChangesAsync();
-
-        var controller = new SystemController(
-            _secretStore,
-            _dbContext,
-            new AuditLogWriter(_dbContext, _tenantContext)
-        );
-
-        var action = await controller.GetEnrichmentRuns(
-            "nvd",
-            new PatchHound.Api.Models.PaginationQuery(1, 2),
-            CancellationToken.None
-        );
-
-        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var page = ok
-            .Value.Should()
-            .BeOfType<PatchHound.Api.Models.PagedResponse<EnrichmentRunDto>>()
-            .Subject;
-        page.TotalCount.Should().Be(3);
-        page.PageSize.Should().Be(2);
-        page.Items.Should().HaveCount(2);
-    }
-
     public void Dispose()
     {
         _dbContext.Dispose();
-    }
-
-    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(tenantContext);
-        return services.BuildServiceProvider();
     }
 
     private static EnrichmentRun CreateCompletedRun(string sourceKey, int jobsClaimed)

@@ -6,6 +6,7 @@ using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Core.Services;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Core;
 
@@ -45,18 +46,13 @@ public class AiReportServiceTests
             Asset.Create(_tenantId, "asset-1", AssetType.Device, "web-server-01", Criticality.High),
         };
 
-        var profile = TenantAiProfile.Create(
+        var profile = TenantAiProfileFactory.Create(
             _tenantId,
-            "Default analysis",
-            TenantAiProviderType.AzureOpenAi,
-            true,
-            true,
-            "gpt-4o",
-            "System prompt",
-            0.2m,
-            1.0m,
-            1200,
-            60,
+            providerType: TenantAiProviderType.AzureOpenAi,
+            name: "Default analysis",
+            model: "gpt-4o",
+            systemPrompt: "System prompt",
+            topP: 1.0m,
             baseUrl: "https://example.openai.azure.com",
             deploymentName: "gpt-4o-prod",
             apiVersion: "2024-10-21",
@@ -142,18 +138,12 @@ public class AiReportServiceTests
             "Qualys"
         );
 
-        var profile = TenantAiProfile.Create(
+        var profile = TenantAiProfileFactory.Create(
             _tenantId,
-            "Broken Azure",
-            TenantAiProviderType.AzureOpenAi,
-            true,
-            true,
-            "gpt-4o",
-            "System prompt",
-            0.2m,
-            null,
-            1200,
-            60
+            providerType: TenantAiProviderType.AzureOpenAi,
+            name: "Broken Azure",
+            model: "gpt-4o",
+            systemPrompt: "System prompt"
         );
 
         _resolver
@@ -188,18 +178,16 @@ public class AiReportServiceTests
             "Scanner"
         );
 
-        var profile = TenantAiProfile.Create(
+        var profile = TenantAiProfileFactory.Create(
             _tenantId,
-            "Ollama local",
-            TenantAiProviderType.AzureOpenAi,
-            false,
-            true,
-            "gpt-4o-mini",
-            "System prompt",
-            0.1m,
-            null,
-            900,
-            45,
+            providerType: TenantAiProviderType.AzureOpenAi,
+            name: "Ollama local",
+            isDefault: false,
+            model: "gpt-4o-mini",
+            systemPrompt: "System prompt",
+            temperature: 0.1m,
+            maxOutputTokens: 900,
+            timeoutSeconds: 45,
             baseUrl: "https://example.openai.azure.com",
             deploymentName: "gpt-4o-mini",
             apiVersion: "2024-10-21",

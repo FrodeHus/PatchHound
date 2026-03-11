@@ -1,18 +1,17 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Software;
 using PatchHound.Core.Common;
-using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
 
@@ -36,7 +35,10 @@ public class SoftwareControllerTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(tenantContext));
+        _dbContext = new PatchHoundDbContext(
+            options,
+            TestServiceProviderFactory.Create(tenantContext)
+        );
         _aiProvider = Substitute.For<IAiReportProvider>();
         _tenantAiConfigurationResolver = Substitute.For<ITenantAiConfigurationResolver>();
         _tenantAiTextGenerationService = new TenantAiTextGenerationService(
@@ -49,13 +51,13 @@ public class SoftwareControllerTests : IDisposable
     [Fact]
     public async Task Get_ReturnsTenantSoftwareDetailWithCohortsAndAliases()
     {
-        var tenantSoftware = await SeedNormalizedSoftwareGraphAsync();
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
 
-        var action = await _controller.Get(tenantSoftware.Id, CancellationToken.None);
+        var action = await _controller.Get(graph.TenantSoftware.Id, CancellationToken.None);
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<TenantSoftwareDetailDto>().Subject;
 
-        payload.Id.Should().Be(tenantSoftware.Id);
+        payload.Id.Should().Be(graph.TenantSoftware.Id);
         payload.CanonicalName.Should().Be("agent");
         payload.ActiveInstallCount.Should().Be(2);
         payload.UniqueDeviceCount.Should().Be(2);
@@ -70,10 +72,10 @@ public class SoftwareControllerTests : IDisposable
     [Fact]
     public async Task GetInstallations_FiltersByVersionAndReturnsPagedRows()
     {
-        var tenantSoftware = await SeedNormalizedSoftwareGraphAsync();
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
 
         var action = await _controller.GetInstallations(
-            tenantSoftware.Id,
+            graph.TenantSoftware.Id,
             new TenantSoftwareInstallationQuery("2.0"),
             new PaginationQuery(1, 10),
             CancellationToken.None
@@ -91,9 +93,9 @@ public class SoftwareControllerTests : IDisposable
     [Fact]
     public async Task GetVulnerabilities_ReturnsAffectedVersionsAndEvidence()
     {
-        var tenantSoftware = await SeedNormalizedSoftwareGraphAsync();
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
 
-        var action = await _controller.GetVulnerabilities(tenantSoftware.Id, CancellationToken.None);
+        var action = await _controller.GetVulnerabilities(graph.TenantSoftware.Id, CancellationToken.None);
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeAssignableTo<IReadOnlyList<TenantSoftwareVulnerabilityDto>>().Subject;
 
@@ -108,7 +110,7 @@ public class SoftwareControllerTests : IDisposable
     [Fact]
     public async Task List_ReturnsPagedNormalizedSoftwareItems()
     {
-        var tenantSoftware = await SeedNormalizedSoftwareGraphAsync();
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
 
         var action = await _controller.List(
             new TenantSoftwareFilterQuery(Search: "agent", VulnerableOnly: true),
@@ -120,7 +122,7 @@ public class SoftwareControllerTests : IDisposable
 
         payload.TotalCount.Should().Be(1);
         payload.Items.Should().ContainSingle();
-        payload.Items[0].Id.Should().Be(tenantSoftware.Id);
+        payload.Items[0].Id.Should().Be(graph.TenantSoftware.Id);
         payload.Items[0].ActiveInstallCount.Should().Be(2);
         payload.Items[0].ActiveVulnerabilityCount.Should().Be(1);
         payload.Items[0].VersionCount.Should().Be(2);
@@ -129,19 +131,13 @@ public class SoftwareControllerTests : IDisposable
     [Fact]
     public async Task GenerateAiReport_ReturnsMergedSoftwareReport()
     {
-        var tenantSoftware = await SeedNormalizedSoftwareGraphAsync();
-        var profile = TenantAiProfile.Create(
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var profile = TenantAiProfileFactory.Create(
             _tenantId,
-            "Default AI",
-            TenantAiProviderType.Ollama,
-            true,
-            true,
-            "llama3",
-            "system",
-            0.2m,
-            null,
-            1200,
-            60
+            providerType: TenantAiProviderType.Ollama,
+            name: "Default AI",
+            model: "llama3",
+            systemPrompt: "system"
         );
         _tenantAiConfigurationResolver
             .ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
@@ -157,14 +153,14 @@ public class SoftwareControllerTests : IDisposable
             .Returns("# Software report");
 
         var action = await _controller.GenerateAiReport(
-            tenantSoftware.Id,
+            graph.TenantSoftware.Id,
             new GenerateTenantSoftwareAiReportRequest(null),
             CancellationToken.None
         );
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<TenantSoftwareAiReportDto>().Subject;
 
-        payload.TenantSoftwareId.Should().Be(tenantSoftware.Id);
+        payload.TenantSoftwareId.Should().Be(graph.TenantSoftware.Id);
         payload.Content.Should().Be("# Software report");
         payload.ProviderType.Should().Be("Ollama");
 
@@ -182,186 +178,8 @@ public class SoftwareControllerTests : IDisposable
             );
     }
 
-    private async Task<TenantSoftware> SeedNormalizedSoftwareGraphAsync()
-    {
-        var normalizedSoftware = NormalizedSoftware.Create(
-            "agent",
-            "contoso",
-            "cpe:contoso:agent",
-            "cpe:2.3:a:contoso:agent:*:*:*:*:*:*:*:*",
-            SoftwareNormalizationMethod.ExplicitCpe,
-            SoftwareNormalizationConfidence.High,
-            new DateTimeOffset(2026, 3, 10, 10, 0, 0, TimeSpan.Zero)
-        );
-        var tenantSoftware = TenantSoftware.Create(
-            _tenantId,
-            normalizedSoftware.Id,
-            new DateTimeOffset(2026, 2, 10, 0, 0, 0, TimeSpan.Zero),
-            new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
-        );
-
-        var deviceOne = Asset.Create(_tenantId, "device-1", AssetType.Device, "Device 1", Criticality.High);
-        deviceOne.UpdateDeviceDetails("Device 1", null, null, null, null, null, null, null);
-        var deviceTwo = Asset.Create(_tenantId, "device-2", AssetType.Device, "Device 2", Criticality.Medium);
-        deviceTwo.UpdateDeviceDetails("Device 2", null, null, null, null, null, null, null);
-        var softwareOne = Asset.Create(_tenantId, "software-1", AssetType.Software, "Contoso Agent", Criticality.Low);
-        var softwareTwo = Asset.Create(_tenantId, "software-2", AssetType.Software, "Contoso Agent", Criticality.Low);
-        var profile = AssetSecurityProfile.Create(
-            _tenantId,
-            "Server Profile",
-            null,
-            EnvironmentClass.Server,
-            InternetReachability.InternalNetwork,
-            SecurityRequirementLevel.High,
-            SecurityRequirementLevel.High,
-            SecurityRequirementLevel.High
-        );
-        deviceOne.AssignSecurityProfile(profile.Id);
-
-        var definition = VulnerabilityDefinition.Create(
-            "CVE-2026-1000",
-            "Contoso Agent vulnerability",
-            "Description",
-            Severity.Critical,
-            "NVD",
-            9.8m,
-            null,
-            new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero)
-        );
-        var tenantVulnerability = TenantVulnerability.Create(
-            _tenantId,
-            definition.Id,
-            VulnerabilityStatus.Open,
-            DateTimeOffset.UtcNow
-        );
-
-        await _dbContext.AddRangeAsync(
-            normalizedSoftware,
-            tenantSoftware,
-            deviceOne,
-            deviceTwo,
-            softwareOne,
-            softwareTwo,
-            profile,
-            definition,
-            tenantVulnerability
-        );
-        await _dbContext.NormalizedSoftwareAliases.AddRangeAsync(
-            NormalizedSoftwareAlias.Create(
-                normalizedSoftware.Id,
-                SoftwareIdentitySourceSystem.Defender,
-                "software-1",
-                "Contoso Agent",
-                "Contoso",
-                "1.0",
-                SoftwareNormalizationConfidence.High,
-                "Resolved via software CPE binding.",
-                DateTimeOffset.UtcNow
-            ),
-            NormalizedSoftwareAlias.Create(
-                normalizedSoftware.Id,
-                SoftwareIdentitySourceSystem.Defender,
-                "software-2",
-                "Contoso Agent",
-                "Contoso",
-                "2.0",
-                SoftwareNormalizationConfidence.High,
-                "Resolved via software CPE binding.",
-                DateTimeOffset.UtcNow
-            )
-        );
-        await _dbContext.NormalizedSoftwareInstallations.AddRangeAsync(
-            NormalizedSoftwareInstallation.Create(
-                _tenantId,
-                tenantSoftware.Id,
-                softwareOne.Id,
-                deviceOne.Id,
-                SoftwareIdentitySourceSystem.Defender,
-                "1.0",
-                new DateTimeOffset(2026, 2, 10, 0, 0, 0, TimeSpan.Zero),
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero),
-                null,
-                true,
-                1
-            ),
-            NormalizedSoftwareInstallation.Create(
-                _tenantId,
-                tenantSoftware.Id,
-                softwareTwo.Id,
-                deviceTwo.Id,
-                SoftwareIdentitySourceSystem.Defender,
-                "2.0",
-                new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero),
-                new DateTimeOffset(2026, 3, 9, 0, 0, 0, TimeSpan.Zero),
-                null,
-                true,
-                1
-            )
-        );
-        await _dbContext.SoftwareVulnerabilityMatches.AddRangeAsync(
-            SoftwareVulnerabilityMatch.Create(
-                _tenantId,
-                softwareOne.Id,
-                definition.Id,
-                SoftwareVulnerabilityMatchMethod.CpeBinding,
-                MatchConfidence.High,
-                "match-one",
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
-            ),
-            SoftwareVulnerabilityMatch.Create(
-                _tenantId,
-                softwareTwo.Id,
-                definition.Id,
-                SoftwareVulnerabilityMatchMethod.CpeBinding,
-                MatchConfidence.High,
-                "match-two",
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
-            )
-        );
-        await _dbContext.NormalizedSoftwareVulnerabilityProjections.AddAsync(
-            NormalizedSoftwareVulnerabilityProjection.Create(
-                _tenantId,
-                tenantSoftware.Id,
-                definition.Id,
-                SoftwareVulnerabilityMatchMethod.CpeBinding,
-                MatchConfidence.High,
-                2,
-                2,
-                2,
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero),
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero),
-                null,
-                """
-                [{"method":"CpeBinding","confidence":"High","evidence":"contoso-agent","firstSeenAt":"2026-03-10T00:00:00+00:00","lastSeenAt":"2026-03-10T00:00:00+00:00","resolvedAt":null}]
-                """
-            )
-        );
-        await _dbContext.VulnerabilityAssets.AddRangeAsync(
-            VulnerabilityAsset.Create(
-                tenantVulnerability.Id,
-                deviceOne.Id,
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
-            ),
-            VulnerabilityAsset.Create(
-                tenantVulnerability.Id,
-                deviceTwo.Id,
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
-            )
-        );
-        await _dbContext.SaveChangesAsync();
-
-        return tenantSoftware;
-    }
-
     public void Dispose()
     {
         _dbContext.Dispose();
-    }
-
-    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(tenantContext);
-        return services.BuildServiceProvider();
     }
 }
