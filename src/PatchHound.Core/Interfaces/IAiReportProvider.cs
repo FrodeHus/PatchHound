@@ -14,6 +14,12 @@ public interface IAiReportProvider
         CancellationToken ct
     );
 
+    Task<string> GenerateTextAsync(
+        AiTextGenerationRequest request,
+        TenantAiProfileResolved profile,
+        CancellationToken ct
+    );
+
     Task<AiProviderValidationResult> ValidateAsync(
         TenantAiProfileResolved profile,
         CancellationToken ct

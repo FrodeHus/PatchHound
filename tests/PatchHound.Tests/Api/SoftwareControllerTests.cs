@@ -6,9 +6,12 @@ using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Software;
+using PatchHound.Core.Common;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
+using PatchHound.Core.Models;
+using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Tests.Api;
@@ -17,6 +20,9 @@ public class SoftwareControllerTests : IDisposable
 {
     private readonly Guid _tenantId = Guid.NewGuid();
     private readonly PatchHoundDbContext _dbContext;
+    private readonly IAiReportProvider _aiProvider;
+    private readonly ITenantAiConfigurationResolver _tenantAiConfigurationResolver;
+    private readonly TenantAiTextGenerationService _tenantAiTextGenerationService;
     private readonly SoftwareController _controller;
 
     public SoftwareControllerTests()
@@ -24,13 +30,20 @@ public class SoftwareControllerTests : IDisposable
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.CurrentTenantId.Returns(_tenantId);
         tenantContext.AccessibleTenantIds.Returns([_tenantId]);
+        tenantContext.HasAccessToTenant(_tenantId).Returns(true);
 
         var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
         _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(tenantContext));
-        _controller = new SoftwareController(_dbContext);
+        _aiProvider = Substitute.For<IAiReportProvider>();
+        _tenantAiConfigurationResolver = Substitute.For<ITenantAiConfigurationResolver>();
+        _tenantAiTextGenerationService = new TenantAiTextGenerationService(
+            [_aiProvider],
+            _tenantAiConfigurationResolver
+        );
+        _controller = new SoftwareController(_dbContext, _tenantAiTextGenerationService, tenantContext);
     }
 
     [Fact]
@@ -111,6 +124,62 @@ public class SoftwareControllerTests : IDisposable
         payload.Items[0].ActiveInstallCount.Should().Be(2);
         payload.Items[0].ActiveVulnerabilityCount.Should().Be(1);
         payload.Items[0].VersionCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task GenerateAiReport_ReturnsMergedSoftwareReport()
+    {
+        var tenantSoftware = await SeedNormalizedSoftwareGraphAsync();
+        var profile = TenantAiProfile.Create(
+            _tenantId,
+            "Default AI",
+            TenantAiProviderType.Ollama,
+            true,
+            true,
+            "llama3",
+            "system",
+            0.2m,
+            null,
+            1200,
+            60
+        );
+        _tenantAiConfigurationResolver
+            .ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(
+                Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, string.Empty))
+            );
+        _aiProvider.ProviderType.Returns(TenantAiProviderType.Ollama);
+        _aiProvider
+            .ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
+            .Returns(AiProviderValidationResult.Success());
+        _aiProvider
+            .GenerateTextAsync(Arg.Any<AiTextGenerationRequest>(), Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
+            .Returns("# Software report");
+
+        var action = await _controller.GenerateAiReport(
+            tenantSoftware.Id,
+            new GenerateTenantSoftwareAiReportRequest(null),
+            CancellationToken.None
+        );
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<TenantSoftwareAiReportDto>().Subject;
+
+        payload.TenantSoftwareId.Should().Be(tenantSoftware.Id);
+        payload.Content.Should().Be("# Software report");
+        payload.ProviderType.Should().Be("Ollama");
+
+        await _aiProvider
+            .Received(1)
+            .GenerateTextAsync(
+                Arg.Is<AiTextGenerationRequest>(request =>
+                    request.UserPrompt.Contains("\"software\"")
+                    && request.UserPrompt.Contains("\"installations\"")
+                    && request.UserPrompt.Contains("\"vulnerabilities\"")
+                    && request.UserPrompt.Contains("CVE-2026-1000")
+                ),
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<CancellationToken>()
+            );
     }
 
     private async Task<TenantSoftware> SeedNormalizedSoftwareGraphAsync()

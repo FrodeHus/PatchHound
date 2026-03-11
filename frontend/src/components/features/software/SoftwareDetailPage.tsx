@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import type {
   TenantSoftwareDetail,
   TenantSoftwareVulnerability,
   PagedTenantSoftwareInstallations,
 } from '@/api/software.schemas'
+import { SoftwareAiReportTab } from '@/components/features/software/SoftwareAiReportTab'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 
 type SoftwareDetailPageProps = {
@@ -24,6 +25,7 @@ export function SoftwareDetailPage({
   onSelectVersion,
   onPageChange,
 }: SoftwareDetailPageProps) {
+  const [activeInsightTab, setActiveInsightTab] = useState<'vulnerabilities' | 'ai'>('vulnerabilities')
   const activeVersion =
     detail.versionCohorts.find((cohort) => normalizeVersion(cohort.version) === selectedVersion) ??
     detail.versionCohorts[0] ??
@@ -199,60 +201,81 @@ export function SoftwareDetailPage({
           </section>
 
           <section className="rounded-[28px] border border-border/70 bg-card p-5">
-            <div>
-              <h2 className="text-lg font-semibold">Known vulnerabilities</h2>
-              <p className="text-sm text-muted-foreground">Aggregated exposure for this normalized product across all linked software aliases.</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Analysis workspace</h2>
+                <p className="text-sm text-muted-foreground">Review linked vulnerabilities or generate an AI summary from the merged software exposure payload.</p>
+              </div>
+              <div className="flex gap-2 rounded-full border border-border/70 bg-background p-1">
+                <InsightTabButton
+                  isActive={activeInsightTab === 'vulnerabilities'}
+                  label="Known vulnerabilities"
+                  onClick={() => setActiveInsightTab('vulnerabilities')}
+                />
+                <InsightTabButton
+                  isActive={activeInsightTab === 'ai'}
+                  label="AI report"
+                  onClick={() => setActiveInsightTab('ai')}
+                />
+              </div>
             </div>
-            {vulnerabilities.length === 0 ? (
-              <p className="mt-5 text-sm text-muted-foreground">No vulnerability matches are currently projected for this software.</p>
+
+            {activeInsightTab === 'vulnerabilities' ? (
+              vulnerabilities.length === 0 ? (
+                <p className="mt-5 text-sm text-muted-foreground">No vulnerability matches are currently projected for this software.</p>
+              ) : (
+                <div className="mt-5 space-y-3">
+                  {vulnerabilities.map((item) => (
+                    <Link
+                      key={item.tenantVulnerabilityId}
+                      to="/vulnerabilities/$id"
+                      params={{ id: item.tenantVulnerabilityId }}
+                      className="block rounded-3xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">{item.title}</p>
+                            <Pill>{item.vendorSeverity}</Pill>
+                            {item.bestConfidence ? <Pill>{item.bestConfidence}</Pill> : null}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {item.externalId} • {item.source}
+                            {item.cvssScore !== null ? ` • CVSS ${item.cvssScore.toFixed(1)}` : ''}
+                          </p>
+                          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <span>{item.affectedInstallCount} installs</span>
+                            <span>{item.affectedDeviceCount} devices</span>
+                            <span>{item.affectedVersionCount} versions</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {item.affectedVersions.map((version) => (
+                              <span
+                                key={version}
+                                className={normalizeVersion(version) === selectedVersion
+                                  ? 'rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs text-primary'
+                                  : 'rounded-full border border-border/70 bg-card px-2 py-1 text-xs text-muted-foreground'}
+                              >
+                                {version}
+                              </span>
+                            ))}
+                          </div>
+                          {item.evidence[0] ? (
+                            <p className="text-xs text-muted-foreground">{item.evidence[0].evidence}</p>
+                          ) : null}
+                        </div>
+                        <div className="text-right text-xs text-muted-foreground">
+                          <p>{item.bestMatchMethod}</p>
+                          <p className="mt-1">Seen {formatDate(item.lastSeenAt)}</p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )
             ) : (
-              <div className="mt-5 space-y-3">
-                {vulnerabilities.map((item) => (
-                  <Link
-                    key={item.tenantVulnerabilityId}
-                    to="/vulnerabilities/$id"
-                    params={{ id: item.tenantVulnerabilityId }}
-                    className="block rounded-3xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{item.title}</p>
-                          <Pill>{item.vendorSeverity}</Pill>
-                          {item.bestConfidence ? <Pill>{item.bestConfidence}</Pill> : null}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {item.externalId} • {item.source}
-                          {item.cvssScore !== null ? ` • CVSS ${item.cvssScore.toFixed(1)}` : ''}
-                        </p>
-                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                          <span>{item.affectedInstallCount} installs</span>
-                          <span>{item.affectedDeviceCount} devices</span>
-                          <span>{item.affectedVersionCount} versions</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {item.affectedVersions.map((version) => (
-                            <span
-                              key={version}
-                              className={normalizeVersion(version) === selectedVersion
-                                ? 'rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs text-primary'
-                                : 'rounded-full border border-border/70 bg-card px-2 py-1 text-xs text-muted-foreground'}
-                            >
-                              {version}
-                            </span>
-                          ))}
-                        </div>
-                        {item.evidence[0] ? (
-                          <p className="text-xs text-muted-foreground">{item.evidence[0].evidence}</p>
-                        ) : null}
-                      </div>
-                      <div className="text-right text-xs text-muted-foreground">
-                        <p>{item.bestMatchMethod}</p>
-                        <p className="mt-1">Seen {formatDate(item.lastSeenAt)}</p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+              <div className="mt-5">
+                <SoftwareAiReportTab tenantSoftwareId={detail.id} />
               </div>
             )}
           </section>
@@ -291,6 +314,30 @@ export function SoftwareDetailPage({
         </aside>
       </div>
     </section>
+  )
+}
+
+function InsightTabButton({
+  isActive,
+  label,
+  onClick,
+}: {
+  isActive: boolean
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        isActive
+          ? 'rounded-full bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground'
+          : 'rounded-full px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted'
+      }
+    >
+      {label}
+    </button>
   )
 }
 

@@ -112,9 +112,19 @@ export const tenantSoftwareVulnerabilitySchema = z.object({
   evidence: z.array(tenantSoftwareVulnerabilityEvidenceSchema),
 })
 
+export const tenantSoftwareAiReportSchema = z.object({
+  tenantSoftwareId: z.string().uuid(),
+  content: z.string(),
+  providerType: z.string(),
+  profileName: z.string(),
+  model: z.string(),
+  generatedAt: isoDateTimeSchema,
+})
+
 export type TenantSoftwareDetail = z.infer<typeof tenantSoftwareDetailSchema>
 export type TenantSoftwareListItem = z.infer<typeof tenantSoftwareListItemSchema>
 export type TenantSoftwareVersionCohort = z.infer<typeof tenantSoftwareVersionCohortSchema>
 export type TenantSoftwareInstallation = z.infer<typeof tenantSoftwareInstallationSchema>
 export type PagedTenantSoftwareInstallations = z.infer<typeof pagedTenantSoftwareInstallationsSchema>
 export type TenantSoftwareVulnerability = z.infer<typeof tenantSoftwareVulnerabilitySchema>
+export type TenantSoftwareAiReport = z.infer<typeof tenantSoftwareAiReportSchema>

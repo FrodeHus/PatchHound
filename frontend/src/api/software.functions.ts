@@ -1,9 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { authMiddleware } from '@/server/middleware'
-import { apiGet } from '@/server/api'
+import { apiGet, apiPost } from '@/server/api'
 import {
   tenantSoftwareDetailSchema,
+  tenantSoftwareAiReportSchema,
   tenantSoftwareVulnerabilitySchema,
   pagedTenantSoftwareSchema,
   pagedTenantSoftwareInstallationsSchema,
@@ -60,4 +61,12 @@ export const fetchTenantSoftwareVulnerabilities = createServerFn({ method: 'GET'
   .handler(async ({ context, data: { id } }) => {
     const data = await apiGet(`/software/${id}/vulnerabilities`, context)
     return z.array(tenantSoftwareVulnerabilitySchema).parse(data)
+  })
+
+export const generateTenantSoftwareAiReport = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ id: z.string(), tenantAiProfileId: z.string().uuid().optional() }))
+  .handler(async ({ context, data: { id, tenantAiProfileId } }) => {
+    const data = await apiPost(`/software/${id}/ai-report`, context, { tenantAiProfileId })
+    return tenantSoftwareAiReportSchema.parse(data)
   })
