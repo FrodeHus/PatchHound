@@ -84,7 +84,15 @@ public class SecurityProfilesController : ControllerBase
         CancellationToken ct
     )
     {
-        if (!_tenantContext.HasAccessToTenant(request.TenantId))
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(
+                new ProblemDetails
+                {
+                    Title = "An active tenant must be selected before creating a security profile."
+                }
+            );
+
+        if (!_tenantContext.HasAccessToTenant(tenantId))
             return Forbid();
 
         if (!TryParseRequest(request, out var parsed, out var error))
@@ -93,7 +101,7 @@ public class SecurityProfilesController : ControllerBase
         }
 
         var profile = AssetSecurityProfile.Create(
-            request.TenantId,
+            tenantId,
             request.Name.Trim(),
             request.Description?.Trim(),
             parsed.EnvironmentClass,

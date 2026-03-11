@@ -14,7 +14,6 @@ public record SecurityProfileDto(
 );
 
 public record CreateSecurityProfileRequest(
-    Guid TenantId,
     string Name,
     string? Description,
     string EnvironmentClass,
