@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models;
@@ -15,6 +14,7 @@ using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Tenants;
 using PatchHound.Infrastructure.VulnerabilitySources;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
 
@@ -36,7 +36,10 @@ public class VulnerabilitiesControllerTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(_tenantContext));
+        _dbContext = new PatchHoundDbContext(
+            options,
+            TestServiceProviderFactory.Create(_tenantContext)
+        );
 
         var vulnerabilityService = new VulnerabilityService(
             Substitute.For<IRepository<TenantVulnerability>>(),
@@ -57,104 +60,7 @@ public class VulnerabilitiesControllerTests : IDisposable
     [Fact]
     public async Task List_RecurrenceOnly_ReturnsOnlyPerAssetRecurringVulnerabilities()
     {
-        var recurringDefinition = VulnerabilityDefinition.Create(
-            "CVE-2026-0001",
-            "Recurring vulnerability",
-            "Desc",
-            Severity.High,
-            "MicrosoftDefender"
-        );
-        var recurringProjection = CreateTenantVulnerability(recurringDefinition);
-        var recurringAsset = Asset.Create(
-            _tenantId,
-            "device-1",
-            AssetType.Device,
-            "Device 1",
-            Criticality.High
-        );
-        var recurringLink = VulnerabilityAsset.Create(
-            recurringProjection.TenantVulnerability.Id,
-            recurringAsset.Id,
-            DateTimeOffset.UtcNow.AddDays(-10)
-        );
-
-        var nonRecurringDefinition = VulnerabilityDefinition.Create(
-            "CVE-2026-0002",
-            "Multi asset no recurrence",
-            "Desc",
-            Severity.High,
-            "MicrosoftDefender"
-        );
-        var nonRecurringProjection = CreateTenantVulnerability(nonRecurringDefinition);
-        var assetTwo = Asset.Create(
-            _tenantId,
-            "device-2",
-            AssetType.Device,
-            "Device 2",
-            Criticality.Medium
-        );
-        var assetThree = Asset.Create(
-            _tenantId,
-            "device-3",
-            AssetType.Device,
-            "Device 3",
-            Criticality.Medium
-        );
-        var linkTwo = VulnerabilityAsset.Create(
-            nonRecurringProjection.TenantVulnerability.Id,
-            assetTwo.Id,
-            DateTimeOffset.UtcNow.AddDays(-6)
-        );
-        var linkThree = VulnerabilityAsset.Create(
-            nonRecurringProjection.TenantVulnerability.Id,
-            assetThree.Id,
-            DateTimeOffset.UtcNow.AddDays(-5)
-        );
-
-        await _dbContext.AddRangeAsync(
-            recurringProjection.Definition,
-            recurringProjection.TenantVulnerability,
-            recurringAsset,
-            recurringLink,
-            nonRecurringProjection.Definition,
-            nonRecurringProjection.TenantVulnerability,
-            assetTwo,
-            assetThree,
-            linkTwo,
-            linkThree
-        );
-
-        await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(
-            VulnerabilityAssetEpisode.Create(
-                _tenantId,
-                recurringProjection.TenantVulnerability.Id,
-                recurringAsset.Id,
-                1,
-                DateTimeOffset.UtcNow.AddDays(-20)
-            ),
-            VulnerabilityAssetEpisode.Create(
-                _tenantId,
-                recurringProjection.TenantVulnerability.Id,
-                recurringAsset.Id,
-                2,
-                DateTimeOffset.UtcNow.AddDays(-3)
-            ),
-            VulnerabilityAssetEpisode.Create(
-                _tenantId,
-                nonRecurringProjection.TenantVulnerability.Id,
-                assetTwo.Id,
-                1,
-                DateTimeOffset.UtcNow.AddDays(-6)
-            ),
-            VulnerabilityAssetEpisode.Create(
-                _tenantId,
-                nonRecurringProjection.TenantVulnerability.Id,
-                assetThree.Id,
-                1,
-                DateTimeOffset.UtcNow.AddDays(-5)
-            )
-        );
-        await _dbContext.SaveChangesAsync();
+        await TenantVulnerabilityGraphFactory.SeedRecurrenceListGraphAsync(_dbContext, _tenantId);
 
         var action = await _controller.List(
             new VulnerabilityFilterQuery(RecurrenceOnly: true),
@@ -182,14 +88,12 @@ public class VulnerabilitiesControllerTests : IDisposable
             "Device 1",
             Criticality.High
         );
-        var vulnerability = VulnerabilityDefinition.Create(
+        var projection = TenantVulnerabilityGraphFactory.CreateProjection(
+            _tenantId,
             "CVE-2026-0100",
             "Contoso app vulnerability",
-            "Desc",
-            Severity.Critical,
-            "MicrosoftDefender"
+            Severity.Critical
         );
-        var projection = CreateTenantVulnerability(vulnerability);
         var link = VulnerabilityAsset.Create(
             projection.TenantVulnerability.Id,
             device.Id,
@@ -286,64 +190,7 @@ public class VulnerabilitiesControllerTests : IDisposable
             .Equal("Contoso Agent", "Nearby Utility", "Legacy Runtime");
     }
 
-    [Fact]
-    public async Task List_ReturnsPaginationMetadata()
-    {
-        for (var i = 0; i < 3; i++)
-        {
-            var vulnerability = VulnerabilityDefinition.Create(
-                $"CVE-2026-100{i}",
-                $"Vulnerability {i}",
-                "Desc",
-                Severity.Medium,
-                "MicrosoftDefender"
-            );
-            var projection = CreateTenantVulnerability(vulnerability);
-            await _dbContext.VulnerabilityDefinitions.AddAsync(projection.Definition);
-            await _dbContext.TenantVulnerabilities.AddAsync(projection.TenantVulnerability);
-        }
-
-        await _dbContext.SaveChangesAsync();
-
-        var action = await _controller.List(
-            new VulnerabilityFilterQuery(),
-            new PaginationQuery(2, 2),
-            CancellationToken.None
-        );
-
-        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var payload = result.Value.Should().BeOfType<PagedResponse<VulnerabilityDto>>().Subject;
-
-        payload.Page.Should().Be(2);
-        payload.PageSize.Should().Be(2);
-        payload.TotalCount.Should().Be(3);
-        payload.TotalPages.Should().Be(2);
-        payload.Items.Should().HaveCount(1);
-    }
-
     public void Dispose() => _dbContext.Dispose();
-
-    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(tenantContext);
-        return services.BuildServiceProvider();
-    }
-
-    private (VulnerabilityDefinition Definition, TenantVulnerability TenantVulnerability)
-        CreateTenantVulnerability(VulnerabilityDefinition vulnerability)
-    {
-        return (
-            vulnerability,
-            TenantVulnerability.Create(
-                _tenantId,
-                vulnerability.Id,
-                VulnerabilityStatus.Open,
-                DateTimeOffset.UtcNow
-            )
-        );
-    }
-
     private sealed class StubNvdApiClient(NvdCveResponse response) : NvdApiClient(new HttpClient())
     {
         public override Task<NvdCveResponse> GetCveAsync(

@@ -5,13 +5,19 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Models;
 using PatchHound.Infrastructure.AiProviders;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Infrastructure;
 
 public class AiProvidersTests
 {
-    [Fact]
-    public async Task OllamaValidateAsync_PerformsOutboundRequest()
+    [Theory]
+    [InlineData("http://ollama.local:11434")]
+    [InlineData("http://ollama.local:11434/api")]
+    [InlineData("http://ollama.local:11434/api/generate")]
+    [InlineData("http://ollama.local:11434/api/chat")]
+    [InlineData("http://ollama.local:11434/v1/chat/completions")]
+    public async Task OllamaValidateAsync_NormalizesConfiguredBaseUrl(string configuredBaseUrl)
     {
         var handler = new RecordingHttpMessageHandler(
             _ => new HttpResponseMessage(HttpStatusCode.OK)
@@ -21,56 +27,14 @@ public class AiProvidersTests
         );
         var provider = new OllamaAiProvider(new HttpClient(handler));
 
-        var profile = TenantAiProfile.Create(
+        var profile = TenantAiProfileFactory.Create(
             Guid.NewGuid(),
-            "Local Ollama",
-            TenantAiProviderType.Ollama,
-            true,
-            true,
-            "llama3.1:8b",
-            "Prompt",
-            0.2m,
-            1.0m,
-            1200,
-            60,
-            baseUrl: "http://ollama.local:11434",
+            providerType: TenantAiProviderType.Ollama,
+            name: "Local Ollama",
+            model: "llama3.1:8b",
+            topP: 1.0m,
+            baseUrl: configuredBaseUrl,
             keepAlive: "5m"
-        );
-
-        var result = await provider.ValidateAsync(
-            new TenantAiProfileResolved(profile, string.Empty),
-            CancellationToken.None
-        );
-
-        result.IsSuccess.Should().BeTrue();
-        handler.Requests.Should().HaveCount(1);
-        handler.Requests[0].RequestUri!.ToString().Should().Be("http://ollama.local:11434/api/generate");
-    }
-
-    [Fact]
-    public async Task OllamaValidateAsync_AcceptsBaseUrlThatAlreadyIncludesApi()
-    {
-        var handler = new RecordingHttpMessageHandler(
-            _ => new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent("""{"response":"OK"}""", Encoding.UTF8, "application/json"),
-            }
-        );
-        var provider = new OllamaAiProvider(new HttpClient(handler));
-
-        var profile = TenantAiProfile.Create(
-            Guid.NewGuid(),
-            "Local Ollama",
-            TenantAiProviderType.Ollama,
-            true,
-            true,
-            "llama3.1:8b",
-            "Prompt",
-            0.2m,
-            1.0m,
-            1200,
-            60,
-            baseUrl: "http://ollama.local:11434/api"
         );
 
         var result = await provider.ValidateAsync(
@@ -104,18 +68,12 @@ public class AiProvidersTests
         });
         var provider = new OllamaAiProvider(new HttpClient(handler));
 
-        var profile = TenantAiProfile.Create(
+        var profile = TenantAiProfileFactory.Create(
             Guid.NewGuid(),
-            "Local Ollama",
-            TenantAiProviderType.Ollama,
-            true,
-            true,
-            "llama3.1:8b",
-            "Prompt",
-            0.2m,
-            1.0m,
-            1200,
-            60,
+            providerType: TenantAiProviderType.Ollama,
+            name: "Local Ollama",
+            model: "llama3.1:8b",
+            topP: 1.0m,
             baseUrl: "http://ollama.local:11434"
         );
 
@@ -142,18 +100,12 @@ public class AiProvidersTests
         );
         var provider = new OllamaAiProvider(new HttpClient(handler));
 
-        var profile = TenantAiProfile.Create(
+        var profile = TenantAiProfileFactory.Create(
             Guid.NewGuid(),
-            "Local Ollama",
-            TenantAiProviderType.Ollama,
-            true,
-            true,
-            "llama3.1:8b",
-            "Prompt",
-            0.2m,
-            1.0m,
-            1200,
-            60,
+            providerType: TenantAiProviderType.Ollama,
+            name: "Local Ollama",
+            model: "llama3.1:8b",
+            topP: 1.0m,
             baseUrl: "http://ollama.local:11434"
         );
 
@@ -165,45 +117,6 @@ public class AiProvidersTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("model 'llama3.1:8b' not found");
         result.Error.Should().NotContain("{\"error\"");
-    }
-
-    [Theory]
-    [InlineData("http://ollama.local:11434/api/generate")]
-    [InlineData("http://ollama.local:11434/api/chat")]
-    [InlineData("http://ollama.local:11434/v1/chat/completions")]
-    public async Task OllamaValidateAsync_NormalizesEndpointStyleBaseUrls(string configuredBaseUrl)
-    {
-        var handler = new RecordingHttpMessageHandler(
-            _ => new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent("""{"response":"OK"}""", Encoding.UTF8, "application/json"),
-            }
-        );
-        var provider = new OllamaAiProvider(new HttpClient(handler));
-
-        var profile = TenantAiProfile.Create(
-            Guid.NewGuid(),
-            "Local Ollama",
-            TenantAiProviderType.Ollama,
-            true,
-            true,
-            "llama3.1:8b",
-            "Prompt",
-            0.2m,
-            1.0m,
-            1200,
-            60,
-            baseUrl: configuredBaseUrl
-        );
-
-        var result = await provider.ValidateAsync(
-            new TenantAiProfileResolved(profile, string.Empty),
-            CancellationToken.None
-        );
-
-        result.IsSuccess.Should().BeTrue();
-        handler.Requests.Should().HaveCount(1);
-        handler.Requests[0].RequestUri!.ToString().Should().Be("http://ollama.local:11434/api/generate");
     }
 
     [Fact]
@@ -222,18 +135,11 @@ public class AiProvidersTests
         );
         var provider = new OpenAiProvider(new HttpClient(handler));
         var request = BuildRequest(tenantId);
-        var profile = TenantAiProfile.Create(
+        var profile = TenantAiProfileFactory.Create(
             tenantId,
-            "OpenAI",
-            TenantAiProviderType.OpenAi,
-            true,
-            true,
-            "gpt-4.1-mini",
-            "Prompt",
-            0.2m,
-            1.0m,
-            1200,
-            60,
+            providerType: TenantAiProviderType.OpenAi,
+            name: "OpenAI",
+            topP: 1.0m,
             baseUrl: "https://api.openai.com/v1",
             secretRef: "secret"
         );
@@ -263,18 +169,12 @@ public class AiProvidersTests
             }
         );
         var provider = new AzureOpenAiProvider(new HttpClient(handler));
-        var profile = TenantAiProfile.Create(
+        var profile = TenantAiProfileFactory.Create(
             Guid.NewGuid(),
-            "Azure",
-            TenantAiProviderType.AzureOpenAi,
-            true,
-            true,
-            "gpt-4o",
-            "Prompt",
-            0.2m,
-            1.0m,
-            1200,
-            60,
+            providerType: TenantAiProviderType.AzureOpenAi,
+            name: "Azure",
+            model: "gpt-4o",
+            topP: 1.0m,
             baseUrl: "https://example.openai.azure.com",
             deploymentName: "gpt-4o-prod",
             apiVersion: "2024-10-21",

@@ -1349,11 +1349,17 @@ public class IngestionServiceTests : IDisposable
         updatedAsset.Name.Should().Be("FreshMachineName");
     }
 
-    [Fact]
-    public async Task ProcessResultsAsync_FirstMissingSync_DoesNotResolveEpisode()
+    [Theory]
+    [InlineData("first-miss")]
+    [InlineData("second-miss")]
+    [InlineData("reappear-before-second-miss")]
+    [InlineData("reappear-after-resolution")]
+    public async Task ProcessResultsAsync_RecurringEpisodeLifecycle_HandlesExpectedScenario(
+        string scenario
+    )
     {
         var vulnerability = VulnerabilityDefinition.Create(
-            "CVE-2025-2001",
+            $"CVE-2025-{scenario}",
             "Recurring vulnerability",
             "Desc",
             Severity.High,
@@ -1371,232 +1377,21 @@ public class IngestionServiceTests : IDisposable
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
-        var episode = VulnerabilityAssetEpisode.Create(
-            _tenantId,
-            tenantVulnerability.Id,
-            asset.Id,
-            1,
-            DateTimeOffset.UtcNow.AddHours(-2)
-        );
-        var projection = VulnerabilityAsset.Create(
-            tenantVulnerability.Id,
-            asset.Id,
-            DateTimeOffset.UtcNow.AddHours(-2)
-        );
-        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
-        await _dbContext.VulnerabilityAssets.AddAsync(projection);
-        await _dbContext.SaveChangesAsync();
+        await SeedRecurringEpisodeScenarioAsync(scenario, tenantVulnerability, asset);
 
-        await _service.ProcessResultsAsync(_tenantId, "TestSource", [], CancellationToken.None);
+        var results = scenario switch
+        {
+            "reappear-before-second-miss" or "reappear-after-resolution" => CreateRecurringReappearanceResult(
+                vulnerability.ExternalId
+            ),
+            _ => [],
+        };
 
-        var updatedEpisode = await _dbContext
-            .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
-            .FirstAsync();
-        var updatedProjection = await _dbContext
-            .VulnerabilityAssets.IgnoreQueryFilters()
-            .FirstAsync();
-        var updatedVulnerability = await _dbContext
-            .TenantVulnerabilities.IgnoreQueryFilters()
-            .FirstAsync();
-
-        updatedEpisode.Status.Should().Be(VulnerabilityStatus.Open);
-        updatedEpisode.MissingSyncCount.Should().Be(1);
-        updatedEpisode.ResolvedAt.Should().BeNull();
-        updatedProjection.Status.Should().Be(VulnerabilityStatus.Open);
-        updatedVulnerability.Status.Should().Be(VulnerabilityStatus.Open);
-    }
-
-    [Fact]
-    public async Task ProcessResultsAsync_SecondMissingSync_ResolvesEpisodeAndProjection()
-    {
-        var vulnerability = VulnerabilityDefinition.Create(
-            "CVE-2025-2002",
-            "Recurring vulnerability",
-            "Desc",
-            Severity.High,
-            "TestSource"
-        );
-        var asset = Asset.Create(
-            _tenantId,
-            "asset-1",
-            AssetType.Device,
-            "Server1",
-            Criticality.Medium
-        );
-        await _dbContext.VulnerabilityDefinitions.AddAsync(vulnerability);
-        var tenantVulnerability = await CreateTenantVulnerabilityAsync(vulnerability);
-        await _dbContext.Assets.AddAsync(asset);
-        await _dbContext.SaveChangesAsync();
-
-        var episode = VulnerabilityAssetEpisode.Create(
-            _tenantId,
-            tenantVulnerability.Id,
-            asset.Id,
-            1,
-            DateTimeOffset.UtcNow.AddHours(-2)
-        );
-        episode.MarkMissing();
-        var projection = VulnerabilityAsset.Create(
-            tenantVulnerability.Id,
-            asset.Id,
-            DateTimeOffset.UtcNow.AddHours(-2)
-        );
-        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
-        await _dbContext.VulnerabilityAssets.AddAsync(projection);
-        await _dbContext.SaveChangesAsync();
-
-        await _service.ProcessResultsAsync(_tenantId, "TestSource", [], CancellationToken.None);
-
-        var updatedEpisode = await _dbContext
-            .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
-            .FirstAsync();
-        var updatedProjection = await _dbContext
-            .VulnerabilityAssets.IgnoreQueryFilters()
-            .FirstAsync();
-        var updatedVulnerability = await _dbContext
-            .TenantVulnerabilities.IgnoreQueryFilters()
-            .FirstAsync();
-
-        updatedEpisode.Status.Should().Be(VulnerabilityStatus.Resolved);
-        updatedEpisode.MissingSyncCount.Should().Be(2);
-        updatedEpisode.ResolvedAt.Should().NotBeNull();
-        updatedProjection.Status.Should().Be(VulnerabilityStatus.Resolved);
-        updatedProjection.ResolvedDate.Should().NotBeNull();
-        updatedVulnerability.Status.Should().Be(VulnerabilityStatus.Resolved);
-    }
-
-    [Fact]
-    public async Task ProcessResultsAsync_ReappearanceBeforeSecondMiss_ContinuesSameEpisode()
-    {
-        var vulnerability = VulnerabilityDefinition.Create(
-            "CVE-2025-2003",
-            "Recurring vulnerability",
-            "Desc",
-            Severity.High,
-            "TestSource"
-        );
-        var asset = Asset.Create(
-            _tenantId,
-            "asset-1",
-            AssetType.Device,
-            "Server1",
-            Criticality.Medium
-        );
-        await _dbContext.VulnerabilityDefinitions.AddAsync(vulnerability);
-        var tenantVulnerability = await CreateTenantVulnerabilityAsync(vulnerability);
-        await _dbContext.Assets.AddAsync(asset);
-        await _dbContext.SaveChangesAsync();
-
-        var firstSeenAt = DateTimeOffset.UtcNow.AddHours(-2);
-        var episode = VulnerabilityAssetEpisode.Create(
-            _tenantId,
-            tenantVulnerability.Id,
-            asset.Id,
-            1,
-            firstSeenAt
-        );
-        episode.MarkMissing();
-        var projection = VulnerabilityAsset.Create(
-            tenantVulnerability.Id,
-            asset.Id,
-            firstSeenAt
-        );
-        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
-        await _dbContext.VulnerabilityAssets.AddAsync(projection);
-        await _dbContext.SaveChangesAsync();
-
-        await _service.ProcessResultsAsync(
-            _tenantId,
-            "TestSource",
-            [
-                new(
-                    "CVE-2025-2003",
-                    "Recurring vulnerability",
-                    "Desc",
-                    Severity.High,
-                    8.0m,
-                    null,
-                    null,
-                    [new IngestionAffectedAsset("asset-1", "Server1", AssetType.Device)]
-                ),
-            ],
-            CancellationToken.None
-        );
+        await _service.ProcessResultsAsync(_tenantId, "TestSource", results, CancellationToken.None);
 
         var episodes = await _dbContext
             .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
-            .ToListAsync();
-        episodes.Should().HaveCount(1);
-        episodes[0].EpisodeNumber.Should().Be(1);
-        episodes[0].MissingSyncCount.Should().Be(0);
-        episodes[0].Status.Should().Be(VulnerabilityStatus.Open);
-    }
-
-    [Fact]
-    public async Task ProcessResultsAsync_ReappearanceAfterResolution_CreatesNewEpisode()
-    {
-        var vulnerability = VulnerabilityDefinition.Create(
-            "CVE-2025-2004",
-            "Recurring vulnerability",
-            "Desc",
-            Severity.High,
-            "TestSource"
-        );
-        var asset = Asset.Create(
-            _tenantId,
-            "asset-1",
-            AssetType.Device,
-            "Server1",
-            Criticality.Medium
-        );
-        await _dbContext.VulnerabilityDefinitions.AddAsync(vulnerability);
-        var tenantVulnerability = await CreateTenantVulnerabilityAsync(vulnerability);
-        await _dbContext.Assets.AddAsync(asset);
-        await _dbContext.SaveChangesAsync();
-
-        var firstSeenAt = DateTimeOffset.UtcNow.AddDays(-1);
-        var firstEpisode = VulnerabilityAssetEpisode.Create(
-            _tenantId,
-            tenantVulnerability.Id,
-            asset.Id,
-            1,
-            firstSeenAt
-        );
-        firstEpisode.MarkMissing();
-        firstEpisode.MarkMissing();
-        firstEpisode.Resolve(DateTimeOffset.UtcNow.AddHours(-2));
-        var projection = VulnerabilityAsset.Create(
-            tenantVulnerability.Id,
-            asset.Id,
-            firstSeenAt
-        );
-        projection.Resolve(DateTimeOffset.UtcNow.AddHours(-2));
-        tenantVulnerability.UpdateStatus(VulnerabilityStatus.Resolved, DateTimeOffset.UtcNow.AddHours(-2));
-        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(firstEpisode);
-        await _dbContext.VulnerabilityAssets.AddAsync(projection);
-        await _dbContext.SaveChangesAsync();
-
-        await _service.ProcessResultsAsync(
-            _tenantId,
-            "TestSource",
-            [
-                new(
-                    "CVE-2025-2004",
-                    "Recurring vulnerability",
-                    "Desc",
-                    Severity.High,
-                    8.0m,
-                    null,
-                    null,
-                    [new IngestionAffectedAsset("asset-1", "Server1", AssetType.Device)]
-                ),
-            ],
-            CancellationToken.None
-        );
-
-        var episodes = await _dbContext
-            .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
-            .OrderBy(episode => episode.EpisodeNumber)
+            .OrderBy(current => current.EpisodeNumber)
             .ToListAsync();
         var updatedProjection = await _dbContext
             .VulnerabilityAssets.IgnoreQueryFilters()
@@ -1605,13 +1400,45 @@ public class IngestionServiceTests : IDisposable
             .TenantVulnerabilities.IgnoreQueryFilters()
             .FirstAsync();
 
-        episodes.Should().HaveCount(2);
-        episodes[0].Status.Should().Be(VulnerabilityStatus.Resolved);
-        episodes[1].EpisodeNumber.Should().Be(2);
-        episodes[1].Status.Should().Be(VulnerabilityStatus.Open);
-        updatedProjection.Status.Should().Be(VulnerabilityStatus.Open);
-        updatedProjection.ResolvedDate.Should().BeNull();
-        updatedVulnerability.Status.Should().Be(VulnerabilityStatus.Open);
+        switch (scenario)
+        {
+            case "first-miss":
+                episodes.Should().HaveCount(1);
+                episodes[0].Status.Should().Be(VulnerabilityStatus.Open);
+                episodes[0].MissingSyncCount.Should().Be(1);
+                episodes[0].ResolvedAt.Should().BeNull();
+                updatedProjection.Status.Should().Be(VulnerabilityStatus.Open);
+                updatedVulnerability.Status.Should().Be(VulnerabilityStatus.Open);
+                break;
+            case "second-miss":
+                episodes.Should().HaveCount(1);
+                episodes[0].Status.Should().Be(VulnerabilityStatus.Resolved);
+                episodes[0].MissingSyncCount.Should().Be(2);
+                episodes[0].ResolvedAt.Should().NotBeNull();
+                updatedProjection.Status.Should().Be(VulnerabilityStatus.Resolved);
+                updatedProjection.ResolvedDate.Should().NotBeNull();
+                updatedVulnerability.Status.Should().Be(VulnerabilityStatus.Resolved);
+                break;
+            case "reappear-before-second-miss":
+                episodes.Should().HaveCount(1);
+                episodes[0].EpisodeNumber.Should().Be(1);
+                episodes[0].MissingSyncCount.Should().Be(0);
+                episodes[0].Status.Should().Be(VulnerabilityStatus.Open);
+                updatedProjection.Status.Should().Be(VulnerabilityStatus.Open);
+                updatedVulnerability.Status.Should().Be(VulnerabilityStatus.Open);
+                break;
+            case "reappear-after-resolution":
+                episodes.Should().HaveCount(2);
+                episodes[0].Status.Should().Be(VulnerabilityStatus.Resolved);
+                episodes[1].EpisodeNumber.Should().Be(2);
+                episodes[1].Status.Should().Be(VulnerabilityStatus.Open);
+                updatedProjection.Status.Should().Be(VulnerabilityStatus.Open);
+                updatedProjection.ResolvedDate.Should().BeNull();
+                updatedVulnerability.Status.Should().Be(VulnerabilityStatus.Open);
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown test scenario '{scenario}'.");
+        }
     }
 
     [Fact]
@@ -1715,6 +1542,67 @@ public class IngestionServiceTests : IDisposable
         enrichmentJob.ExternalKey.Should().Be("CVE-2026-1234");
         enrichmentJob.Status.Should().Be(EnrichmentJobStatus.Pending);
     }
+
+    private async Task SeedRecurringEpisodeScenarioAsync(
+        string scenario,
+        TenantVulnerability tenantVulnerability,
+        Asset asset
+    )
+    {
+        var detectedAt = scenario == "reappear-after-resolution"
+            ? DateTimeOffset.UtcNow.AddDays(-1)
+            : DateTimeOffset.UtcNow.AddHours(-2);
+        var episode = VulnerabilityAssetEpisode.Create(
+            _tenantId,
+            tenantVulnerability.Id,
+            asset.Id,
+            1,
+            detectedAt
+        );
+        var projection = VulnerabilityAsset.Create(tenantVulnerability.Id, asset.Id, detectedAt);
+
+        switch (scenario)
+        {
+            case "first-miss":
+                break;
+            case "second-miss":
+            case "reappear-before-second-miss":
+                episode.MarkMissing();
+                break;
+            case "reappear-after-resolution":
+            {
+                var resolvedAt = DateTimeOffset.UtcNow.AddHours(-2);
+                episode.MarkMissing();
+                episode.MarkMissing();
+                episode.Resolve(resolvedAt);
+                projection.Resolve(resolvedAt);
+                tenantVulnerability.UpdateStatus(VulnerabilityStatus.Resolved, resolvedAt);
+                break;
+            }
+            default:
+                throw new InvalidOperationException(
+                    $"Unknown recurring episode test scenario '{scenario}'."
+                );
+        }
+
+        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
+        await _dbContext.VulnerabilityAssets.AddAsync(projection);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private static List<IngestionResult> CreateRecurringReappearanceResult(string externalId) =>
+        [
+            new(
+                externalId,
+                "Recurring vulnerability",
+                "Desc",
+                Severity.High,
+                8.0m,
+                null,
+                null,
+                [new IngestionAffectedAsset("asset-1", "Server1", AssetType.Device)]
+            ),
+        ];
 
     public void Dispose() => _dbContext.Dispose();
 

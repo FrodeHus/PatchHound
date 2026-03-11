@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models.Settings;
@@ -13,6 +12,7 @@ using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
 
@@ -35,7 +35,10 @@ public class TenantAiProfilesControllerTests : IDisposable
         var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
-        _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(_tenantContext));
+        _dbContext = new PatchHoundDbContext(
+            options,
+            TestServiceProviderFactory.Create(_tenantContext)
+        );
         _secretStore = Substitute.For<ISecretStore>();
         _resolver = Substitute.For<ITenantAiConfigurationResolver>();
         _provider = Substitute.For<IAiReportProvider>();
@@ -94,32 +97,8 @@ public class TenantAiProfilesControllerTests : IDisposable
     [Fact]
     public async Task SetDefault_ClearsExistingDefault()
     {
-        var first = TenantAiProfile.Create(
-            _tenantId,
-            "First",
-            TenantAiProviderType.OpenAi,
-            true,
-            true,
-            "gpt-4.1-mini",
-            "Prompt",
-            0.2m,
-            null,
-            1200,
-            60
-        );
-        var second = TenantAiProfile.Create(
-            _tenantId,
-            "Second",
-            TenantAiProviderType.OpenAi,
-            false,
-            true,
-            "gpt-4.1-mini",
-            "Prompt",
-            0.2m,
-            null,
-            1200,
-            60
-        );
+        var first = TenantAiProfileFactory.Create(_tenantId, name: "First");
+        var second = TenantAiProfileFactory.Create(_tenantId, name: "Second", isDefault: false);
 
         await _dbContext.TenantAiProfiles.AddRangeAsync(first, second);
         await _dbContext.SaveChangesAsync();
@@ -135,18 +114,8 @@ public class TenantAiProfilesControllerTests : IDisposable
     [Fact]
     public async Task ValidateProfile_PersistsValidationResult()
     {
-        var profile = TenantAiProfile.Create(
+        var profile = TenantAiProfileFactory.Create(
             _tenantId,
-            "Default",
-            TenantAiProviderType.OpenAi,
-            true,
-            true,
-            "gpt-4.1-mini",
-            "Prompt",
-            0.2m,
-            null,
-            1200,
-            60,
             secretRef: "tenants/test/ai/default"
         );
 
@@ -174,19 +143,9 @@ public class TenantAiProfilesControllerTests : IDisposable
     [Fact]
     public async Task ListAvailableModels_ReturnsProviderModels()
     {
-        var profile = TenantAiProfile.Create(
+        var profile = TenantAiProfileFactory.Create(
             _tenantId,
-            "Default",
-            TenantAiProviderType.OpenAi,
-            true,
-            true,
-            "gpt-4.1-mini",
-            "Prompt",
-            0.2m,
-            null,
-            1200,
-            60,
-            "https://api.openai.com/v1",
+            baseUrl: "https://api.openai.com/v1",
             secretRef: "tenants/test/ai/default"
         );
 
@@ -235,19 +194,10 @@ public class TenantAiProfilesControllerTests : IDisposable
     [Fact]
     public async Task Update_ProfileConfiguration_ResetsValidationStatus()
     {
-        var profile = TenantAiProfile.Create(
+        var profile = TenantAiProfileFactory.Create(
             _tenantId,
-            "Default",
-            TenantAiProviderType.OpenAi,
-            true,
-            true,
-            "gpt-4.1-mini",
-            "Prompt",
-            0.2m,
-            1.0m,
-            1200,
-            60,
-            "https://api.openai.com/v1",
+            topP: 1.0m,
+            baseUrl: "https://api.openai.com/v1",
             secretRef: "tenants/test/ai/default"
         );
         profile.RecordValidation(TenantAiProfileValidationStatus.Valid, string.Empty);
@@ -287,12 +237,5 @@ public class TenantAiProfilesControllerTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-    }
-
-    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(tenantContext);
-        return services.BuildServiceProvider();
     }
 }
