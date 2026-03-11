@@ -27,6 +27,7 @@ import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/ind
 import { Route as ApiInternalEventsRouteImport } from './routes/api/internal/events'
 import { Route as AuthedVulnerabilitiesIdRouteImport } from './routes/_authed/vulnerabilities/$id'
 import { Route as AuthedSoftwareIdRouteImport } from './routes/_authed/software/$id'
+import { Route as AuthedSettingsAiRouteImport } from './routes/_authed/settings/ai'
 import { Route as AuthedAssetsIdRouteImport } from './routes/_authed/assets/$id'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
 import { Route as AuthedAdminTeamsRouteImport } from './routes/_authed/admin/teams'
@@ -125,6 +126,11 @@ const AuthedSoftwareIdRoute = AuthedSoftwareIdRouteImport.update({
   path: '/software/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedSettingsAiRoute = AuthedSettingsAiRouteImport.update({
+  id: '/settings/ai',
+  path: '/settings/ai',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedAssetsIdRoute = AuthedAssetsIdRouteImport.update({
   id: '/assets/$id',
   path: '/assets/$id',
@@ -175,6 +181,7 @@ export interface FileRoutesByFullPath {
   '/admin/teams': typeof AuthedAdminTeamsRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/assets/$id': typeof AuthedAssetsIdRoute
+  '/settings/ai': typeof AuthedSettingsAiRoute
   '/software/$id': typeof AuthedSoftwareIdRoute
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/api/internal/events': typeof ApiInternalEventsRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/admin/teams': typeof AuthedAdminTeamsRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/assets/$id': typeof AuthedAssetsIdRoute
+  '/settings/ai': typeof AuthedSettingsAiRoute
   '/software/$id': typeof AuthedSoftwareIdRoute
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/api/internal/events': typeof ApiInternalEventsRoute
@@ -229,6 +237,7 @@ export interface FileRoutesById {
   '/_authed/admin/teams': typeof AuthedAdminTeamsRoute
   '/_authed/admin/users': typeof AuthedAdminUsersRoute
   '/_authed/assets/$id': typeof AuthedAssetsIdRoute
+  '/_authed/settings/ai': typeof AuthedSettingsAiRoute
   '/_authed/software/$id': typeof AuthedSoftwareIdRoute
   '/_authed/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/api/internal/events': typeof ApiInternalEventsRoute
@@ -257,6 +266,7 @@ export interface FileRouteTypes {
     | '/admin/teams'
     | '/admin/users'
     | '/assets/$id'
+    | '/settings/ai'
     | '/software/$id'
     | '/vulnerabilities/$id'
     | '/api/internal/events'
@@ -283,6 +293,7 @@ export interface FileRouteTypes {
     | '/admin/teams'
     | '/admin/users'
     | '/assets/$id'
+    | '/settings/ai'
     | '/software/$id'
     | '/vulnerabilities/$id'
     | '/api/internal/events'
@@ -310,6 +321,7 @@ export interface FileRouteTypes {
     | '/_authed/admin/teams'
     | '/_authed/admin/users'
     | '/_authed/assets/$id'
+    | '/_authed/settings/ai'
     | '/_authed/software/$id'
     | '/_authed/vulnerabilities/$id'
     | '/api/internal/events'
@@ -463,6 +475,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSoftwareIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/settings/ai': {
+      id: '/_authed/settings/ai'
+      path: '/settings/ai'
+      fullPath: '/settings/ai'
+      preLoaderRoute: typeof AuthedSettingsAiRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/assets/$id': {
       id: '/_authed/assets/$id'
       path: '/assets/$id'
@@ -522,6 +541,7 @@ interface AuthedRouteChildren {
   AuthedAdminTeamsRoute: typeof AuthedAdminTeamsRoute
   AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
   AuthedAssetsIdRoute: typeof AuthedAssetsIdRoute
+  AuthedSettingsAiRoute: typeof AuthedSettingsAiRoute
   AuthedSoftwareIdRoute: typeof AuthedSoftwareIdRoute
   AuthedVulnerabilitiesIdRoute: typeof AuthedVulnerabilitiesIdRoute
   AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
@@ -542,6 +562,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminTeamsRoute: AuthedAdminTeamsRoute,
   AuthedAdminUsersRoute: AuthedAdminUsersRoute,
   AuthedAssetsIdRoute: AuthedAssetsIdRoute,
+  AuthedSettingsAiRoute: AuthedSettingsAiRoute,
   AuthedSoftwareIdRoute: AuthedSoftwareIdRoute,
   AuthedVulnerabilitiesIdRoute: AuthedVulnerabilitiesIdRoute,
   AuthedAdminIndexRoute: AuthedAdminIndexRoute,

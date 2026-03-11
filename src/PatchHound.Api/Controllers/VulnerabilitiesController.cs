@@ -679,7 +679,7 @@ public class VulnerabilitiesController : ControllerBase
             affectedAssets,
             tenantVulnerability.TenantId,
             _tenantContext.CurrentUserId,
-            request.ProviderName,
+            request.TenantAiProfileId,
             ct
         );
 
@@ -695,7 +695,9 @@ public class VulnerabilitiesController : ControllerBase
                 report.Id,
                 report.TenantVulnerabilityId,
                 report.Content,
-                report.Provider,
+                report.ProviderType,
+                report.ProfileName,
+                report.Model,
                 report.GeneratedAt
             )
         );

@@ -63,6 +63,7 @@ public static class DependencyInjection
             IRepository<TenantSlaConfiguration>,
             RepositoryBase<TenantSlaConfiguration>
         >();
+        services.AddScoped<IRepository<TenantAiProfile>, RepositoryBase<TenantAiProfile>>();
         services.AddScoped<
             IRepository<OrganizationalSeverity>,
             RepositoryBase<OrganizationalSeverity>
@@ -87,6 +88,7 @@ public static class DependencyInjection
         services.AddScoped<StagedAssetMergeService>();
         services.AddScoped<IEnrichmentSourceRunner, NvdVulnerabilityEnrichmentRunner>();
         services.AddScoped<AiReportService>();
+        services.AddScoped<ITenantAiConfigurationResolver, TenantAiConfigurationResolver>();
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<EnvironmentalSeverityCalculator>();
         services.AddScoped<VulnerabilityAssessmentService>();
@@ -98,9 +100,9 @@ public static class DependencyInjection
         services.Configure<SmtpOptions>(configuration.GetSection("Smtp"));
 
         // AI Report Providers
+        services.AddScoped<IAiReportProvider, OllamaAiProvider>();
         services.AddScoped<IAiReportProvider, AzureOpenAiProvider>();
-        services.AddScoped<IAiReportProvider, AnthropicProvider>();
-        services.Configure<AiProviderOptions>(configuration.GetSection("AiProvider"));
+        services.AddScoped<IAiReportProvider, OpenAiProvider>();
 
         // Vulnerability Sources
         services.AddScoped<IVulnerabilitySource, DefenderVulnerabilitySource>();

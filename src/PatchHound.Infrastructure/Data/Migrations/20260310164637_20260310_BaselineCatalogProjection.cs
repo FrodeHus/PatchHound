@@ -381,6 +381,38 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "TenantAiProfiles",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    ProviderType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    IsDefault = table.Column<bool>(type: "boolean", nullable: false),
+                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    Model = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    SystemPrompt = table.Column<string>(type: "text", nullable: false),
+                    Temperature = table.Column<decimal>(type: "numeric(4,2)", precision: 4, scale: 2, nullable: false),
+                    TopP = table.Column<decimal>(type: "numeric(4,2)", precision: 4, scale: 2, nullable: true),
+                    MaxOutputTokens = table.Column<int>(type: "integer", nullable: false),
+                    TimeoutSeconds = table.Column<int>(type: "integer", nullable: false),
+                    BaseUrl = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    DeploymentName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    ApiVersion = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    KeepAlive = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    SecretRef = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    LastValidatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    LastValidationStatus = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    LastValidationError = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TenantAiProfiles", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "TenantSourceConfigurations",
                 columns: table => new
                 {
@@ -851,14 +883,26 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     TenantVulnerabilityId = table.Column<Guid>(type: "uuid", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantAiProfileId = table.Column<Guid>(type: "uuid", nullable: false),
                     Content = table.Column<string>(type: "text", nullable: false),
-                    Provider = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    ProviderType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ProfileName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Model = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    SystemPromptHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Temperature = table.Column<decimal>(type: "numeric(4,2)", precision: 4, scale: 2, nullable: false),
+                    MaxOutputTokens = table.Column<int>(type: "integer", nullable: false),
                     GeneratedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     GeneratedBy = table.Column<Guid>(type: "uuid", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AIReports", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_AIReports_TenantAiProfiles_TenantAiProfileId",
+                        column: x => x.TenantAiProfileId,
+                        principalTable: "TenantAiProfiles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_AIReports_TenantVulnerabilities_TenantVulnerabilityId",
                         column: x => x.TenantVulnerabilityId,
@@ -1000,6 +1044,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 name: "IX_AIReports_TenantId",
                 table: "AIReports",
                 column: "TenantId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AIReports_TenantAiProfileId",
+                table: "AIReports",
+                column: "TenantAiProfileId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AIReports_TenantVulnerabilityId",
@@ -1364,6 +1413,17 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_TenantAiProfiles_TenantId",
+                table: "TenantAiProfiles",
+                column: "TenantId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TenantAiProfiles_TenantId_Name",
+                table: "TenantAiProfiles",
+                columns: new[] { "TenantId", "Name" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_TenantSourceConfigurations_TenantId_SourceKey",
                 table: "TenantSourceConfigurations",
                 columns: new[] { "TenantId", "SourceKey" },
@@ -1483,6 +1543,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
         {
             migrationBuilder.DropTable(
                 name: "AIReports");
+
+            migrationBuilder.DropTable(
+                name: "TenantAiProfiles");
 
             migrationBuilder.DropTable(
                 name: "AuditLogEntries");
