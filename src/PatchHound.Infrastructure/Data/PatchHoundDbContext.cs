@@ -33,6 +33,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<EnrichmentJob> EnrichmentJobs => Set<EnrichmentJob>();
     public DbSet<EnrichmentRun> EnrichmentRuns => Set<EnrichmentRun>();
     public DbSet<TenantSlaConfiguration> TenantSlaConfigurations => Set<TenantSlaConfiguration>();
+    public DbSet<TenantAiProfile> TenantAiProfiles => Set<TenantAiProfile>();
     public DbSet<User> Users => Set<User>();
     public DbSet<UserTenantRole> UserTenantRoles => Set<UserTenantRole>();
     public DbSet<Team> Teams => Set<Team>();
@@ -192,6 +193,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         modelBuilder
             .Entity<Tenant>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.Id));
+        modelBuilder
+            .Entity<TenantAiProfile>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<UserTenantRole>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));

@@ -1,42 +1,34 @@
 using System.Text;
-using Microsoft.Extensions.Options;
+using PatchHound.Core.Enums;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Interfaces;
-using PatchHound.Infrastructure.Options;
+using PatchHound.Core.Models;
 
 namespace PatchHound.Infrastructure.AiProviders;
 
 public class AzureOpenAiProvider : IAiReportProvider
 {
-    private readonly AiProviderOptions _options;
-
-    public AzureOpenAiProvider(IOptions<AiProviderOptions> options)
-    {
-        _options = options.Value;
-    }
-
-    public string ProviderName => "AzureOpenAI";
+    public TenantAiProviderType ProviderType => TenantAiProviderType.AzureOpenAi;
 
     public Task<string> GenerateReportAsync(
-        VulnerabilityDefinition vulnerabilityDefinition,
-        IReadOnlyList<Asset> affectedAssets,
+        AiReportGenerationRequest request,
+        TenantAiProfileResolved profile,
         CancellationToken ct
     )
     {
-        // Stub implementation - replace with actual Azure OpenAI API call
         var sb = new StringBuilder();
-        sb.AppendLine($"# AI Vulnerability Report: {vulnerabilityDefinition.Title}");
+        sb.AppendLine($"# AI Vulnerability Report: {request.VulnerabilityDefinition.Title}");
         sb.AppendLine();
-        sb.AppendLine($"**Provider:** Azure OpenAI ({_options.ModelId ?? "gpt-4o"})");
-        sb.AppendLine($"**Vulnerability:** {vulnerabilityDefinition.ExternalId}");
-        sb.AppendLine($"**Severity:** {vulnerabilityDefinition.VendorSeverity}");
-        sb.AppendLine($"**CVSS Score:** {vulnerabilityDefinition.CvssScore?.ToString("F1") ?? "N/A"}");
+        sb.AppendLine($"**Provider:** Azure OpenAI ({profile.Profile.Model})");
+        sb.AppendLine($"**Vulnerability:** {request.VulnerabilityDefinition.ExternalId}");
+        sb.AppendLine($"**Severity:** {request.VulnerabilityDefinition.VendorSeverity}");
+        sb.AppendLine($"**CVSS Score:** {request.VulnerabilityDefinition.CvssScore?.ToString("F1") ?? "N/A"}");
         sb.AppendLine();
         sb.AppendLine("## Description");
-        sb.AppendLine(vulnerabilityDefinition.Description);
+        sb.AppendLine(request.VulnerabilityDefinition.Description);
         sb.AppendLine();
         sb.AppendLine("## Affected Assets");
-        foreach (var asset in affectedAssets)
+        foreach (var asset in request.AffectedAssets)
         {
             sb.AppendLine(
                 $"- **{asset.Name}** ({asset.AssetType}, Criticality: {asset.Criticality})"
@@ -53,5 +45,41 @@ public class AzureOpenAiProvider : IAiReportProvider
         );
 
         return Task.FromResult(sb.ToString());
+    }
+
+    public Task<AiProviderValidationResult> ValidateAsync(
+        TenantAiProfileResolved profile,
+        CancellationToken ct
+    )
+    {
+        if (string.IsNullOrWhiteSpace(profile.Profile.BaseUrl))
+        {
+            return Task.FromResult(
+                AiProviderValidationResult.Failure("Endpoint is required for Azure OpenAI.")
+            );
+        }
+
+        if (string.IsNullOrWhiteSpace(profile.Profile.DeploymentName))
+        {
+            return Task.FromResult(
+                AiProviderValidationResult.Failure("Deployment name is required for Azure OpenAI.")
+            );
+        }
+
+        if (string.IsNullOrWhiteSpace(profile.Profile.ApiVersion))
+        {
+            return Task.FromResult(
+                AiProviderValidationResult.Failure("API version is required for Azure OpenAI.")
+            );
+        }
+
+        if (string.IsNullOrWhiteSpace(profile.ApiKey))
+        {
+            return Task.FromResult(
+                AiProviderValidationResult.Failure("API key is required for Azure OpenAI.")
+            );
+        }
+
+        return Task.FromResult(AiProviderValidationResult.Success());
     }
 }

@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   ScrollText,
   Server,
+  Settings2,
   Shield,
   ShieldCheck,
   Boxes,
@@ -41,6 +42,7 @@ const navItems: NavItem[] = [
   { to: '/assets', label: 'Assets', icon: Server },
   { to: '/software', label: 'Software', icon: Boxes },
   { to: '/audit-log', label: 'Audit Trail', icon: ScrollText, roles: ['Auditor', 'GlobalAdmin'] },
+  { to: '/settings', label: 'Settings', icon: Settings2, roles: ['GlobalAdmin', 'SecurityManager'] },
   { to: '/admin', label: 'Admin Console', icon: ShieldCheck, roles: ['GlobalAdmin', 'SecurityManager'] },
 ]
 

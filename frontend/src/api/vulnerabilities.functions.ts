@@ -57,9 +57,9 @@ export const updateOrganizationalSeverity = createServerFn({ method: 'POST' })
 
 export const generateAiReport = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .inputValidator(z.object({ id: z.string(), providerName: z.string() }))
-  .handler(async ({ context, data: { id, providerName } }) => {
-    const data = await apiPost(`/vulnerabilities/${id}/ai-report`, context, { providerName })
+  .inputValidator(z.object({ id: z.string(), tenantAiProfileId: z.string().uuid().optional() }))
+  .handler(async ({ context, data: { id, tenantAiProfileId } }) => {
+    const data = await apiPost(`/vulnerabilities/${id}/ai-report`, context, { tenantAiProfileId })
     return aiReportSchema.parse(data)
   })
 

@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Building2, ShieldCheck } from 'lucide-react'
+import { Bot, Building2, ShieldCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/settings/')({
@@ -21,6 +21,20 @@ function SettingsPage() {
             </CardHeader>
             <CardContent className="text-sm leading-6 text-muted-foreground">
               Review configured tenants, rename them, and maintain ingestion credentials and sync schedules per source.
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to="/settings/ai" className="group">
+          <Card className="rounded-[28px] border-border/70 bg-card/82 transition-colors group-hover:border-primary/35">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>AI Configuration</CardTitle>
+                <Bot className="size-5 text-primary" />
+              </div>
+            </CardHeader>
+            <CardContent className="text-sm leading-6 text-muted-foreground">
+              Configure Ollama, Azure OpenAI, or OpenAI profiles for the active tenant, including prompts and runtime settings.
             </CardContent>
           </Card>
         </Link>

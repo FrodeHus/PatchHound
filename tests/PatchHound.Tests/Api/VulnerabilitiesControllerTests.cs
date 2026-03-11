@@ -9,6 +9,7 @@ using PatchHound.Api.Models.Vulnerabilities;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
+using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
@@ -43,11 +44,12 @@ public class VulnerabilitiesControllerTests : IDisposable
             Substitute.For<IUnitOfWork>(),
             _tenantContext
         );
+        var aiConfigurationResolver = Substitute.For<ITenantAiConfigurationResolver>();
 
         _controller = new VulnerabilitiesController(
             _dbContext,
             vulnerabilityService,
-            new AiReportService([]),
+            new AiReportService([], aiConfigurationResolver),
             _tenantContext
         );
     }

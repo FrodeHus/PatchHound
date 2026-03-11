@@ -4,6 +4,8 @@ public record AiReportDto(
     Guid Id,
     Guid TenantVulnerabilityId,
     string Content,
-    string Provider,
+    string ProviderType,
+    string ProfileName,
+    string Model,
     DateTimeOffset GeneratedAt
 );

@@ -1,8 +1,10 @@
 using FluentAssertions;
 using NSubstitute;
+using PatchHound.Core.Common;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
+using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 
 namespace PatchHound.Tests.Core;
@@ -11,20 +13,23 @@ public class AiReportServiceTests
 {
     private readonly Guid _tenantId = Guid.NewGuid();
     private readonly Guid _userId = Guid.NewGuid();
+    private readonly Guid _profileId = Guid.NewGuid();
 
     private readonly IAiReportProvider _azureProvider;
+    private readonly ITenantAiConfigurationResolver _resolver;
     private readonly AiReportService _service;
 
     public AiReportServiceTests()
     {
         _azureProvider = Substitute.For<IAiReportProvider>();
-        _azureProvider.ProviderName.Returns("AzureOpenAI");
+        _azureProvider.ProviderType.Returns(TenantAiProviderType.AzureOpenAi);
+        _resolver = Substitute.For<ITenantAiConfigurationResolver>();
 
-        _service = new AiReportService(new[] { _azureProvider });
+        _service = new AiReportService(new[] { _azureProvider }, _resolver);
     }
 
     [Fact]
-    public async Task GenerateReport_ProviderFound_ReturnsAIReport()
+    public async Task GenerateReport_DefaultProfileFound_ReturnsAIReport()
     {
         var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-1234",
@@ -40,10 +45,35 @@ public class AiReportServiceTests
             Asset.Create(_tenantId, "asset-1", AssetType.Device, "web-server-01", Criticality.High),
         };
 
+        var profile = TenantAiProfile.Create(
+            _tenantId,
+            "Default analysis",
+            TenantAiProviderType.AzureOpenAi,
+            true,
+            true,
+            "gpt-4o",
+            "System prompt",
+            0.2m,
+            1.0m,
+            1200,
+            60,
+            baseUrl: "https://example.openai.azure.com",
+            deploymentName: "gpt-4o-prod",
+            apiVersion: "2024-10-21",
+            secretRef: "tenants/test/ai/default"
+        );
+
+        _resolver
+            .ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, "secret")));
+
+        _azureProvider
+            .ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
+            .Returns(AiProviderValidationResult.Success());
         _azureProvider
             .GenerateReportAsync(
-                vulnerability,
-                Arg.Any<IReadOnlyList<Asset>>(),
+                Arg.Any<AiReportGenerationRequest>(),
+                Arg.Any<TenantAiProfileResolved>(),
                 Arg.Any<CancellationToken>()
             )
             .Returns("# AI Report\n\nThis is a generated report.");
@@ -54,22 +84,26 @@ public class AiReportServiceTests
             assets,
             _tenantId,
             _userId,
-            "AzureOpenAI",
+            null,
             CancellationToken.None
         );
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.TenantVulnerabilityId.Should().NotBeEmpty();
+        result.Value.TenantAiProfileId.Should().Be(profile.Id);
         result.Value.TenantId.Should().Be(_tenantId);
         result.Value.GeneratedBy.Should().Be(_userId);
-        result.Value.Provider.Should().Be("AzureOpenAI");
+        result.Value.ProviderType.Should().Be(TenantAiProviderType.AzureOpenAi.ToString());
+        result.Value.ProfileName.Should().Be("Default analysis");
+        result.Value.Model.Should().Be("gpt-4o");
+        result.Value.MaxOutputTokens.Should().Be(1200);
+        result.Value.Temperature.Should().Be(0.2m);
         result.Value.Content.Should().Be("# AI Report\n\nThis is a generated report.");
-        result.Value.Id.Should().NotBeEmpty();
+        result.Value.SystemPromptHash.Should().NotBeEmpty();
         result.Value.GeneratedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5));
     }
 
     [Fact]
-    public async Task GenerateReport_UnknownProvider_ReturnsFailure()
+    public async Task GenerateReport_NoDefaultProfileConfigured_ReturnsFailure()
     {
         var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-1234",
@@ -79,23 +113,26 @@ public class AiReportServiceTests
             "Defender"
         );
 
+        _resolver
+            .ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(Result<TenantAiProfileResolved>.Failure("No enabled default AI profile is configured for this tenant."));
+
         var result = await _service.GenerateReportAsync(
             vulnerability,
             Guid.NewGuid(),
-            new List<Asset>(),
+            [],
             _tenantId,
             _userId,
-            "NonExistentProvider",
+            null,
             CancellationToken.None
         );
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("Unknown AI provider");
-        result.Error.Should().Contain("NonExistentProvider");
+        result.Error.Should().Contain("No enabled default AI profile");
     }
 
     [Fact]
-    public async Task GenerateReport_ProviderNameIsCaseInsensitive()
+    public async Task GenerateReport_ValidationFails_ReturnsFailure()
     {
         var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-5678",
@@ -105,51 +142,44 @@ public class AiReportServiceTests
             "Qualys"
         );
 
+        var profile = TenantAiProfile.Create(
+            _tenantId,
+            "Broken Azure",
+            TenantAiProviderType.AzureOpenAi,
+            true,
+            true,
+            "gpt-4o",
+            "System prompt",
+            0.2m,
+            null,
+            1200,
+            60
+        );
+
+        _resolver
+            .ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, string.Empty)));
         _azureProvider
-            .GenerateReportAsync(
-                vulnerability,
-                Arg.Any<IReadOnlyList<Asset>>(),
-                Arg.Any<CancellationToken>()
-            )
-            .Returns("Report content");
+            .ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
+            .Returns(AiProviderValidationResult.Failure("API key is required for Azure OpenAI."));
 
         var result = await _service.GenerateReportAsync(
             vulnerability,
             Guid.NewGuid(),
-            new List<Asset>(),
+            [],
             _tenantId,
             _userId,
-            "azureopenai",
+            null,
             CancellationToken.None
         );
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Content.Should().Be("Report content");
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be("API key is required for Azure OpenAI.");
     }
 
     [Fact]
-    public async Task GenerateReport_MultipleProviders_SelectsCorrectOne()
+    public async Task GenerateReport_ProfileOverride_SelectsRequestedProfile()
     {
-        var anthropicProvider = Substitute.For<IAiReportProvider>();
-        anthropicProvider.ProviderName.Returns("Anthropic");
-        anthropicProvider
-            .GenerateReportAsync(
-                Arg.Any<VulnerabilityDefinition>(),
-                Arg.Any<IReadOnlyList<Asset>>(),
-                Arg.Any<CancellationToken>()
-            )
-            .Returns("Anthropic report");
-
-        _azureProvider
-            .GenerateReportAsync(
-                Arg.Any<VulnerabilityDefinition>(),
-                Arg.Any<IReadOnlyList<Asset>>(),
-                Arg.Any<CancellationToken>()
-            )
-            .Returns("Azure report");
-
-        var service = new AiReportService(new[] { _azureProvider, anthropicProvider });
-
         var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-9999",
             "Test",
@@ -158,18 +188,50 @@ public class AiReportServiceTests
             "Scanner"
         );
 
-        var result = await service.GenerateReportAsync(
+        var profile = TenantAiProfile.Create(
+            _tenantId,
+            "Ollama local",
+            TenantAiProviderType.AzureOpenAi,
+            false,
+            true,
+            "gpt-4o-mini",
+            "System prompt",
+            0.1m,
+            null,
+            900,
+            45,
+            baseUrl: "https://example.openai.azure.com",
+            deploymentName: "gpt-4o-mini",
+            apiVersion: "2024-10-21",
+            secretRef: "tenants/test/ai/alt"
+        );
+
+        _resolver
+            .ResolveByIdAsync(_tenantId, _profileId, Arg.Any<CancellationToken>())
+            .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, "secret")));
+        _azureProvider
+            .ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
+            .Returns(AiProviderValidationResult.Success());
+        _azureProvider
+            .GenerateReportAsync(
+                Arg.Any<AiReportGenerationRequest>(),
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<CancellationToken>()
+            )
+            .Returns("Azure report");
+
+        var result = await _service.GenerateReportAsync(
             vulnerability,
             Guid.NewGuid(),
-            new List<Asset>(),
+            [],
             _tenantId,
             _userId,
-            "Anthropic",
+            _profileId,
             CancellationToken.None
         );
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.Content.Should().Be("Anthropic report");
-        result.Value.Provider.Should().Be("Anthropic");
+        result.Value.Content.Should().Be("Azure report");
+        await _resolver.Received(1).ResolveByIdAsync(_tenantId, _profileId, Arg.Any<CancellationToken>());
     }
 }
