@@ -13,7 +13,7 @@ export function SlaComplianceCard({ percent, overdueCount, totalCount }: SlaComp
   const boundedPercent = Math.max(0, Math.min(100, Number(percent.toFixed(1))))
 
   return (
-    <Card className="rounded-[28px] border-border/70 bg-card/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <Card className="rounded-2xl border-border/70 bg-card/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div>

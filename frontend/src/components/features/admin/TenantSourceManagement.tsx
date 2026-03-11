@@ -90,7 +90,7 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
 
   return (
     <section className="space-y-5">
-      <Card className="rounded-[30px] border-border/70 bg-card/82 shadow-sm">
+      <Card className="rounded-2xl border-border/70 bg-card/82 shadow-sm">
         <CardHeader className="border-b border-border/60 pb-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-1">

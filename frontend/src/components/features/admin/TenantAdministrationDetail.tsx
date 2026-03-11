@@ -101,7 +101,7 @@ export function TenantAdministrationDetail({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-        <Card className="rounded-[28px] border-border/70 bg-card/82">
+        <Card className="rounded-2xl border-border/70 bg-card/82">
           <CardHeader>
             <CardTitle>Tenant Identity</CardTitle>
           </CardHeader>
@@ -119,7 +119,7 @@ export function TenantAdministrationDetail({
           </CardContent>
         </Card>
 
-        <Card className="rounded-[28px] border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_88%,black),var(--card))]">
+        <Card className="rounded-2xl border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_88%,black),var(--card))]">
           <CardHeader>
             <CardTitle>Tenant Assets</CardTitle>
           </CardHeader>
@@ -156,7 +156,7 @@ export function TenantAdministrationDetail({
         </Card>
       </div>
 
-      <Card className="rounded-[28px] border-border/70 bg-card/82">
+      <Card className="rounded-2xl border-border/70 bg-card/82">
         <CardHeader>
           <CardTitle>SLA Configuration</CardTitle>
         </CardHeader>

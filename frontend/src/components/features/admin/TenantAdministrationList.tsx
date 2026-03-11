@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
-import { ArrowRight, BadgeCheck, Building2, DatabaseZap, KeyRound, ShieldCheck } from 'lucide-react'
+import { BadgeCheck, Building2, DatabaseZap, KeyRound, ShieldCheck } from 'lucide-react'
 import type { TenantListItem } from '@/api/settings.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -113,7 +113,7 @@ export function TenantAdministrationList({
   return (
     <section className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <Card className="rounded-[28px] border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_90%,black),var(--card))]">
+        <Card className="rounded-2xl border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_90%,black),var(--card))]">
           <CardHeader>
             <Badge variant="outline" className="w-fit rounded-full border-primary/20 bg-primary/10 text-primary">
               Tenant Administration
@@ -128,7 +128,7 @@ export function TenantAdministrationList({
         </Card>
 
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-          <Card className="rounded-[28px] border-border/70 bg-card/80">
+          <Card className="rounded-2xl">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Tenants</p>
@@ -137,7 +137,7 @@ export function TenantAdministrationList({
               <CardTitle className="text-3xl font-semibold tracking-[-0.04em]">{totalCount}</CardTitle>
             </CardHeader>
           </Card>
-          <Card className="rounded-[28px] border-border/70 bg-card/80">
+          <Card className="rounded-2xl">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Configured Sources</p>
@@ -148,7 +148,7 @@ export function TenantAdministrationList({
               </CardTitle>
             </CardHeader>
           </Card>
-          <Card className="rounded-[28px] border-border/70 bg-card/80">
+          <Card className="rounded-2xl">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Ready To Connect</p>
@@ -162,7 +162,7 @@ export function TenantAdministrationList({
         </div>
       </div>
 
-      <Card className="rounded-[28px] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_9%,transparent),transparent_48%),var(--color-card)]">
+      <Card className="rounded-2xl border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_9%,transparent),transparent_48%),var(--color-card)]">
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
@@ -235,7 +235,7 @@ export function TenantAdministrationList({
             </div>
           </div>
 
-          <div className="rounded-3xl border border-border/70 bg-background/35 p-4">
+          <div className="rounded-3xl border border-border/80 bg-muted/60 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">What gets created</p>
             <div className="mt-4 space-y-2">
               <SetupRow label="Tenant record" value="Registered immediately" />
@@ -270,7 +270,7 @@ export function TenantAdministrationList({
             description="Create the first tenant to start configuring ingestion sources and inventory policy."
           />
         ) : (
-          <div className="overflow-hidden rounded-[24px] border border-border/70 bg-background/30">
+          <div className="overflow-hidden rounded-[24px] border border-border/80 bg-muted/55">
             <DataTable columns={columns} data={tenants} getRowId={(row) => row.id} className="min-w-[980px]" />
           </div>
         )}
@@ -290,7 +290,7 @@ export function TenantAdministrationList({
 
 function SetupRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-3 py-3">
+    <div className="flex items-start justify-between gap-3 rounded-xl border border-border/80 bg-card/88 px-3 py-3">
       <span className="text-sm font-medium text-foreground">{label}</span>
       <span className="max-w-[16rem] text-right text-xs text-muted-foreground">{value}</span>
     </div>
@@ -307,7 +307,7 @@ function GuideItem({
   text: string
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-border/60 bg-background/30 px-3 py-3">
+    <div className="flex items-start gap-3 rounded-2xl border border-border/80 bg-muted/60 px-3 py-3">
       <span className="mt-0.5 flex size-8 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
         <Icon className="size-4" />
       </span>

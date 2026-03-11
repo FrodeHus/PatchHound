@@ -236,7 +236,7 @@ export function TenantAiSettingsPage() {
       </header>
 
       <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <Card className="rounded-[28px] border-border/70 bg-card/85">
+        <Card className="rounded-2xl border-border/70 bg-card/85">
           <CardHeader className="space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
@@ -317,7 +317,7 @@ export function TenantAiSettingsPage() {
         </Card>
 
         <div className="space-y-4">
-          <Card className="rounded-[28px] border-border/70 bg-card">
+          <Card className="rounded-2xl border-border/70 bg-card">
             <CardHeader className="space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="space-y-1">
@@ -689,7 +689,7 @@ export function TenantAiSettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-[28px] border-border/70 bg-card/75">
+          <Card className="rounded-2xl border-border/70 bg-card/75">
             <CardContent className="grid gap-4 p-6 md:grid-cols-3">
               <StatusTile
                 label="Default profile"

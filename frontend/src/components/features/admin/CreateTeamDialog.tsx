@@ -16,7 +16,7 @@ export function CreateTeamDialog({ isSubmitting, tenants, onCreate }: CreateTeam
   const [tenantId, setTenantId] = useState('')
 
   return (
-    <Card className="rounded-[28px] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_52%),var(--color-card)]">
+    <Card className="rounded-2xl border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_52%),var(--color-card)]">
       <CardHeader className="space-y-3">
         <Badge variant="outline" className="w-fit rounded-full border-primary/20 bg-primary/10 text-primary">
           New Assignment Group

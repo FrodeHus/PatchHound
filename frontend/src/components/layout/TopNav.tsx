@@ -58,7 +58,7 @@ export function TopNav({
 
   return (
     <header className="sticky top-0 z-20 px-4 pb-4 pt-4 sm:px-6">
-      <div className="rounded-[28px] border border-border/70 bg-card/78 p-3 backdrop-blur-xl">
+      <div className="rounded-2xl border border-border/70 bg-card/78 p-3 backdrop-blur-xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button

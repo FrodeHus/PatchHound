@@ -11,7 +11,7 @@ export function ExposureScore({ score }: ExposureScoreProps) {
   const posture = roundedScore >= 80 ? 'Elevated' : roundedScore >= 50 ? 'Guarded' : 'Stable'
 
   return (
-    <Card className="overflow-hidden rounded-[28px] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_14%,transparent),transparent_56%),var(--color-card)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <Card className="overflow-hidden rounded-2xl border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_14%,transparent),transparent_56%),var(--color-card)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div>

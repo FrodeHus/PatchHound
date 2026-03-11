@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { InsetPanel } from '@/components/ui/inset-panel'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import {
@@ -107,7 +108,7 @@ function SecurityProfilesPage() {
 
   return (
     <section className="space-y-4 pb-4">
-      <Card className="rounded-[30px] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_52%),var(--color-card)]">
+      <Card className="rounded-2xl border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_52%),var(--color-card)]">
         <CardHeader className="space-y-3">
           <Badge variant="outline" className="w-fit rounded-full border-primary/20 bg-primary/10 text-primary">
             Environmental Severity
@@ -139,7 +140,7 @@ function SecurityProfilesPage() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-[30px] border-border/70 bg-card/82">
+      <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle>Create Security Profile</CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -330,7 +331,7 @@ function SecurityProfilesPage() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-[30px] border-border/70 bg-card/82">
+      <Card className="rounded-2xl border-border/70 bg-card/82">
         <CardHeader>
           <div className="flex items-end justify-between gap-3">
             <div>
@@ -344,27 +345,27 @@ function SecurityProfilesPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {!selectedTenantId ? (
-            <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-6 text-sm text-muted-foreground">
+            <InsetPanel className="px-4 py-6 text-sm text-muted-foreground">
               Choose a tenant from the top bar to review security profiles.
-            </div>
+            </InsetPanel>
           ) : profilesQuery.isPending && !profilePage ? (
-            <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-6 text-sm text-muted-foreground">
+            <InsetPanel className="px-4 py-6 text-sm text-muted-foreground">
               Loading security profiles...
-            </div>
+            </InsetPanel>
           ) : profilePage && profilePage.items.length === 0 ? (
-            <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-6 text-sm text-muted-foreground">
+            <InsetPanel className="px-4 py-6 text-sm text-muted-foreground">
               No security profiles found.
-            </div>
+            </InsetPanel>
           ) : (
             profilePage?.items.map((profile) => (
-              <div key={profile.id} className="rounded-[24px] border border-border/70 bg-background/30 p-4">
+              <InsetPanel key={profile.id} className="rounded-xl p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-lg font-semibold">{profile.name}</p>
                     <p className="mt-1 text-sm text-muted-foreground">{profile.description ?? 'No description provided.'}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className="rounded-full border-border/70 bg-background/60 text-foreground">
+                    <Badge variant="outline" className="rounded-full border-border/80 bg-card text-foreground">
                       {tenantNames.get(profile.tenantId) ?? 'Unknown tenant'}
                     </Badge>
                     <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/10 text-primary">
@@ -415,7 +416,7 @@ function SecurityProfilesPage() {
                 <p className="mt-4 text-xs text-muted-foreground">
                   Updated {new Date(profile.updatedAt).toLocaleString()}
                 </p>
-              </div>
+              </InsetPanel>
             ))
           )}
           {profilePage ? (
@@ -463,14 +464,14 @@ function FieldBlock({
   control: React.ReactNode
 }) {
   return (
-    <div className="space-y-2 rounded-[22px] border border-border/70 bg-background/25 p-4">
+    <InsetPanel className="space-y-2 rounded-[22px] p-4">
       <div className="space-y-1">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       {control}
       {helper ? <p className="text-xs leading-5 text-primary">{helper}</p> : null}
-    </div>
+    </InsetPanel>
   )
 }
 
@@ -484,7 +485,7 @@ function GuideCard({
   text: string
 }) {
   return (
-    <div className="rounded-[24px] border border-border/70 bg-background/28 p-4">
+    <InsetPanel emphasis="subtle" className="rounded-xl p-4">
       <div className="flex items-center gap-3">
         <span className="flex size-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
           <Icon className="size-4" />
@@ -492,7 +493,7 @@ function GuideCard({
         <p className="font-medium">{title}</p>
       </div>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">{text}</p>
-    </div>
+    </InsetPanel>
   )
 }
 
@@ -506,14 +507,14 @@ function ProfileMetric({
   explanation: string
 }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-card/50 p-3">
+    <InsetPanel emphasis="strong" className="p-3">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-        <Badge variant="outline" className="rounded-full border-border/70 bg-background/60 text-foreground">
+        <Badge variant="outline" className="rounded-full border-border/80 bg-muted/75 text-foreground">
           {value}
         </Badge>
       </div>
       <p className="mt-3 text-xs leading-5 text-muted-foreground">{explanation}</p>
-    </div>
+    </InsetPanel>
   )
 }
