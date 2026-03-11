@@ -88,7 +88,7 @@ function AdminLandingPage() {
           const Icon = area.icon
           return (
             <Link key={area.to} to={area.to} className="block">
-              <Card className="h-full rounded-[28px] border-border/70 bg-card/90 transition hover:border-primary/30 hover:bg-accent/10">
+              <Card className="h-full rounded-2xl border-border/70 bg-card/90 transition hover:border-primary/30 hover:bg-accent/10">
                 <CardHeader className="space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="rounded-2xl border border-border/70 bg-background/50 p-3">

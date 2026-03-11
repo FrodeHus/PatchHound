@@ -30,7 +30,7 @@ function SettingsPage() {
       <h1 className="text-2xl font-semibold">Settings</h1>
       <div className="grid gap-4 xl:grid-cols-2">
         <Link to="/admin/tenants" search={{ page: 1, pageSize: 25 }} className="group">
-          <Card className="rounded-[28px] border-border/70 bg-card/82 transition-colors group-hover:border-primary/35">
+          <Card className="rounded-2xl border-border/70 bg-card/82 transition-colors group-hover:border-primary/35">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Tenant Administration</CardTitle>
@@ -44,7 +44,7 @@ function SettingsPage() {
         </Link>
 
         <Link to="/settings/ai" className="group">
-          <Card className="rounded-[28px] border-border/70 bg-card/82 transition-colors group-hover:border-primary/35">
+          <Card className="rounded-2xl border-border/70 bg-card/82 transition-colors group-hover:border-primary/35">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
@@ -78,7 +78,7 @@ function SettingsPage() {
           </Card>
         </Link>
 
-        <Card className="rounded-[28px] border-border/70 bg-card/70">
+        <Card className="rounded-2xl border-border/70 bg-card/70">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Security Posture Settings</CardTitle>

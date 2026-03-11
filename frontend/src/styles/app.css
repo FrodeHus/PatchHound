@@ -51,7 +51,7 @@
     --radius: 0.875rem;
     --background: oklch(0.16 0.015 255);
     --foreground: oklch(0.96 0.01 255);
-    --card: oklch(0.205 0.014 255);
+    --card: oklch(0.235 0.016 255);
     --card-foreground: oklch(0.965 0.01 255);
     --popover: oklch(0.225 0.014 255);
     --popover-foreground: oklch(0.965 0.01 255);
@@ -85,7 +85,7 @@
 [data-theme="light"] {
     --background: oklch(0.985 0.004 95);
     --foreground: oklch(0.22 0.012 255);
-    --card: oklch(0.995 0.002 95);
+    --card: oklch(0.965 0.006 95);
     --card-foreground: oklch(0.22 0.012 255);
     --popover: oklch(0.995 0.002 95);
     --popover-foreground: oklch(0.22 0.012 255);
@@ -119,7 +119,7 @@
 [data-theme="solarized"] {
     --background: oklch(0.28 0.03 240);
     --foreground: oklch(0.9 0.02 100);
-    --card: oklch(0.32 0.03 238);
+    --card: oklch(0.355 0.032 238);
     --card-foreground: oklch(0.91 0.02 100);
     --popover: oklch(0.34 0.03 236);
     --popover-foreground: oklch(0.91 0.02 100);
@@ -153,7 +153,7 @@
 [data-theme="cyberpunk"] {
     --background: oklch(0.18 0.03 286);
     --foreground: oklch(0.94 0.02 300);
-    --card: oklch(0.22 0.04 286);
+    --card: oklch(0.265 0.045 286);
     --card-foreground: oklch(0.95 0.02 300);
     --popover: oklch(0.25 0.04 286);
     --popover-foreground: oklch(0.95 0.02 300);
@@ -187,7 +187,7 @@
 [data-theme="hackthebox"] {
     --background: oklch(0.16 0.02 160);
     --foreground: oklch(0.92 0.02 155);
-    --card: oklch(0.2 0.025 160);
+    --card: oklch(0.245 0.03 160);
     --card-foreground: oklch(0.92 0.02 155);
     --popover: oklch(0.23 0.025 160);
     --popover-foreground: oklch(0.92 0.02 155);
@@ -221,7 +221,7 @@
 [data-theme="catppuccin-latte"] {
     --background: oklch(0.97 0.01 80);
     --foreground: oklch(0.35 0.03 300);
-    --card: oklch(0.985 0.006 80);
+    --card: oklch(0.948 0.012 80);
     --card-foreground: oklch(0.35 0.03 300);
     --popover: oklch(0.99 0.004 80);
     --popover-foreground: oklch(0.35 0.03 300);
@@ -255,7 +255,7 @@
 [data-theme="catppuccin-frappe"] {
     --background: oklch(0.32 0.03 286);
     --foreground: oklch(0.9 0.015 280);
-    --card: oklch(0.36 0.03 286);
+    --card: oklch(0.405 0.032 286);
     --card-foreground: oklch(0.9 0.015 280);
     --popover: oklch(0.39 0.03 286);
     --popover-foreground: oklch(0.9 0.015 280);
@@ -289,7 +289,7 @@
 [data-theme="catppuccin-macchiato"] {
     --background: oklch(0.26 0.03 272);
     --foreground: oklch(0.92 0.015 285);
-    --card: oklch(0.3 0.03 272);
+    --card: oklch(0.345 0.032 272);
     --card-foreground: oklch(0.92 0.015 285);
     --popover: oklch(0.33 0.03 272);
     --popover-foreground: oklch(0.92 0.015 285);
@@ -323,7 +323,7 @@
 [data-theme="catppuccin-mocha"] {
     --background: oklch(0.22 0.03 278);
     --foreground: oklch(0.94 0.015 285);
-    --card: oklch(0.26 0.03 278);
+    --card: oklch(0.305 0.032 278);
     --card-foreground: oklch(0.94 0.015 285);
     --popover: oklch(0.29 0.03 278);
     --popover-foreground: oklch(0.94 0.015 285);

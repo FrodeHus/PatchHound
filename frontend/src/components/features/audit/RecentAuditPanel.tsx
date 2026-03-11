@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import type { AuditLogItem } from '@/api/audit-log.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { InsetPanel } from '@/components/ui/inset-panel'
 import { formatAuditEntityType, formatAuditKey, parseAuditValues } from '@/lib/audit'
 import { formatDateTime } from '@/lib/formatting'
 
@@ -19,7 +20,7 @@ export function RecentAuditPanel({
   emptyMessage,
 }: RecentAuditPanelProps) {
   return (
-    <Card className="rounded-[28px] border-border/70 bg-card/82">
+    <Card className="rounded-[28px]">
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div className="space-y-1">
           <CardTitle>{title}</CardTitle>
@@ -35,19 +36,19 @@ export function RecentAuditPanel({
       </CardHeader>
       <CardContent className="space-y-3">
         {items.length === 0 ? (
-          <div className="rounded-2xl border border-border/60 bg-background/25 px-4 py-6 text-sm text-muted-foreground">
+          <InsetPanel className="px-4 py-6 text-sm text-muted-foreground">
             {emptyMessage}
-          </div>
+          </InsetPanel>
         ) : (
           items.map((item) => (
-            <div key={item.id} className="rounded-2xl border border-border/60 bg-background/25 px-4 py-3">
+            <InsetPanel key={item.id} className="px-4 py-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge className={actionBadgeClassName(item.action)}>{item.action}</Badge>
                     <span className="text-sm font-medium text-foreground">{formatAuditEntityType(item.entityType)}</span>
                     {item.entityLabel ? (
-                      <Badge variant="outline" className="rounded-full border-border/70 bg-background/60 text-foreground">
+                      <Badge variant="outline" className="rounded-full border-border/80 bg-card text-foreground">
                         {item.entityLabel}
                       </Badge>
                     ) : null}
@@ -56,7 +57,7 @@ export function RecentAuditPanel({
                 </div>
                 <span className="text-xs text-muted-foreground">{formatTimestamp(item.timestamp)}</span>
               </div>
-            </div>
+            </InsetPanel>
           ))
         )}
       </CardContent>
@@ -103,6 +104,6 @@ function actionBadgeClassName(action: string) {
     case 'Deleted':
       return 'rounded-full border border-destructive/25 bg-destructive/10 text-destructive hover:bg-destructive/10'
     default:
-      return 'rounded-full border border-border/70 bg-background/70 text-foreground hover:bg-background/70'
+      return 'rounded-full border border-border/80 bg-card text-foreground hover:bg-card'
   }
 }

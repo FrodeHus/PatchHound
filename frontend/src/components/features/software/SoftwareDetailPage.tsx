@@ -33,7 +33,7 @@ export function SoftwareDetailPage({
 
   return (
     <section className="space-y-5">
-      <header className="overflow-hidden rounded-[32px] border border-border/70 bg-[linear-gradient(140deg,color-mix(in_oklab,var(--primary)_12%,transparent),transparent_45%),linear-gradient(180deg,color-mix(in_oklab,var(--foreground)_4%,transparent),transparent_60%),var(--color-card)] p-6">
+      <header className="overflow-hidden rounded-2xl border border-border/70 bg-[linear-gradient(140deg,color-mix(in_oklab,var(--primary)_12%,transparent),transparent_45%),linear-gradient(180deg,color-mix(in_oklab,var(--foreground)_4%,transparent),transparent_60%),var(--color-card)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-3">
             <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
@@ -52,7 +52,7 @@ export function SoftwareDetailPage({
               </p>
             </div>
           </div>
-          <div className="grid min-w-[220px] gap-3 rounded-3xl border border-border/70 bg-background/50 p-4">
+          <div className="grid min-w-[220px] gap-3 rounded-xl border border-border/70 bg-background/50 p-4">
             <Metric label="Active installs" value={String(detail.activeInstallCount)} />
             <Metric label="Devices" value={String(detail.uniqueDeviceCount)} />
             <Metric label="Vulnerable installs" value={String(detail.vulnerableInstallCount)} tone={detail.vulnerableInstallCount > 0 ? 'danger' : 'neutral'} />
@@ -61,7 +61,7 @@ export function SoftwareDetailPage({
         </div>
       </header>
 
-      <section className="rounded-[28px] border border-border/70 bg-card p-5">
+      <section className="rounded-2xl border border-border/70 bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">Version pressure rail</h2>
@@ -83,8 +83,8 @@ export function SoftwareDetailPage({
                 type="button"
                 onClick={() => onSelectVersion(versionKey)}
                 className={isSelected
-                  ? 'rounded-3xl border border-primary/30 bg-primary/10 p-4 text-left'
-                  : 'rounded-3xl border border-border/70 bg-background p-4 text-left hover:border-foreground/20 hover:bg-muted/20'}
+                  ? 'rounded-xl border border-primary/30 bg-primary/10 p-4 text-left'
+                  : 'rounded-xl border border-border/70 bg-background p-4 text-left hover:border-foreground/20 hover:bg-muted/20'}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -114,7 +114,7 @@ export function SoftwareDetailPage({
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
         <div className="space-y-4">
-          <section className="rounded-[28px] border border-border/70 bg-card p-5">
+      <section className="rounded-2xl border border-border/70 bg-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Cohort installations</h2>
@@ -138,7 +138,7 @@ export function SoftwareDetailPage({
             {installations.items.length === 0 ? (
               <p className="mt-6 text-sm text-muted-foreground">No installations found for this cohort.</p>
             ) : (
-              <div className="mt-5 overflow-hidden rounded-3xl border border-border/70">
+              <div className="mt-5 overflow-hidden rounded-xl border border-border/70">
                 <table className="min-w-full divide-y divide-border/70 text-sm">
                   <thead className="bg-muted/30 text-left text-xs uppercase tracking-[0.14em] text-muted-foreground">
                     <tr>
@@ -200,7 +200,7 @@ export function SoftwareDetailPage({
             </div>
           </section>
 
-          <section className="rounded-[28px] border border-border/70 bg-card p-5">
+          <section className="rounded-2xl border border-border/70 bg-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Analysis workspace</h2>
@@ -230,7 +230,7 @@ export function SoftwareDetailPage({
                       key={item.tenantVulnerabilityId}
                       to="/vulnerabilities/$id"
                       params={{ id: item.tenantVulnerabilityId }}
-                      className="block rounded-3xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
+                      className="block rounded-xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="space-y-2">
@@ -282,7 +282,7 @@ export function SoftwareDetailPage({
         </div>
 
         <aside className="space-y-4">
-          <section className="rounded-[28px] border border-border/70 bg-card p-5">
+          <section className="rounded-2xl border border-border/70 bg-card p-5">
             <h2 className="text-lg font-semibold">Identity rail</h2>
             <div className="mt-4 grid gap-3">
               <Metric label="Canonical vendor" value={detail.canonicalVendor ? startCase(detail.canonicalVendor) : 'Unknown'} />
@@ -292,7 +292,7 @@ export function SoftwareDetailPage({
             </div>
           </section>
 
-          <section className="rounded-[28px] border border-border/70 bg-card p-5">
+          <section className="rounded-2xl border border-border/70 bg-card p-5">
             <h2 className="text-lg font-semibold">Source identities</h2>
             <div className="mt-4 space-y-3">
               {detail.sourceAliases.map((alias) => (

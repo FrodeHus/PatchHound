@@ -36,7 +36,7 @@ export function SoftwareAiReportTab({ tenantSoftwareId }: SoftwareAiReportTabPro
   const canGenerate = !profilesQuery.isLoading && !!defaultProfile && defaultProfileIsUsable
 
   return (
-    <section className="space-y-4 rounded-[28px] border border-border/70 bg-card p-5">
+    <section className="space-y-4 rounded-2xl border border-border/70 bg-card p-5">
       <header className="space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">

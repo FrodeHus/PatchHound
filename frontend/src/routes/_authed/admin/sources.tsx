@@ -92,7 +92,7 @@ function SourcesAdministrationPage() {
       ) : null}
 
       {activeView === "tenant" ? (
-        <Card className="rounded-[30px] border-border/70 bg-card/82 shadow-sm">
+        <Card className="rounded-2xl border-border/70 bg-card/82 shadow-sm">
           <CardHeader className="border-b border-border/60 pb-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-1">
@@ -155,7 +155,7 @@ function SourcesAdministrationPage() {
       ) : null}
 
       {activeView === "tenant" && !tenants.length ? (
-        <Card className="rounded-[28px] border-border/70 bg-card/82">
+        <Card className="rounded-2xl border-border/70 bg-card/82">
           <CardContent className="py-8 text-sm text-muted-foreground">
             No tenants are registered yet.
           </CardContent>
@@ -163,7 +163,7 @@ function SourcesAdministrationPage() {
       ) : null}
 
       {activeView === "tenant" && tenants.length > 0 && !selectedTenantId ? (
-        <Card className="rounded-[28px] border-border/70 bg-card/82">
+        <Card className="rounded-2xl border-border/70 bg-card/82">
           <CardContent className="py-8 text-sm text-muted-foreground">
             No tenant scope is active. Choose a tenant from the top bar.
           </CardContent>
@@ -171,7 +171,7 @@ function SourcesAdministrationPage() {
       ) : null}
 
       {activeView === "tenant" && selectedTenantId && tenantQuery.isPending ? (
-        <Card className="rounded-[28px] border-border/70 bg-card/82">
+        <Card className="rounded-2xl border-border/70 bg-card/82">
           <CardContent className="py-8 text-sm text-muted-foreground">
             Loading tenant source configuration...
           </CardContent>
@@ -214,7 +214,7 @@ function SourcesAdministrationPage() {
             ) : null}
           </div>
         ) : (
-          <Card className="rounded-[28px] border-border/70 bg-card/82">
+          <Card className="rounded-2xl border-border/70 bg-card/82">
             <CardContent className="py-8 text-sm text-muted-foreground">
               Loading global enrichment providers...
             </CardContent>
