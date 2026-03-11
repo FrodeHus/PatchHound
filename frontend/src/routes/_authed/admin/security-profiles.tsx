@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { ShieldCheck, Signal, TriangleAlert } from 'lucide-react'
@@ -56,6 +56,7 @@ function SecurityProfilesPage() {
     queryKey: ['security-profiles', selectedTenantId, search.page, search.pageSize],
     queryFn: () => fetchSecurityProfiles({ data: { page: search.page, pageSize: search.pageSize } }),
     initialData: initialProfiles,
+    staleTime: 30_000,
   })
 
   const mutation = useMutation({
@@ -82,13 +83,14 @@ function SecurityProfilesPage() {
       setAvailabilityRequirement(securityProfileRequirementOptions[1])
       await queryClient.invalidateQueries({ queryKey: ['security-profiles'] })
       if (canViewAudit) {
-        await recentAuditMutation.mutateAsync()
+        await queryClient.invalidateQueries({ queryKey: ['audit-log', 'AssetSecurityProfile', selectedTenantId] })
       }
     },
   })
   const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
-  const recentAuditMutation = useMutation({
-    mutationFn: async () =>
+  const recentAuditQuery = useQuery({
+    queryKey: ['audit-log', 'AssetSecurityProfile', selectedTenantId],
+    queryFn: async () =>
       fetchAuditLog({
         data: {
           entityType: 'AssetSecurityProfile',
@@ -96,16 +98,10 @@ function SecurityProfilesPage() {
           pageSize: 5,
         },
       }),
+    enabled: canViewAudit,
+    staleTime: 30_000,
   })
-  const recentAuditItems = recentAuditMutation.data?.items ?? []
-  const isRecentAuditPending = recentAuditMutation.isPending
-  const loadRecentAudit = recentAuditMutation.mutateAsync
-
-  useEffect(() => {
-    if (canViewAudit && recentAuditItems.length === 0 && !isRecentAuditPending) {
-      void loadRecentAudit()
-    }
-  }, [canViewAudit, isRecentAuditPending, loadRecentAudit, recentAuditItems.length])
+  const recentAuditItems = recentAuditQuery.data?.items ?? []
 
   const profilePage = profilesQuery.data
 
