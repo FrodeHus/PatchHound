@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models.Comments;
@@ -10,6 +9,7 @@ using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Tenants;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
 
@@ -32,7 +32,10 @@ public class CommentsControllerTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(_tenantContext));
+        _dbContext = new PatchHoundDbContext(
+            options,
+            TestServiceProviderFactory.Create(_tenantContext)
+        );
         _controller = new CommentsController(_dbContext, _tenantContext);
     }
 
@@ -106,12 +109,5 @@ public class CommentsControllerTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-    }
-
-    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(tenantContext);
-        return services.BuildServiceProvider();
     }
 }

@@ -1,12 +1,12 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Infrastructure;
 
@@ -28,7 +28,10 @@ public class EmailNotificationServiceTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(_tenantContext));
+        _dbContext = new PatchHoundDbContext(
+            options,
+            TestServiceProviderFactory.Create(_tenantContext)
+        );
         _emailSender = Substitute.For<IEmailSender>();
         _sut = new EmailNotificationService(_dbContext, _emailSender);
     }
@@ -186,12 +189,5 @@ public class EmailNotificationServiceTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-    }
-
-    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(tenantContext);
-        return services.BuildServiceProvider();
     }
 }

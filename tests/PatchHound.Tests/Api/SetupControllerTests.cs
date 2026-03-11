@@ -3,7 +3,6 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models.Setup;
@@ -14,6 +13,7 @@ using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Tenants;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
 
@@ -37,7 +37,10 @@ public class SetupControllerTests : IDisposable
             .AddInterceptors(interceptor)
             .Options;
 
-        _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(_tenantContext));
+        _dbContext = new PatchHoundDbContext(
+            options,
+            TestServiceProviderFactory.Create(_tenantContext)
+        );
         _setupService = Substitute.For<ISetupService>();
         _secretStore = Substitute.For<ISecretStore>();
         _controller = new SetupController(_setupService, _dbContext, _secretStore)
@@ -118,12 +121,5 @@ public class SetupControllerTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-    }
-
-    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(tenantContext);
-        return services.BuildServiceProvider();
     }
 }

@@ -1,12 +1,12 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Infrastructure;
 
@@ -26,7 +26,10 @@ public class NormalizedSoftwareProjectionServiceTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(tenantContext));
+        _dbContext = new PatchHoundDbContext(
+            options,
+            TestServiceProviderFactory.Create(tenantContext)
+        );
         _service = new NormalizedSoftwareProjectionService(
             _dbContext,
             new NormalizedSoftwareResolver(_dbContext)
@@ -179,12 +182,5 @@ public class NormalizedSoftwareProjectionServiceTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-    }
-
-    private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(tenantContext);
-        return services.BuildServiceProvider();
     }
 }
