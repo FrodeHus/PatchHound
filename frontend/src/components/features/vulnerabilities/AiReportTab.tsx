@@ -6,6 +6,7 @@ import { generateAiReport } from '@/api/vulnerabilities.functions'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { MarkdownViewer } from '@/components/ui/markdown-viewer'
 import { Separator } from '@/components/ui/separator'
 import { formatDateTime } from '@/lib/formatting'
 
@@ -130,7 +131,7 @@ export function AiReportTab({ vulnerabilityId }: AiReportTabProps) {
             <Sparkles className="size-3.5" />
             Generated markdown
           </div>
-          <pre className="mt-3 whitespace-pre-wrap text-sm leading-6">{mutation.data.content}</pre>
+          <MarkdownViewer content={mutation.data.content} className="mt-3" />
         </article>
       ) : null}
 
