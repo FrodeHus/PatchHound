@@ -5,6 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Software;
+using PatchHound.Core.Interfaces;
+using PatchHound.Core.Models;
+using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Api.Controllers;
@@ -12,7 +15,11 @@ namespace PatchHound.Api.Controllers;
 [ApiController]
 [Route("api/software")]
 [Authorize]
-public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
+public class SoftwareController(
+    PatchHoundDbContext dbContext,
+    TenantAiTextGenerationService tenantAiTextGenerationService,
+    ITenantContext tenantContext
+) : ControllerBase
 {
     private sealed record VulnerabilityEvidenceRow(
         string Method,
@@ -449,6 +456,231 @@ public class SoftwareController(PatchHoundDbContext dbContext) : ControllerBase
                     );
                 })
                 .ToList()
+        );
+    }
+
+    [HttpPost("{id:guid}/ai-report")]
+    [Authorize(Policy = Policies.GenerateAiReports)]
+    public async Task<ActionResult<TenantSoftwareAiReportDto>> GenerateAiReport(
+        Guid id,
+        [FromBody] GenerateTenantSoftwareAiReportRequest request,
+        CancellationToken ct
+    )
+    {
+        var tenantSoftware = await dbContext
+            .TenantSoftware.AsNoTracking()
+            .Where(item => item.Id == id)
+            .Select(item => new
+            {
+                item.Id,
+                item.TenantId,
+                item.NormalizedSoftwareId,
+                item.FirstSeenAt,
+                item.LastSeenAt,
+                item.NormalizedSoftware.CanonicalName,
+                item.NormalizedSoftware.CanonicalVendor,
+                item.NormalizedSoftware.PrimaryCpe23Uri,
+                NormalizationMethod = item.NormalizedSoftware.NormalizationMethod.ToString(),
+                Confidence = item.NormalizedSoftware.Confidence.ToString(),
+            })
+            .FirstOrDefaultAsync(ct);
+        if (tenantSoftware is null)
+        {
+            return NotFound(new ProblemDetails { Title = "Tenant software not found" });
+        }
+
+        if (!tenantContext.HasAccessToTenant(tenantSoftware.TenantId))
+        {
+            return Forbid();
+        }
+
+        var aliases = await dbContext
+            .NormalizedSoftwareAliases.AsNoTracking()
+            .Where(item => item.NormalizedSoftwareId == tenantSoftware.NormalizedSoftwareId)
+            .OrderBy(item => item.SourceSystem)
+            .ThenBy(item => item.ExternalSoftwareId)
+            .Select(item => new
+            {
+                SourceSystem = item.SourceSystem.ToString(),
+                item.ExternalSoftwareId,
+                item.RawName,
+                item.RawVendor,
+                item.RawVersion,
+                AliasConfidence = item.AliasConfidence.ToString(),
+                item.MatchReason,
+            })
+            .ToListAsync(ct);
+
+        var installations = await dbContext
+            .NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(item => item.TenantSoftwareId == id)
+            .Select(item => new
+            {
+                item.DeviceAssetId,
+                DeviceName = item.DeviceAsset.DeviceComputerDnsName ?? item.DeviceAsset.Name,
+                DeviceCriticality = item.DeviceAsset.Criticality.ToString(),
+                item.SoftwareAssetId,
+                SoftwareAssetName = item.SoftwareAsset.Name,
+                item.DetectedVersion,
+                item.FirstSeenAt,
+                item.LastSeenAt,
+                item.RemovedAt,
+                item.IsActive,
+                item.CurrentEpisodeNumber,
+            })
+            .ToListAsync(ct);
+
+        var projections = await dbContext
+            .NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
+            .Where(item => item.TenantSoftwareId == id)
+            .Join(
+                dbContext.VulnerabilityDefinitions.AsNoTracking(),
+                projection => projection.VulnerabilityDefinitionId,
+                vulnerabilityDefinition => vulnerabilityDefinition.Id,
+                (projection, vulnerabilityDefinition) => new { projection, vulnerabilityDefinition }
+            )
+            .OrderByDescending(item => item.vulnerabilityDefinition.CvssScore)
+            .ThenByDescending(item => item.vulnerabilityDefinition.PublishedDate)
+            .ToListAsync(ct);
+
+        var tenantVulnerabilityIdsByDefinitionId = await dbContext
+            .TenantVulnerabilities.AsNoTracking()
+            .Where(item => item.TenantId == tenantSoftware.TenantId)
+            .ToDictionaryAsync(item => item.VulnerabilityDefinitionId, item => item.Id, ct);
+
+        var activeInstallations = installations.Where(item => item.IsActive).ToList();
+        var relevantSoftwareAssetIds = activeInstallations
+            .Select(item => item.SoftwareAssetId)
+            .Distinct()
+            .ToList();
+
+        var matches = await dbContext
+            .SoftwareVulnerabilityMatches.AsNoTracking()
+            .Where(match => relevantSoftwareAssetIds.Contains(match.SoftwareAssetId))
+            .Select(match => new
+            {
+                match.SoftwareAssetId,
+                match.VulnerabilityDefinitionId,
+                match.ResolvedAt,
+                Method = match.MatchMethod.ToString(),
+                Confidence = match.Confidence.ToString(),
+                match.Evidence,
+                match.FirstSeenAt,
+                match.LastSeenAt,
+            })
+            .ToListAsync(ct);
+
+        var vulnerabilityPayload = projections.Select(item =>
+        {
+            var relatedMatches = matches
+                .Where(match => match.VulnerabilityDefinitionId == item.projection.VulnerabilityDefinitionId)
+                .Where(match => item.projection.ResolvedAt is null || match.ResolvedAt is null)
+                .ToList();
+            var relatedSoftwareAssetIds = relatedMatches.Select(match => match.SoftwareAssetId).ToHashSet();
+            var affectedVersions = activeInstallations
+                .Where(installation => relatedSoftwareAssetIds.Contains(installation.SoftwareAssetId))
+                .Select(installation => installation.DetectedVersion)
+                .Where(version => !string.IsNullOrWhiteSpace(version))
+                .Cast<string>()
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(version => version, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return new
+            {
+                TenantVulnerabilityId = tenantVulnerabilityIdsByDefinitionId[item.projection.VulnerabilityDefinitionId],
+                item.vulnerabilityDefinition.Id,
+                item.vulnerabilityDefinition.ExternalId,
+                item.vulnerabilityDefinition.Title,
+                VendorSeverity = item.vulnerabilityDefinition.VendorSeverity.ToString(),
+                item.vulnerabilityDefinition.CvssScore,
+                item.vulnerabilityDefinition.PublishedDate,
+                item.vulnerabilityDefinition.Source,
+                BestMatchMethod = item.projection.BestMatchMethod.ToString(),
+                BestConfidence = item.projection.BestConfidence.ToString(),
+                item.projection.AffectedInstallCount,
+                item.projection.AffectedDeviceCount,
+                item.projection.AffectedVersionCount,
+                AffectedVersions = affectedVersions,
+                item.projection.FirstSeenAt,
+                item.projection.LastSeenAt,
+                item.projection.ResolvedAt,
+                Evidence = relatedMatches.Select(match => new
+                {
+                    match.Method,
+                    match.Confidence,
+                    match.Evidence,
+                    match.FirstSeenAt,
+                    match.LastSeenAt,
+                    match.ResolvedAt,
+                }),
+            };
+        });
+
+        var payload = new
+        {
+            software = new
+            {
+                tenantSoftware.Id,
+                tenantSoftware.CanonicalName,
+                tenantSoftware.CanonicalVendor,
+                tenantSoftware.PrimaryCpe23Uri,
+                tenantSoftware.NormalizationMethod,
+                tenantSoftware.Confidence,
+                tenantSoftware.FirstSeenAt,
+                tenantSoftware.LastSeenAt,
+                ActiveInstallCount = activeInstallations.Count,
+                UniqueDeviceCount = activeInstallations.Select(item => item.DeviceAssetId).Distinct().Count(),
+                VulnerableInstallCount = activeInstallations.Count(item =>
+                    matches.Any(match => match.SoftwareAssetId == item.SoftwareAssetId && match.ResolvedAt == null)
+                ),
+                ActiveVulnerabilityCount = projections.Count(item => item.projection.ResolvedAt == null),
+            },
+            aliases,
+            installations = installations.Select(item => new
+            {
+                item.DeviceAssetId,
+                item.DeviceName,
+                item.DeviceCriticality,
+                item.SoftwareAssetId,
+                item.SoftwareAssetName,
+                item.DetectedVersion,
+                item.FirstSeenAt,
+                item.LastSeenAt,
+                item.RemovedAt,
+                item.IsActive,
+                item.CurrentEpisodeNumber,
+            }),
+            vulnerabilities = vulnerabilityPayload,
+        };
+
+        var generationResult = await tenantAiTextGenerationService.GenerateAsync(
+            tenantSoftware.TenantId,
+            request.TenantAiProfileId,
+            new AiTextGenerationRequest(
+                "You are a PatchHound software exposure analyst. Use only the provided JSON. " +
+                "Summarize prevalence, versions, linked vulnerability exposure, remediation priorities, and any notable operational concentration. " +
+                "Return markdown with these sections: Executive Summary, Exposure Surface, Vulnerability Landscape, Priority Actions.",
+                JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true })
+            ),
+            ct
+        );
+
+        if (!generationResult.IsSuccess)
+        {
+            return BadRequest(new ProblemDetails { Title = generationResult.Error });
+        }
+
+        var generated = generationResult.Value;
+        return Ok(
+            new TenantSoftwareAiReportDto(
+                id,
+                generated.Content,
+                generated.ProviderType,
+                generated.ProfileName,
+                generated.Model,
+                generated.GeneratedAt
+            )
         );
     }
 

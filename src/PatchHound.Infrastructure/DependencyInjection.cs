@@ -88,6 +88,7 @@ public static class DependencyInjection
         services.AddScoped<StagedAssetMergeService>();
         services.AddScoped<IEnrichmentSourceRunner, NvdVulnerabilityEnrichmentRunner>();
         services.AddScoped<AiReportService>();
+        services.AddScoped<TenantAiTextGenerationService>();
         services.AddScoped<ITenantAiConfigurationResolver, TenantAiConfigurationResolver>();
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<EnvironmentalSeverityCalculator>();

@@ -22,10 +22,23 @@ public class OllamaAiProvider : IAiReportProvider
         AiReportGenerationRequest request,
         TenantAiProfileResolved profile,
         CancellationToken ct
+    ) => GenerateTextAsync(
+        new AiTextGenerationRequest(
+            profile.Profile.SystemPrompt,
+            AiProviderPromptBuilder.BuildReportPrompt(request)
+        ),
+        profile,
+        ct
+    );
+
+    public Task<string> GenerateTextAsync(
+        AiTextGenerationRequest request,
+        TenantAiProfileResolved profile,
+        CancellationToken ct
     ) => SendGenerateAsync(
         profile,
-        profile.Profile.SystemPrompt,
-        AiProviderPromptBuilder.BuildReportPrompt(request),
+        request.SystemPrompt,
+        request.UserPrompt,
         profile.Profile.MaxOutputTokens,
         ct
     );
