@@ -55,6 +55,8 @@ public class SoftwareControllerTests : IDisposable
             _dbContext,
             _tenantAiTextGenerationService,
             _softwareDescriptionJobService,
+            _tenantAiConfigurationResolver,
+            _tenantAiResearchService,
             tenantContext
         );
     }
@@ -180,10 +182,14 @@ public class SoftwareControllerTests : IDisposable
             .Received(1)
             .GenerateTextAsync(
                 Arg.Is<AiTextGenerationRequest>(request =>
+                    request.SystemPrompt.Contains("Do not list individual devices.")
+                    && request.SystemPrompt.Contains("How The Vulnerabilities Work")
+                    && 
                     request.UserPrompt.Contains("\"software\"")
-                    && request.UserPrompt.Contains("\"installations\"")
+                    && request.UserPrompt.Contains("\"installationSummary\"")
                     && request.UserPrompt.Contains("\"vulnerabilities\"")
                     && request.UserPrompt.Contains("CVE-2026-1000")
+                    && !request.UserPrompt.Contains("\"deviceName\"")
                 ),
                 Arg.Any<TenantAiProfileResolved>(),
                 Arg.Any<CancellationToken>()
