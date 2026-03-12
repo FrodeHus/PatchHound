@@ -14,6 +14,7 @@ builder.Services.AddScoped<IEmailSender, NoOpEmailSender>();
 // Hosted services
 builder.Services.AddHostedService<IngestionWorker>();
 builder.Services.AddHostedService<EnrichmentWorker>();
+builder.Services.AddHostedService<SoftwareDescriptionWorker>();
 builder.Services.AddHostedService<SlaCheckWorker>();
 
 var host = builder.Build();

@@ -136,6 +136,16 @@ export const tenantSoftwareDescriptionSchema = z.object({
   generatedAt: isoDateTimeSchema,
 })
 
+export const tenantSoftwareDescriptionJobSchema = z.object({
+  id: z.string().uuid(),
+  tenantSoftwareId: z.string().uuid(),
+  status: z.string(),
+  error: z.string().nullable(),
+  requestedAt: isoDateTimeSchema,
+  startedAt: isoDateTimeSchema.nullable(),
+  completedAt: isoDateTimeSchema.nullable(),
+})
+
 export type TenantSoftwareDetail = z.infer<typeof tenantSoftwareDetailSchema>
 export type TenantSoftwareListItem = z.infer<typeof tenantSoftwareListItemSchema>
 export type TenantSoftwareVersionCohort = z.infer<typeof tenantSoftwareVersionCohortSchema>
@@ -144,3 +154,4 @@ export type PagedTenantSoftwareInstallations = z.infer<typeof pagedTenantSoftwar
 export type TenantSoftwareVulnerability = z.infer<typeof tenantSoftwareVulnerabilitySchema>
 export type TenantSoftwareAiReport = z.infer<typeof tenantSoftwareAiReportSchema>
 export type TenantSoftwareDescription = z.infer<typeof tenantSoftwareDescriptionSchema>
+export type TenantSoftwareDescriptionJob = z.infer<typeof tenantSoftwareDescriptionJobSchema>

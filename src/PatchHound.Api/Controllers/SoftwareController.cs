@@ -19,7 +19,7 @@ namespace PatchHound.Api.Controllers;
 public class SoftwareController(
     PatchHoundDbContext dbContext,
     TenantAiTextGenerationService tenantAiTextGenerationService,
-    SoftwareDescriptionGenerationService softwareDescriptionGenerationService,
+    SoftwareDescriptionJobService softwareDescriptionJobService,
     ITenantContext tenantContext
 ) : ControllerBase
 {
@@ -158,7 +158,7 @@ public class SoftwareController(
 
     [HttpPost("{id:guid}/description")]
     [Authorize(Policy = Policies.GenerateAiReports)]
-    public async Task<ActionResult<TenantSoftwareDescriptionDto>> GenerateDescription(
+    public async Task<ActionResult<TenantSoftwareDescriptionJobDto>> GenerateDescription(
         Guid id,
         [FromBody] GenerateTenantSoftwareDescriptionRequest request,
         CancellationToken ct
@@ -169,7 +169,7 @@ public class SoftwareController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        var result = await softwareDescriptionGenerationService.GenerateAsync(
+        var result = await softwareDescriptionJobService.EnqueueAsync(
             currentTenantId,
             id,
             request.TenantAiProfileId,
@@ -177,18 +177,49 @@ public class SoftwareController(
         );
         if (!result.IsSuccess)
         {
-            return BadRequest(new ProblemDetails { Title = result.Error ?? "Failed to generate software description." });
+            return BadRequest(new ProblemDetails { Title = result.Error ?? "Failed to queue software description generation." });
         }
 
         return Ok(
-            new TenantSoftwareDescriptionDto(
+            new TenantSoftwareDescriptionJobDto(
+                result.Value.Id,
                 result.Value.TenantSoftwareId,
-                result.Value.NormalizedSoftwareId,
-                result.Value.Description,
-                result.Value.ProviderType,
-                result.Value.ProfileName,
-                result.Value.Model,
-                result.Value.GeneratedAt
+                result.Value.Status.ToString(),
+                string.IsNullOrWhiteSpace(result.Value.Error) ? null : result.Value.Error,
+                result.Value.RequestedAt,
+                result.Value.StartedAt,
+                result.Value.CompletedAt
+            )
+        );
+    }
+
+    [HttpGet("{id:guid}/description-status")]
+    [Authorize(Policy = Policies.GenerateAiReports)]
+    public async Task<ActionResult<TenantSoftwareDescriptionJobDto?>> GetDescriptionStatus(
+        Guid id,
+        CancellationToken ct
+    )
+    {
+        if (tenantContext.CurrentTenantId is not Guid currentTenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var job = await softwareDescriptionJobService.GetLatestAsync(currentTenantId, id, ct);
+        if (job is null)
+        {
+            return Ok(null);
+        }
+
+        return Ok(
+            new TenantSoftwareDescriptionJobDto(
+                job.Id,
+                job.TenantSoftwareId,
+                job.Status.ToString(),
+                string.IsNullOrWhiteSpace(job.Error) ? null : job.Error,
+                job.RequestedAt,
+                job.StartedAt,
+                job.CompletedAt
             )
         );
     }
