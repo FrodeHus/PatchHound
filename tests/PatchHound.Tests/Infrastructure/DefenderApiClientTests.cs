@@ -131,7 +131,7 @@ public class DefenderApiClientTests
         handler
             .RequestUris.Should()
             .ContainInOrder(
-                "https://api.securitycenter.microsoft.com/api/vulnerabilities/machinesVulnerabilities?$top=8000",
+                "https://api.securitycenter.microsoft.com/api/vulnerabilities/machinesVulnerabilities",
                 "https://api.securitycenter.microsoft.com/api/vulnerabilities/machinesVulnerabilities?$skip=1"
             );
     }
@@ -175,7 +175,7 @@ public class DefenderApiClientTests
         handler
             .RequestUris.Should()
             .ContainInOrder(
-                "https://api.securitycenter.microsoft.com/api/machines?$top=10000",
+                "https://api.securitycenter.microsoft.com/api/machines",
                 "https://api.securitycenter.microsoft.com/api/machines?$skip=1"
             );
     }
@@ -226,7 +226,7 @@ public class DefenderApiClientTests
         handler
             .RequestUris.Should()
             .ContainInOrder(
-                "https://api.securitycenter.microsoft.com/api/software?$top=10000",
+                "https://api.securitycenter.microsoft.com/api/software",
                 "https://api.securitycenter.microsoft.com/api/software?$skip=1"
             );
     }
@@ -274,7 +274,7 @@ public class DefenderApiClientTests
         handler
             .RequestUris.Should()
             .ContainInOrder(
-                "https://api.securitycenter.microsoft.com/api/software/software-1/machineReferences?$top=10000",
+                "https://api.securitycenter.microsoft.com/api/software/software-1/machineReferences",
                 "https://api.securitycenter.microsoft.com/api/software/software-1/machineReferences?$skip=1"
             );
     }
@@ -299,7 +299,7 @@ public class DefenderApiClientTests
             .RequestUris[0]
             .Should()
             .Be(
-                "https://api.securitycenter.microsoft.com/api/software/missing-software/machineReferences?$top=10000"
+                "https://api.securitycenter.microsoft.com/api/software/missing-software/machineReferences"
             );
     }
 
