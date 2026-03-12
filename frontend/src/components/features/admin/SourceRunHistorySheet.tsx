@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { fetchTenantIngestionRuns } from '@/api/settings.functions'
 import type { TenantIngestionRun } from '@/api/settings.schemas'
 import { Badge } from '@/components/ui/badge'
@@ -30,35 +30,38 @@ export function SourceRunHistorySheet({
 }: SourceRunHistorySheetProps) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const runsMutation = useMutation({
-    mutationFn: async (input: { tenantId: string; sourceKey: string; page: number; pageSize: number }) =>
-      fetchTenantIngestionRuns({ data: input }),
+  const runsQuery = useQuery({
+    queryKey: ['tenant-ingestion-runs', tenantId, sourceKey, page, pageSize],
+    enabled: isOpen && Boolean(sourceKey),
+    queryFn: async () =>
+      fetchTenantIngestionRuns({
+        data: {
+          tenantId,
+          sourceKey: sourceKey!,
+          page,
+          pageSize,
+        },
+      }),
   })
 
-  useEffect(() => {
-    if (!isOpen || !sourceKey) {
-      return
-    }
-
-    void runsMutation.mutateAsync({ tenantId, sourceKey, page, pageSize })
-  }, [isOpen, page, pageSize, sourceKey, tenantId])
-
-  useEffect(() => {
-    if (!isOpen) {
-      setPage(1)
-      setPageSize(10)
-    }
-  }, [isOpen])
-
-  const data = runsMutation.data
+  const data = runsQuery.data
   const runs = data?.items ?? []
   const succeededRuns = runs.filter((run) => run.status.toLowerCase() === 'succeeded').length
   const failedRuns = runs.filter((run) => run.status.toLowerCase() === 'failed').length
   const runningRuns = runs.filter((run) => run.status.toLowerCase() === 'running').length
   const successRate = runs.length ? Math.round((succeededRuns / runs.length) * 100) : 0
 
+  function handleOpenChange(open: boolean) {
+    if (!open) {
+      setPage(1)
+      setPageSize(10)
+    }
+
+    onOpenChange(open)
+  }
+
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+    <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="w-full overflow-y-auto border-l border-border/80 bg-background/98 p-0 sm:max-w-3xl">
         <SheetHeader className="border-b border-border/70 bg-muted/20">
           <SheetTitle>{sourceDisplayName ?? 'Source history'}</SheetTitle>
@@ -81,7 +84,7 @@ export function SourceRunHistorySheet({
             </div>
           ) : null}
 
-          {!data && runsMutation.isPending ? (
+          {!data && runsQuery.isPending ? (
             <p className="text-sm text-muted-foreground">Loading run history...</p>
           ) : null}
 
@@ -162,6 +165,22 @@ function RunHistoryCard({ run }: { run: TenantIngestionRun }) {
         <span className="text-xs text-muted-foreground">{run.id}</span>
       </div>
 
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <RunSummaryMetric label="Latest phase" value={formatPhase(run.latestPhase)} />
+        <RunSummaryMetric
+          label="Latest batch"
+          value={run.latestBatchNumber !== null ? String(run.latestBatchNumber) : '—'}
+        />
+        <RunSummaryMetric
+          label="Checkpoint"
+          value={
+            run.latestCheckpointStatus
+              ? `${run.latestCheckpointStatus} · ${run.latestRecordsCommitted ?? 0} rows`
+              : '—'
+          }
+        />
+      </div>
+
       <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3 lg:grid-cols-4">
         <RunMetric label="Fetched Vulns" value={run.fetchedVulnerabilityCount} />
         <RunMetric label="Fetched Assets" value={run.fetchedAssetCount} />
@@ -197,6 +216,15 @@ function RunMetric({ label, value }: { label: string; value: number }) {
   )
 }
 
+function RunSummaryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-background/35 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
+    </div>
+  )
+}
+
 function formatTimestamp(value: string | null) {
   if (!value) {
     return 'Never'
@@ -211,4 +239,15 @@ function formatTimestamp(value: string | null) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date)
+}
+
+function formatPhase(value: string | null) {
+  if (!value) {
+    return '—'
+  }
+
+  return value
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
 }

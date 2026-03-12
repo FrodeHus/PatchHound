@@ -15,8 +15,11 @@ public class IngestionService
 {
     private const int MaxPersistenceAttempts = 2;
     private const int MaxSourceAttempts = 2;
+    private const int AssetBatchSize = 5000;
+    private const int VulnerabilityBatchSize = 5000;
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan IngestionArtifactRetention = TimeSpan.FromDays(7);
+    private static readonly TimeSpan FailedIngestionRetention = TimeSpan.FromHours(24);
     private static readonly JsonSerializerOptions StagingJsonOptions = new(
         JsonSerializerDefaults.Web
     );
@@ -30,6 +33,8 @@ public class IngestionService
     private readonly StagedVulnerabilityMergeService _stagedVulnerabilityMergeService;
     private readonly StagedAssetMergeService _stagedAssetMergeService;
     private readonly ILogger<IngestionService> _logger;
+
+    private sealed record AcquiredIngestionRun(IngestionRun Run, bool Resumed);
 
     public IngestionService(
         PatchHoundDbContext dbContext,
@@ -75,8 +80,8 @@ public class IngestionService
 
         foreach (var source in sources)
         {
-            var run = await TryAcquireIngestionRunAsync(tenantId, source.SourceKey, ct);
-            if (run is null)
+            var acquiredRun = await TryAcquireIngestionRunAsync(tenantId, source.SourceKey, ct);
+            if (acquiredRun is null)
             {
                 _logger.LogInformation(
                     "Skipping ingestion from {Source} for tenant {TenantId} because another run already holds the lease.",
@@ -85,6 +90,8 @@ public class IngestionService
                 );
                 continue;
             }
+
+            var run = acquiredRun.Run;
 
             startedAny = true;
             var runCompleted = false;
@@ -98,7 +105,10 @@ public class IngestionService
             {
                 for (var attempt = 1; attempt <= MaxSourceAttempts; attempt++)
                 {
-                    await ClearStagedDataForRunAsync(run.Id, ct);
+                    if (!(acquiredRun.Resumed && attempt == 1))
+                    {
+                        await ClearStagedDataForRunAsync(run.Id, ct);
+                    }
 
                     await UpdateRuntimeStateAsync(
                         tenantId,
@@ -121,24 +131,38 @@ public class IngestionService
                             tenantId
                         );
 
-                        if (source is IAssetInventorySource assetInventorySource)
+                        var assetStagingCompleted = await IsCheckpointCompletedAsync(
+                            run.Id,
+                            "asset-staging",
+                            ct
+                        );
+                        var assetMergeCompleted = await IsCheckpointCompletedAsync(
+                            run.Id,
+                            "asset-merge",
+                            ct
+                        );
+                        var vulnerabilityStagingCompleted = await IsCheckpointCompletedAsync(
+                            run.Id,
+                            "vulnerability-staging",
+                            ct
+                        );
+                        var vulnerabilityMergeCompleted = await IsCheckpointCompletedAsync(
+                            run.Id,
+                            "vulnerability-merge",
+                            ct
+                        );
+
+                        if (!assetStagingCompleted && source is IAssetInventoryBatchSource assetInventoryBatchSource)
                         {
-                            var assetSnapshot = await assetInventorySource.FetchAssetsAsync(
-                                tenantId,
-                                ct
-                            );
-                            var normalizedAssetSnapshot = NormalizeAssetSnapshot(assetSnapshot);
-                            fetchedAssetCount = assetSnapshot.Assets.Count;
-                            fetchedSoftwareInstallationCount = assetSnapshot
-                                .DeviceSoftwareLinks
-                                .Count;
-                            await StageAssetInventorySnapshotAsync(
+                            var assetBatchSummary = await StageAssetBatchesAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
-                                normalizedAssetSnapshot,
+                                assetInventoryBatchSource,
                                 ct
                             );
+                            fetchedAssetCount = assetBatchSummary.AssetCount;
+                            fetchedSoftwareInstallationCount = assetBatchSummary.LinkCount;
                             assetMergeSummary = await ExecuteWithConcurrencyRetryAsync(
                                 () =>
                                     ProcessStagedAssetsAsync(
@@ -149,6 +173,19 @@ public class IngestionService
                                     ),
                                 source.SourceName,
                                 tenantId,
+                                ct
+                            );
+                            await CommitCheckpointAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                "asset-merge",
+                                assetBatchSummary.BatchNumber,
+                                null,
+                                assetMergeSummary.MergedAssetCount
+                                    + assetMergeSummary.InstallationsCreated
+                                    + assetMergeSummary.InstallationsTouched,
+                                "Completed",
                                 ct
                             );
                             _logger.LogInformation(
@@ -167,30 +204,194 @@ public class IngestionService
                                 assetMergeSummary.InstallationsRemoved
                             );
                         }
+                        else if (!assetStagingCompleted && source is IAssetInventorySource assetInventorySource)
+                        {
+                            var assetSnapshot = await assetInventorySource.FetchAssetsAsync(
+                                tenantId,
+                                ct
+                            );
+                            var normalizedAssetSnapshot = NormalizeAssetSnapshot(assetSnapshot);
+                            fetchedAssetCount = assetSnapshot.Assets.Count;
+                            fetchedSoftwareInstallationCount = assetSnapshot
+                                .DeviceSoftwareLinks
+                                .Count;
+                            await StageAssetInventorySnapshotAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                normalizedAssetSnapshot,
+                                0,
+                                ct
+                            );
+                            await CommitCheckpointAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                "asset-staging",
+                                0,
+                                null,
+                                normalizedAssetSnapshot.Assets.Count + normalizedAssetSnapshot.DeviceSoftwareLinks.Count,
+                                "Staged",
+                                ct
+                            );
+                            assetMergeSummary = await ExecuteWithConcurrencyRetryAsync(
+                                () =>
+                                    ProcessStagedAssetsAsync(
+                                        run.Id,
+                                        tenantId,
+                                        source.SourceKey,
+                                        ct
+                                    ),
+                                source.SourceName,
+                                tenantId,
+                                ct
+                            );
+                            await CommitCheckpointAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                "asset-merge",
+                                0,
+                                null,
+                                assetMergeSummary.MergedAssetCount + assetMergeSummary.InstallationsCreated + assetMergeSummary.InstallationsTouched,
+                                "Completed",
+                                ct
+                            );
+                            _logger.LogInformation(
+                                "Asset inventory merge for {Source} tenant {TenantId}: stagedAssets={StagedAssetCount} mergedAssets={MergedAssetCount} stagedSoftwareLinks={StagedSoftwareLinkCount} resolvedSoftwareLinks={ResolvedSoftwareLinkCount} createdInstallations={InstallationsCreated} touchedInstallations={InstallationsTouched} openedEpisodes={EpisodesOpened} seenEpisodes={EpisodesSeen} staleInstallations={StaleInstallationsMarked} removedInstallations={InstallationsRemoved}",
+                                source.SourceName,
+                                tenantId,
+                                assetMergeSummary.StagedAssetCount,
+                                assetMergeSummary.MergedAssetCount,
+                                assetMergeSummary.StagedSoftwareLinkCount,
+                                assetMergeSummary.ResolvedSoftwareLinkCount,
+                                assetMergeSummary.InstallationsCreated,
+                                assetMergeSummary.InstallationsTouched,
+                                assetMergeSummary.EpisodesOpened,
+                                assetMergeSummary.EpisodesSeen,
+                                assetMergeSummary.StaleInstallationsMarked,
+                                assetMergeSummary.InstallationsRemoved
+                            );
+                        }
+                        else if (assetStagingCompleted)
+                        {
+                            fetchedAssetCount = await _dbContext
+                                .StagedAssets.IgnoreQueryFilters()
+                                .CountAsync(item => item.IngestionRunId == run.Id, ct);
+                            fetchedSoftwareInstallationCount = await _dbContext
+                                .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
+                                .CountAsync(item => item.IngestionRunId == run.Id, ct);
+                        }
 
-                        var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
-                        fetchedVulnerabilityCount = results.Count;
-                        var normalizedResults = NormalizeResults(results);
-                        await StageVulnerabilitiesAsync(
-                            run.Id,
-                            tenantId,
-                            source.SourceKey,
-                            normalizedResults,
-                            ct
-                        );
-                        vulnerabilityMergeSummary = await ExecuteWithConcurrencyRetryAsync(
-                            () =>
-                                ProcessStagedResultsAsync(
-                                    run.Id,
-                                    tenantId,
-                                    source.SourceKey,
-                                    source.SourceName,
-                                    ct
-                                ),
-                            source.SourceName,
-                            tenantId,
-                            ct
-                        );
+                        if (!assetMergeCompleted && assetStagingCompleted)
+                        {
+                            assetMergeSummary = await ExecuteWithConcurrencyRetryAsync(
+                                () =>
+                                    ProcessStagedAssetsAsync(
+                                        run.Id,
+                                        tenantId,
+                                        source.SourceKey,
+                                        ct
+                                    ),
+                                source.SourceName,
+                                tenantId,
+                                ct
+                            );
+                            var assetMergeBatchNumber = await GetCheckpointBatchNumberAsync(
+                                run.Id,
+                                "asset-staging",
+                                ct
+                            );
+                            await CommitCheckpointAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                "asset-merge",
+                                assetMergeBatchNumber,
+                                null,
+                                assetMergeSummary.MergedAssetCount
+                                    + assetMergeSummary.InstallationsCreated
+                                    + assetMergeSummary.InstallationsTouched,
+                                "Completed",
+                                ct
+                            );
+                        }
+
+                        if (!vulnerabilityStagingCompleted && source is IVulnerabilityBatchSource batchSource)
+                        {
+                            fetchedVulnerabilityCount = await StageVulnerabilityBatchesAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                batchSource,
+                                ct
+                            );
+                        }
+                        else if (!vulnerabilityStagingCompleted)
+                        {
+                            var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
+                            fetchedVulnerabilityCount = results.Count;
+                            var normalizedResults = NormalizeResults(results);
+                            await StageVulnerabilitiesAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                normalizedResults,
+                                0,
+                                ct
+                            );
+                            await CommitCheckpointAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                "vulnerability-staging",
+                                0,
+                                null,
+                                normalizedResults.Count,
+                                "Staged",
+                                ct
+                            );
+                        }
+                        else
+                        {
+                            fetchedVulnerabilityCount = await _dbContext
+                                .StagedVulnerabilities.IgnoreQueryFilters()
+                                .CountAsync(item => item.IngestionRunId == run.Id, ct);
+                        }
+
+                        if (!vulnerabilityMergeCompleted && vulnerabilityStagingCompleted)
+                        {
+                            vulnerabilityMergeSummary = await ExecuteWithConcurrencyRetryAsync(
+                                () =>
+                                    ProcessStagedResultsAsync(
+                                        run.Id,
+                                        tenantId,
+                                        source.SourceKey,
+                                        source.SourceName,
+                                        ct
+                                    ),
+                                source.SourceName,
+                                tenantId,
+                                ct
+                            );
+                            var vulnerabilityMergeBatchNumber = await GetCheckpointBatchNumberAsync(
+                                run.Id,
+                                "vulnerability-staging",
+                                ct
+                            );
+                            await CommitCheckpointAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                "vulnerability-merge",
+                                vulnerabilityMergeBatchNumber,
+                                null,
+                                vulnerabilityMergeSummary.MergedExposureCount,
+                                "Completed",
+                                ct
+                            );
+                        }
+
                         await EnqueueEnrichmentJobsForRunAsync(run.Id, tenantId, ct);
                         await ExecuteWithConcurrencyRetryAsync(
                             async () =>
@@ -220,7 +421,7 @@ public class IngestionService
                             "Completed ingestion from {Source} for tenant {TenantId}: {Count} vulnerabilities",
                             source.SourceName,
                             tenantId,
-                            results.Count
+                            fetchedVulnerabilityCount
                         );
 
                         await UpdateRuntimeStateAsync(
@@ -318,6 +519,8 @@ public class IngestionService
         return startedAny;
     }
 
+    private sealed record AssetBatchStageSummary(int AssetCount, int LinkCount, int BatchNumber);
+
     private async Task<T> ExecuteWithConcurrencyRetryAsync<T>(
         Func<Task<T>> operation,
         string sourceName,
@@ -386,6 +589,21 @@ public class IngestionService
             source.LastError
         );
         update(runtime);
+        if (IsInMemoryProvider())
+        {
+            source.UpdateRuntime(
+                runtime.ManualRequestedAt,
+                runtime.LastStartedAt,
+                runtime.LastCompletedAt,
+                runtime.LastSucceededAt,
+                runtime.LastStatus,
+                runtime.LastError
+            );
+            _dbContext.TenantSourceConfigurations.Update(source);
+            await _dbContext.SaveChangesAsync(ct);
+            return;
+        }
+
         await _dbContext
             .TenantSourceConfigurations.IgnoreQueryFilters()
             .Where(item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey)
@@ -402,7 +620,7 @@ public class IngestionService
             );
     }
 
-    private async Task<IngestionRun?> TryAcquireIngestionRunAsync(
+    private async Task<AcquiredIngestionRun?> TryAcquireIngestionRunAsync(
         Guid tenantId,
         string sourceKey,
         CancellationToken ct
@@ -410,24 +628,106 @@ public class IngestionService
     {
         var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
         var now = DateTimeOffset.UtcNow;
-        var run = IngestionRun.Start(tenantId, normalizedSourceKey, now);
         var strategy = _dbContext.Database.CreateExecutionStrategy();
 
         return await strategy.ExecuteAsync(async () =>
         {
+            if (IsInMemoryProvider())
+            {
+                var sourceConfiguration = await _dbContext
+                    .TenantSourceConfigurations.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(
+                        item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
+                        ct
+                    );
+
+                if (sourceConfiguration is null)
+                {
+                    return null;
+                }
+
+                if (
+                    sourceConfiguration.ActiveIngestionRunId.HasValue
+                    && sourceConfiguration.LeaseExpiresAt >= now
+                )
+                {
+                    return null;
+                }
+
+                IngestionRun? resumableRun = null;
+                if (sourceConfiguration.ActiveIngestionRunId.HasValue)
+                {
+                    resumableRun = await _dbContext
+                        .IngestionRuns.IgnoreQueryFilters()
+                        .FirstOrDefaultAsync(
+                            item =>
+                                item.Id == sourceConfiguration.ActiveIngestionRunId.Value
+                                && item.Status == "Running"
+                                && !item.CompletedAt.HasValue,
+                            ct
+                        );
+                }
+
+                var resumed = resumableRun is not null;
+                var run = resumableRun ?? IngestionRun.Start(tenantId, normalizedSourceKey, now);
+                sourceConfiguration.AcquireLease(run.Id, now, now.Add(LeaseDuration));
+                if (!resumed)
+                {
+                    await _dbContext.IngestionRuns.AddAsync(run, ct);
+                }
+
+                await _dbContext.SaveChangesAsync(ct);
+                return new AcquiredIngestionRun(run, resumed);
+            }
+
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
+
+            var persistedSourceConfiguration = await _dbContext
+                .TenantSourceConfigurations.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(
+                    item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
+                    ct
+                );
+
+            if (persistedSourceConfiguration is null)
+            {
+                await transaction.RollbackAsync(ct);
+                return null;
+            }
+
+            if (
+                persistedSourceConfiguration.ActiveIngestionRunId.HasValue
+                && persistedSourceConfiguration.LeaseExpiresAt >= now
+            )
+            {
+                await transaction.RollbackAsync(ct);
+                return null;
+            }
+
+            IngestionRun? resumable = null;
+            if (persistedSourceConfiguration.ActiveIngestionRunId.HasValue)
+            {
+                resumable = await _dbContext
+                    .IngestionRuns.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(
+                        item =>
+                            item.Id == persistedSourceConfiguration.ActiveIngestionRunId.Value
+                            && item.Status == "Running"
+                            && !item.CompletedAt.HasValue,
+                        ct
+                    );
+            }
+
+            var resumedRun = resumable is not null;
+            var acquiredRun = resumable ?? IngestionRun.Start(tenantId, normalizedSourceKey, now);
 
             var updatedRows = await _dbContext
                 .TenantSourceConfigurations.IgnoreQueryFilters()
-                .Where(item =>
-                    item.TenantId == tenantId
-                    && item.SourceKey == normalizedSourceKey
-                    && (!item.ActiveIngestionRunId.HasValue || item.LeaseExpiresAt < now)
-                )
+                .Where(item => item.Id == persistedSourceConfiguration.Id)
                 .ExecuteUpdateAsync(
                     setters =>
                         setters
-                            .SetProperty(item => item.ActiveIngestionRunId, run.Id)
+                            .SetProperty(item => item.ActiveIngestionRunId, acquiredRun.Id)
                             .SetProperty(item => item.LeaseAcquiredAt, now)
                             .SetProperty(item => item.LeaseExpiresAt, now.Add(LeaseDuration)),
                     ct
@@ -439,11 +739,15 @@ public class IngestionService
                 return null;
             }
 
-            await _dbContext.IngestionRuns.AddAsync(run, ct);
+            if (!resumedRun)
+            {
+                await _dbContext.IngestionRuns.AddAsync(acquiredRun, ct);
+            }
+
             await _dbContext.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
 
-            return run;
+            return new AcquiredIngestionRun(acquiredRun, resumedRun);
         });
     }
 
@@ -467,6 +771,80 @@ public class IngestionService
 
         await strategy.ExecuteAsync(async () =>
         {
+            if (IsInMemoryProvider())
+            {
+                var run = await _dbContext
+                    .IngestionRuns.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(item => item.Id == runId, ct);
+                if (run is null)
+                {
+                    return;
+                }
+
+                if (succeeded)
+                {
+                    run.CompleteSucceeded(
+                        completedAt,
+                        fetchedVulnerabilityCount,
+                        fetchedAssetCount,
+                        fetchedSoftwareInstallationCount,
+                        vulnerabilityMergeSummary.StagedVulnerabilityCount,
+                        vulnerabilityMergeSummary.StagedExposureCount,
+                        vulnerabilityMergeSummary.MergedExposureCount,
+                        vulnerabilityMergeSummary.OpenedProjectionCount,
+                        vulnerabilityMergeSummary.ResolvedProjectionCount,
+                        assetMergeSummary.StagedAssetCount,
+                        assetMergeSummary.MergedAssetCount,
+                        assetMergeSummary.StagedSoftwareLinkCount,
+                        assetMergeSummary.ResolvedSoftwareLinkCount,
+                        assetMergeSummary.InstallationsCreated,
+                        assetMergeSummary.InstallationsTouched,
+                        assetMergeSummary.EpisodesOpened,
+                        assetMergeSummary.EpisodesSeen,
+                        assetMergeSummary.StaleInstallationsMarked,
+                        assetMergeSummary.InstallationsRemoved
+                    );
+                }
+                else
+                {
+                    run.CompleteFailed(
+                        completedAt,
+                        error ?? "Unknown ingestion failure",
+                        fetchedVulnerabilityCount,
+                        fetchedAssetCount,
+                        fetchedSoftwareInstallationCount,
+                        vulnerabilityMergeSummary.StagedVulnerabilityCount,
+                        vulnerabilityMergeSummary.StagedExposureCount,
+                        vulnerabilityMergeSummary.MergedExposureCount,
+                        vulnerabilityMergeSummary.OpenedProjectionCount,
+                        vulnerabilityMergeSummary.ResolvedProjectionCount,
+                        assetMergeSummary.StagedAssetCount,
+                        assetMergeSummary.MergedAssetCount,
+                        assetMergeSummary.StagedSoftwareLinkCount,
+                        assetMergeSummary.ResolvedSoftwareLinkCount,
+                        assetMergeSummary.InstallationsCreated,
+                        assetMergeSummary.InstallationsTouched,
+                        assetMergeSummary.EpisodesOpened,
+                        assetMergeSummary.EpisodesSeen,
+                        assetMergeSummary.StaleInstallationsMarked,
+                        assetMergeSummary.InstallationsRemoved
+                    );
+                }
+
+                var source = await _dbContext
+                    .TenantSourceConfigurations.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(
+                        item =>
+                            item.TenantId == tenantId
+                            && item.SourceKey == normalizedSourceKey
+                            && item.ActiveIngestionRunId == runId,
+                        ct
+                    );
+                source?.ReleaseLease(runId);
+                await _dbContext.SaveChangesAsync(ct);
+                return;
+            }
+
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
 
             var updatedRunRows = succeeded
@@ -681,16 +1059,67 @@ public class IngestionService
         CancellationToken ct
     )
     {
-        var cutoff = now.Subtract(IngestionArtifactRetention);
+        var completedCutoff = now.Subtract(IngestionArtifactRetention);
+        var failedCutoff = now.Subtract(FailedIngestionRetention);
         var expiredRunIds = await _dbContext
             .IngestionRuns.IgnoreQueryFilters()
-            .Where(item => item.CompletedAt.HasValue && item.CompletedAt.Value < cutoff)
+            .Where(item =>
+                item.CompletedAt.HasValue
+                && (
+                    (item.Status == "Failed" && item.CompletedAt.Value < failedCutoff)
+                    || (item.Status != "Failed" && item.CompletedAt.Value < completedCutoff)
+                )
+            )
             .Select(item => item.Id)
             .ToListAsync(ct);
 
         if (expiredRunIds.Count == 0)
         {
             return new IngestionArtifactCleanupSummary(0, 0, 0, 0, 0);
+        }
+
+        if (IsInMemoryProvider())
+        {
+            var stagedExposures = await _dbContext
+                .StagedVulnerabilityExposures.IgnoreQueryFilters()
+                .Where(item => expiredRunIds.Contains(item.IngestionRunId))
+                .ToListAsync(ct);
+            var stagedVulnerabilities = await _dbContext
+                .StagedVulnerabilities.IgnoreQueryFilters()
+                .Where(item => expiredRunIds.Contains(item.IngestionRunId))
+                .ToListAsync(ct);
+            var stagedSoftwareLinks = await _dbContext
+                .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
+                .Where(item => expiredRunIds.Contains(item.IngestionRunId))
+                .ToListAsync(ct);
+            var stagedAssets = await _dbContext
+                .StagedAssets.IgnoreQueryFilters()
+                .Where(item => expiredRunIds.Contains(item.IngestionRunId))
+                .ToListAsync(ct);
+            var checkpoints = await _dbContext
+                .IngestionCheckpoints.IgnoreQueryFilters()
+                .Where(item => expiredRunIds.Contains(item.IngestionRunId))
+                .ToListAsync(ct);
+            var runs = await _dbContext
+                .IngestionRuns.IgnoreQueryFilters()
+                .Where(item => expiredRunIds.Contains(item.Id))
+                .ToListAsync(ct);
+
+            _dbContext.StagedVulnerabilityExposures.RemoveRange(stagedExposures);
+            _dbContext.StagedVulnerabilities.RemoveRange(stagedVulnerabilities);
+            _dbContext.StagedDeviceSoftwareInstallations.RemoveRange(stagedSoftwareLinks);
+            _dbContext.StagedAssets.RemoveRange(stagedAssets);
+            _dbContext.IngestionCheckpoints.RemoveRange(checkpoints);
+            _dbContext.IngestionRuns.RemoveRange(runs);
+            await _dbContext.SaveChangesAsync(ct);
+
+            return new IngestionArtifactCleanupSummary(
+                runs.Count,
+                stagedVulnerabilities.Count,
+                stagedExposures.Count,
+                stagedAssets.Count,
+                stagedSoftwareLinks.Count
+            );
         }
 
         var prunedExposureCount = await _dbContext
@@ -707,6 +1136,10 @@ public class IngestionService
             .ExecuteDeleteAsync(ct);
         var prunedAssetCount = await _dbContext
             .StagedAssets.IgnoreQueryFilters()
+            .Where(item => expiredRunIds.Contains(item.IngestionRunId))
+            .ExecuteDeleteAsync(ct);
+        await _dbContext
+            .IngestionCheckpoints.IgnoreQueryFilters()
             .Where(item => expiredRunIds.Contains(item.IngestionRunId))
             .ExecuteDeleteAsync(ct);
         var prunedRunCount = await _dbContext
@@ -731,6 +1164,24 @@ public class IngestionService
     )
     {
         var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        if (IsInMemoryProvider())
+        {
+            var source = await _dbContext
+                .TenantSourceConfigurations.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(
+                    item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
+                    ct
+                );
+            if (source is null)
+            {
+                return;
+            }
+
+            source.ReleaseLease(runId);
+            await _dbContext.SaveChangesAsync(ct);
+            return;
+        }
+
         await _dbContext
             .TenantSourceConfigurations.IgnoreQueryFilters()
             .Where(item =>
@@ -750,6 +1201,33 @@ public class IngestionService
 
     private async Task ClearStagedDataForRunAsync(Guid ingestionRunId, CancellationToken ct)
     {
+        if (IsInMemoryProvider())
+        {
+            var stagedExposures = await _dbContext
+                .StagedVulnerabilityExposures.IgnoreQueryFilters()
+                .Where(item => item.IngestionRunId == ingestionRunId)
+                .ToListAsync(ct);
+            var stagedVulnerabilities = await _dbContext
+                .StagedVulnerabilities.IgnoreQueryFilters()
+                .Where(item => item.IngestionRunId == ingestionRunId)
+                .ToListAsync(ct);
+            var stagedSoftwareLinks = await _dbContext
+                .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
+                .Where(item => item.IngestionRunId == ingestionRunId)
+                .ToListAsync(ct);
+            var stagedAssets = await _dbContext
+                .StagedAssets.IgnoreQueryFilters()
+                .Where(item => item.IngestionRunId == ingestionRunId)
+                .ToListAsync(ct);
+
+            _dbContext.StagedVulnerabilityExposures.RemoveRange(stagedExposures);
+            _dbContext.StagedVulnerabilities.RemoveRange(stagedVulnerabilities);
+            _dbContext.StagedDeviceSoftwareInstallations.RemoveRange(stagedSoftwareLinks);
+            _dbContext.StagedAssets.RemoveRange(stagedAssets);
+            await _dbContext.SaveChangesAsync(ct);
+            return;
+        }
+
         await _dbContext
             .StagedVulnerabilityExposures.IgnoreQueryFilters()
             .Where(item => item.IngestionRunId == ingestionRunId)
@@ -768,11 +1246,86 @@ public class IngestionService
             .ExecuteDeleteAsync(ct);
     }
 
+    private async Task<bool> IsCheckpointCompletedAsync(
+        Guid ingestionRunId,
+        string phase,
+        CancellationToken ct
+    )
+    {
+        return await _dbContext
+            .IngestionCheckpoints.IgnoreQueryFilters()
+            .AnyAsync(
+                item =>
+                    item.IngestionRunId == ingestionRunId
+                    && item.Phase == phase
+                    && item.Status == "Completed",
+                ct
+            );
+    }
+
+    private async Task<int> GetCheckpointBatchNumberAsync(
+        Guid ingestionRunId,
+        string phase,
+        CancellationToken ct
+    )
+    {
+        return await _dbContext
+            .IngestionCheckpoints.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == ingestionRunId && item.Phase == phase)
+            .Select(item => item.BatchNumber)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    private async Task CommitCheckpointAsync(
+        Guid ingestionRunId,
+        Guid tenantId,
+        string sourceKey,
+        string phase,
+        int batchNumber,
+        string? cursorJson,
+        int recordsCommitted,
+        string status,
+        CancellationToken ct
+    )
+    {
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        var checkpoint = await _dbContext
+            .IngestionCheckpoints.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(
+                item => item.IngestionRunId == ingestionRunId && item.Phase == phase,
+                ct
+            );
+
+        if (checkpoint is null)
+        {
+            checkpoint = IngestionCheckpoint.Start(
+                ingestionRunId,
+                tenantId,
+                normalizedSourceKey,
+                phase,
+                DateTimeOffset.UtcNow
+            );
+            await _dbContext.IngestionCheckpoints.AddAsync(checkpoint, ct);
+        }
+
+        checkpoint.CommitBatch(
+            batchNumber,
+            cursorJson,
+            recordsCommitted,
+            status,
+            DateTimeOffset.UtcNow
+        );
+
+        await _dbContext.SaveChangesAsync(ct);
+        _dbContext.ChangeTracker.Clear();
+    }
+
     private async Task StageVulnerabilitiesAsync(
         Guid ingestionRunId,
         Guid tenantId,
         string sourceKey,
         IReadOnlyList<IngestionResult> results,
+        int batchNumber,
         CancellationToken ct
     )
     {
@@ -792,7 +1345,8 @@ public class IngestionService
                 result.Title,
                 result.VendorSeverity,
                 JsonSerializer.Serialize(result with { AffectedAssets = [] }, StagingJsonOptions),
-                stagedAt
+                stagedAt,
+                batchNumber
             )
         );
         var exposures = results.SelectMany(result =>
@@ -806,7 +1360,8 @@ public class IngestionService
                     affectedAsset.AssetName,
                     affectedAsset.AssetType,
                     JsonSerializer.Serialize(affectedAsset, StagingJsonOptions),
-                    stagedAt
+                    stagedAt,
+                    batchNumber
                 )
             )
         );
@@ -817,11 +1372,93 @@ public class IngestionService
         _dbContext.ChangeTracker.Clear();
     }
 
+    private async Task<int> StageVulnerabilityBatchesAsync(
+        Guid ingestionRunId,
+        Guid tenantId,
+        string sourceKey,
+        IVulnerabilityBatchSource batchSource,
+        CancellationToken ct
+    )
+    {
+        var checkpoint = await _dbContext
+            .IngestionCheckpoints.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(
+                item =>
+                    item.IngestionRunId == ingestionRunId
+                    && item.Phase == "vulnerability-staging",
+                ct
+            );
+        var batchNumber = checkpoint?.BatchNumber ?? 0;
+        var cursorJson =
+            string.IsNullOrWhiteSpace(checkpoint?.CursorJson) ? null : checkpoint.CursorJson;
+        var totalResults = 0;
+
+        while (true)
+        {
+            var batch = await batchSource.FetchVulnerabilityBatchAsync(
+                tenantId,
+                cursorJson,
+                VulnerabilityBatchSize,
+                ct
+            );
+            var normalizedResults = NormalizeResults(batch.Items);
+
+            if (normalizedResults.Count > 0)
+            {
+                batchNumber++;
+                totalResults += normalizedResults.Count;
+                await StageVulnerabilitiesAsync(
+                    ingestionRunId,
+                    tenantId,
+                    sourceKey,
+                    normalizedResults,
+                    batchNumber,
+                    ct
+                );
+                await CommitCheckpointAsync(
+                    ingestionRunId,
+                    tenantId,
+                    sourceKey,
+                    "vulnerability-staging",
+                    batchNumber,
+                    batch.NextCursorJson,
+                    normalizedResults.Count,
+                    batch.IsComplete ? "Completed" : "Running",
+                    ct
+                );
+            }
+            else if (batch.IsComplete)
+            {
+                await CommitCheckpointAsync(
+                    ingestionRunId,
+                    tenantId,
+                    sourceKey,
+                    "vulnerability-staging",
+                    batchNumber,
+                    batch.NextCursorJson,
+                    0,
+                    "Completed",
+                    ct
+                );
+            }
+
+            if (batch.IsComplete)
+            {
+                break;
+            }
+
+            cursorJson = batch.NextCursorJson;
+        }
+
+        return totalResults;
+    }
+
     private async Task StageAssetInventorySnapshotAsync(
         Guid ingestionRunId,
         Guid tenantId,
         string sourceKey,
         IngestionAssetInventorySnapshot snapshot,
+        int batchNumber,
         CancellationToken ct
     )
     {
@@ -844,7 +1481,8 @@ public class IngestionService
                     asset.Name,
                     asset.AssetType,
                     JsonSerializer.Serialize(asset, StagingJsonOptions),
-                    stagedAt
+                    stagedAt,
+                    batchNumber
                 )
             );
             await _dbContext.StagedAssets.AddRangeAsync(stagedAssets, ct);
@@ -861,7 +1499,8 @@ public class IngestionService
                     link.SoftwareExternalId,
                     link.ObservedAt,
                     JsonSerializer.Serialize(link, StagingJsonOptions),
-                    stagedAt
+                    stagedAt,
+                    batchNumber
                 )
             );
             await _dbContext.StagedDeviceSoftwareInstallations.AddRangeAsync(stagedLinks, ct);
@@ -919,8 +1558,30 @@ public class IngestionService
         await _dbContext.SaveChangesAsync(ct);
 
         var normalizedResults = NormalizeResults(results);
-        await StageVulnerabilitiesAsync(run.Id, tenantId, run.SourceKey, normalizedResults, ct);
+        await StageVulnerabilitiesAsync(run.Id, tenantId, run.SourceKey, normalizedResults, 0, ct);
+        await CommitCheckpointAsync(
+            run.Id,
+            tenantId,
+            run.SourceKey,
+            "vulnerability-staging",
+            0,
+            null,
+            normalizedResults.Count,
+            "Staged",
+            ct
+        );
         await ProcessStagedResultsAsync(run.Id, tenantId, run.SourceKey, sourceName, ct);
+        await CommitCheckpointAsync(
+            run.Id,
+            tenantId,
+            run.SourceKey,
+            "vulnerability-merge",
+            0,
+            null,
+            normalizedResults.Sum(item => item.AffectedAssets.Count),
+            "Completed",
+            ct
+        );
         await _softwareVulnerabilityMatchService.SyncForTenantAsync(tenantId, ct);
     }
 
@@ -957,9 +1618,119 @@ public class IngestionService
             tenantId,
             run.SourceKey,
             normalizedSnapshot,
+            0,
+            ct
+        );
+        await CommitCheckpointAsync(
+            run.Id,
+            tenantId,
+            run.SourceKey,
+            "asset-staging",
+            0,
+            null,
+            normalizedSnapshot.Assets.Count + normalizedSnapshot.DeviceSoftwareLinks.Count,
+            "Staged",
             ct
         );
         await ProcessStagedAssetsAsync(run.Id, tenantId, run.SourceKey, ct);
+        await CommitCheckpointAsync(
+            run.Id,
+            tenantId,
+            run.SourceKey,
+            "asset-merge",
+            0,
+            null,
+            normalizedSnapshot.Assets.Count + normalizedSnapshot.DeviceSoftwareLinks.Count,
+            "Completed",
+            ct
+        );
+    }
+
+    private async Task<AssetBatchStageSummary> StageAssetBatchesAsync(
+        Guid ingestionRunId,
+        Guid tenantId,
+        string sourceKey,
+        IAssetInventoryBatchSource batchSource,
+        CancellationToken ct
+    )
+    {
+        var checkpoint = await _dbContext
+            .IngestionCheckpoints.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item =>
+                item.IngestionRunId == ingestionRunId
+                && item.TenantId == tenantId
+                && item.SourceKey == sourceKey
+                && item.Phase == "asset-staging",
+                ct
+            );
+
+        var batchNumber = checkpoint?.BatchNumber ?? 0;
+        var cursorJson = string.IsNullOrWhiteSpace(checkpoint?.CursorJson)
+            ? null
+            : checkpoint!.CursorJson;
+        var totalAssets = 0;
+        var totalLinks = 0;
+
+        while (true)
+        {
+            var batch = await batchSource.FetchAssetBatchAsync(
+                tenantId,
+                cursorJson,
+                AssetBatchSize,
+                ct
+            );
+            batchNumber++;
+
+            var normalizedBatch = NormalizeAssetSnapshots(batch.Items);
+            if (normalizedBatch.Assets.Count > 0 || normalizedBatch.DeviceSoftwareLinks.Count > 0)
+            {
+                totalAssets += normalizedBatch.Assets.Count;
+                totalLinks += normalizedBatch.DeviceSoftwareLinks.Count;
+
+                await StageAssetInventorySnapshotAsync(
+                    ingestionRunId,
+                    tenantId,
+                    sourceKey,
+                    normalizedBatch,
+                    batchNumber,
+                    ct
+                );
+                await CommitCheckpointAsync(
+                    ingestionRunId,
+                    tenantId,
+                    sourceKey,
+                    "asset-staging",
+                    batchNumber,
+                    batch.NextCursorJson,
+                    normalizedBatch.Assets.Count + normalizedBatch.DeviceSoftwareLinks.Count,
+                    batch.IsComplete ? "Completed" : "Running",
+                    ct
+                );
+            }
+            else if (batch.IsComplete)
+            {
+                await CommitCheckpointAsync(
+                    ingestionRunId,
+                    tenantId,
+                    sourceKey,
+                    "asset-staging",
+                    batchNumber,
+                    batch.NextCursorJson,
+                    0,
+                    "Completed",
+                    ct
+                );
+            }
+
+            if (batch.IsComplete)
+            {
+                break;
+            }
+
+            cursorJson = batch.NextCursorJson;
+        }
+
+        return new AssetBatchStageSummary(totalAssets, totalLinks, batchNumber);
     }
 
     internal async Task<StagedAssetMergeSummary> ProcessStagedAssetsAsync(
@@ -1041,6 +1812,32 @@ public class IngestionService
             .ToList();
 
         return new IngestionAssetInventorySnapshot(assets, deviceSoftwareLinks);
+    }
+
+    private static IngestionAssetInventorySnapshot NormalizeAssetSnapshots(
+        IReadOnlyList<IngestionAssetInventorySnapshot> snapshots
+    )
+    {
+        if (snapshots.Count == 0)
+        {
+            return new IngestionAssetInventorySnapshot([], []);
+        }
+
+        return NormalizeAssetSnapshot(
+            new IngestionAssetInventorySnapshot(
+                snapshots.SelectMany(item => item.Assets).ToList(),
+                snapshots.SelectMany(item => item.DeviceSoftwareLinks).ToList()
+            )
+        );
+    }
+
+    private bool IsInMemoryProvider()
+    {
+        return string.Equals(
+            _dbContext.Database.ProviderName,
+            "Microsoft.EntityFrameworkCore.InMemory",
+            StringComparison.Ordinal
+        );
     }
 
     private static IEnumerable<IReadOnlyList<T>> Chunk<T>(IReadOnlyList<T> items, int size)

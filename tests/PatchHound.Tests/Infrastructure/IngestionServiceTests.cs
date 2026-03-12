@@ -390,6 +390,24 @@ public class IngestionServiceTests : IDisposable
                 .VulnerabilityAssets.IgnoreQueryFilters()
                 .CountAsync()
         ).Should().Be(2);
+
+        var run = await _dbContext.IngestionRuns.IgnoreQueryFilters().SingleAsync();
+        var checkpoints = await _dbContext
+            .IngestionCheckpoints.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == run.Id)
+            .OrderBy(item => item.Phase)
+            .ToListAsync();
+        checkpoints.Should().HaveCount(2);
+        checkpoints.Select(item => item.Phase).Should().Equal("vulnerability-merge", "vulnerability-staging");
+        checkpoints.Should().Contain(item =>
+            item.Phase == "vulnerability-staging"
+            && item.BatchNumber == 0
+            && item.RecordsCommitted == 1
+            && item.Status == "Staged");
+        checkpoints.Should().Contain(item =>
+            item.Phase == "vulnerability-merge"
+            && item.BatchNumber == 0
+            && item.Status == "Completed");
     }
 
     [Fact]
@@ -714,6 +732,447 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RunIngestionAsync_WhenRunningLeaseExpired_ResumesSameRunFromCheckpoint()
+    {
+        var sourceConfiguration = TenantSourceConfiguration.Create(
+            _tenantId,
+            "batch-source",
+            "Batch Source",
+            true,
+            "0 * * * *"
+        );
+        var existingRun = IngestionRun.Start(
+            _tenantId,
+            "batch-source",
+            DateTimeOffset.UtcNow.AddMinutes(-10)
+        );
+        sourceConfiguration.AcquireLease(
+            existingRun.Id,
+            DateTimeOffset.UtcNow.AddMinutes(-10),
+            DateTimeOffset.UtcNow.AddMinutes(-1)
+        );
+
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.IngestionRuns.AddAsync(existingRun);
+        await _dbContext.TenantSourceConfigurations.AddAsync(sourceConfiguration);
+        await _dbContext.StagedVulnerabilities.AddAsync(
+            StagedVulnerability.Create(
+                existingRun.Id,
+                _tenantId,
+                "batch-source",
+                "CVE-2026-RESUME-1",
+                "Resumed vuln 1",
+                Severity.High,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new IngestionResult(
+                        "CVE-2026-RESUME-1",
+                        "Resumed vuln 1",
+                        "Description",
+                        Severity.High,
+                        8.0m,
+                        null,
+                        null,
+                        []
+                    )
+                ),
+                DateTimeOffset.UtcNow.AddMinutes(-9),
+                1
+            )
+        );
+        await _dbContext.IngestionCheckpoints.AddAsync(
+            IngestionCheckpoint.Start(
+                existingRun.Id,
+                _tenantId,
+                "batch-source",
+                "vulnerability-staging",
+                DateTimeOffset.UtcNow.AddMinutes(-9)
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+        var checkpoint = await _dbContext.IngestionCheckpoints.IgnoreQueryFilters().SingleAsync();
+        checkpoint.CommitBatch(
+            1,
+            "cursor-2",
+            1,
+            "Running",
+            DateTimeOffset.UtcNow.AddMinutes(-9)
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var batchSource = Substitute.For<IVulnerabilitySource, IVulnerabilityBatchSource>();
+        batchSource.SourceKey.Returns("batch-source");
+        batchSource.SourceName.Returns("BatchSource");
+        var batchInterface = (IVulnerabilityBatchSource)batchSource;
+        batchInterface
+            .FetchVulnerabilityBatchAsync(
+                _tenantId,
+                "cursor-2",
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>()
+            )
+            .Returns(
+                new SourceBatchResult<IngestionResult>(
+                    [
+                        new IngestionResult(
+                            "CVE-2026-RESUME-2",
+                            "Resumed vuln 2",
+                            "Description",
+                            Severity.Critical,
+                            9.1m,
+                            null,
+                            null,
+                            []
+                        ),
+                    ],
+                    null,
+                    true
+                )
+            );
+
+        var logger = Substitute.For<ILogger<IngestionService>>();
+        var taskProjectionService = new RemediationTaskProjectionService(
+            _dbContext,
+            new SlaService()
+        );
+        var assessmentService = new VulnerabilityAssessmentService(
+            _dbContext,
+            new EnvironmentalSeverityCalculator()
+        );
+        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
+        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
+            _dbContext,
+            normalizedSoftwareResolver
+        );
+        var softwareMatchService = new SoftwareVulnerabilityMatchService(
+            _dbContext,
+            normalizedSoftwareProjectionService
+        );
+        var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
+            _dbContext,
+            Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
+        );
+        var stagedMergeService = new StagedVulnerabilityMergeService(
+            _dbContext,
+            assessmentService,
+            taskProjectionService
+        );
+        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
+        var service = new IngestionService(
+            _dbContext,
+            [batchSource],
+            enrichmentJobEnqueuer,
+            assessmentService,
+            softwareMatchService,
+            normalizedSoftwareProjectionService,
+            taskProjectionService,
+            stagedMergeService,
+            stagedAssetMergeService,
+            logger
+        );
+
+        var started = await service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        started.Should().BeTrue();
+        (await _dbContext.IngestionRuns.IgnoreQueryFilters().CountAsync()).Should().Be(1);
+
+        var stagedBatchNumbers = await _dbContext
+            .StagedVulnerabilities.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == existingRun.Id)
+            .OrderBy(item => item.BatchNumber)
+            .Select(item => item.BatchNumber)
+            .ToListAsync();
+        stagedBatchNumbers.Should().Equal([1, 2]);
+
+        var updatedCheckpoint = await _dbContext
+            .IngestionCheckpoints.IgnoreQueryFilters()
+            .SingleAsync(item =>
+                item.IngestionRunId == existingRun.Id && item.Phase == "vulnerability-staging"
+            );
+        updatedCheckpoint.BatchNumber.Should().Be(2);
+        updatedCheckpoint.Status.Should().Be("Completed");
+    }
+
+    [Fact]
+    public async Task RunIngestionAsync_WhenAssetBatchLeaseExpired_ResumesSameRunFromCheckpoint()
+    {
+        var sourceConfiguration = TenantSourceConfiguration.Create(
+            _tenantId,
+            "asset-batch-source",
+            "Asset Batch Source",
+            true,
+            "0 * * * *"
+        );
+        var existingRun = IngestionRun.Start(
+            _tenantId,
+            "asset-batch-source",
+            DateTimeOffset.UtcNow.AddMinutes(-10)
+        );
+        sourceConfiguration.AcquireLease(
+            existingRun.Id,
+            DateTimeOffset.UtcNow.AddMinutes(-10),
+            DateTimeOffset.UtcNow.AddMinutes(-1)
+        );
+
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.IngestionRuns.AddAsync(existingRun);
+        await _dbContext.TenantSourceConfigurations.AddAsync(sourceConfiguration);
+        await _dbContext.StagedAssets.AddAsync(
+            StagedAsset.Create(
+                existingRun.Id,
+                _tenantId,
+                "asset-batch-source",
+                "DEVICE-1",
+                "Server01",
+                AssetType.Device,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new IngestionAsset("DEVICE-1", "Server01", AssetType.Device)
+                ),
+                DateTimeOffset.UtcNow.AddMinutes(-9),
+                1
+            )
+        );
+        await _dbContext.IngestionCheckpoints.AddAsync(
+            IngestionCheckpoint.Start(
+                existingRun.Id,
+                _tenantId,
+                "asset-batch-source",
+                "asset-staging",
+                DateTimeOffset.UtcNow.AddMinutes(-9)
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var checkpoint = await _dbContext
+            .IngestionCheckpoints.IgnoreQueryFilters()
+            .SingleAsync(item =>
+                item.IngestionRunId == existingRun.Id && item.Phase == "asset-staging"
+            );
+        checkpoint.CommitBatch(
+            1,
+            "asset-cursor-2",
+            1,
+            "Running",
+            DateTimeOffset.UtcNow.AddMinutes(-9)
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var batchSource = Substitute.For<
+            IVulnerabilitySource,
+            IAssetInventoryBatchSource,
+            IVulnerabilityBatchSource
+        >();
+        batchSource.SourceKey.Returns("asset-batch-source");
+        batchSource.SourceName.Returns("AssetBatchSource");
+
+        var assetBatchInterface = (IAssetInventoryBatchSource)batchSource;
+        assetBatchInterface
+            .FetchAssetBatchAsync(
+                _tenantId,
+                "asset-cursor-2",
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>()
+            )
+            .Returns(
+                new SourceBatchResult<IngestionAssetInventorySnapshot>(
+                    [
+                        new IngestionAssetInventorySnapshot(
+                        [new IngestionAsset("SOFTWARE-1", "Agent 1.0", AssetType.Software)],
+                        [new IngestionDeviceSoftwareLink("DEVICE-1", "SOFTWARE-1", DateTimeOffset.UtcNow)]
+                        ),
+                    ],
+                    null,
+                    true
+                )
+            );
+
+        var vulnerabilityBatchInterface = (IVulnerabilityBatchSource)batchSource;
+        vulnerabilityBatchInterface
+            .FetchVulnerabilityBatchAsync(_tenantId, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new SourceBatchResult<IngestionResult>([], null, true));
+
+        var logger = Substitute.For<ILogger<IngestionService>>();
+        var taskProjectionService = new RemediationTaskProjectionService(
+            _dbContext,
+            new SlaService()
+        );
+        var assessmentService = new VulnerabilityAssessmentService(
+            _dbContext,
+            new EnvironmentalSeverityCalculator()
+        );
+        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
+        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
+            _dbContext,
+            normalizedSoftwareResolver
+        );
+        var softwareMatchService = new SoftwareVulnerabilityMatchService(
+            _dbContext,
+            normalizedSoftwareProjectionService
+        );
+        var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
+            _dbContext,
+            Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
+        );
+        var stagedMergeService = new StagedVulnerabilityMergeService(
+            _dbContext,
+            assessmentService,
+            taskProjectionService
+        );
+        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
+        var service = new IngestionService(
+            _dbContext,
+            [batchSource],
+            enrichmentJobEnqueuer,
+            assessmentService,
+            softwareMatchService,
+            normalizedSoftwareProjectionService,
+            taskProjectionService,
+            stagedMergeService,
+            stagedAssetMergeService,
+            logger
+        );
+
+        var started = await service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        started.Should().BeTrue();
+        (await _dbContext.IngestionRuns.IgnoreQueryFilters().CountAsync()).Should().Be(1);
+
+        var stagedAssets = await _dbContext
+            .StagedAssets.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == existingRun.Id)
+            .OrderBy(item => item.BatchNumber)
+            .Select(item => item.BatchNumber)
+            .ToListAsync();
+        stagedAssets.Should().Equal([1, 2]);
+
+        var stagedLinks = await _dbContext
+            .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == existingRun.Id)
+            .ToListAsync();
+        stagedLinks.Should().ContainSingle();
+        stagedLinks[0].BatchNumber.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task RunIngestionAsync_WhenAssetPhasesCompleted_DoesNotRefetchAssetsOnResume()
+    {
+        var sourceConfiguration = TenantSourceConfiguration.Create(
+            _tenantId,
+            "resume-source",
+            "Resume Source",
+            true,
+            "0 * * * *"
+        );
+        var existingRun = IngestionRun.Start(
+            _tenantId,
+            "resume-source",
+            DateTimeOffset.UtcNow.AddMinutes(-10)
+        );
+        sourceConfiguration.AcquireLease(
+            existingRun.Id,
+            DateTimeOffset.UtcNow.AddMinutes(-10),
+            DateTimeOffset.UtcNow.AddMinutes(-1)
+        );
+
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.IngestionRuns.AddAsync(existingRun);
+        await _dbContext.TenantSourceConfigurations.AddAsync(sourceConfiguration);
+        await _dbContext.IngestionCheckpoints.AddRangeAsync(
+            IngestionCheckpoint.Start(
+                existingRun.Id,
+                _tenantId,
+                "resume-source",
+                "asset-staging",
+                DateTimeOffset.UtcNow.AddMinutes(-9)
+            ),
+            IngestionCheckpoint.Start(
+                existingRun.Id,
+                _tenantId,
+                "resume-source",
+                "asset-merge",
+                DateTimeOffset.UtcNow.AddMinutes(-9)
+            ),
+            IngestionCheckpoint.Start(
+                existingRun.Id,
+                _tenantId,
+                "resume-source",
+                "vulnerability-staging",
+                DateTimeOffset.UtcNow.AddMinutes(-9)
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var checkpoints = await _dbContext.IngestionCheckpoints.IgnoreQueryFilters().ToListAsync();
+        checkpoints.Single(item => item.Phase == "asset-staging")
+            .CommitBatch(1, null, 2, "Completed", DateTimeOffset.UtcNow.AddMinutes(-9));
+        checkpoints.Single(item => item.Phase == "asset-merge")
+            .CommitBatch(1, null, 2, "Completed", DateTimeOffset.UtcNow.AddMinutes(-9));
+        checkpoints.Single(item => item.Phase == "vulnerability-staging")
+            .CommitBatch(1, null, 0, "Completed", DateTimeOffset.UtcNow.AddMinutes(-9));
+        await _dbContext.SaveChangesAsync();
+
+        var batchSource = Substitute.For<
+            IVulnerabilitySource,
+            IAssetInventoryBatchSource,
+            IVulnerabilityBatchSource
+        >();
+        batchSource.SourceKey.Returns("resume-source");
+        batchSource.SourceName.Returns("ResumeSource");
+
+        var vulnerabilityBatchInterface = (IVulnerabilityBatchSource)batchSource;
+        vulnerabilityBatchInterface
+            .FetchVulnerabilityBatchAsync(_tenantId, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new SourceBatchResult<IngestionResult>([], null, true));
+
+        var logger = Substitute.For<ILogger<IngestionService>>();
+        var taskProjectionService = new RemediationTaskProjectionService(
+            _dbContext,
+            new SlaService()
+        );
+        var assessmentService = new VulnerabilityAssessmentService(
+            _dbContext,
+            new EnvironmentalSeverityCalculator()
+        );
+        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
+        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
+            _dbContext,
+            normalizedSoftwareResolver
+        );
+        var softwareMatchService = new SoftwareVulnerabilityMatchService(
+            _dbContext,
+            normalizedSoftwareProjectionService
+        );
+        var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
+            _dbContext,
+            Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
+        );
+        var stagedMergeService = new StagedVulnerabilityMergeService(
+            _dbContext,
+            assessmentService,
+            taskProjectionService
+        );
+        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
+        var service = new IngestionService(
+            _dbContext,
+            [batchSource],
+            enrichmentJobEnqueuer,
+            assessmentService,
+            softwareMatchService,
+            normalizedSoftwareProjectionService,
+            taskProjectionService,
+            stagedMergeService,
+            stagedAssetMergeService,
+            logger
+        );
+
+        var started = await service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        started.Should().BeTrue();
+        await ((IAssetInventoryBatchSource)batchSource)
+            .DidNotReceive()
+            .FetchAssetBatchAsync(_tenantId, Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task RunIngestionAsync_PrunesExpiredStagingArtifactsForOldCompletedRuns()
     {
         var oldRun = IngestionRun.Start(
@@ -858,6 +1317,105 @@ public class IngestionServiceTests : IDisposable
             await _dbContext
                 .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
                 .AnyAsync(item => item.IngestionRunId == oldRun.Id)
+        )
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
+    public async Task RunIngestionAsync_PrunesFailedRunsOlderThan24Hours()
+    {
+        var failedRun = IngestionRun.Start(
+            _tenantId,
+            "test-source",
+            DateTimeOffset.UtcNow.AddDays(-2)
+        );
+        failedRun.CompleteFailed(
+            DateTimeOffset.UtcNow.AddHours(-30),
+            "Timed out",
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+        );
+        await _dbContext.IngestionRuns.AddAsync(failedRun);
+        await _dbContext.StagedVulnerabilities.AddAsync(
+            StagedVulnerability.Create(
+                failedRun.Id,
+                _tenantId,
+                "test-source",
+                "CVE-FAILED-1",
+                "Failed vuln",
+                Severity.Low,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new IngestionResult(
+                        "CVE-FAILED-1",
+                        "Failed vuln",
+                        string.Empty,
+                        Severity.Low,
+                        null,
+                        null,
+                        null,
+                        []
+                    )
+                ),
+                DateTimeOffset.UtcNow.AddHours(-30)
+            )
+        );
+        await _dbContext.IngestionCheckpoints.AddAsync(
+            IngestionCheckpoint.Start(
+                failedRun.Id,
+                _tenantId,
+                "test-source",
+                "vulnerability-staging",
+                DateTimeOffset.UtcNow.AddHours(-30)
+            )
+        );
+
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(
+            TenantSourceConfiguration.Create(
+                _tenantId,
+                "test-source",
+                "Test Source",
+                true,
+                "0 * * * *"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        _source.FetchVulnerabilitiesAsync(_tenantId, Arg.Any<CancellationToken>()).Returns([]);
+
+        await _service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        (await _dbContext.IngestionRuns.IgnoreQueryFilters().AnyAsync(item => item.Id == failedRun.Id))
+            .Should()
+            .BeFalse();
+        (
+            await _dbContext
+                .StagedVulnerabilities.IgnoreQueryFilters()
+                .AnyAsync(item => item.IngestionRunId == failedRun.Id)
+        )
+            .Should()
+            .BeFalse();
+        (
+            await _dbContext
+                .IngestionCheckpoints.IgnoreQueryFilters()
+                .AnyAsync(item => item.IngestionRunId == failedRun.Id)
         )
             .Should()
             .BeFalse();

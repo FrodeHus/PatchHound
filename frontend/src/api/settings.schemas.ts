@@ -16,6 +16,13 @@ export const tenantIngestionRuntimeSchema = z.object({
   lastSucceededAt: nullableIsoDateTimeSchema,
   lastStatus: z.string(),
   lastError: z.string(),
+  activeIngestionRunId: z.string().uuid().nullable(),
+  leaseExpiresAt: nullableIsoDateTimeSchema,
+  activePhase: z.string().nullable(),
+  activeBatchNumber: z.number().nullable(),
+  activeCheckpointStatus: z.string().nullable(),
+  activeRecordsCommitted: z.number().nullable(),
+  activeCheckpointCommittedAt: nullableIsoDateTimeSchema,
 })
 
 export const tenantIngestionRunSchema = z.object({
@@ -42,6 +49,11 @@ export const tenantIngestionRunSchema = z.object({
   staleInstallationsMarked: z.number(),
   installationsRemoved: z.number(),
   error: z.string(),
+  latestPhase: z.string().nullable(),
+  latestBatchNumber: z.number().nullable(),
+  latestCheckpointStatus: z.string().nullable(),
+  latestRecordsCommitted: z.number().nullable(),
+  lastCheckpointCommittedAt: nullableIsoDateTimeSchema,
 })
 
 export const tenantIngestionSourceSchema = z.object({

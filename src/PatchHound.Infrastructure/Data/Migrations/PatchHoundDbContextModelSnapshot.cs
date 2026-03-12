@@ -726,6 +726,58 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("IngestionRuns");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.IngestionCheckpoint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BatchNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CursorJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("IngestionRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("LastCommittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Phase")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("RecordsCommitted")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngestionRunId");
+
+                    b.HasIndex("IngestionRunId", "Phase")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "SourceKey", "Phase");
+
+                    b.ToTable("IngestionCheckpoints");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.NormalizedSoftware", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1285,6 +1337,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<int>("BatchNumber")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ExternalId")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -1317,6 +1372,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("IngestionRunId");
 
+                    b.HasIndex("IngestionRunId", "BatchNumber");
+
                     b.HasIndex("TenantId", "SourceKey", "ExternalId");
 
                     b.ToTable("StagedAssets");
@@ -1327,6 +1384,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<int>("BatchNumber")
+                        .HasColumnType("integer");
 
                     b.Property<string>("DeviceExternalId")
                         .IsRequired()
@@ -1363,6 +1423,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("IngestionRunId");
 
+                    b.HasIndex("IngestionRunId", "BatchNumber");
+
                     b.HasIndex("TenantId", "SourceKey", "DeviceExternalId", "SoftwareExternalId");
 
                     b.ToTable("StagedDeviceSoftwareInstallations");
@@ -1373,6 +1435,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<int>("BatchNumber")
+                        .HasColumnType("integer");
 
                     b.Property<string>("ExternalId")
                         .IsRequired()
@@ -1411,6 +1476,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("IngestionRunId");
 
+                    b.HasIndex("IngestionRunId", "BatchNumber");
+
                     b.HasIndex("TenantId", "SourceKey", "ExternalId");
 
                     b.ToTable("StagedVulnerabilities");
@@ -1436,6 +1503,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<int>("BatchNumber")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("IngestionRunId")
                         .HasColumnType("uuid");
@@ -1463,6 +1533,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("IngestionRunId");
+
+                    b.HasIndex("IngestionRunId", "BatchNumber");
 
                     b.HasIndex("TenantId", "SourceKey", "VulnerabilityExternalId", "AssetExternalId");
 

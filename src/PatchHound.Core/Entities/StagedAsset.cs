@@ -6,6 +6,7 @@ public class StagedAsset
 {
     public Guid Id { get; private set; }
     public Guid IngestionRunId { get; private set; }
+    public int BatchNumber { get; private set; }
     public Guid TenantId { get; private set; }
     public string SourceKey { get; private set; } = string.Empty;
     public string ExternalId { get; private set; } = string.Empty;
@@ -24,13 +25,15 @@ public class StagedAsset
         string name,
         AssetType assetType,
         string payloadJson,
-        DateTimeOffset stagedAt
+        DateTimeOffset stagedAt,
+        int batchNumber = 0
     )
     {
         return new StagedAsset
         {
             Id = Guid.NewGuid(),
             IngestionRunId = ingestionRunId,
+            BatchNumber = batchNumber,
             TenantId = tenantId,
             SourceKey = sourceKey,
             ExternalId = externalId,

@@ -184,6 +184,7 @@ export function TenantSourceManagement({
                   const isConfigured = Boolean(source.credentials.clientId || source.credentials.hasSecret)
                   const statusTone = getSourceStatusTone(source)
                   const statusLabel = source.runtime.lastStatus ?? (isConfigured ? 'Configured' : 'Needs credentials')
+                  const activity = describeSourceActivity(source)
 
                   return (
                     <InsetPanel key={source.key} className="space-y-4 p-4">
@@ -209,6 +210,19 @@ export function TenantSourceManagement({
                         <Metric label="Client ID" value={source.credentials.clientId ? 'Configured' : 'Missing'} />
                         <Metric label="Secret" value={source.credentials.hasSecret ? 'Stored' : 'Missing'} />
                       </div>
+
+                      <InsetPanel className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,160px))]">
+                        <div className="space-y-1">
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                            Ingestion activity
+                          </p>
+                          <p className="text-sm font-medium text-foreground">{activity.title}</p>
+                          <p className="text-xs text-muted-foreground">{activity.description}</p>
+                        </div>
+                        <Metric label="Phase" value={activity.phase} compact />
+                        <Metric label="Batch" value={activity.batch} compact />
+                        <Metric label="Checkpoint" value={activity.checkpoint} compact />
+                      </InsetPanel>
 
                       {source.runtime.lastError ? (
                         <InsetPanel emphasis="subtle" className="px-4 py-3 text-sm text-destructive">
@@ -575,13 +589,57 @@ function StatusBadge({
   )
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  label,
+  value,
+  compact = false,
+}: {
+  label: string
+  value: string
+  compact?: boolean
+}) {
   return (
-    <InsetPanel emphasis="strong" className="px-3 py-2">
+    <InsetPanel emphasis="strong" className={cn('px-3 py-2', compact && 'min-h-0')}>
       <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
     </InsetPanel>
   )
+}
+
+function describeSourceActivity(source: TenantIngestionSourceDraft) {
+  if (source.runtime.activeIngestionRunId && source.runtime.activePhase) {
+    return {
+      title: 'Ingestion running',
+      description: `Lease active until ${formatTimestamp(source.runtime.leaseExpiresAt)}. Latest checkpoint ${formatTimestamp(source.runtime.activeCheckpointCommittedAt)}.`,
+      phase: formatPhase(source.runtime.activePhase),
+      batch:
+        source.runtime.activeBatchNumber !== null
+          ? String(source.runtime.activeBatchNumber)
+          : '—',
+      checkpoint: source.runtime.activeCheckpointStatus ?? 'Running',
+    }
+  }
+
+  const latestRun = source.recentRuns[0]
+  if (latestRun?.status.toLowerCase() === 'failed') {
+    return {
+      title: 'Last run failed',
+      description:
+        'Failed staged snapshots are retained for up to 24 hours before they are discarded.',
+      phase: formatPhase(latestRun.latestPhase),
+      batch:
+        latestRun.latestBatchNumber !== null ? String(latestRun.latestBatchNumber) : '—',
+      checkpoint: latestRun.latestCheckpointStatus ?? 'Failed',
+    }
+  }
+
+  return {
+    title: 'Idle',
+    description: `Last completed ${formatTimestamp(source.runtime.lastCompletedAt)}.`,
+    phase: 'Ready',
+    batch: '—',
+    checkpoint: source.runtime.lastStatus || 'Idle',
+  }
 }
 
 function FormSection({
@@ -674,4 +732,15 @@ function formatTimestamp(value: string | null) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date)
+}
+
+function formatPhase(value: string | null | undefined) {
+  if (!value) {
+    return '—'
+  }
+
+  return value
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
 }

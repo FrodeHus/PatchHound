@@ -55,7 +55,14 @@ public record TenantIngestionRuntimeDto(
     DateTimeOffset? LastCompletedAt,
     DateTimeOffset? LastSucceededAt,
     string LastStatus,
-    string LastError
+    string LastError,
+    Guid? ActiveIngestionRunId,
+    DateTimeOffset? LeaseExpiresAt,
+    string? ActivePhase,
+    int? ActiveBatchNumber,
+    string? ActiveCheckpointStatus,
+    int? ActiveRecordsCommitted,
+    DateTimeOffset? ActiveCheckpointCommittedAt
 );
 
 public record TenantIngestionRunDto(
@@ -81,7 +88,12 @@ public record TenantIngestionRunDto(
     int InstallationEpisodesSeen,
     int StaleInstallationsMarked,
     int InstallationsRemoved,
-    string Error
+    string Error,
+    string? LatestPhase,
+    int? LatestBatchNumber,
+    string? LatestCheckpointStatus,
+    int? LatestRecordsCommitted,
+    DateTimeOffset? LastCheckpointCommittedAt
 );
 
 public record UpdateTenantRequest(
