@@ -6,6 +6,11 @@ public record TenantSoftwareDetailDto(
     string CanonicalName,
     string? CanonicalVendor,
     string? PrimaryCpe23Uri,
+    string? Description,
+    DateTimeOffset? DescriptionGeneratedAt,
+    string? DescriptionProviderType,
+    string? DescriptionProfileName,
+    string? DescriptionModel,
     string NormalizationMethod,
     string Confidence,
     DateTimeOffset? FirstSeenAt,
@@ -85,4 +90,14 @@ public record TenantSoftwareVulnerabilityEvidenceDto(
     DateTimeOffset FirstSeenAt,
     DateTimeOffset LastSeenAt,
     DateTimeOffset? ResolvedAt
+);
+
+public record TenantSoftwareDescriptionDto(
+    Guid TenantSoftwareId,
+    Guid NormalizedSoftwareId,
+    string Description,
+    string ProviderType,
+    string ProfileName,
+    string Model,
+    DateTimeOffset GeneratedAt
 );

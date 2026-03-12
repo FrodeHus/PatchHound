@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { fetchTenantIngestionRuns } from '@/api/settings.functions'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useRouter } from '@tanstack/react-router'
+import { RotateCw } from 'lucide-react'
+import { fetchTenantIngestionRuns, triggerTenantIngestionSync } from '@/api/settings.functions'
 import type { TenantIngestionRun } from '@/api/settings.schemas'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Button } from '@/components/ui/button'
@@ -27,6 +29,7 @@ export function SourceRunHistoryView({
   sourceKey,
   sourceDisplayName,
 }: SourceRunHistoryViewProps) {
+  const router = useRouter()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [filter, setFilter] = useState<RunFilter>('all')
@@ -42,6 +45,19 @@ export function SourceRunHistoryView({
           pageSize,
         },
       }),
+  })
+  const resumeMutation = useMutation({
+    mutationFn: async () => {
+      await triggerTenantIngestionSync({
+        data: {
+          tenantId,
+          sourceKey,
+        },
+      })
+    },
+    onSuccess: async () => {
+      await router.invalidate()
+    },
   })
 
   const data = runsQuery.data
@@ -129,12 +145,18 @@ export function SourceRunHistoryView({
       ) : null}
 
       {data?.items.length ? (
-        <div className="space-y-3">
-          {filteredRuns.map((run) => (
-            <RunHistoryCard key={run.id} run={run} />
-          ))}
-          <PaginationControls
-            page={data.page}
+          <div className="space-y-3">
+            {filteredRuns.map((run) => (
+              <RunHistoryCard
+                key={run.id}
+                run={run}
+                canResume={getRunCategory(run.status) === 'failed-recoverable'}
+                isResuming={resumeMutation.isPending}
+                onResume={() => resumeMutation.mutate()}
+              />
+            ))}
+            <PaginationControls
+              page={data.page}
             pageSize={data.pageSize}
             totalCount={data.totalCount}
             totalPages={data.totalPages}
@@ -204,7 +226,17 @@ function SummaryCard({
   )
 }
 
-function RunHistoryCard({ run }: { run: TenantIngestionRun }) {
+function RunHistoryCard({
+  run,
+  canResume,
+  isResuming,
+  onResume,
+}: {
+  run: TenantIngestionRun
+  canResume: boolean
+  isResuming: boolean
+  onResume: () => void
+}) {
   const tone = getRunTone(run.status)
 
   return (
@@ -225,7 +257,15 @@ function RunHistoryCard({ run }: { run: TenantIngestionRun }) {
           <span className="text-muted-foreground">Started {formatTimestamp(run.startedAt)}</span>
           <span className="text-muted-foreground">Completed {formatTimestamp(run.completedAt)}</span>
         </div>
-        <span className="text-xs text-muted-foreground">{run.id}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          {canResume ? (
+            <Button type="button" size="sm" variant="outline" disabled={isResuming} onClick={onResume}>
+              <RotateCw className="size-4" />
+              {isResuming ? 'Resuming...' : 'Resume ingestion'}
+            </Button>
+          ) : null}
+          <span className="text-xs text-muted-foreground">{run.id}</span>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">

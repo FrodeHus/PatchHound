@@ -812,6 +812,24 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("DescriptionGeneratedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DescriptionModel")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("DescriptionProfileName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("DescriptionProviderType")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTimeOffset>("LastEvaluatedAt")
                         .HasColumnType("timestamp with time zone");
 

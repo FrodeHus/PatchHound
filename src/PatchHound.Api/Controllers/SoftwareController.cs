@@ -9,6 +9,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Api.Controllers;
 
@@ -18,6 +19,7 @@ namespace PatchHound.Api.Controllers;
 public class SoftwareController(
     PatchHoundDbContext dbContext,
     TenantAiTextGenerationService tenantAiTextGenerationService,
+    SoftwareDescriptionGenerationService softwareDescriptionGenerationService,
     ITenantContext tenantContext
 ) : ControllerBase
 {
@@ -55,6 +57,11 @@ public class SoftwareController(
                 item.NormalizedSoftware.CanonicalName,
                 item.NormalizedSoftware.CanonicalVendor,
                 item.NormalizedSoftware.PrimaryCpe23Uri,
+                item.NormalizedSoftware.Description,
+                item.NormalizedSoftware.DescriptionGeneratedAt,
+                item.NormalizedSoftware.DescriptionProviderType,
+                item.NormalizedSoftware.DescriptionProfileName,
+                item.NormalizedSoftware.DescriptionModel,
                 NormalizationMethod = item.NormalizedSoftware.NormalizationMethod.ToString(),
                 Confidence = item.NormalizedSoftware.Confidence.ToString(),
             })
@@ -115,6 +122,11 @@ public class SoftwareController(
                 tenantSoftware.CanonicalName,
                 tenantSoftware.CanonicalVendor,
                 tenantSoftware.PrimaryCpe23Uri,
+                tenantSoftware.Description,
+                tenantSoftware.DescriptionGeneratedAt,
+                tenantSoftware.DescriptionProviderType,
+                tenantSoftware.DescriptionProfileName,
+                tenantSoftware.DescriptionModel,
                 tenantSoftware.NormalizationMethod,
                 tenantSoftware.Confidence,
                 installations.Count == 0 ? tenantSoftware.FirstSeenAt : installations.Min(item => item.FirstSeenAt),
@@ -140,6 +152,43 @@ public class SoftwareController(
                         item.MatchReason
                     ))
                     .ToList()
+            )
+        );
+    }
+
+    [HttpPost("{id:guid}/description")]
+    [Authorize(Policy = Policies.GenerateAiReports)]
+    public async Task<ActionResult<TenantSoftwareDescriptionDto>> GenerateDescription(
+        Guid id,
+        [FromBody] GenerateTenantSoftwareDescriptionRequest request,
+        CancellationToken ct
+    )
+    {
+        if (tenantContext.CurrentTenantId is not Guid currentTenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var result = await softwareDescriptionGenerationService.GenerateAsync(
+            currentTenantId,
+            id,
+            request.TenantAiProfileId,
+            ct
+        );
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new ProblemDetails { Title = result.Error ?? "Failed to generate software description." });
+        }
+
+        return Ok(
+            new TenantSoftwareDescriptionDto(
+                result.Value.TenantSoftwareId,
+                result.Value.NormalizedSoftwareId,
+                result.Value.Description,
+                result.Value.ProviderType,
+                result.Value.ProfileName,
+                result.Value.Model,
+                result.Value.GeneratedAt
             )
         );
     }

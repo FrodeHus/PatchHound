@@ -36,7 +36,15 @@ public class TenantAiTextGenerationService
             );
         }
 
-        var resolvedProfile = resolvedResult.Value;
+        return await GenerateResolvedAsync(resolvedResult.Value, request, ct);
+    }
+
+    public async Task<Result<AiTextGenerationResult>> GenerateResolvedAsync(
+        TenantAiProfileResolved resolvedProfile,
+        AiTextGenerationRequest request,
+        CancellationToken ct
+    )
+    {
         var provider = _providers.FirstOrDefault(p => p.ProviderType == resolvedProfile.Profile.ProviderType);
         if (provider is null)
         {

@@ -11,6 +11,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
@@ -22,6 +23,8 @@ public class SoftwareControllerTests : IDisposable
     private readonly IAiReportProvider _aiProvider;
     private readonly ITenantAiConfigurationResolver _tenantAiConfigurationResolver;
     private readonly TenantAiTextGenerationService _tenantAiTextGenerationService;
+    private readonly ITenantAiResearchService _tenantAiResearchService;
+    private readonly SoftwareDescriptionGenerationService _softwareDescriptionGenerationService;
     private readonly SoftwareController _controller;
 
     public SoftwareControllerTests()
@@ -41,11 +44,23 @@ public class SoftwareControllerTests : IDisposable
         );
         _aiProvider = Substitute.For<IAiReportProvider>();
         _tenantAiConfigurationResolver = Substitute.For<ITenantAiConfigurationResolver>();
+        _tenantAiResearchService = Substitute.For<ITenantAiResearchService>();
         _tenantAiTextGenerationService = new TenantAiTextGenerationService(
             [_aiProvider],
             _tenantAiConfigurationResolver
         );
-        _controller = new SoftwareController(_dbContext, _tenantAiTextGenerationService, tenantContext);
+        _softwareDescriptionGenerationService = new SoftwareDescriptionGenerationService(
+            _dbContext,
+            _tenantAiConfigurationResolver,
+            _tenantAiResearchService,
+            _tenantAiTextGenerationService
+        );
+        _controller = new SoftwareController(
+            _dbContext,
+            _tenantAiTextGenerationService,
+            _softwareDescriptionGenerationService,
+            tenantContext
+        );
     }
 
     [Fact]
@@ -67,6 +82,7 @@ public class SoftwareControllerTests : IDisposable
         payload.VersionCohorts.Should().HaveCount(2);
         payload.VersionCohorts.Select(item => item.Version).Should().BeEquivalentTo("1.0", "2.0");
         payload.SourceAliases.Should().HaveCount(2);
+        payload.Description.Should().BeNull();
     }
 
     [Fact]
@@ -172,6 +188,66 @@ public class SoftwareControllerTests : IDisposable
                     && request.UserPrompt.Contains("\"installations\"")
                     && request.UserPrompt.Contains("\"vulnerabilities\"")
                     && request.UserPrompt.Contains("CVE-2026-1000")
+                ),
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<CancellationToken>()
+            );
+    }
+
+    [Fact]
+    public async Task GenerateDescription_PersistsProductDescription()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var profile = TenantAiProfileFactory.Create(
+            _tenantId,
+            providerType: TenantAiProviderType.OpenAi,
+            name: "Default AI",
+            model: "gpt-5-mini",
+            systemPrompt: "system"
+        );
+        _tenantAiConfigurationResolver
+            .ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(
+                Result<TenantAiProfileResolved>.Success(
+                    new TenantAiProfileResolved(profile, "api-key")
+                )
+            );
+        _aiProvider.ProviderType.Returns(TenantAiProviderType.OpenAi);
+        _aiProvider
+            .ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
+            .Returns(AiProviderValidationResult.Success());
+        _aiProvider
+            .GenerateTextAsync(
+                Arg.Any<AiTextGenerationRequest>(),
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<CancellationToken>()
+            )
+            .Returns("Agent is a widely deployed enterprise endpoint management product.");
+
+        var action = await _controller.GenerateDescription(
+            graph.TenantSoftware.Id,
+            new GenerateTenantSoftwareDescriptionRequest(null),
+            CancellationToken.None
+        );
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<TenantSoftwareDescriptionDto>().Subject;
+
+        payload.TenantSoftwareId.Should().Be(graph.TenantSoftware.Id);
+        payload.Description.Should().Contain("enterprise endpoint management product");
+
+        var normalizedSoftware = await _dbContext.NormalizedSoftware.FirstAsync(
+            item => item.Id == graph.TenantSoftware.NormalizedSoftwareId
+        );
+        normalizedSoftware.Description.Should().Be(payload.Description);
+        normalizedSoftware.DescriptionProviderType.Should().Be("OpenAi");
+
+        await _aiProvider
+            .Received(1)
+            .GenerateTextAsync(
+                Arg.Is<AiTextGenerationRequest>(request =>
+                    request.UserPrompt.Contains("Primary software identity:")
+                    && request.UserPrompt.Contains("Contoso Agent")
+                    && request.UserPrompt.Contains("Known identity variants:")
                 ),
                 Arg.Any<TenantAiProfileResolved>(),
                 Arg.Any<CancellationToken>()

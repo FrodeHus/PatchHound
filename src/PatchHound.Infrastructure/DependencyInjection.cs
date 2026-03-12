@@ -89,9 +89,12 @@ public static class DependencyInjection
         services.AddScoped<IEnrichmentSourceRunner, NvdVulnerabilityEnrichmentRunner>();
         services.AddScoped<AiReportService>();
         services.AddScoped<TenantAiTextGenerationService>();
+        services.AddScoped<SoftwareDescriptionGenerationService>();
         services.AddScoped<IRiskChangeBriefAiSummaryService, RiskChangeBriefAiSummaryService>();
         services.AddScoped<ITenantAiConfigurationResolver, TenantAiConfigurationResolver>();
-        services.AddScoped<ITenantAiResearchService, TenantAiResearchService>();
+        services
+            .AddHttpClient<ITenantAiResearchService, TenantAiResearchService>()
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<EnvironmentalSeverityCalculator>();
         services.AddScoped<VulnerabilityAssessmentService>();

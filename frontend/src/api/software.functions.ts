@@ -5,6 +5,7 @@ import { apiGet, apiPost } from '@/server/api'
 import {
   tenantSoftwareDetailSchema,
   tenantSoftwareAiReportSchema,
+  tenantSoftwareDescriptionSchema,
   tenantSoftwareVulnerabilitySchema,
   pagedTenantSoftwareSchema,
   pagedTenantSoftwareInstallationsSchema,
@@ -69,4 +70,12 @@ export const generateTenantSoftwareAiReport = createServerFn({ method: 'POST' })
   .handler(async ({ context, data: { id, tenantAiProfileId } }) => {
     const data = await apiPost(`/software/${id}/ai-report`, context, { tenantAiProfileId })
     return tenantSoftwareAiReportSchema.parse(data)
+  })
+
+export const generateTenantSoftwareDescription = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ id: z.string(), tenantAiProfileId: z.string().uuid().optional() }))
+  .handler(async ({ context, data: { id, tenantAiProfileId } }) => {
+    const data = await apiPost(`/software/${id}/description`, context, { tenantAiProfileId })
+    return tenantSoftwareDescriptionSchema.parse(data)
   })

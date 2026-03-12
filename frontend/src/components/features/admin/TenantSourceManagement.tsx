@@ -202,6 +202,7 @@ export function TenantSourceManagement({
                   const statusTone = getSourceStatusTone(source)
                   const statusLabel = source.runtime.lastStatus ?? (isConfigured ? 'Configured' : 'Needs credentials')
                   const activity = describeSourceActivity(source)
+                  const recoverableFailure = isRecoverableFailure(source)
 
                   return (
                     <InsetPanel key={source.key} className="space-y-4 p-4">
@@ -259,7 +260,13 @@ export function TenantSourceManagement({
                             onClick={() => syncMutation.mutate(source.key)}
                           >
                             <RotateCw className="size-4" />
-                            {syncingSourceKey === source.key ? 'Syncing...' : 'Manual sync'}
+                            {syncingSourceKey === source.key
+                              ? recoverableFailure
+                                ? 'Resuming...'
+                                : 'Syncing...'
+                              : recoverableFailure
+                                ? 'Resume ingestion'
+                                : 'Manual sync'}
                           </Button>
                         ) : null}
                         <Button
@@ -836,6 +843,11 @@ function getSourceStatusTone(source: TenantIngestionSourceDraft): 'neutral' | 's
   }
 
   return 'neutral'
+}
+
+function isRecoverableFailure(source: TenantIngestionSourceDraft) {
+  const latestRunStatus = source.recentRuns[0]?.status?.toLowerCase()
+  return latestRunStatus === 'failedrecoverable'
 }
 
 function mapSourceToDraft(source: TenantIngestionSource): TenantIngestionSourceDraft {
