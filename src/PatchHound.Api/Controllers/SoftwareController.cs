@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Software;
+using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Core.Services;
@@ -20,6 +21,8 @@ public class SoftwareController(
     PatchHoundDbContext dbContext,
     TenantAiTextGenerationService tenantAiTextGenerationService,
     SoftwareDescriptionJobService softwareDescriptionJobService,
+    ITenantAiConfigurationResolver tenantAiConfigurationResolver,
+    ITenantAiResearchService tenantAiResearchService,
     ITenantContext tenantContext
 ) : ControllerBase
 {
@@ -657,6 +660,7 @@ public class SoftwareController(
             .Select(item => item.SoftwareAssetId)
             .Distinct()
             .ToList();
+        var uniqueDeviceCount = activeInstallations.Select(item => item.DeviceAssetId).Distinct().Count();
 
         var matches = await dbContext
             .SoftwareVulnerabilityMatches.AsNoTracking()
@@ -721,6 +725,30 @@ public class SoftwareController(
             };
         });
 
+        var versionSummary = activeInstallations
+            .GroupBy(item => string.IsNullOrWhiteSpace(item.DetectedVersion) ? "Unknown" : item.DetectedVersion!)
+            .Select(group => new
+            {
+                Version = group.Key,
+                InstallCount = group.Count(),
+                DeviceCount = group.Select(item => item.DeviceAssetId).Distinct().Count(),
+            })
+            .OrderByDescending(item => item.InstallCount)
+            .ThenBy(item => item.Version, StringComparer.OrdinalIgnoreCase)
+            .Take(12)
+            .ToList();
+
+        var deviceCriticalitySummary = activeInstallations
+            .GroupBy(item => item.DeviceCriticality)
+            .Select(group => new
+            {
+                Criticality = group.Key,
+                DeviceCount = group.Select(item => item.DeviceAssetId).Distinct().Count(),
+            })
+            .OrderByDescending(item => item.DeviceCount)
+            .ThenBy(item => item.Criticality, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         var payload = new
         {
             software = new
@@ -734,39 +762,92 @@ public class SoftwareController(
                 tenantSoftware.FirstSeenAt,
                 tenantSoftware.LastSeenAt,
                 ActiveInstallCount = activeInstallations.Count,
-                UniqueDeviceCount = activeInstallations.Select(item => item.DeviceAssetId).Distinct().Count(),
+                UniqueDeviceCount = uniqueDeviceCount,
                 VulnerableInstallCount = activeInstallations.Count(item =>
                     matches.Any(match => match.SoftwareAssetId == item.SoftwareAssetId && match.ResolvedAt == null)
                 ),
                 ActiveVulnerabilityCount = projections.Count(item => item.projection.ResolvedAt == null),
             },
             aliases,
-            installations = installations.Select(item => new
+            installationSummary = new
             {
-                item.DeviceAssetId,
-                item.DeviceName,
-                item.DeviceCriticality,
-                item.SoftwareAssetId,
-                item.SoftwareAssetName,
-                item.DetectedVersion,
-                item.FirstSeenAt,
-                item.LastSeenAt,
-                item.RemovedAt,
-                item.IsActive,
-                item.CurrentEpisodeNumber,
-            }),
+                ActiveInstallCount = activeInstallations.Count,
+                UniqueDeviceCount = uniqueDeviceCount,
+                VersionSummary = versionSummary,
+                DeviceCriticalitySummary = deviceCriticalitySummary,
+            },
             vulnerabilities = vulnerabilityPayload,
         };
 
-        var generationResult = await tenantAiTextGenerationService.GenerateAsync(
-            tenantSoftware.TenantId,
-            request.TenantAiProfileId,
-            new AiTextGenerationRequest(
-                "You are a PatchHound software exposure analyst. Use only the provided JSON. " +
-                "Summarize prevalence, versions, linked vulnerability exposure, remediation priorities, and any notable operational concentration. " +
-                "Return markdown with these sections: Executive Summary, Exposure Surface, Vulnerability Landscape, Priority Actions.",
-                JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true })
-            ),
+        var resolvedProfileResult = request.TenantAiProfileId.HasValue
+            ? await tenantAiConfigurationResolver.ResolveByIdAsync(
+                tenantSoftware.TenantId,
+                request.TenantAiProfileId.Value,
+                ct
+            )
+            : await tenantAiConfigurationResolver.ResolveDefaultAsync(tenantSoftware.TenantId, ct);
+
+        if (!resolvedProfileResult.IsSuccess)
+        {
+            return BadRequest(new ProblemDetails { Title = resolvedProfileResult.Error ?? "Unable to resolve tenant AI configuration." });
+        }
+
+        var resolvedProfile = resolvedProfileResult.Value;
+        var aiRequest = new AiTextGenerationRequest(
+            "You are a PatchHound software vulnerability analyst. " +
+            "Write a concise markdown report explaining the security risk of this software in the tenant. " +
+            "Focus on what the software is, what the linked vulnerabilities do, how they are exploited or triggered, what makes the current tenant exposure risky, and the highest-priority remediation actions. " +
+            "Do not list individual devices. Use counts, versions, and prevalence summaries only. " +
+            "If external research is provided, use it to explain the vulnerabilities and exploitation mechanics, and cite sources when available. " +
+            "Return markdown with these sections: Executive Summary, What This Software Is, How The Vulnerabilities Work, Tenant Exposure, Priority Actions.",
+            JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true })
+        );
+
+        var profile = resolvedProfile.Profile;
+        if (profile.AllowExternalResearch)
+        {
+            if (
+                profile.WebResearchMode == TenantAiWebResearchMode.ProviderNative
+                && profile.ProviderType == TenantAiProviderType.OpenAi
+            )
+            {
+                aiRequest = aiRequest with
+                {
+                    UseProviderNativeWebResearch = true,
+                    AllowedDomains = ParseAllowedDomains(profile.AllowedDomains),
+                    MaxResearchSources = profile.MaxResearchSources,
+                    IncludeCitations = profile.IncludeCitations,
+                };
+            }
+            else if (profile.WebResearchMode == TenantAiWebResearchMode.PatchHoundManaged)
+            {
+                var researchQuery = BuildSoftwareRiskResearchQuery(
+                    tenantSoftware.CanonicalVendor,
+                    tenantSoftware.CanonicalName,
+                    tenantSoftware.PrimaryCpe23Uri,
+                    projections.Select(item => item.vulnerabilityDefinition.ExternalId).ToList()
+                );
+                var researchResult = await tenantAiResearchService.ResearchAsync(
+                    resolvedProfile,
+                    new AiWebResearchRequest(
+                        researchQuery,
+                        ParseAllowedDomains(profile.AllowedDomains),
+                        profile.MaxResearchSources,
+                        profile.IncludeCitations
+                    ),
+                    ct
+                );
+
+                if (researchResult.IsSuccess && !string.IsNullOrWhiteSpace(researchResult.Value.Context))
+                {
+                    aiRequest = aiRequest with { ExternalContext = researchResult.Value.Context };
+                }
+            }
+        }
+
+        var generationResult = await tenantAiTextGenerationService.GenerateResolvedAsync(
+            resolvedProfile,
+            aiRequest,
             ct
         );
 
@@ -786,6 +867,30 @@ public class SoftwareController(
                 generated.GeneratedAt
             )
         );
+    }
+
+    private static IReadOnlyList<string> ParseAllowedDomains(string? allowedDomains)
+    {
+        return (allowedDomains ?? string.Empty)
+            .Split([',', '\n', '\r', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string BuildSoftwareRiskResearchQuery(
+        string? canonicalVendor,
+        string canonicalName,
+        string? primaryCpe23Uri,
+        IReadOnlyList<string> cveIds
+    )
+    {
+        var product = string.IsNullOrWhiteSpace(canonicalVendor)
+            ? canonicalName
+            : $"{canonicalVendor} {canonicalName}";
+        var cveSummary = cveIds.Count == 0 ? string.Empty : $" Related CVEs: {string.Join(", ", cveIds.Take(5))}.";
+        var cpeSummary = string.IsNullOrWhiteSpace(primaryCpe23Uri) ? string.Empty : $" CPE: {primaryCpe23Uri}.";
+        return $"Explain the security risks and exploitation mechanics for {product}.{cpeSummary}{cveSummary}";
     }
 
     private static IReadOnlyList<TenantSoftwareVulnerabilityEvidenceDto> ParseEvidence(
