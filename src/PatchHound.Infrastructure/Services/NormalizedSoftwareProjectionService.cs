@@ -15,24 +15,30 @@ public class NormalizedSoftwareProjectionService(
 
     public async Task SyncTenantAsync(Guid tenantId, CancellationToken ct)
     {
+        await SyncTenantAsync(tenantId, null, ct);
+    }
+
+    public async Task SyncTenantAsync(Guid tenantId, Guid? snapshotId, CancellationToken ct)
+    {
         var resolutions = await resolver.SyncTenantAsync(tenantId, ct);
-        await RebuildInstallationProjectionAsync(tenantId, resolutions, ct);
+        await RebuildInstallationProjectionAsync(tenantId, snapshotId, resolutions, ct);
         await dbContext.SaveChangesAsync(ct);
-        await RebuildVulnerabilityProjectionAsync(tenantId, resolutions, ct);
+        await RebuildVulnerabilityProjectionAsync(tenantId, snapshotId, resolutions, ct);
         await dbContext.SaveChangesAsync(ct);
     }
 
     private async Task RebuildInstallationProjectionAsync(
         Guid tenantId,
+        Guid? snapshotId,
         IReadOnlyDictionary<Guid, NormalizedSoftwareResolver.ResolutionResult> resolutions,
         CancellationToken ct
     )
     {
-        var tenantSoftwareRows = await UpsertTenantSoftwareAsync(tenantId, resolutions, ct);
+        var tenantSoftwareRows = await UpsertTenantSoftwareAsync(tenantId, snapshotId, resolutions, ct);
 
         var existingInstallations = await dbContext
             .NormalizedSoftwareInstallations.IgnoreQueryFilters()
-            .Where(item => item.TenantId == tenantId)
+            .Where(item => item.TenantId == tenantId && item.SnapshotId == snapshotId)
             .ToListAsync(ct);
         if (existingInstallations.Count > 0)
         {
@@ -81,6 +87,7 @@ public class NormalizedSoftwareProjectionService(
 
                 return NormalizedSoftwareInstallation.Create(
                     tenantId,
+                    snapshotId,
                     tenantSoftware.Id,
                     episode.SoftwareAssetId,
                     episode.DeviceAssetId,
@@ -103,13 +110,14 @@ public class NormalizedSoftwareProjectionService(
 
     private async Task RebuildVulnerabilityProjectionAsync(
         Guid tenantId,
+        Guid? snapshotId,
         IReadOnlyDictionary<Guid, NormalizedSoftwareResolver.ResolutionResult> resolutions,
         CancellationToken ct
     )
     {
         var existingProjections = await dbContext
             .NormalizedSoftwareVulnerabilityProjections.IgnoreQueryFilters()
-            .Where(item => item.TenantId == tenantId)
+            .Where(item => item.TenantId == tenantId && item.SnapshotId == snapshotId)
             .ToListAsync(ct);
         if (existingProjections.Count > 0)
         {
@@ -186,6 +194,7 @@ public class NormalizedSoftwareProjectionService(
             projections.Add(
                 NormalizedSoftwareVulnerabilityProjection.Create(
                     tenantId,
+                    snapshotId,
                     group.Key.TenantSoftwareId,
                     group.Key.VulnerabilityDefinitionId,
                     orderedMatches[0].MatchMethod,
@@ -215,6 +224,7 @@ public class NormalizedSoftwareProjectionService(
 
     private async Task<Dictionary<Guid, TenantSoftware>> UpsertTenantSoftwareAsync(
         Guid tenantId,
+        Guid? snapshotId,
         IReadOnlyDictionary<Guid, NormalizedSoftwareResolver.ResolutionResult> resolutions,
         CancellationToken ct
     )
@@ -226,7 +236,7 @@ public class NormalizedSoftwareProjectionService(
 
         var existingRows = await dbContext
             .TenantSoftware.IgnoreQueryFilters()
-            .Where(item => item.TenantId == tenantId)
+            .Where(item => item.TenantId == tenantId && item.SnapshotId == snapshotId)
             .ToListAsync(ct);
 
         var existingByNormalizedId = existingRows.ToDictionary(item => item.NormalizedSoftwareId);
@@ -237,11 +247,12 @@ public class NormalizedSoftwareProjectionService(
         {
             if (!existingByNormalizedId.TryGetValue(normalizedSoftwareId, out var row))
             {
-                row = TenantSoftware.Create(tenantId, normalizedSoftwareId, now, now);
+                row = TenantSoftware.Create(tenantId, snapshotId, normalizedSoftwareId, now, now);
                 await dbContext.TenantSoftware.AddAsync(row, ct);
             }
             else
             {
+                row.AssignSnapshot(snapshotId);
                 row.UpdateObservationWindow(row.FirstSeenAt, now);
             }
 

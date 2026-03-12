@@ -105,12 +105,14 @@ public class AssetsControllerTests : IDisposable
         );
         var tenantAgent = TenantSoftware.Create(
             _tenantId,
+            null,
             normalizedAgent.Id,
             new DateTimeOffset(2026, 3, 8, 9, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 3, 8, 10, 0, 0, TimeSpan.Zero)
         );
         var tenantRuntime = TenantSoftware.Create(
             _tenantId,
+            null,
             normalizedRuntime.Id,
             new DateTimeOffset(2026, 3, 8, 9, 30, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 3, 8, 10, 0, 0, TimeSpan.Zero)

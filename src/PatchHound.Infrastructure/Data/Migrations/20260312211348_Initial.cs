@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace PatchHound.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class _20260310_BaselineCatalogProjection : Migration
+    public partial class Initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -24,6 +24,14 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     ConfidentialityRequirement = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     IntegrityRequirement = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     AvailabilityRequirement = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ModifiedAttackVector = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ModifiedAttackComplexity = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ModifiedPrivilegesRequired = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ModifiedUserInteraction = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ModifiedScope = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ModifiedConfidentialityImpact = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ModifiedIntegrityImpact = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ModifiedAvailabilityImpact = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
@@ -142,6 +150,26 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "IngestionCheckpoints",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    IngestionRunId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SourceKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Phase = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    BatchNumber = table.Column<int>(type: "integer", nullable: false),
+                    CursorJson = table.Column<string>(type: "text", nullable: false),
+                    RecordsCommitted = table.Column<int>(type: "integer", nullable: false),
+                    Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    LastCommittedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_IngestionCheckpoints", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "IngestionRuns",
                 columns: table => new
                 {
@@ -150,30 +178,35 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     SourceKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     StartedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     CompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    AbortRequestedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     Status = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    FetchedVulnerabilityCount = table.Column<int>(type: "integer", nullable: false),
-                    FetchedAssetCount = table.Column<int>(type: "integer", nullable: false),
-                    FetchedSoftwareInstallationCount = table.Column<int>(type: "integer", nullable: false),
+                    StagedMachineCount = table.Column<int>(type: "integer", nullable: false),
+                    StagedSoftwareCount = table.Column<int>(type: "integer", nullable: false),
                     StagedVulnerabilityCount = table.Column<int>(type: "integer", nullable: false),
-                    StagedExposureCount = table.Column<int>(type: "integer", nullable: false),
-                    MergedExposureCount = table.Column<int>(type: "integer", nullable: false),
-                    OpenedProjectionCount = table.Column<int>(type: "integer", nullable: false),
-                    ResolvedProjectionCount = table.Column<int>(type: "integer", nullable: false),
-                    StagedAssetCount = table.Column<int>(type: "integer", nullable: false),
-                    MergedAssetCount = table.Column<int>(type: "integer", nullable: false),
-                    StagedSoftwareLinkCount = table.Column<int>(type: "integer", nullable: false),
-                    ResolvedSoftwareLinkCount = table.Column<int>(type: "integer", nullable: false),
-                    InstallationsCreated = table.Column<int>(type: "integer", nullable: false),
-                    InstallationsTouched = table.Column<int>(type: "integer", nullable: false),
-                    InstallationEpisodesOpened = table.Column<int>(type: "integer", nullable: false),
-                    InstallationEpisodesSeen = table.Column<int>(type: "integer", nullable: false),
-                    StaleInstallationsMarked = table.Column<int>(type: "integer", nullable: false),
-                    InstallationsRemoved = table.Column<int>(type: "integer", nullable: false),
+                    PersistedMachineCount = table.Column<int>(type: "integer", nullable: false),
+                    PersistedSoftwareCount = table.Column<int>(type: "integer", nullable: false),
+                    PersistedVulnerabilityCount = table.Column<int>(type: "integer", nullable: false),
                     Error = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_IngestionRuns", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "IngestionSnapshots",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SourceKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    IngestionRunId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_IngestionSnapshots", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -185,6 +218,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     CanonicalVendor = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     CanonicalProductKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
                     PrimaryCpe23Uri = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    Description = table.Column<string>(type: "text", nullable: true),
+                    DescriptionGeneratedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DescriptionProviderType = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    DescriptionProfileName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    DescriptionModel = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     NormalizationMethod = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     Confidence = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
                     LastEvaluatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -263,11 +301,33 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "SoftwareDescriptionJobs",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantSoftwareId = table.Column<Guid>(type: "uuid", nullable: false),
+                    NormalizedSoftwareId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantAiProfileId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Status = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    Error = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: false),
+                    RequestedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    StartedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SoftwareDescriptionJobs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "StagedAssets",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     IngestionRunId = table.Column<Guid>(type: "uuid", nullable: false),
+                    BatchNumber = table.Column<int>(type: "integer", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
                     SourceKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     ExternalId = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
@@ -287,6 +347,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     IngestionRunId = table.Column<Guid>(type: "uuid", nullable: false),
+                    BatchNumber = table.Column<int>(type: "integer", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
                     SourceKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     DeviceExternalId = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
@@ -306,6 +367,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     IngestionRunId = table.Column<Guid>(type: "uuid", nullable: false),
+                    BatchNumber = table.Column<int>(type: "integer", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
                     SourceKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     ExternalId = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
@@ -325,6 +387,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     IngestionRunId = table.Column<Guid>(type: "uuid", nullable: false),
+                    BatchNumber = table.Column<int>(type: "integer", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
                     SourceKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     VulnerabilityExternalId = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
@@ -350,6 +413,43 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Teams", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "TenantAiProfiles",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    ProviderType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    IsDefault = table.Column<bool>(type: "boolean", nullable: false),
+                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    Model = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    SystemPrompt = table.Column<string>(type: "text", nullable: false),
+                    Temperature = table.Column<decimal>(type: "numeric(4,2)", precision: 4, scale: 2, nullable: false),
+                    TopP = table.Column<decimal>(type: "numeric(4,2)", precision: 4, scale: 2, nullable: true),
+                    MaxOutputTokens = table.Column<int>(type: "integer", nullable: false),
+                    TimeoutSeconds = table.Column<int>(type: "integer", nullable: false),
+                    BaseUrl = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    DeploymentName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    ApiVersion = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    KeepAlive = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    SecretRef = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    AllowExternalResearch = table.Column<bool>(type: "boolean", nullable: false),
+                    WebResearchMode = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    IncludeCitations = table.Column<bool>(type: "boolean", nullable: false),
+                    MaxResearchSources = table.Column<int>(type: "integer", nullable: false),
+                    AllowedDomains = table.Column<string>(type: "text", nullable: false),
+                    LastValidatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    LastValidationStatus = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    LastValidationError = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TenantAiProfiles", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -381,38 +481,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "TenantAiProfiles",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    ProviderType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    IsDefault = table.Column<bool>(type: "boolean", nullable: false),
-                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false),
-                    Model = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    SystemPrompt = table.Column<string>(type: "text", nullable: false),
-                    Temperature = table.Column<decimal>(type: "numeric(4,2)", precision: 4, scale: 2, nullable: false),
-                    TopP = table.Column<decimal>(type: "numeric(4,2)", precision: 4, scale: 2, nullable: true),
-                    MaxOutputTokens = table.Column<int>(type: "integer", nullable: false),
-                    TimeoutSeconds = table.Column<int>(type: "integer", nullable: false),
-                    BaseUrl = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    DeploymentName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    ApiVersion = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    KeepAlive = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    SecretRef = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    LastValidatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    LastValidationStatus = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    LastValidationError = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_TenantAiProfiles", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "TenantSourceConfigurations",
                 columns: table => new
                 {
@@ -432,6 +500,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     LastCompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     LastSucceededAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     ActiveIngestionRunId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ActiveSnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
+                    BuildingSnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
                     LeaseAcquiredAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     LeaseExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     LastStatus = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
@@ -575,6 +645,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
                     NormalizedSoftwareId = table.Column<Guid>(type: "uuid", nullable: false),
                     FirstSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     LastSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -775,6 +846,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
                     SoftwareAssetId = table.Column<Guid>(type: "uuid", nullable: false),
                     VulnerabilityDefinitionId = table.Column<Guid>(type: "uuid", nullable: false),
                     MatchMethod = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
@@ -807,6 +879,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
                     TenantSoftwareId = table.Column<Guid>(type: "uuid", nullable: false),
                     SoftwareAssetId = table.Column<Guid>(type: "uuid", nullable: false),
                     DeviceAssetId = table.Column<Guid>(type: "uuid", nullable: false),
@@ -847,6 +920,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
                     TenantSoftwareId = table.Column<Guid>(type: "uuid", nullable: false),
                     VulnerabilityDefinitionId = table.Column<Guid>(type: "uuid", nullable: false),
                     BestMatchMethod = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
@@ -943,6 +1017,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
                     TenantVulnerabilityId = table.Column<Guid>(type: "uuid", nullable: false),
                     AssetId = table.Column<Guid>(type: "uuid", nullable: false),
                     AssetSecurityProfileId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -1017,6 +1092,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    SnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
                     TenantVulnerabilityId = table.Column<Guid>(type: "uuid", nullable: false),
                     AssetId = table.Column<Guid>(type: "uuid", nullable: false),
                     DetectedDate = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -1041,14 +1117,14 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_AIReports_TenantId",
-                table: "AIReports",
-                column: "TenantId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_AIReports_TenantAiProfileId",
                 table: "AIReports",
                 column: "TenantAiProfileId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AIReports_TenantId",
+                table: "AIReports",
+                column: "TenantId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AIReports_TenantVulnerabilityId",
@@ -1177,9 +1253,30 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_IngestionCheckpoints_IngestionRunId",
+                table: "IngestionCheckpoints",
+                column: "IngestionRunId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IngestionCheckpoints_IngestionRunId_Phase",
+                table: "IngestionCheckpoints",
+                columns: new[] { "IngestionRunId", "Phase" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IngestionCheckpoints_TenantId_SourceKey_Phase",
+                table: "IngestionCheckpoints",
+                columns: new[] { "TenantId", "SourceKey", "Phase" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_IngestionRuns_TenantId_SourceKey_StartedAt",
                 table: "IngestionRuns",
                 columns: new[] { "TenantId", "SourceKey", "StartedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IngestionSnapshots_TenantId_SourceKey_Status",
+                table: "IngestionSnapshots",
+                columns: new[] { "TenantId", "SourceKey", "Status" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_NormalizedSoftware_CanonicalProductKey",
@@ -1204,6 +1301,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 column: "DeviceAssetId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_NormalizedSoftwareInstallations_SnapshotId",
+                table: "NormalizedSoftwareInstallations",
+                column: "SnapshotId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_NormalizedSoftwareInstallations_SoftwareAssetId",
                 table: "NormalizedSoftwareInstallations",
                 column: "SoftwareAssetId");
@@ -1214,15 +1316,15 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 column: "TenantId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareInstallations_TenantId_SoftwareAssetId_De~",
+                name: "IX_NormalizedSoftwareInstallations_TenantId_SnapshotId_Softwar~",
                 table: "NormalizedSoftwareInstallations",
-                columns: new[] { "TenantId", "SoftwareAssetId", "DeviceAssetId" },
+                columns: new[] { "TenantId", "SnapshotId", "SoftwareAssetId", "DeviceAssetId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareInstallations_TenantId_TenantSoftwareId_D~",
+                name: "IX_NormalizedSoftwareInstallations_TenantId_SnapshotId_TenantS~",
                 table: "NormalizedSoftwareInstallations",
-                columns: new[] { "TenantId", "TenantSoftwareId", "DetectedVersion", "LastSeenAt" });
+                columns: new[] { "TenantId", "SnapshotId", "TenantSoftwareId", "DetectedVersion", "LastSeenAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_NormalizedSoftwareInstallations_TenantSoftwareId",
@@ -1230,14 +1332,19 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 column: "TenantSoftwareId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_NormalizedSoftwareVulnerabilityProjections_SnapshotId",
+                table: "NormalizedSoftwareVulnerabilityProjections",
+                column: "SnapshotId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_NormalizedSoftwareVulnerabilityProjections_TenantId",
                 table: "NormalizedSoftwareVulnerabilityProjections",
                 column: "TenantId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareVulnerabilityProjections_TenantId_TenantS~",
+                name: "IX_NormalizedSoftwareVulnerabilityProjections_TenantId_Snapsho~",
                 table: "NormalizedSoftwareVulnerabilityProjections",
-                columns: new[] { "TenantId", "TenantSoftwareId", "VulnerabilityDefinitionId" },
+                columns: new[] { "TenantId", "SnapshotId", "TenantSoftwareId", "VulnerabilityDefinitionId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -1313,6 +1420,26 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_SoftwareDescriptionJobs_TenantId",
+                table: "SoftwareDescriptionJobs",
+                column: "TenantId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareDescriptionJobs_TenantId_TenantSoftwareId_Requested~",
+                table: "SoftwareDescriptionJobs",
+                columns: new[] { "TenantId", "TenantSoftwareId", "RequestedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareDescriptionJobs_TenantId_TenantSoftwareId_Status",
+                table: "SoftwareDescriptionJobs",
+                columns: new[] { "TenantId", "TenantSoftwareId", "Status" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareVulnerabilityMatches_SnapshotId",
+                table: "SoftwareVulnerabilityMatches",
+                column: "SnapshotId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SoftwareVulnerabilityMatches_SoftwareAssetId",
                 table: "SoftwareVulnerabilityMatches",
                 column: "SoftwareAssetId");
@@ -1323,9 +1450,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 column: "TenantId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_SoftwareVulnerabilityMatches_TenantId_SoftwareAssetId_Vulne~",
+                name: "IX_SoftwareVulnerabilityMatches_TenantId_SnapshotId_SoftwareAs~",
                 table: "SoftwareVulnerabilityMatches",
-                columns: new[] { "TenantId", "SoftwareAssetId", "VulnerabilityDefinitionId" },
+                columns: new[] { "TenantId", "SnapshotId", "SoftwareAssetId", "VulnerabilityDefinitionId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -1339,6 +1466,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 column: "IngestionRunId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_StagedAssets_IngestionRunId_BatchNumber",
+                table: "StagedAssets",
+                columns: new[] { "IngestionRunId", "BatchNumber" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_StagedAssets_TenantId_SourceKey_ExternalId",
                 table: "StagedAssets",
                 columns: new[] { "TenantId", "SourceKey", "ExternalId" });
@@ -1347,6 +1479,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 name: "IX_StagedDeviceSoftwareInstallations_IngestionRunId",
                 table: "StagedDeviceSoftwareInstallations",
                 column: "IngestionRunId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_StagedDeviceSoftwareInstallations_IngestionRunId_BatchNumber",
+                table: "StagedDeviceSoftwareInstallations",
+                columns: new[] { "IngestionRunId", "BatchNumber" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_StagedDeviceSoftwareInstallations_TenantId_SourceKey_Device~",
@@ -1359,6 +1496,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 column: "IngestionRunId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_StagedVulnerabilities_IngestionRunId_BatchNumber",
+                table: "StagedVulnerabilities",
+                columns: new[] { "IngestionRunId", "BatchNumber" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_StagedVulnerabilities_TenantId_SourceKey_ExternalId",
                 table: "StagedVulnerabilities",
                 columns: new[] { "TenantId", "SourceKey", "ExternalId" });
@@ -1367,6 +1509,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 name: "IX_StagedVulnerabilityExposures_IngestionRunId",
                 table: "StagedVulnerabilityExposures",
                 column: "IngestionRunId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_StagedVulnerabilityExposures_IngestionRunId_BatchNumber",
+                table: "StagedVulnerabilityExposures",
+                columns: new[] { "IngestionRunId", "BatchNumber" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_StagedVulnerabilityExposures_TenantId_SourceKey_Vulnerabili~",
@@ -1391,6 +1538,17 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_TenantAiProfiles_TenantId",
+                table: "TenantAiProfiles",
+                column: "TenantId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TenantAiProfiles_TenantId_Name",
+                table: "TenantAiProfiles",
+                columns: new[] { "TenantId", "Name" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Tenants_EntraTenantId",
                 table: "Tenants",
                 column: "EntraTenantId",
@@ -1402,26 +1560,30 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 column: "NormalizedSoftwareId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_TenantSoftware_SnapshotId",
+                table: "TenantSoftware",
+                column: "SnapshotId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_TenantSoftware_TenantId",
                 table: "TenantSoftware",
                 column: "TenantId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_TenantSoftware_TenantId_NormalizedSoftwareId",
+                name: "IX_TenantSoftware_TenantId_SnapshotId_NormalizedSoftwareId",
                 table: "TenantSoftware",
-                columns: new[] { "TenantId", "NormalizedSoftwareId" },
+                columns: new[] { "TenantId", "SnapshotId", "NormalizedSoftwareId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_TenantAiProfiles_TenantId",
-                table: "TenantAiProfiles",
-                column: "TenantId");
+                name: "IX_TenantSourceConfigurations_ActiveSnapshotId",
+                table: "TenantSourceConfigurations",
+                column: "ActiveSnapshotId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_TenantAiProfiles_TenantId_Name",
-                table: "TenantAiProfiles",
-                columns: new[] { "TenantId", "Name" },
-                unique: true);
+                name: "IX_TenantSourceConfigurations_BuildingSnapshotId",
+                table: "TenantSourceConfigurations",
+                column: "BuildingSnapshotId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_TenantSourceConfigurations_TenantId_SourceKey",
@@ -1479,14 +1641,19 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 column: "AssetSecurityProfileId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_VulnerabilityAssetAssessments_SnapshotId",
+                table: "VulnerabilityAssetAssessments",
+                column: "SnapshotId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_VulnerabilityAssetAssessments_TenantId",
                 table: "VulnerabilityAssetAssessments",
                 column: "TenantId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_VulnerabilityAssetAssessments_TenantId_TenantVulnerabilityI~",
+                name: "IX_VulnerabilityAssetAssessments_TenantId_SnapshotId_TenantVul~",
                 table: "VulnerabilityAssetAssessments",
-                columns: new[] { "TenantId", "TenantVulnerabilityId", "AssetId" },
+                columns: new[] { "TenantId", "SnapshotId", "TenantVulnerabilityId", "AssetId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -1516,9 +1683,14 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 column: "AssetId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_VulnerabilityAssets_TenantVulnerabilityId_AssetId",
+                name: "IX_VulnerabilityAssets_SnapshotId",
                 table: "VulnerabilityAssets",
-                columns: new[] { "TenantVulnerabilityId", "AssetId" },
+                column: "SnapshotId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_VulnerabilityAssets_TenantVulnerabilityId_AssetId_SnapshotId",
+                table: "VulnerabilityAssets",
+                columns: new[] { "TenantVulnerabilityId", "AssetId", "SnapshotId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -1545,9 +1717,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 name: "AIReports");
 
             migrationBuilder.DropTable(
-                name: "TenantAiProfiles");
-
-            migrationBuilder.DropTable(
                 name: "AuditLogEntries");
 
             migrationBuilder.DropTable(
@@ -1569,7 +1738,13 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 name: "EnrichmentSourceConfigurations");
 
             migrationBuilder.DropTable(
+                name: "IngestionCheckpoints");
+
+            migrationBuilder.DropTable(
                 name: "IngestionRuns");
+
+            migrationBuilder.DropTable(
+                name: "IngestionSnapshots");
 
             migrationBuilder.DropTable(
                 name: "NormalizedSoftwareAliases");
@@ -1594,6 +1769,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "SoftwareCpeBindings");
+
+            migrationBuilder.DropTable(
+                name: "SoftwareDescriptionJobs");
 
             migrationBuilder.DropTable(
                 name: "SoftwareVulnerabilityMatches");
@@ -1636,6 +1814,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "VulnerabilityDefinitionReferences");
+
+            migrationBuilder.DropTable(
+                name: "TenantAiProfiles");
 
             migrationBuilder.DropTable(
                 name: "TenantSoftware");

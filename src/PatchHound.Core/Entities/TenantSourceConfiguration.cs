@@ -18,6 +18,8 @@ public class TenantSourceConfiguration
     public DateTimeOffset? LastCompletedAt { get; private set; }
     public DateTimeOffset? LastSucceededAt { get; private set; }
     public Guid? ActiveIngestionRunId { get; private set; }
+    public Guid? ActiveSnapshotId { get; private set; }
+    public Guid? BuildingSnapshotId { get; private set; }
     public DateTimeOffset? LeaseAcquiredAt { get; private set; }
     public DateTimeOffset? LeaseExpiresAt { get; private set; }
     public string LastStatus { get; private set; } = string.Empty;
@@ -139,5 +141,11 @@ public class TenantSourceConfiguration
         ActiveIngestionRunId = null;
         LeaseAcquiredAt = null;
         LeaseExpiresAt = null;
+    }
+
+    public void SetSnapshotPointers(Guid? activeSnapshotId, Guid? buildingSnapshotId)
+    {
+        ActiveSnapshotId = activeSnapshotId;
+        BuildingSnapshotId = buildingSnapshotId;
     }
 }

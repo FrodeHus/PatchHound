@@ -95,6 +95,7 @@ public class IngestionService
 
             startedAny = true;
             var runCompleted = false;
+            IngestionSnapshot? softwareSnapshot = null;
             var fetchedVulnerabilityCount = 0;
             var fetchedAssetCount = 0;
             var fetchedSoftwareCount = 0;
@@ -151,6 +152,16 @@ public class IngestionService
                             ct
                         );
 
+                        if (SupportsSoftwareSnapshots(source.SourceKey))
+                        {
+                            softwareSnapshot ??= await GetOrCreateBuildingSoftwareSnapshotAsync(
+                                tenantId,
+                                source.SourceKey,
+                                run.Id,
+                                ct
+                            );
+                        }
+
                         if (!assetStagingCompleted && source is IAssetInventoryBatchSource assetInventoryBatchSource)
                         {
                             await ThrowIfAbortRequestedAsync(run.Id, ct);
@@ -194,6 +205,7 @@ public class IngestionService
                                         run.Id,
                                         tenantId,
                                         source.SourceKey,
+                                        softwareSnapshot?.Id,
                                         ct
                                     ),
                                 source.SourceName,
@@ -283,6 +295,7 @@ public class IngestionService
                                         run.Id,
                                         tenantId,
                                         source.SourceKey,
+                                        softwareSnapshot?.Id,
                                         ct
                                     ),
                                 source.SourceName,
@@ -345,6 +358,7 @@ public class IngestionService
                                         run.Id,
                                         tenantId,
                                         source.SourceKey,
+                                        softwareSnapshot?.Id,
                                         ct
                                     ),
                                 source.SourceName,
@@ -453,6 +467,7 @@ public class IngestionService
                                         run.Id,
                                         tenantId,
                                         source.SourceKey,
+                                        softwareSnapshot?.Id,
                                         source.SourceName,
                                         ct
                                     ),
@@ -480,19 +495,51 @@ public class IngestionService
                         }
 
                         await EnqueueEnrichmentJobsForRunAsync(run.Id, tenantId, ct);
-                        await ExecuteWithConcurrencyRetryAsync(
-                            async () =>
-                            {
-                                await _softwareVulnerabilityMatchService.SyncForTenantAsync(
-                                    tenantId,
-                                    ct
-                                );
-                                return true;
-                            },
-                            source.SourceName,
-                            tenantId,
-                            ct
-                        );
+                        if (SupportsSoftwareSnapshots(source.SourceKey))
+                        {
+                            softwareSnapshot ??= await GetOrCreateBuildingSoftwareSnapshotAsync(
+                                tenantId,
+                                source.SourceKey,
+                                run.Id,
+                                ct
+                            );
+                            await ExecuteWithConcurrencyRetryAsync(
+                                async () =>
+                                {
+                                    await _softwareVulnerabilityMatchService.SyncForTenantAsync(
+                                        tenantId,
+                                        softwareSnapshot.Id,
+                                        ct
+                                    );
+                                    return true;
+                                },
+                                source.SourceName,
+                                tenantId,
+                                ct
+                            );
+                            await PublishSnapshotAsync(
+                                tenantId,
+                                source.SourceKey,
+                                softwareSnapshot.Id,
+                                ct
+                            );
+                        }
+                        else
+                        {
+                            await ExecuteWithConcurrencyRetryAsync(
+                                async () =>
+                                {
+                                    await _softwareVulnerabilityMatchService.SyncForTenantAsync(
+                                        tenantId,
+                                        ct
+                                    );
+                                    return true;
+                                },
+                                source.SourceName,
+                                tenantId,
+                                ct
+                            );
+                        }
                         _logger.LogInformation(
                             "Vulnerability merge for {Source} tenant {TenantId}: stagedVulnerabilities={StagedVulnerabilityCount} persistedVulnerabilities={PersistedVulnerabilityCount}",
                             source.SourceName,
@@ -562,6 +609,19 @@ public class IngestionService
                             source.SourceName,
                             tenantId
                         );
+
+                        if (
+                            softwareSnapshot is not null
+                            && failureStatus == IngestionRunStatuses.FailedTerminal
+                        )
+                        {
+                            await DiscardBuildingSnapshotAsync(
+                                tenantId,
+                                source.SourceKey,
+                                softwareSnapshot.Id,
+                                ct
+                            );
+                        }
 
                         await UpdateRuntimeStateAsync(
                             tenantId,
@@ -1757,7 +1817,8 @@ public class IngestionService
             "Staged",
             ct
         );
-        await ProcessStagedResultsAsync(run.Id, tenantId, run.SourceKey, sourceName, ct);
+        await ProcessStagedResultsAsync(run.Id, tenantId, run.SourceKey, null, sourceName, ct);
+
         await CommitCheckpointAsync(
             run.Id,
             tenantId,
@@ -1769,13 +1830,39 @@ public class IngestionService
             "Completed",
             ct
         );
-        await _softwareVulnerabilityMatchService.SyncForTenantAsync(tenantId, ct);
+        if (SupportsSoftwareSnapshots(run.SourceKey))
+        {
+            var softwareSnapshot = await GetOrCreateBuildingSoftwareSnapshotAsync(
+                tenantId,
+                run.SourceKey,
+                run.Id,
+                ct
+            );
+            await ProcessStagedAssetsAsync(
+                run.Id,
+                tenantId,
+                run.SourceKey,
+                softwareSnapshot.Id,
+                ct
+            );
+            await _softwareVulnerabilityMatchService.SyncForTenantAsync(
+                tenantId,
+                softwareSnapshot.Id,
+                ct
+            );
+            await PublishSnapshotAsync(tenantId, run.SourceKey, softwareSnapshot.Id, ct);
+        }
+        else
+        {
+            await _softwareVulnerabilityMatchService.SyncForTenantAsync(tenantId, ct);
+        }
     }
 
     internal async Task<StagedVulnerabilityMergeSummary> ProcessStagedResultsAsync(
         Guid ingestionRunId,
         Guid tenantId,
         string sourceKey,
+        Guid? snapshotId,
         string sourceName,
         CancellationToken ct
     )
@@ -1784,6 +1871,7 @@ public class IngestionService
             ingestionRunId,
             tenantId,
             sourceKey,
+            snapshotId,
             sourceName,
             ct
         );
@@ -1819,7 +1907,7 @@ public class IngestionService
             "Staged",
             ct
         );
-        await ProcessStagedAssetsAsync(run.Id, tenantId, run.SourceKey, ct);
+        await ProcessStagedAssetsAsync(run.Id, tenantId, run.SourceKey, null, ct);
         await CommitCheckpointAsync(
             run.Id,
             tenantId,
@@ -1958,6 +2046,7 @@ public class IngestionService
         Guid ingestionRunId,
         Guid tenantId,
         string sourceKey,
+        Guid? snapshotId,
         CancellationToken ct
     )
     {
@@ -1967,8 +2056,199 @@ public class IngestionService
             sourceKey,
             ct
         );
-        await _normalizedSoftwareProjectionService.SyncTenantAsync(tenantId, ct);
+        await _normalizedSoftwareProjectionService.SyncTenantAsync(tenantId, snapshotId, ct);
         return summary;
+    }
+
+    private static bool SupportsSoftwareSnapshots(string sourceKey)
+    {
+        return sourceKey.Trim().ToLowerInvariant() == TenantSourceCatalog.DefenderSourceKey;
+    }
+
+    private async Task<IngestionSnapshot> GetOrCreateBuildingSoftwareSnapshotAsync(
+        Guid tenantId,
+        string sourceKey,
+        Guid ingestionRunId,
+        CancellationToken ct
+    )
+    {
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        var source = await _dbContext
+            .TenantSourceConfigurations.IgnoreQueryFilters()
+            .FirstAsync(
+                item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
+                ct
+            );
+
+        if (source.BuildingSnapshotId is Guid buildingSnapshotId)
+        {
+            var existing = await _dbContext
+                .IngestionSnapshots.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(item => item.Id == buildingSnapshotId, ct);
+            if (
+                existing is not null
+                && existing.IngestionRunId == ingestionRunId
+                && existing.Status == IngestionSnapshotStatuses.Building
+            )
+            {
+                return existing;
+            }
+
+            if (existing is not null && existing.Status == IngestionSnapshotStatuses.Building)
+            {
+                existing.Discard();
+                await CleanupSnapshotDataAsync(existing.Id, ct);
+            }
+        }
+
+        var snapshot = IngestionSnapshot.Create(
+            tenantId,
+            normalizedSourceKey,
+            ingestionRunId,
+            DateTimeOffset.UtcNow
+        );
+        source.SetSnapshotPointers(source.ActiveSnapshotId, snapshot.Id);
+        await _dbContext.IngestionSnapshots.AddAsync(snapshot, ct);
+        await _dbContext.SaveChangesAsync(ct);
+        return snapshot;
+    }
+
+    private async Task PublishSnapshotAsync(
+        Guid tenantId,
+        string sourceKey,
+        Guid snapshotId,
+        CancellationToken ct
+    )
+    {
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        var source = await _dbContext
+            .TenantSourceConfigurations.IgnoreQueryFilters()
+            .FirstAsync(
+                item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
+                ct
+            );
+        var snapshot = await _dbContext
+            .IngestionSnapshots.IgnoreQueryFilters()
+            .FirstAsync(item => item.Id == snapshotId, ct);
+
+        Guid? retiredSnapshotId = null;
+        if (source.ActiveSnapshotId is Guid previousActiveSnapshotId && previousActiveSnapshotId != snapshotId)
+        {
+            var previous = await _dbContext
+                .IngestionSnapshots.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(item => item.Id == previousActiveSnapshotId, ct);
+            if (previous is not null)
+            {
+                previous.Discard();
+                retiredSnapshotId = previous.Id;
+            }
+        }
+
+        snapshot.MarkPublished();
+        source.SetSnapshotPointers(snapshot.Id, null);
+        await _dbContext.SaveChangesAsync(ct);
+
+        if (retiredSnapshotId.HasValue)
+        {
+            await CleanupSnapshotDataAsync(retiredSnapshotId.Value, ct);
+        }
+    }
+
+    private async Task DiscardBuildingSnapshotAsync(
+        Guid tenantId,
+        string sourceKey,
+        Guid snapshotId,
+        CancellationToken ct
+    )
+    {
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        var source = await _dbContext
+            .TenantSourceConfigurations.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(
+                item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
+                ct
+            );
+        var snapshot = await _dbContext
+            .IngestionSnapshots.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item => item.Id == snapshotId, ct);
+
+        if (snapshot is not null && snapshot.Status == IngestionSnapshotStatuses.Building)
+        {
+            snapshot.Discard();
+        }
+
+        if (source is not null && source.BuildingSnapshotId == snapshotId)
+        {
+            source.SetSnapshotPointers(source.ActiveSnapshotId, null);
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
+        await CleanupSnapshotDataAsync(snapshotId, ct);
+    }
+
+    private async Task CleanupSnapshotDataAsync(Guid snapshotId, CancellationToken ct)
+    {
+        if (_dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        {
+            var tenantSoftware = await _dbContext
+                .TenantSoftware.IgnoreQueryFilters()
+                .Where(item => item.SnapshotId == snapshotId)
+                .ToListAsync(ct);
+            var installations = await _dbContext
+                .NormalizedSoftwareInstallations.IgnoreQueryFilters()
+                .Where(item => item.SnapshotId == snapshotId)
+                .ToListAsync(ct);
+            var softwareMatches = await _dbContext
+                .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
+                .Where(item => item.SnapshotId == snapshotId)
+                .ToListAsync(ct);
+            var softwareProjections = await _dbContext
+                .NormalizedSoftwareVulnerabilityProjections.IgnoreQueryFilters()
+                .Where(item => item.SnapshotId == snapshotId)
+                .ToListAsync(ct);
+            var vulnerabilityAssets = await _dbContext
+                .VulnerabilityAssets.IgnoreQueryFilters()
+                .Where(item => item.SnapshotId == snapshotId)
+                .ToListAsync(ct);
+            var assessments = await _dbContext
+                .VulnerabilityAssetAssessments.IgnoreQueryFilters()
+                .Where(item => item.SnapshotId == snapshotId)
+                .ToListAsync(ct);
+
+            _dbContext.TenantSoftware.RemoveRange(tenantSoftware);
+            _dbContext.NormalizedSoftwareInstallations.RemoveRange(installations);
+            _dbContext.SoftwareVulnerabilityMatches.RemoveRange(softwareMatches);
+            _dbContext.NormalizedSoftwareVulnerabilityProjections.RemoveRange(softwareProjections);
+            _dbContext.VulnerabilityAssets.RemoveRange(vulnerabilityAssets);
+            _dbContext.VulnerabilityAssetAssessments.RemoveRange(assessments);
+            await _dbContext.SaveChangesAsync(ct);
+            return;
+        }
+
+        await _dbContext
+            .VulnerabilityAssetAssessments.IgnoreQueryFilters()
+            .Where(item => item.SnapshotId == snapshotId)
+            .ExecuteDeleteAsync(ct);
+        await _dbContext
+            .VulnerabilityAssets.IgnoreQueryFilters()
+            .Where(item => item.SnapshotId == snapshotId)
+            .ExecuteDeleteAsync(ct);
+        await _dbContext
+            .NormalizedSoftwareVulnerabilityProjections.IgnoreQueryFilters()
+            .Where(item => item.SnapshotId == snapshotId)
+            .ExecuteDeleteAsync(ct);
+        await _dbContext
+            .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
+            .Where(item => item.SnapshotId == snapshotId)
+            .ExecuteDeleteAsync(ct);
+        await _dbContext
+            .NormalizedSoftwareInstallations.IgnoreQueryFilters()
+            .Where(item => item.SnapshotId == snapshotId)
+            .ExecuteDeleteAsync(ct);
+        await _dbContext
+            .TenantSoftware.IgnoreQueryFilters()
+            .Where(item => item.SnapshotId == snapshotId)
+            .ExecuteDeleteAsync(ct);
     }
 
     private static IReadOnlyList<IngestionResult> NormalizeResults(

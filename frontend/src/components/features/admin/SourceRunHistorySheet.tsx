@@ -416,6 +416,11 @@ function RunHistoryCard({
               {formatPhase(run.latestPhase)}
             </Badge>
           ) : null}
+          {run.snapshotStatus ? (
+            <Badge variant="outline" className="rounded-full border-border/70 bg-muted/60 text-muted-foreground">
+              {formatSnapshotStatus(run.snapshotStatus)}
+            </Badge>
+          ) : null}
           <span className="text-muted-foreground">Started {formatTimestamp(run.startedAt)}</span>
           <span className="text-muted-foreground">Completed {formatTimestamp(run.completedAt)}</span>
         </div>
@@ -549,6 +554,14 @@ function formatTimestamp(value: string | null) {
 function formatPhase(value: string) {
   return value
     .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function formatSnapshotStatus(value: string) {
+  return value
+    .split(/(?=[A-Z])|-/)
+    .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
 }

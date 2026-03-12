@@ -11,6 +11,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Api.Controllers;
 
@@ -60,6 +61,7 @@ public class AssetsController : ControllerBase
     {
         if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        var activeSnapshotId = await ResolveActiveVulnerabilitySnapshotIdAsync(currentTenantId, ct);
 
         var query = _dbContext
             .Assets.AsNoTracking()
@@ -145,7 +147,9 @@ public class AssetsController : ControllerBase
                     .AssetSecurityProfiles.Where(profile => profile.Id == a.SecurityProfileId)
                     .Select(profile => profile.Name)
                     .FirstOrDefault(),
-                VulnerabilityCount = _dbContext.VulnerabilityAssets.Count(va => va.AssetId == a.Id),
+                VulnerabilityCount = _dbContext.VulnerabilityAssets.Count(va =>
+                    va.AssetId == a.Id && va.SnapshotId == activeSnapshotId
+                ),
             })
             .ToListAsync(ct);
 
@@ -183,6 +187,7 @@ public class AssetsController : ControllerBase
     {
         if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        var activeSnapshotId = await ResolveActiveVulnerabilitySnapshotIdAsync(currentTenantId, ct);
 
         var asset = await _dbContext
             .Assets.AsNoTracking()
@@ -373,7 +378,9 @@ public class AssetsController : ControllerBase
 
         var assessmentsByVulnerabilityId = await _dbContext
             .VulnerabilityAssetAssessments.AsNoTracking()
-            .Where(assessment => assessment.AssetId == id)
+            .Where(assessment =>
+                assessment.AssetId == id && assessment.SnapshotId == activeSnapshotId
+            )
             .ToDictionaryAsync(assessment => assessment.TenantVulnerabilityId, ct);
 
         var possibleCorrelationsByVulnerabilityId = episodeRows
@@ -398,7 +405,7 @@ public class AssetsController : ControllerBase
 
         var vulnerabilityRows = await _dbContext
             .VulnerabilityAssets.AsNoTracking()
-            .Where(va => va.AssetId == id)
+            .Where(va => va.AssetId == id && va.SnapshotId == activeSnapshotId)
             .Join(
                 _dbContext.TenantVulnerabilities.AsNoTracking(),
                 va => va.TenantVulnerabilityId,
@@ -857,6 +864,20 @@ public class AssetsController : ControllerBase
             .ThenBy(item => item!.Age)
             .Select(item => item!.Name)
             .ToList();
+    }
+
+    private async Task<Guid?> ResolveActiveVulnerabilitySnapshotIdAsync(
+        Guid tenantId,
+        CancellationToken ct
+    )
+    {
+        return await _dbContext
+            .TenantSourceConfigurations.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId && item.SourceKey == TenantSourceCatalog.DefenderSourceKey
+            )
+            .Select(item => item.ActiveSnapshotId)
+            .FirstOrDefaultAsync(ct);
     }
 
     private static bool TryParseCpe23(string? cpe23Uri, out ParsedCpeComponents components)

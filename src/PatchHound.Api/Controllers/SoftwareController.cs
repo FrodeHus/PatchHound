@@ -11,6 +11,7 @@ using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Api.Controllers;
 
@@ -47,9 +48,15 @@ public class SoftwareController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+
         var tenantSoftware = await dbContext
             .TenantSoftware.AsNoTracking()
-            .Where(item => item.Id == id && item.TenantId == currentTenantId)
+            .Where(item =>
+                item.Id == id
+                && item.TenantId == currentTenantId
+                && item.SnapshotId == activeSnapshotId
+            )
             .Select(item => new
             {
                 item.Id,
@@ -83,7 +90,7 @@ public class SoftwareController(
 
         var installations = await dbContext
             .NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.TenantSoftwareId == id)
+            .Where(item => item.TenantSoftwareId == id && item.SnapshotId == activeSnapshotId)
             .ToListAsync(ct);
 
         var activeInstallations = installations.Where(item => item.IsActive).ToList();
@@ -91,7 +98,11 @@ public class SoftwareController(
 
         var openMatches = await dbContext
             .SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(match => match.ResolvedAt == null && softwareAssetIds.Contains(match.SoftwareAssetId))
+            .Where(match =>
+                match.SnapshotId == activeSnapshotId
+                && match.ResolvedAt == null
+                && softwareAssetIds.Contains(match.SoftwareAssetId)
+            )
             .Select(match => new { match.SoftwareAssetId, match.VulnerabilityDefinitionId })
             .Distinct()
             .ToListAsync(ct);
@@ -141,7 +152,13 @@ public class SoftwareController(
                 ),
                 await dbContext
                     .NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
-                    .CountAsync(item => item.TenantSoftwareId == id && item.ResolvedAt == null, ct),
+                    .CountAsync(
+                        item =>
+                            item.TenantSoftwareId == id
+                            && item.SnapshotId == activeSnapshotId
+                            && item.ResolvedAt == null,
+                        ct
+                    ),
                 versionCohorts.Count,
                 versionCohorts,
                 aliases
@@ -170,6 +187,21 @@ public class SoftwareController(
         if (tenantContext.CurrentTenantId is not Guid currentTenantId)
         {
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+        var tenantSoftwareExists = await dbContext
+            .TenantSoftware.AsNoTracking()
+            .AnyAsync(
+                item =>
+                    item.Id == id
+                    && item.TenantId == currentTenantId
+                    && item.SnapshotId == activeSnapshotId,
+                ct
+            );
+        if (!tenantSoftwareExists)
+        {
+            return NotFound(new ProblemDetails { Title = "Tenant software not found" });
         }
 
         var result = await softwareDescriptionJobService.EnqueueAsync(
@@ -242,8 +274,11 @@ public class SoftwareController(
 
         var query = dbContext
             .TenantSoftware.AsNoTracking()
-            .Where(item => item.TenantId == currentTenantId)
-            .AsQueryable();
+            .Where(item => item.TenantId == currentTenantId);
+
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+        query = query.Where(item => item.SnapshotId == activeSnapshotId);
+        query = query.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
@@ -275,7 +310,9 @@ public class SoftwareController(
         {
             query = query.Where(item =>
                 dbContext.NormalizedSoftwareVulnerabilityProjections.Any(projection =>
-                    projection.TenantSoftwareId == item.Id && projection.ResolvedAt == null
+                    projection.TenantSoftwareId == item.Id
+                    && projection.SnapshotId == activeSnapshotId
+                    && projection.ResolvedAt == null
                 )
             );
         }
@@ -297,27 +334,46 @@ public class SoftwareController(
                 PrimaryCpe23Uri = item.NormalizedSoftware.PrimaryCpe23Uri,
                 ActiveInstallCount = dbContext
                     .NormalizedSoftwareInstallations
-                    .Where(installation => installation.TenantSoftwareId == item.Id && installation.IsActive)
+                    .Where(installation =>
+                        installation.TenantSoftwareId == item.Id
+                        && installation.SnapshotId == activeSnapshotId
+                        && installation.IsActive
+                    )
                     .Count(),
                 UniqueDeviceCount = dbContext
                     .NormalizedSoftwareInstallations
-                    .Where(installation => installation.TenantSoftwareId == item.Id && installation.IsActive)
+                    .Where(installation =>
+                        installation.TenantSoftwareId == item.Id
+                        && installation.SnapshotId == activeSnapshotId
+                        && installation.IsActive
+                    )
                     .Select(installation => installation.DeviceAssetId)
                     .Distinct()
                     .Count(),
                 ActiveVulnerabilityCount = dbContext
                     .NormalizedSoftwareVulnerabilityProjections
-                    .Where(projection => projection.TenantSoftwareId == item.Id && projection.ResolvedAt == null)
+                    .Where(projection =>
+                        projection.TenantSoftwareId == item.Id
+                        && projection.SnapshotId == activeSnapshotId
+                        && projection.ResolvedAt == null
+                    )
                     .Count(),
                 VersionCount = dbContext
                     .NormalizedSoftwareInstallations
-                    .Where(installation => installation.TenantSoftwareId == item.Id && installation.IsActive)
+                    .Where(installation =>
+                        installation.TenantSoftwareId == item.Id
+                        && installation.SnapshotId == activeSnapshotId
+                        && installation.IsActive
+                    )
                     .Select(installation => installation.DetectedVersion ?? string.Empty)
                     .Distinct()
                     .Count(version => version != string.Empty),
                 LastSeenAt = dbContext
                     .NormalizedSoftwareInstallations
-                    .Where(installation => installation.TenantSoftwareId == item.Id)
+                    .Where(installation =>
+                        installation.TenantSoftwareId == item.Id
+                        && installation.SnapshotId == activeSnapshotId
+                    )
                     .Select(installation => (DateTimeOffset?)installation.LastSeenAt)
                     .Max(),
             })
@@ -362,19 +418,24 @@ public class SoftwareController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+
         var tenantSoftware = await dbContext
             .TenantSoftware.AsNoTracking()
-            .Where(item => item.Id == id && item.TenantId == currentTenantId)
+            .Where(item =>
+                item.Id == id
+                && item.TenantId == currentTenantId
+                && item.SnapshotId == activeSnapshotId
+            )
             .Select(item => new { item.Id, item.TenantId })
             .FirstOrDefaultAsync(ct);
         if (tenantSoftware is null)
         {
             return NotFound();
         }
-
         var installationsQuery = dbContext
             .NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.TenantSoftwareId == id);
+            .Where(item => item.TenantSoftwareId == id && item.SnapshotId == activeSnapshotId);
 
         if (query.ActiveOnly)
         {
@@ -472,19 +533,24 @@ public class SoftwareController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+
         var tenantSoftware = await dbContext
             .TenantSoftware.AsNoTracking()
-            .Where(item => item.Id == id && item.TenantId == currentTenantId)
+            .Where(item =>
+                item.Id == id
+                && item.TenantId == currentTenantId
+                && item.SnapshotId == activeSnapshotId
+            )
             .Select(item => new { item.Id, item.TenantId })
             .FirstOrDefaultAsync(ct);
         if (tenantSoftware is null)
         {
             return NotFound();
         }
-
         var projections = await dbContext
             .NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
-            .Where(item => item.TenantSoftwareId == id)
+            .Where(item => item.TenantSoftwareId == id && item.SnapshotId == activeSnapshotId)
             .Join(
                 dbContext.VulnerabilityDefinitions.AsNoTracking(),
                 projection => projection.VulnerabilityDefinitionId,
@@ -502,7 +568,9 @@ public class SoftwareController(
 
         var activeInstallations = await dbContext
             .NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.TenantSoftwareId == id && item.IsActive)
+            .Where(item =>
+                item.TenantSoftwareId == id && item.SnapshotId == activeSnapshotId && item.IsActive
+            )
             .ToListAsync(ct);
         var relevantSoftwareAssetIds = activeInstallations
             .Select(item => item.SoftwareAssetId)
@@ -511,7 +579,10 @@ public class SoftwareController(
 
         var openMatches = await dbContext
             .SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(match => relevantSoftwareAssetIds.Contains(match.SoftwareAssetId))
+            .Where(match =>
+                match.SnapshotId == activeSnapshotId
+                && relevantSoftwareAssetIds.Contains(match.SoftwareAssetId)
+            )
             .Select(match => new { match.SoftwareAssetId, match.VulnerabilityDefinitionId, match.ResolvedAt })
             .ToListAsync(ct);
 
@@ -579,9 +650,15 @@ public class SoftwareController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+
         var tenantSoftware = await dbContext
             .TenantSoftware.AsNoTracking()
-            .Where(item => item.Id == id && item.TenantId == currentTenantId)
+            .Where(item =>
+                item.Id == id
+                && item.TenantId == currentTenantId
+                && item.SnapshotId == activeSnapshotId
+            )
             .Select(item => new
             {
                 item.Id,
@@ -617,10 +694,9 @@ public class SoftwareController(
                 item.MatchReason,
             })
             .ToListAsync(ct);
-
         var installations = await dbContext
             .NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.TenantSoftwareId == id)
+            .Where(item => item.TenantSoftwareId == id && item.SnapshotId == activeSnapshotId)
             .Select(item => new
             {
                 item.DeviceAssetId,
@@ -639,7 +715,7 @@ public class SoftwareController(
 
         var projections = await dbContext
             .NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
-            .Where(item => item.TenantSoftwareId == id)
+            .Where(item => item.TenantSoftwareId == id && item.SnapshotId == activeSnapshotId)
             .Join(
                 dbContext.VulnerabilityDefinitions.AsNoTracking(),
                 projection => projection.VulnerabilityDefinitionId,
@@ -664,7 +740,10 @@ public class SoftwareController(
 
         var matches = await dbContext
             .SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(match => relevantSoftwareAssetIds.Contains(match.SoftwareAssetId))
+            .Where(match =>
+                match.SnapshotId == activeSnapshotId
+                && relevantSoftwareAssetIds.Contains(match.SoftwareAssetId)
+            )
             .Select(match => new
             {
                 match.SoftwareAssetId,
@@ -928,5 +1007,20 @@ public class SoftwareController(
     private static string? RestoreVersion(string versionKey)
     {
         return string.IsNullOrWhiteSpace(versionKey) ? null : versionKey;
+    }
+
+    private async Task<Guid?> ResolveActiveSoftwareSnapshotIdAsync(
+        Guid tenantId,
+        CancellationToken ct
+    )
+    {
+        return await dbContext
+            .TenantSourceConfigurations.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId
+                && item.SourceKey == TenantSourceCatalog.DefenderSourceKey
+            )
+            .Select(item => item.ActiveSnapshotId)
+            .FirstOrDefaultAsync(ct);
     }
 }

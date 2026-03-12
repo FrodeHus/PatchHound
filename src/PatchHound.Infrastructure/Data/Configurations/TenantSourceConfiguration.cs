@@ -22,9 +22,14 @@ public class TenantSourceConfigurationConfiguration
         builder.Property(source => source.ApiBaseUrl).HasMaxLength(512).IsRequired();
         builder.Property(source => source.TokenScope).HasMaxLength(512).IsRequired();
         builder.Property(source => source.ActiveIngestionRunId);
+        builder.Property(source => source.ActiveSnapshotId);
+        builder.Property(source => source.BuildingSnapshotId);
         builder.Property(source => source.LeaseAcquiredAt);
         builder.Property(source => source.LeaseExpiresAt);
         builder.Property(source => source.LastStatus).HasMaxLength(64).IsRequired();
         builder.Property(source => source.LastError).HasMaxLength(512).IsRequired();
+
+        builder.HasIndex(source => source.ActiveSnapshotId);
+        builder.HasIndex(source => source.BuildingSnapshotId);
     }
 }

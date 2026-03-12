@@ -6,6 +6,7 @@ public class NormalizedSoftwareInstallation
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public Guid? SnapshotId { get; private set; }
     public Guid TenantSoftwareId { get; private set; }
     public Guid SoftwareAssetId { get; private set; }
     public Guid DeviceAssetId { get; private set; }
@@ -25,6 +26,7 @@ public class NormalizedSoftwareInstallation
 
     public static NormalizedSoftwareInstallation Create(
         Guid tenantId,
+        Guid? snapshotId,
         Guid tenantSoftwareId,
         Guid softwareAssetId,
         Guid deviceAssetId,
@@ -41,6 +43,7 @@ public class NormalizedSoftwareInstallation
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
+            SnapshotId = snapshotId,
             TenantSoftwareId = tenantSoftwareId,
             SoftwareAssetId = softwareAssetId,
             DeviceAssetId = deviceAssetId,
@@ -55,6 +58,7 @@ public class NormalizedSoftwareInstallation
     }
 
     public void UpdateProjection(
+        Guid? snapshotId,
         Guid tenantSoftwareId,
         SoftwareIdentitySourceSystem sourceSystem,
         string? detectedVersion,
@@ -65,6 +69,7 @@ public class NormalizedSoftwareInstallation
         int currentEpisodeNumber
     )
     {
+        SnapshotId = snapshotId;
         TenantSoftwareId = tenantSoftwareId;
         SourceSystem = sourceSystem;
         DetectedVersion = string.IsNullOrWhiteSpace(detectedVersion) ? null : detectedVersion.Trim();

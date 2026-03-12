@@ -7,7 +7,7 @@ export const Route = createFileRoute('/auth/logout')({
     handlers: {
       GET: async () => {
         const session = await getSession()
-        session.destroy()
+        await session.destroy()
 
         const tenantId = process.env.ENTRA_TENANT_ID
         const postLogoutUri = encodeURIComponent(process.env.FRONTEND_ORIGIN ?? 'http://localhost:3000')
