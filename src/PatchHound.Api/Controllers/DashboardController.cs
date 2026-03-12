@@ -34,14 +34,27 @@ public class DashboardController : ControllerBase
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummaryDto>> GetSummary(CancellationToken ct)
     {
-        var riskChangeBrief = await BuildRiskChangeBriefAsync(limit: 3, highCriticalOnly: true, ct);
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var riskChangeBrief = await BuildRiskChangeBriefAsync(
+            tenantId,
+            limit: 3,
+            highCriticalOnly: true,
+            ct
+        );
 
         // Vulnerability counts by severity
         var bySeverity = await _dbContext
             .TenantVulnerabilities.AsNoTracking()
             .Where(v =>
-                v.Status == VulnerabilityStatus.Open
-                || v.Status == VulnerabilityStatus.InRemediation
+                v.TenantId == tenantId
+                && (
+                    v.Status == VulnerabilityStatus.Open
+                    || v.Status == VulnerabilityStatus.InRemediation
+                )
             )
             .GroupBy(v => v.VulnerabilityDefinition.VendorSeverity)
             .Select(g => new { Severity = g.Key, Count = g.Count() })
@@ -56,6 +69,7 @@ public class DashboardController : ControllerBase
         // Vulnerability counts by status
         var byStatus = await _dbContext
             .TenantVulnerabilities.AsNoTracking()
+            .Where(v => v.TenantId == tenantId)
             .GroupBy(v => v.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToListAsync(ct);
@@ -69,6 +83,7 @@ public class DashboardController : ControllerBase
         // SLA compliance
         var tasks = await _dbContext
             .RemediationTasks.AsNoTracking()
+            .Where(t => t.TenantId == tenantId)
             .Select(t => new
             {
                 t.Status,
@@ -97,8 +112,9 @@ public class DashboardController : ControllerBase
                 _dbContext.TenantVulnerabilities.AsNoTracking(),
                 va => va.TenantVulnerabilityId,
                 v => v.Id,
-                (va, v) => new { v.VulnerabilityDefinition.VendorSeverity, va.AssetId }
+                (va, v) => new { v.TenantId, v.VulnerabilityDefinition.VendorSeverity, va.AssetId }
             )
+            .Where(x => x.TenantId == tenantId)
             .Join(
                 _dbContext.Assets,
                 x => x.AssetId,
@@ -116,8 +132,11 @@ public class DashboardController : ControllerBase
         var topVulns = await _dbContext
             .TenantVulnerabilities.AsNoTracking()
             .Where(v =>
-                v.Status == VulnerabilityStatus.Open
-                || v.Status == VulnerabilityStatus.InRemediation
+                v.TenantId == tenantId
+                && (
+                    v.Status == VulnerabilityStatus.Open
+                    || v.Status == VulnerabilityStatus.InRemediation
+                )
             )
             .OrderByDescending(v => v.VulnerabilityDefinition.VendorSeverity)
             .ThenBy(v => v.VulnerabilityDefinition.PublishedDate)
@@ -128,7 +147,10 @@ public class DashboardController : ControllerBase
                 v.VulnerabilityDefinition.Title,
                 v.VulnerabilityDefinition.VendorSeverity.ToString(),
                 v.VulnerabilityDefinition.CvssScore,
-                _dbContext.VulnerabilityAssets.Count(va => va.TenantVulnerabilityId == v.Id),
+                _dbContext.VulnerabilityAssets.Count(va =>
+                    va.TenantVulnerabilityId == v.Id
+                    && va.TenantVulnerability.TenantId == tenantId
+                ),
                 v.VulnerabilityDefinition.PublishedDate.HasValue
                     ? (int)(now - v.VulnerabilityDefinition.PublishedDate.Value).TotalDays
                     : 0
@@ -137,6 +159,7 @@ public class DashboardController : ControllerBase
 
         var recurrenceRows = await _dbContext
             .VulnerabilityAssetEpisodes.AsNoTracking()
+            .Where(episode => episode.TenantId == tenantId)
             .GroupBy(episode => new { episode.TenantVulnerabilityId, episode.AssetId })
             .Select(group => new
             {
@@ -176,7 +199,7 @@ public class DashboardController : ControllerBase
 
         var recurringVulnerabilities = await _dbContext
             .TenantVulnerabilities.AsNoTracking()
-            .Where(v => topRecurringVulnerabilityIds.Contains(v.Id))
+            .Where(v => v.TenantId == tenantId && topRecurringVulnerabilityIds.Contains(v.Id))
             .Select(v => new
             {
                 v.Id,
@@ -213,7 +236,7 @@ public class DashboardController : ControllerBase
         var recurringAssetIds = topRecurringAssetCounts.Select(row => row.AssetId).ToList();
         var recurringAssets = await _dbContext
             .Assets.AsNoTracking()
-            .Where(asset => recurringAssetIds.Contains(asset.Id))
+            .Where(asset => asset.TenantId == tenantId && recurringAssetIds.Contains(asset.Id))
             .ToDictionaryAsync(asset => asset.Id, ct);
 
         var topRecurringAssets = topRecurringAssetCounts
@@ -253,12 +276,22 @@ public class DashboardController : ControllerBase
     [HttpGet("risk-changes")]
     public async Task<ActionResult<DashboardRiskChangeBriefDto>> GetRiskChanges(CancellationToken ct)
     {
-        return Ok(await BuildRiskChangeBriefAsync(limit: null, highCriticalOnly: false, ct));
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        return Ok(await BuildRiskChangeBriefAsync(tenantId, limit: null, highCriticalOnly: false, ct));
     }
 
     [HttpGet("trends")]
     public async Task<ActionResult<TrendDataDto>> GetTrends(CancellationToken ct)
     {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var startDate = today.AddDays(-89);
 
@@ -271,6 +304,7 @@ public class DashboardController : ControllerBase
                 (episode, vulnerability) =>
                     new
                     {
+                        vulnerability.TenantId,
                         VulnerabilityId = episode.TenantVulnerabilityId,
                         vulnerability.VulnerabilityDefinition.VendorSeverity,
                         episode.FirstSeenAt,
@@ -278,7 +312,8 @@ public class DashboardController : ControllerBase
                     }
             )
             .Where(row =>
-                DateOnly.FromDateTime(row.FirstSeenAt.UtcDateTime) <= today
+                row.TenantId == tenantId
+                && DateOnly.FromDateTime(row.FirstSeenAt.UtcDateTime) <= today
                 && DateOnly.FromDateTime((row.ResolvedAt ?? DateTimeOffset.UtcNow).UtcDateTime)
                     >= startDate
             )
@@ -335,6 +370,7 @@ public class DashboardController : ControllerBase
     }
 
     private async Task<DashboardRiskChangeBriefDto> BuildRiskChangeBriefAsync(
+        Guid tenantId,
         int? limit,
         bool highCriticalOnly,
         CancellationToken ct
@@ -345,14 +381,17 @@ public class DashboardController : ControllerBase
         var candidateRows = await _dbContext
             .TenantVulnerabilities.AsNoTracking()
             .Where(v =>
-                (
+                v.TenantId == tenantId
+                && (
                     (
-                        v.Status == VulnerabilityStatus.Open
-                        || v.Status == VulnerabilityStatus.InRemediation
+                        (
+                            v.Status == VulnerabilityStatus.Open
+                            || v.Status == VulnerabilityStatus.InRemediation
+                        )
+                        && (v.CreatedAt >= cutoff || v.UpdatedAt >= cutoff)
                     )
-                    && (v.CreatedAt >= cutoff || v.UpdatedAt >= cutoff)
+                    || (v.Status == VulnerabilityStatus.Resolved && v.UpdatedAt >= cutoff)
                 )
-                || (v.Status == VulnerabilityStatus.Resolved && v.UpdatedAt >= cutoff)
             )
             .Select(v => new
             {

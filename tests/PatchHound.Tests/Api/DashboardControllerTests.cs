@@ -467,5 +467,74 @@ public class DashboardControllerTests : IDisposable
         payload.RiskChangeBrief.AiSummary.Should().Be("1 critical issue appeared in the last 24 hours.");
     }
 
+    [Fact]
+    public async Task GetTrends_FiltersToCurrentTenantOnly()
+    {
+        var otherTenantId = Guid.NewGuid();
+
+        var currentDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-6000",
+            "Current tenant issue",
+            "Desc",
+            Severity.High,
+            "MicrosoftDefender"
+        );
+        var currentTenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            currentDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow.AddDays(-1)
+        );
+
+        var otherDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-6001",
+            "Other tenant issue",
+            "Desc",
+            Severity.High,
+            "MicrosoftDefender"
+        );
+        var otherTenantVulnerability = TenantVulnerability.Create(
+            otherTenantId,
+            otherDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow.AddDays(-1)
+        );
+
+        await _dbContext.AddRangeAsync(
+            currentDefinition,
+            otherDefinition,
+            currentTenantVulnerability,
+            otherTenantVulnerability
+        );
+        await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                currentTenantVulnerability.Id,
+                Guid.NewGuid(),
+                1,
+                DateTimeOffset.UtcNow.AddDays(-1)
+            ),
+            VulnerabilityAssetEpisode.Create(
+                otherTenantId,
+                otherTenantVulnerability.Id,
+                Guid.NewGuid(),
+                1,
+                DateTimeOffset.UtcNow.AddDays(-1)
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetTrends(CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<TrendDataDto>().Subject;
+        var todayHigh = payload.Items.Single(item =>
+            item.Date == DateOnly.FromDateTime(DateTime.UtcNow)
+            && item.Severity == Severity.High.ToString()
+        );
+
+        todayHigh.Count.Should().Be(1);
+    }
+
     public void Dispose() => _dbContext.Dispose();
 }
