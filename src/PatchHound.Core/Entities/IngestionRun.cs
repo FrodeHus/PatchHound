@@ -19,31 +19,12 @@ public class IngestionRun
     public DateTimeOffset? CompletedAt { get; private set; }
     public DateTimeOffset? AbortRequestedAt { get; private set; }
     public string Status { get; private set; } = string.Empty;
-    public int FetchedVulnerabilityCount { get; private set; }
-    public int FetchedAssetCount { get; private set; }
-    public int FetchedSoftwareCount { get; private set; }
-    public int FetchedSoftwareInstallationCount { get; private set; }
-    public int SoftwareWithoutMachineReferencesCount { get; private set; }
     public int StagedMachineCount { get; private set; }
     public int StagedSoftwareCount { get; private set; }
     public int StagedVulnerabilityCount { get; private set; }
     public int PersistedMachineCount { get; private set; }
     public int PersistedSoftwareCount { get; private set; }
     public int PersistedVulnerabilityCount { get; private set; }
-    public int StagedExposureCount { get; private set; }
-    public int MergedExposureCount { get; private set; }
-    public int OpenedProjectionCount { get; private set; }
-    public int ResolvedProjectionCount { get; private set; }
-    public int StagedAssetCount { get; private set; }
-    public int MergedAssetCount { get; private set; }
-    public int StagedSoftwareLinkCount { get; private set; }
-    public int ResolvedSoftwareLinkCount { get; private set; }
-    public int InstallationsCreated { get; private set; }
-    public int InstallationsTouched { get; private set; }
-    public int InstallationEpisodesOpened { get; private set; }
-    public int InstallationEpisodesSeen { get; private set; }
-    public int StaleInstallationsMarked { get; private set; }
-    public int InstallationsRemoved { get; private set; }
     public string Error { get; private set; } = string.Empty;
 
     private IngestionRun() { }
@@ -75,62 +56,36 @@ public class IngestionRun
         AbortRequestedAt = requestedAt;
     }
 
+    public void Abort(DateTimeOffset completedAt, string error)
+    {
+        if (CompletedAt.HasValue)
+        {
+            return;
+        }
+
+        CompletedAt = completedAt;
+        Status = IngestionRunStatuses.FailedTerminal;
+        Error = error;
+    }
+
     public void CompleteSucceeded(
         DateTimeOffset completedAt,
-        int fetchedVulnerabilityCount,
-        int fetchedAssetCount,
-        int fetchedSoftwareCount,
-        int fetchedSoftwareInstallationCount,
-        int softwareWithoutMachineReferencesCount,
         int stagedMachineCount,
         int stagedSoftwareCount,
         int stagedVulnerabilityCount,
         int persistedMachineCount,
         int persistedSoftwareCount,
-        int persistedVulnerabilityCount,
-        int stagedExposureCount,
-        int mergedExposureCount,
-        int openedProjectionCount,
-        int resolvedProjectionCount,
-        int stagedAssetCount,
-        int mergedAssetCount,
-        int stagedSoftwareLinkCount,
-        int resolvedSoftwareLinkCount,
-        int installationsCreated,
-        int installationsTouched,
-        int installationEpisodesOpened,
-        int installationEpisodesSeen,
-        int staleInstallationsMarked,
-        int installationsRemoved
+        int persistedVulnerabilityCount
     )
     {
         CompletedAt = completedAt;
         Status = IngestionRunStatuses.Succeeded;
-        FetchedVulnerabilityCount = fetchedVulnerabilityCount;
-        FetchedAssetCount = fetchedAssetCount;
-        FetchedSoftwareCount = fetchedSoftwareCount;
-        FetchedSoftwareInstallationCount = fetchedSoftwareInstallationCount;
-        SoftwareWithoutMachineReferencesCount = softwareWithoutMachineReferencesCount;
         StagedMachineCount = stagedMachineCount;
         StagedSoftwareCount = stagedSoftwareCount;
         StagedVulnerabilityCount = stagedVulnerabilityCount;
         PersistedMachineCount = persistedMachineCount;
         PersistedSoftwareCount = persistedSoftwareCount;
         PersistedVulnerabilityCount = persistedVulnerabilityCount;
-        StagedExposureCount = stagedExposureCount;
-        MergedExposureCount = mergedExposureCount;
-        OpenedProjectionCount = openedProjectionCount;
-        ResolvedProjectionCount = resolvedProjectionCount;
-        StagedAssetCount = stagedAssetCount;
-        MergedAssetCount = mergedAssetCount;
-        StagedSoftwareLinkCount = stagedSoftwareLinkCount;
-        ResolvedSoftwareLinkCount = resolvedSoftwareLinkCount;
-        InstallationsCreated = installationsCreated;
-        InstallationsTouched = installationsTouched;
-        InstallationEpisodesOpened = installationEpisodesOpened;
-        InstallationEpisodesSeen = installationEpisodesSeen;
-        StaleInstallationsMarked = staleInstallationsMarked;
-        InstallationsRemoved = installationsRemoved;
         Error = string.Empty;
     }
 
@@ -138,60 +93,22 @@ public class IngestionRun
         DateTimeOffset completedAt,
         string error,
         string failureStatus,
-        int fetchedVulnerabilityCount,
-        int fetchedAssetCount,
-        int fetchedSoftwareCount,
-        int fetchedSoftwareInstallationCount,
-        int softwareWithoutMachineReferencesCount,
         int stagedMachineCount,
         int stagedSoftwareCount,
         int stagedVulnerabilityCount,
         int persistedMachineCount,
         int persistedSoftwareCount,
-        int persistedVulnerabilityCount,
-        int stagedExposureCount,
-        int mergedExposureCount,
-        int openedProjectionCount,
-        int resolvedProjectionCount,
-        int stagedAssetCount,
-        int mergedAssetCount,
-        int stagedSoftwareLinkCount,
-        int resolvedSoftwareLinkCount,
-        int installationsCreated,
-        int installationsTouched,
-        int installationEpisodesOpened,
-        int installationEpisodesSeen,
-        int staleInstallationsMarked,
-        int installationsRemoved
+        int persistedVulnerabilityCount
     )
     {
         CompletedAt = completedAt;
         Status = failureStatus;
-        FetchedVulnerabilityCount = fetchedVulnerabilityCount;
-        FetchedAssetCount = fetchedAssetCount;
-        FetchedSoftwareCount = fetchedSoftwareCount;
-        FetchedSoftwareInstallationCount = fetchedSoftwareInstallationCount;
-        SoftwareWithoutMachineReferencesCount = softwareWithoutMachineReferencesCount;
         StagedMachineCount = stagedMachineCount;
         StagedSoftwareCount = stagedSoftwareCount;
         StagedVulnerabilityCount = stagedVulnerabilityCount;
         PersistedMachineCount = persistedMachineCount;
         PersistedSoftwareCount = persistedSoftwareCount;
         PersistedVulnerabilityCount = persistedVulnerabilityCount;
-        StagedExposureCount = stagedExposureCount;
-        MergedExposureCount = mergedExposureCount;
-        OpenedProjectionCount = openedProjectionCount;
-        ResolvedProjectionCount = resolvedProjectionCount;
-        StagedAssetCount = stagedAssetCount;
-        MergedAssetCount = mergedAssetCount;
-        StagedSoftwareLinkCount = stagedSoftwareLinkCount;
-        ResolvedSoftwareLinkCount = resolvedSoftwareLinkCount;
-        InstallationsCreated = installationsCreated;
-        InstallationsTouched = installationsTouched;
-        InstallationEpisodesOpened = installationEpisodesOpened;
-        InstallationEpisodesSeen = installationEpisodesSeen;
-        StaleInstallationsMarked = staleInstallationsMarked;
-        InstallationsRemoved = installationsRemoved;
         Error = error;
     }
 }

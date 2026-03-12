@@ -212,30 +212,11 @@ public class TenantsControllerTests : IDisposable
         firstRun.CompleteSucceeded(
             DateTimeOffset.UtcNow.AddMinutes(-19),
             10,
-            5,
-            2,
-            2,
-            0,
-            5,
             2,
             10,
             5,
             2,
-            10,
-            12,
-            12,
-            3,
-            1,
-            5,
-            2,
-            2,
-            1,
-            1,
-            1,
-            1,
-            0,
-            0,
-            0
+            10
         );
 
         var secondRun = IngestionRun.Start(
@@ -248,30 +229,11 @@ public class TenantsControllerTests : IDisposable
             "Ingestion failed: TimeoutException",
             IngestionRunStatuses.FailedRecoverable,
             4,
-            2,
             1,
-            1,
-            0,
-            2,
             1,
             4,
             2,
-            1,
-            4,
-            4,
-            4,
-            1,
-            2,
-            2,
-            1,
-            1,
-            1,
-            1,
-            0,
-            0,
-            0,
-            0,
-            0
+            1
         );
 
         await _dbContext.IngestionRuns.AddRangeAsync(firstRun, secondRun);
@@ -326,27 +288,8 @@ public class TenantsControllerTests : IDisposable
             1,
             1,
             1,
-            0,
             1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            0,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            0,
-            0,
-            0,
-            0
+            1
         );
 
         await _dbContext.Tenants.AddAsync(tenant);
@@ -562,7 +505,12 @@ public class TenantsControllerTests : IDisposable
         var run = IngestionRun.Start(tenant.Id, source.SourceKey, DateTimeOffset.UtcNow.AddMinutes(-10));
         run.CompleteSucceeded(
             DateTimeOffset.UtcNow.AddMinutes(-9),
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
         );
 
         await _dbContext.Tenants.AddAsync(tenant);

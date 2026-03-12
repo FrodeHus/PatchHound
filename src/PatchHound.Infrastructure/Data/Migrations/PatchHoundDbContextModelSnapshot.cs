@@ -703,42 +703,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
-                    b.Property<int>("FetchedAssetCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("FetchedSoftwareCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("FetchedSoftwareInstallationCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("FetchedVulnerabilityCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("InstallationEpisodesOpened")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("InstallationEpisodesSeen")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("InstallationsCreated")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("InstallationsRemoved")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("InstallationsTouched")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("MergedAssetCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("MergedExposureCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("OpenedProjectionCount")
-                        .HasColumnType("integer");
-
                     b.Property<int>("PersistedMachineCount")
                         .HasColumnType("integer");
 
@@ -748,39 +712,18 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<int>("PersistedVulnerabilityCount")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ResolvedProjectionCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ResolvedSoftwareLinkCount")
-                        .HasColumnType("integer");
-
                     b.Property<string>("SourceKey")
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
-                    b.Property<int>("StagedAssetCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("StagedExposureCount")
-                        .HasColumnType("integer");
-
                     b.Property<int>("StagedMachineCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("StagedSoftwareLinkCount")
                         .HasColumnType("integer");
 
                     b.Property<int>("StagedSoftwareCount")
                         .HasColumnType("integer");
 
                     b.Property<int>("StagedVulnerabilityCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SoftwareWithoutMachineReferencesCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("StaleInstallationsMarked")
                         .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("StartedAt")

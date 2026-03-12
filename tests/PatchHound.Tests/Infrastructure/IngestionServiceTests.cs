@@ -527,12 +527,10 @@ public class IngestionServiceTests : IDisposable
         var run = await _dbContext.IngestionRuns.IgnoreQueryFilters().SingleAsync();
         run.Status.Should().Be("Succeeded");
         run.CompletedAt.Should().NotBeNull();
-        run.FetchedVulnerabilityCount.Should().Be(1);
         run.StagedVulnerabilityCount.Should().Be(1);
-        run.StagedExposureCount.Should().Be(0);
-        run.MergedExposureCount.Should().Be(0);
-        run.StagedAssetCount.Should().Be(0);
-        run.StagedSoftwareLinkCount.Should().Be(0);
+        run.StagedMachineCount.Should().Be(0);
+        run.StagedSoftwareCount.Should().Be(0);
+        run.PersistedVulnerabilityCount.Should().Be(1);
 
         var source = await _dbContext.TenantSourceConfigurations.IgnoreQueryFilters().SingleAsync();
         source.ActiveIngestionRunId.Should().BeNull();
@@ -1574,8 +1572,8 @@ public class IngestionServiceTests : IDisposable
             .IngestionRuns.IgnoreQueryFilters()
             .SingleAsync(item => item.SourceKey == "paged-source");
         run.Status.Should().Be(IngestionRunStatuses.Succeeded);
-        run.FetchedAssetCount.Should().Be(4);
-        run.FetchedVulnerabilityCount.Should().Be(3);
+        run.StagedMachineCount.Should().Be(4);
+        run.StagedVulnerabilityCount.Should().Be(3);
 
         var assets = await _dbContext
             .Assets.IgnoreQueryFilters()
@@ -1869,34 +1867,7 @@ public class IngestionServiceTests : IDisposable
             "test-source",
             DateTimeOffset.UtcNow.AddDays(-10)
         );
-        oldRun.CompleteSucceeded(
-            DateTimeOffset.UtcNow.AddDays(-8),
-            1,
-            1,
-            1,
-            1,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-        );
+        oldRun.CompleteSucceeded(DateTimeOffset.UtcNow.AddDays(-8), 1, 1, 1, 1, 1, 1);
         await _dbContext.IngestionRuns.AddAsync(oldRun);
         await _dbContext.StagedVulnerabilities.AddAsync(
             StagedVulnerability.Create(
@@ -2034,27 +2005,8 @@ public class IngestionServiceTests : IDisposable
             1,
             1,
             1,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
+            1,
+            1
         );
         await _dbContext.IngestionRuns.AddAsync(failedRun);
         await _dbContext.StagedVulnerabilities.AddAsync(
