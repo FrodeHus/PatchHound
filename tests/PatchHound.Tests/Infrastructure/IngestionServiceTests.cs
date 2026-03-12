@@ -570,6 +570,37 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RunIngestionAsync_WhenThrottledAfterRetries_MarksRunAsFailedRecoverableWithReason()
+    {
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(
+            TenantSourceConfiguration.Create(
+                _tenantId,
+                "test-source",
+                "Test Source",
+                true,
+                "0 * * * *"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        _source
+            .FetchVulnerabilitiesAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns<Task<IReadOnlyList<IngestionResult>>>(_ =>
+                throw new HttpRequestException("Too many requests", null, HttpStatusCode.TooManyRequests)
+            );
+
+        var started = await _service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        started.Should().BeTrue();
+
+        var run = await _dbContext.IngestionRuns.IgnoreQueryFilters().SingleAsync();
+        run.Status.Should().Be(IngestionRunStatuses.FailedRecoverable);
+        run.Error.Should().Contain("429 Too Many Requests");
+        run.Error.Should().Contain("retry limit");
+    }
+
+    [Fact]
     public async Task ProcessStagedAssetsAsync_UsesStagedSnapshotForMerge()
     {
         var run = IngestionRun.Start(_tenantId, "test-source", DateTimeOffset.UtcNow);

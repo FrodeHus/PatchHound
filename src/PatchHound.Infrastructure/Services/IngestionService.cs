@@ -603,6 +603,7 @@ public class IngestionService
                         var failureStatus = IsTerminalIngestionFailure(ex)
                             ? IngestionRunStatuses.FailedTerminal
                             : IngestionRunStatuses.FailedRecoverable;
+                        var failureReason = DescribeIngestionFailure(ex);
                         _logger.LogError(
                             ex,
                             "Error during ingestion from {Source} for tenant {TenantId}",
@@ -617,7 +618,7 @@ public class IngestionService
                             {
                                 runtime.LastCompletedAt = DateTimeOffset.UtcNow;
                                 runtime.LastStatus = failureStatus;
-                                runtime.LastError = $"Ingestion failed: {ex.GetType().Name}";
+                                runtime.LastError = failureReason;
                             },
                             ct
                         );
@@ -626,7 +627,7 @@ public class IngestionService
                             tenantId,
                             source.SourceKey,
                             succeeded: false,
-                            error: $"Ingestion failed: {ex.GetType().Name}",
+                            error: failureReason,
                             fetchedVulnerabilityCount,
                             fetchedAssetCount,
                             fetchedSoftwareCount,
@@ -896,6 +897,28 @@ public class IngestionService
                 or HttpStatusCode.Unauthorized
                 or HttpStatusCode.Forbidden => true,
             _ => false,
+        };
+    }
+
+    private static string DescribeIngestionFailure(Exception ex)
+    {
+        return ex switch
+        {
+            HttpRequestException httpEx when httpEx.StatusCode == HttpStatusCode.TooManyRequests
+                => "Ingestion failed: external API throttled (429 Too Many Requests) after the configured retry limit was exhausted.",
+            HttpRequestException httpEx when httpEx.StatusCode == HttpStatusCode.BadRequest
+                => "Ingestion failed: external API rejected the request (400 Bad Request).",
+            HttpRequestException httpEx when httpEx.StatusCode == HttpStatusCode.Unauthorized
+                => "Ingestion failed: external API authentication failed (401 Unauthorized).",
+            HttpRequestException httpEx when httpEx.StatusCode == HttpStatusCode.Forbidden
+                => "Ingestion failed: external API access was forbidden (403 Forbidden).",
+            TimeoutException
+                => "Ingestion failed: an external API request timed out and the run stopped so it can resume from the last committed checkpoint.",
+            TaskCanceledException
+                => "Ingestion failed: an external API request timed out and the run stopped so it can resume from the last committed checkpoint.",
+            IngestionTerminalException terminal
+                => $"Ingestion failed: {terminal.Message}",
+            _ => $"Ingestion failed: {ex.GetType().Name}",
         };
     }
 
