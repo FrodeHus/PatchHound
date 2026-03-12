@@ -20,7 +20,9 @@ public class IngestionRun
     public string Status { get; private set; } = string.Empty;
     public int FetchedVulnerabilityCount { get; private set; }
     public int FetchedAssetCount { get; private set; }
+    public int FetchedSoftwareCount { get; private set; }
     public int FetchedSoftwareInstallationCount { get; private set; }
+    public int SoftwareWithoutMachineReferencesCount { get; private set; }
     public int StagedVulnerabilityCount { get; private set; }
     public int StagedExposureCount { get; private set; }
     public int MergedExposureCount { get; private set; }
@@ -61,7 +63,9 @@ public class IngestionRun
         DateTimeOffset completedAt,
         int fetchedVulnerabilityCount,
         int fetchedAssetCount,
+        int fetchedSoftwareCount,
         int fetchedSoftwareInstallationCount,
+        int softwareWithoutMachineReferencesCount,
         int stagedVulnerabilityCount,
         int stagedExposureCount,
         int mergedExposureCount,
@@ -83,7 +87,9 @@ public class IngestionRun
         Status = IngestionRunStatuses.Succeeded;
         FetchedVulnerabilityCount = fetchedVulnerabilityCount;
         FetchedAssetCount = fetchedAssetCount;
+        FetchedSoftwareCount = fetchedSoftwareCount;
         FetchedSoftwareInstallationCount = fetchedSoftwareInstallationCount;
+        SoftwareWithoutMachineReferencesCount = softwareWithoutMachineReferencesCount;
         StagedVulnerabilityCount = stagedVulnerabilityCount;
         StagedExposureCount = stagedExposureCount;
         MergedExposureCount = mergedExposureCount;
@@ -108,7 +114,9 @@ public class IngestionRun
         string failureStatus,
         int fetchedVulnerabilityCount,
         int fetchedAssetCount,
+        int fetchedSoftwareCount,
         int fetchedSoftwareInstallationCount,
+        int softwareWithoutMachineReferencesCount,
         int stagedVulnerabilityCount,
         int stagedExposureCount,
         int mergedExposureCount,
@@ -130,7 +138,9 @@ public class IngestionRun
         Status = failureStatus;
         FetchedVulnerabilityCount = fetchedVulnerabilityCount;
         FetchedAssetCount = fetchedAssetCount;
+        FetchedSoftwareCount = fetchedSoftwareCount;
         FetchedSoftwareInstallationCount = fetchedSoftwareInstallationCount;
+        SoftwareWithoutMachineReferencesCount = softwareWithoutMachineReferencesCount;
         StagedVulnerabilityCount = stagedVulnerabilityCount;
         StagedExposureCount = stagedExposureCount;
         MergedExposureCount = mergedExposureCount;

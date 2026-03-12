@@ -247,7 +247,12 @@ function RunHistoryCard({ run }: { run: TenantIngestionRun }) {
       <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3 lg:grid-cols-4">
         <RunMetric label="Fetched Vulns" value={run.fetchedVulnerabilityCount} />
         <RunMetric label="Fetched Assets" value={run.fetchedAssetCount} />
+        <RunMetric label="Software Retrieved" value={run.fetchedSoftwareCount} />
         <RunMetric label="Fetched SW Links" value={run.fetchedSoftwareInstallationCount} />
+        <RunMetric
+          label="Missing Machine Refs"
+          value={run.softwareWithoutMachineReferencesCount}
+        />
         <RunMetric label="Staged Vulns" value={run.stagedVulnerabilityCount} />
         <RunMetric label="Staged Exposures" value={run.stagedExposureCount} />
         <RunMetric label="Merged Exposures" value={run.mergedExposureCount} />

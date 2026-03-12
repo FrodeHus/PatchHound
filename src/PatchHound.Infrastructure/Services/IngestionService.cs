@@ -16,8 +16,8 @@ public class IngestionService
 {
     private const int MaxPersistenceAttempts = 2;
     private const int MaxSourceAttempts = 2;
-    private const int AssetBatchSize = 5000;
-    private const int VulnerabilityBatchSize = 5000;
+    private const int AssetBatchSize = 200;
+    private const int VulnerabilityBatchSize = 250;
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan IngestionArtifactRetention = TimeSpan.FromDays(7);
     private static readonly TimeSpan FailedIngestionRetention = TimeSpan.FromHours(24);
@@ -98,7 +98,9 @@ public class IngestionService
             var runCompleted = false;
             var fetchedVulnerabilityCount = 0;
             var fetchedAssetCount = 0;
+            var fetchedSoftwareCount = 0;
             var fetchedSoftwareInstallationCount = 0;
+            var softwareWithoutMachineReferencesCount = 0;
             var vulnerabilityMergeSummary = new StagedVulnerabilityMergeSummary(0, 0, 0, 0, 0);
             var assetMergeSummary = new StagedAssetMergeSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
@@ -170,7 +172,18 @@ public class IngestionService
                                 ct
                             );
                             fetchedAssetCount = assetBatchSummary.AssetCount;
+                            fetchedSoftwareCount = assetBatchSummary.SoftwareCount;
                             fetchedSoftwareInstallationCount = assetBatchSummary.LinkCount;
+                            softwareWithoutMachineReferencesCount =
+                                assetBatchSummary.SoftwareWithoutMachineReferencesCount;
+                            await UpdateIngestionAssetFetchMetricsAsync(
+                                run.Id,
+                                fetchedAssetCount,
+                                fetchedSoftwareCount,
+                                fetchedSoftwareInstallationCount,
+                                softwareWithoutMachineReferencesCount,
+                                ct
+                            );
                             await UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
@@ -243,9 +256,20 @@ public class IngestionService
                             );
                             var normalizedAssetSnapshot = NormalizeAssetSnapshot(assetSnapshot);
                             fetchedAssetCount = assetSnapshot.Assets.Count;
+                            fetchedSoftwareCount = assetSnapshot.RetrievedSoftwareCount;
                             fetchedSoftwareInstallationCount = assetSnapshot
                                 .DeviceSoftwareLinks
                                 .Count;
+                            softwareWithoutMachineReferencesCount =
+                                assetSnapshot.SoftwareWithoutMachineReferencesCount;
+                            await UpdateIngestionAssetFetchMetricsAsync(
+                                run.Id,
+                                fetchedAssetCount,
+                                fetchedSoftwareCount,
+                                fetchedSoftwareInstallationCount,
+                                softwareWithoutMachineReferencesCount,
+                                ct
+                            );
                             await StageAssetInventorySnapshotAsync(
                                 run.Id,
                                 tenantId,
@@ -325,9 +349,19 @@ public class IngestionService
                             fetchedAssetCount = await _dbContext
                                 .StagedAssets.IgnoreQueryFilters()
                                 .CountAsync(item => item.IngestionRunId == run.Id, ct);
+                            fetchedSoftwareCount = await _dbContext
+                                .IngestionRuns.IgnoreQueryFilters()
+                                .Where(item => item.Id == run.Id)
+                                .Select(item => item.FetchedSoftwareCount)
+                                .FirstOrDefaultAsync(ct);
                             fetchedSoftwareInstallationCount = await _dbContext
                                 .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
                                 .CountAsync(item => item.IngestionRunId == run.Id, ct);
+                            softwareWithoutMachineReferencesCount = await _dbContext
+                                .IngestionRuns.IgnoreQueryFilters()
+                                .Where(item => item.Id == run.Id)
+                                .Select(item => item.SoftwareWithoutMachineReferencesCount)
+                                .FirstOrDefaultAsync(ct);
                         }
 
                         if (!assetMergeCompleted && assetStagingCompleted)
@@ -538,7 +572,9 @@ public class IngestionService
                             error: null,
                             fetchedVulnerabilityCount,
                             fetchedAssetCount,
+                            fetchedSoftwareCount,
                             fetchedSoftwareInstallationCount,
+                            softwareWithoutMachineReferencesCount,
                             vulnerabilityMergeSummary,
                             assetMergeSummary,
                             null,
@@ -593,7 +629,9 @@ public class IngestionService
                             error: $"Ingestion failed: {ex.GetType().Name}",
                             fetchedVulnerabilityCount,
                             fetchedAssetCount,
+                            fetchedSoftwareCount,
                             fetchedSoftwareInstallationCount,
+                            softwareWithoutMachineReferencesCount,
                             vulnerabilityMergeSummary,
                             assetMergeSummary,
                             failureStatus,
@@ -617,7 +655,13 @@ public class IngestionService
         return startedAny;
     }
 
-    private sealed record AssetBatchStageSummary(int AssetCount, int LinkCount, int BatchNumber);
+    private sealed record AssetBatchStageSummary(
+        int AssetCount,
+        int SoftwareCount,
+        int LinkCount,
+        int SoftwareWithoutMachineReferencesCount,
+        int BatchNumber
+    );
 
     private async Task<T> ExecuteWithConcurrencyRetryAsync<T>(
         Func<Task<T>> operation,
@@ -780,6 +824,61 @@ public class IngestionService
             .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, status), ct);
     }
 
+    private async Task UpdateIngestionAssetFetchMetricsAsync(
+        Guid runId,
+        int fetchedAssetCount,
+        int fetchedSoftwareCount,
+        int fetchedSoftwareInstallationCount,
+        int softwareWithoutMachineReferencesCount,
+        CancellationToken ct
+    )
+    {
+        if (IsInMemoryProvider())
+        {
+            var run = await _dbContext
+                .IngestionRuns.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(item => item.Id == runId, ct);
+            if (run is null)
+            {
+                return;
+            }
+
+            _dbContext.Entry(run).Property(nameof(IngestionRun.FetchedAssetCount)).CurrentValue =
+                fetchedAssetCount;
+            _dbContext.Entry(run).Property(nameof(IngestionRun.FetchedSoftwareCount)).CurrentValue =
+                fetchedSoftwareCount;
+            _dbContext
+                .Entry(run)
+                .Property(nameof(IngestionRun.FetchedSoftwareInstallationCount))
+                .CurrentValue = fetchedSoftwareInstallationCount;
+            _dbContext
+                .Entry(run)
+                .Property(nameof(IngestionRun.SoftwareWithoutMachineReferencesCount))
+                .CurrentValue = softwareWithoutMachineReferencesCount;
+            await _dbContext.SaveChangesAsync(ct);
+            return;
+        }
+
+        await _dbContext
+            .IngestionRuns.IgnoreQueryFilters()
+            .Where(item => item.Id == runId)
+            .ExecuteUpdateAsync(
+                setters =>
+                    setters
+                        .SetProperty(item => item.FetchedAssetCount, fetchedAssetCount)
+                        .SetProperty(item => item.FetchedSoftwareCount, fetchedSoftwareCount)
+                        .SetProperty(
+                            item => item.FetchedSoftwareInstallationCount,
+                            fetchedSoftwareInstallationCount
+                        )
+                        .SetProperty(
+                            item => item.SoftwareWithoutMachineReferencesCount,
+                            softwareWithoutMachineReferencesCount
+                        ),
+                ct
+            );
+    }
+
     private static bool IsActiveRunStatus(string status)
     {
         return status is IngestionRunStatuses.Staging
@@ -842,7 +941,11 @@ public class IngestionService
                         .FirstOrDefaultAsync(
                             item =>
                                 item.Id == sourceConfiguration.ActiveIngestionRunId.Value
-                                && IsActiveRunStatus(item.Status)
+                                && (
+                                    item.Status == IngestionRunStatuses.Staging
+                                    || item.Status == IngestionRunStatuses.MergePending
+                                    || item.Status == IngestionRunStatuses.Merging
+                                )
                                 && !item.CompletedAt.HasValue,
                             ct
                         );
@@ -892,7 +995,11 @@ public class IngestionService
                     .FirstOrDefaultAsync(
                         item =>
                             item.Id == persistedSourceConfiguration.ActiveIngestionRunId.Value
-                            && IsActiveRunStatus(item.Status)
+                            && (
+                                item.Status == IngestionRunStatuses.Staging
+                                || item.Status == IngestionRunStatuses.MergePending
+                                || item.Status == IngestionRunStatuses.Merging
+                            )
                             && !item.CompletedAt.HasValue,
                         ct
                     );
@@ -939,7 +1046,9 @@ public class IngestionService
         string? error,
         int fetchedVulnerabilityCount,
         int fetchedAssetCount,
+        int fetchedSoftwareCount,
         int fetchedSoftwareInstallationCount,
+        int softwareWithoutMachineReferencesCount,
         StagedVulnerabilityMergeSummary vulnerabilityMergeSummary,
         StagedAssetMergeSummary assetMergeSummary,
         string? failureStatus,
@@ -968,7 +1077,9 @@ public class IngestionService
                         completedAt,
                         fetchedVulnerabilityCount,
                         fetchedAssetCount,
+                        fetchedSoftwareCount,
                         fetchedSoftwareInstallationCount,
+                        softwareWithoutMachineReferencesCount,
                         vulnerabilityMergeSummary.StagedVulnerabilityCount,
                         vulnerabilityMergeSummary.StagedExposureCount,
                         vulnerabilityMergeSummary.MergedExposureCount,
@@ -994,7 +1105,9 @@ public class IngestionService
                         failureStatus ?? IngestionRunStatuses.FailedRecoverable,
                         fetchedVulnerabilityCount,
                         fetchedAssetCount,
+                        fetchedSoftwareCount,
                         fetchedSoftwareInstallationCount,
+                        softwareWithoutMachineReferencesCount,
                         vulnerabilityMergeSummary.StagedVulnerabilityCount,
                         vulnerabilityMergeSummary.StagedExposureCount,
                         vulnerabilityMergeSummary.MergedExposureCount,
@@ -1043,9 +1156,14 @@ public class IngestionService
                                     fetchedVulnerabilityCount
                                 )
                                 .SetProperty(item => item.FetchedAssetCount, fetchedAssetCount)
+                                .SetProperty(item => item.FetchedSoftwareCount, fetchedSoftwareCount)
                                 .SetProperty(
                                     item => item.FetchedSoftwareInstallationCount,
                                     fetchedSoftwareInstallationCount
+                                )
+                                .SetProperty(
+                                    item => item.SoftwareWithoutMachineReferencesCount,
+                                    softwareWithoutMachineReferencesCount
                                 )
                                 .SetProperty(
                                     item => item.StagedVulnerabilityCount,
@@ -1123,9 +1241,14 @@ public class IngestionService
                                     fetchedVulnerabilityCount
                                 )
                                 .SetProperty(item => item.FetchedAssetCount, fetchedAssetCount)
+                                .SetProperty(item => item.FetchedSoftwareCount, fetchedSoftwareCount)
                                 .SetProperty(
                                     item => item.FetchedSoftwareInstallationCount,
                                     fetchedSoftwareInstallationCount
+                                )
+                                .SetProperty(
+                                    item => item.SoftwareWithoutMachineReferencesCount,
+                                    softwareWithoutMachineReferencesCount
                                 )
                                 .SetProperty(
                                     item => item.StagedVulnerabilityCount,
@@ -1855,7 +1978,9 @@ public class IngestionService
             ? null
             : checkpoint!.CursorJson;
         var totalAssets = 0;
+        var totalSoftware = 0;
         var totalLinks = 0;
+        var totalSoftwareWithoutMachineReferences = 0;
 
         while (true)
         {
@@ -1868,10 +1993,18 @@ public class IngestionService
             batchNumber++;
 
             var normalizedBatch = NormalizeAssetSnapshots(batch.Items);
-            if (normalizedBatch.Assets.Count > 0 || normalizedBatch.DeviceSoftwareLinks.Count > 0)
+            if (
+                normalizedBatch.Assets.Count > 0
+                || normalizedBatch.DeviceSoftwareLinks.Count > 0
+                || normalizedBatch.RetrievedSoftwareCount > 0
+                || normalizedBatch.SoftwareWithoutMachineReferencesCount > 0
+            )
             {
                 totalAssets += normalizedBatch.Assets.Count;
+                totalSoftware += normalizedBatch.RetrievedSoftwareCount;
                 totalLinks += normalizedBatch.DeviceSoftwareLinks.Count;
+                totalSoftwareWithoutMachineReferences +=
+                    normalizedBatch.SoftwareWithoutMachineReferencesCount;
 
                 await StageAssetInventorySnapshotAsync(
                     ingestionRunId,
@@ -1916,7 +2049,13 @@ public class IngestionService
             cursorJson = batch.NextCursorJson;
         }
 
-        return new AssetBatchStageSummary(totalAssets, totalLinks, batchNumber);
+        return new AssetBatchStageSummary(
+            totalAssets,
+            totalSoftware,
+            totalLinks,
+            totalSoftwareWithoutMachineReferences,
+            batchNumber
+        );
     }
 
     internal async Task<StagedAssetMergeSummary> ProcessStagedAssetsAsync(
@@ -1997,7 +2136,12 @@ public class IngestionService
             .Select(group => group.OrderByDescending(link => link.ObservedAt).First())
             .ToList();
 
-        return new IngestionAssetInventorySnapshot(assets, deviceSoftwareLinks);
+        return new IngestionAssetInventorySnapshot(
+            assets,
+            deviceSoftwareLinks,
+            snapshot.RetrievedSoftwareCount,
+            snapshot.SoftwareWithoutMachineReferencesCount
+        );
     }
 
     private static IngestionAssetInventorySnapshot NormalizeAssetSnapshots(
@@ -2012,7 +2156,9 @@ public class IngestionService
         return NormalizeAssetSnapshot(
             new IngestionAssetInventorySnapshot(
                 snapshots.SelectMany(item => item.Assets).ToList(),
-                snapshots.SelectMany(item => item.DeviceSoftwareLinks).ToList()
+                snapshots.SelectMany(item => item.DeviceSoftwareLinks).ToList(),
+                snapshots.Sum(item => item.RetrievedSoftwareCount),
+                snapshots.Sum(item => item.SoftwareWithoutMachineReferencesCount)
             )
         );
     }

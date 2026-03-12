@@ -56,5 +56,7 @@ public record IngestionDeviceSoftwareLink(
 
 public record IngestionAssetInventorySnapshot(
     IReadOnlyList<IngestionAsset> Assets,
-    IReadOnlyList<IngestionDeviceSoftwareLink> DeviceSoftwareLinks
+    IReadOnlyList<IngestionDeviceSoftwareLink> DeviceSoftwareLinks,
+    int RetrievedSoftwareCount = 0,
+    int SoftwareWithoutMachineReferencesCount = 0
 );
