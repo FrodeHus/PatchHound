@@ -39,6 +39,7 @@ export const Route = createFileRoute('/auth/callback')({
         session.accessToken = tokens.access_token
         session.tokenExpiry = Date.now() + tokens.expires_in * 1000
         session.homeAccountId = tokens.home_account_id
+        session.tokenCache = tokens.token_cache
         session.userId = claims.oid
         session.email = claims.preferred_username
         session.displayName = claims.name

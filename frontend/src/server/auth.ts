@@ -7,7 +7,9 @@ const ENTRA_REDIRECT_URI = process.env.ENTRA_REDIRECT_URI!
 const ENTRA_SCOPES = process.env.ENTRA_SCOPES ?? 'openid profile email'
 
 const AUTHORITY = `https://login.microsoftonline.com/${ENTRA_TENANT_ID}`
-const SCOPES = ENTRA_SCOPES.split(/\s+/).filter(Boolean)
+const SCOPES = Array.from(
+  new Set([...ENTRA_SCOPES.split(/\s+/).filter(Boolean), 'openid', 'profile', 'email', 'offline_access']),
+)
 
 const msalClient = new ConfidentialClientApplication({
   auth: {
@@ -62,6 +64,7 @@ export async function exchangeCodeForTokens(code: string): Promise<{
   id_token?: string
   claims?: IdTokenClaims
   home_account_id?: string
+  token_cache?: string
 }> {
   const result = await msalClient.acquireTokenByCode({
     code,
@@ -83,12 +86,14 @@ export async function exchangeCodeForTokens(code: string): Promise<{
     id_token: result.idToken,
     claims: result.idTokenClaims as IdTokenClaims | undefined,
     home_account_id: result.account?.homeAccountId,
+    token_cache: msalClient.getTokenCache().serialize(),
   }
 }
 
 export async function refreshAccessToken(homeAccountId: string): Promise<{
   access_token: string
   expires_in: number
+  token_cache?: string
 }> {
   const account = await msalClient.getTokenCache().getAccountByHomeId(homeAccountId)
   if (!account) {
@@ -112,7 +117,16 @@ export async function refreshAccessToken(homeAccountId: string): Promise<{
   return {
     access_token: result.accessToken,
     expires_in: expiresIn,
+    token_cache: msalClient.getTokenCache().serialize(),
   }
+}
+
+export async function hydrateTokenCache(serializedCache?: string): Promise<void> {
+  if (!serializedCache?.trim()) {
+    return
+  }
+
+  msalClient.getTokenCache().deserialize(serializedCache)
 }
 
 export async function resolveTenantDisplayName(
