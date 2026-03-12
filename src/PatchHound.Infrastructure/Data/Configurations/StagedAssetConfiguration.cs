@@ -11,6 +11,7 @@ public class StagedAssetConfiguration : IEntityTypeConfiguration<StagedAsset>
         builder.HasKey(item => item.Id);
 
         builder.HasIndex(item => item.IngestionRunId);
+        builder.HasIndex(item => new { item.IngestionRunId, item.BatchNumber });
         builder.HasIndex(item => new
         {
             item.TenantId,

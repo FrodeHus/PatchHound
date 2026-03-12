@@ -431,10 +431,25 @@ public class TenantsController : ControllerBase
             .Where(run => run.TenantId == id && run.SourceKey == normalizedSourceKey);
 
         var totalCount = await query.CountAsync(ct);
-        var items = await query
+        var pagedRuns = await query
             .OrderByDescending(run => run.StartedAt)
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
+            .ToListAsync(ct);
+        var runIds = pagedRuns.Select(run => run.Id).ToList();
+        var checkpointsByRunId =
+            runIds.Count == 0
+                ? new Dictionary<Guid, IngestionCheckpoint>()
+                : (await _dbContext
+                    .IngestionCheckpoints.AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Where(checkpoint => runIds.Contains(checkpoint.IngestionRunId))
+                    .OrderByDescending(checkpoint => checkpoint.LastCommittedAt)
+                    .ToListAsync(ct))
+                    .GroupBy(checkpoint => checkpoint.IngestionRunId)
+                    .ToDictionary(group => group.Key, group => group.First());
+        var items = pagedRuns
+            .OrderByDescending(run => run.StartedAt)
             .Select(run => new TenantIngestionRunDto(
                 run.Id,
                 run.StartedAt,
@@ -458,9 +473,14 @@ public class TenantsController : ControllerBase
                 run.InstallationEpisodesSeen,
                 run.StaleInstallationsMarked,
                 run.InstallationsRemoved,
-                run.Error
+                run.Error,
+                checkpointsByRunId.GetValueOrDefault(run.Id)?.Phase,
+                checkpointsByRunId.GetValueOrDefault(run.Id)?.BatchNumber,
+                checkpointsByRunId.GetValueOrDefault(run.Id)?.Status,
+                checkpointsByRunId.GetValueOrDefault(run.Id)?.RecordsCommitted,
+                checkpointsByRunId.GetValueOrDefault(run.Id)?.LastCommittedAt
             ))
-            .ToListAsync(ct);
+            .ToList();
 
         return Ok(
             new PagedResponse<TenantIngestionRunDto>(
@@ -474,6 +494,7 @@ public class TenantsController : ControllerBase
 
     private static TenantIngestionSourceDto MapSourceDto(
         TenantSourceConfiguration source,
+        IngestionCheckpoint? activeCheckpoint,
         IReadOnlyList<TenantIngestionRunDto> recentRuns
     )
     {
@@ -496,7 +517,14 @@ public class TenantsController : ControllerBase
                 source.LastCompletedAt,
                 source.LastSucceededAt,
                 source.LastStatus,
-                source.LastError
+                source.LastError,
+                source.ActiveIngestionRunId,
+                source.LeaseExpiresAt,
+                activeCheckpoint?.Phase,
+                activeCheckpoint?.BatchNumber,
+                activeCheckpoint?.Status,
+                activeCheckpoint?.RecordsCommitted,
+                activeCheckpoint?.LastCommittedAt
             ),
             recentRuns
         );
@@ -560,6 +588,10 @@ public class TenantsController : ControllerBase
             .OrderBy(source => source.DisplayName)
             .ToListAsync(ct);
         var sourceKeys = sources.Select(source => source.SourceKey).ToList();
+        var activeRunIds = sources
+            .Where(source => source.ActiveIngestionRunId.HasValue)
+            .Select(source => source.ActiveIngestionRunId!.Value)
+            .ToList();
         var recentRuns =
             sourceKeys.Count == 0
                 ? []
@@ -569,6 +601,21 @@ public class TenantsController : ControllerBase
                     .Where(run => run.TenantId == tenantId && sourceKeys.Contains(run.SourceKey))
                     .OrderByDescending(run => run.StartedAt)
                     .ToListAsync(ct);
+        var checkpointRunIds = recentRuns
+            .Select(run => run.Id)
+            .Concat(activeRunIds)
+            .Distinct()
+            .ToList();
+        var latestCheckpointsByRunId =
+            checkpointRunIds.Count == 0
+                ? new Dictionary<Guid, IngestionCheckpoint>()
+                : await _dbContext
+                    .IngestionCheckpoints.AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Where(checkpoint => checkpointRunIds.Contains(checkpoint.IngestionRunId))
+                    .OrderByDescending(checkpoint => checkpoint.LastCommittedAt)
+                    .GroupBy(checkpoint => checkpoint.IngestionRunId)
+                    .ToDictionaryAsync(group => group.Key, group => group.First(), ct);
         var recentRunsBySourceKey = recentRuns
             .GroupBy(run => run.SourceKey, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
@@ -600,7 +647,12 @@ public class TenantsController : ControllerBase
                                 run.InstallationEpisodesSeen,
                                 run.StaleInstallationsMarked,
                                 run.InstallationsRemoved,
-                                run.Error
+                                run.Error,
+                                latestCheckpointsByRunId.GetValueOrDefault(run.Id)?.Phase,
+                                latestCheckpointsByRunId.GetValueOrDefault(run.Id)?.BatchNumber,
+                                latestCheckpointsByRunId.GetValueOrDefault(run.Id)?.Status,
+                                latestCheckpointsByRunId.GetValueOrDefault(run.Id)?.RecordsCommitted,
+                                latestCheckpointsByRunId.GetValueOrDefault(run.Id)?.LastCommittedAt
                             ))
                             .ToList(),
                 StringComparer.OrdinalIgnoreCase
@@ -616,6 +668,9 @@ public class TenantsController : ControllerBase
                 .Select(source =>
                     MapSourceDto(
                         source,
+                        source.ActiveIngestionRunId.HasValue
+                            ? latestCheckpointsByRunId.GetValueOrDefault(source.ActiveIngestionRunId.Value)
+                            : null,
                         recentRunsBySourceKey.GetValueOrDefault(source.SourceKey, [])
                     )
                 )
