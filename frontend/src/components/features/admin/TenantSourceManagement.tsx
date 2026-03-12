@@ -4,7 +4,7 @@ import { useMutation } from '@tanstack/react-query'
 import { ArrowLeft, CircleHelp, PenSquare, RotateCw } from 'lucide-react'
 import { triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
 import type { TenantDetail, TenantIngestionSource } from '@/api/settings.schemas'
-import { SourceRunHistorySheet } from '@/components/features/admin/SourceRunHistorySheet'
+import { SourceRunHistoryView } from '@/components/features/admin/SourceRunHistorySheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -17,8 +17,11 @@ import { cn } from '@/lib/utils'
 type TenantSourceManagementProps = {
   tenant: TenantDetail
   editingSourceKey: string | null
+  historySourceKey: string | null
   onEditSource: (sourceKey: string) => void
+  onOpenHistory: (sourceKey: string) => void
   onCloseEditor: () => void
+  onCloseHistory: () => void
 }
 
 type TenantIngestionSourceDraft = Omit<TenantIngestionSource, 'credentials'> & {
@@ -30,19 +33,25 @@ type TenantIngestionSourceDraft = Omit<TenantIngestionSource, 'credentials'> & {
 export function TenantSourceManagement({
   tenant,
   editingSourceKey,
+  historySourceKey,
   onEditSource,
+  onOpenHistory,
   onCloseEditor,
+  onCloseHistory,
 }: TenantSourceManagementProps) {
   const router = useRouter()
   const [sources, setSources] = useState(() => tenant.ingestionSources.map(mapSourceToDraft))
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
   const [syncingSourceKey, setSyncingSourceKey] = useState<string | null>(null)
   const [syncState, setSyncState] = useState<'idle' | 'success' | 'error'>('idle')
-  const [historySourceKey, setHistorySourceKey] = useState<string | null>(null)
 
   const editingSource = useMemo(
     () => sources.find((source) => source.key === editingSourceKey) ?? null,
     [editingSourceKey, sources],
+  )
+  const historySource = useMemo(
+    () => sources.find((source) => source.key === historySourceKey) ?? null,
+    [historySourceKey, sources],
   )
 
   const mutation = useMutation({
@@ -124,7 +133,15 @@ export function TenantSourceManagement({
           />
         ) : null}
 
-        {!editingSource ? (
+        {!editingSource && historySource ? (
+          <TenantSourceHistoryPage
+            tenant={tenant}
+            source={historySource}
+            onBack={onCloseHistory}
+          />
+        ) : null}
+
+        {!editingSource && !historySource ? (
           <>
         <Card className="rounded-2xl bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_94%,black),var(--card))] shadow-sm">
           <CardHeader className="border-b border-border/60 pb-5">
@@ -253,7 +270,7 @@ export function TenantSourceManagement({
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={() => setHistorySourceKey(source.key)}
+                          onClick={() => onOpenHistory(source.key)}
                         >
                           View full history
                         </Button>
@@ -270,21 +287,100 @@ export function TenantSourceManagement({
           </CardContent>
         </Card>
 
-        <SourceRunHistorySheet
-          tenantId={tenant.id}
-          sourceKey={historySourceKey}
-          sourceDisplayName={sources.find((source) => source.key === historySourceKey)?.displayName ?? null}
-          isOpen={historySourceKey !== null}
-          onOpenChange={(open) => {
-            if (!open) {
-              setHistorySourceKey(null)
-            }
-          }}
-        />
           </>
         ) : null}
       </section>
     </TooltipProvider>
+  )
+}
+
+function TenantSourceHistoryPage({
+  tenant,
+  source,
+  onBack,
+}: {
+  tenant: TenantDetail
+  source: TenantIngestionSourceDraft
+  onBack: () => void
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="space-y-3">
+        <Link
+          to="/admin/sources"
+          search={{ activeView: 'tenant' }}
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Back to tenant sources
+        </Link>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-semibold tracking-tight">{`${source.displayName} history`}</h2>
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+              Review ingestion batches, merge progress, and failure posture for this source without squeezing the history into a narrow side panel.
+            </p>
+          </div>
+          <Button type="button" variant="outline" onClick={onBack}>
+            Close history
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <Card className="rounded-2xl border-border/70 bg-card/85">
+          <CardContent className="p-5">
+            <SourceRunHistoryView
+              tenantId={tenant.id}
+              sourceKey={source.key}
+              sourceDisplayName={source.displayName}
+            />
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card className="rounded-2xl border-border/70 bg-card/75">
+            <CardHeader>
+              <h3 className="text-base font-medium">Source posture</h3>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <InsetPanel emphasis="subtle" className="px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Current status</p>
+                <p className="mt-1 font-medium text-foreground">{source.runtime.lastStatus ?? 'Unknown'}</p>
+              </InsetPanel>
+              <InsetPanel emphasis="subtle" className="px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Last run</p>
+                <p className="mt-1 font-medium text-foreground">{formatTimestamp(source.runtime.lastCompletedAt)}</p>
+              </InsetPanel>
+              <InsetPanel emphasis="subtle" className="px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Last success</p>
+                <p className="mt-1 font-medium text-foreground">{formatTimestamp(source.runtime.lastSucceededAt)}</p>
+              </InsetPanel>
+              {source.runtime.lastError ? (
+                <InsetPanel className="px-4 py-3 text-sm text-destructive">
+                  Last error: {source.runtime.lastError}
+                </InsetPanel>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-border/70 bg-card/75">
+            <CardHeader>
+              <h3 className="text-base font-medium">Navigation</h3>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <InsetPanel emphasis="subtle" className="px-4 py-3">
+                Use the source list for operational overview, then open full history here when you need batch-level or failure-level detail.
+              </InsetPanel>
+              <Button type="button" variant="outline" className="w-full justify-start" onClick={onBack}>
+                <ArrowLeft className="size-4" />
+                Back to source list
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
   )
 }
 

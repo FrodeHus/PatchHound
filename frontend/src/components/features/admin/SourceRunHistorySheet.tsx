@@ -2,25 +2,17 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchTenantIngestionRuns } from '@/api/settings.functions'
 import type { TenantIngestionRun } from '@/api/settings.schemas'
+import { InsetPanel } from '@/components/ui/inset-panel'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import { DataTableActiveFilters } from '@/components/ui/data-table-workbench'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 
-type SourceRunHistorySheetProps = {
+type SourceRunHistoryViewProps = {
   tenantId: string
-  sourceKey: string | null
-  sourceDisplayName: string | null
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
+  sourceKey: string
+  sourceDisplayName: string
 }
 
 type RunFilter = 'all' | 'active' | 'failed-recoverable' | 'failed-terminal' | 'succeeded'
@@ -30,24 +22,22 @@ type RunActiveFilter = {
   onClear: () => void
 }
 
-export function SourceRunHistorySheet({
+export function SourceRunHistoryView({
   tenantId,
   sourceKey,
   sourceDisplayName,
-  isOpen,
-  onOpenChange,
-}: SourceRunHistorySheetProps) {
+}: SourceRunHistoryViewProps) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [filter, setFilter] = useState<RunFilter>('all')
   const runsQuery = useQuery({
     queryKey: ['tenant-ingestion-runs', tenantId, sourceKey, page, pageSize],
-    enabled: isOpen && Boolean(sourceKey),
+    enabled: true,
     queryFn: async () =>
       fetchTenantIngestionRuns({
         data: {
           tenantId,
-          sourceKey: sourceKey!,
+          sourceKey,
           page,
           pageSize,
         },
@@ -74,109 +64,97 @@ export function SourceRunHistorySheet({
           },
         ]
 
-  function handleOpenChange(open: boolean) {
-    if (!open) {
-      setPage(1)
-      setPageSize(10)
-      setFilter('all')
-    }
-
-    onOpenChange(open)
-  }
-
   return (
-    <Sheet open={isOpen} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto border-l border-border/80 bg-background/98 p-0 sm:max-w-3xl">
-        <SheetHeader className="border-b border-border/70 bg-muted/20">
-          <SheetTitle>{sourceDisplayName ?? 'Source history'}</SheetTitle>
-          <SheetDescription>
-            Recent ingestion runs with staged, merged, and reconciliation counters for this source.
-          </SheetDescription>
-        </SheetHeader>
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <h2 className="text-2xl font-semibold tracking-tight">{sourceDisplayName} run history</h2>
+        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+          Review batch progress, merge state, and recent recoverable or terminal failures for this ingestion source.
+        </p>
+      </div>
 
-        <div className="space-y-4 p-6">
-          {data ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <SummaryCard
-                label="Page Success Rate"
-                value={`${successRate}%`}
-                tone={successRate >= 80 ? 'success' : successRate >= 50 ? 'warning' : 'error'}
-              />
-              <SummaryCard label="Succeeded" value={String(succeededRuns)} tone="success" />
-              <SummaryCard label="Failed" value={String(failedRuns)} tone={failedRuns > 0 ? 'error' : 'neutral'} />
-              <SummaryCard label="Running" value={String(runningRuns)} tone={runningRuns > 0 ? 'warning' : 'neutral'} />
-            </div>
-          ) : null}
-
-          {!data && runsQuery.isPending ? (
-            <p className="text-sm text-muted-foreground">Loading run history...</p>
-          ) : null}
-
-          {data?.items.length ? (
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <RunFilterButton active={filter === 'all'} count={runs.length} onClick={() => setFilter('all')}>
-                  All
-                </RunFilterButton>
-                <RunFilterButton active={filter === 'active'} count={runningRuns} onClick={() => setFilter('active')}>
-                  Active
-                </RunFilterButton>
-                <RunFilterButton
-                  active={filter === 'failed-recoverable'}
-                  count={recoverableFailedRuns}
-                  onClick={() => setFilter('failed-recoverable')}
-                >
-                  Recoverable failed
-                </RunFilterButton>
-                <RunFilterButton
-                  active={filter === 'failed-terminal'}
-                  count={terminalFailedRuns}
-                  onClick={() => setFilter('failed-terminal')}
-                >
-                  Terminal failed
-                </RunFilterButton>
-                <RunFilterButton
-                  active={filter === 'succeeded'}
-                  count={succeededRuns}
-                  onClick={() => setFilter('succeeded')}
-                >
-                  Succeeded
-                </RunFilterButton>
-              </div>
-
-              <DataTableActiveFilters filters={activeFilters} onClearAll={() => setFilter('all')} />
-            </div>
-          ) : null}
-
-          {data?.items.length ? (
-            <div className="space-y-3">
-              {filteredRuns.map((run) => (
-                <RunHistoryCard key={run.id} run={run} />
-              ))}
-              <PaginationControls
-                page={data.page}
-                pageSize={data.pageSize}
-                totalCount={data.totalCount}
-                totalPages={data.totalPages}
-                onPageChange={setPage}
-                onPageSizeChange={(value) => {
-                  setPageSize(value)
-                  setPage(1)
-                }}
-              />
-            </div>
-          ) : null}
-
-          {data && filteredRuns.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border/70 bg-background/20 px-4 py-8 text-sm text-muted-foreground">
-              {runs.length === 0
-                ? 'No ingestion runs have been recorded for this source yet.'
-                : 'No runs on this page match the selected status filter.'}
-            </div>
-          ) : null}
+      {data ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard
+            label="Page Success Rate"
+            value={`${successRate}%`}
+            tone={successRate >= 80 ? 'success' : successRate >= 50 ? 'warning' : 'error'}
+          />
+          <SummaryCard label="Succeeded" value={String(succeededRuns)} tone="success" />
+          <SummaryCard label="Failed" value={String(failedRuns)} tone={failedRuns > 0 ? 'error' : 'neutral'} />
+          <SummaryCard label="Active" value={String(runningRuns)} tone={runningRuns > 0 ? 'warning' : 'neutral'} />
         </div>
-      </SheetContent>
-    </Sheet>
+      ) : null}
+
+      {!data && runsQuery.isPending ? (
+        <InsetPanel emphasis="subtle" className="px-4 py-8 text-sm text-muted-foreground">
+          Loading run history...
+        </InsetPanel>
+      ) : null}
+
+      {data?.items.length ? (
+        <InsetPanel className="space-y-4 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <RunFilterButton active={filter === 'all'} count={runs.length} onClick={() => setFilter('all')}>
+              All
+            </RunFilterButton>
+            <RunFilterButton active={filter === 'active'} count={runningRuns} onClick={() => setFilter('active')}>
+              Active
+            </RunFilterButton>
+            <RunFilterButton
+              active={filter === 'failed-recoverable'}
+              count={recoverableFailedRuns}
+              onClick={() => setFilter('failed-recoverable')}
+            >
+              Recoverable failed
+            </RunFilterButton>
+            <RunFilterButton
+              active={filter === 'failed-terminal'}
+              count={terminalFailedRuns}
+              onClick={() => setFilter('failed-terminal')}
+            >
+              Terminal failed
+            </RunFilterButton>
+            <RunFilterButton
+              active={filter === 'succeeded'}
+              count={succeededRuns}
+              onClick={() => setFilter('succeeded')}
+            >
+              Succeeded
+            </RunFilterButton>
+          </div>
+
+          <DataTableActiveFilters filters={activeFilters} onClearAll={() => setFilter('all')} />
+        </InsetPanel>
+      ) : null}
+
+      {data?.items.length ? (
+        <div className="space-y-3">
+          {filteredRuns.map((run) => (
+            <RunHistoryCard key={run.id} run={run} />
+          ))}
+          <PaginationControls
+            page={data.page}
+            pageSize={data.pageSize}
+            totalCount={data.totalCount}
+            totalPages={data.totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value)
+              setPage(1)
+            }}
+          />
+        </div>
+      ) : null}
+
+      {data && filteredRuns.length === 0 ? (
+        <InsetPanel emphasis="subtle" className="border-dashed px-4 py-8 text-sm text-muted-foreground">
+          {runs.length === 0
+            ? 'No ingestion runs have been recorded for this source yet.'
+            : 'No runs on this page match the selected status filter.'}
+        </InsetPanel>
+      ) : null}
+    </div>
   )
 }
 

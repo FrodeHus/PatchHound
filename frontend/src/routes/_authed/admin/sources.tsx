@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 export const Route = createFileRoute('/_authed/admin/sources')({
   validateSearch: z.object({
     activeView: z.enum(['tenant', 'global-enrichment']).optional(),
-    mode: z.enum(['edit']).optional(),
+    mode: z.enum(['edit', 'history']).optional(),
     sourceKey: z.string().optional(),
   }),
   component: SourcesAdministrationPage,
@@ -205,6 +205,7 @@ function SourcesAdministrationPage() {
           key={tenant.id}
           tenant={tenant}
           editingSourceKey={search.mode === 'edit' ? search.sourceKey ?? null : null}
+          historySourceKey={search.mode === 'history' ? search.sourceKey ?? null : null}
           onEditSource={(sourceKey) => {
             void navigate({
               to: '/admin/sources',
@@ -212,6 +213,24 @@ function SourcesAdministrationPage() {
                 activeView: 'tenant',
                 mode: 'edit',
                 sourceKey,
+              },
+            })
+          }}
+          onOpenHistory={(sourceKey) => {
+            void navigate({
+              to: '/admin/sources',
+              search: {
+                activeView: 'tenant',
+                mode: 'history',
+                sourceKey,
+              },
+            })
+          }}
+          onCloseHistory={() => {
+            void navigate({
+              to: '/admin/sources',
+              search: {
+                activeView: 'tenant',
               },
             })
           }}
