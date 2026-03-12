@@ -25,6 +25,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { InsetPanel } from '@/components/ui/inset-panel'
 
 type AssetDetailPaneProps = {
   asset: AssetDetail | null
@@ -53,15 +54,15 @@ export function AssetDetailPane({
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto border-l border-border/80 bg-background/98 p-0 sm:max-w-2xl">
-        <SheetHeader className="border-b border-border/70 bg-muted/20">
+      <SheetContent side="right" className="w-full overflow-y-auto border-l border-border/80 bg-card p-0 sm:max-w-2xl">
+        <SheetHeader className="border-b border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_96%,black),var(--card))]">
           <SheetTitle>{asset?.name ?? 'Asset detail'}</SheetTitle>
           <SheetDescription>
             Inspect operational context, ownership, and type-specific signals without leaving the asset table.
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-6 p-4">
+        <div className="space-y-6 p-5">
           {isLoading ? (
             <div className="space-y-3">
               <SkeletonBlock className="h-24" />
@@ -71,14 +72,14 @@ export function AssetDetailPane({
           ) : null}
 
           {!isLoading && !asset ? (
-            <section className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-6 text-sm text-muted-foreground">
+            <InsetPanel emphasis="subtle" className="border-dashed p-6 text-sm text-muted-foreground">
               Select an asset to inspect.
-            </section>
+            </InsetPanel>
           ) : null}
 
           {!isLoading && asset ? (
             <>
-              <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+              <section className="rounded-2xl border border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_94%,black),var(--card))] p-4 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="space-y-2">
                     <div className="flex flex-wrap gap-2">
@@ -111,12 +112,12 @@ export function AssetDetailPane({
                       ) : null}
                     </div>
                   </div>
-                  <div className="rounded-xl border border-border/70 bg-background px-3 py-2 text-right">
+                  <InsetPanel emphasis="strong" className="px-3 py-2 text-right">
                     <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                       External ID
                     </p>
                     <code className="text-xs">{asset.externalId}</code>
-                  </div>
+                  </InsetPanel>
                 </div>
               </section>
 
@@ -153,7 +154,7 @@ export function AssetDetailPane({
 
               {asset.assetType === 'Device' ? <DeviceActivityTimeline asset={asset} /> : null}
 
-              <section className="rounded-2xl border border-border/70 bg-card p-4">
+              <section className="rounded-2xl border border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_94%,black),var(--card))] p-4">
                 <div className="mb-4 flex items-end justify-between gap-3">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -161,9 +162,9 @@ export function AssetDetailPane({
                     </p>
                     <h3 className="text-lg font-semibold">Linked vulnerabilities</h3>
                   </div>
-                  <div className="rounded-xl bg-muted/40 px-3 py-1 text-sm">
+                  <InsetPanel emphasis="subtle" className="px-3 py-1 text-sm">
                     {asset.vulnerabilities.length} linked
-                  </div>
+                  </InsetPanel>
                 </div>
 
                 {asset.vulnerabilities.length === 0 ? (
@@ -177,7 +178,7 @@ export function AssetDetailPane({
                         key={vulnerability.vulnerabilityId}
                         to="/vulnerabilities/$id"
                         params={{ id: vulnerability.vulnerabilityId }}
-                        className="block rounded-xl border border-border/70 bg-background px-3 py-3 transition hover:border-foreground/20 hover:bg-muted/20"
+                        className="block rounded-xl border border-border/80 bg-muted/55 px-3 py-3 transition hover:border-foreground/20 hover:bg-muted/70"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
