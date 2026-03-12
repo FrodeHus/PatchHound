@@ -216,19 +216,24 @@ public class TenantsControllerTests : IDisposable
             2,
             2,
             0,
+            5,
+            2,
+            10,
+            5,
+            2,
             10,
             12,
             12,
             3,
             1,
             5,
-            5,
             2,
             2,
             1,
             1,
             1,
             1,
+            0,
             0,
             0
         );
@@ -247,17 +252,22 @@ public class TenantsControllerTests : IDisposable
             1,
             1,
             0,
+            2,
+            1,
+            4,
+            2,
+            1,
             4,
             4,
             4,
             1,
             2,
             2,
-            2,
             1,
             1,
             1,
             1,
+            0,
             0,
             0,
             0,
@@ -286,9 +296,205 @@ public class TenantsControllerTests : IDisposable
         payload.Items.Should().HaveCount(2);
         payload.Items[0].Status.Should().Be("FailedRecoverable");
         payload.Items[0].Error.Should().Be("Ingestion failed: TimeoutException");
-        payload.Items[1].FetchedVulnerabilityCount.Should().Be(10);
-        payload.Items[1].FetchedSoftwareCount.Should().Be(2);
-        payload.Items[1].SoftwareWithoutMachineReferencesCount.Should().Be(0);
+        payload.Items[1].StagedVulnerabilityCount.Should().Be(10);
+        payload.Items[1].StagedSoftwareCount.Should().Be(2);
+        payload.Items[1].PersistedMachineCount.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task DeleteRun_RemovesRunAndAssociatedStagedArtifacts()
+    {
+        var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");
+        var source = TenantSourceConfiguration.Create(
+            tenant.Id,
+            "microsoft-defender",
+            "Microsoft Defender",
+            true,
+            "0 */6 * * *",
+            "entra-tenant",
+            "client-id",
+            "secret/ref",
+            "https://api.securitycenter.microsoft.com",
+            "https://api.securitycenter.microsoft.com/.default"
+        );
+        var run = IngestionRun.Start(tenant.Id, source.SourceKey, DateTimeOffset.UtcNow.AddMinutes(-10));
+        run.CompleteFailed(
+            DateTimeOffset.UtcNow.AddMinutes(-9),
+            "Ingestion failed: TimeoutException",
+            IngestionRunStatuses.FailedRecoverable,
+            1,
+            1,
+            1,
+            1,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0
+        );
+
+        await _dbContext.Tenants.AddAsync(tenant);
+        await _dbContext.TenantSourceConfigurations.AddAsync(source);
+        await _dbContext.IngestionRuns.AddAsync(run);
+        var checkpoint = IngestionCheckpoint.Start(
+            run.Id,
+            tenant.Id,
+            source.SourceKey,
+            "asset-staging",
+            DateTimeOffset.UtcNow.AddMinutes(-9)
+        );
+        checkpoint.CommitBatch(
+            2,
+            null,
+            1,
+            "Running",
+            DateTimeOffset.UtcNow.AddMinutes(-9)
+        );
+        await _dbContext.IngestionCheckpoints.AddAsync(checkpoint);
+        await _dbContext.StagedAssets.AddAsync(
+            StagedAsset.Create(
+                run.Id,
+                tenant.Id,
+                source.SourceKey,
+                "asset-1",
+                "host-1",
+                AssetType.Device,
+                "{}",
+                DateTimeOffset.UtcNow.AddMinutes(-10),
+                1
+            )
+        );
+        await _dbContext.StagedVulnerabilities.AddAsync(
+            StagedVulnerability.Create(
+                run.Id,
+                tenant.Id,
+                source.SourceKey,
+                "CVE-2026-0001",
+                "Test vulnerability",
+                Severity.Critical,
+                "{}",
+                DateTimeOffset.UtcNow.AddMinutes(-10),
+                1
+            )
+        );
+        await _dbContext.StagedVulnerabilityExposures.AddAsync(
+            StagedVulnerabilityExposure.Create(
+                run.Id,
+                tenant.Id,
+                source.SourceKey,
+                "CVE-2026-0001",
+                "asset-1",
+                "host-1",
+                AssetType.Device,
+                "{}",
+                DateTimeOffset.UtcNow.AddMinutes(-10),
+                1
+            )
+        );
+        await _dbContext.StagedDeviceSoftwareInstallations.AddAsync(
+            StagedDeviceSoftwareInstallation.Create(
+                run.Id,
+                tenant.Id,
+                source.SourceKey,
+                "asset-1",
+                "software-1",
+                DateTimeOffset.UtcNow.AddMinutes(-10),
+                "{}",
+                DateTimeOffset.UtcNow.AddMinutes(-9),
+                1
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
+        _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
+
+        var action = await _controller.DeleteRun(
+            tenant.Id,
+            source.SourceKey,
+            run.Id,
+            CancellationToken.None
+        );
+
+        action.Should().BeOfType<NoContentResult>();
+        (await _dbContext.IngestionRuns.AnyAsync(item => item.Id == run.Id)).Should().BeFalse();
+        (await _dbContext.IngestionCheckpoints.AnyAsync(item => item.IngestionRunId == run.Id))
+            .Should()
+            .BeFalse();
+        (await _dbContext.StagedAssets.AnyAsync(item => item.IngestionRunId == run.Id)).Should().BeFalse();
+        (await _dbContext.StagedVulnerabilities.AnyAsync(item => item.IngestionRunId == run.Id))
+            .Should()
+            .BeFalse();
+        (
+            await _dbContext.StagedVulnerabilityExposures.AnyAsync(item =>
+                item.IngestionRunId == run.Id
+            )
+        )
+            .Should()
+            .BeFalse();
+        (
+            await _dbContext.StagedDeviceSoftwareInstallations.AnyAsync(item =>
+                item.IngestionRunId == run.Id
+            )
+        )
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
+    public async Task DeleteRun_WhenRunIsActive_ReturnsConflict()
+    {
+        var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");
+        var source = TenantSourceConfiguration.Create(
+            tenant.Id,
+            "microsoft-defender",
+            "Microsoft Defender",
+            true,
+            "0 */6 * * *",
+            "entra-tenant",
+            "client-id",
+            "secret/ref",
+            "https://api.securitycenter.microsoft.com",
+            "https://api.securitycenter.microsoft.com/.default"
+        );
+        var run = IngestionRun.Start(tenant.Id, source.SourceKey, DateTimeOffset.UtcNow.AddMinutes(-2));
+        source.AcquireLease(run.Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(5));
+
+        await _dbContext.Tenants.AddAsync(tenant);
+        await _dbContext.TenantSourceConfigurations.AddAsync(source);
+        await _dbContext.IngestionRuns.AddAsync(run);
+        await _dbContext.SaveChangesAsync();
+
+        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
+        _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
+
+        var action = await _controller.DeleteRun(
+            tenant.Id,
+            source.SourceKey,
+            run.Id,
+            CancellationToken.None
+        );
+
+        var conflict = action.Should().BeOfType<ConflictObjectResult>().Subject;
+        var problem = conflict.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Title.Should().Be("Active ingestion runs cannot be deleted");
+        (await _dbContext.IngestionRuns.AnyAsync(item => item.Id == run.Id)).Should().BeTrue();
     }
 
     public void Dispose()

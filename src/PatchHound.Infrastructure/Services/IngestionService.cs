@@ -101,30 +101,25 @@ public class IngestionService
             var fetchedSoftwareCount = 0;
             var fetchedSoftwareInstallationCount = 0;
             var softwareWithoutMachineReferencesCount = 0;
-            var vulnerabilityMergeSummary = new StagedVulnerabilityMergeSummary(0, 0, 0, 0, 0);
-            var assetMergeSummary = new StagedAssetMergeSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            var vulnerabilityMergeSummary = new StagedVulnerabilityMergeSummary(0, 0, 0, 0, 0, 0);
+            var assetMergeSummary = new StagedAssetMergeSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
             try
             {
                 for (var attempt = 1; attempt <= MaxSourceAttempts; attempt++)
                 {
-                    if (!(acquiredRun.Resumed && attempt == 1))
-                    {
-                        await ClearStagedDataForRunAsync(run.Id, ct);
-                    }
-
-                        await UpdateRuntimeStateAsync(
-                            tenantId,
-                            source.SourceKey,
-                            runtime =>
-                            {
-                                runtime.ManualRequestedAt = null;
-                                runtime.LastStartedAt = DateTimeOffset.UtcNow;
-                                runtime.LastStatus = IngestionRunStatuses.Staging;
-                                runtime.LastError = string.Empty;
-                            },
-                            ct
-                        );
+                    await UpdateRuntimeStateAsync(
+                        tenantId,
+                        source.SourceKey,
+                        runtime =>
+                        {
+                            runtime.ManualRequestedAt = null;
+                            runtime.LastStartedAt = DateTimeOffset.UtcNow;
+                            runtime.LastStatus = IngestionRunStatuses.Staging;
+                            runtime.LastError = string.Empty;
+                        },
+                        ct
+                    );
 
                     try
                     {
@@ -226,11 +221,13 @@ public class IngestionService
                             assetStagingCompleted = true;
                             assetMergeCompleted = true;
                             _logger.LogInformation(
-                                "Asset inventory merge for {Source} tenant {TenantId}: stagedAssets={StagedAssetCount} mergedAssets={MergedAssetCount} stagedSoftwareLinks={StagedSoftwareLinkCount} resolvedSoftwareLinks={ResolvedSoftwareLinkCount} createdInstallations={InstallationsCreated} touchedInstallations={InstallationsTouched} openedEpisodes={EpisodesOpened} seenEpisodes={EpisodesSeen} staleInstallations={StaleInstallationsMarked} removedInstallations={InstallationsRemoved}",
+                                "Asset inventory merge for {Source} tenant {TenantId}: stagedMachines={StagedMachineCount} stagedSoftware={StagedSoftwareCount} persistedMachines={PersistedMachineCount} persistedSoftware={PersistedSoftwareCount} stagedSoftwareLinks={StagedSoftwareLinkCount} resolvedSoftwareLinks={ResolvedSoftwareLinkCount} createdInstallations={InstallationsCreated} touchedInstallations={InstallationsTouched} openedEpisodes={EpisodesOpened} seenEpisodes={EpisodesSeen} staleInstallations={StaleInstallationsMarked} removedInstallations={InstallationsRemoved}",
                                 source.SourceName,
                                 tenantId,
-                                assetMergeSummary.StagedAssetCount,
-                                assetMergeSummary.MergedAssetCount,
+                                assetMergeSummary.StagedMachineCount,
+                                assetMergeSummary.StagedSoftwareCount,
+                                assetMergeSummary.PersistedMachineCount,
+                                assetMergeSummary.PersistedSoftwareCount,
                                 assetMergeSummary.StagedSoftwareLinkCount,
                                 assetMergeSummary.ResolvedSoftwareLinkCount,
                                 assetMergeSummary.InstallationsCreated,
@@ -329,11 +326,13 @@ public class IngestionService
                             assetStagingCompleted = true;
                             assetMergeCompleted = true;
                             _logger.LogInformation(
-                                "Asset inventory merge for {Source} tenant {TenantId}: stagedAssets={StagedAssetCount} mergedAssets={MergedAssetCount} stagedSoftwareLinks={StagedSoftwareLinkCount} resolvedSoftwareLinks={ResolvedSoftwareLinkCount} createdInstallations={InstallationsCreated} touchedInstallations={InstallationsTouched} openedEpisodes={EpisodesOpened} seenEpisodes={EpisodesSeen} staleInstallations={StaleInstallationsMarked} removedInstallations={InstallationsRemoved}",
+                                "Asset inventory merge for {Source} tenant {TenantId}: stagedMachines={StagedMachineCount} stagedSoftware={StagedSoftwareCount} persistedMachines={PersistedMachineCount} persistedSoftware={PersistedSoftwareCount} stagedSoftwareLinks={StagedSoftwareLinkCount} resolvedSoftwareLinks={ResolvedSoftwareLinkCount} createdInstallations={InstallationsCreated} touchedInstallations={InstallationsTouched} openedEpisodes={EpisodesOpened} seenEpisodes={EpisodesSeen} staleInstallations={StaleInstallationsMarked} removedInstallations={InstallationsRemoved}",
                                 source.SourceName,
                                 tenantId,
-                                assetMergeSummary.StagedAssetCount,
-                                assetMergeSummary.MergedAssetCount,
+                                assetMergeSummary.StagedMachineCount,
+                                assetMergeSummary.StagedSoftwareCount,
+                                assetMergeSummary.PersistedMachineCount,
+                                assetMergeSummary.PersistedSoftwareCount,
                                 assetMergeSummary.StagedSoftwareLinkCount,
                                 assetMergeSummary.ResolvedSoftwareLinkCount,
                                 assetMergeSummary.InstallationsCreated,
@@ -564,7 +563,7 @@ public class IngestionService
                             },
                             ct
                         );
-                        await CompleteIngestionRunAsync(
+                            await CompleteIngestionRunAsync(
                             run.Id,
                             tenantId,
                             source.SourceKey,
@@ -917,9 +916,24 @@ public class IngestionService
             TaskCanceledException
                 => "Ingestion failed: an external API request timed out and the run stopped so it can resume from the last committed checkpoint.",
             IngestionTerminalException terminal
-                => $"Ingestion failed: {terminal.Message}",
-            _ => $"Ingestion failed: {ex.GetType().Name}",
+                => $"Ingestion failed: {DescribeTerminalConfigurationFailure(terminal)}",
+            _ => "Ingestion failed: an unexpected error stopped the run. Review worker logs for details.",
         };
+    }
+
+    private static string DescribeTerminalConfigurationFailure(IngestionTerminalException ex)
+    {
+        var message = ex.Message.Trim();
+
+        if (
+            message.Contains("credentials are incomplete", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("could not be resolved", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return "source configuration is incomplete or invalid. Review source credentials and settings before retrying.";
+        }
+
+        return "source configuration is invalid and requires operator action before the run can continue.";
     }
 
     private async Task<AcquiredIngestionRun?> TryAcquireIngestionRunAsync(
@@ -1103,12 +1117,17 @@ public class IngestionService
                         fetchedSoftwareCount,
                         fetchedSoftwareInstallationCount,
                         softwareWithoutMachineReferencesCount,
+                        assetMergeSummary.StagedMachineCount,
+                        assetMergeSummary.StagedSoftwareCount,
                         vulnerabilityMergeSummary.StagedVulnerabilityCount,
+                        assetMergeSummary.PersistedMachineCount,
+                        assetMergeSummary.PersistedSoftwareCount,
+                        vulnerabilityMergeSummary.PersistedVulnerabilityCount,
                         vulnerabilityMergeSummary.StagedExposureCount,
                         vulnerabilityMergeSummary.MergedExposureCount,
                         vulnerabilityMergeSummary.OpenedProjectionCount,
                         vulnerabilityMergeSummary.ResolvedProjectionCount,
-                        assetMergeSummary.StagedAssetCount,
+                        assetMergeSummary.StagedMachineCount + assetMergeSummary.StagedSoftwareCount,
                         assetMergeSummary.MergedAssetCount,
                         assetMergeSummary.StagedSoftwareLinkCount,
                         assetMergeSummary.ResolvedSoftwareLinkCount,
@@ -1131,12 +1150,17 @@ public class IngestionService
                         fetchedSoftwareCount,
                         fetchedSoftwareInstallationCount,
                         softwareWithoutMachineReferencesCount,
+                        assetMergeSummary.StagedMachineCount,
+                        assetMergeSummary.StagedSoftwareCount,
                         vulnerabilityMergeSummary.StagedVulnerabilityCount,
+                        assetMergeSummary.PersistedMachineCount,
+                        assetMergeSummary.PersistedSoftwareCount,
+                        vulnerabilityMergeSummary.PersistedVulnerabilityCount,
                         vulnerabilityMergeSummary.StagedExposureCount,
                         vulnerabilityMergeSummary.MergedExposureCount,
                         vulnerabilityMergeSummary.OpenedProjectionCount,
                         vulnerabilityMergeSummary.ResolvedProjectionCount,
-                        assetMergeSummary.StagedAssetCount,
+                        assetMergeSummary.StagedMachineCount + assetMergeSummary.StagedSoftwareCount,
                         assetMergeSummary.MergedAssetCount,
                         assetMergeSummary.StagedSoftwareLinkCount,
                         assetMergeSummary.ResolvedSoftwareLinkCount,
@@ -1189,8 +1213,28 @@ public class IngestionService
                                     softwareWithoutMachineReferencesCount
                                 )
                                 .SetProperty(
+                                    item => item.StagedMachineCount,
+                                    assetMergeSummary.StagedMachineCount
+                                )
+                                .SetProperty(
+                                    item => item.StagedSoftwareCount,
+                                    assetMergeSummary.StagedSoftwareCount
+                                )
+                                .SetProperty(
                                     item => item.StagedVulnerabilityCount,
                                     vulnerabilityMergeSummary.StagedVulnerabilityCount
+                                )
+                                .SetProperty(
+                                    item => item.PersistedMachineCount,
+                                    assetMergeSummary.PersistedMachineCount
+                                )
+                                .SetProperty(
+                                    item => item.PersistedSoftwareCount,
+                                    assetMergeSummary.PersistedSoftwareCount
+                                )
+                                .SetProperty(
+                                    item => item.PersistedVulnerabilityCount,
+                                    vulnerabilityMergeSummary.PersistedVulnerabilityCount
                                 )
                                 .SetProperty(
                                     item => item.StagedExposureCount,
@@ -1210,7 +1254,7 @@ public class IngestionService
                                 )
                                 .SetProperty(
                                     item => item.StagedAssetCount,
-                                    assetMergeSummary.StagedAssetCount
+                                    assetMergeSummary.StagedMachineCount + assetMergeSummary.StagedSoftwareCount
                                 )
                                 .SetProperty(
                                     item => item.MergedAssetCount,
@@ -1274,8 +1318,28 @@ public class IngestionService
                                     softwareWithoutMachineReferencesCount
                                 )
                                 .SetProperty(
+                                    item => item.StagedMachineCount,
+                                    assetMergeSummary.StagedMachineCount
+                                )
+                                .SetProperty(
+                                    item => item.StagedSoftwareCount,
+                                    assetMergeSummary.StagedSoftwareCount
+                                )
+                                .SetProperty(
                                     item => item.StagedVulnerabilityCount,
                                     vulnerabilityMergeSummary.StagedVulnerabilityCount
+                                )
+                                .SetProperty(
+                                    item => item.PersistedMachineCount,
+                                    assetMergeSummary.PersistedMachineCount
+                                )
+                                .SetProperty(
+                                    item => item.PersistedSoftwareCount,
+                                    assetMergeSummary.PersistedSoftwareCount
+                                )
+                                .SetProperty(
+                                    item => item.PersistedVulnerabilityCount,
+                                    vulnerabilityMergeSummary.PersistedVulnerabilityCount
                                 )
                                 .SetProperty(
                                     item => item.StagedExposureCount,
@@ -1295,7 +1359,7 @@ public class IngestionService
                                 )
                                 .SetProperty(
                                     item => item.StagedAssetCount,
-                                    assetMergeSummary.StagedAssetCount
+                                    assetMergeSummary.StagedMachineCount + assetMergeSummary.StagedSoftwareCount
                                 )
                                 .SetProperty(
                                     item => item.MergedAssetCount,

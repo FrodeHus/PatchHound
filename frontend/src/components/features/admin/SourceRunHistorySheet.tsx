@@ -1,12 +1,24 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
-import { RotateCw } from 'lucide-react'
-import { fetchTenantIngestionRuns, triggerTenantIngestionSync } from '@/api/settings.functions'
+import { RotateCw, Trash2 } from 'lucide-react'
+import {
+  deleteTenantIngestionRun,
+  fetchTenantIngestionRuns,
+  triggerTenantIngestionSync,
+} from '@/api/settings.functions'
 import type { TenantIngestionRun } from '@/api/settings.schemas'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import { DataTableActiveFilters } from '@/components/ui/data-table-workbench'
 import { cn } from '@/lib/utils'
@@ -33,6 +45,7 @@ export function SourceRunHistoryView({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [filter, setFilter] = useState<RunFilter>('all')
+  const [runPendingDelete, setRunPendingDelete] = useState<TenantIngestionRun | null>(null)
   const runsQuery = useQuery({
     queryKey: ['tenant-ingestion-runs', tenantId, sourceKey, page, pageSize],
     enabled: true,
@@ -59,6 +72,21 @@ export function SourceRunHistoryView({
       await router.invalidate()
     },
   })
+  const deleteMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      await deleteTenantIngestionRun({
+        data: {
+          tenantId,
+          sourceKey,
+          runId,
+        },
+      })
+    },
+    onSuccess: async () => {
+      setRunPendingDelete(null)
+      await router.invalidate()
+    },
+  })
 
   const data = runsQuery.data
   const runs = data?.items ?? []
@@ -68,7 +96,6 @@ export function SourceRunHistoryView({
   const runningRuns = runs.filter((run) => getRunTone(run.status) === 'warning').length
   const recoverableFailedRuns = runs.filter((run) => getRunCategory(run.status) === 'failed-recoverable').length
   const terminalFailedRuns = runs.filter((run) => getRunCategory(run.status) === 'failed-terminal').length
-  const successRate = runs.length ? Math.round((succeededRuns / runs.length) * 100) : 0
   const activeFilters: RunActiveFilter[] =
     filter === 'all'
       ? []
@@ -91,14 +118,14 @@ export function SourceRunHistoryView({
 
       {data ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard
-            label="Page Success Rate"
-            value={`${successRate}%`}
-            tone={successRate >= 80 ? 'success' : successRate >= 50 ? 'warning' : 'error'}
-          />
           <SummaryCard label="Succeeded" value={String(succeededRuns)} tone="success" />
           <SummaryCard label="Failed" value={String(failedRuns)} tone={failedRuns > 0 ? 'error' : 'neutral'} />
           <SummaryCard label="Active" value={String(runningRuns)} tone={runningRuns > 0 ? 'warning' : 'neutral'} />
+          <SummaryCard
+            label="Recoverable Failed"
+            value={String(recoverableFailedRuns)}
+            tone={recoverableFailedRuns > 0 ? 'warning' : 'neutral'}
+          />
         </div>
       ) : null}
 
@@ -146,15 +173,18 @@ export function SourceRunHistoryView({
 
       {data?.items.length ? (
           <div className="space-y-3">
-            {filteredRuns.map((run) => (
-              <RunHistoryCard
-                key={run.id}
-                run={run}
-                canResume={getRunCategory(run.status) === 'failed-recoverable'}
-                isResuming={resumeMutation.isPending}
-                onResume={() => resumeMutation.mutate()}
-              />
-            ))}
+          {filteredRuns.map((run) => (
+            <RunHistoryCard
+              key={run.id}
+              run={run}
+              canResume={getRunCategory(run.status) === 'failed-recoverable'}
+              canDelete={getRunCategory(run.status) !== 'active'}
+              isResuming={resumeMutation.isPending}
+              isDeleting={deleteMutation.isPending && runPendingDelete?.id === run.id}
+              onResume={() => resumeMutation.mutate()}
+              onDelete={() => setRunPendingDelete(run)}
+            />
+          ))}
             <PaginationControls
               page={data.page}
             pageSize={data.pageSize}
@@ -176,6 +206,55 @@ export function SourceRunHistoryView({
             : 'No runs on this page match the selected status filter.'}
         </InsetPanel>
       ) : null}
+
+      <Dialog open={runPendingDelete !== null} onOpenChange={(open) => {
+        if (!open && !deleteMutation.isPending) {
+          setRunPendingDelete(null)
+        }
+      }}>
+        <DialogContent className="w-full max-w-lg rounded-2xl border-border/80 bg-card p-0 sm:max-w-lg">
+          <DialogHeader className="border-b border-border/60 px-6 py-5">
+            <DialogTitle>Delete ingestion run</DialogTitle>
+            <DialogDescription>
+              This removes the selected run and all staged data associated with it. Use this to clean out a faulty
+              ingestion before starting again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 px-6 py-5 text-sm text-muted-foreground">
+            <p>
+              <span className="font-medium text-foreground">Run:</span>{' '}
+              {runPendingDelete ? `${runPendingDelete.status} · ${formatTimestamp(runPendingDelete.startedAt)}` : '—'}
+            </p>
+            <p>
+              Staged machines: {runPendingDelete?.stagedMachineCount ?? 0} · staged vulnerabilities:{' '}
+              {runPendingDelete?.stagedVulnerabilityCount ?? 0} · staged software:{' '}
+              {runPendingDelete?.stagedSoftwareCount ?? 0}
+            </p>
+          </div>
+          <DialogFooter className="border-t border-border/60 bg-card px-6 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deleteMutation.isPending}
+              onClick={() => setRunPendingDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!runPendingDelete || deleteMutation.isPending}
+              onClick={() => {
+                if (runPendingDelete) {
+                  deleteMutation.mutate(runPendingDelete.id)
+                }
+              }}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete run'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -229,13 +308,19 @@ function SummaryCard({
 function RunHistoryCard({
   run,
   canResume,
+  canDelete,
   isResuming,
+  isDeleting,
   onResume,
+  onDelete,
 }: {
   run: TenantIngestionRun
   canResume: boolean
+  canDelete: boolean
   isResuming: boolean
+  isDeleting: boolean
   onResume: () => void
+  onDelete: () => void
 }) {
   const tone = getRunTone(run.status)
 
@@ -254,6 +339,11 @@ function RunHistoryCard({
           >
             {run.status}
           </Badge>
+          {run.latestPhase ? (
+            <Badge variant="outline" className="rounded-full border-border/70 bg-muted/60 text-muted-foreground">
+              {formatPhase(run.latestPhase)}
+            </Badge>
+          ) : null}
           <span className="text-muted-foreground">Started {formatTimestamp(run.startedAt)}</span>
           <span className="text-muted-foreground">Completed {formatTimestamp(run.completedAt)}</span>
         </div>
@@ -264,50 +354,23 @@ function RunHistoryCard({
               {isResuming ? 'Resuming...' : 'Resume ingestion'}
             </Button>
           ) : null}
+          {canDelete ? (
+            <Button type="button" size="sm" variant="outline" disabled={isDeleting} onClick={onDelete}>
+              <Trash2 className="size-4" />
+              {isDeleting ? 'Deleting...' : 'Delete run'}
+            </Button>
+          ) : null}
           <span className="text-xs text-muted-foreground">{run.id}</span>
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <RunSummaryMetric label="Latest phase" value={formatPhase(run.latestPhase)} />
-        <RunSummaryMetric
-          label="Latest batch"
-          value={run.latestBatchNumber !== null ? String(run.latestBatchNumber) : '—'}
-        />
-        <RunSummaryMetric
-          label="Checkpoint"
-          value={
-            run.latestCheckpointStatus
-              ? `${run.latestCheckpointStatus} · ${run.latestRecordsCommitted ?? 0} rows`
-              : '—'
-          }
-        />
-      </div>
-
-      <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3 lg:grid-cols-4">
-        <RunMetric label="Fetched Vulns" value={run.fetchedVulnerabilityCount} />
-        <RunMetric label="Fetched Assets" value={run.fetchedAssetCount} />
-        <RunMetric label="Software Retrieved" value={run.fetchedSoftwareCount} />
-        <RunMetric label="Fetched SW Links" value={run.fetchedSoftwareInstallationCount} />
-        <RunMetric
-          label="Missing Machine Refs"
-          value={run.softwareWithoutMachineReferencesCount}
-        />
-        <RunMetric label="Staged Vulns" value={run.stagedVulnerabilityCount} />
-        <RunMetric label="Staged Exposures" value={run.stagedExposureCount} />
-        <RunMetric label="Merged Exposures" value={run.mergedExposureCount} />
-        <RunMetric label="Opened Projections" value={run.openedProjectionCount} />
-        <RunMetric label="Resolved Projections" value={run.resolvedProjectionCount} />
-        <RunMetric label="Staged Assets" value={run.stagedAssetCount} />
-        <RunMetric label="Merged Assets" value={run.mergedAssetCount} />
-        <RunMetric label="Staged SW Links" value={run.stagedSoftwareLinkCount} />
-        <RunMetric label="Resolved SW Links" value={run.resolvedSoftwareLinkCount} />
-        <RunMetric label="Installs Created" value={run.installationsCreated} />
-        <RunMetric label="Installs Touched" value={run.installationsTouched} />
-        <RunMetric label="Episodes Opened" value={run.installationEpisodesOpened} />
-        <RunMetric label="Episodes Seen" value={run.installationEpisodesSeen} />
-        <RunMetric label="Stale Installs" value={run.staleInstallationsMarked} />
-        <RunMetric label="Installs Removed" value={run.installationsRemoved} />
+      <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-3">
+        <RunMetric label="Staged machines" value={run.stagedMachineCount} />
+        <RunMetric label="Staged vulnerabilities" value={run.stagedVulnerabilityCount} />
+        <RunMetric label="Staged software" value={run.stagedSoftwareCount} />
+        <RunMetric label="Persisted machines" value={run.persistedMachineCount} />
+        <RunMetric label="Persisted vulnerabilities" value={run.persistedVulnerabilityCount} />
+        <RunMetric label="Persisted software" value={run.persistedSoftwareCount} />
       </div>
 
       {run.error ? <p className="mt-3 text-xs text-destructive">Error: {run.error}</p> : null}
@@ -389,15 +452,6 @@ function RunMetric({ label, value }: { label: string; value: number }) {
   )
 }
 
-function RunSummaryMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border/60 bg-background/35 px-3 py-2">
-      <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
-    </div>
-  )
-}
-
 function formatTimestamp(value: string | null) {
   if (!value) {
     return 'Never'
@@ -414,11 +468,7 @@ function formatTimestamp(value: string | null) {
   }).format(date)
 }
 
-function formatPhase(value: string | null) {
-  if (!value) {
-    return '—'
-  }
-
+function formatPhase(value: string) {
   return value
     .split('-')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))

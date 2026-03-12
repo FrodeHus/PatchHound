@@ -728,7 +728,7 @@ function describeSourceActivity(source: TenantIngestionSourceDraft) {
       title,
       description: `Lease active until ${formatTimestamp(source.runtime.leaseExpiresAt)}. Latest checkpoint ${formatTimestamp(source.runtime.activeCheckpointCommittedAt)}.`,
       metricsSummary: latestRun
-        ? `${latestRun.fetchedSoftwareCount} software retrieved · ${latestRun.softwareWithoutMachineReferencesCount} missing machine references`
+        ? `${latestRun.stagedSoftwareCount} staged software · ${latestRun.persistedSoftwareCount} persisted software`
         : null,
       phase: formatPhase(source.runtime.activePhase),
       batch:
@@ -758,7 +758,7 @@ function describeSourceActivity(source: TenantIngestionSourceDraft) {
           : latestRunStatus === 'failedterminal'
             ? 'This run requires operator action before retrying, but failed staged data will still be discarded after 24 hours.'
             : 'Failed staged snapshots are retained for up to 24 hours before they are discarded.',
-      metricsSummary: `${latestRun.fetchedSoftwareCount} software retrieved · ${latestRun.softwareWithoutMachineReferencesCount} missing machine references`,
+      metricsSummary: `${latestRun.stagedSoftwareCount} staged software · ${latestRun.persistedSoftwareCount} persisted software`,
       phase: formatPhase(latestRun.latestPhase),
       batch:
         latestRun.latestBatchNumber !== null ? String(latestRun.latestBatchNumber) : '—',
@@ -770,7 +770,7 @@ function describeSourceActivity(source: TenantIngestionSourceDraft) {
     title: 'Idle',
     description: `Last completed ${formatTimestamp(source.runtime.lastCompletedAt)}.`,
     metricsSummary: latestRun
-      ? `${latestRun.fetchedSoftwareCount} software retrieved · ${latestRun.softwareWithoutMachineReferencesCount} missing machine references`
+      ? `${latestRun.stagedSoftwareCount} staged software · ${latestRun.persistedSoftwareCount} persisted software`
       : null,
     phase: 'Ready',
     batch: '—',

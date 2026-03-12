@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
-import { apiGet, apiPost, apiPut } from '@/server/api'
+import { apiDelete, apiGet, apiPost, apiPut } from '@/server/api'
 import {
   pagedTenantIngestionRunSchema,
   pagedTenantSchema,
@@ -98,4 +98,15 @@ export const fetchTenantIngestionRuns = createServerFn({ method: 'GET' })
       context,
     )
     return pagedTenantIngestionRunSchema.parse(data)
+  })
+
+export const deleteTenantIngestionRun = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({
+    tenantId: z.string(),
+    sourceKey: z.string(),
+    runId: z.string().uuid(),
+  }))
+  .handler(async ({ context, data: { tenantId, sourceKey, runId } }) => {
+    await apiDelete(`/tenants/${tenantId}/ingestion-sources/${sourceKey}/runs/${runId}`, context)
   })

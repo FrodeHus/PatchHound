@@ -455,26 +455,12 @@ public class TenantsController : ControllerBase
                 run.StartedAt,
                 run.CompletedAt,
                 run.Status,
-                run.FetchedVulnerabilityCount,
-                run.FetchedAssetCount,
-                run.FetchedSoftwareCount,
-                run.FetchedSoftwareInstallationCount,
-                run.SoftwareWithoutMachineReferencesCount,
+                run.StagedMachineCount,
                 run.StagedVulnerabilityCount,
-                run.StagedExposureCount,
-                run.MergedExposureCount,
-                run.OpenedProjectionCount,
-                run.ResolvedProjectionCount,
-                run.StagedAssetCount,
-                run.MergedAssetCount,
-                run.StagedSoftwareLinkCount,
-                run.ResolvedSoftwareLinkCount,
-                run.InstallationsCreated,
-                run.InstallationsTouched,
-                run.InstallationEpisodesOpened,
-                run.InstallationEpisodesSeen,
-                run.StaleInstallationsMarked,
-                run.InstallationsRemoved,
+                run.StagedSoftwareCount,
+                run.PersistedMachineCount,
+                run.PersistedVulnerabilityCount,
+                run.PersistedSoftwareCount,
                 run.Error,
                 checkpointsByRunId.GetValueOrDefault(run.Id)?.Phase,
                 checkpointsByRunId.GetValueOrDefault(run.Id)?.BatchNumber,
@@ -492,6 +478,89 @@ public class TenantsController : ControllerBase
                 pagination.BoundedPageSize
             )
         );
+    }
+
+    [HttpDelete("{id:guid}/ingestion-sources/{sourceKey}/runs/{runId:guid}")]
+    [Authorize(Policy = Policies.ConfigureTenant)]
+    public async Task<IActionResult> DeleteRun(
+        Guid id,
+        string sourceKey,
+        Guid runId,
+        CancellationToken ct
+    )
+    {
+        if (!_tenantContext.HasAccessToTenant(id))
+            return Forbid();
+
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (tenant is null)
+            return NotFound();
+
+        var source = await _dbContext.TenantSourceConfigurations.FirstOrDefaultAsync(
+            item => item.TenantId == id && item.SourceKey == normalizedSourceKey,
+            ct
+        );
+
+        if (source is null)
+            return NotFound(new ProblemDetails { Title = "Ingestion source not found" });
+
+        var run = await _dbContext.IngestionRuns.FirstOrDefaultAsync(
+            item => item.Id == runId && item.TenantId == id && item.SourceKey == normalizedSourceKey,
+            ct
+        );
+
+        if (run is null)
+            return NotFound(new ProblemDetails { Title = "Ingestion run not found" });
+
+        var isActiveRun =
+            source.ActiveIngestionRunId == runId
+            || (
+                run.CompletedAt is null
+                && (
+                    run.Status == IngestionRunStatuses.Staging
+                    || run.Status == IngestionRunStatuses.MergePending
+                    || run.Status == IngestionRunStatuses.Merging
+                )
+            );
+
+        if (isActiveRun)
+        {
+            return Conflict(
+                new ProblemDetails
+                {
+                    Title = "Active ingestion runs cannot be deleted",
+                    Detail = "Wait for the run to finish or fail before deleting it.",
+                }
+            );
+        }
+
+        var checkpoints = await _dbContext
+            .IngestionCheckpoints.Where(item => item.IngestionRunId == runId)
+            .ToListAsync(ct);
+        var stagedVulnerabilities = await _dbContext
+            .StagedVulnerabilities.Where(item => item.IngestionRunId == runId)
+            .ToListAsync(ct);
+        var stagedVulnerabilityExposures = await _dbContext
+            .StagedVulnerabilityExposures.Where(item => item.IngestionRunId == runId)
+            .ToListAsync(ct);
+        var stagedAssets = await _dbContext
+            .StagedAssets.Where(item => item.IngestionRunId == runId)
+            .ToListAsync(ct);
+        var stagedInstallations = await _dbContext
+            .StagedDeviceSoftwareInstallations.Where(item => item.IngestionRunId == runId)
+            .ToListAsync(ct);
+
+        _dbContext.IngestionCheckpoints.RemoveRange(checkpoints);
+        _dbContext.StagedVulnerabilities.RemoveRange(stagedVulnerabilities);
+        _dbContext.StagedVulnerabilityExposures.RemoveRange(stagedVulnerabilityExposures);
+        _dbContext.StagedAssets.RemoveRange(stagedAssets);
+        _dbContext.StagedDeviceSoftwareInstallations.RemoveRange(stagedInstallations);
+        _dbContext.IngestionRuns.Remove(run);
+
+        await _dbContext.SaveChangesAsync(ct);
+
+        return NoContent();
     }
 
     private static TenantIngestionSourceDto MapSourceDto(
@@ -631,26 +700,12 @@ public class TenantsController : ControllerBase
                                 run.StartedAt,
                                 run.CompletedAt,
                                 run.Status,
-                                run.FetchedVulnerabilityCount,
-                                run.FetchedAssetCount,
-                                run.FetchedSoftwareCount,
-                                run.FetchedSoftwareInstallationCount,
-                                run.SoftwareWithoutMachineReferencesCount,
+                                run.StagedMachineCount,
                                 run.StagedVulnerabilityCount,
-                                run.StagedExposureCount,
-                                run.MergedExposureCount,
-                                run.OpenedProjectionCount,
-                                run.ResolvedProjectionCount,
-                                run.StagedAssetCount,
-                                run.MergedAssetCount,
-                                run.StagedSoftwareLinkCount,
-                                run.ResolvedSoftwareLinkCount,
-                                run.InstallationsCreated,
-                                run.InstallationsTouched,
-                                run.InstallationEpisodesOpened,
-                                run.InstallationEpisodesSeen,
-                                run.StaleInstallationsMarked,
-                                run.InstallationsRemoved,
+                                run.StagedSoftwareCount,
+                                run.PersistedMachineCount,
+                                run.PersistedVulnerabilityCount,
+                                run.PersistedSoftwareCount,
                                 run.Error,
                                 latestCheckpointsByRunId.GetValueOrDefault(run.Id)?.Phase,
                                 latestCheckpointsByRunId.GetValueOrDefault(run.Id)?.BatchNumber,

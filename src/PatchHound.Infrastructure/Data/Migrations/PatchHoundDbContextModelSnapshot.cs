@@ -736,6 +736,15 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<int>("OpenedProjectionCount")
                         .HasColumnType("integer");
 
+                    b.Property<int>("PersistedMachineCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PersistedSoftwareCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PersistedVulnerabilityCount")
+                        .HasColumnType("integer");
+
                     b.Property<int>("ResolvedProjectionCount")
                         .HasColumnType("integer");
 
@@ -753,7 +762,13 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<int>("StagedExposureCount")
                         .HasColumnType("integer");
 
+                    b.Property<int>("StagedMachineCount")
+                        .HasColumnType("integer");
+
                     b.Property<int>("StagedSoftwareLinkCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StagedSoftwareCount")
                         .HasColumnType("integer");
 
                     b.Property<int>("StagedVulnerabilityCount")

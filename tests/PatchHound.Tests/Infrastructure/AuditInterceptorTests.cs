@@ -108,6 +108,45 @@ public class AuditInterceptorTests : IDisposable
         auditEntries[0].EntityType.Should().Be("Tenant");
     }
 
+    [Fact]
+    public async Task DeletingIngestionCleanupEntities_DoesNotCreateAuditEntries()
+    {
+        var run = IngestionRun.Start(_tenantId, "test-source", DateTimeOffset.UtcNow);
+        var checkpoint = IngestionCheckpoint.Start(
+            run.Id,
+            _tenantId,
+            "test-source",
+            "asset-staging",
+            DateTimeOffset.UtcNow
+        );
+        var stagedAsset = StagedAsset.Create(
+            run.Id,
+            _tenantId,
+            "test-source",
+            "device-1",
+            "Device 1",
+            AssetType.Device,
+            "{}",
+            DateTimeOffset.UtcNow
+        );
+
+        _dbContext.IngestionRuns.Add(run);
+        _dbContext.IngestionCheckpoints.Add(checkpoint);
+        _dbContext.StagedAssets.Add(stagedAsset);
+        await _dbContext.SaveChangesAsync();
+
+        _dbContext.AuditLogEntries.RemoveRange(_dbContext.AuditLogEntries.IgnoreQueryFilters());
+        await _dbContext.SaveChangesAsync();
+
+        _dbContext.IngestionRuns.Remove(run);
+        _dbContext.IngestionCheckpoints.Remove(checkpoint);
+        _dbContext.StagedAssets.Remove(stagedAsset);
+        await _dbContext.SaveChangesAsync();
+
+        var auditEntries = await _dbContext.AuditLogEntries.IgnoreQueryFilters().ToListAsync();
+        auditEntries.Should().BeEmpty();
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();
