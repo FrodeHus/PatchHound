@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { z } from 'zod'
 import { fetchAuditLog } from '@/api/audit-log.functions'
 import { fetchTenantDetail } from '@/api/settings.functions'
 import { RecentAuditPanel } from '@/components/features/audit/RecentAuditPanel'
@@ -14,13 +14,20 @@ import { fetchEnrichmentSources } from '@/server/system.functions'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/_authed/admin/sources')({
+  validateSearch: z.object({
+    activeView: z.enum(['tenant', 'global-enrichment']).optional(),
+    mode: z.enum(['edit']).optional(),
+    sourceKey: z.string().optional(),
+  }),
   component: SourcesAdministrationPage,
 })
 
 function SourcesAdministrationPage() {
+  const navigate = Route.useNavigate()
+  const search = Route.useSearch()
   const { user } = Route.useRouteContext()
   const { selectedTenantId, tenants } = useTenantScope()
-  const [activeView, setActiveView] = useState<'tenant' | 'global-enrichment'>('tenant')
+  const activeView = search.activeView ?? 'tenant'
   const canManageEnrichment = hasGlobalEnrichmentAccess(user.roles)
   const tenantQuery = useQuery({
     queryKey: ['tenant-detail', selectedTenantId],
@@ -78,14 +85,28 @@ function SourcesAdministrationPage() {
           <button
             type="button"
             className={viewToggleClassName(activeView === "tenant")}
-            onClick={() => setActiveView("tenant")}
+            onClick={() => {
+              void navigate({
+                to: '/admin/sources',
+                search: {
+                  activeView: 'tenant',
+                },
+              })
+            }}
           >
             Tenant Sources
           </button>
           <button
             type="button"
             className={viewToggleClassName(activeView === "global-enrichment")}
-            onClick={() => setActiveView("global-enrichment")}
+            onClick={() => {
+              void navigate({
+                to: '/admin/sources',
+                search: {
+                  activeView: 'global-enrichment',
+                },
+              })
+            }}
           >
             Global Enrichment
           </button>
@@ -180,7 +201,29 @@ function SourcesAdministrationPage() {
       ) : null}
 
       {activeView === "tenant" && tenant ? (
-        <TenantSourceManagement key={tenant.id} tenant={tenant} />
+        <TenantSourceManagement
+          key={tenant.id}
+          tenant={tenant}
+          editingSourceKey={search.mode === 'edit' ? search.sourceKey ?? null : null}
+          onEditSource={(sourceKey) => {
+            void navigate({
+              to: '/admin/sources',
+              search: {
+                activeView: 'tenant',
+                mode: 'edit',
+                sourceKey,
+              },
+            })
+          }}
+          onCloseEditor={() => {
+            void navigate({
+              to: '/admin/sources',
+              search: {
+                activeView: 'tenant',
+              },
+            })
+          }}
+        />
       ) : null}
 
       {activeView === "tenant" && tenant && canViewAudit ? (

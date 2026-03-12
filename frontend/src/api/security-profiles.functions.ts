@@ -30,9 +30,17 @@ export const createSecurityProfile = createServerFn({ method: 'POST' })
       confidentialityRequirement: z.string(),
       integrityRequirement: z.string(),
       availabilityRequirement: z.string(),
+      modifiedAttackVector: z.string(),
+      modifiedAttackComplexity: z.string(),
+      modifiedPrivilegesRequired: z.string(),
+      modifiedUserInteraction: z.string(),
+      modifiedScope: z.string(),
+      modifiedConfidentialityImpact: z.string(),
+      modifiedIntegrityImpact: z.string(),
+      modifiedAvailabilityImpact: z.string(),
     }),
   )
-  .handler(async ({ context, data: { name, description, environmentClass, internetReachability, confidentialityRequirement, integrityRequirement, availabilityRequirement } }) => {
+  .handler(async ({ context, data: { name, description, environmentClass, internetReachability, confidentialityRequirement, integrityRequirement, availabilityRequirement, modifiedAttackVector, modifiedAttackComplexity, modifiedPrivilegesRequired, modifiedUserInteraction, modifiedScope, modifiedConfidentialityImpact, modifiedIntegrityImpact, modifiedAvailabilityImpact } }) => {
     await apiPost('/security-profiles', context, {
       name,
       description,
@@ -41,6 +49,14 @@ export const createSecurityProfile = createServerFn({ method: 'POST' })
       confidentialityRequirement,
       integrityRequirement,
       availabilityRequirement,
+      modifiedAttackVector,
+      modifiedAttackComplexity,
+      modifiedPrivilegesRequired,
+      modifiedUserInteraction,
+      modifiedScope,
+      modifiedConfidentialityImpact,
+      modifiedIntegrityImpact,
+      modifiedAvailabilityImpact,
     })
   })
 
@@ -56,9 +72,17 @@ export const updateSecurityProfile = createServerFn({ method: 'POST' })
       confidentialityRequirement: z.string(),
       integrityRequirement: z.string(),
       availabilityRequirement: z.string(),
+      modifiedAttackVector: z.string(),
+      modifiedAttackComplexity: z.string(),
+      modifiedPrivilegesRequired: z.string(),
+      modifiedUserInteraction: z.string(),
+      modifiedScope: z.string(),
+      modifiedConfidentialityImpact: z.string(),
+      modifiedIntegrityImpact: z.string(),
+      modifiedAvailabilityImpact: z.string(),
     }),
   )
-  .handler(async ({ context, data: { id, name, description, environmentClass, internetReachability, confidentialityRequirement, integrityRequirement, availabilityRequirement } }) => {
+  .handler(async ({ context, data: { id, name, description, environmentClass, internetReachability, confidentialityRequirement, integrityRequirement, availabilityRequirement, modifiedAttackVector, modifiedAttackComplexity, modifiedPrivilegesRequired, modifiedUserInteraction, modifiedScope, modifiedConfidentialityImpact, modifiedIntegrityImpact, modifiedAvailabilityImpact } }) => {
     await apiPut(`/security-profiles/${id}`, context, {
       name,
       description,
@@ -67,5 +91,13 @@ export const updateSecurityProfile = createServerFn({ method: 'POST' })
       confidentialityRequirement,
       integrityRequirement,
       availabilityRequirement,
+      modifiedAttackVector,
+      modifiedAttackComplexity,
+      modifiedPrivilegesRequired,
+      modifiedUserInteraction,
+      modifiedScope,
+      modifiedConfidentialityImpact,
+      modifiedIntegrityImpact,
+      modifiedAvailabilityImpact,
     })
   })

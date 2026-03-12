@@ -35,5 +35,37 @@ public class AssetSecurityProfileConfiguration : IEntityTypeConfiguration<AssetS
             .Property(profile => profile.AvailabilityRequirement)
             .HasConversion<string>()
             .HasMaxLength(32);
+        builder
+            .Property(profile => profile.ModifiedAttackVector)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder
+            .Property(profile => profile.ModifiedAttackComplexity)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder
+            .Property(profile => profile.ModifiedPrivilegesRequired)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder
+            .Property(profile => profile.ModifiedUserInteraction)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder
+            .Property(profile => profile.ModifiedScope)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder
+            .Property(profile => profile.ModifiedConfidentialityImpact)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder
+            .Property(profile => profile.ModifiedIntegrityImpact)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder
+            .Property(profile => profile.ModifiedAvailabilityImpact)
+            .HasConversion<string>()
+            .HasMaxLength(32);
     }
 }

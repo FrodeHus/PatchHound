@@ -15,6 +15,12 @@ export const securityProfileInternetReachabilityOptions = [
 ] as const
 
 export const securityProfileRequirementOptions = ['Low', 'Medium', 'High'] as const
+export const securityProfileModifiedAttackVectorOptions = ['NotDefined', 'Network', 'Adjacent', 'Local', 'Physical'] as const
+export const securityProfileModifiedAttackComplexityOptions = ['NotDefined', 'Low', 'High'] as const
+export const securityProfileModifiedPrivilegesRequiredOptions = ['NotDefined', 'None', 'Low', 'High'] as const
+export const securityProfileModifiedUserInteractionOptions = ['NotDefined', 'None', 'Required'] as const
+export const securityProfileModifiedScopeOptions = ['NotDefined', 'Unchanged', 'Changed'] as const
+export const securityProfileModifiedImpactOptions = ['NotDefined', 'None', 'Low', 'High'] as const
 
 export const securityProfileFieldGuidance = {
   environmentClass: {
@@ -36,6 +42,38 @@ export const securityProfileFieldGuidance = {
   availabilityRequirement: {
     label: 'Availability Requirement',
     description: 'Raise this when uptime matters. Higher values increase the impact of denial-of-service or outage-causing vulnerabilities.',
+  },
+  modifiedAttackVector: {
+    label: 'Modified Attack Vector',
+    description: 'Authoritative environmental override for how reachable exploitation is in this environment.',
+  },
+  modifiedAttackComplexity: {
+    label: 'Modified Attack Complexity',
+    description: 'Override exploit preconditions when this environment materially changes the difficulty of exploitation.',
+  },
+  modifiedPrivilegesRequired: {
+    label: 'Modified Privileges Required',
+    description: 'Override how much privilege is realistically required in this environment.',
+  },
+  modifiedUserInteraction: {
+    label: 'Modified User Interaction',
+    description: 'Override whether another user action is still required in this environment.',
+  },
+  modifiedScope: {
+    label: 'Modified Scope',
+    description: 'Override whether exploitation can still cross security boundaries in this environment.',
+  },
+  modifiedConfidentialityImpact: {
+    label: 'Modified Confidentiality Impact',
+    description: 'Authoritative environmental override for confidentiality impact.',
+  },
+  modifiedIntegrityImpact: {
+    label: 'Modified Integrity Impact',
+    description: 'Authoritative environmental override for integrity impact.',
+  },
+  modifiedAvailabilityImpact: {
+    label: 'Modified Availability Impact',
+    description: 'Authoritative environmental override for availability impact.',
   },
 } as const
 
@@ -59,4 +97,44 @@ export const securityProfileEnvironmentHelp: Record<(typeof securityProfileEnvir
   Lab: 'Test or isolated environment where some impact dimensions may be lower.',
   Kiosk: 'Locked-down interactive endpoint with constrained user behavior.',
   OT: 'Operational technology or production control environment where availability often matters more.',
+}
+
+export const securityProfileModifiedAttackVectorHelp: Record<(typeof securityProfileModifiedAttackVectorOptions)[number], string> = {
+  NotDefined: 'Use the vendor CVSS attack vector as-is.',
+  Network: 'Treat exploitation as possible over the network.',
+  Adjacent: 'Treat exploitation as limited to adjacent network conditions.',
+  Local: 'Treat exploitation as requiring local or logged-in access.',
+  Physical: 'Treat exploitation as requiring physical access.',
+}
+
+export const securityProfileModifiedAttackComplexityHelp: Record<(typeof securityProfileModifiedAttackComplexityOptions)[number], string> = {
+  NotDefined: 'Use the vendor CVSS attack complexity as-is.',
+  Low: 'Treat exploitation as requiring no uncommon conditions.',
+  High: 'Treat exploitation as dependent on difficult or uncommon conditions.',
+}
+
+export const securityProfileModifiedPrivilegesRequiredHelp: Record<(typeof securityProfileModifiedPrivilegesRequiredOptions)[number], string> = {
+  NotDefined: 'Use the vendor CVSS privileges-required metric as-is.',
+  None: 'Treat exploitation as requiring no prior privileges.',
+  Low: 'Treat exploitation as requiring basic privileges.',
+  High: 'Treat exploitation as requiring elevated privileges.',
+}
+
+export const securityProfileModifiedUserInteractionHelp: Record<(typeof securityProfileModifiedUserInteractionOptions)[number], string> = {
+  NotDefined: 'Use the vendor CVSS user-interaction metric as-is.',
+  None: 'Treat exploitation as requiring no user interaction.',
+  Required: 'Treat exploitation as still requiring another user action.',
+}
+
+export const securityProfileModifiedScopeHelp: Record<(typeof securityProfileModifiedScopeOptions)[number], string> = {
+  NotDefined: 'Use the vendor CVSS scope as-is.',
+  Unchanged: 'Treat impact as remaining within the same security scope.',
+  Changed: 'Treat impact as crossing a security boundary.',
+}
+
+export const securityProfileModifiedImpactHelp: Record<(typeof securityProfileModifiedImpactOptions)[number], string> = {
+  NotDefined: 'Use the vendor CVSS impact metric as-is.',
+  None: 'Treat this impact dimension as unaffected in this environment.',
+  Low: 'Treat this impact dimension as limited.',
+  High: 'Treat this impact dimension as high.',
 }

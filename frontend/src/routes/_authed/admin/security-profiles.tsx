@@ -7,6 +7,7 @@ import { createSecurityProfile, fetchSecurityProfiles, updateSecurityProfile } f
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import { RecentAuditPanel } from '@/components/features/audit/RecentAuditPanel'
 import { useTenantScope } from '@/components/layout/tenant-scope'
+import { CvssWorkbenchTrigger } from '@/components/features/vulnerabilities/CvssCalculator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,6 +19,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
+  securityProfileModifiedAttackComplexityHelp,
+  securityProfileModifiedAttackComplexityOptions,
+  securityProfileModifiedAttackVectorHelp,
+  securityProfileModifiedAttackVectorOptions,
+  securityProfileModifiedImpactHelp,
+  securityProfileModifiedImpactOptions,
+  securityProfileModifiedPrivilegesRequiredHelp,
+  securityProfileModifiedPrivilegesRequiredOptions,
+  securityProfileModifiedScopeHelp,
+  securityProfileModifiedScopeOptions,
+  securityProfileModifiedUserInteractionHelp,
+  securityProfileModifiedUserInteractionOptions,
   securityProfileEnvironmentClassOptions,
   securityProfileEnvironmentHelp,
   securityProfileFieldGuidance,
@@ -50,6 +63,14 @@ type SecurityProfileDraft = {
   confidentialityRequirement: (typeof securityProfileRequirementOptions)[number]
   integrityRequirement: (typeof securityProfileRequirementOptions)[number]
   availabilityRequirement: (typeof securityProfileRequirementOptions)[number]
+  modifiedAttackVector: (typeof securityProfileModifiedAttackVectorOptions)[number]
+  modifiedAttackComplexity: (typeof securityProfileModifiedAttackComplexityOptions)[number]
+  modifiedPrivilegesRequired: (typeof securityProfileModifiedPrivilegesRequiredOptions)[number]
+  modifiedUserInteraction: (typeof securityProfileModifiedUserInteractionOptions)[number]
+  modifiedScope: (typeof securityProfileModifiedScopeOptions)[number]
+  modifiedConfidentialityImpact: (typeof securityProfileModifiedImpactOptions)[number]
+  modifiedIntegrityImpact: (typeof securityProfileModifiedImpactOptions)[number]
+  modifiedAvailabilityImpact: (typeof securityProfileModifiedImpactOptions)[number]
 }
 
 const defaultDraft = (): SecurityProfileDraft => ({
@@ -60,6 +81,14 @@ const defaultDraft = (): SecurityProfileDraft => ({
   confidentialityRequirement: securityProfileRequirementOptions[1],
   integrityRequirement: securityProfileRequirementOptions[1],
   availabilityRequirement: securityProfileRequirementOptions[1],
+  modifiedAttackVector: securityProfileModifiedAttackVectorOptions[0],
+  modifiedAttackComplexity: securityProfileModifiedAttackComplexityOptions[0],
+  modifiedPrivilegesRequired: securityProfileModifiedPrivilegesRequiredOptions[0],
+  modifiedUserInteraction: securityProfileModifiedUserInteractionOptions[0],
+  modifiedScope: securityProfileModifiedScopeOptions[0],
+  modifiedConfidentialityImpact: securityProfileModifiedImpactOptions[0],
+  modifiedIntegrityImpact: securityProfileModifiedImpactOptions[0],
+  modifiedAvailabilityImpact: securityProfileModifiedImpactOptions[0],
 })
 
 function toDraft(profile: SecurityProfile): SecurityProfileDraft {
@@ -71,6 +100,19 @@ function toDraft(profile: SecurityProfile): SecurityProfileDraft {
     confidentialityRequirement: profile.confidentialityRequirement as (typeof securityProfileRequirementOptions)[number],
     integrityRequirement: profile.integrityRequirement as (typeof securityProfileRequirementOptions)[number],
     availabilityRequirement: profile.availabilityRequirement as (typeof securityProfileRequirementOptions)[number],
+    modifiedAttackVector: profile.modifiedAttackVector as (typeof securityProfileModifiedAttackVectorOptions)[number],
+    modifiedAttackComplexity:
+      profile.modifiedAttackComplexity as (typeof securityProfileModifiedAttackComplexityOptions)[number],
+    modifiedPrivilegesRequired:
+      profile.modifiedPrivilegesRequired as (typeof securityProfileModifiedPrivilegesRequiredOptions)[number],
+    modifiedUserInteraction:
+      profile.modifiedUserInteraction as (typeof securityProfileModifiedUserInteractionOptions)[number],
+    modifiedScope: profile.modifiedScope as (typeof securityProfileModifiedScopeOptions)[number],
+    modifiedConfidentialityImpact:
+      profile.modifiedConfidentialityImpact as (typeof securityProfileModifiedImpactOptions)[number],
+    modifiedIntegrityImpact: profile.modifiedIntegrityImpact as (typeof securityProfileModifiedImpactOptions)[number],
+    modifiedAvailabilityImpact:
+      profile.modifiedAvailabilityImpact as (typeof securityProfileModifiedImpactOptions)[number],
   }
 }
 
@@ -118,6 +160,14 @@ function SecurityProfilesPage() {
         confidentialityRequirement: draft.confidentialityRequirement,
         integrityRequirement: draft.integrityRequirement,
         availabilityRequirement: draft.availabilityRequirement,
+        modifiedAttackVector: draft.modifiedAttackVector,
+        modifiedAttackComplexity: draft.modifiedAttackComplexity,
+        modifiedPrivilegesRequired: draft.modifiedPrivilegesRequired,
+        modifiedUserInteraction: draft.modifiedUserInteraction,
+        modifiedScope: draft.modifiedScope,
+        modifiedConfidentialityImpact: draft.modifiedConfidentialityImpact,
+        modifiedIntegrityImpact: draft.modifiedIntegrityImpact,
+        modifiedAvailabilityImpact: draft.modifiedAvailabilityImpact,
       }
 
       if (editingProfile) {
@@ -317,6 +367,15 @@ function SecurityProfilesPage() {
                       explanation={
                         securityProfileRequirementHelp[
                           profile.availabilityRequirement as (typeof securityProfileRequirementOptions)[number]
+                        ]
+                      }
+                    />
+                    <ProfileMetric
+                      label="Modified AV"
+                      value={profile.modifiedAttackVector}
+                      explanation={
+                        securityProfileModifiedAttackVectorHelp[
+                          profile.modifiedAttackVector as (typeof securityProfileModifiedAttackVectorOptions)[number]
                         ]
                       }
                     />
@@ -619,6 +678,137 @@ function SecurityProfileSheet({
               />
             </div>
           </FormSection>
+
+          <FormSection
+            title="Environmental Overrides"
+            description="These explicit CVSS environmental fields are authoritative. Use Not Defined to inherit the vendor CVSS metric for that dimension."
+          >
+            <div className="grid gap-5 xl:grid-cols-2">
+              <FieldBlock
+                label={securityProfileFieldGuidance.modifiedAttackVector.label}
+                description={securityProfileFieldGuidance.modifiedAttackVector.description}
+                helper={securityProfileModifiedAttackVectorHelp[draft.modifiedAttackVector]}
+                control={(
+                  <ProfileSelect
+                    value={draft.modifiedAttackVector}
+                    options={securityProfileModifiedAttackVectorOptions}
+                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedAttackVector: value as SecurityProfileDraft['modifiedAttackVector'] }))}
+                  />
+                )}
+              />
+              <FieldBlock
+                label={securityProfileFieldGuidance.modifiedAttackComplexity.label}
+                description={securityProfileFieldGuidance.modifiedAttackComplexity.description}
+                helper={securityProfileModifiedAttackComplexityHelp[draft.modifiedAttackComplexity]}
+                control={(
+                  <ProfileSelect
+                    value={draft.modifiedAttackComplexity}
+                    options={securityProfileModifiedAttackComplexityOptions}
+                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedAttackComplexity: value as SecurityProfileDraft['modifiedAttackComplexity'] }))}
+                  />
+                )}
+              />
+              <FieldBlock
+                label={securityProfileFieldGuidance.modifiedPrivilegesRequired.label}
+                description={securityProfileFieldGuidance.modifiedPrivilegesRequired.description}
+                helper={securityProfileModifiedPrivilegesRequiredHelp[draft.modifiedPrivilegesRequired]}
+                control={(
+                  <ProfileSelect
+                    value={draft.modifiedPrivilegesRequired}
+                    options={securityProfileModifiedPrivilegesRequiredOptions}
+                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedPrivilegesRequired: value as SecurityProfileDraft['modifiedPrivilegesRequired'] }))}
+                  />
+                )}
+              />
+              <FieldBlock
+                label={securityProfileFieldGuidance.modifiedUserInteraction.label}
+                description={securityProfileFieldGuidance.modifiedUserInteraction.description}
+                helper={securityProfileModifiedUserInteractionHelp[draft.modifiedUserInteraction]}
+                control={(
+                  <ProfileSelect
+                    value={draft.modifiedUserInteraction}
+                    options={securityProfileModifiedUserInteractionOptions}
+                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedUserInteraction: value as SecurityProfileDraft['modifiedUserInteraction'] }))}
+                  />
+                )}
+              />
+              <FieldBlock
+                label={securityProfileFieldGuidance.modifiedScope.label}
+                description={securityProfileFieldGuidance.modifiedScope.description}
+                helper={securityProfileModifiedScopeHelp[draft.modifiedScope]}
+                control={(
+                  <ProfileSelect
+                    value={draft.modifiedScope}
+                    options={securityProfileModifiedScopeOptions}
+                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedScope: value as SecurityProfileDraft['modifiedScope'] }))}
+                  />
+                )}
+              />
+            </div>
+            <div className="grid gap-5 xl:grid-cols-3">
+              <FieldBlock
+                label={securityProfileFieldGuidance.modifiedConfidentialityImpact.label}
+                description={securityProfileFieldGuidance.modifiedConfidentialityImpact.description}
+                helper={securityProfileModifiedImpactHelp[draft.modifiedConfidentialityImpact]}
+                control={(
+                  <ProfileSelect
+                    value={draft.modifiedConfidentialityImpact}
+                    options={securityProfileModifiedImpactOptions}
+                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedConfidentialityImpact: value as SecurityProfileDraft['modifiedConfidentialityImpact'] }))}
+                  />
+                )}
+              />
+              <FieldBlock
+                label={securityProfileFieldGuidance.modifiedIntegrityImpact.label}
+                description={securityProfileFieldGuidance.modifiedIntegrityImpact.description}
+                helper={securityProfileModifiedImpactHelp[draft.modifiedIntegrityImpact]}
+                control={(
+                  <ProfileSelect
+                    value={draft.modifiedIntegrityImpact}
+                    options={securityProfileModifiedImpactOptions}
+                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedIntegrityImpact: value as SecurityProfileDraft['modifiedIntegrityImpact'] }))}
+                  />
+                )}
+              />
+              <FieldBlock
+                label={securityProfileFieldGuidance.modifiedAvailabilityImpact.label}
+                description={securityProfileFieldGuidance.modifiedAvailabilityImpact.description}
+                helper={securityProfileModifiedImpactHelp[draft.modifiedAvailabilityImpact]}
+                control={(
+                  <ProfileSelect
+                    value={draft.modifiedAvailabilityImpact}
+                    options={securityProfileModifiedImpactOptions}
+                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedAvailabilityImpact: value as SecurityProfileDraft['modifiedAvailabilityImpact'] }))}
+                  />
+                )}
+              />
+            </div>
+          </FormSection>
+
+          <FormSection
+            title="CVSS Preview"
+            description="Use the calculator to see how this profile adjusts a vendor CVSS vector into an environmental score."
+          >
+            <CvssWorkbenchTrigger
+              securityProfile={{
+                name: draft.name.trim() || null,
+                internetReachability: draft.internetReachability,
+                confidentialityRequirement: draft.confidentialityRequirement,
+                integrityRequirement: draft.integrityRequirement,
+                availabilityRequirement: draft.availabilityRequirement,
+                modifiedAttackVector: draft.modifiedAttackVector,
+                modifiedAttackComplexity: draft.modifiedAttackComplexity,
+                modifiedPrivilegesRequired: draft.modifiedPrivilegesRequired,
+                modifiedUserInteraction: draft.modifiedUserInteraction,
+                modifiedScope: draft.modifiedScope,
+                modifiedConfidentialityImpact: draft.modifiedConfidentialityImpact,
+                modifiedIntegrityImpact: draft.modifiedIntegrityImpact,
+                modifiedAvailabilityImpact: draft.modifiedAvailabilityImpact,
+              }}
+              title="Environmental scoring workbench"
+              description="Preview how this security profile changes a vendor CVSS vector, then open the full calculator only when you need to inspect the detailed metric breakdown."
+            />
+          </FormSection>
         </div>
 
         <SheetFooter className="border-t border-border/60">
@@ -633,6 +823,31 @@ function SecurityProfileSheet({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+  )
+}
+
+function ProfileSelect({
+  value,
+  options,
+  onValueChange,
+}: {
+  value: string
+  options: readonly string[]
+  onValueChange: (value: string | null) => void
+}) {
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger className="h-11 w-full rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
+        {options.map((option) => (
+          <SelectItem key={option} value={option}>
+            {option}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
 

@@ -63,6 +63,14 @@ public class SecurityProfilesController : ControllerBase
                 profile.ConfidentialityRequirement.ToString(),
                 profile.IntegrityRequirement.ToString(),
                 profile.AvailabilityRequirement.ToString(),
+                profile.ModifiedAttackVector.ToString(),
+                profile.ModifiedAttackComplexity.ToString(),
+                profile.ModifiedPrivilegesRequired.ToString(),
+                profile.ModifiedUserInteraction.ToString(),
+                profile.ModifiedScope.ToString(),
+                profile.ModifiedConfidentialityImpact.ToString(),
+                profile.ModifiedIntegrityImpact.ToString(),
+                profile.ModifiedAvailabilityImpact.ToString(),
                 profile.UpdatedAt
             ))
             .ToListAsync(ct);
@@ -108,7 +116,15 @@ public class SecurityProfilesController : ControllerBase
             parsed.InternetReachability,
             parsed.ConfidentialityRequirement,
             parsed.IntegrityRequirement,
-            parsed.AvailabilityRequirement
+            parsed.AvailabilityRequirement,
+            parsed.ModifiedAttackVector,
+            parsed.ModifiedAttackComplexity,
+            parsed.ModifiedPrivilegesRequired,
+            parsed.ModifiedUserInteraction,
+            parsed.ModifiedScope,
+            parsed.ModifiedConfidentialityImpact,
+            parsed.ModifiedIntegrityImpact,
+            parsed.ModifiedAvailabilityImpact
         );
 
         _dbContext.AssetSecurityProfiles.Add(profile);
@@ -149,7 +165,15 @@ public class SecurityProfilesController : ControllerBase
             parsed.InternetReachability,
             parsed.ConfidentialityRequirement,
             parsed.IntegrityRequirement,
-            parsed.AvailabilityRequirement
+            parsed.AvailabilityRequirement,
+            parsed.ModifiedAttackVector,
+            parsed.ModifiedAttackComplexity,
+            parsed.ModifiedPrivilegesRequired,
+            parsed.ModifiedUserInteraction,
+            parsed.ModifiedScope,
+            parsed.ModifiedConfidentialityImpact,
+            parsed.ModifiedIntegrityImpact,
+            parsed.ModifiedAvailabilityImpact
         );
 
         var affectedAssetIds = await _dbContext
@@ -178,6 +202,14 @@ public class SecurityProfilesController : ControllerBase
             profile.ConfidentialityRequirement.ToString(),
             profile.IntegrityRequirement.ToString(),
             profile.AvailabilityRequirement.ToString(),
+            profile.ModifiedAttackVector.ToString(),
+            profile.ModifiedAttackComplexity.ToString(),
+            profile.ModifiedPrivilegesRequired.ToString(),
+            profile.ModifiedUserInteraction.ToString(),
+            profile.ModifiedScope.ToString(),
+            profile.ModifiedConfidentialityImpact.ToString(),
+            profile.ModifiedIntegrityImpact.ToString(),
+            profile.ModifiedAvailabilityImpact.ToString(),
             profile.UpdatedAt
         );
 
@@ -193,6 +225,14 @@ public class SecurityProfilesController : ControllerBase
             request.ConfidentialityRequirement,
             request.IntegrityRequirement,
             request.AvailabilityRequirement,
+            request.ModifiedAttackVector,
+            request.ModifiedAttackComplexity,
+            request.ModifiedPrivilegesRequired,
+            request.ModifiedUserInteraction,
+            request.ModifiedScope,
+            request.ModifiedConfidentialityImpact,
+            request.ModifiedIntegrityImpact,
+            request.ModifiedAvailabilityImpact,
             out parsed,
             out error
         );
@@ -210,6 +250,14 @@ public class SecurityProfilesController : ControllerBase
             request.ConfidentialityRequirement,
             request.IntegrityRequirement,
             request.AvailabilityRequirement,
+            request.ModifiedAttackVector,
+            request.ModifiedAttackComplexity,
+            request.ModifiedPrivilegesRequired,
+            request.ModifiedUserInteraction,
+            request.ModifiedScope,
+            request.ModifiedConfidentialityImpact,
+            request.ModifiedIntegrityImpact,
+            request.ModifiedAvailabilityImpact,
             out parsed,
             out error
         );
@@ -221,6 +269,14 @@ public class SecurityProfilesController : ControllerBase
         string confidentialityRequirement,
         string integrityRequirement,
         string availabilityRequirement,
+        string modifiedAttackVector,
+        string modifiedAttackComplexity,
+        string modifiedPrivilegesRequired,
+        string modifiedUserInteraction,
+        string modifiedScope,
+        string modifiedConfidentialityImpact,
+        string modifiedIntegrityImpact,
+        string modifiedAvailabilityImpact,
         out ParsedRequest parsed,
         out string error
     )
@@ -259,12 +315,35 @@ public class SecurityProfilesController : ControllerBase
             return false;
         }
 
+        if (
+            !Enum.TryParse<CvssModifiedAttackVector>(modifiedAttackVector, out var parsedModifiedAttackVector)
+            || !Enum.TryParse<CvssModifiedAttackComplexity>(modifiedAttackComplexity, out var parsedModifiedAttackComplexity)
+            || !Enum.TryParse<CvssModifiedPrivilegesRequired>(modifiedPrivilegesRequired, out var parsedModifiedPrivilegesRequired)
+            || !Enum.TryParse<CvssModifiedUserInteraction>(modifiedUserInteraction, out var parsedModifiedUserInteraction)
+            || !Enum.TryParse<CvssModifiedScope>(modifiedScope, out var parsedModifiedScope)
+            || !Enum.TryParse<CvssModifiedImpact>(modifiedConfidentialityImpact, out var parsedModifiedConfidentialityImpact)
+            || !Enum.TryParse<CvssModifiedImpact>(modifiedIntegrityImpact, out var parsedModifiedIntegrityImpact)
+            || !Enum.TryParse<CvssModifiedImpact>(modifiedAvailabilityImpact, out var parsedModifiedAvailabilityImpact)
+        )
+        {
+            error = "Invalid CVSS environmental metric override.";
+            return false;
+        }
+
         parsed = new ParsedRequest(
             parsedEnvironmentClass,
             parsedReachability,
             parsedConfidentiality,
             parsedIntegrity,
-            parsedAvailability
+            parsedAvailability,
+            parsedModifiedAttackVector,
+            parsedModifiedAttackComplexity,
+            parsedModifiedPrivilegesRequired,
+            parsedModifiedUserInteraction,
+            parsedModifiedScope,
+            parsedModifiedConfidentialityImpact,
+            parsedModifiedIntegrityImpact,
+            parsedModifiedAvailabilityImpact
         );
         return true;
     }
@@ -274,6 +353,14 @@ public class SecurityProfilesController : ControllerBase
         InternetReachability InternetReachability,
         SecurityRequirementLevel ConfidentialityRequirement,
         SecurityRequirementLevel IntegrityRequirement,
-        SecurityRequirementLevel AvailabilityRequirement
+        SecurityRequirementLevel AvailabilityRequirement,
+        CvssModifiedAttackVector ModifiedAttackVector,
+        CvssModifiedAttackComplexity ModifiedAttackComplexity,
+        CvssModifiedPrivilegesRequired ModifiedPrivilegesRequired,
+        CvssModifiedUserInteraction ModifiedUserInteraction,
+        CvssModifiedScope ModifiedScope,
+        CvssModifiedImpact ModifiedConfidentialityImpact,
+        CvssModifiedImpact ModifiedIntegrityImpact,
+        CvssModifiedImpact ModifiedAvailabilityImpact
     );
 }

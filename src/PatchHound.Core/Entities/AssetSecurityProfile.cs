@@ -13,6 +13,14 @@ public class AssetSecurityProfile
     public SecurityRequirementLevel ConfidentialityRequirement { get; private set; }
     public SecurityRequirementLevel IntegrityRequirement { get; private set; }
     public SecurityRequirementLevel AvailabilityRequirement { get; private set; }
+    public CvssModifiedAttackVector ModifiedAttackVector { get; private set; }
+    public CvssModifiedAttackComplexity ModifiedAttackComplexity { get; private set; }
+    public CvssModifiedPrivilegesRequired ModifiedPrivilegesRequired { get; private set; }
+    public CvssModifiedUserInteraction ModifiedUserInteraction { get; private set; }
+    public CvssModifiedScope ModifiedScope { get; private set; }
+    public CvssModifiedImpact ModifiedConfidentialityImpact { get; private set; }
+    public CvssModifiedImpact ModifiedIntegrityImpact { get; private set; }
+    public CvssModifiedImpact ModifiedAvailabilityImpact { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -26,7 +34,15 @@ public class AssetSecurityProfile
         InternetReachability internetReachability,
         SecurityRequirementLevel confidentialityRequirement,
         SecurityRequirementLevel integrityRequirement,
-        SecurityRequirementLevel availabilityRequirement
+        SecurityRequirementLevel availabilityRequirement,
+        CvssModifiedAttackVector? modifiedAttackVector = null,
+        CvssModifiedAttackComplexity modifiedAttackComplexity = CvssModifiedAttackComplexity.NotDefined,
+        CvssModifiedPrivilegesRequired modifiedPrivilegesRequired = CvssModifiedPrivilegesRequired.NotDefined,
+        CvssModifiedUserInteraction modifiedUserInteraction = CvssModifiedUserInteraction.NotDefined,
+        CvssModifiedScope modifiedScope = CvssModifiedScope.NotDefined,
+        CvssModifiedImpact modifiedConfidentialityImpact = CvssModifiedImpact.NotDefined,
+        CvssModifiedImpact modifiedIntegrityImpact = CvssModifiedImpact.NotDefined,
+        CvssModifiedImpact modifiedAvailabilityImpact = CvssModifiedImpact.NotDefined
     )
     {
         var now = DateTimeOffset.UtcNow;
@@ -42,6 +58,14 @@ public class AssetSecurityProfile
             ConfidentialityRequirement = confidentialityRequirement,
             IntegrityRequirement = integrityRequirement,
             AvailabilityRequirement = availabilityRequirement,
+            ModifiedAttackVector = modifiedAttackVector ?? MapInternetReachabilityToModifiedAttackVector(internetReachability),
+            ModifiedAttackComplexity = modifiedAttackComplexity,
+            ModifiedPrivilegesRequired = modifiedPrivilegesRequired,
+            ModifiedUserInteraction = modifiedUserInteraction,
+            ModifiedScope = modifiedScope,
+            ModifiedConfidentialityImpact = modifiedConfidentialityImpact,
+            ModifiedIntegrityImpact = modifiedIntegrityImpact,
+            ModifiedAvailabilityImpact = modifiedAvailabilityImpact,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -54,7 +78,15 @@ public class AssetSecurityProfile
         InternetReachability internetReachability,
         SecurityRequirementLevel confidentialityRequirement,
         SecurityRequirementLevel integrityRequirement,
-        SecurityRequirementLevel availabilityRequirement
+        SecurityRequirementLevel availabilityRequirement,
+        CvssModifiedAttackVector? modifiedAttackVector = null,
+        CvssModifiedAttackComplexity modifiedAttackComplexity = CvssModifiedAttackComplexity.NotDefined,
+        CvssModifiedPrivilegesRequired modifiedPrivilegesRequired = CvssModifiedPrivilegesRequired.NotDefined,
+        CvssModifiedUserInteraction modifiedUserInteraction = CvssModifiedUserInteraction.NotDefined,
+        CvssModifiedScope modifiedScope = CvssModifiedScope.NotDefined,
+        CvssModifiedImpact modifiedConfidentialityImpact = CvssModifiedImpact.NotDefined,
+        CvssModifiedImpact modifiedIntegrityImpact = CvssModifiedImpact.NotDefined,
+        CvssModifiedImpact modifiedAvailabilityImpact = CvssModifiedImpact.NotDefined
     )
     {
         Name = name;
@@ -64,6 +96,26 @@ public class AssetSecurityProfile
         ConfidentialityRequirement = confidentialityRequirement;
         IntegrityRequirement = integrityRequirement;
         AvailabilityRequirement = availabilityRequirement;
+        ModifiedAttackVector = modifiedAttackVector ?? MapInternetReachabilityToModifiedAttackVector(internetReachability);
+        ModifiedAttackComplexity = modifiedAttackComplexity;
+        ModifiedPrivilegesRequired = modifiedPrivilegesRequired;
+        ModifiedUserInteraction = modifiedUserInteraction;
+        ModifiedScope = modifiedScope;
+        ModifiedConfidentialityImpact = modifiedConfidentialityImpact;
+        ModifiedIntegrityImpact = modifiedIntegrityImpact;
+        ModifiedAvailabilityImpact = modifiedAvailabilityImpact;
         UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    private static CvssModifiedAttackVector MapInternetReachabilityToModifiedAttackVector(
+        InternetReachability internetReachability
+    )
+    {
+        return internetReachability switch
+        {
+            InternetReachability.AdjacentOnly => CvssModifiedAttackVector.Adjacent,
+            InternetReachability.LocalOnly => CvssModifiedAttackVector.Local,
+            _ => CvssModifiedAttackVector.Network,
+        };
     }
 }

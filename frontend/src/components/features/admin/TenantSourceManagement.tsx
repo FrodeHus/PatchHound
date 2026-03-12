@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { useRouter } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
-import { CircleHelp, PenSquare, RotateCw } from 'lucide-react'
+import { ArrowLeft, CircleHelp, PenSquare, RotateCw } from 'lucide-react'
 import { triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
 import type { TenantDetail, TenantIngestionSource } from '@/api/settings.schemas'
 import { SourceRunHistorySheet } from '@/components/features/admin/SourceRunHistorySheet'
@@ -11,12 +11,14 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Separator } from '@/components/ui/separator'
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 type TenantSourceManagementProps = {
   tenant: TenantDetail
+  editingSourceKey: string | null
+  onEditSource: (sourceKey: string) => void
+  onCloseEditor: () => void
 }
 
 type TenantIngestionSourceDraft = Omit<TenantIngestionSource, 'credentials'> & {
@@ -25,15 +27,18 @@ type TenantIngestionSourceDraft = Omit<TenantIngestionSource, 'credentials'> & {
   }
 }
 
-export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) {
+export function TenantSourceManagement({
+  tenant,
+  editingSourceKey,
+  onEditSource,
+  onCloseEditor,
+}: TenantSourceManagementProps) {
   const router = useRouter()
   const [sources, setSources] = useState(() => tenant.ingestionSources.map(mapSourceToDraft))
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
   const [syncingSourceKey, setSyncingSourceKey] = useState<string | null>(null)
   const [syncState, setSyncState] = useState<'idle' | 'success' | 'error'>('idle')
   const [historySourceKey, setHistorySourceKey] = useState<string | null>(null)
-  const [editingSourceKey, setEditingSourceKey] = useState<string | null>(null)
-  const [sheetOpen, setSheetOpen] = useState(false)
 
   const editingSource = useMemo(
     () => sources.find((source) => source.key === editingSourceKey) ?? null,
@@ -64,8 +69,6 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
     },
     onSuccess: async () => {
       setSaveState('saved')
-      setSheetOpen(false)
-      setEditingSourceKey(null)
       await router.invalidate()
     },
     onError: () => {
@@ -109,6 +112,20 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
   return (
     <TooltipProvider>
       <section className="space-y-5">
+        {editingSource ? (
+          <TenantSourceEditorPage
+            tenant={tenant}
+            source={editingSource}
+            isSaving={mutation.isPending}
+            saveState={saveState}
+            onBack={onCloseEditor}
+            onSave={() => mutation.mutate()}
+            onUpdateSource={updateSource}
+          />
+        ) : null}
+
+        {!editingSource ? (
+          <>
         <Card className="rounded-2xl bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_94%,black),var(--card))] shadow-sm">
           <CardHeader className="border-b border-border/60 pb-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -214,10 +231,7 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={() => {
-                            setEditingSourceKey(source.key)
-                            setSheetOpen(true)
-                          }}
+                          onClick={() => onEditSource(source.key)}
                         >
                           <PenSquare className="size-4" />
                           Edit
@@ -242,21 +256,6 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
           </CardContent>
         </Card>
 
-        <TenantSourceSheet
-          tenant={tenant}
-          source={editingSource}
-          isSaving={mutation.isPending}
-          onOpenChange={(open) => {
-            setSheetOpen(open)
-            if (!open) {
-              setEditingSourceKey(null)
-            }
-          }}
-          open={sheetOpen}
-          onSave={() => mutation.mutate()}
-          onUpdateSource={updateSource}
-        />
-
         <SourceRunHistorySheet
           tenantId={tenant.id}
           sourceKey={historySourceKey}
@@ -268,44 +267,65 @@ export function TenantSourceManagement({ tenant }: TenantSourceManagementProps) 
             }
           }}
         />
+          </>
+        ) : null}
       </section>
     </TooltipProvider>
   )
 }
 
-function TenantSourceSheet({
+function TenantSourceEditorPage({
   tenant,
   source,
-  open,
   isSaving,
-  onOpenChange,
+  saveState,
   onSave,
+  onBack,
   onUpdateSource,
 }: {
   tenant: TenantDetail
-  source: TenantIngestionSourceDraft | null
-  open: boolean
+  source: TenantIngestionSourceDraft
   isSaving: boolean
-  onOpenChange: (open: boolean) => void
+  saveState: 'idle' | 'saved' | 'error'
   onSave: () => void
+  onBack: () => void
   onUpdateSource: (
     key: string,
     mutate: (current: TenantIngestionSourceDraft) => TenantIngestionSourceDraft,
   ) => void
 }) {
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl">
-        <SheetHeader className="border-b border-border/60">
-          <SheetTitle>{source ? `Edit ${source.displayName}` : 'Edit source'}</SheetTitle>
-          <SheetDescription>
-            Update runtime control, scheduling, and credentials for this ingestion source.
-          </SheetDescription>
-        </SheetHeader>
+    <div className="space-y-5">
+      <div className="space-y-3">
+        <Link
+          to="/admin/sources"
+          search={{ activeView: 'tenant' }}
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Back to tenant sources
+        </Link>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-semibold tracking-tight">{`Edit ${source.displayName}`}</h2>
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+              Update runtime control, scheduling, and credentials for this ingestion source.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" onClick={onBack}>
+              Cancel
+            </Button>
+            <Button onClick={onSave} disabled={isSaving}>
+              {isSaving ? 'Saving...' : `Save ${source.displayName}`}
+            </Button>
+          </div>
+        </div>
+      </div>
 
-        {source ? (
-          <>
-            <div className="flex-1 space-y-6 overflow-y-auto p-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <Card className="rounded-2xl border-border/70 bg-card/85">
+          <CardContent className="space-y-6 p-5">
               <FormSection title="Runtime control">
                 <InsetPanel className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="space-y-1">
@@ -449,17 +469,66 @@ function TenantSourceSheet({
                   />
                 </div>
               </FormSection>
-            </div>
+          </CardContent>
+        </Card>
 
-            <SheetFooter className="border-t border-border/60">
-              <Button onClick={onSave} disabled={isSaving} className="rounded-full px-5">
-                {isSaving ? 'Saving...' : `Save ${source.displayName}`}
-              </Button>
-            </SheetFooter>
-          </>
-        ) : null}
-      </SheetContent>
-    </Sheet>
+        <div className="space-y-4">
+          {saveState === 'saved' ? <StatusPanel tone="success" message="Source configuration saved." /> : null}
+          {saveState === 'error' ? <StatusPanel tone="error" message="Saving failed. Review the values and try again." /> : null}
+          <Card className="rounded-2xl border-border/70 bg-card/75">
+            <CardHeader>
+              <h3 className="text-base font-medium">Source posture</h3>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <InsetPanel emphasis="subtle" className="px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Last run</p>
+                <p className="mt-1 font-medium text-foreground">{formatTimestamp(source.runtime.lastCompletedAt)}</p>
+              </InsetPanel>
+              <InsetPanel emphasis="subtle" className="px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Last success</p>
+                <p className="mt-1 font-medium text-foreground">{formatTimestamp(source.runtime.lastSucceededAt)}</p>
+              </InsetPanel>
+              <InsetPanel emphasis="subtle" className="px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Status</p>
+                <p className="mt-1 font-medium text-foreground">{source.runtime.lastStatus ?? 'Unknown'}</p>
+              </InsetPanel>
+              {source.runtime.lastError ? (
+                <InsetPanel className="px-4 py-3 text-sm text-destructive">
+                  Last error: {source.runtime.lastError}
+                </InsetPanel>
+              ) : null}
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border-border/70 bg-card/75">
+            <CardHeader>
+              <h3 className="text-base font-medium">Navigation</h3>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Save keeps you on this page so you can review status or continue refining the source settings.
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatusPanel({
+  tone,
+  message,
+}: {
+  tone: 'success' | 'error'
+  message: string
+}) {
+  return (
+    <InsetPanel
+      className={cn(
+        'px-4 py-3 text-sm',
+        tone === 'success' ? 'text-emerald-700 dark:text-emerald-300' : 'text-destructive',
+      )}
+    >
+      {message}
+    </InsetPanel>
   )
 }
 

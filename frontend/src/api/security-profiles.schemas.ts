@@ -12,6 +12,14 @@ export const securityProfileSchema = z.object({
   confidentialityRequirement: z.string(),
   integrityRequirement: z.string(),
   availabilityRequirement: z.string(),
+  modifiedAttackVector: z.string(),
+  modifiedAttackComplexity: z.string(),
+  modifiedPrivilegesRequired: z.string(),
+  modifiedUserInteraction: z.string(),
+  modifiedScope: z.string(),
+  modifiedConfidentialityImpact: z.string(),
+  modifiedIntegrityImpact: z.string(),
+  modifiedAvailabilityImpact: z.string(),
   updatedAt: isoDateTimeSchema,
 })
 
