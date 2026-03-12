@@ -8,8 +8,9 @@ namespace PatchHound.Infrastructure.ExternalHttp;
 
 internal static class ExternalHttpResiliencePolicies
 {
-    private const int RetryCount = 4;
-    private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(30);
+    private const int DefaultRetryCount = 4;
+    private const int DefenderRetryCount = 6;
+    private static readonly TimeSpan DefaultMaxRetryDelay = TimeSpan.FromSeconds(30);
 
     public static IHttpClientBuilder AddExternalHttpPolicies(
         this IHttpClientBuilder builder,
@@ -37,21 +38,72 @@ internal static class ExternalHttpResiliencePolicies
             );
     }
 
+    public static IHttpClientBuilder AddDefenderHttpPolicies(this IHttpClientBuilder builder)
+    {
+        return builder
+            .ConfigurePrimaryHttpMessageHandler(() =>
+                new SocketsHttpHandler
+                {
+                    AutomaticDecompression =
+                        DecompressionMethods.GZip | DecompressionMethods.Deflate,
+                    // Defender explicitly documents throttling and asks clients to reduce request volume.
+                    // Keep parallelism tight and honor Retry-After for backoff.
+                    MaxConnectionsPerServer = 2,
+                    PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+                }
+            )
+            .AddPolicyHandler(
+                (serviceProvider, _) =>
+                {
+                    var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+                    return CreateDefenderRetryPolicy(
+                        loggerFactory.CreateLogger("PatchHound.DefenderHttpPolicy")
+                    );
+                }
+            );
+    }
+
     internal static IAsyncPolicy<HttpResponseMessage> CreateRetryPolicy(ILogger logger)
+    {
+        return CreateRetryPolicy(
+            logger,
+            DefaultRetryCount,
+            DefaultMaxRetryDelay,
+            honorRetryAfterFully: false
+        );
+    }
+
+    internal static IAsyncPolicy<HttpResponseMessage> CreateDefenderRetryPolicy(ILogger logger)
+    {
+        return CreateRetryPolicy(
+            logger,
+            DefenderRetryCount,
+            maxRetryDelay: TimeSpan.FromMinutes(5),
+            honorRetryAfterFully: true
+        );
+    }
+
+    private static IAsyncPolicy<HttpResponseMessage> CreateRetryPolicy(
+        ILogger logger,
+        int retryCount,
+        TimeSpan maxRetryDelay,
+        bool honorRetryAfterFully
+    )
     {
         return HttpPolicyExtensions
             .HandleTransientHttpError()
             .OrResult(ShouldRetry)
             .WaitAndRetryAsync(
-                RetryCount,
-                (attempt, outcome, _) => GetRetryDelay(outcome, attempt),
+                retryCount,
+                (attempt, outcome, _) =>
+                    GetRetryDelay(outcome, attempt, maxRetryDelay, honorRetryAfterFully),
                 (outcome, delay, attempt, _) =>
                 {
                     logger.LogWarning(
                         "Retrying outbound HTTP request after {DelayMs}ms. Attempt {Attempt}/{RetryCount}. StatusCode: {StatusCode}.",
                         (int)delay.TotalMilliseconds,
                         attempt,
-                        RetryCount,
+                        retryCount,
                         outcome.Result?.StatusCode
                     );
 
@@ -60,14 +112,19 @@ internal static class ExternalHttpResiliencePolicies
             );
     }
 
-    internal static TimeSpan GetRetryDelay(DelegateResult<HttpResponseMessage> outcome, int attempt)
+    internal static TimeSpan GetRetryDelay(
+        DelegateResult<HttpResponseMessage> outcome,
+        int attempt,
+        TimeSpan maxRetryDelay,
+        bool honorRetryAfterFully
+    )
     {
         var retryAfter = outcome.Result?.Headers.RetryAfter;
         if (retryAfter is not null)
         {
             if (retryAfter.Delta is { } delta && delta > TimeSpan.Zero)
             {
-                return ClampDelay(delta);
+                return honorRetryAfterFully ? delta : ClampDelay(delta, maxRetryDelay);
             }
 
             if (retryAfter.Date is { } date)
@@ -75,13 +132,15 @@ internal static class ExternalHttpResiliencePolicies
                 var absoluteDelay = date - DateTimeOffset.UtcNow;
                 if (absoluteDelay > TimeSpan.Zero)
                 {
-                    return ClampDelay(absoluteDelay);
+                    return honorRetryAfterFully
+                        ? absoluteDelay
+                        : ClampDelay(absoluteDelay, maxRetryDelay);
                 }
             }
         }
 
         var exponentialDelay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
-        return ClampDelay(exponentialDelay);
+        return ClampDelay(exponentialDelay, maxRetryDelay);
     }
 
     private static bool ShouldRetry(HttpResponseMessage response)
@@ -89,8 +148,8 @@ internal static class ExternalHttpResiliencePolicies
         return response.StatusCode == HttpStatusCode.TooManyRequests;
     }
 
-    private static TimeSpan ClampDelay(TimeSpan delay)
+    private static TimeSpan ClampDelay(TimeSpan delay, TimeSpan maxRetryDelay)
     {
-        return delay > MaxRetryDelay ? MaxRetryDelay : delay;
+        return delay > maxRetryDelay ? maxRetryDelay : delay;
     }
 }
