@@ -1,4 +1,3 @@
-using System.Net;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -123,6 +122,8 @@ public class IngestionService
 
                     try
                     {
+                        await ThrowIfAbortRequestedAsync(run.Id, ct);
+
                         _logger.LogInformation(
                             "Starting ingestion from {Source} for tenant {TenantId}",
                             source.SourceName,
@@ -152,6 +153,7 @@ public class IngestionService
 
                         if (!assetStagingCompleted && source is IAssetInventoryBatchSource assetInventoryBatchSource)
                         {
+                            await ThrowIfAbortRequestedAsync(run.Id, ct);
                             await UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
@@ -186,6 +188,7 @@ public class IngestionService
                                 IngestionRunStatuses.MergePending,
                                 ct
                             );
+                            await ThrowIfAbortRequestedAsync(run.Id, ct);
                             await UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
@@ -365,6 +368,7 @@ public class IngestionService
 
                         if (!assetMergeCompleted && assetStagingCompleted)
                         {
+                            await ThrowIfAbortRequestedAsync(run.Id, ct);
                             await UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
@@ -414,6 +418,7 @@ public class IngestionService
 
                         if (!vulnerabilityStagingCompleted && source is IVulnerabilityBatchSource batchSource)
                         {
+                            await ThrowIfAbortRequestedAsync(run.Id, ct);
                             await UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
@@ -432,6 +437,7 @@ public class IngestionService
                         }
                         else if (!vulnerabilityStagingCompleted)
                         {
+                            await ThrowIfAbortRequestedAsync(run.Id, ct);
                             await UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
@@ -472,6 +478,7 @@ public class IngestionService
 
                         if (!vulnerabilityMergeCompleted && vulnerabilityStagingCompleted)
                         {
+                            await ThrowIfAbortRequestedAsync(run.Id, ct);
                             await UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
@@ -599,10 +606,10 @@ public class IngestionService
                     }
                     catch (Exception ex)
                     {
-                        var failureStatus = IsTerminalIngestionFailure(ex)
+                        var failureStatus = IngestionFailurePolicy.IsTerminal(ex)
                             ? IngestionRunStatuses.FailedTerminal
                             : IngestionRunStatuses.FailedRecoverable;
-                        var failureReason = DescribeIngestionFailure(ex);
+                        var failureReason = IngestionFailurePolicy.Describe(ex);
                         _logger.LogError(
                             ex,
                             "Error during ingestion from {Source} for tenant {TenantId}",
@@ -879,63 +886,6 @@ public class IngestionService
             );
     }
 
-    private static bool IsActiveRunStatus(string status)
-    {
-        return status is IngestionRunStatuses.Staging
-            or IngestionRunStatuses.MergePending
-            or IngestionRunStatuses.Merging;
-    }
-
-    private static bool IsTerminalIngestionFailure(Exception ex)
-    {
-        return ex switch
-        {
-            IngestionTerminalException => true,
-            ArgumentException => true,
-            HttpRequestException httpEx when httpEx.StatusCode is HttpStatusCode.BadRequest
-                or HttpStatusCode.Unauthorized
-                or HttpStatusCode.Forbidden => true,
-            _ => false,
-        };
-    }
-
-    private static string DescribeIngestionFailure(Exception ex)
-    {
-        return ex switch
-        {
-            HttpRequestException httpEx when httpEx.StatusCode == HttpStatusCode.TooManyRequests
-                => "Ingestion failed: external API throttled (429 Too Many Requests) after the configured retry limit was exhausted.",
-            HttpRequestException httpEx when httpEx.StatusCode == HttpStatusCode.BadRequest
-                => "Ingestion failed: external API rejected the request (400 Bad Request).",
-            HttpRequestException httpEx when httpEx.StatusCode == HttpStatusCode.Unauthorized
-                => "Ingestion failed: external API authentication failed (401 Unauthorized).",
-            HttpRequestException httpEx when httpEx.StatusCode == HttpStatusCode.Forbidden
-                => "Ingestion failed: external API access was forbidden (403 Forbidden).",
-            TimeoutException
-                => "Ingestion failed: an external API request timed out and the run stopped so it can resume from the last committed checkpoint.",
-            TaskCanceledException
-                => "Ingestion failed: an external API request timed out and the run stopped so it can resume from the last committed checkpoint.",
-            IngestionTerminalException terminal
-                => $"Ingestion failed: {DescribeTerminalConfigurationFailure(terminal)}",
-            _ => "Ingestion failed: an unexpected error stopped the run. Review worker logs for details.",
-        };
-    }
-
-    private static string DescribeTerminalConfigurationFailure(IngestionTerminalException ex)
-    {
-        var message = ex.Message.Trim();
-
-        if (
-            message.Contains("credentials are incomplete", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("could not be resolved", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            return "source configuration is incomplete or invalid. Review source credentials and settings before retrying.";
-        }
-
-        return "source configuration is invalid and requires operator action before the run can continue.";
-    }
-
     private async Task<AcquiredIngestionRun?> TryAcquireIngestionRunAsync(
         Guid tenantId,
         string sourceKey,
@@ -973,11 +923,17 @@ public class IngestionService
                 IngestionRun? resumableRun = null;
                 if (sourceConfiguration.ActiveIngestionRunId.HasValue)
                 {
+                    await FinalizeAbortedRunIfPendingAsync(
+                        sourceConfiguration.ActiveIngestionRunId.Value,
+                        now,
+                        ct
+                    );
                     resumableRun = await _dbContext
                         .IngestionRuns.IgnoreQueryFilters()
                         .FirstOrDefaultAsync(
                             item =>
                                 item.Id == sourceConfiguration.ActiveIngestionRunId.Value
+                                && item.AbortRequestedAt == null
                                 && (
                                     item.Status == IngestionRunStatuses.Staging
                                     || item.Status == IngestionRunStatuses.MergePending
@@ -1027,11 +983,17 @@ public class IngestionService
             IngestionRun? resumable = null;
             if (persistedSourceConfiguration.ActiveIngestionRunId.HasValue)
             {
+                await FinalizeAbortedRunIfPendingAsync(
+                    persistedSourceConfiguration.ActiveIngestionRunId.Value,
+                    now,
+                    ct
+                );
                 resumable = await _dbContext
                     .IngestionRuns.IgnoreQueryFilters()
                     .FirstOrDefaultAsync(
                         item =>
                             item.Id == persistedSourceConfiguration.ActiveIngestionRunId.Value
+                            && item.AbortRequestedAt == null
                             && (
                                 item.Status == IngestionRunStatuses.Staging
                                 || item.Status == IngestionRunStatuses.MergePending
@@ -1073,6 +1035,76 @@ public class IngestionService
 
             return new AcquiredIngestionRun(acquiredRun, resumedRun);
         });
+    }
+
+    private async Task FinalizeAbortedRunIfPendingAsync(
+        Guid runId,
+        DateTimeOffset completedAt,
+        CancellationToken ct
+    )
+    {
+        if (IsInMemoryProvider())
+        {
+            var run = await _dbContext
+                .IngestionRuns.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(item => item.Id == runId, ct);
+
+            if (
+                run is null
+                || run.CompletedAt.HasValue
+                || !run.AbortRequestedAt.HasValue
+                || !IngestionRunStatePolicy.IsActive(run.Status)
+            )
+            {
+                return;
+            }
+
+            _dbContext.Entry(run).Property(nameof(IngestionRun.CompletedAt)).CurrentValue =
+                completedAt;
+            _dbContext.Entry(run).Property(nameof(IngestionRun.Status)).CurrentValue =
+                IngestionRunStatuses.FailedTerminal;
+            _dbContext.Entry(run).Property(nameof(IngestionRun.Error)).CurrentValue =
+                IngestionFailurePolicy.Describe(new IngestionAbortedException());
+            await _dbContext.SaveChangesAsync(ct);
+            return;
+        }
+
+        await _dbContext
+            .IngestionRuns.IgnoreQueryFilters()
+            .Where(item =>
+                item.Id == runId
+                && item.AbortRequestedAt != null
+                && item.CompletedAt == null
+                && (
+                    item.Status == IngestionRunStatuses.Staging
+                    || item.Status == IngestionRunStatuses.MergePending
+                    || item.Status == IngestionRunStatuses.Merging
+                ))
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(item => item.CompletedAt, completedAt)
+                    .SetProperty(item => item.Status, IngestionRunStatuses.FailedTerminal)
+                    .SetProperty(
+                        item => item.Error,
+                        IngestionFailurePolicy.Describe(new IngestionAbortedException())
+                    ),
+                ct
+            );
+    }
+
+    private async Task ThrowIfAbortRequestedAsync(Guid runId, CancellationToken ct)
+    {
+        var abortRequestedAt = await _dbContext
+            .IngestionRuns.IgnoreQueryFilters()
+            .Where(item => item.Id == runId)
+            .Select(item => item.AbortRequestedAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (abortRequestedAt.HasValue)
+        {
+            _dbContext.ChangeTracker.Clear();
+            throw new IngestionAbortedException();
+        }
     }
 
     private async Task CompleteIngestionRunAsync(
@@ -1791,6 +1823,7 @@ public class IngestionService
 
         while (true)
         {
+            await ThrowIfAbortRequestedAsync(ingestionRunId, ct);
             batchNumber++;
             var batch = await batchSource.FetchVulnerabilityBatchAsync(
                 tenantId,
@@ -2071,6 +2104,7 @@ public class IngestionService
 
         while (true)
         {
+            await ThrowIfAbortRequestedAsync(ingestionRunId, ct);
             var batch = await batchSource.FetchAssetBatchAsync(
                 tenantId,
                 cursorJson,

@@ -110,3 +110,14 @@ export const deleteTenantIngestionRun = createServerFn({ method: 'POST' })
   .handler(async ({ context, data: { tenantId, sourceKey, runId } }) => {
     await apiDelete(`/tenants/${tenantId}/ingestion-sources/${sourceKey}/runs/${runId}`, context)
   })
+
+export const abortTenantIngestionRun = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({
+    tenantId: z.string(),
+    sourceKey: z.string(),
+    runId: z.string().uuid(),
+  }))
+  .handler(async ({ context, data: { tenantId, sourceKey, runId } }) => {
+    await apiPost(`/tenants/${tenantId}/ingestion-sources/${sourceKey}/runs/${runId}/abort`, context)
+  })

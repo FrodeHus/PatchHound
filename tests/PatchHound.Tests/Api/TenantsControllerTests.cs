@@ -497,6 +497,87 @@ public class TenantsControllerTests : IDisposable
         (await _dbContext.IngestionRuns.AnyAsync(item => item.Id == run.Id)).Should().BeTrue();
     }
 
+    [Fact]
+    public async Task AbortRun_WhenRunIsActive_RequestsAbort()
+    {
+        var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");
+        var source = TenantSourceConfiguration.Create(
+            tenant.Id,
+            "microsoft-defender",
+            "Microsoft Defender",
+            true,
+            "0 */6 * * *",
+            "entra-tenant",
+            "client-id",
+            "secret/ref",
+            "https://api.securitycenter.microsoft.com",
+            "https://api.securitycenter.microsoft.com/.default"
+        );
+        var run = IngestionRun.Start(tenant.Id, source.SourceKey, DateTimeOffset.UtcNow.AddMinutes(-2));
+        source.AcquireLease(run.Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(5));
+
+        await _dbContext.Tenants.AddAsync(tenant);
+        await _dbContext.TenantSourceConfigurations.AddAsync(source);
+        await _dbContext.IngestionRuns.AddAsync(run);
+        await _dbContext.SaveChangesAsync();
+
+        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
+        _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
+
+        var action = await _controller.AbortRun(
+            tenant.Id,
+            source.SourceKey,
+            run.Id,
+            CancellationToken.None
+        );
+
+        action.Should().BeOfType<AcceptedResult>();
+        var updatedRun = await _dbContext.IngestionRuns.SingleAsync(item => item.Id == run.Id);
+        updatedRun.AbortRequestedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task AbortRun_WhenRunIsNotActive_ReturnsConflict()
+    {
+        var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");
+        var source = TenantSourceConfiguration.Create(
+            tenant.Id,
+            "microsoft-defender",
+            "Microsoft Defender",
+            true,
+            "0 */6 * * *",
+            "entra-tenant",
+            "client-id",
+            "secret/ref",
+            "https://api.securitycenter.microsoft.com",
+            "https://api.securitycenter.microsoft.com/.default"
+        );
+        var run = IngestionRun.Start(tenant.Id, source.SourceKey, DateTimeOffset.UtcNow.AddMinutes(-10));
+        run.CompleteSucceeded(
+            DateTimeOffset.UtcNow.AddMinutes(-9),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        );
+
+        await _dbContext.Tenants.AddAsync(tenant);
+        await _dbContext.TenantSourceConfigurations.AddAsync(source);
+        await _dbContext.IngestionRuns.AddAsync(run);
+        await _dbContext.SaveChangesAsync();
+
+        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
+        _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
+
+        var action = await _controller.AbortRun(
+            tenant.Id,
+            source.SourceKey,
+            run.Id,
+            CancellationToken.None
+        );
+
+        var conflict = action.Should().BeOfType<ConflictObjectResult>().Subject;
+        var problem = conflict.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Title.Should().Be("Only active ingestion runs can be aborted");
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

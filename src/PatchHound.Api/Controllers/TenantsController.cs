@@ -515,14 +515,7 @@ public class TenantsController : ControllerBase
 
         var isActiveRun =
             source.ActiveIngestionRunId == runId
-            || (
-                run.CompletedAt is null
-                && (
-                    run.Status == IngestionRunStatuses.Staging
-                    || run.Status == IngestionRunStatuses.MergePending
-                    || run.Status == IngestionRunStatuses.Merging
-                )
-            );
+            || (run.CompletedAt is null && IngestionRunStatePolicy.IsActive(run.Status));
 
         if (isActiveRun)
         {
@@ -561,6 +554,60 @@ public class TenantsController : ControllerBase
         await _dbContext.SaveChangesAsync(ct);
 
         return NoContent();
+    }
+
+    [HttpPost("{id:guid}/ingestion-sources/{sourceKey}/runs/{runId:guid}/abort")]
+    [Authorize(Policy = Policies.ConfigureTenant)]
+    public async Task<IActionResult> AbortRun(
+        Guid id,
+        string sourceKey,
+        Guid runId,
+        CancellationToken ct
+    )
+    {
+        if (!_tenantContext.HasAccessToTenant(id))
+            return Forbid();
+
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (tenant is null)
+            return NotFound();
+
+        var source = await _dbContext.TenantSourceConfigurations.FirstOrDefaultAsync(
+            item => item.TenantId == id && item.SourceKey == normalizedSourceKey,
+            ct
+        );
+
+        if (source is null)
+            return NotFound(new ProblemDetails { Title = "Ingestion source not found" });
+
+        var run = await _dbContext.IngestionRuns.FirstOrDefaultAsync(
+            item => item.Id == runId && item.TenantId == id && item.SourceKey == normalizedSourceKey,
+            ct
+        );
+
+        if (run is null)
+            return NotFound(new ProblemDetails { Title = "Ingestion run not found" });
+
+        var isActiveRun =
+            source.ActiveIngestionRunId == runId
+            || (run.CompletedAt is null && IngestionRunStatePolicy.IsActive(run.Status));
+
+        if (!isActiveRun)
+        {
+            return Conflict(
+                new ProblemDetails
+                {
+                    Title = "Only active ingestion runs can be aborted",
+                    Detail = "This run is no longer active.",
+                }
+            );
+        }
+
+        run.RequestAbort(DateTimeOffset.UtcNow);
+        await _dbContext.SaveChangesAsync(ct);
+
+        return Accepted();
     }
 
     private static TenantIngestionSourceDto MapSourceDto(
