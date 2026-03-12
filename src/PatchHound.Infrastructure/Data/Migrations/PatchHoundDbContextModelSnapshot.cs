@@ -1571,6 +1571,13 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("AllowedDomains")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("AllowExternalResearch")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("BaseUrl")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -1588,6 +1595,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IncludeCitations")
                         .HasColumnType("boolean");
 
                     b.Property<string>("KeepAlive")
@@ -1609,6 +1619,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("MaxOutputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MaxResearchSources")
                         .HasColumnType("integer");
 
                     b.Property<string>("Model")
@@ -1651,6 +1664,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("WebResearchMode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.HasKey("Id");
 

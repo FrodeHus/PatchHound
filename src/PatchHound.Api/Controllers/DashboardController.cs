@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models.Dashboard;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Interfaces;
+using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 
@@ -15,16 +17,24 @@ namespace PatchHound.Api.Controllers;
 public class DashboardController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
+    private readonly IRiskChangeBriefAiSummaryService _riskChangeBriefAiSummaryService;
+    private readonly ITenantContext _tenantContext;
 
-    public DashboardController(PatchHoundDbContext dbContext)
+    public DashboardController(
+        PatchHoundDbContext dbContext,
+        IRiskChangeBriefAiSummaryService riskChangeBriefAiSummaryService,
+        ITenantContext tenantContext
+    )
     {
         _dbContext = dbContext;
+        _riskChangeBriefAiSummaryService = riskChangeBriefAiSummaryService;
+        _tenantContext = tenantContext;
     }
 
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummaryDto>> GetSummary(CancellationToken ct)
     {
-        var riskChangeBrief = await BuildRiskChangeBriefAsync(limit: 3, ct);
+        var riskChangeBrief = await BuildRiskChangeBriefAsync(limit: 3, highCriticalOnly: true, ct);
 
         // Vulnerability counts by severity
         var bySeverity = await _dbContext
@@ -243,7 +253,7 @@ public class DashboardController : ControllerBase
     [HttpGet("risk-changes")]
     public async Task<ActionResult<DashboardRiskChangeBriefDto>> GetRiskChanges(CancellationToken ct)
     {
-        return Ok(await BuildRiskChangeBriefAsync(limit: null, ct));
+        return Ok(await BuildRiskChangeBriefAsync(limit: null, highCriticalOnly: false, ct));
     }
 
     [HttpGet("trends")]
@@ -326,6 +336,7 @@ public class DashboardController : ControllerBase
 
     private async Task<DashboardRiskChangeBriefDto> BuildRiskChangeBriefAsync(
         int? limit,
+        bool highCriticalOnly,
         CancellationToken ct
     )
     {
@@ -384,10 +395,9 @@ public class DashboardController : ControllerBase
                 ),
                 EffectiveSeverity = row.AdjustedSeverity ?? row.VendorSeverity,
             })
-            .Where(row =>
-                row.EffectiveSeverity == Severity.High
-                || row.EffectiveSeverity == Severity.Critical
-            )
+            .Where(row => !highCriticalOnly
+                || row.EffectiveSeverity == Severity.High
+                || row.EffectiveSeverity == Severity.Critical)
             .OrderByDescending(row => row.Item.ChangedAt)
             .ThenByDescending(row => row.Item.AffectedAssetCount)
             .ToList();
@@ -406,15 +416,14 @@ public class DashboardController : ControllerBase
                 ),
                 EffectiveSeverity = row.AdjustedSeverity ?? row.VendorSeverity,
             })
-            .Where(row =>
-                row.EffectiveSeverity == Severity.High
-                || row.EffectiveSeverity == Severity.Critical
-            )
+            .Where(row => !highCriticalOnly
+                || row.EffectiveSeverity == Severity.High
+                || row.EffectiveSeverity == Severity.Critical)
             .OrderByDescending(row => row.Item.ChangedAt)
             .ThenByDescending(row => row.Item.AffectedAssetCount)
             .ToList();
 
-        return new DashboardRiskChangeBriefDto(
+        var deterministicBrief = new DashboardRiskChangeBriefDto(
             appearedRows.Count,
             resolvedRows.Count,
             (limit.HasValue ? appearedRows.Take(limit.Value) : appearedRows)
@@ -425,5 +434,46 @@ public class DashboardController : ControllerBase
                 .ToList(),
             null
         );
+
+        if (limit != 3)
+        {
+            return deterministicBrief;
+        }
+
+        try
+        {
+            var aiSummary = await _riskChangeBriefAiSummaryService.GenerateAsync(
+                _tenantContext.CurrentTenantId ?? Guid.Empty,
+                new RiskChangeBriefSummaryInput(
+                    deterministicBrief.AppearedCount,
+                    deterministicBrief.ResolvedCount,
+                    deterministicBrief.Appeared
+                        .Select(item => new RiskChangeBriefSummaryItemInput(
+                            item.ExternalId,
+                            item.Title,
+                            item.Severity,
+                            item.AffectedAssetCount,
+                            item.ChangedAt
+                        ))
+                        .ToList(),
+                    deterministicBrief.Resolved
+                        .Select(item => new RiskChangeBriefSummaryItemInput(
+                            item.ExternalId,
+                            item.Title,
+                            item.Severity,
+                            item.AffectedAssetCount,
+                            item.ChangedAt
+                        ))
+                        .ToList()
+                ),
+                ct
+            );
+
+            return deterministicBrief with { AiSummary = aiSummary };
+        }
+        catch
+        {
+            return deterministicBrief;
+        }
     }
 }

@@ -17,6 +17,11 @@ export const tenantAiProfileSchema = z.object({
   deploymentName: z.string(),
   apiVersion: z.string(),
   keepAlive: z.string(),
+  allowExternalResearch: z.boolean(),
+  webResearchMode: z.string(),
+  includeCitations: z.boolean(),
+  maxResearchSources: z.number(),
+  allowedDomains: z.string(),
   hasSecret: z.boolean(),
   lastValidatedAt: nullableIsoDateTimeSchema,
   lastValidationStatus: z.string(),
@@ -39,6 +44,11 @@ export const saveTenantAiProfileSchema = z.object({
   deploymentName: z.string(),
   apiVersion: z.string(),
   keepAlive: z.string(),
+  allowExternalResearch: z.boolean(),
+  webResearchMode: z.enum(['Disabled', 'ProviderNative', 'PatchHoundManaged']),
+  includeCitations: z.boolean(),
+  maxResearchSources: z.number().int().positive(),
+  allowedDomains: z.string(),
   apiKey: z.string(),
 })
 

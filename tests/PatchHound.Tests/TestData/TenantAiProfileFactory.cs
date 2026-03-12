@@ -21,7 +21,12 @@ internal static class TenantAiProfileFactory
         string deploymentName = "",
         string apiVersion = "",
         string keepAlive = "",
-        string secretRef = ""
+        string secretRef = "",
+        bool allowExternalResearch = false,
+        TenantAiWebResearchMode webResearchMode = TenantAiWebResearchMode.Disabled,
+        bool includeCitations = true,
+        int maxResearchSources = 5,
+        string allowedDomains = ""
     ) =>
         TenantAiProfile.Create(
             tenantId,
@@ -39,6 +44,11 @@ internal static class TenantAiProfileFactory
             deploymentName,
             apiVersion,
             keepAlive,
-            secretRef
+            secretRef,
+            allowExternalResearch,
+            webResearchMode,
+            includeCitations,
+            maxResearchSources,
+            allowedDomains
         );
 }

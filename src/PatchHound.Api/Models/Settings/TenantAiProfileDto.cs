@@ -16,6 +16,11 @@ public record TenantAiProfileDto(
     string DeploymentName,
     string ApiVersion,
     string KeepAlive,
+    bool AllowExternalResearch,
+    string WebResearchMode,
+    bool IncludeCitations,
+    int MaxResearchSources,
+    string AllowedDomains,
     bool HasSecret,
     DateTimeOffset? LastValidatedAt,
     string LastValidationStatus,
@@ -37,6 +42,11 @@ public record SaveTenantAiProfileRequest(
     string DeploymentName,
     string ApiVersion,
     string KeepAlive,
+    bool AllowExternalResearch,
+    string WebResearchMode,
+    bool IncludeCitations,
+    int MaxResearchSources,
+    string AllowedDomains,
     string ApiKey
 );
 

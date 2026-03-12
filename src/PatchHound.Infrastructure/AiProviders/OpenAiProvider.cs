@@ -36,13 +36,27 @@ public class OpenAiProvider : IAiReportProvider
         AiTextGenerationRequest request,
         TenantAiProfileResolved profile,
         CancellationToken ct
-    ) => SendChatCompletionAsync(
-        profile,
-        request.SystemPrompt,
-        request.UserPrompt,
-        profile.Profile.MaxOutputTokens,
-        ct
-    );
+    )
+    {
+        var userPrompt = BuildUserPrompt(request);
+
+        return request.UseProviderNativeWebResearch
+            ? SendResponsesApiRequestAsync(
+                profile,
+                request.SystemPrompt,
+                userPrompt,
+                profile.Profile.MaxOutputTokens,
+                request,
+                ct
+            )
+            : SendChatCompletionAsync(
+                profile,
+                request.SystemPrompt,
+                userPrompt,
+                profile.Profile.MaxOutputTokens,
+                ct
+            );
+    }
 
     public async Task<AiProviderValidationResult> ValidateAsync(
         TenantAiProfileResolved profile,
@@ -194,5 +208,99 @@ public class OpenAiProvider : IAiReportProvider
         }
 
         return content.Trim();
+    }
+
+    private async Task<string> SendResponsesApiRequestAsync(
+        TenantAiProfileResolved profile,
+        string systemPrompt,
+        string userPrompt,
+        int maxTokens,
+        AiTextGenerationRequest request,
+        CancellationToken ct
+    )
+    {
+        using var httpRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"{profile.Profile.BaseUrl.TrimEnd('/')}/responses"
+        );
+        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", profile.ApiKey);
+        httpRequest.Content = JsonContent.Create(
+            new
+            {
+                model = profile.Profile.Model,
+                input = new object[]
+                {
+                    new { role = "system", content = systemPrompt },
+                    new { role = "user", content = userPrompt },
+                },
+                tools = new object[]
+                {
+                    new
+                    {
+                        type = "web_search_preview",
+                    },
+                },
+                temperature = decimal.ToDouble(profile.Profile.Temperature),
+                top_p = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
+                max_output_tokens = maxTokens,
+            }
+        );
+
+        using var response = await _httpClient.SendAsync(httpRequest, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException(
+                AiProviderErrorParser.FormatHttpError(
+                    "OpenAI",
+                    (int)response.StatusCode,
+                    response.ReasonPhrase,
+                    body
+                )
+            );
+        }
+
+        using var document = JsonDocument.Parse(body);
+        if (document.RootElement.TryGetProperty("output_text", out var outputText)
+            && outputText.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(outputText.GetString()))
+        {
+            return outputText.GetString()!.Trim();
+        }
+
+        if (document.RootElement.TryGetProperty("output", out var outputItems))
+        {
+            foreach (var item in outputItems.EnumerateArray())
+            {
+                if (!item.TryGetProperty("type", out var typeProperty)
+                    || typeProperty.GetString() != "message"
+                    || !item.TryGetProperty("content", out var contentItems))
+                {
+                    continue;
+                }
+
+                foreach (var contentItem in contentItems.EnumerateArray())
+                {
+                    if (contentItem.TryGetProperty("text", out var textProperty)
+                        && textProperty.ValueKind == JsonValueKind.String
+                        && !string.IsNullOrWhiteSpace(textProperty.GetString()))
+                    {
+                        return textProperty.GetString()!.Trim();
+                    }
+                }
+            }
+        }
+
+        throw new InvalidOperationException("OpenAI responses API did not contain output text.");
+    }
+
+    private static string BuildUserPrompt(AiTextGenerationRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.ExternalContext))
+        {
+            return request.UserPrompt;
+        }
+
+        return $"{request.UserPrompt}\n\nExternal research context:\n{request.ExternalContext}";
     }
 }

@@ -7,6 +7,7 @@ using PatchHound.Api.Models.Dashboard;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
+using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Tests.TestData;
 
@@ -17,6 +18,7 @@ public class DashboardControllerTests : IDisposable
     private readonly Guid _tenantId = Guid.NewGuid();
     private readonly PatchHoundDbContext _dbContext;
     private readonly DashboardController _controller;
+    private readonly IRiskChangeBriefAiSummaryService _riskChangeBriefAiSummaryService;
 
     public DashboardControllerTests()
     {
@@ -33,7 +35,11 @@ public class DashboardControllerTests : IDisposable
             options,
             TestServiceProviderFactory.Create(tenantContext)
         );
-        _controller = new DashboardController(_dbContext);
+        _riskChangeBriefAiSummaryService = Substitute.For<IRiskChangeBriefAiSummaryService>();
+        _riskChangeBriefAiSummaryService
+            .GenerateAsync(Arg.Any<Guid>(), Arg.Any<RiskChangeBriefSummaryInput>(), Arg.Any<CancellationToken>())
+            .Returns((string?)null);
+        _controller = new DashboardController(_dbContext, _riskChangeBriefAiSummaryService, tenantContext);
     }
 
     [Fact]
@@ -371,6 +377,94 @@ public class DashboardControllerTests : IDisposable
 
         detailPayload.AppearedCount.Should().Be(1);
         detailPayload.ResolvedCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetRiskChanges_IncludesLowerSeverities_WhileSummaryRemainsHighCritical()
+    {
+        var highDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-4100",
+            "High issue",
+            "Desc",
+            Severity.High,
+            "MicrosoftDefender"
+        );
+        var highTenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            highDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow.AddHours(-2)
+        );
+
+        var mediumDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-4101",
+            "Medium issue",
+            "Desc",
+            Severity.Medium,
+            "MicrosoftDefender"
+        );
+        var mediumTenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            mediumDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow.AddHours(-1)
+        );
+
+        await _dbContext.AddRangeAsync(
+            highDefinition,
+            mediumDefinition,
+            highTenantVulnerability,
+            mediumTenantVulnerability
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var summaryAction = await _controller.GetSummary(CancellationToken.None);
+        var summaryPayload = summaryAction.Result.Should().BeOfType<OkObjectResult>().Subject.Value
+            .Should().BeOfType<DashboardSummaryDto>().Subject;
+
+        summaryPayload.RiskChangeBrief.Appeared.Should().ContainSingle();
+        summaryPayload.RiskChangeBrief.Appeared[0].ExternalId.Should().Be("CVE-2026-4100");
+
+        var detailAction = await _controller.GetRiskChanges(CancellationToken.None);
+        var detailPayload = detailAction.Result.Should().BeOfType<OkObjectResult>().Subject.Value
+            .Should().BeOfType<DashboardRiskChangeBriefDto>().Subject;
+
+        detailPayload.Appeared.Should().HaveCount(2);
+        detailPayload.Appeared.Select(item => item.ExternalId)
+            .Should()
+            .Contain(["CVE-2026-4100", "CVE-2026-4101"]);
+    }
+
+    [Fact]
+    public async Task GetSummary_IncludesAiSummary_WhenGenerated()
+    {
+        var definition = VulnerabilityDefinition.Create(
+            "CVE-2026-5000",
+            "Fresh issue",
+            "Desc",
+            Severity.Critical,
+            "MicrosoftDefender"
+        );
+        var tenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            definition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow
+        );
+
+        await _dbContext.AddRangeAsync(definition, tenantVulnerability);
+        await _dbContext.SaveChangesAsync();
+
+        _riskChangeBriefAiSummaryService
+            .GenerateAsync(_tenantId, Arg.Any<RiskChangeBriefSummaryInput>(), Arg.Any<CancellationToken>())
+            .Returns("1 critical issue appeared in the last 24 hours.");
+
+        var action = await _controller.GetSummary(CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
+
+        payload.RiskChangeBrief.AiSummary.Should().Be("1 critical issue appeared in the last 24 hours.");
     }
 
     public void Dispose() => _dbContext.Dispose();

@@ -156,6 +156,45 @@ public class AiProvidersTests
     }
 
     [Fact]
+    public async Task OpenAiGenerateTextAsync_UsesResponsesApi_WhenProviderNativeResearchIsEnabled()
+    {
+        var tenantId = Guid.NewGuid();
+        var handler = new RecordingHttpMessageHandler(
+            _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """{"output_text":"Generated summary with research"}""",
+                    Encoding.UTF8,
+                    "application/json"
+                ),
+            }
+        );
+        var provider = new OpenAiProvider(new HttpClient(handler));
+        var profile = TenantAiProfileFactory.Create(
+            tenantId,
+            providerType: TenantAiProviderType.OpenAi,
+            name: "OpenAI",
+            topP: 1.0m,
+            baseUrl: "https://api.openai.com/v1",
+            secretRef: "secret"
+        );
+
+        var content = await provider.GenerateTextAsync(
+            new AiTextGenerationRequest(
+                "System",
+                "User",
+                UseProviderNativeWebResearch: true
+            ),
+            new TenantAiProfileResolved(profile, "api-key"),
+            CancellationToken.None
+        );
+
+        content.Should().Be("Generated summary with research");
+        handler.Requests.Should().HaveCount(1);
+        handler.Requests[0].RequestUri!.ToString().Should().Be("https://api.openai.com/v1/responses");
+    }
+
+    [Fact]
     public async Task AzureValidateAsync_PerformsChatCompletionRequest()
     {
         var handler = new RecordingHttpMessageHandler(

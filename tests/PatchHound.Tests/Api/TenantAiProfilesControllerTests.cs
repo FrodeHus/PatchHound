@@ -74,6 +74,11 @@ public class TenantAiProfilesControllerTests : IDisposable
                 "",
                 "",
                 "",
+                false,
+                "Disabled",
+                true,
+                5,
+                "",
                 "secret-value"
             ),
             CancellationToken.None
@@ -182,6 +187,11 @@ public class TenantAiProfilesControllerTests : IDisposable
                 "",
                 "",
                 "",
+                false,
+                "Disabled",
+                true,
+                5,
+                "",
                 "secret-value"
             ),
             CancellationToken.None
@@ -221,6 +231,11 @@ public class TenantAiProfilesControllerTests : IDisposable
                 "https://api.openai.com/v1",
                 "",
                 "",
+                "",
+                false,
+                "Disabled",
+                true,
+                5,
                 "",
                 ""
             ),

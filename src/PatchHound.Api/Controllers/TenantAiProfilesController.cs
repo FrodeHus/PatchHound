@@ -93,7 +93,12 @@ public class TenantAiProfilesController : ControllerBase
             request.BaseUrl,
             request.DeploymentName,
             request.ApiVersion,
-            request.KeepAlive
+            request.KeepAlive,
+            allowExternalResearch: request.AllowExternalResearch,
+            webResearchMode: ResolveWebResearchMode(request),
+            includeCitations: request.IncludeCitations,
+            maxResearchSources: request.MaxResearchSources,
+            allowedDomains: request.AllowedDomains
         );
 
         var secretRef = BuildSecretRef(tenantId, profile.Id);
@@ -118,7 +123,12 @@ public class TenantAiProfilesController : ControllerBase
                 request.DeploymentName,
                 request.ApiVersion,
                 request.KeepAlive,
-                secretRef
+                secretRef,
+                request.AllowExternalResearch,
+                ResolveWebResearchMode(request),
+                request.IncludeCitations,
+                request.MaxResearchSources,
+                request.AllowedDomains
             );
         }
 
@@ -143,7 +153,12 @@ public class TenantAiProfilesController : ControllerBase
                 request.DeploymentName,
                 request.ApiVersion,
                 request.KeepAlive,
-                profile.SecretRef
+                profile.SecretRef,
+                request.AllowExternalResearch,
+                ResolveWebResearchMode(request),
+                request.IncludeCitations,
+                request.MaxResearchSources,
+                request.AllowedDomains
             );
         }
 
@@ -221,7 +236,12 @@ public class TenantAiProfilesController : ControllerBase
             request.DeploymentName,
             request.ApiVersion,
             request.KeepAlive,
-            secretRef
+            secretRef,
+            request.AllowExternalResearch,
+            ResolveWebResearchMode(request),
+            request.IncludeCitations,
+            request.MaxResearchSources,
+            request.AllowedDomains
         );
         profile.ResetValidation();
 
@@ -267,7 +287,12 @@ public class TenantAiProfilesController : ControllerBase
             profile.DeploymentName,
             profile.ApiVersion,
             profile.KeepAlive,
-            profile.SecretRef
+            profile.SecretRef,
+            profile.AllowExternalResearch,
+            profile.WebResearchMode,
+            profile.IncludeCitations,
+            profile.MaxResearchSources,
+            profile.AllowedDomains
         );
 
         await _dbContext.SaveChangesAsync(ct);
@@ -372,7 +397,12 @@ public class TenantAiProfilesController : ControllerBase
                 profile.DeploymentName,
                 profile.ApiVersion,
                 profile.KeepAlive,
-                profile.SecretRef
+                profile.SecretRef,
+                profile.AllowExternalResearch,
+                profile.WebResearchMode,
+                profile.IncludeCitations,
+                profile.MaxResearchSources,
+                profile.AllowedDomains
             );
         }
     }
@@ -427,6 +457,21 @@ public class TenantAiProfilesController : ControllerBase
         if (request.IsDefault && !request.IsEnabled)
         {
             return new ProblemDetails { Title = "Default AI profiles must be enabled." };
+        }
+
+        if (request.AllowExternalResearch && request.MaxResearchSources <= 0)
+        {
+            return new ProblemDetails { Title = "Max research sources must be greater than 0 when external research is enabled." };
+        }
+
+        if (
+            request.AllowExternalResearch
+            && Enum.TryParse<TenantAiWebResearchMode>(request.WebResearchMode, true, out var researchMode)
+            && researchMode == TenantAiWebResearchMode.ProviderNative
+            && providerType != TenantAiProviderType.OpenAi
+        )
+        {
+            return new ProblemDetails { Title = "Provider-native web research is currently supported only for OpenAI profiles." };
         }
 
         switch (providerType)
@@ -491,11 +536,30 @@ public class TenantAiProfilesController : ControllerBase
             profile.DeploymentName,
             profile.ApiVersion,
             profile.KeepAlive,
+            profile.AllowExternalResearch,
+            profile.WebResearchMode.ToString(),
+            profile.IncludeCitations,
+            profile.MaxResearchSources,
+            profile.AllowedDomains,
             !string.IsNullOrWhiteSpace(profile.SecretRef),
             profile.LastValidatedAt,
             profile.LastValidationStatus.ToString(),
             profile.LastValidationError
         );
+
+    private static TenantAiWebResearchMode ResolveWebResearchMode(
+        SaveTenantAiProfileRequest request
+    )
+    {
+        if (!request.AllowExternalResearch)
+        {
+            return TenantAiWebResearchMode.Disabled;
+        }
+
+        return Enum.TryParse<TenantAiWebResearchMode>(request.WebResearchMode, true, out var mode)
+            ? mode
+            : TenantAiWebResearchMode.PatchHoundManaged;
+    }
 
     private static TenantAiProfileValidationResultDto MapValidationDto(TenantAiProfile profile) =>
         new(

@@ -21,6 +21,11 @@ public class TenantAiProfile
     public string ApiVersion { get; private set; } = string.Empty;
     public string KeepAlive { get; private set; } = string.Empty;
     public string SecretRef { get; private set; } = string.Empty;
+    public bool AllowExternalResearch { get; private set; }
+    public TenantAiWebResearchMode WebResearchMode { get; private set; }
+    public bool IncludeCitations { get; private set; }
+    public int MaxResearchSources { get; private set; }
+    public string AllowedDomains { get; private set; } = string.Empty;
     public DateTimeOffset? LastValidatedAt { get; private set; }
     public TenantAiProfileValidationStatus LastValidationStatus { get; private set; }
     public string LastValidationError { get; private set; } = string.Empty;
@@ -45,7 +50,12 @@ public class TenantAiProfile
         string deploymentName = "",
         string apiVersion = "",
         string keepAlive = "",
-        string secretRef = ""
+        string secretRef = "",
+        bool allowExternalResearch = false,
+        TenantAiWebResearchMode webResearchMode = TenantAiWebResearchMode.Disabled,
+        bool includeCitations = true,
+        int maxResearchSources = 5,
+        string allowedDomains = ""
     )
     {
         var now = DateTimeOffset.UtcNow;
@@ -68,6 +78,11 @@ public class TenantAiProfile
             ApiVersion = apiVersion.Trim(),
             KeepAlive = keepAlive.Trim(),
             SecretRef = secretRef.Trim(),
+            AllowExternalResearch = allowExternalResearch,
+            WebResearchMode = webResearchMode,
+            IncludeCitations = includeCitations,
+            MaxResearchSources = maxResearchSources,
+            AllowedDomains = allowedDomains.Trim(),
             LastValidationStatus = TenantAiProfileValidationStatus.Unknown,
             CreatedAt = now,
             UpdatedAt = now,
@@ -88,7 +103,12 @@ public class TenantAiProfile
         string deploymentName,
         string apiVersion,
         string keepAlive,
-        string secretRef
+        string secretRef,
+        bool allowExternalResearch,
+        TenantAiWebResearchMode webResearchMode,
+        bool includeCitations,
+        int maxResearchSources,
+        string allowedDomains
     )
     {
         Name = name.Trim();
@@ -105,6 +125,11 @@ public class TenantAiProfile
         ApiVersion = apiVersion.Trim();
         KeepAlive = keepAlive.Trim();
         SecretRef = secretRef.Trim();
+        AllowExternalResearch = allowExternalResearch;
+        WebResearchMode = webResearchMode;
+        IncludeCitations = includeCitations;
+        MaxResearchSources = maxResearchSources;
+        AllowedDomains = allowedDomains.Trim();
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 

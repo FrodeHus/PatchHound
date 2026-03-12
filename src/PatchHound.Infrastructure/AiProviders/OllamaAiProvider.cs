@@ -38,7 +38,7 @@ public class OllamaAiProvider : IAiReportProvider
     ) => SendGenerateAsync(
         profile,
         request.SystemPrompt,
-        request.UserPrompt,
+        BuildUserPrompt(request),
         profile.Profile.MaxOutputTokens,
         ct
     );
@@ -284,6 +284,16 @@ public class OllamaAiProvider : IAiReportProvider
         return normalized.EndsWith("/api", StringComparison.OrdinalIgnoreCase)
             ? normalized
             : $"{normalized}/api";
+    }
+
+    private static string BuildUserPrompt(AiTextGenerationRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.ExternalContext))
+        {
+            return request.UserPrompt;
+        }
+
+        return $"{request.UserPrompt}\n\nExternal research context:\n{request.ExternalContext}";
     }
 
     private static string NormalizeOpenAiBaseUrl(string baseUrl)
