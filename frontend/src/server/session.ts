@@ -28,9 +28,7 @@ const cookieOptions = {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __patchhoundFrontendSessionPool: Pool | undefined
-  // eslint-disable-next-line no-var
   var __patchhoundFrontendSessionTableReady: Promise<void> | undefined
 }
 
