@@ -567,6 +567,7 @@ public class IngestionServiceTests : IDisposable
 
         var run = await _dbContext.IngestionRuns.IgnoreQueryFilters().SingleAsync();
         run.Status.Should().Be(IngestionRunStatuses.FailedTerminal);
+        run.Error.Should().Be("Ingestion failed: external API authentication failed (401 Unauthorized).");
     }
 
     [Fact]
@@ -598,6 +599,38 @@ public class IngestionServiceTests : IDisposable
         run.Status.Should().Be(IngestionRunStatuses.FailedRecoverable);
         run.Error.Should().Contain("429 Too Many Requests");
         run.Error.Should().Contain("retry limit");
+    }
+
+    [Fact]
+    public async Task RunIngestionAsync_WhenCredentialsAreIncomplete_UsesSanitizedTerminalReason()
+    {
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(
+            TenantSourceConfiguration.Create(
+                _tenantId,
+                "test-source",
+                "Test Source",
+                true,
+                "0 * * * *"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        _source
+            .FetchVulnerabilitiesAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns<Task<IReadOnlyList<IngestionResult>>>(_ =>
+                throw new IngestionTerminalException("Microsoft Defender source credentials could not be resolved.")
+            );
+
+        var started = await _service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        started.Should().BeTrue();
+
+        var run = await _dbContext.IngestionRuns.IgnoreQueryFilters().SingleAsync();
+        run.Status.Should().Be(IngestionRunStatuses.FailedTerminal);
+        run.Error.Should().Be(
+            "Ingestion failed: source configuration is incomplete or invalid. Review source credentials and settings before retrying."
+        );
     }
 
     [Fact]
@@ -954,6 +987,146 @@ public class IngestionServiceTests : IDisposable
             );
         updatedCheckpoint.BatchNumber.Should().Be(2);
         updatedCheckpoint.Status.Should().Be("Completed");
+    }
+
+    [Fact]
+    public async Task RunIngestionAsync_WhenConcurrencyRetryOccurs_PreservesCommittedStagedBatches()
+    {
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(
+            TenantSourceConfiguration.Create(
+                _tenantId,
+                "retry-source",
+                "Retry Source",
+                true,
+                "0 * * * *"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var batchSource = Substitute.For<IVulnerabilitySource, IVulnerabilityBatchSource>();
+        batchSource.SourceKey.Returns("retry-source");
+        batchSource.SourceName.Returns("RetrySource");
+
+        var batchInterface = (IVulnerabilityBatchSource)batchSource;
+        batchInterface
+            .FetchVulnerabilityBatchAsync(_tenantId, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(
+                new SourceBatchResult<IngestionResult>(
+                    [
+                        new IngestionResult(
+                            "CVE-2026-RETRY-1",
+                            "Retry vuln 1",
+                            "Description",
+                            Severity.High,
+                            8.1m,
+                            null,
+                            null,
+                            []
+                        ),
+                    ],
+                    "cursor-2",
+                    false
+                )
+            );
+
+        var secondCursorAttempt = 0;
+        batchInterface
+            .FetchVulnerabilityBatchAsync(
+                _tenantId,
+                "cursor-2",
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>()
+            )
+            .Returns(_ =>
+            {
+                secondCursorAttempt++;
+                if (secondCursorAttempt == 1)
+                {
+                    throw new DbUpdateConcurrencyException("Simulated concurrency conflict");
+                }
+
+                return new SourceBatchResult<IngestionResult>(
+                    [
+                        new IngestionResult(
+                            "CVE-2026-RETRY-2",
+                            "Retry vuln 2",
+                            "Description",
+                            Severity.Critical,
+                            9.3m,
+                            null,
+                            null,
+                            []
+                        ),
+                    ],
+                    null,
+                    true
+                );
+            });
+
+        var logger = Substitute.For<ILogger<IngestionService>>();
+        var taskProjectionService = new RemediationTaskProjectionService(
+            _dbContext,
+            new SlaService()
+        );
+        var assessmentService = new VulnerabilityAssessmentService(
+            _dbContext,
+            new EnvironmentalSeverityCalculator()
+        );
+        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
+        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
+            _dbContext,
+            normalizedSoftwareResolver
+        );
+        var softwareMatchService = new SoftwareVulnerabilityMatchService(
+            _dbContext,
+            normalizedSoftwareProjectionService
+        );
+        var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
+            _dbContext,
+            Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
+        );
+        var stagedMergeService = new StagedVulnerabilityMergeService(
+            _dbContext,
+            assessmentService,
+            taskProjectionService
+        );
+        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
+        var service = new IngestionService(
+            _dbContext,
+            [batchSource],
+            enrichmentJobEnqueuer,
+            assessmentService,
+            softwareMatchService,
+            normalizedSoftwareProjectionService,
+            taskProjectionService,
+            stagedMergeService,
+            stagedAssetMergeService,
+            logger
+        );
+
+        var started = await service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        started.Should().BeTrue();
+
+        var vulnerabilities = await _dbContext
+            .VulnerabilityDefinitions.IgnoreQueryFilters()
+            .OrderBy(item => item.ExternalId)
+            .Select(item => item.ExternalId)
+            .ToListAsync();
+        vulnerabilities.Should().Equal(["CVE-2026-RETRY-1", "CVE-2026-RETRY-2"]);
+
+        var checkpoints = await _dbContext
+            .IngestionCheckpoints.IgnoreQueryFilters()
+            .Where(item => item.SourceKey == "retry-source" && item.Phase == "vulnerability-staging")
+            .ToListAsync();
+        checkpoints.Should().ContainSingle();
+        checkpoints[0].BatchNumber.Should().Be(2);
+        checkpoints[0].Status.Should().Be("Completed");
+
+        await batchInterface
+            .Received(1)
+            .FetchVulnerabilityBatchAsync(_tenantId, null, Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -1446,6 +1619,11 @@ public class IngestionServiceTests : IDisposable
             0,
             0,
             0,
+            0,
+            0,
+            0,
+            0,
+            0,
             0
         );
         await _dbContext.IngestionRuns.AddAsync(oldRun);
@@ -1585,6 +1763,11 @@ public class IngestionServiceTests : IDisposable
             1,
             1,
             1,
+            0,
+            0,
+            0,
+            0,
+            0,
             0,
             0,
             0,

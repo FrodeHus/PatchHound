@@ -22,30 +22,60 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
     )
     {
         var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var stagedAssets = await dbContext
+        var stagedMachineCount = await dbContext
             .StagedAssets.IgnoreQueryFilters()
-            .Where(item =>
-                item.IngestionRunId == ingestionRunId
-                && item.TenantId == tenantId
-                && item.SourceKey == normalizedSourceKey
-            )
-            .OrderBy(item => item.ExternalId)
-            .ToListAsync(ct);
-        var stagedLinks = await dbContext
+            .CountAsync(
+                item =>
+                    item.IngestionRunId == ingestionRunId
+                    && item.TenantId == tenantId
+                    && item.SourceKey == normalizedSourceKey
+                    && item.AssetType == AssetType.Device,
+                ct
+            );
+        var stagedSoftwareCount = await dbContext
+            .StagedAssets.IgnoreQueryFilters()
+            .CountAsync(
+                item =>
+                    item.IngestionRunId == ingestionRunId
+                    && item.TenantId == tenantId
+                    && item.SourceKey == normalizedSourceKey
+                    && item.AssetType == AssetType.Software,
+                ct
+            );
+        var stagedLinkCount = await dbContext
             .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
-            .Where(item =>
-                item.IngestionRunId == ingestionRunId
-                && item.TenantId == tenantId
-                && item.SourceKey == normalizedSourceKey
-            )
-            .OrderBy(item => item.DeviceExternalId)
-            .ThenBy(item => item.SoftwareExternalId)
-            .ToListAsync(ct);
+            .CountAsync(
+                item =>
+                    item.IngestionRunId == ingestionRunId
+                    && item.TenantId == tenantId
+                    && item.SourceKey == normalizedSourceKey,
+                ct
+            );
 
         var mergedAssetCount = 0;
+        var persistedMachineCount = 0;
+        var persistedSoftwareCount = 0;
+        Guid? lastProcessedAssetId = null;
 
-        foreach (var chunk in Chunk(stagedAssets, AssetChunkSize))
+        while (true)
         {
+            var chunk = await dbContext
+                .StagedAssets.IgnoreQueryFilters()
+                .Where(item =>
+                    item.IngestionRunId == ingestionRunId
+                    && item.TenantId == tenantId
+                    && item.SourceKey == normalizedSourceKey
+                    && (!lastProcessedAssetId.HasValue || item.Id.CompareTo(lastProcessedAssetId.Value) > 0)
+                )
+                .OrderBy(item => item.Id)
+                .Take(AssetChunkSize)
+                .ToListAsync(ct);
+
+            if (chunk.Count == 0)
+            {
+                break;
+            }
+
             var chunkExternalIds = chunk.Select(item => item.ExternalId).Distinct().ToList();
             var existingAssetsByExternalId = await dbContext
                 .Assets.IgnoreQueryFilters()
@@ -66,6 +96,14 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                 }
 
                 mergedAssetCount++;
+                if (asset.AssetType == AssetType.Device)
+                {
+                    persistedMachineCount++;
+                }
+                else if (asset.AssetType == AssetType.Software)
+                {
+                    persistedSoftwareCount++;
+                }
 
                 existingAssetsByExternalId.TryGetValue(asset.ExternalId, out var existing);
 
@@ -131,23 +169,13 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 
             await dbContext.SaveChangesAsync(ct);
             dbContext.ChangeTracker.Clear();
+            lastProcessedAssetId = chunk[^1].Id;
         }
 
-        var links = stagedLinks
-            .Select(item =>
-                JsonSerializer.Deserialize<IngestionDeviceSoftwareLink>(
-                    item.PayloadJson,
-                    StagingJsonOptions
-                )
-            )
-            .Where(item => item is not null)
-            .Cast<IngestionDeviceSoftwareLink>()
-            .ToList();
-
         var softwareLinkSummary = await ProcessDeviceSoftwareLinksAsync(
+            ingestionRunId,
             tenantId,
-            links,
-            new Dictionary<string, Guid>(StringComparer.Ordinal),
+            normalizedSourceKey,
             ct
         );
 
@@ -155,9 +183,12 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
         dbContext.ChangeTracker.Clear();
 
         return new StagedAssetMergeSummary(
-            stagedAssets.Count,
+            stagedMachineCount,
+            stagedSoftwareCount,
             mergedAssetCount,
-            stagedLinks.Count,
+            persistedMachineCount,
+            persistedSoftwareCount,
+            stagedLinkCount,
             softwareLinkSummary.ResolvedLinkCount,
             softwareLinkSummary.InstallationsCreated,
             softwareLinkSummary.InstallationsTouched,
@@ -169,26 +200,113 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
     }
 
     private async Task<StagedAssetSoftwareLinkSummary> ProcessDeviceSoftwareLinksAsync(
+        Guid ingestionRunId,
+        Guid tenantId,
+        string sourceKey,
+        CancellationToken ct
+    )
+    {
+        var assetIdsByExternalId = await dbContext
+            .Assets.IgnoreQueryFilters()
+            .Where(asset => asset.TenantId == tenantId)
+            .Select(asset => new { asset.Id, asset.ExternalId })
+            .ToDictionaryAsync(asset => asset.ExternalId, asset => asset.Id, StringComparer.Ordinal, ct);
+
+        var resolvedLinkCount = 0;
+        var installationsCreated = 0;
+        var installationsTouched = 0;
+        var episodesOpened = 0;
+        var episodesSeen = 0;
+        var stagedPairKeys = new HashSet<string>(StringComparer.Ordinal);
+        Guid? lastProcessedLinkId = null;
+
+        while (true)
+        {
+            var linkChunk = await dbContext
+                .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
+                .Where(item =>
+                    item.IngestionRunId == ingestionRunId
+                    && item.TenantId == tenantId
+                    && item.SourceKey == sourceKey
+                    && (!lastProcessedLinkId.HasValue || item.Id.CompareTo(lastProcessedLinkId.Value) > 0)
+                )
+                .OrderBy(item => item.Id)
+                .Take(AssetChunkSize)
+                .ToListAsync(ct);
+
+            if (linkChunk.Count == 0)
+            {
+                break;
+            }
+
+            var links = linkChunk
+                .Select(item =>
+                    JsonSerializer.Deserialize<IngestionDeviceSoftwareLink>(
+                        item.PayloadJson,
+                        StagingJsonOptions
+                    )
+                )
+                .Where(item => item is not null)
+                .Cast<IngestionDeviceSoftwareLink>()
+                .ToList();
+
+            var chunkSummary = await ProcessDeviceSoftwareLinkChunkAsync(
+                tenantId,
+                links,
+                assetIdsByExternalId,
+                ct
+            );
+
+            foreach (var pairKey in chunkSummary.SeenPairKeys)
+            {
+                stagedPairKeys.Add(pairKey);
+            }
+
+            resolvedLinkCount += chunkSummary.ResolvedLinkCount;
+            installationsCreated += chunkSummary.InstallationsCreated;
+            installationsTouched += chunkSummary.InstallationsTouched;
+            episodesOpened += chunkSummary.EpisodesOpened;
+            episodesSeen += chunkSummary.EpisodesSeen;
+            await dbContext.SaveChangesAsync(ct);
+            dbContext.ChangeTracker.Clear();
+            lastProcessedLinkId = linkChunk[^1].Id;
+        }
+
+        var staleSummary = await ReconcileMissingDeviceSoftwareLinksAsync(
+            tenantId,
+            assetIdsByExternalId,
+            stagedPairKeys,
+            ct
+        );
+
+        return new StagedAssetSoftwareLinkSummary(
+            resolvedLinkCount,
+            installationsCreated,
+            installationsTouched,
+            episodesOpened,
+            episodesSeen,
+            staleSummary.StaleInstallationsMarked,
+            staleSummary.InstallationsRemoved
+        );
+    }
+
+    private async Task<StagedAssetSoftwareLinkChunkSummary> ProcessDeviceSoftwareLinkChunkAsync(
         Guid tenantId,
         IReadOnlyList<IngestionDeviceSoftwareLink> links,
-        Dictionary<string, Guid> assetIdsByExternalId,
+        IReadOnlyDictionary<string, Guid> assetIdsByExternalId,
         CancellationToken ct
     )
     {
         if (links.Count == 0)
         {
-            return new StagedAssetSoftwareLinkSummary(0, 0, 0, 0, 0, 0, 0);
-        }
-
-        var persistedAssetIds = await dbContext
-            .Assets.IgnoreQueryFilters()
-            .Where(asset => asset.TenantId == tenantId)
-            .Select(asset => new { asset.Id, asset.ExternalId })
-            .ToListAsync(ct);
-
-        foreach (var asset in persistedAssetIds)
-        {
-            assetIdsByExternalId.TryAdd(asset.ExternalId, asset.Id);
+            return new StagedAssetSoftwareLinkChunkSummary(
+                0,
+                0,
+                0,
+                0,
+                0,
+                new HashSet<string>(StringComparer.Ordinal)
+            );
         }
 
         var resolvedLinks = links
@@ -219,7 +337,14 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 
         if (resolvedLinks.Count == 0)
         {
-            return new StagedAssetSoftwareLinkSummary(0, 0, 0, 0, 0, 0, 0);
+            return new StagedAssetSoftwareLinkChunkSummary(
+                0,
+                0,
+                0,
+                0,
+                0,
+                new HashSet<string>(StringComparer.Ordinal)
+            );
         }
 
         var installationsCreated = 0;
@@ -323,6 +448,24 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
         var seenKeys = resolvedLinks
             .Select(link => $"{link.DeviceExternalId}:{link.SoftwareExternalId}")
             .ToHashSet(StringComparer.Ordinal);
+
+        return new StagedAssetSoftwareLinkChunkSummary(
+            resolvedLinks.Count,
+            installationsCreated,
+            installationsTouched,
+            episodesOpened,
+            episodesSeen,
+            seenKeys
+        );
+    }
+
+    private async Task<StagedAssetStaleLinkSummary> ReconcileMissingDeviceSoftwareLinksAsync(
+        Guid tenantId,
+        IReadOnlyDictionary<string, Guid> assetIdsByExternalId,
+        IReadOnlySet<string> stagedPairKeys,
+        CancellationToken ct
+    )
+    {
         var currentInstallations = await dbContext
             .DeviceSoftwareInstallations.IgnoreQueryFilters()
             .Where(current => current.TenantId == tenantId)
@@ -330,15 +473,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 
         if (currentInstallations.Count == 0)
         {
-            return new StagedAssetSoftwareLinkSummary(
-                resolvedLinks.Count,
-                installationsCreated,
-                installationsTouched,
-                episodesOpened,
-                episodesSeen,
-                0,
-                0
-            );
+            return new StagedAssetStaleLinkSummary(0, 0);
         }
 
         var externalIdsByAssetId = assetIdsByExternalId.ToDictionary(
@@ -363,7 +498,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                 continue;
             }
 
-            if (seenKeys.Contains($"{deviceExternalId}:{softwareExternalId}"))
+            if (stagedPairKeys.Contains($"{deviceExternalId}:{softwareExternalId}"))
             {
                 continue;
             }
@@ -373,15 +508,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 
         if (staleInstallations.Count == 0)
         {
-            return new StagedAssetSoftwareLinkSummary(
-                resolvedLinks.Count,
-                installationsCreated,
-                installationsTouched,
-                episodesOpened,
-                episodesSeen,
-                0,
-                0
-            );
+            return new StagedAssetStaleLinkSummary(0, 0);
         }
 
         var staleOpenEpisodes = await dbContext
@@ -426,41 +553,21 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
             }
         }
 
-        return new StagedAssetSoftwareLinkSummary(
-            resolvedLinks.Count,
-            installationsCreated,
-            installationsTouched,
-            episodesOpened,
-            episodesSeen,
-            staleInstallations.Count,
-            installationsRemoved
-        );
+        return new StagedAssetStaleLinkSummary(staleInstallations.Count, installationsRemoved);
     }
 
     private static string BuildPairKey(Guid leftId, Guid rightId)
     {
         return $"{leftId:N}:{rightId:N}";
     }
-
-    private static IEnumerable<IReadOnlyList<T>> Chunk<T>(IReadOnlyList<T> items, int size)
-    {
-        for (var index = 0; index < items.Count; index += size)
-        {
-            var count = Math.Min(size, items.Count - index);
-            var chunk = new List<T>(count);
-            for (var offset = 0; offset < count; offset++)
-            {
-                chunk.Add(items[index + offset]);
-            }
-
-            yield return chunk;
-        }
-    }
 }
 
 public sealed record StagedAssetMergeSummary(
-    int StagedAssetCount,
+    int StagedMachineCount,
+    int StagedSoftwareCount,
     int MergedAssetCount,
+    int PersistedMachineCount,
+    int PersistedSoftwareCount,
     int StagedSoftwareLinkCount,
     int ResolvedSoftwareLinkCount,
     int InstallationsCreated,
@@ -477,6 +584,20 @@ internal sealed record StagedAssetSoftwareLinkSummary(
     int InstallationsTouched,
     int EpisodesOpened,
     int EpisodesSeen,
+    int StaleInstallationsMarked,
+    int InstallationsRemoved
+);
+
+internal sealed record StagedAssetSoftwareLinkChunkSummary(
+    int ResolvedLinkCount,
+    int InstallationsCreated,
+    int InstallationsTouched,
+    int EpisodesOpened,
+    int EpisodesSeen,
+    IReadOnlySet<string> SeenPairKeys
+);
+
+internal sealed record StagedAssetStaleLinkSummary(
     int StaleInstallationsMarked,
     int InstallationsRemoved
 );

@@ -17,6 +17,17 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
         "ClientSecret",
         "PasswordHash",
     };
+    private static readonly HashSet<string> IngestionCleanupEntityTypes = new(
+        StringComparer.Ordinal
+    )
+    {
+        nameof(IngestionRun),
+        nameof(IngestionCheckpoint),
+        nameof(StagedAsset),
+        nameof(StagedVulnerability),
+        nameof(StagedVulnerabilityExposure),
+        nameof(StagedDeviceSoftwareInstallation),
+    };
 
     private readonly ITenantContext _tenantContext;
 
@@ -47,6 +58,11 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
 
         foreach (var entry in entries)
         {
+            if (ShouldSkipAudit(entry))
+            {
+                continue;
+            }
+
             var entityId = GetEntityId(entry);
             var tenantId = GetTenantId(entry);
             var action = entry.State switch
@@ -95,6 +111,12 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
         }
 
         return base.SavingChangesAsync(eventData, result, cancellationToken);
+    }
+
+    private static bool ShouldSkipAudit(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry)
+    {
+        return entry.State == EntityState.Deleted
+            && IngestionCleanupEntityTypes.Contains(entry.Entity.GetType().Name);
     }
 
     private static Guid GetEntityId(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry)

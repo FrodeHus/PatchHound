@@ -23,7 +23,12 @@ public class IngestionRun
     public int FetchedSoftwareCount { get; private set; }
     public int FetchedSoftwareInstallationCount { get; private set; }
     public int SoftwareWithoutMachineReferencesCount { get; private set; }
+    public int StagedMachineCount { get; private set; }
+    public int StagedSoftwareCount { get; private set; }
     public int StagedVulnerabilityCount { get; private set; }
+    public int PersistedMachineCount { get; private set; }
+    public int PersistedSoftwareCount { get; private set; }
+    public int PersistedVulnerabilityCount { get; private set; }
     public int StagedExposureCount { get; private set; }
     public int MergedExposureCount { get; private set; }
     public int OpenedProjectionCount { get; private set; }
@@ -66,7 +71,12 @@ public class IngestionRun
         int fetchedSoftwareCount,
         int fetchedSoftwareInstallationCount,
         int softwareWithoutMachineReferencesCount,
+        int stagedMachineCount,
+        int stagedSoftwareCount,
         int stagedVulnerabilityCount,
+        int persistedMachineCount,
+        int persistedSoftwareCount,
+        int persistedVulnerabilityCount,
         int stagedExposureCount,
         int mergedExposureCount,
         int openedProjectionCount,
@@ -90,7 +100,12 @@ public class IngestionRun
         FetchedSoftwareCount = fetchedSoftwareCount;
         FetchedSoftwareInstallationCount = fetchedSoftwareInstallationCount;
         SoftwareWithoutMachineReferencesCount = softwareWithoutMachineReferencesCount;
+        StagedMachineCount = stagedMachineCount;
+        StagedSoftwareCount = stagedSoftwareCount;
         StagedVulnerabilityCount = stagedVulnerabilityCount;
+        PersistedMachineCount = persistedMachineCount;
+        PersistedSoftwareCount = persistedSoftwareCount;
+        PersistedVulnerabilityCount = persistedVulnerabilityCount;
         StagedExposureCount = stagedExposureCount;
         MergedExposureCount = mergedExposureCount;
         OpenedProjectionCount = openedProjectionCount;
@@ -117,7 +132,12 @@ public class IngestionRun
         int fetchedSoftwareCount,
         int fetchedSoftwareInstallationCount,
         int softwareWithoutMachineReferencesCount,
+        int stagedMachineCount,
+        int stagedSoftwareCount,
         int stagedVulnerabilityCount,
+        int persistedMachineCount,
+        int persistedSoftwareCount,
+        int persistedVulnerabilityCount,
         int stagedExposureCount,
         int mergedExposureCount,
         int openedProjectionCount,
@@ -141,7 +161,12 @@ public class IngestionRun
         FetchedSoftwareCount = fetchedSoftwareCount;
         FetchedSoftwareInstallationCount = fetchedSoftwareInstallationCount;
         SoftwareWithoutMachineReferencesCount = softwareWithoutMachineReferencesCount;
+        StagedMachineCount = stagedMachineCount;
+        StagedSoftwareCount = stagedSoftwareCount;
         StagedVulnerabilityCount = stagedVulnerabilityCount;
+        PersistedMachineCount = persistedMachineCount;
+        PersistedSoftwareCount = persistedSoftwareCount;
+        PersistedVulnerabilityCount = persistedVulnerabilityCount;
         StagedExposureCount = stagedExposureCount;
         MergedExposureCount = mergedExposureCount;
         OpenedProjectionCount = openedProjectionCount;
