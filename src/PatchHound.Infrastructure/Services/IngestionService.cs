@@ -1111,7 +1111,20 @@ public class IngestionService
                             && item.ActiveIngestionRunId == runId,
                         ct
                     );
-                source?.ReleaseLease(runId);
+                if (source is not null)
+                {
+                    source.ReleaseLease(runId);
+                    source.UpdateRuntime(
+                        source.ManualRequestedAt,
+                        source.LastStartedAt,
+                        completedAt,
+                        succeeded ? completedAt : source.LastSucceededAt,
+                        succeeded
+                            ? IngestionRunStatuses.Succeeded
+                            : failureStatus ?? IngestionRunStatuses.FailedRecoverable,
+                        succeeded ? string.Empty : error ?? "Unknown ingestion failure"
+                    );
+                }
                 await _dbContext.SaveChangesAsync(ct);
                 return;
             }
@@ -1180,6 +1193,30 @@ public class IngestionService
                             .SetProperty(item => item.ActiveIngestionRunId, (Guid?)null)
                             .SetProperty(item => item.LeaseAcquiredAt, (DateTimeOffset?)null)
                             .SetProperty(item => item.LeaseExpiresAt, (DateTimeOffset?)null),
+                    ct
+                );
+
+            await _dbContext
+                .TenantSourceConfigurations.IgnoreQueryFilters()
+                .Where(item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey)
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(item => item.LastCompletedAt, completedAt)
+                            .SetProperty(
+                                item => item.LastSucceededAt,
+                                item => succeeded ? completedAt : item.LastSucceededAt
+                            )
+                            .SetProperty(
+                                item => item.LastStatus,
+                                succeeded
+                                    ? IngestionRunStatuses.Succeeded
+                                    : failureStatus ?? IngestionRunStatuses.FailedRecoverable
+                            )
+                            .SetProperty(
+                                item => item.LastError,
+                                succeeded ? string.Empty : error ?? "Unknown ingestion failure"
+                            ),
                     ct
                 );
 

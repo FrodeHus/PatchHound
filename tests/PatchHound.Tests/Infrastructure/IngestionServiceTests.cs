@@ -536,6 +536,9 @@ public class IngestionServiceTests : IDisposable
         source.ActiveIngestionRunId.Should().BeNull();
         source.LeaseAcquiredAt.Should().BeNull();
         source.LeaseExpiresAt.Should().BeNull();
+        source.LastStatus.Should().Be(IngestionRunStatuses.Succeeded);
+        source.LastCompletedAt.Should().NotBeNull();
+        source.LastError.Should().BeEmpty();
     }
 
     [Fact]

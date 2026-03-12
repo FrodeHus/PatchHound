@@ -206,18 +206,14 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
         CancellationToken ct
     )
     {
-        var assetIdsByExternalId = await dbContext
-            .Assets.IgnoreQueryFilters()
-            .Where(asset => asset.TenantId == tenantId)
-            .Select(asset => new { asset.Id, asset.ExternalId })
-            .ToDictionaryAsync(asset => asset.ExternalId, asset => asset.Id, StringComparer.Ordinal, ct);
-
         var resolvedLinkCount = 0;
         var installationsCreated = 0;
         var installationsTouched = 0;
         var episodesOpened = 0;
         var episodesSeen = 0;
         var stagedPairKeys = new HashSet<string>(StringComparer.Ordinal);
+        var touchedDeviceExternalIds = new HashSet<string>(StringComparer.Ordinal);
+        var touchedSoftwareExternalIds = new HashSet<string>(StringComparer.Ordinal);
         Guid? lastProcessedLinkId = null;
 
         while (true)
@@ -250,6 +246,32 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                 .Cast<IngestionDeviceSoftwareLink>()
                 .ToList();
 
+            foreach (var link in links)
+            {
+                touchedDeviceExternalIds.Add(link.DeviceExternalId);
+                touchedSoftwareExternalIds.Add(link.SoftwareExternalId);
+            }
+
+            var chunkExternalIds = links
+                .SelectMany(link => new[] { link.DeviceExternalId, link.SoftwareExternalId })
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            var assetIdsByExternalId =
+                chunkExternalIds.Count == 0
+                    ? new Dictionary<string, Guid>(StringComparer.Ordinal)
+                    : await dbContext
+                        .Assets.IgnoreQueryFilters()
+                        .Where(asset =>
+                            asset.TenantId == tenantId && chunkExternalIds.Contains(asset.ExternalId)
+                        )
+                        .Select(asset => new { asset.Id, asset.ExternalId })
+                        .ToDictionaryAsync(
+                            asset => asset.ExternalId,
+                            asset => asset.Id,
+                            StringComparer.Ordinal,
+                            ct
+                        );
+
             var chunkSummary = await ProcessDeviceSoftwareLinkChunkAsync(
                 tenantId,
                 links,
@@ -274,7 +296,8 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 
         var staleSummary = await ReconcileMissingDeviceSoftwareLinksAsync(
             tenantId,
-            assetIdsByExternalId,
+            touchedDeviceExternalIds,
+            touchedSoftwareExternalIds,
             stagedPairKeys,
             ct
         );
@@ -461,14 +484,50 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 
     private async Task<StagedAssetStaleLinkSummary> ReconcileMissingDeviceSoftwareLinksAsync(
         Guid tenantId,
-        IReadOnlyDictionary<string, Guid> assetIdsByExternalId,
+        IReadOnlySet<string> touchedDeviceExternalIds,
+        IReadOnlySet<string> touchedSoftwareExternalIds,
         IReadOnlySet<string> stagedPairKeys,
         CancellationToken ct
     )
     {
+        if (touchedDeviceExternalIds.Count == 0 || touchedSoftwareExternalIds.Count == 0)
+        {
+            return new StagedAssetStaleLinkSummary(0, 0);
+        }
+
+        var touchedAssets = await dbContext
+            .Assets.IgnoreQueryFilters()
+            .Where(asset =>
+                asset.TenantId == tenantId
+                && (
+                    touchedDeviceExternalIds.Contains(asset.ExternalId)
+                    || touchedSoftwareExternalIds.Contains(asset.ExternalId)
+                )
+            )
+            .Select(asset => new { asset.Id, asset.ExternalId })
+            .ToListAsync(ct);
+
+        var deviceExternalIdsByAssetId = touchedAssets
+            .Where(asset => touchedDeviceExternalIds.Contains(asset.ExternalId))
+            .ToDictionary(asset => asset.Id, asset => asset.ExternalId);
+        var softwareExternalIdsByAssetId = touchedAssets
+            .Where(asset => touchedSoftwareExternalIds.Contains(asset.ExternalId))
+            .ToDictionary(asset => asset.Id, asset => asset.ExternalId);
+
+        if (deviceExternalIdsByAssetId.Count == 0 || softwareExternalIdsByAssetId.Count == 0)
+        {
+            return new StagedAssetStaleLinkSummary(0, 0);
+        }
+
+        var deviceAssetIds = deviceExternalIdsByAssetId.Keys.ToList();
+        var softwareAssetIds = softwareExternalIdsByAssetId.Keys.ToList();
         var currentInstallations = await dbContext
             .DeviceSoftwareInstallations.IgnoreQueryFilters()
-            .Where(current => current.TenantId == tenantId)
+            .Where(current =>
+                current.TenantId == tenantId
+                && deviceAssetIds.Contains(current.DeviceAssetId)
+                && softwareAssetIds.Contains(current.SoftwareAssetId)
+            )
             .ToListAsync(ct);
 
         if (currentInstallations.Count == 0)
@@ -476,35 +535,26 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
             return new StagedAssetStaleLinkSummary(0, 0);
         }
 
-        var externalIdsByAssetId = assetIdsByExternalId.ToDictionary(
-            pair => pair.Value,
-            pair => pair.Key
-        );
-        var staleInstallations = new List<DeviceSoftwareInstallation>();
-
-        foreach (var installation in currentInstallations)
-        {
-            if (
-                !externalIdsByAssetId.TryGetValue(
-                    installation.DeviceAssetId,
-                    out var deviceExternalId
-                )
-                || !externalIdsByAssetId.TryGetValue(
-                    installation.SoftwareAssetId,
-                    out var softwareExternalId
-                )
-            )
+        var staleInstallations = currentInstallations
+            .Where(installation =>
             {
-                continue;
-            }
+                if (
+                    !deviceExternalIdsByAssetId.TryGetValue(
+                        installation.DeviceAssetId,
+                        out var deviceExternalId
+                    )
+                    || !softwareExternalIdsByAssetId.TryGetValue(
+                        installation.SoftwareAssetId,
+                        out var softwareExternalId
+                    )
+                )
+                {
+                    return false;
+                }
 
-            if (stagedPairKeys.Contains($"{deviceExternalId}:{softwareExternalId}"))
-            {
-                continue;
-            }
-
-            staleInstallations.Add(installation);
-        }
+                return !stagedPairKeys.Contains($"{deviceExternalId}:{softwareExternalId}");
+            })
+            .ToList();
 
         if (staleInstallations.Count == 0)
         {

@@ -589,17 +589,13 @@ public class TenantsController : ControllerBase
         if (run is null)
             return NotFound(new ProblemDetails { Title = "Ingestion run not found" });
 
-        var isActiveRun =
-            source.ActiveIngestionRunId == runId
-            || (run.CompletedAt is null && IngestionRunStatePolicy.IsActive(run.Status));
-
-        if (!isActiveRun)
+        if (run.CompletedAt is not null)
         {
             return Conflict(
                 new ProblemDetails
                 {
                     Title = "Only active ingestion runs can be aborted",
-                    Detail = "This run is no longer active.",
+                    Detail = "This run has already completed.",
                 }
             );
         }
@@ -608,15 +604,18 @@ public class TenantsController : ControllerBase
         var abortedMessage = IngestionFailurePolicy.Describe(new IngestionAbortedException());
         run.RequestAbort(now);
         run.Abort(now, abortedMessage);
-        source.ReleaseLease(runId);
-        source.UpdateRuntime(
-            source.ManualRequestedAt,
-            source.LastStartedAt,
-            now,
-            source.LastSucceededAt,
-            IngestionRunStatuses.FailedTerminal,
-            abortedMessage
-        );
+        if (source.ActiveIngestionRunId == runId)
+        {
+            source.ReleaseLease(runId);
+            source.UpdateRuntime(
+                source.ManualRequestedAt,
+                source.LastStartedAt,
+                now,
+                source.LastSucceededAt,
+                IngestionRunStatuses.FailedTerminal,
+                abortedMessage
+            );
+        }
         await _dbContext.SaveChangesAsync(ct);
 
         return Accepted();
