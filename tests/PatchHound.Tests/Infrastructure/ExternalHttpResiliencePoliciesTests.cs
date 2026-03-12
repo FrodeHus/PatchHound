@@ -48,10 +48,30 @@ public class ExternalHttpResiliencePoliciesTests
 
         var delay = ExternalHttpResiliencePolicies.GetRetryDelay(
             new Polly.DelegateResult<HttpResponseMessage>(response),
-            attempt: 1
+            attempt: 1,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            honorRetryAfterFully: false
         );
 
         delay.Should().Be(TimeSpan.FromSeconds(7));
+    }
+
+    [Fact]
+    public void GetRetryDelay_ForDefender_HonorsRetryAfterWithoutClamping()
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(
+            TimeSpan.FromSeconds(90)
+        );
+
+        var delay = ExternalHttpResiliencePolicies.GetRetryDelay(
+            new Polly.DelegateResult<HttpResponseMessage>(response),
+            attempt: 1,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            honorRetryAfterFully: true
+        );
+
+        delay.Should().Be(TimeSpan.FromSeconds(90));
     }
 
     [Fact]
@@ -61,7 +81,9 @@ public class ExternalHttpResiliencePoliciesTests
 
         var delay = ExternalHttpResiliencePolicies.GetRetryDelay(
             new Polly.DelegateResult<HttpResponseMessage>(response),
-            attempt: 2
+            attempt: 2,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            honorRetryAfterFully: false
         );
 
         delay.Should().Be(TimeSpan.FromSeconds(4));

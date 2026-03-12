@@ -1206,6 +1206,187 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RunIngestionAsync_WhenBatchSourceHasMultiplePages_MergesAllPages()
+    {
+        var batchSource = Substitute.For<
+            IVulnerabilitySource,
+            IAssetInventoryBatchSource,
+            IVulnerabilityBatchSource
+        >();
+        batchSource.SourceKey.Returns("paged-source");
+        batchSource.SourceName.Returns("PagedSource");
+
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(
+            TenantSourceConfiguration.Create(
+                _tenantId,
+                "paged-source",
+                "Paged Source",
+                true,
+                "0 * * * *"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var assetBatchInterface = (IAssetInventoryBatchSource)batchSource;
+        assetBatchInterface
+            .FetchAssetBatchAsync(_tenantId, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(
+                new SourceBatchResult<IngestionAssetInventorySnapshot>(
+                    [
+                        new IngestionAssetInventorySnapshot(
+                            [
+                                new IngestionAsset("DEVICE-1", "Device 1", AssetType.Device),
+                                new IngestionAsset("DEVICE-2", "Device 2", AssetType.Device),
+                            ],
+                            []
+                        ),
+                    ],
+                    "asset-cursor-2",
+                    false
+                )
+            );
+        assetBatchInterface
+            .FetchAssetBatchAsync(_tenantId, "asset-cursor-2", Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(
+                new SourceBatchResult<IngestionAssetInventorySnapshot>(
+                    [
+                        new IngestionAssetInventorySnapshot(
+                            [
+                                new IngestionAsset("DEVICE-3", "Device 3", AssetType.Device),
+                                new IngestionAsset("DEVICE-4", "Device 4", AssetType.Device),
+                            ],
+                            []
+                        ),
+                    ],
+                    null,
+                    true
+                )
+            );
+
+        var vulnerabilityBatchInterface = (IVulnerabilityBatchSource)batchSource;
+        vulnerabilityBatchInterface
+            .FetchVulnerabilityBatchAsync(_tenantId, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(
+                new SourceBatchResult<IngestionResult>(
+                    [
+                        new IngestionResult(
+                            "CVE-2026-1001",
+                            "Paged Vuln 1",
+                            "Desc 1",
+                            Severity.High,
+                            8.0m,
+                            null,
+                            DateTimeOffset.UtcNow,
+                            [new IngestionAffectedAsset("DEVICE-1", "Device 1", AssetType.Device)]
+                        ),
+                        new IngestionResult(
+                            "CVE-2026-1002",
+                            "Paged Vuln 2",
+                            "Desc 2",
+                            Severity.Critical,
+                            9.0m,
+                            null,
+                            DateTimeOffset.UtcNow,
+                            [new IngestionAffectedAsset("DEVICE-3", "Device 3", AssetType.Device)]
+                        ),
+                    ],
+                    "vulnerability-cursor-2",
+                    false
+                )
+            );
+        vulnerabilityBatchInterface
+            .FetchVulnerabilityBatchAsync(
+                _tenantId,
+                "vulnerability-cursor-2",
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>()
+            )
+            .Returns(
+                new SourceBatchResult<IngestionResult>(
+                    [
+                        new IngestionResult(
+                            "CVE-2026-1003",
+                            "Paged Vuln 3",
+                            "Desc 3",
+                            Severity.High,
+                            7.5m,
+                            null,
+                            DateTimeOffset.UtcNow,
+                            [new IngestionAffectedAsset("DEVICE-4", "Device 4", AssetType.Device)]
+                        ),
+                    ],
+                    null,
+                    true
+                )
+            );
+
+        var logger = Substitute.For<ILogger<IngestionService>>();
+        var taskProjectionService = new RemediationTaskProjectionService(
+            _dbContext,
+            new SlaService()
+        );
+        var assessmentService = new VulnerabilityAssessmentService(
+            _dbContext,
+            new EnvironmentalSeverityCalculator()
+        );
+        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
+        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
+            _dbContext,
+            normalizedSoftwareResolver
+        );
+        var softwareMatchService = new SoftwareVulnerabilityMatchService(
+            _dbContext,
+            normalizedSoftwareProjectionService
+        );
+        var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
+            _dbContext,
+            Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
+        );
+        var stagedMergeService = new StagedVulnerabilityMergeService(
+            _dbContext,
+            assessmentService,
+            taskProjectionService
+        );
+        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
+        var service = new IngestionService(
+            _dbContext,
+            [batchSource],
+            enrichmentJobEnqueuer,
+            assessmentService,
+            softwareMatchService,
+            normalizedSoftwareProjectionService,
+            taskProjectionService,
+            stagedMergeService,
+            stagedAssetMergeService,
+            logger
+        );
+
+        var started = await service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        started.Should().BeTrue();
+
+        var run = await _dbContext
+            .IngestionRuns.IgnoreQueryFilters()
+            .SingleAsync(item => item.SourceKey == "paged-source");
+        run.Status.Should().Be(IngestionRunStatuses.Succeeded);
+        run.FetchedAssetCount.Should().Be(4);
+        run.FetchedVulnerabilityCount.Should().Be(3);
+
+        var assets = await _dbContext
+            .Assets.IgnoreQueryFilters()
+            .Where(item => item.TenantId == _tenantId)
+            .ToListAsync();
+        assets.Should().HaveCount(4);
+
+        var tenantVulnerabilities = await _dbContext
+            .TenantVulnerabilities.IgnoreQueryFilters()
+            .Where(item => item.TenantId == _tenantId)
+            .ToListAsync();
+        tenantVulnerabilities.Should().HaveCount(3);
+    }
+
+    [Fact]
     public async Task RunIngestionAsync_PrunesExpiredStagingArtifactsForOldCompletedRuns()
     {
         var oldRun = IngestionRun.Start(

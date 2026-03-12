@@ -120,7 +120,7 @@ public static class DependencyInjection
         services.AddScoped<IVulnerabilitySource, DefenderVulnerabilitySource>();
         services
             .AddHttpClient<DefenderApiClient>()
-            .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
+            .AddDefenderHttpPolicies();
         services.AddHttpClient<NvdApiClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 1);
         services
             .AddHttpClient<ISecretStore, OpenBaoSecretStore>()
