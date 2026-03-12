@@ -58,7 +58,13 @@ public class AssetsController : ControllerBase
         CancellationToken ct
     )
     {
-        var query = _dbContext.Assets.AsNoTracking().AsQueryable();
+        if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var query = _dbContext
+            .Assets.AsNoTracking()
+            .Where(a => a.TenantId == currentTenantId)
+            .AsQueryable();
 
         if (
             !string.IsNullOrEmpty(filter.AssetType)
@@ -175,7 +181,12 @@ public class AssetsController : ControllerBase
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<AssetDetailDto>> Get(Guid id, CancellationToken ct)
     {
-        var asset = await _dbContext.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, ct);
+        if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var asset = await _dbContext
+            .Assets.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == id && a.TenantId == currentTenantId, ct);
         if (asset is null)
             return NotFound();
 

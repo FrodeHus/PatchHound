@@ -37,12 +37,18 @@ public class SoftwareController(
         CancellationToken ct
     )
     {
+        if (tenantContext.CurrentTenantId is not Guid currentTenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
         var tenantSoftware = await dbContext
             .TenantSoftware.AsNoTracking()
-            .Where(item => item.Id == id)
+            .Where(item => item.Id == id && item.TenantId == currentTenantId)
             .Select(item => new
             {
                 item.Id,
+                item.TenantId,
                 item.NormalizedSoftwareId,
                 item.FirstSeenAt,
                 item.LastSeenAt,
@@ -146,7 +152,15 @@ public class SoftwareController(
         CancellationToken ct
     )
     {
-        var query = dbContext.TenantSoftware.AsNoTracking().AsQueryable();
+        if (tenantContext.CurrentTenantId is not Guid currentTenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var query = dbContext
+            .TenantSoftware.AsNoTracking()
+            .Where(item => item.TenantId == currentTenantId)
+            .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
@@ -260,9 +274,14 @@ public class SoftwareController(
         CancellationToken ct
     )
     {
+        if (tenantContext.CurrentTenantId is not Guid currentTenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
         var tenantSoftware = await dbContext
             .TenantSoftware.AsNoTracking()
-            .Where(item => item.Id == id)
+            .Where(item => item.Id == id && item.TenantId == currentTenantId)
             .Select(item => new { item.Id, item.TenantId })
             .FirstOrDefaultAsync(ct);
         if (tenantSoftware is null)
@@ -365,9 +384,14 @@ public class SoftwareController(
         CancellationToken ct
     )
     {
+        if (tenantContext.CurrentTenantId is not Guid currentTenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
         var tenantSoftware = await dbContext
             .TenantSoftware.AsNoTracking()
-            .Where(item => item.Id == id)
+            .Where(item => item.Id == id && item.TenantId == currentTenantId)
             .Select(item => new { item.Id, item.TenantId })
             .FirstOrDefaultAsync(ct);
         if (tenantSoftware is null)
@@ -467,9 +491,14 @@ public class SoftwareController(
         CancellationToken ct
     )
     {
+        if (tenantContext.CurrentTenantId is not Guid currentTenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
         var tenantSoftware = await dbContext
             .TenantSoftware.AsNoTracking()
-            .Where(item => item.Id == id)
+            .Where(item => item.Id == id && item.TenantId == currentTenantId)
             .Select(item => new
             {
                 item.Id,
@@ -487,11 +516,6 @@ public class SoftwareController(
         if (tenantSoftware is null)
         {
             return NotFound(new ProblemDetails { Title = "Tenant software not found" });
-        }
-
-        if (!tenantContext.HasAccessToTenant(tenantSoftware.TenantId))
-        {
-            return Forbid();
         }
 
         var aliases = await dbContext

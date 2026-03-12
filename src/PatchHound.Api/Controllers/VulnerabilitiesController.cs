@@ -59,7 +59,13 @@ public class VulnerabilitiesController : ControllerBase
         CancellationToken ct
     )
     {
-        var query = _dbContext.TenantVulnerabilities.AsNoTracking().AsQueryable();
+        if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var query = _dbContext
+            .TenantVulnerabilities.AsNoTracking()
+            .Where(v => v.TenantId == currentTenantId)
+            .AsQueryable();
 
         if (
             !string.IsNullOrEmpty(filter.Severity)
@@ -92,6 +98,7 @@ public class VulnerabilitiesController : ControllerBase
         {
             var recurringTenantVulnerabilityIds = await _dbContext
                 .VulnerabilityAssetEpisodes.AsNoTracking()
+                .Where(episode => episode.TenantId == currentTenantId)
                 .GroupBy(episode => new { episode.TenantVulnerabilityId, episode.AssetId })
                 .Where(group => group.Count() > 1)
                 .Select(group => group.Key.TenantVulnerabilityId)
@@ -210,13 +217,16 @@ public class VulnerabilitiesController : ControllerBase
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<VulnerabilityDetailDto>> Get(Guid id, CancellationToken ct)
     {
+        if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
         var tenantVulnerability = await _dbContext
             .TenantVulnerabilities.AsNoTracking()
             .Include(tv => tv.VulnerabilityDefinition)
             .ThenInclude(definition => definition.AffectedSoftware)
             .Include(tv => tv.VulnerabilityDefinition)
             .ThenInclude(definition => definition.References)
-            .FirstOrDefaultAsync(tv => tv.Id == id, ct);
+            .FirstOrDefaultAsync(tv => tv.Id == id && tv.TenantId == currentTenantId, ct);
 
         if (tenantVulnerability is null)
             return NotFound();
