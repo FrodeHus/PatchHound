@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { AlertTriangle, CheckCircle2, ShieldAlert, TimerReset } from 'lucide-react'
 import { fetchDashboardSummary, fetchDashboardTrends } from '@/api/dashboard.functions'
 import { Card, CardContent } from '@/components/ui/card'
+import { InsetPanel } from '@/components/ui/inset-panel'
 import { CriticalVulnerabilities } from '@/components/features/dashboard/CriticalVulnerabilities'
 import { ExposureSlaCard } from '@/components/features/dashboard/ExposureSlaCard'
 import { RemediationVelocity } from '@/components/features/dashboard/RemediationVelocity'
@@ -49,23 +50,23 @@ function DashboardPage() {
 
   return (
     <section className="space-y-6 pb-4">
-      <Card className="overflow-hidden rounded-[36px] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_18%,transparent),transparent_42%),linear-gradient(180deg,color-mix(in_oklab,var(--card)_92%,black),var(--card))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <Card className="overflow-hidden rounded-2xl border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_18%,transparent),transparent_42%),linear-gradient(180deg,color-mix(in_oklab,var(--card)_92%,black),var(--card))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <CardContent className="p-6 sm:p-7">
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(22rem,1fr)]">
-            <div className="rounded-[30px] border border-border/60 bg-background/22 p-5 backdrop-blur-sm">
+            <InsetPanel emphasis="subtle" className="p-5 backdrop-blur-sm">
               <TrendChart data={trends} embedded />
-            </div>
+            </InsetPanel>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
               {statCards.map((item) => {
                 const Icon = item.icon
                 return (
-                  <div key={item.label} className="rounded-3xl border border-border/70 bg-background/30 p-4 backdrop-blur">
+                  <InsetPanel key={item.label} className="p-4 backdrop-blur-sm">
                     <div className="flex items-center justify-between">
                       <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{item.label}</p>
                       <Icon className={`size-4 ${item.tone}`} />
                     </div>
                     <p className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{item.value}</p>
-                  </div>
+                  </InsetPanel>
                 )
               })}
             </div>

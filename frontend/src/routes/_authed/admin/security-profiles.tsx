@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { ShieldCheck, Signal, TriangleAlert } from 'lucide-react'
+import { CircleHelp, PenSquare, Plus, ShieldCheck, Signal, TriangleAlert } from 'lucide-react'
 import { fetchAuditLog } from '@/api/audit-log.functions'
-import { createSecurityProfile, fetchSecurityProfiles } from '@/api/security-profiles.functions'
+import { createSecurityProfile, fetchSecurityProfiles, updateSecurityProfile } from '@/api/security-profiles.functions'
+import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import { RecentAuditPanel } from '@/components/features/audit/RecentAuditPanel'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { Badge } from '@/components/ui/badge'
@@ -11,8 +12,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { InsetPanel } from '@/components/ui/inset-panel'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PaginationControls } from '@/components/ui/pagination-controls'
+import { Separator } from '@/components/ui/separator'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   securityProfileEnvironmentClassOptions,
   securityProfileEnvironmentHelp,
@@ -38,6 +42,38 @@ export const Route = createFileRoute('/_authed/admin/security-profiles')({
   component: SecurityProfilesPage,
 })
 
+type SecurityProfileDraft = {
+  name: string
+  description: string
+  environmentClass: (typeof securityProfileEnvironmentClassOptions)[number]
+  internetReachability: (typeof securityProfileInternetReachabilityOptions)[number]
+  confidentialityRequirement: (typeof securityProfileRequirementOptions)[number]
+  integrityRequirement: (typeof securityProfileRequirementOptions)[number]
+  availabilityRequirement: (typeof securityProfileRequirementOptions)[number]
+}
+
+const defaultDraft = (): SecurityProfileDraft => ({
+  name: '',
+  description: '',
+  environmentClass: securityProfileEnvironmentClassOptions[0],
+  internetReachability: securityProfileInternetReachabilityOptions[0],
+  confidentialityRequirement: securityProfileRequirementOptions[1],
+  integrityRequirement: securityProfileRequirementOptions[1],
+  availabilityRequirement: securityProfileRequirementOptions[1],
+})
+
+function toDraft(profile: SecurityProfile): SecurityProfileDraft {
+  return {
+    name: profile.name,
+    description: profile.description ?? '',
+    environmentClass: profile.environmentClass as (typeof securityProfileEnvironmentClassOptions)[number],
+    internetReachability: profile.internetReachability as (typeof securityProfileInternetReachabilityOptions)[number],
+    confidentialityRequirement: profile.confidentialityRequirement as (typeof securityProfileRequirementOptions)[number],
+    integrityRequirement: profile.integrityRequirement as (typeof securityProfileRequirementOptions)[number],
+    availabilityRequirement: profile.availabilityRequirement as (typeof securityProfileRequirementOptions)[number],
+  }
+}
+
 function SecurityProfilesPage() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
@@ -45,14 +81,12 @@ function SecurityProfilesPage() {
   const initialProfiles = Route.useLoaderData()
   const queryClient = useQueryClient()
   const { selectedTenantId, tenants } = useTenantScope()
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [environmentClass, setEnvironmentClass] = useState<(typeof securityProfileEnvironmentClassOptions)[number]>(securityProfileEnvironmentClassOptions[0])
-  const [internetReachability, setInternetReachability] = useState<(typeof securityProfileInternetReachabilityOptions)[number]>(securityProfileInternetReachabilityOptions[0])
-  const [confidentialityRequirement, setConfidentialityRequirement] = useState<(typeof securityProfileRequirementOptions)[number]>(securityProfileRequirementOptions[1])
-  const [integrityRequirement, setIntegrityRequirement] = useState<(typeof securityProfileRequirementOptions)[number]>(securityProfileRequirementOptions[1])
-  const [availabilityRequirement, setAvailabilityRequirement] = useState<(typeof securityProfileRequirementOptions)[number]>(securityProfileRequirementOptions[1])
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [editingProfile, setEditingProfile] = useState<SecurityProfile | null>(null)
+  const [draft, setDraft] = useState<SecurityProfileDraft>(defaultDraft)
   const tenantNames = new Map(tenants.map((tenant) => [tenant.id, tenant.name]))
+  const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
+
   const profilesQuery = useQuery({
     queryKey: ['security-profiles', selectedTenantId, search.page, search.pageSize],
     queryFn: () => fetchSecurityProfiles({ data: { page: search.page, pageSize: search.pageSize } }),
@@ -60,35 +94,6 @@ function SecurityProfilesPage() {
     staleTime: 30_000,
   })
 
-  const mutation = useMutation({
-    mutationFn: async () => {
-      await createSecurityProfile({
-        data: {
-          name,
-          description,
-          environmentClass,
-          internetReachability,
-          confidentialityRequirement,
-          integrityRequirement,
-          availabilityRequirement,
-        },
-      })
-    },
-    onSuccess: async () => {
-      setName('')
-      setDescription('')
-      setEnvironmentClass(securityProfileEnvironmentClassOptions[0])
-      setInternetReachability(securityProfileInternetReachabilityOptions[0])
-      setConfidentialityRequirement(securityProfileRequirementOptions[1])
-      setIntegrityRequirement(securityProfileRequirementOptions[1])
-      setAvailabilityRequirement(securityProfileRequirementOptions[1])
-      await queryClient.invalidateQueries({ queryKey: ['security-profiles'] })
-      if (canViewAudit) {
-        await queryClient.invalidateQueries({ queryKey: ['audit-log', 'AssetSecurityProfile', selectedTenantId] })
-      }
-    },
-  })
-  const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
   const recentAuditQuery = useQuery({
     queryKey: ['audit-log', 'AssetSecurityProfile', selectedTenantId],
     queryFn: async () =>
@@ -102,353 +107,532 @@ function SecurityProfilesPage() {
     enabled: canViewAudit,
     staleTime: 30_000,
   })
-  const recentAuditItems = recentAuditQuery.data?.items ?? []
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        name: draft.name,
+        description: draft.description,
+        environmentClass: draft.environmentClass,
+        internetReachability: draft.internetReachability,
+        confidentialityRequirement: draft.confidentialityRequirement,
+        integrityRequirement: draft.integrityRequirement,
+        availabilityRequirement: draft.availabilityRequirement,
+      }
+
+      if (editingProfile) {
+        await updateSecurityProfile({
+          data: {
+            id: editingProfile.id,
+            ...payload,
+          },
+        })
+        return
+      }
+
+      await createSecurityProfile({ data: payload })
+    },
+    onSuccess: async () => {
+      setSheetOpen(false)
+      setEditingProfile(null)
+      setDraft(defaultDraft())
+      await queryClient.invalidateQueries({ queryKey: ['security-profiles'] })
+      if (canViewAudit) {
+        await queryClient.invalidateQueries({ queryKey: ['audit-log', 'AssetSecurityProfile', selectedTenantId] })
+      }
+    },
+  })
 
   const profilePage = profilesQuery.data
+  const recentAuditItems = recentAuditQuery.data?.items ?? []
+  const canSave = !!selectedTenantId?.trim() && draft.name.trim().length > 0
+  const sheetTitle = editingProfile ? 'Edit security profile' : 'Create security profile'
+  const sheetDescription = editingProfile
+    ? 'Update the severity context for this reusable tenant profile.'
+    : 'Define a reusable environment profile for the tenant selected in the top bar.'
+  const selectedTenantName = tenantNames.get(selectedTenantId ?? '') ?? 'No tenant selected'
 
   return (
-    <section className="space-y-4 pb-4">
-      <Card className="rounded-2xl border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_52%),var(--color-card)]">
-        <CardHeader className="space-y-3">
-          <Badge variant="outline" className="w-fit rounded-full border-primary/20 bg-primary/10 text-primary">
-            Environmental Severity
-          </Badge>
-          <CardTitle className="text-3xl font-semibold tracking-[-0.04em]">
-            Security profiles explain why a device should score differently than vendor baseline severity.
-          </CardTitle>
-          <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
-            These profiles do not change the CVE itself. They describe the device environment so PatchHound can
-            recalculate effective severity using reachability and business impact requirements.
-          </p>
-        </CardHeader>
-        <CardContent className="grid gap-4 lg:grid-cols-3">
-          <GuideCard
-            icon={Signal}
-            title="Reachability changes exploitability"
-            text="A device reachable from the internet should keep more severe network exposure than a device that is only local or tightly segmented."
-          />
-          <GuideCard
-            icon={ShieldCheck}
-            title="Requirements change impact"
-            text="Confidentiality, integrity, and availability tell PatchHound which impact dimensions should weigh more heavily for this environment."
-          />
-          <GuideCard
-            icon={TriangleAlert}
-            title="Use profiles deliberately"
-            text="Choose a small set of reusable profiles. If every device gets a one-off profile, the scoring model becomes hard to trust."
-          />
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle>Create Security Profile</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Define the device environment once for the tenant selected in the top bar, then assign it to assets that should share the same severity logic.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-2">
-            <FieldBlock
-              label="Active Tenant"
-              description="This form follows the tenant scope in the top navigation."
-              control={<div className="rounded-xl border border-input bg-background px-3 py-2.5 text-sm font-medium">{tenantNames.get(selectedTenantId ?? '') ?? 'No tenant selected'}</div>}
+    <TooltipProvider>
+      <section className="space-y-4 pb-4">
+        <Card className="rounded-2xl border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_52%),var(--color-card)]">
+          <CardHeader className="space-y-3">
+            <Badge variant="outline" className="w-fit rounded-full border-primary/20 bg-primary/10 text-primary">
+              Environmental Severity
+            </Badge>
+            <CardTitle className="text-3xl font-semibold tracking-[-0.04em]">
+              Security profiles explain why a device should score differently than vendor baseline severity.
+            </CardTitle>
+            <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
+              These profiles do not change the CVE itself. They describe the device environment so PatchHound can
+              recalculate effective severity using reachability and business impact requirements.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-4 lg:grid-cols-3">
+            <GuideCard
+              icon={Signal}
+              title="Reachability changes exploitability"
+              text="A device reachable from the internet should keep more severe network exposure than a device that is only local or tightly segmented."
             />
-            <FieldBlock
-              label="Profile Name"
-              description="Use a clear operational name such as “Internet-facing server” or “Internal workstation”."
-              control={(
-                <Input
-                  placeholder="Internet-facing server"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                />
-              )}
+            <GuideCard
+              icon={ShieldCheck}
+              title="Requirements change impact"
+              text="Confidentiality, integrity, and availability tell PatchHound which impact dimensions should weigh more heavily for this environment."
             />
-          </div>
+            <GuideCard
+              icon={TriangleAlert}
+              title="Use profiles deliberately"
+              text="Choose a small set of reusable profiles. If every device gets a one-off profile, the scoring model becomes hard to trust."
+            />
+          </CardContent>
+        </Card>
 
-          <FieldBlock
-            label="Description"
-            description="Write the assignment intent so admins know when this profile should be used."
-            control={(
-              <Input
-                placeholder="Use for production servers reachable from the public internet."
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-              />
+        <Card className="rounded-2xl border-border/70 bg-card/82">
+          <CardHeader>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <CardTitle>Profiles</CardTitle>
+                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                  Review the current severity logic for the tenant selected in the top bar, then create or edit
+                  profiles in the side panel.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  {profilePage?.totalCount ?? 0} total
+                </p>
+                <Button
+                  type="button"
+                  disabled={!selectedTenantId}
+                  onClick={() => {
+                    setEditingProfile(null)
+                    setDraft(defaultDraft())
+                    setSheetOpen(true)
+                  }}
+                >
+                  <Plus className="size-4" />
+                  New profile
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!selectedTenantId ? (
+              <InsetPanel className="flex items-center justify-between gap-4 px-4 py-6 text-sm text-muted-foreground">
+                <span>Choose a tenant from the top bar to review and edit security profiles.</span>
+                <Button type="button" disabled variant="outline">
+                  <Plus className="size-4" />
+                  New profile
+                </Button>
+              </InsetPanel>
+            ) : profilesQuery.isPending && !profilePage ? (
+              <InsetPanel className="px-4 py-6 text-sm text-muted-foreground">
+                Loading security profiles...
+              </InsetPanel>
+            ) : profilePage && profilePage.items.length === 0 ? (
+              <InsetPanel className="flex flex-wrap items-center justify-between gap-4 px-4 py-6">
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">No security profiles yet.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Create the first reusable severity profile for {selectedTenantName}.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setEditingProfile(null)
+                    setDraft(defaultDraft())
+                    setSheetOpen(true)
+                  }}
+                >
+                  <Plus className="size-4" />
+                  Create profile
+                </Button>
+              </InsetPanel>
+            ) : (
+              profilePage?.items.map((profile) => (
+                <InsetPanel key={profile.id} className="rounded-xl p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-lg font-semibold">{profile.name}</p>
+                        <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/10 text-primary">
+                          {profile.environmentClass}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {profile.description ?? 'No description provided.'}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="rounded-full border-border/80 bg-card text-foreground">
+                        {tenantNames.get(profile.tenantId) ?? 'Unknown tenant'}
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingProfile(profile)
+                          setDraft(toDraft(profile))
+                          setSheetOpen(true)
+                        }}
+                      >
+                        <PenSquare className="size-4" />
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 xl:grid-cols-4">
+                    <ProfileMetric
+                      label="Reachability"
+                      value={profile.internetReachability}
+                      explanation={
+                        securityProfileInternetReachabilityHelp[
+                          profile.internetReachability as (typeof securityProfileInternetReachabilityOptions)[number]
+                        ]
+                      }
+                    />
+                    <ProfileMetric
+                      label="Confidentiality"
+                      value={profile.confidentialityRequirement}
+                      explanation={
+                        securityProfileRequirementHelp[
+                          profile.confidentialityRequirement as (typeof securityProfileRequirementOptions)[number]
+                        ]
+                      }
+                    />
+                    <ProfileMetric
+                      label="Integrity"
+                      value={profile.integrityRequirement}
+                      explanation={
+                        securityProfileRequirementHelp[
+                          profile.integrityRequirement as (typeof securityProfileRequirementOptions)[number]
+                        ]
+                      }
+                    />
+                    <ProfileMetric
+                      label="Availability"
+                      value={profile.availabilityRequirement}
+                      explanation={
+                        securityProfileRequirementHelp[
+                          profile.availabilityRequirement as (typeof securityProfileRequirementOptions)[number]
+                        ]
+                      }
+                    />
+                  </div>
+
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    Updated {new Date(profile.updatedAt).toLocaleString()}
+                  </p>
+                </InsetPanel>
+              ))
             )}
+
+            {profilePage ? (
+              <PaginationControls
+                page={profilePage.page}
+                pageSize={profilePage.pageSize}
+                totalCount={profilePage.totalCount}
+                totalPages={profilePage.totalPages}
+                onPageChange={(page) => {
+                  void navigate({
+                    search: (prev) => ({ ...prev, page }),
+                  })
+                }}
+                onPageSizeChange={(nextPageSize) => {
+                  void navigate({
+                    search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
+                  })
+                }}
+              />
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {canViewAudit ? (
+          <RecentAuditPanel
+            title="Profile Activity"
+            description="Recent profile changes are shown here so security teams can see when severity logic changed."
+            items={recentAuditItems}
+            emptyMessage="No recent security profile changes have been recorded."
           />
+        ) : null}
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <FieldBlock
-              label={securityProfileFieldGuidance.environmentClass.label}
-              description={securityProfileFieldGuidance.environmentClass.description}
-              helper={securityProfileEnvironmentHelp[environmentClass]}
-              control={(
-                <Select
-                  value={environmentClass}
-                  onValueChange={(value) => {
-                    if (value) {
-                      setEnvironmentClass(value)
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-10 w-full rounded-xl bg-background px-3">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                    {securityProfileEnvironmentClassOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            <FieldBlock
-              label={securityProfileFieldGuidance.internetReachability.label}
-              description={securityProfileFieldGuidance.internetReachability.description}
-              helper={securityProfileInternetReachabilityHelp[internetReachability]}
-              control={(
-                <Select
-                  value={internetReachability}
-                  onValueChange={(value) => {
-                    if (value) {
-                      setInternetReachability(value)
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-10 w-full rounded-xl bg-background px-3">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                    {securityProfileInternetReachabilityOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </div>
+        <SecurityProfileSheet
+          open={sheetOpen}
+          title={sheetTitle}
+          description={sheetDescription}
+          selectedTenantName={selectedTenantName}
+          editingProfile={editingProfile}
+          draft={draft}
+          isSaving={saveMutation.isPending}
+          canSave={canSave}
+          onOpenChange={(open) => {
+            setSheetOpen(open)
+            if (!open) {
+              setEditingProfile(null)
+              setDraft(defaultDraft())
+            }
+          }}
+          onDraftChange={setDraft}
+          onSave={() => saveMutation.mutate()}
+        />
+      </section>
+    </TooltipProvider>
+  )
+}
 
-          <div className="grid gap-4 xl:grid-cols-3">
-            <FieldBlock
-              label={securityProfileFieldGuidance.confidentialityRequirement.label}
-              description={securityProfileFieldGuidance.confidentialityRequirement.description}
-              helper={securityProfileRequirementHelp[confidentialityRequirement]}
-              control={(
-                <Select
-                  value={confidentialityRequirement}
-                  onValueChange={(value) => {
-                    if (value) {
-                      setConfidentialityRequirement(value)
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-10 w-full rounded-xl bg-background px-3">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                    {securityProfileRequirementOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            <FieldBlock
-              label={securityProfileFieldGuidance.integrityRequirement.label}
-              description={securityProfileFieldGuidance.integrityRequirement.description}
-              helper={securityProfileRequirementHelp[integrityRequirement]}
-              control={(
-                <Select
-                  value={integrityRequirement}
-                  onValueChange={(value) => {
-                    if (value) {
-                      setIntegrityRequirement(value)
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-10 w-full rounded-xl bg-background px-3">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                    {securityProfileRequirementOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            <FieldBlock
-              label={securityProfileFieldGuidance.availabilityRequirement.label}
-              description={securityProfileFieldGuidance.availabilityRequirement.description}
-              helper={securityProfileRequirementHelp[availabilityRequirement]}
-              control={(
-                <Select
-                  value={availabilityRequirement}
-                  onValueChange={(value) => {
-                    if (value) {
-                      setAvailabilityRequirement(value)
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-10 w-full rounded-xl bg-background px-3">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                    {securityProfileRequirementOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </div>
+function SecurityProfileSheet({
+  open,
+  title,
+  description,
+  selectedTenantName,
+  editingProfile,
+  draft,
+  isSaving,
+  canSave,
+  onOpenChange,
+  onDraftChange,
+  onSave,
+}: {
+  open: boolean
+  title: string
+  description: string
+  selectedTenantName: string
+  editingProfile: SecurityProfile | null
+  draft: SecurityProfileDraft
+  isSaving: boolean
+  canSave: boolean
+  onOpenChange: (open: boolean) => void
+  onDraftChange: React.Dispatch<React.SetStateAction<SecurityProfileDraft>>
+  onSave: () => void
+}) {
+  const saveLabel = editingProfile ? 'Save changes' : 'Create profile'
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              disabled={mutation.isPending || !selectedTenantId?.trim() || !name.trim()}
-              onClick={() => {
-                mutation.mutate()
-              }}
-            >
-              {mutation.isPending ? 'Creating profile...' : 'Create profile'}
-            </Button>
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-2xl">
+        <SheetHeader className="border-b border-border/60">
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 space-y-6 overflow-y-auto p-5">
+          <FormSection
+            title="Identity"
+            description="Name the profile and confirm the tenant scope before defining how severity should be adjusted."
+          >
+            <div className="grid gap-5 md:grid-cols-2">
+              <FieldBlock
+                label="Active Tenant"
+                description="This form follows the tenant scope in the top navigation."
+                control={<div className="rounded-lg border border-border/75 bg-muted/55 px-3 py-3 text-sm font-medium">{selectedTenantName}</div>}
+              />
+              <FieldBlock
+                label="Profile Name"
+                description="Use a clear operational name such as “Internet-facing server” or “Internal workstation”."
+                control={(
+                  <Input
+                    placeholder="Internet-facing server"
+                    value={draft.name}
+                    onChange={(event) => onDraftChange((current) => ({ ...current, name: event.target.value }))}
+                    className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                  />
+                )}
+              />
+            </div>
+          </FormSection>
+
+          <FormSection
+            title="Exposure Context"
+            description="Describe the environment this profile represents so PatchHound can weight exploitability correctly."
+          >
+            <div className="grid gap-5">
+              <FieldBlock
+                label="Description"
+                description="Write the assignment intent so admins know when this profile should be used."
+                control={(
+                  <Input
+                    placeholder="Use for production servers reachable from the public internet."
+                    value={draft.description}
+                    onChange={(event) => onDraftChange((current) => ({ ...current, description: event.target.value }))}
+                    className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                  />
+                )}
+              />
+
+              <div className="grid gap-5 xl:grid-cols-2">
+                <FieldBlock
+                  label={securityProfileFieldGuidance.environmentClass.label}
+                  description={securityProfileFieldGuidance.environmentClass.description}
+                  helper={securityProfileEnvironmentHelp[draft.environmentClass]}
+                  control={(
+                    <Select
+                      value={draft.environmentClass}
+                      onValueChange={(value) => {
+                        if (value) {
+                          onDraftChange((current) => ({
+                            ...current,
+                            environmentClass: value,
+                          }))
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-11 w-full rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
+                        {securityProfileEnvironmentClassOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldBlock
+                  label={securityProfileFieldGuidance.internetReachability.label}
+                  description={securityProfileFieldGuidance.internetReachability.description}
+                  helper={securityProfileInternetReachabilityHelp[draft.internetReachability]}
+                  control={(
+                    <Select
+                      value={draft.internetReachability}
+                      onValueChange={(value) => {
+                        if (value) {
+                          onDraftChange((current) => ({
+                            ...current,
+                            internetReachability: value,
+                          }))
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-11 w-full rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
+                        {securityProfileInternetReachabilityOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            </div>
+          </FormSection>
+
+          <FormSection
+            title="Impact Weighting"
+            description="Set how confidentiality, integrity, and availability should influence the effective severity for devices using this profile."
+          >
+            <div className="grid gap-5 xl:grid-cols-3">
+              <FieldBlock
+                label={securityProfileFieldGuidance.confidentialityRequirement.label}
+                description={securityProfileFieldGuidance.confidentialityRequirement.description}
+                helper={securityProfileRequirementHelp[draft.confidentialityRequirement]}
+                control={(
+                  <Select
+                    value={draft.confidentialityRequirement}
+                    onValueChange={(value) => {
+                      if (value) {
+                        onDraftChange((current) => ({
+                          ...current,
+                          confidentialityRequirement: value,
+                        }))
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-11 w-full rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
+                      {securityProfileRequirementOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <FieldBlock
+                label={securityProfileFieldGuidance.integrityRequirement.label}
+                description={securityProfileFieldGuidance.integrityRequirement.description}
+                helper={securityProfileRequirementHelp[draft.integrityRequirement]}
+                control={(
+                  <Select
+                    value={draft.integrityRequirement}
+                    onValueChange={(value) => {
+                      if (value) {
+                        onDraftChange((current) => ({
+                          ...current,
+                          integrityRequirement: value,
+                        }))
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-11 w-full rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
+                      {securityProfileRequirementOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <FieldBlock
+                label={securityProfileFieldGuidance.availabilityRequirement.label}
+                description={securityProfileFieldGuidance.availabilityRequirement.description}
+                helper={securityProfileRequirementHelp[draft.availabilityRequirement]}
+                control={(
+                  <Select
+                    value={draft.availabilityRequirement}
+                    onValueChange={(value) => {
+                      if (value) {
+                        onDraftChange((current) => ({
+                          ...current,
+                          availabilityRequirement: value,
+                        }))
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-11 w-full rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
+                      {securityProfileRequirementOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+          </FormSection>
+        </div>
+
+        <SheetFooter className="border-t border-border/60">
+          <InsetPanel emphasis="subtle" className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
             <p className="text-sm text-muted-foreground">
               Profiles can be assigned later from the asset inspector or the asset detail page.
             </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl border-border/70 bg-card/82">
-        <CardHeader>
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <CardTitle>Profiles</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Review the current severity logic for the tenant selected in the top bar.
-              </p>
-            </div>
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{profilePage?.totalCount ?? 0} total</p>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {!selectedTenantId ? (
-            <InsetPanel className="px-4 py-6 text-sm text-muted-foreground">
-              Choose a tenant from the top bar to review security profiles.
-            </InsetPanel>
-          ) : profilesQuery.isPending && !profilePage ? (
-            <InsetPanel className="px-4 py-6 text-sm text-muted-foreground">
-              Loading security profiles...
-            </InsetPanel>
-          ) : profilePage && profilePage.items.length === 0 ? (
-            <InsetPanel className="px-4 py-6 text-sm text-muted-foreground">
-              No security profiles found.
-            </InsetPanel>
-          ) : (
-            profilePage?.items.map((profile) => (
-              <InsetPanel key={profile.id} className="rounded-xl p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-lg font-semibold">{profile.name}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{profile.description ?? 'No description provided.'}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className="rounded-full border-border/80 bg-card text-foreground">
-                      {tenantNames.get(profile.tenantId) ?? 'Unknown tenant'}
-                    </Badge>
-                    <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/10 text-primary">
-                      {profile.environmentClass}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 xl:grid-cols-4">
-                  <ProfileMetric
-                    label="Reachability"
-                    value={profile.internetReachability}
-                    explanation={
-                      securityProfileInternetReachabilityHelp[
-                        profile.internetReachability as (typeof securityProfileInternetReachabilityOptions)[number]
-                      ]
-                    }
-                  />
-                  <ProfileMetric
-                    label="Confidentiality"
-                    value={profile.confidentialityRequirement}
-                    explanation={
-                      securityProfileRequirementHelp[
-                        profile.confidentialityRequirement as (typeof securityProfileRequirementOptions)[number]
-                      ]
-                    }
-                  />
-                  <ProfileMetric
-                    label="Integrity"
-                    value={profile.integrityRequirement}
-                    explanation={
-                      securityProfileRequirementHelp[
-                        profile.integrityRequirement as (typeof securityProfileRequirementOptions)[number]
-                      ]
-                    }
-                  />
-                  <ProfileMetric
-                    label="Availability"
-                    value={profile.availabilityRequirement}
-                    explanation={
-                      securityProfileRequirementHelp[
-                        profile.availabilityRequirement as (typeof securityProfileRequirementOptions)[number]
-                      ]
-                    }
-                  />
-                </div>
-
-                <p className="mt-4 text-xs text-muted-foreground">
-                  Updated {new Date(profile.updatedAt).toLocaleString()}
-                </p>
-              </InsetPanel>
-            ))
-          )}
-          {profilePage ? (
-            <PaginationControls
-              page={profilePage.page}
-              pageSize={profilePage.pageSize}
-              totalCount={profilePage.totalCount}
-              totalPages={profilePage.totalPages}
-              onPageChange={(page) => {
-                void navigate({
-                  search: (prev) => ({ ...prev, page }),
-                })
-              }}
-              onPageSizeChange={(nextPageSize) => {
-                void navigate({
-                  search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
-                })
-              }}
-            />
-          ) : null}
-        </CardContent>
-      </Card>
-
-      {canViewAudit ? (
-        <RecentAuditPanel
-          title="Profile Activity"
-          description="Recent profile changes are shown here so security teams can see when severity logic changed."
-          items={recentAuditItems}
-          emptyMessage="No recent security profile changes have been recorded."
-        />
-      ) : null}
-    </section>
+            <Button disabled={!canSave || isSaving} onClick={onSave}>
+              {isSaving ? 'Saving...' : saveLabel}
+            </Button>
+          </InsetPanel>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }
 
@@ -463,15 +647,53 @@ function FieldBlock({
   helper?: string
   control: React.ReactNode
 }) {
+  const tooltipText = [description, helper].filter(Boolean).join('\n\n')
+
   return (
-    <InsetPanel className="space-y-2 rounded-[22px] p-4">
-      <div className="space-y-1">
+    <div className="grid content-start gap-2">
+      <div className="flex min-h-5 items-center gap-2">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        {tooltipText ? (
+          <Tooltip>
+            <TooltipTrigger className="inline-flex items-center text-muted-foreground/80 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:text-foreground">
+              <CircleHelp className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent
+              align="start"
+              side="top"
+              className="max-w-sm rounded-lg border border-border/80 bg-popover px-3 py-2 text-xs leading-5 text-popover-foreground shadow-lg"
+            >
+              <div className="space-y-2">
+                {description ? <p>{description}</p> : null}
+                {helper ? <p className="text-primary/90">{helper}</p> : null}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
       </div>
       {control}
-      {helper ? <p className="text-xs leading-5 text-primary">{helper}</p> : null}
-    </InsetPanel>
+    </div>
+  )
+}
+
+function FormSection({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="space-y-1">
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{title}</p>
+        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
+      </div>
+      {children}
+      <Separator className="opacity-60" />
+    </div>
   )
 }
 

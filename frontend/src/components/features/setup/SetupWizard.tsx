@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, CircleHelp } from 'lucide-react'
 import type { SetupContext, SetupPayload } from '@/api/setup.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 type SetupWizardProps = {
@@ -79,7 +80,8 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
         : true
 
   return (
-    <section className="mx-auto w-full max-w-4xl px-6 py-10">
+    <TooltipProvider>
+      <section className="mx-auto w-full max-w-4xl px-6 py-10">
       <Card className="border-border/70 bg-card py-0 text-card-foreground shadow-[0_30px_80px_-35px_rgba(15,23,42,0.3)]">
         <CardHeader className="gap-4 border-b border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_65%),color-mix(in_oklab,var(--card)_94%,transparent)] pb-5">
           <div className="space-y-2">
@@ -163,11 +165,12 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
 
           {stepIndex === 0 ? (
             <div className="space-y-4">
-              <div className="grid gap-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="tenant-name">
-                  Workspace name
-                </label>
-                <Input
+              <Field
+                label="Workspace name"
+                htmlFor="tenant-name"
+                tooltip="The tenant display name operators will see throughout PatchHound."
+                control={(
+                  <Input
                   id="tenant-name"
                   value={tenantName}
                   onChange={(event) => {
@@ -176,7 +179,8 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
                   placeholder="Acme Production"
                   className="h-11 rounded-xl px-3 text-sm"
                 />
-              </div>
+                )}
+              />
 
               <div className="rounded-2xl border border-border/70 bg-muted/40 p-4 text-sm text-muted-foreground">
                 Entra tenant: <span className="font-medium text-foreground">{setupContext.entraTenantId}</span>
@@ -213,11 +217,12 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-foreground" htmlFor="defender-client-id">
-                    Client ID
-                  </label>
-                  <Input
+                <Field
+                  label="Client ID"
+                  htmlFor="defender-client-id"
+                  tooltip="Application client identifier used for the Defender ingestion source."
+                  control={(
+                    <Input
                     id="defender-client-id"
                     value={defenderClientId}
                     onChange={(event) => {
@@ -230,13 +235,15 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
                     placeholder="Application (client) ID"
                     className="h-11 rounded-xl px-3 text-sm"
                   />
-                </div>
+                  )}
+                />
 
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-foreground" htmlFor="defender-client-secret">
-                    Client secret
-                  </label>
-                  <Input
+                <Field
+                  label="Client secret"
+                  htmlFor="defender-client-secret"
+                  tooltip="Secret value for the Defender application. Stored server-side after setup."
+                  control={(
+                    <Input
                     id="defender-client-secret"
                     type="password"
                     value={defenderClientSecret}
@@ -250,12 +257,9 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
                     placeholder="Paste the secret value"
                     className="h-11 rounded-xl px-3 text-sm"
                   />
-                </div>
+                  )}
+                />
               </div>
-
-              <p className="text-sm text-muted-foreground">
-                If enabled, PatchHound uses the default Defender schedule and your current Entra tenant ID.
-              </p>
 
               {defenderValidationMessage ? (
                 <p className="text-sm text-rose-600">{defenderValidationMessage}</p>
@@ -341,6 +345,43 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
           </div>
         </CardContent>
       </Card>
-    </section>
+      </section>
+    </TooltipProvider>
+  )
+}
+
+function Field({
+  label,
+  htmlFor,
+  tooltip,
+  control,
+}: {
+  label: string
+  htmlFor: string
+  tooltip?: string
+  control: React.ReactNode
+}) {
+  return (
+    <div className="grid content-start gap-2">
+      <div className="flex min-h-5 items-center gap-2">
+        <label className="text-sm font-medium text-foreground" htmlFor={htmlFor}>
+          {label}
+        </label>
+        {tooltip ? (
+          <Tooltip>
+            <TooltipTrigger className="inline-flex items-center text-muted-foreground/80 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:text-foreground">
+              <CircleHelp className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent
+              align="start"
+              className="max-w-sm rounded-lg border border-border/80 bg-popover px-3 py-2 text-xs leading-5 text-popover-foreground shadow-lg"
+            >
+              {tooltip}
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
+      </div>
+      {control}
+    </div>
   )
 }
