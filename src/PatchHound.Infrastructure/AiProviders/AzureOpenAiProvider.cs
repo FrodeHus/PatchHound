@@ -39,7 +39,7 @@ public class AzureOpenAiProvider : IAiReportProvider
     ) => SendChatCompletionAsync(
         profile,
         request.SystemPrompt,
-        request.UserPrompt,
+        BuildUserPrompt(request),
         profile.Profile.MaxOutputTokens,
         ct
     );
@@ -155,5 +155,15 @@ public class AzureOpenAiProvider : IAiReportProvider
         }
 
         return content.Trim();
+    }
+
+    private static string BuildUserPrompt(AiTextGenerationRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.ExternalContext))
+        {
+            return request.UserPrompt;
+        }
+
+        return $"{request.UserPrompt}\n\nExternal research context:\n{request.ExternalContext}";
     }
 }

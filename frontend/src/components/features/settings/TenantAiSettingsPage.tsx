@@ -31,6 +31,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Separator } from '@/components/ui/separator'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatDateTime } from '@/lib/formatting'
@@ -113,6 +114,11 @@ function createEmptyProfile(): SaveTenantAiProfile {
     deploymentName: '',
     apiVersion: '',
     keepAlive: '',
+    allowExternalResearch: false,
+    webResearchMode: 'Disabled',
+    includeCitations: true,
+    maxResearchSources: 5,
+    allowedDomains: '',
     apiKey: '',
   }
 }
@@ -134,6 +140,11 @@ function toDraft(profile: TenantAiProfile): SaveTenantAiProfile {
     deploymentName: profile.deploymentName,
     apiVersion: profile.apiVersion,
     keepAlive: profile.keepAlive,
+    allowExternalResearch: profile.allowExternalResearch,
+    webResearchMode: profile.webResearchMode as SaveTenantAiProfile['webResearchMode'],
+    includeCitations: profile.includeCitations,
+    maxResearchSources: profile.maxResearchSources,
+    allowedDomains: profile.allowedDomains,
     apiKey: '',
   }
 }
@@ -549,14 +560,21 @@ function AiProfileEditorPage({
                         ? 'border-primary/40 bg-primary/8'
                         : 'border-border/70 bg-background hover:border-foreground/15'
                     }`}
-                    onClick={() => {
-                      onDraftChange((current) => ({
-                        ...current,
-                        providerType: provider.type,
-                        ...providerDefaults[provider.type],
-                      }))
-                    }}
-                  >
+                      onClick={() => {
+                        onDraftChange((current) => ({
+                          ...current,
+                          providerType: provider.type,
+                          ...providerDefaults[provider.type],
+                          webResearchMode: current.allowExternalResearch
+                            ? provider.type === 'OpenAi'
+                              ? current.webResearchMode === 'Disabled'
+                                ? 'ProviderNative'
+                                : current.webResearchMode
+                              : 'PatchHoundManaged'
+                            : 'Disabled',
+                        }))
+                      }}
+                    >
                     <div className="flex items-center gap-2">
                       <Icon className="size-4 text-primary" />
                       <span className="font-medium">{provider.label}</span>
@@ -764,6 +782,100 @@ function AiProfileEditorPage({
                   }
                 />
               </Field>
+            </div>
+          </FormSection>
+
+          <FormSection title="Web research" icon={CircleAlert}>
+            <div className="space-y-4">
+              <InsetPanel className="space-y-4 p-4">
+                <label className="flex items-start gap-3">
+                  <Checkbox
+                    checked={draft.allowExternalResearch}
+                    onCheckedChange={(checked) => {
+                      const allowExternalResearch = checked === true
+                      onDraftChange((current) => ({
+                        ...current,
+                        allowExternalResearch,
+                        webResearchMode: allowExternalResearch
+                          ? current.providerType === 'OpenAi'
+                            ? current.webResearchMode === 'Disabled'
+                              ? 'ProviderNative'
+                              : current.webResearchMode
+                            : 'PatchHoundManaged'
+                          : 'Disabled',
+                      }))
+                    }}
+                  />
+                  <div className="space-y-1">
+                    <span className="text-sm font-medium text-foreground">Allow external web research</span>
+                    <p className="text-sm text-muted-foreground">
+                      Use recent external context when supported by the provider or by PatchHound-managed research.
+                    </p>
+                  </div>
+                </label>
+
+                {draft.allowExternalResearch ? (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Research mode" tooltip="Choose provider-native search where supported, or PatchHound-managed research for a provider-agnostic workflow.">
+                      <Select
+                        value={draft.webResearchMode}
+                        onValueChange={(value) =>
+                          onDraftChange((current) => ({
+                            ...current,
+                            webResearchMode: value as SaveTenantAiProfile['webResearchMode'],
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-10 w-full rounded-xl border-border/80 bg-card px-3">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                          {draft.providerType === 'OpenAi' ? (
+                            <SelectItem value="ProviderNative">Provider native</SelectItem>
+                          ) : null}
+                          <SelectItem value="PatchHoundManaged">PatchHound managed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+
+                    <Field label="Max research sources" tooltip="Upper bound for external sources added to the research context.">
+                      <Input
+                        type="number"
+                        min="1"
+                        value={String(draft.maxResearchSources)}
+                        onChange={(event) =>
+                          onDraftChange((current) => ({
+                            ...current,
+                            maxResearchSources: Number(event.target.value || 1),
+                          }))
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Allowed domains" tooltip="Optional allow-list. Enter one domain per line to constrain external research.">
+                      <Textarea
+                        rows={4}
+                        value={draft.allowedDomains}
+                        onChange={(event) =>
+                          onDraftChange((current) => ({ ...current, allowedDomains: event.target.value }))
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Citations" tooltip="Include source references when external research contributes to generated output.">
+                      <label className="flex h-10 items-center gap-3 rounded-xl border border-border/80 bg-card px-3">
+                        <Checkbox
+                          checked={draft.includeCitations}
+                          onCheckedChange={(checked) =>
+                            onDraftChange((current) => ({ ...current, includeCitations: checked === true }))
+                          }
+                        />
+                        <span className="text-sm text-foreground">Include citations in generated output</span>
+                      </label>
+                    </Field>
+                  </div>
+                ) : null}
+              </InsetPanel>
             </div>
           </FormSection>
 

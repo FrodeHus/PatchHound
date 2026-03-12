@@ -23,6 +23,11 @@ public class TenantAiProfileConfiguration : IEntityTypeConfiguration<TenantAiPro
         builder.Property(item => item.KeepAlive).HasMaxLength(64).IsRequired();
         builder.Property(item => item.SecretRef).HasMaxLength(512).IsRequired();
         builder
+            .Property(item => item.WebResearchMode)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder.Property(item => item.AllowedDomains).HasColumnType("text").IsRequired();
+        builder
             .Property(item => item.LastValidationStatus)
             .HasConversion<string>()
             .HasMaxLength(16);
