@@ -271,6 +271,9 @@ export function TenantSourceManagement({
                           {activity.metricsSummary ? (
                             <p className="text-xs text-muted-foreground">{activity.metricsSummary}</p>
                           ) : null}
+                          {activity.snapshotSummary ? (
+                            <p className="text-xs text-muted-foreground">{activity.snapshotSummary}</p>
+                          ) : null}
                         </div>
                         <Metric label="Phase" value={activity.phase} compact />
                         <Metric label="Batch" value={activity.batch} compact />
@@ -655,6 +658,23 @@ function TenantSourceEditorPage({
                 <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Status</p>
                 <p className="mt-1 font-medium text-foreground">{source.runtime.lastStatus ?? 'Unknown'}</p>
               </InsetPanel>
+              {(source.runtime.activeSnapshotStatus || source.runtime.buildingSnapshotStatus) ? (
+                <InsetPanel emphasis="subtle" className="px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Snapshot state</p>
+                  <div className="mt-1 space-y-1">
+                    {source.runtime.activeSnapshotStatus ? (
+                      <p className="font-medium text-foreground">
+                        Active: {formatSnapshotStatus(source.runtime.activeSnapshotStatus)}
+                      </p>
+                    ) : null}
+                    {source.runtime.buildingSnapshotStatus ? (
+                      <p className="font-medium text-foreground">
+                        Building: {formatSnapshotStatus(source.runtime.buildingSnapshotStatus)}
+                      </p>
+                    ) : null}
+                  </div>
+                </InsetPanel>
+              ) : null}
               {source.runtime.lastError ? (
                 <InsetPanel className="px-4 py-3 text-sm text-destructive">
                   Last error: {source.runtime.lastError}
@@ -757,6 +777,12 @@ function Metric({
 
 function describeSourceActivity(source: TenantIngestionSourceDraft) {
   const latestRun = source.recentRuns[0]
+  const activeSnapshotSummary = source.runtime.activeSnapshotStatus
+    ? `Active snapshot · ${formatSnapshotStatus(source.runtime.activeSnapshotStatus)}`
+    : null
+  const buildingSnapshotSummary = source.runtime.buildingSnapshotStatus
+    ? `Building snapshot · ${formatSnapshotStatus(source.runtime.buildingSnapshotStatus)}`
+    : null
 
   if (source.runtime.activeIngestionRunId && source.runtime.activePhase) {
     const runtimeStatus = source.runtime.lastStatus?.toLowerCase()
@@ -773,6 +799,7 @@ function describeSourceActivity(source: TenantIngestionSourceDraft) {
       metricsSummary: latestRun
         ? `${latestRun.stagedSoftwareCount} staged software · ${latestRun.persistedSoftwareCount} persisted software`
         : null,
+      snapshotSummary: buildingSnapshotSummary ?? activeSnapshotSummary,
       phase: formatPhase(source.runtime.activePhase),
       batch:
         source.runtime.activeBatchNumber !== null
@@ -802,6 +829,9 @@ function describeSourceActivity(source: TenantIngestionSourceDraft) {
             ? 'This run requires operator action before retrying, but failed staged data will still be discarded after 24 hours.'
             : 'Failed staged snapshots are retained for up to 24 hours before they are discarded.',
       metricsSummary: `${latestRun.stagedSoftwareCount} staged software · ${latestRun.persistedSoftwareCount} persisted software`,
+      snapshotSummary: latestRun.snapshotStatus
+        ? `Run snapshot · ${formatSnapshotStatus(latestRun.snapshotStatus)}`
+        : activeSnapshotSummary,
       phase: formatPhase(latestRun.latestPhase),
       batch:
         latestRun.latestBatchNumber !== null ? String(latestRun.latestBatchNumber) : '—',
@@ -815,6 +845,7 @@ function describeSourceActivity(source: TenantIngestionSourceDraft) {
     metricsSummary: latestRun
       ? `${latestRun.stagedSoftwareCount} staged software · ${latestRun.persistedSoftwareCount} persisted software`
       : null,
+    snapshotSummary: buildingSnapshotSummary ?? activeSnapshotSummary,
     phase: 'Ready',
     batch: '—',
     checkpoint: source.runtime.lastStatus || 'Idle',
@@ -926,6 +957,18 @@ function formatPhase(value: string | null | undefined) {
 
   return value
     .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function formatSnapshotStatus(value: string | null | undefined) {
+  if (!value) {
+    return '—'
+  }
+
+  return value
+    .split(/(?=[A-Z])|-/)
+    .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
 }

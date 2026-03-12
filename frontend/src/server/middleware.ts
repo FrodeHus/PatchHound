@@ -1,7 +1,7 @@
 import { createMiddleware } from '@tanstack/react-start'
 import { getCookie } from '@tanstack/react-start/server'
 import { getSession, isTokenExpired } from '@/server/session'
-import { hydrateTokenCache, refreshAccessToken } from '@/server/auth'
+import { refreshAccessTokenByRefreshToken } from '@/server/auth'
 import { redirect } from '@tanstack/react-router'
 import { selectedTenantCookieKey } from '@/components/layout/tenant-scope'
 
@@ -31,21 +31,20 @@ export const authMiddleware = createMiddleware({ type: 'function' })
     }
 
     // Refresh token if expired
-    if (isTokenExpired(session) && session.homeAccountId) {
+    if (isTokenExpired(session) && session.refreshToken) {
       try {
-        await hydrateTokenCache(session.tokenCache)
-        const tokens = await refreshAccessToken(session.homeAccountId)
+        const tokens = await refreshAccessTokenByRefreshToken(session.refreshToken)
         session.accessToken = tokens.access_token
         session.tokenExpiry = Date.now() + tokens.expires_in * 1000
-        session.tokenCache = tokens.token_cache
+        session.refreshToken = tokens.refresh_token ?? session.refreshToken
         await session.save()
       } catch {
         // Refresh failed — force re-login
-        session.destroy()
+        await session.destroy()
         throw redirect({ to: '/auth/login' })
       }
     } else if (isTokenExpired(session)) {
-      session.destroy()
+      await session.destroy()
       throw redirect({ to: '/auth/login' })
     }
 

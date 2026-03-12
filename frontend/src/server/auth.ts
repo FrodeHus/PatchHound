@@ -30,7 +30,22 @@ export type IdTokenClaims = {
   [key: string]: unknown
 }
 
+type TokenExchangeResult = {
+  access_token: string
+  expires_in: number
+  id_token?: string
+  claims?: IdTokenClaims
+  refresh_token?: string
+}
+
+type TokenRefreshResult = {
+  access_token: string
+  expires_in: number
+  refresh_token?: string
+}
+
 const GRAPH_SCOPE = 'https://graph.microsoft.com/.default'
+const TOKEN_ENDPOINT = `https://login.microsoftonline.com/${ENTRA_TENANT_ID}/oauth2/v2.0/token`
 
 export function getClaimString(
   claims: IdTokenClaims | undefined,
@@ -58,75 +73,114 @@ export async function getAuthorizationUrl(state: string): Promise<string> {
   })
 }
 
-export async function exchangeCodeForTokens(code: string): Promise<{
-  access_token: string
-  expires_in: number
-  id_token?: string
-  claims?: IdTokenClaims
-  home_account_id?: string
-  token_cache?: string
-}> {
-  const result = await msalClient.acquireTokenByCode({
+export async function exchangeCodeForTokens(code: string): Promise<TokenExchangeResult> {
+  const body = new URLSearchParams({
+    client_id: ENTRA_CLIENT_ID,
+    client_secret: ENTRA_CLIENT_SECRET,
     code,
-    scopes: SCOPES,
-    redirectUri: ENTRA_REDIRECT_URI,
+    grant_type: 'authorization_code',
+    redirect_uri: ENTRA_REDIRECT_URI,
+    scope: SCOPES.join(' '),
   })
 
-  if (!result?.accessToken) {
+  const response = await fetch(TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body,
+  })
+
+  if (!response.ok) {
+    throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`)
+  }
+
+  const result = await response.json() as {
+    access_token?: string
+    expires_in?: number
+    id_token?: string
+    refresh_token?: string
+  }
+
+  if (!result.access_token) {
     throw new Error('Token exchange failed: access token missing')
   }
 
-  const expiresIn = result.expiresOn
-    ? Math.max(60, Math.floor((result.expiresOn.getTime() - Date.now()) / 1000))
+  const expiresIn = typeof result.expires_in === 'number' && result.expires_in > 0
+    ? Math.max(60, result.expires_in)
     : 3600
+  const claims = decodeJwtClaims(result.id_token)
 
   return {
-    access_token: result.accessToken,
+    access_token: result.access_token,
     expires_in: expiresIn,
-    id_token: result.idToken,
-    claims: result.idTokenClaims as IdTokenClaims | undefined,
-    home_account_id: result.account?.homeAccountId,
-    token_cache: msalClient.getTokenCache().serialize(),
+    id_token: result.id_token,
+    claims,
+    refresh_token: result.refresh_token,
   }
 }
 
-export async function refreshAccessToken(homeAccountId: string): Promise<{
-  access_token: string
-  expires_in: number
-  token_cache?: string
-}> {
-  const account = await msalClient.getTokenCache().getAccountByHomeId(homeAccountId)
-  if (!account) {
-    throw new Error('Token refresh failed: account not found in cache')
-  }
-
-  const result = await msalClient.acquireTokenSilent({
-    account,
-    scopes: SCOPES,
-    forceRefresh: true,
+export async function refreshAccessTokenByRefreshToken(refreshToken: string): Promise<TokenRefreshResult> {
+  const body = new URLSearchParams({
+    client_id: ENTRA_CLIENT_ID,
+    client_secret: ENTRA_CLIENT_SECRET,
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+    scope: SCOPES.join(' '),
   })
 
-  if (!result?.accessToken) {
+  const response = await fetch(TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body,
+  })
+
+  if (!response.ok) {
+    throw new Error(`Token refresh failed: ${response.status} ${response.statusText}`)
+  }
+
+  const result = await response.json() as {
+    access_token?: string
+    expires_in?: number
+    refresh_token?: string
+  }
+
+  if (!result.access_token) {
     throw new Error('Token refresh failed: access token missing')
   }
 
-  const expiresIn = result.expiresOn
-    ? Math.max(60, Math.floor((result.expiresOn.getTime() - Date.now()) / 1000))
+  const expiresIn = typeof result.expires_in === 'number' && result.expires_in > 0
+    ? Math.max(60, result.expires_in)
     : 3600
 
   return {
-    access_token: result.accessToken,
+    access_token: result.access_token,
     expires_in: expiresIn,
-    token_cache: msalClient.getTokenCache().serialize(),
+    refresh_token: result.refresh_token,
   }
 }
 
-export async function hydrateTokenCache(serializedCache?: string): Promise<void> {
-  if (!serializedCache?.trim()) {
-    return
+function decodeJwtClaims(idToken?: string): IdTokenClaims | undefined {
+  if (!idToken) {
+    return undefined
   }
 
-  msalClient.getTokenCache().deserialize(serializedCache)
+  const [, payload] = idToken.split('.')
+  if (!payload) {
+    return undefined
+  }
+
+  const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '=')
+
+  try {
+    const decoded = Buffer.from(padded, 'base64').toString('utf8')
+    return JSON.parse(decoded) as IdTokenClaims
+  } catch {
+    return undefined
+  }
 }
 
 export async function resolveTenantDisplayName(

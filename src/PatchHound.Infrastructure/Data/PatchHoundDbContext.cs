@@ -22,6 +22,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<TenantSourceConfiguration> TenantSourceConfigurations =>
         Set<TenantSourceConfiguration>();
     public DbSet<IngestionRun> IngestionRuns => Set<IngestionRun>();
+    public DbSet<IngestionSnapshot> IngestionSnapshots => Set<IngestionSnapshot>();
     public DbSet<IngestionCheckpoint> IngestionCheckpoints => Set<IngestionCheckpoint>();
     public DbSet<StagedVulnerability> StagedVulnerabilities => Set<StagedVulnerability>();
     public DbSet<StagedVulnerabilityExposure> StagedVulnerabilityExposures =>
@@ -209,6 +210,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<IngestionRun>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<IngestionSnapshot>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<IngestionCheckpoint>()

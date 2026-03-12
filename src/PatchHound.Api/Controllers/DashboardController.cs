@@ -8,6 +8,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Api.Controllers;
 
@@ -38,6 +39,7 @@ public class DashboardController : ControllerBase
         {
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
+        var activeSnapshotId = await ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
 
         var riskChangeBrief = await BuildRiskChangeBriefAsync(
             tenantId,
@@ -107,7 +109,9 @@ public class DashboardController : ControllerBase
         // Exposure score: vulnerability severity × asset criticality for open vulnerability-asset pairs
         var vulnerabilityAssetPairs = await _dbContext
             .VulnerabilityAssets.AsNoTracking()
-            .Where(va => va.Status != VulnerabilityStatus.Resolved)
+            .Where(va =>
+                va.Status != VulnerabilityStatus.Resolved && va.SnapshotId == activeSnapshotId
+            )
             .Join(
                 _dbContext.TenantVulnerabilities.AsNoTracking(),
                 va => va.TenantVulnerabilityId,
@@ -150,6 +154,7 @@ public class DashboardController : ControllerBase
                 _dbContext.VulnerabilityAssets.Count(va =>
                     va.TenantVulnerabilityId == v.Id
                     && va.TenantVulnerability.TenantId == tenantId
+                    && va.SnapshotId == activeSnapshotId
                 ),
                 v.VulnerabilityDefinition.PublishedDate.HasValue
                     ? (int)(now - v.VulnerabilityDefinition.PublishedDate.Value).TotalDays
@@ -273,6 +278,20 @@ public class DashboardController : ControllerBase
         );
     }
 
+    private async Task<Guid?> ResolveActiveVulnerabilitySnapshotIdAsync(
+        Guid tenantId,
+        CancellationToken ct
+    )
+    {
+        return await _dbContext
+            .TenantSourceConfigurations.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId && item.SourceKey == TenantSourceCatalog.DefenderSourceKey
+            )
+            .Select(item => item.ActiveSnapshotId)
+            .FirstOrDefaultAsync(ct);
+    }
+
     [HttpGet("risk-changes")]
     public async Task<ActionResult<DashboardRiskChangeBriefDto>> GetRiskChanges(CancellationToken ct)
     {
@@ -376,6 +395,7 @@ public class DashboardController : ControllerBase
         CancellationToken ct
     )
     {
+        var activeSnapshotId = await ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
         var cutoff = DateTimeOffset.UtcNow.AddHours(-24);
 
         var candidateRows = await _dbContext
@@ -409,7 +429,7 @@ public class DashboardController : ControllerBase
                     .Select(os => (Severity?)os.AdjustedSeverity)
                     .FirstOrDefault(),
                 AffectedAssetCount = _dbContext.VulnerabilityAssets.Count(va =>
-                    va.TenantVulnerabilityId == v.Id
+                    va.TenantVulnerabilityId == v.Id && va.SnapshotId == activeSnapshotId
                 ),
             })
             .ToListAsync(ct);

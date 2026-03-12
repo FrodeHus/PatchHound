@@ -116,6 +116,7 @@ public class NormalizedSoftwareProjectionServiceTests : IDisposable
         await _dbContext.SoftwareVulnerabilityMatches.AddRangeAsync(
             SoftwareVulnerabilityMatch.Create(
                 _tenantId,
+                null,
                 softwareOne.Id,
                 vulnerability.Id,
                 SoftwareVulnerabilityMatchMethod.CpeBinding,
@@ -125,6 +126,7 @@ public class NormalizedSoftwareProjectionServiceTests : IDisposable
             ),
             SoftwareVulnerabilityMatch.Create(
                 _tenantId,
+                null,
                 softwareTwo.Id,
                 vulnerability.Id,
                 SoftwareVulnerabilityMatchMethod.CpeBinding,

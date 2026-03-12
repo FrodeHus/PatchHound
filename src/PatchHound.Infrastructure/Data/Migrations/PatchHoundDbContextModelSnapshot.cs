@@ -61,79 +61,28 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
+                    b.Property<decimal>("Temperature")
+                        .HasPrecision(4, 2)
+                        .HasColumnType("numeric(4,2)");
 
                     b.Property<Guid>("TenantAiProfileId")
                         .HasColumnType("uuid");
 
-                    b.Property<decimal>("Temperature")
-                        .HasPrecision(4, 2)
-                        .HasColumnType("numeric(4,2)");
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantVulnerabilityId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TenantId");
-
                     b.HasIndex("TenantAiProfileId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("TenantVulnerabilityId");
 
                     b.ToTable("AIReports");
-                });
-
-            modelBuilder.Entity("PatchHound.Core.Entities.SoftwareDescriptionJob", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Error")
-                        .IsRequired()
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
-
-                    b.Property<Guid>("NormalizedSoftwareId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("RequestedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<Guid?>("TenantAiProfileId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TenantSoftwareId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("TenantId", "TenantSoftwareId", "RequestedAt");
-
-                    b.HasIndex("TenantId", "TenantSoftwareId", "Status");
-
-                    b.ToTable("SoftwareDescriptionJobs");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.Asset", b =>
@@ -686,6 +635,58 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("EnrichmentSourceConfigurations");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.IngestionCheckpoint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BatchNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CursorJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("IngestionRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("LastCommittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Phase")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("RecordsCommitted")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngestionRunId");
+
+                    b.HasIndex("IngestionRunId", "Phase")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "SourceKey", "Phase");
+
+                    b.ToTable("IngestionCheckpoints");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.IngestionRun", b =>
                 {
                     b.Property<Guid>("Id")
@@ -744,32 +745,17 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("IngestionRuns");
                 });
 
-            modelBuilder.Entity("PatchHound.Core.Entities.IngestionCheckpoint", b =>
+            modelBuilder.Entity("PatchHound.Core.Entities.IngestionSnapshot", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<int>("BatchNumber")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("CursorJson")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("IngestionRunId")
                         .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("LastCommittedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Phase")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<int>("RecordsCommitted")
-                        .HasColumnType("integer");
 
                     b.Property<string>("SourceKey")
                         .IsRequired()
@@ -786,14 +772,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IngestionRunId");
+                    b.HasIndex("TenantId", "SourceKey", "Status");
 
-                    b.HasIndex("IngestionRunId", "Phase")
-                        .IsUnique();
-
-                    b.HasIndex("TenantId", "SourceKey", "Phase");
-
-                    b.ToTable("IngestionCheckpoints");
+                    b.ToTable("IngestionSnapshots");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.NormalizedSoftware", b =>
@@ -951,6 +932,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("RemovedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("SnapshotId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("SoftwareAssetId")
                         .HasColumnType("uuid");
 
@@ -969,16 +953,18 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("DeviceAssetId");
 
+                    b.HasIndex("SnapshotId");
+
                     b.HasIndex("SoftwareAssetId");
 
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantSoftwareId");
 
-                    b.HasIndex("TenantId", "SoftwareAssetId", "DeviceAssetId")
+                    b.HasIndex("TenantId", "SnapshotId", "SoftwareAssetId", "DeviceAssetId")
                         .IsUnique();
 
-                    b.HasIndex("TenantId", "TenantSoftwareId", "DetectedVersion", "LastSeenAt");
+                    b.HasIndex("TenantId", "SnapshotId", "TenantSoftwareId", "DetectedVersion", "LastSeenAt");
 
                     b.ToTable("NormalizedSoftwareInstallations");
                 });
@@ -1021,6 +1007,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("SnapshotId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -1032,13 +1021,15 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SnapshotId");
+
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantSoftwareId");
 
                     b.HasIndex("VulnerabilityDefinitionId");
 
-                    b.HasIndex("TenantId", "TenantSoftwareId", "VulnerabilityDefinitionId")
+                    b.HasIndex("TenantId", "SnapshotId", "TenantSoftwareId", "VulnerabilityDefinitionId")
                         .IsUnique();
 
                     b.ToTable("NormalizedSoftwareVulnerabilityProjections");
@@ -1309,6 +1300,57 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("SoftwareCpeBindings");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.SoftwareDescriptionJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Error")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<Guid>("NormalizedSoftwareId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid?>("TenantAiProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantSoftwareId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "TenantSoftwareId", "RequestedAt");
+
+                    b.HasIndex("TenantId", "TenantSoftwareId", "Status");
+
+                    b.ToTable("SoftwareDescriptionJobs");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.SoftwareVulnerabilityMatch", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1339,6 +1381,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("SnapshotId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("SoftwareAssetId")
                         .HasColumnType("uuid");
 
@@ -1350,13 +1395,15 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SnapshotId");
+
                     b.HasIndex("SoftwareAssetId");
 
                     b.HasIndex("TenantId");
 
                     b.HasIndex("VulnerabilityDefinitionId");
 
-                    b.HasIndex("TenantId", "SoftwareAssetId", "VulnerabilityDefinitionId")
+                    b.HasIndex("TenantId", "SnapshotId", "SoftwareAssetId", "VulnerabilityDefinitionId")
                         .IsUnique();
 
                     b.ToTable("SoftwareVulnerabilityMatches");
@@ -1645,46 +1692,23 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("Tenants");
                 });
 
-            modelBuilder.Entity("PatchHound.Core.Entities.TenantSlaConfiguration", b =>
-                {
-                    b.Property<Guid>("TenantId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("CriticalDays")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("HighDays")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("LowDays")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("MediumDays")
-                        .HasColumnType("integer");
-
-                    b.HasKey("TenantId");
-
-                    b.ToTable("TenantSlaConfigurations");
-                });
-
             modelBuilder.Entity("PatchHound.Core.Entities.TenantAiProfile", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ApiVersion")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                    b.Property<bool>("AllowExternalResearch")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("AllowedDomains")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<bool>("AllowExternalResearch")
-                        .HasColumnType("boolean");
+                    b.Property<string>("ApiVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("BaseUrl")
                         .IsRequired()
@@ -1699,19 +1723,22 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<bool>("IncludeCitations")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsDefault")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IncludeCitations")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("KeepAlive")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("LastValidatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("LastValidationError")
                         .IsRequired()
@@ -1722,9 +1749,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
-
-                    b.Property<DateTimeOffset?>("LastValidatedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("MaxOutputTokens")
                         .HasColumnType("integer");
@@ -1756,12 +1780,12 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
                     b.Property<decimal>("Temperature")
                         .HasPrecision(4, 2)
                         .HasColumnType("numeric(4,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("TimeoutSeconds")
                         .HasColumnType("integer");
@@ -1788,6 +1812,29 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("TenantAiProfiles");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.TenantSlaConfiguration", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CriticalDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HighDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LowDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MediumDays")
+                        .HasColumnType("integer");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("TenantSlaConfigurations");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.TenantSoftware", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1806,6 +1853,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("NormalizedSoftwareId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("SnapshotId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -1816,9 +1866,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("NormalizedSoftwareId");
 
+                    b.HasIndex("SnapshotId");
+
                     b.HasIndex("TenantId");
 
-                    b.HasIndex("TenantId", "NormalizedSoftwareId")
+                    b.HasIndex("TenantId", "SnapshotId", "NormalizedSoftwareId")
                         .IsUnique();
 
                     b.ToTable("TenantSoftware");
@@ -1833,10 +1885,16 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid?>("ActiveIngestionRunId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ActiveSnapshotId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("ApiBaseUrl")
                         .IsRequired()
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
+
+                    b.Property<Guid?>("BuildingSnapshotId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ClientId")
                         .IsRequired()
@@ -1908,6 +1966,10 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasColumnType("character varying(512)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ActiveSnapshotId");
+
+                    b.HasIndex("BuildingSnapshotId");
 
                     b.HasIndex("TenantId", "SourceKey")
                         .IsUnique();
@@ -2024,6 +2086,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("ResolvedDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("SnapshotId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -2036,7 +2101,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("AssetId");
 
-                    b.HasIndex("TenantVulnerabilityId", "AssetId")
+                    b.HasIndex("SnapshotId");
+
+                    b.HasIndex("TenantVulnerabilityId", "AssetId", "SnapshotId")
                         .IsUnique();
 
                     b.ToTable("VulnerabilityAssets");
@@ -2095,6 +2162,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
+                    b.Property<Guid?>("SnapshotId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -2107,11 +2177,13 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("AssetSecurityProfileId");
 
+                    b.HasIndex("SnapshotId");
+
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantVulnerabilityId");
 
-                    b.HasIndex("TenantId", "TenantVulnerabilityId", "AssetId")
+                    b.HasIndex("TenantId", "SnapshotId", "TenantVulnerabilityId", "AssetId")
                         .IsUnique();
 
                     b.ToTable("VulnerabilityAssetAssessments");

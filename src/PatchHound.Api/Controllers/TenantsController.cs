@@ -437,6 +437,19 @@ public class TenantsController : ControllerBase
             .Take(pagination.BoundedPageSize)
             .ToListAsync(ct);
         var runIds = pagedRuns.Select(run => run.Id).ToList();
+        var snapshotsByRunId =
+            runIds.Count == 0
+                ? new Dictionary<Guid, IngestionSnapshot>()
+                : await _dbContext
+                    .IngestionSnapshots.AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Where(snapshot => runIds.Contains(snapshot.IngestionRunId))
+                    .GroupBy(snapshot => snapshot.IngestionRunId)
+                    .ToDictionaryAsync(
+                        group => group.Key,
+                        group => group.OrderByDescending(item => item.CreatedAt).First(),
+                        ct
+                    );
         var checkpointsByRunId =
             runIds.Count == 0
                 ? new Dictionary<Guid, IngestionCheckpoint>()
@@ -462,6 +475,7 @@ public class TenantsController : ControllerBase
                 run.PersistedVulnerabilityCount,
                 run.PersistedSoftwareCount,
                 run.Error,
+                snapshotsByRunId.GetValueOrDefault(run.Id)?.Status,
                 checkpointsByRunId.GetValueOrDefault(run.Id)?.Phase,
                 checkpointsByRunId.GetValueOrDefault(run.Id)?.BatchNumber,
                 checkpointsByRunId.GetValueOrDefault(run.Id)?.Status,
@@ -624,6 +638,8 @@ public class TenantsController : ControllerBase
     private static TenantIngestionSourceDto MapSourceDto(
         TenantSourceConfiguration source,
         IngestionCheckpoint? activeCheckpoint,
+        IngestionSnapshot? activeSnapshot,
+        IngestionSnapshot? buildingSnapshot,
         IReadOnlyList<TenantIngestionRunDto> recentRuns
     )
     {
@@ -649,6 +665,8 @@ public class TenantsController : ControllerBase
                 source.LastError,
                 source.ActiveIngestionRunId,
                 source.LeaseExpiresAt,
+                activeSnapshot?.Status,
+                buildingSnapshot?.Status,
                 activeCheckpoint?.Phase,
                 activeCheckpoint?.BatchNumber,
                 activeCheckpoint?.Status,
@@ -735,6 +753,34 @@ public class TenantsController : ControllerBase
             .Concat(activeRunIds)
             .Distinct()
             .ToList();
+        var snapshotIds = sources
+            .SelectMany(source =>
+                new[] { source.ActiveSnapshotId, source.BuildingSnapshotId }.Where(id => id.HasValue)
+            )
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+        var snapshotsById =
+            snapshotIds.Count == 0
+                ? new Dictionary<Guid, IngestionSnapshot>()
+                : await _dbContext
+                    .IngestionSnapshots.AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Where(snapshot => snapshotIds.Contains(snapshot.Id))
+                    .ToDictionaryAsync(snapshot => snapshot.Id, ct);
+        var snapshotsByRunId =
+            checkpointRunIds.Count == 0
+                ? new Dictionary<Guid, IngestionSnapshot>()
+                : await _dbContext
+                    .IngestionSnapshots.AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Where(snapshot => checkpointRunIds.Contains(snapshot.IngestionRunId))
+                    .GroupBy(snapshot => snapshot.IngestionRunId)
+                    .ToDictionaryAsync(
+                        group => group.Key,
+                        group => group.OrderByDescending(item => item.CreatedAt).First(),
+                        ct
+                    );
         var latestCheckpointsByRunId =
             checkpointRunIds.Count == 0
                 ? new Dictionary<Guid, IngestionCheckpoint>()
@@ -765,6 +811,7 @@ public class TenantsController : ControllerBase
                                 run.PersistedVulnerabilityCount,
                                 run.PersistedSoftwareCount,
                                 run.Error,
+                                snapshotsByRunId.GetValueOrDefault(run.Id)?.Status,
                                 latestCheckpointsByRunId.GetValueOrDefault(run.Id)?.Phase,
                                 latestCheckpointsByRunId.GetValueOrDefault(run.Id)?.BatchNumber,
                                 latestCheckpointsByRunId.GetValueOrDefault(run.Id)?.Status,
@@ -787,6 +834,12 @@ public class TenantsController : ControllerBase
                         source,
                         source.ActiveIngestionRunId.HasValue
                             ? latestCheckpointsByRunId.GetValueOrDefault(source.ActiveIngestionRunId.Value)
+                            : null,
+                        source.ActiveSnapshotId.HasValue
+                            ? snapshotsById.GetValueOrDefault(source.ActiveSnapshotId.Value)
+                            : null,
+                        source.BuildingSnapshotId.HasValue
+                            ? snapshotsById.GetValueOrDefault(source.BuildingSnapshotId.Value)
                             : null,
                         recentRunsBySourceKey.GetValueOrDefault(source.SourceKey, [])
                     )

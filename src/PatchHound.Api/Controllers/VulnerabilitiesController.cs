@@ -8,6 +8,7 @@ using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Api.Controllers;
 
@@ -61,6 +62,7 @@ public class VulnerabilitiesController : ControllerBase
     {
         if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        var activeSnapshotId = await ResolveActiveVulnerabilitySnapshotIdAsync(currentTenantId, ct);
 
         var query = _dbContext
             .TenantVulnerabilities.AsNoTracking()
@@ -170,7 +172,9 @@ public class VulnerabilitiesController : ControllerBase
                 CvssScore = v.VulnerabilityDefinition.CvssScore,
                 PublishedDate = v.VulnerabilityDefinition.PublishedDate,
                 AffectedAssetCount = _dbContext
-                    .VulnerabilityAssets.Where(link => link.TenantVulnerabilityId == v.Id)
+                    .VulnerabilityAssets.Where(link =>
+                        link.TenantVulnerabilityId == v.Id && link.SnapshotId == activeSnapshotId
+                    )
                     .Count(),
                 AdjustedSeverity = _dbContext
                     .OrganizationalSeverities.Where(os => os.TenantVulnerabilityId == v.Id)
@@ -219,6 +223,7 @@ public class VulnerabilitiesController : ControllerBase
     {
         if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        var activeSnapshotId = await ResolveActiveVulnerabilitySnapshotIdAsync(currentTenantId, ct);
 
         var tenantVulnerability = await _dbContext
             .TenantVulnerabilities.AsNoTracking()
@@ -240,7 +245,10 @@ public class VulnerabilitiesController : ControllerBase
 
         var vulnerabilityAssets = await _dbContext
             .VulnerabilityAssets.AsNoTracking()
-            .Where(link => link.TenantVulnerabilityId == tenantVulnerability.Id)
+            .Where(link =>
+                link.TenantVulnerabilityId == tenantVulnerability.Id
+                && link.SnapshotId == activeSnapshotId
+            )
             .ToListAsync(ct);
 
         // Get asset names for affected assets
@@ -261,7 +269,10 @@ public class VulnerabilitiesController : ControllerBase
 
         var assessmentsByAssetId = await _dbContext
             .VulnerabilityAssetAssessments.AsNoTracking()
-            .Where(assessment => assessment.TenantVulnerabilityId == tenantVulnerability.Id)
+            .Where(assessment =>
+                assessment.TenantVulnerabilityId == tenantVulnerability.Id
+                && assessment.SnapshotId == activeSnapshotId
+            )
             .ToDictionaryAsync(assessment => assessment.AssetId, ct);
 
         var episodeRows = await _dbContext
@@ -471,6 +482,20 @@ public class VulnerabilitiesController : ControllerBase
         );
 
         return Ok(detail);
+    }
+
+    private async Task<Guid?> ResolveActiveVulnerabilitySnapshotIdAsync(
+        Guid tenantId,
+        CancellationToken ct
+    )
+    {
+        return await _dbContext
+            .TenantSourceConfigurations.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId && item.SourceKey == TenantSourceCatalog.DefenderSourceKey
+            )
+            .Select(item => item.ActiveSnapshotId)
+            .FirstOrDefaultAsync(ct);
     }
 
     private static string FormatSourceDisplay(string source)

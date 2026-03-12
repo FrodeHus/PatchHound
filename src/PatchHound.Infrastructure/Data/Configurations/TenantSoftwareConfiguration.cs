@@ -11,8 +11,11 @@ public class TenantSoftwareConfiguration : IEntityTypeConfiguration<TenantSoftwa
         builder.HasKey(item => item.Id);
 
         builder.HasIndex(item => item.TenantId);
+        builder.HasIndex(item => item.SnapshotId);
         builder.HasIndex(item => item.NormalizedSoftwareId);
-        builder.HasIndex(item => new { item.TenantId, item.NormalizedSoftwareId }).IsUnique();
+        builder
+            .HasIndex(item => new { item.TenantId, item.SnapshotId, item.NormalizedSoftwareId })
+            .IsUnique();
 
         builder
             .HasOne(item => item.NormalizedSoftware)

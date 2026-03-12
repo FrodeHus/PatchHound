@@ -25,6 +25,7 @@ internal static class TenantSoftwareGraphFactory
         );
         var tenantSoftware = TenantSoftware.Create(
             tenantId,
+            null,
             normalizedSoftware.Id,
             new DateTimeOffset(2026, 2, 10, 0, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
@@ -103,6 +104,7 @@ internal static class TenantSoftwareGraphFactory
         await dbContext.NormalizedSoftwareInstallations.AddRangeAsync(
             NormalizedSoftwareInstallation.Create(
                 tenantId,
+                null,
                 tenantSoftware.Id,
                 softwareOne.Id,
                 deviceOne.Id,
@@ -116,6 +118,7 @@ internal static class TenantSoftwareGraphFactory
             ),
             NormalizedSoftwareInstallation.Create(
                 tenantId,
+                null,
                 tenantSoftware.Id,
                 softwareTwo.Id,
                 deviceTwo.Id,
@@ -131,6 +134,7 @@ internal static class TenantSoftwareGraphFactory
         await dbContext.SoftwareVulnerabilityMatches.AddRangeAsync(
             SoftwareVulnerabilityMatch.Create(
                 tenantId,
+                null,
                 softwareOne.Id,
                 definition.Id,
                 SoftwareVulnerabilityMatchMethod.CpeBinding,
@@ -140,6 +144,7 @@ internal static class TenantSoftwareGraphFactory
             ),
             SoftwareVulnerabilityMatch.Create(
                 tenantId,
+                null,
                 softwareTwo.Id,
                 definition.Id,
                 SoftwareVulnerabilityMatchMethod.CpeBinding,
@@ -151,6 +156,7 @@ internal static class TenantSoftwareGraphFactory
         await dbContext.NormalizedSoftwareVulnerabilityProjections.AddAsync(
             NormalizedSoftwareVulnerabilityProjection.Create(
                 tenantId,
+                null,
                 tenantSoftware.Id,
                 definition.Id,
                 SoftwareVulnerabilityMatchMethod.CpeBinding,

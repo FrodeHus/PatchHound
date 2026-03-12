@@ -469,6 +469,7 @@ public class IngestionServiceTests : IDisposable
             run.Id,
             _tenantId,
             "test-source",
+            null,
             "TestSource",
             CancellationToken.None
         );
@@ -698,6 +699,7 @@ public class IngestionServiceTests : IDisposable
             run.Id,
             _tenantId,
             "test-source",
+            null,
             CancellationToken.None
         );
 
