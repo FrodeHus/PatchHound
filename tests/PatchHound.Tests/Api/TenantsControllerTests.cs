@@ -534,6 +534,13 @@ public class TenantsControllerTests : IDisposable
         action.Should().BeOfType<AcceptedResult>();
         var updatedRun = await _dbContext.IngestionRuns.SingleAsync(item => item.Id == run.Id);
         updatedRun.AbortRequestedAt.Should().NotBeNull();
+        updatedRun.Status.Should().Be(IngestionRunStatuses.FailedTerminal);
+        updatedRun.CompletedAt.Should().NotBeNull();
+        updatedRun.Error.Should().Be("Ingestion failed: the run was aborted by an operator.");
+        var updatedSource = await _dbContext.TenantSourceConfigurations.SingleAsync(item => item.Id == source.Id);
+        updatedSource.ActiveIngestionRunId.Should().BeNull();
+        updatedSource.LeaseAcquiredAt.Should().BeNull();
+        updatedSource.LeaseExpiresAt.Should().BeNull();
     }
 
     [Fact]

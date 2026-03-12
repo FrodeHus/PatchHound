@@ -912,6 +912,18 @@ public class IngestionService
                     return null;
                 }
 
+                if (sourceConfiguration.ActiveIngestionRunId.HasValue)
+                {
+                    await FinalizeAbortedRunIfPendingAsync(
+                        sourceConfiguration.ActiveIngestionRunId.Value,
+                        tenantId,
+                        normalizedSourceKey,
+                        now,
+                        ct
+                    );
+                    await _dbContext.Entry(sourceConfiguration).ReloadAsync(ct);
+                }
+
                 if (
                     sourceConfiguration.ActiveIngestionRunId.HasValue
                     && sourceConfiguration.LeaseExpiresAt >= now
@@ -923,11 +935,6 @@ public class IngestionService
                 IngestionRun? resumableRun = null;
                 if (sourceConfiguration.ActiveIngestionRunId.HasValue)
                 {
-                    await FinalizeAbortedRunIfPendingAsync(
-                        sourceConfiguration.ActiveIngestionRunId.Value,
-                        now,
-                        ct
-                    );
                     resumableRun = await _dbContext
                         .IngestionRuns.IgnoreQueryFilters()
                         .FirstOrDefaultAsync(
@@ -971,6 +978,29 @@ public class IngestionService
                 return null;
             }
 
+            if (persistedSourceConfiguration.ActiveIngestionRunId.HasValue)
+            {
+                await FinalizeAbortedRunIfPendingAsync(
+                    persistedSourceConfiguration.ActiveIngestionRunId.Value,
+                    tenantId,
+                    normalizedSourceKey,
+                    now,
+                    ct
+                );
+                persistedSourceConfiguration = await _dbContext
+                    .TenantSourceConfigurations.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(
+                        item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
+                        ct
+                    );
+
+                if (persistedSourceConfiguration is null)
+                {
+                    await transaction.RollbackAsync(ct);
+                    return null;
+                }
+            }
+
             if (
                 persistedSourceConfiguration.ActiveIngestionRunId.HasValue
                 && persistedSourceConfiguration.LeaseExpiresAt >= now
@@ -983,11 +1013,6 @@ public class IngestionService
             IngestionRun? resumable = null;
             if (persistedSourceConfiguration.ActiveIngestionRunId.HasValue)
             {
-                await FinalizeAbortedRunIfPendingAsync(
-                    persistedSourceConfiguration.ActiveIngestionRunId.Value,
-                    now,
-                    ct
-                );
                 resumable = await _dbContext
                     .IngestionRuns.IgnoreQueryFilters()
                     .FirstOrDefaultAsync(
@@ -1039,10 +1064,14 @@ public class IngestionService
 
     private async Task FinalizeAbortedRunIfPendingAsync(
         Guid runId,
+        Guid tenantId,
+        string sourceKey,
         DateTimeOffset completedAt,
         CancellationToken ct
     )
     {
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+
         if (IsInMemoryProvider())
         {
             var run = await _dbContext
@@ -1065,6 +1094,16 @@ public class IngestionService
                 IngestionRunStatuses.FailedTerminal;
             _dbContext.Entry(run).Property(nameof(IngestionRun.Error)).CurrentValue =
                 IngestionFailurePolicy.Describe(new IngestionAbortedException());
+            var source = await _dbContext
+                .TenantSourceConfigurations.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(
+                    item =>
+                        item.TenantId == tenantId
+                        && item.SourceKey == normalizedSourceKey
+                        && item.ActiveIngestionRunId == runId,
+                    ct
+                );
+            source?.ReleaseLease(runId);
             await _dbContext.SaveChangesAsync(ct);
             return;
         }
@@ -1088,6 +1127,21 @@ public class IngestionService
                         item => item.Error,
                         IngestionFailurePolicy.Describe(new IngestionAbortedException())
                     ),
+                ct
+            );
+
+        await _dbContext
+            .TenantSourceConfigurations.IgnoreQueryFilters()
+            .Where(item =>
+                item.TenantId == tenantId
+                && item.SourceKey == normalizedSourceKey
+                && item.ActiveIngestionRunId == runId)
+            .ExecuteUpdateAsync(
+                setters =>
+                    setters
+                        .SetProperty(item => item.ActiveIngestionRunId, (Guid?)null)
+                        .SetProperty(item => item.LeaseAcquiredAt, (DateTimeOffset?)null)
+                        .SetProperty(item => item.LeaseExpiresAt, (DateTimeOffset?)null),
                 ct
             );
     }
