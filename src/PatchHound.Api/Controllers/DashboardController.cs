@@ -24,6 +24,8 @@ public class DashboardController : ControllerBase
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummaryDto>> GetSummary(CancellationToken ct)
     {
+        var riskChangeBrief = await BuildRiskChangeBriefAsync(limit: 3, ct);
+
         // Vulnerability counts by severity
         var bySeverity = await _dbContext
             .TenantVulnerabilities.AsNoTracking()
@@ -229,12 +231,19 @@ public class DashboardController : ControllerBase
                 tasks.Count,
                 avgRemediationDays,
                 topVulns,
+                riskChangeBrief,
                 recurringVulnerabilityIds.Count,
                 recurrenceRatePercent,
                 topRecurringVulnerabilities,
                 topRecurringAssets
             )
         );
+    }
+
+    [HttpGet("risk-changes")]
+    public async Task<ActionResult<DashboardRiskChangeBriefDto>> GetRiskChanges(CancellationToken ct)
+    {
+        return Ok(await BuildRiskChangeBriefAsync(limit: null, ct));
     }
 
     [HttpGet("trends")]
@@ -313,5 +322,108 @@ public class DashboardController : ControllerBase
         {
             yield return current;
         }
+    }
+
+    private async Task<DashboardRiskChangeBriefDto> BuildRiskChangeBriefAsync(
+        int? limit,
+        CancellationToken ct
+    )
+    {
+        var cutoff = DateTimeOffset.UtcNow.AddHours(-24);
+
+        var candidateRows = await _dbContext
+            .TenantVulnerabilities.AsNoTracking()
+            .Where(v =>
+                (
+                    (
+                        v.Status == VulnerabilityStatus.Open
+                        || v.Status == VulnerabilityStatus.InRemediation
+                    )
+                    && (v.CreatedAt >= cutoff || v.UpdatedAt >= cutoff)
+                )
+                || (v.Status == VulnerabilityStatus.Resolved && v.UpdatedAt >= cutoff)
+            )
+            .Select(v => new
+            {
+                v.Id,
+                v.Status,
+                v.CreatedAt,
+                v.UpdatedAt,
+                v.VulnerabilityDefinition.ExternalId,
+                v.VulnerabilityDefinition.Title,
+                VendorSeverity = v.VulnerabilityDefinition.VendorSeverity,
+                AdjustedSeverity = _dbContext
+                    .OrganizationalSeverities
+                    .Where(os => os.TenantVulnerabilityId == v.Id)
+                    .OrderByDescending(os => os.AdjustedAt)
+                    .Select(os => (Severity?)os.AdjustedSeverity)
+                    .FirstOrDefault(),
+                AffectedAssetCount = _dbContext.VulnerabilityAssets.Count(va =>
+                    va.TenantVulnerabilityId == v.Id
+                ),
+            })
+            .ToListAsync(ct);
+
+        var appearedRows = candidateRows
+            .Where(row =>
+                (
+                    row.Status == VulnerabilityStatus.Open
+                    || row.Status == VulnerabilityStatus.InRemediation
+                )
+                && (row.CreatedAt >= cutoff || row.UpdatedAt >= cutoff)
+            )
+            .Select(row => new
+            {
+                Item = new DashboardRiskChangeItemDto(
+                    row.Id,
+                    row.ExternalId,
+                    row.Title,
+                    (row.AdjustedSeverity ?? row.VendorSeverity).ToString(),
+                    row.AffectedAssetCount,
+                    row.CreatedAt >= cutoff ? row.CreatedAt : row.UpdatedAt
+                ),
+                EffectiveSeverity = row.AdjustedSeverity ?? row.VendorSeverity,
+            })
+            .Where(row =>
+                row.EffectiveSeverity == Severity.High
+                || row.EffectiveSeverity == Severity.Critical
+            )
+            .OrderByDescending(row => row.Item.ChangedAt)
+            .ThenByDescending(row => row.Item.AffectedAssetCount)
+            .ToList();
+
+        var resolvedRows = candidateRows
+            .Where(row => row.Status == VulnerabilityStatus.Resolved && row.UpdatedAt >= cutoff)
+            .Select(row => new
+            {
+                Item = new DashboardRiskChangeItemDto(
+                    row.Id,
+                    row.ExternalId,
+                    row.Title,
+                    (row.AdjustedSeverity ?? row.VendorSeverity).ToString(),
+                    row.AffectedAssetCount,
+                    row.UpdatedAt
+                ),
+                EffectiveSeverity = row.AdjustedSeverity ?? row.VendorSeverity,
+            })
+            .Where(row =>
+                row.EffectiveSeverity == Severity.High
+                || row.EffectiveSeverity == Severity.Critical
+            )
+            .OrderByDescending(row => row.Item.ChangedAt)
+            .ThenByDescending(row => row.Item.AffectedAssetCount)
+            .ToList();
+
+        return new DashboardRiskChangeBriefDto(
+            appearedRows.Count,
+            resolvedRows.Count,
+            (limit.HasValue ? appearedRows.Take(limit.Value) : appearedRows)
+                .Select(row => row.Item)
+                .ToList(),
+            (limit.HasValue ? resolvedRows.Take(limit.Value) : resolvedRows)
+                .Select(row => row.Item)
+                .ToList(),
+            null
+        );
     }
 }

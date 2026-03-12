@@ -284,5 +284,94 @@ public class DashboardControllerTests : IDisposable
         yesterdayPoint.Count.Should().Be(1);
     }
 
+    [Fact]
+    public async Task GetSummary_AndRiskChanges_ReportHighCriticalAppearedAndResolvedItems()
+    {
+        var appearedDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-4000",
+            "Fresh critical issue",
+            "Desc",
+            Severity.Critical,
+            "MicrosoftDefender"
+        );
+        var appearedTenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            appearedDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow.AddHours(-2)
+        );
+
+        var resolvedDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-4001",
+            "Recently resolved issue",
+            "Desc",
+            Severity.Critical,
+            "MicrosoftDefender"
+        );
+        var resolvedTenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            resolvedDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow.AddDays(-2)
+        );
+        resolvedTenantVulnerability.UpdateStatus(
+            VulnerabilityStatus.Resolved,
+            DateTimeOffset.UtcNow.AddHours(-3)
+        );
+
+        var appearedAsset = Asset.Create(
+            _tenantId,
+            "device-change-1",
+            AssetType.Device,
+            "Device Change 1",
+            Criticality.High
+        );
+        var resolvedAsset = Asset.Create(
+            _tenantId,
+            "device-change-2",
+            AssetType.Device,
+            "Device Change 2",
+            Criticality.High
+        );
+
+        await _dbContext.AddRangeAsync(
+            appearedDefinition,
+            resolvedDefinition,
+            appearedTenantVulnerability,
+            resolvedTenantVulnerability,
+            appearedAsset,
+            resolvedAsset,
+            VulnerabilityAsset.Create(
+                appearedTenantVulnerability.Id,
+                appearedAsset.Id,
+                DateTimeOffset.UtcNow.AddHours(-2)
+            ),
+            VulnerabilityAsset.Create(
+                resolvedTenantVulnerability.Id,
+                resolvedAsset.Id,
+                DateTimeOffset.UtcNow.AddDays(-2)
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var summaryAction = await _controller.GetSummary(CancellationToken.None);
+        var summaryPayload = summaryAction.Result.Should().BeOfType<OkObjectResult>().Subject.Value
+            .Should().BeOfType<DashboardSummaryDto>().Subject;
+
+        summaryPayload.RiskChangeBrief.AppearedCount.Should().Be(1);
+        summaryPayload.RiskChangeBrief.ResolvedCount.Should().Be(1);
+        summaryPayload.RiskChangeBrief.Appeared.Should().ContainSingle();
+        summaryPayload.RiskChangeBrief.Appeared[0].ExternalId.Should().Be("CVE-2026-4000");
+        summaryPayload.RiskChangeBrief.Resolved.Should().ContainSingle();
+        summaryPayload.RiskChangeBrief.Resolved[0].ExternalId.Should().Be("CVE-2026-4001");
+
+        var detailAction = await _controller.GetRiskChanges(CancellationToken.None);
+        var detailPayload = detailAction.Result.Should().BeOfType<OkObjectResult>().Subject.Value
+            .Should().BeOfType<DashboardRiskChangeBriefDto>().Subject;
+
+        detailPayload.AppearedCount.Should().Be(1);
+        detailPayload.ResolvedCount.Should().Be(1);
+    }
+
     public void Dispose() => _dbContext.Dispose();
 }

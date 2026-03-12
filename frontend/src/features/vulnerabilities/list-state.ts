@@ -24,9 +24,10 @@ export function buildVulnerabilitiesListRequest(search: VulnerabilitiesListSearc
 
 export const vulnerabilityQueryKeys = {
   all: ['vulnerabilities'] as const,
-  list: (search: VulnerabilitiesListSearch) => [
+  list: (tenantId: string | null, search: VulnerabilitiesListSearch) => [
     ...vulnerabilityQueryKeys.all,
     'list',
+    tenantId,
     search.search,
     search.severity,
     search.status,

@@ -9,6 +9,7 @@ public record DashboardSummaryDto(
     int TotalTaskCount,
     decimal AverageRemediationDays,
     List<TopVulnerabilityDto> TopCriticalVulnerabilities,
+    DashboardRiskChangeBriefDto RiskChangeBrief,
     int RecurringVulnerabilityCount,
     decimal RecurrenceRatePercent,
     List<RecurringVulnerabilityDto> TopRecurringVulnerabilities,
@@ -38,6 +39,23 @@ public record RecurringAssetDto(
     string Name,
     string AssetType,
     int RecurringVulnerabilityCount
+);
+
+public record DashboardRiskChangeBriefDto(
+    int AppearedCount,
+    int ResolvedCount,
+    List<DashboardRiskChangeItemDto> Appeared,
+    List<DashboardRiskChangeItemDto> Resolved,
+    string? AiSummary
+);
+
+public record DashboardRiskChangeItemDto(
+    Guid TenantVulnerabilityId,
+    string ExternalId,
+    string Title,
+    string Severity,
+    int AffectedAssetCount,
+    DateTimeOffset ChangedAt
 );
 
 public record TrendDataDto(List<TrendItem> Items);

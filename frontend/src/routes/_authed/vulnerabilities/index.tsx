@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { fetchVulnerabilities } from '@/api/vulnerabilities.functions'
 import { VulnerabilityTable } from '@/components/features/vulnerabilities/VulnerabilityTable'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 import { buildVulnerabilitiesListRequest, vulnerabilityQueryKeys } from '@/features/vulnerabilities/list-state'
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
 import { createListSearchUpdater } from '@/routes/list-search-helpers'
@@ -26,22 +28,30 @@ function VulnerabilitiesPage() {
   const initialData = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
+  const { selectedTenantId } = useTenantScope()
+  const [initialTenantId] = useState(selectedTenantId)
+  const canUseInitialData = initialTenantId === selectedTenantId
   const searchActions = createListSearchUpdater<typeof search>(navigate)
   const query = useQuery({
-    queryKey: vulnerabilityQueryKeys.list(search),
+    queryKey: vulnerabilityQueryKeys.list(selectedTenantId, search),
     queryFn: () => fetchVulnerabilities({ data: buildVulnerabilitiesListRequest(search) }),
-    initialData,
+    initialData: canUseInitialData ? initialData : undefined,
   })
+  const data = query.data ?? (canUseInitialData ? initialData : undefined)
+
+  if (!data) {
+    return null
+  }
 
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold">Vulnerabilities</h1>
       <VulnerabilityTable
-        items={query.data.items}
-        totalCount={query.data.totalCount}
-        page={query.data.page}
-        pageSize={query.data.pageSize}
-        totalPages={query.data.totalPages}
+        items={data.items}
+        totalCount={data.totalCount}
+        page={data.page}
+        pageSize={data.pageSize}
+        totalPages={data.totalPages}
         searchValue={search.search}
         severityFilter={search.severity}
         statusFilter={search.status}

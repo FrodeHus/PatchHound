@@ -1,4 +1,6 @@
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, ShieldAlert, TimerReset } from 'lucide-react'
 import { fetchDashboardSummary, fetchDashboardTrends } from '@/api/dashboard.functions'
 import { Card, CardContent } from '@/components/ui/card'
@@ -6,7 +8,9 @@ import { InsetPanel } from '@/components/ui/inset-panel'
 import { CriticalVulnerabilities } from '@/components/features/dashboard/CriticalVulnerabilities'
 import { ExposureSlaCard } from '@/components/features/dashboard/ExposureSlaCard'
 import { RemediationVelocity } from '@/components/features/dashboard/RemediationVelocity'
+import { RiskChangeBriefCard } from '@/components/features/dashboard/RiskChangeBriefCard'
 import { TrendChart } from '@/components/features/dashboard/TrendChart'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 
 export const Route = createFileRoute('/_authed/')({
   loader: async () => {
@@ -20,7 +24,28 @@ export const Route = createFileRoute('/_authed/')({
 })
 
 function DashboardPage() {
-  const { summary, trends } = Route.useLoaderData()
+  const initialData = Route.useLoaderData()
+  const { selectedTenantId } = useTenantScope()
+  const [initialTenantId] = useState(selectedTenantId)
+  const canUseInitialData = initialTenantId === selectedTenantId
+  const summaryQuery = useQuery({
+    queryKey: ['dashboard', 'summary', selectedTenantId],
+    queryFn: () => fetchDashboardSummary(),
+    initialData: canUseInitialData ? initialData.summary : undefined,
+    staleTime: 30_000,
+  })
+  const trendsQuery = useQuery({
+    queryKey: ['dashboard', 'trends', selectedTenantId],
+    queryFn: () => fetchDashboardTrends(),
+    initialData: canUseInitialData ? initialData.trends : undefined,
+    staleTime: 30_000,
+  })
+  const summary = summaryQuery.data ?? (canUseInitialData ? initialData.summary : undefined)
+  const trends = trendsQuery.data ?? (canUseInitialData ? initialData.trends : undefined)
+
+  if (!summary || !trends) {
+    return null
+  }
   const statCards = [
     {
       label: 'Critical backlog',
@@ -88,6 +113,8 @@ function DashboardPage() {
           vulnerabilitiesBySeverity={summary.vulnerabilitiesBySeverity}
         />
       </div>
+
+      <RiskChangeBriefCard brief={summary.riskChangeBrief} />
 
       <div className="grid gap-4 xl:grid-cols-5">
         <div className="xl:col-span-5">
