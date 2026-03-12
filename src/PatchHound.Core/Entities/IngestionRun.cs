@@ -1,5 +1,15 @@
 namespace PatchHound.Core.Entities;
 
+public static class IngestionRunStatuses
+{
+    public const string Staging = "Staging";
+    public const string MergePending = "MergePending";
+    public const string Merging = "Merging";
+    public const string Succeeded = "Succeeded";
+    public const string FailedRecoverable = "FailedRecoverable";
+    public const string FailedTerminal = "FailedTerminal";
+}
+
 public class IngestionRun
 {
     public Guid Id { get; private set; }
@@ -38,8 +48,13 @@ public class IngestionRun
             TenantId = tenantId,
             SourceKey = sourceKey,
             StartedAt = startedAt,
-            Status = "Running",
+            Status = IngestionRunStatuses.Staging,
         };
+    }
+
+    public void UpdateStatus(string status)
+    {
+        Status = status;
     }
 
     public void CompleteSucceeded(
@@ -65,7 +80,7 @@ public class IngestionRun
     )
     {
         CompletedAt = completedAt;
-        Status = "Succeeded";
+        Status = IngestionRunStatuses.Succeeded;
         FetchedVulnerabilityCount = fetchedVulnerabilityCount;
         FetchedAssetCount = fetchedAssetCount;
         FetchedSoftwareInstallationCount = fetchedSoftwareInstallationCount;
@@ -90,6 +105,7 @@ public class IngestionRun
     public void CompleteFailed(
         DateTimeOffset completedAt,
         string error,
+        string failureStatus,
         int fetchedVulnerabilityCount,
         int fetchedAssetCount,
         int fetchedSoftwareInstallationCount,
@@ -111,7 +127,7 @@ public class IngestionRun
     )
     {
         CompletedAt = completedAt;
-        Status = "Failed";
+        Status = failureStatus;
         FetchedVulnerabilityCount = fetchedVulnerabilityCount;
         FetchedAssetCount = fetchedAssetCount;
         FetchedSoftwareInstallationCount = fetchedSoftwareInstallationCount;
