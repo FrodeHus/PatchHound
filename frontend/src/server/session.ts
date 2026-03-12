@@ -5,6 +5,7 @@ import { getCookie, setCookie } from '@tanstack/react-start/server'
 export interface SessionData {
   accessToken?: string
   tokenExpiry?: number
+  tokenCache?: string
   userId?: string
   email?: string
   displayName?: string
