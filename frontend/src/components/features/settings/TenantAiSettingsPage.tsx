@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  ArrowLeft,
   Bot,
   CircleAlert,
   CircleHelp,
@@ -21,6 +23,7 @@ import {
 } from '@/api/ai-settings.functions'
 import type { SaveTenantAiProfile, TenantAiProfile } from '@/api/ai-settings.schemas'
 import { useTenantScope } from '@/components/layout/tenant-scope'
+import { Route } from '@/routes/_authed/settings/ai'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,7 +31,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Separator } from '@/components/ui/separator'
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatDateTime } from '@/lib/formatting'
@@ -168,11 +170,12 @@ function extractMissingOllamaModel(errorMessage: string, model: string) {
 }
 
 export function TenantAiSettingsPage() {
+  const navigate = useNavigate()
+  const search = Route.useSearch()
   const queryClient = useQueryClient()
   const { selectedTenantId, tenants } = useTenantScope()
-  const [sheetOpen, setSheetOpen] = useState(false)
   const [draft, setDraft] = useState<SaveTenantAiProfile>(createEmptyProfile)
-  const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
+  const [saveBanner, setSaveBanner] = useState<string | null>(null)
 
   const selectedTenantName = useMemo(
     () => tenants.find((item) => item.id === selectedTenantId)?.name ?? 'Current tenant',
@@ -186,6 +189,9 @@ export function TenantAiSettingsPage() {
   })
 
   const profiles = profilesQuery.data ?? EMPTY_PROFILES
+  const editingProfileId = search.mode === 'edit' ? search.profileId ?? null : null
+  const isCreateMode = search.mode === 'new'
+  const isEditorOpen = isCreateMode || !!editingProfileId
   const editingProfile = useMemo(
     () => profiles.find((item) => item.id === editingProfileId) ?? null,
     [editingProfileId, profiles],
@@ -193,11 +199,17 @@ export function TenantAiSettingsPage() {
 
   const saveMutation = useMutation({
     mutationFn: (payload: SaveTenantAiProfile) => saveTenantAiProfile({ data: payload }),
-    onSuccess: async () => {
+    onSuccess: async (savedProfile) => {
       await queryClient.invalidateQueries({ queryKey: ['tenant-ai-profiles', selectedTenantId] })
-      setSheetOpen(false)
-      setEditingProfileId(null)
-      setDraft(createEmptyProfile())
+      setSaveBanner('Profile saved successfully.')
+      setDraft(toDraft(savedProfile))
+      await navigate({
+        to: '/settings/ai',
+        search: {
+          mode: 'edit',
+          profileId: savedProfile.id,
+        },
+      })
     },
   })
 
@@ -226,9 +238,60 @@ export function TenantAiSettingsPage() {
 
   const defaultProfile = profiles.find((item) => item.isDefault) ?? null
 
+  function openNewProfile() {
+    setDraft(createEmptyProfile())
+    setSaveBanner(null)
+    void navigate({
+      to: '/settings/ai',
+      search: {
+        mode: 'new',
+      },
+    })
+  }
+
+  function openProfile(profile: TenantAiProfile) {
+    setDraft(toDraft(profile))
+    setSaveBanner(null)
+    void navigate({
+      to: '/settings/ai',
+      search: {
+        mode: 'edit',
+        profileId: profile.id,
+      },
+    })
+  }
+
+  function closeEditor() {
+    setSaveBanner(null)
+    void navigate({
+      to: '/settings/ai',
+      search: {},
+    })
+  }
+
   return (
     <TooltipProvider>
       <section className="space-y-5 pb-6">
+        {isEditorOpen ? (
+          <AiProfileEditorPage
+            profile={editingProfile}
+            draft={draft}
+            isSaving={saveMutation.isPending}
+            saveBanner={saveBanner}
+            saveError={saveMutation.isError ? getErrorMessage(saveMutation.error, 'Failed to save AI profile.') : null}
+            validateError={validateMutation.isError ? getErrorMessage(validateMutation.error, 'Failed to validate AI profile.') : null}
+            isValidating={validateMutation.isPending}
+            onValidate={(id) => validateMutation.mutate(id)}
+            modelResult={modelsMutation.data ?? null}
+            modelError={modelsMutation.isError ? getErrorMessage(modelsMutation.error, 'Failed to list available models.') : null}
+            isListingModels={modelsMutation.isPending}
+            onListModels={(id) => modelsMutation.mutate(id)}
+            onDraftChange={setDraft}
+            onSave={() => saveMutation.mutate(draft)}
+            onBack={closeEditor}
+          />
+        ) : (
+          <>
         <header className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">Tenant settings</Badge>
@@ -257,11 +320,7 @@ export function TenantAiSettingsPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    setEditingProfileId(null)
-                    setDraft(createEmptyProfile())
-                    setSheetOpen(true)
-                  }}
+                  onClick={openNewProfile}
                 >
                   <Plus className="size-4" />
                   New
@@ -284,11 +343,7 @@ export function TenantAiSettingsPage() {
                   </div>
                   <Button
                     type="button"
-                    onClick={() => {
-                      setEditingProfileId(null)
-                      setDraft(createEmptyProfile())
-                      setSheetOpen(true)
-                    }}
+                    onClick={openNewProfile}
                   >
                     <Plus className="size-4" />
                     Create profile
@@ -327,11 +382,7 @@ export function TenantAiSettingsPage() {
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => {
-                          setEditingProfileId(profile.id)
-                          setDraft(toDraft(profile))
-                          setSheetOpen(true)
-                        }}
+                        onClick={() => openProfile(profile)}
                       >
                         <PenSquare className="size-4" />
                         Edit
@@ -398,39 +449,18 @@ export function TenantAiSettingsPage() {
           </div>
         </div>
 
-        <AiProfileSheet
-          open={sheetOpen}
-          profile={editingProfile}
-          draft={draft}
-          isSaving={saveMutation.isPending}
-          saveError={saveMutation.isError ? getErrorMessage(saveMutation.error, 'Failed to save AI profile.') : null}
-          validateError={validateMutation.isError ? getErrorMessage(validateMutation.error, 'Failed to validate AI profile.') : null}
-          isValidating={validateMutation.isPending}
-          onValidate={(id) => validateMutation.mutate(id)}
-          modelResult={modelsMutation.data ?? null}
-          modelError={modelsMutation.isError ? getErrorMessage(modelsMutation.error, 'Failed to list available models.') : null}
-          isListingModels={modelsMutation.isPending}
-          onListModels={(id) => modelsMutation.mutate(id)}
-          onOpenChange={(open) => {
-            setSheetOpen(open)
-            if (!open) {
-              setEditingProfileId(null)
-              setDraft(createEmptyProfile())
-            }
-          }}
-          onDraftChange={setDraft}
-          onSave={() => saveMutation.mutate(draft)}
-        />
+          </>
+        )}
       </section>
     </TooltipProvider>
   )
 }
 
-function AiProfileSheet({
-  open,
+function AiProfileEditorPage({
   profile,
   draft,
   isSaving,
+  saveBanner,
   saveError,
   validateError,
   isValidating,
@@ -439,14 +469,14 @@ function AiProfileSheet({
   modelError,
   isListingModels,
   onListModels,
-  onOpenChange,
   onDraftChange,
   onSave,
+  onBack,
 }: {
-  open: boolean
   profile: TenantAiProfile | null
   draft: SaveTenantAiProfile
   isSaving: boolean
+  saveBanner: string | null
   saveError: string | null
   validateError: string | null
   isValidating: boolean
@@ -455,23 +485,56 @@ function AiProfileSheet({
   modelError: string | null
   isListingModels: boolean
   onListModels: (id: string) => void
-  onOpenChange: (open: boolean) => void
   onDraftChange: React.Dispatch<React.SetStateAction<SaveTenantAiProfile>>
   onSave: () => void
+  onBack: () => void
 }) {
   const saveLabel = profile ? 'Save changes' : 'Create profile'
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-3xl">
-        <SheetHeader className="border-b border-border/60">
-          <SheetTitle>{profile ? 'Edit AI profile' : 'Create AI profile'}</SheetTitle>
-          <SheetDescription>
-            Configure provider, connection, runtime, and prompt settings for this tenant AI profile.
-          </SheetDescription>
-        </SheetHeader>
+    <div className="space-y-5">
+      <div className="space-y-3">
+        <Link
+          to="/settings/ai"
+          search={{}}
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Back to AI profiles
+        </Link>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {profile ? 'Edit AI profile' : 'Create AI profile'}
+            </h1>
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+              Configure provider, connection, runtime, and prompt settings for this tenant AI profile.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={onBack}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={isSaving} onClick={onSave}>
+              {isSaving ? 'Saving...' : saveLabel}
+            </Button>
+            {profile ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isValidating}
+                onClick={() => onValidate(profile.id)}
+              >
+                {isValidating ? 'Validating...' : 'Validate connection'}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </div>
 
-        <div className="flex-1 space-y-6 overflow-y-auto p-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <Card className="rounded-2xl border-border/70 bg-card/85">
+          <CardContent className="space-y-6 p-5">
           <FormSection title="Provider" icon={Sparkles}>
             <div className="grid gap-3 md:grid-cols-3">
               {providerOptions.map((provider) => {
@@ -754,27 +817,52 @@ function AiProfileSheet({
 
           {saveError ? <InlineError message={saveError} /> : null}
           {validateError ? <InlineError message={validateError} /> : null}
-        </div>
+          </CardContent>
+        </Card>
 
-        <SheetFooter className="border-t border-border/60">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" disabled={isSaving} onClick={onSave}>
-              {isSaving ? 'Saving...' : saveLabel}
-            </Button>
-            {profile ? (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isValidating}
-                onClick={() => onValidate(profile.id)}
-              >
-                {isValidating ? 'Validating...' : 'Validate connection'}
-              </Button>
-            ) : null}
-          </div>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        <div className="space-y-4">
+          {saveBanner ? (
+            <InsetPanel className="px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
+              {saveBanner}
+            </InsetPanel>
+          ) : null}
+          <Card className="rounded-2xl border-border/70 bg-card/75">
+            <CardHeader>
+              <CardTitle>Profile posture</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <InsetPanel emphasis="subtle" className="px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Provider</p>
+                <p className="mt-1 font-medium text-foreground">{getProviderLabel(draft.providerType)}</p>
+              </InsetPanel>
+              <InsetPanel emphasis="subtle" className="px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Default state</p>
+                <p className="mt-1 font-medium text-foreground">{draft.isDefault ? 'Default profile' : 'Secondary profile'}</p>
+              </InsetPanel>
+              <InsetPanel emphasis="subtle" className="px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Validation</p>
+                <p className="mt-1 font-medium text-foreground">
+                  {profile ? profile.lastValidationStatus : 'Validate after first save'}
+                </p>
+                {profile?.lastValidatedAt ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Checked {formatDateTime(profile.lastValidatedAt)}</p>
+                ) : null}
+              </InsetPanel>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border-border/70 bg-card/75">
+            <CardHeader>
+              <CardTitle>Navigation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                Save keeps you on this page so you can validate or continue refining the profile. Use the back link when you are done.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
   )
 }
 

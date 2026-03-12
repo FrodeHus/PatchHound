@@ -1,5 +1,7 @@
 import type { AuditLogItem } from '@/api/audit-log.schemas'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { InsetPanel } from '@/components/ui/inset-panel'
 
 type AuditDetailDialogProps = {
@@ -13,15 +15,16 @@ export function AuditDetailDialog({ selected, onClose }: AuditDetailDialogProps)
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="max-h-[80vh] w-full max-w-4xl overflow-auto rounded-[28px] border border-border/80 bg-card p-5 shadow-lg shadow-black/25">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Audit Entry Detail</h3>
-          <button type="button" className="rounded-full border border-input px-3 py-1.5 text-sm" onClick={onClose}>
-            Close
-          </button>
-        </div>
-
+    <Dialog open onOpenChange={(open) => {
+      if (!open) {
+        onClose()
+      }
+    }}>
+      <DialogContent className="w-[min(96vw,72rem)] max-w-[72rem] overflow-hidden rounded-2xl border-border/80 bg-card p-0 sm:max-w-[72rem]">
+        <DialogHeader className="border-b border-border/60 px-5 py-4">
+          <DialogTitle>Audit Entry Detail</DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[76vh] overflow-auto px-5 py-4">
         <dl className="mb-4 grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-3">
           <InsetPanel className="p-3"><dt className="text-xs text-muted-foreground">Entity Type</dt><dd className="mt-2 font-medium">{selected.entityType}</dd></InsetPanel>
           <InsetPanel className="p-3"><dt className="text-xs text-muted-foreground">Entity Label</dt><dd className="mt-2 font-medium">{selected.entityLabel ?? '(none)'}</dd></InsetPanel>
@@ -41,7 +44,13 @@ export function AuditDetailDialog({ selected, onClose }: AuditDetailDialogProps)
             <pre className="max-h-80 overflow-auto rounded-md border border-border/80 bg-muted/65 p-2 text-xs">{selected.newValues ?? '(none)'}</pre>
           </section>
         </div>
-      </div>
-    </div>
+        </div>
+        <DialogFooter className="border-t border-border/60 bg-card px-5 py-4">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

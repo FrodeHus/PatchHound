@@ -59,9 +59,31 @@ public class EnvironmentalSeverityCalculator
             );
         }
 
-        var modifiedAttackVector = ApplyReachability(
-            parsed.AttackVector,
-            profile.InternetReachability
+        var modifiedAttackVector = ResolveAttackVector(parsed.AttackVector, profile.ModifiedAttackVector);
+        var modifiedAttackComplexity = ResolveAttackComplexity(
+            parsed.AttackComplexity,
+            profile.ModifiedAttackComplexity
+        );
+        var modifiedPrivilegesRequired = ResolvePrivilegesRequired(
+            parsed.PrivilegesRequired,
+            profile.ModifiedPrivilegesRequired
+        );
+        var modifiedUserInteraction = ResolveUserInteraction(
+            parsed.UserInteraction,
+            profile.ModifiedUserInteraction
+        );
+        var modifiedScope = ResolveScope(parsed.Scope, profile.ModifiedScope);
+        var modifiedConfidentialityImpact = ResolveImpact(
+            parsed.ConfidentialityImpact,
+            profile.ModifiedConfidentialityImpact
+        );
+        var modifiedIntegrityImpact = ResolveImpact(
+            parsed.IntegrityImpact,
+            profile.ModifiedIntegrityImpact
+        );
+        var modifiedAvailabilityImpact = ResolveImpact(
+            parsed.AvailabilityImpact,
+            profile.ModifiedAvailabilityImpact
         );
         var confidentialityRequirement = RequirementMultiplier(profile.ConfidentialityRequirement);
         var integrityRequirement = RequirementMultiplier(profile.IntegrityRequirement);
@@ -76,9 +98,16 @@ public class EnvironmentalSeverityCalculator
         );
         factors.Add(
             new(
-                "InternetReachability",
-                profile.InternetReachability.ToString(),
-                "Mapped to the modified attack vector during environmental scoring."
+                "ModifiedExploitability",
+                $"MAV:{profile.ModifiedAttackVector} MAC:{profile.ModifiedAttackComplexity} MPR:{profile.ModifiedPrivilegesRequired} MUI:{profile.ModifiedUserInteraction} MS:{profile.ModifiedScope}",
+                "Explicit CVSS environmental modified exploitability metrics from the security profile."
+            )
+        );
+        factors.Add(
+            new(
+                "ModifiedImpact",
+                $"MC:{profile.ModifiedConfidentialityImpact} MI:{profile.ModifiedIntegrityImpact} MA:{profile.ModifiedAvailabilityImpact}",
+                "Explicit CVSS environmental modified impact metrics from the security profile."
             )
         );
         factors.Add(
@@ -91,14 +120,27 @@ public class EnvironmentalSeverityCalculator
 
         var effectiveVector = parsed.ToModifiedVector(
             modifiedAttackVector,
+            modifiedAttackComplexity,
+            modifiedPrivilegesRequired,
+            modifiedUserInteraction,
+            modifiedScope,
+            modifiedConfidentialityImpact,
+            modifiedIntegrityImpact,
+            modifiedAvailabilityImpact,
             confidentialityRequirement.LevelCode,
             integrityRequirement.LevelCode,
             availabilityRequirement.LevelCode
         );
 
         var effectiveScore = CalculateEnvironmentalScore(
-            parsed,
             modifiedAttackVector,
+            modifiedAttackComplexity,
+            modifiedPrivilegesRequired,
+            modifiedUserInteraction,
+            modifiedScope,
+            modifiedConfidentialityImpact,
+            modifiedIntegrityImpact,
+            modifiedAvailabilityImpact,
             confidentialityRequirement.Multiplier,
             integrityRequirement.Multiplier,
             availabilityRequirement.Multiplier
@@ -109,7 +151,21 @@ public class EnvironmentalSeverityCalculator
             effectiveSeverity,
             profile,
             modifiedAttackVector,
-            parsed.AttackVector
+            parsed.AttackVector,
+            modifiedAttackComplexity,
+            parsed.AttackComplexity,
+            modifiedPrivilegesRequired,
+            parsed.PrivilegesRequired,
+            modifiedUserInteraction,
+            parsed.UserInteraction,
+            modifiedScope,
+            parsed.Scope,
+            modifiedConfidentialityImpact,
+            parsed.ConfidentialityImpact,
+            modifiedIntegrityImpact,
+            parsed.IntegrityImpact,
+            modifiedAvailabilityImpact,
+            parsed.AvailabilityImpact
         );
 
         return new EnvironmentalSeverityCalculationResult(
@@ -126,22 +182,28 @@ public class EnvironmentalSeverityCalculator
     }
 
     private static decimal CalculateEnvironmentalScore(
-        CvssVector parsed,
         AttackVector modifiedAttackVector,
+        AttackComplexity modifiedAttackComplexity,
+        PrivilegesRequired modifiedPrivilegesRequired,
+        UserInteraction modifiedUserInteraction,
+        ScopeMetric modifiedScope,
+        decimal modifiedConfidentialityImpact,
+        decimal modifiedIntegrityImpact,
+        decimal modifiedAvailabilityImpact,
         decimal confidentialityRequirement,
         decimal integrityRequirement,
         decimal availabilityRequirement
     )
     {
-        var mc = parsed.ConfidentialityImpact * confidentialityRequirement;
-        var mi = parsed.IntegrityImpact * integrityRequirement;
-        var ma = parsed.AvailabilityImpact * availabilityRequirement;
+        var mc = modifiedConfidentialityImpact * confidentialityRequirement;
+        var mi = modifiedIntegrityImpact * integrityRequirement;
+        var ma = modifiedAvailabilityImpact * availabilityRequirement;
         var mcValue = (double)mc;
         var miValue = (double)mi;
         var maValue = (double)ma;
         var miss = Math.Min(1d - ((1d - mcValue) * (1d - miValue) * (1d - maValue)), 0.915d);
 
-        var scopeChanged = parsed.Scope == ScopeMetric.Changed;
+        var scopeChanged = modifiedScope == ScopeMetric.Changed;
         var modifiedImpact = scopeChanged
             ? 7.52d * (miss - 0.029d) - 3.25d * Math.Pow(miss * 0.9731d - 0.02d, 13d)
             : 6.42d * miss;
@@ -154,9 +216,9 @@ public class EnvironmentalSeverityCalculator
         var exploitability =
             8.22d
             * AttackVectorWeight(modifiedAttackVector)
-            * AttackComplexityWeight(parsed.AttackComplexity)
-            * PrivilegesRequiredWeight(parsed.PrivilegesRequired, scopeChanged)
-            * UserInteractionWeight(parsed.UserInteraction);
+            * AttackComplexityWeight(modifiedAttackComplexity)
+            * PrivilegesRequiredWeight(modifiedPrivilegesRequired, scopeChanged)
+            * UserInteractionWeight(modifiedUserInteraction);
 
         var score = scopeChanged
             ? Math.Min(1.08d * (modifiedImpact + exploitability), 10d)
@@ -164,37 +226,6 @@ public class EnvironmentalSeverityCalculator
 
         return RoundUp1(score);
     }
-
-    private static AttackVector ApplyReachability(
-        AttackVector baseAttackVector,
-        InternetReachability reachability
-    )
-    {
-        var maximumReachability = reachability switch
-        {
-            InternetReachability.Internet => AttackVector.Network,
-            InternetReachability.InternalNetwork => AttackVector.Network,
-            InternetReachability.AdjacentOnly => AttackVector.Adjacent,
-            InternetReachability.LocalOnly => AttackVector.Local,
-            _ => baseAttackVector,
-        };
-
-        return MoreRestrictive(baseAttackVector, maximumReachability);
-    }
-
-    private static AttackVector MoreRestrictive(AttackVector left, AttackVector right)
-    {
-        return Restrictiveness(left) >= Restrictiveness(right) ? left : right;
-    }
-
-    private static int Restrictiveness(AttackVector attackVector) =>
-        attackVector switch
-        {
-            AttackVector.Physical => 4,
-            AttackVector.Local => 3,
-            AttackVector.Adjacent => 2,
-            _ => 1,
-        };
 
     private static RequirementWeight RequirementMultiplier(SecurityRequirementLevel level)
     {
@@ -211,16 +242,63 @@ public class EnvironmentalSeverityCalculator
         Severity effectiveSeverity,
         AssetSecurityProfile profile,
         AttackVector modifiedAttackVector,
-        AttackVector baseAttackVector
+        AttackVector baseAttackVector,
+        AttackComplexity modifiedAttackComplexity,
+        AttackComplexity baseAttackComplexity,
+        PrivilegesRequired modifiedPrivilegesRequired,
+        PrivilegesRequired basePrivilegesRequired,
+        UserInteraction modifiedUserInteraction,
+        UserInteraction baseUserInteraction,
+        ScopeMetric modifiedScope,
+        ScopeMetric baseScope,
+        decimal modifiedConfidentialityImpact,
+        decimal baseConfidentialityImpact,
+        decimal modifiedIntegrityImpact,
+        decimal baseIntegrityImpact,
+        decimal modifiedAvailabilityImpact,
+        decimal baseAvailabilityImpact
     )
     {
         var reasons = new List<string>();
 
         if (modifiedAttackVector != baseAttackVector)
         {
-            reasons.Add(
-                $"Reachability reduced attack vector from {baseAttackVector} to {modifiedAttackVector}"
-            );
+            reasons.Add($"Modified attack vector changed from {baseAttackVector} to {modifiedAttackVector}");
+        }
+
+        if (modifiedAttackComplexity != baseAttackComplexity)
+        {
+            reasons.Add($"Modified attack complexity changed from {baseAttackComplexity} to {modifiedAttackComplexity}");
+        }
+
+        if (modifiedPrivilegesRequired != basePrivilegesRequired)
+        {
+            reasons.Add($"Modified privileges required changed from {basePrivilegesRequired} to {modifiedPrivilegesRequired}");
+        }
+
+        if (modifiedUserInteraction != baseUserInteraction)
+        {
+            reasons.Add($"Modified user interaction changed from {baseUserInteraction} to {modifiedUserInteraction}");
+        }
+
+        if (modifiedScope != baseScope)
+        {
+            reasons.Add($"Modified scope changed from {baseScope} to {modifiedScope}");
+        }
+
+        if (modifiedConfidentialityImpact != baseConfidentialityImpact)
+        {
+            reasons.Add("Modified confidentiality impact differs from the vendor vector");
+        }
+
+        if (modifiedIntegrityImpact != baseIntegrityImpact)
+        {
+            reasons.Add("Modified integrity impact differs from the vendor vector");
+        }
+
+        if (modifiedAvailabilityImpact != baseAvailabilityImpact)
+        {
+            reasons.Add("Modified availability impact differs from the vendor vector");
         }
 
         if (profile.ConfidentialityRequirement != SecurityRequirementLevel.Medium)
@@ -392,6 +470,13 @@ public class EnvironmentalSeverityCalculator
 
         public string ToModifiedVector(
             AttackVector modifiedAttackVector,
+            AttackComplexity modifiedAttackComplexity,
+            PrivilegesRequired modifiedPrivilegesRequired,
+            UserInteraction modifiedUserInteraction,
+            ScopeMetric modifiedScope,
+            decimal modifiedConfidentialityImpact,
+            decimal modifiedIntegrityImpact,
+            decimal modifiedAvailabilityImpact,
             string confidentialityRequirement,
             string integrityRequirement,
             string availabilityRequirement
@@ -403,6 +488,13 @@ public class EnvironmentalSeverityCalculator
                 {
                     "CVSS:3.1",
                     $"MAV:{AttackVectorCode(modifiedAttackVector)}",
+                    $"MAC:{AttackComplexityCode(modifiedAttackComplexity)}",
+                    $"MPR:{PrivilegesRequiredCode(modifiedPrivilegesRequired)}",
+                    $"MUI:{UserInteractionCode(modifiedUserInteraction)}",
+                    $"MS:{ScopeCode(modifiedScope)}",
+                    $"MC:{ImpactCode(modifiedConfidentialityImpact)}",
+                    $"MI:{ImpactCode(modifiedIntegrityImpact)}",
+                    $"MA:{ImpactCode(modifiedAvailabilityImpact)}",
                     $"CR:{confidentialityRequirement}",
                     $"IR:{integrityRequirement}",
                     $"AR:{availabilityRequirement}",
@@ -435,7 +527,84 @@ public class EnvironmentalSeverityCalculator
                 AttackVector.Physical => "P",
                 _ => "N",
             };
+
+        private static string AttackComplexityCode(AttackComplexity attackComplexity) =>
+            attackComplexity == AttackComplexity.High ? "H" : "L";
+
+        private static string PrivilegesRequiredCode(PrivilegesRequired privilegesRequired) =>
+            privilegesRequired switch
+            {
+                PrivilegesRequired.Low => "L",
+                PrivilegesRequired.High => "H",
+                _ => "N",
+            };
+
+        private static string UserInteractionCode(UserInteraction userInteraction) =>
+            userInteraction == UserInteraction.Required ? "R" : "N";
+
+        private static string ScopeCode(ScopeMetric scope) =>
+            scope == ScopeMetric.Changed ? "C" : "U";
+
+        private static string ImpactCode(decimal impact) =>
+            impact switch
+            {
+                0.22m => "L",
+                0.56m => "H",
+                _ => "N",
+            };
     }
+
+    private static AttackVector ResolveAttackVector(
+        AttackVector baseAttackVector,
+        CvssModifiedAttackVector modifiedAttackVector
+    ) =>
+        modifiedAttackVector switch
+        {
+            CvssModifiedAttackVector.Network => AttackVector.Network,
+            CvssModifiedAttackVector.Adjacent => AttackVector.Adjacent,
+            CvssModifiedAttackVector.Local => AttackVector.Local,
+            CvssModifiedAttackVector.Physical => AttackVector.Physical,
+            _ => baseAttackVector,
+        };
+
+    private static AttackComplexity ResolveAttackComplexity(
+        AttackComplexity baseAttackComplexity,
+        CvssModifiedAttackComplexity modifiedAttackComplexity
+    ) => modifiedAttackComplexity == CvssModifiedAttackComplexity.High ? AttackComplexity.High :
+        modifiedAttackComplexity == CvssModifiedAttackComplexity.Low ? AttackComplexity.Low :
+        baseAttackComplexity;
+
+    private static PrivilegesRequired ResolvePrivilegesRequired(
+        PrivilegesRequired basePrivilegesRequired,
+        CvssModifiedPrivilegesRequired modifiedPrivilegesRequired
+    ) => modifiedPrivilegesRequired switch
+    {
+        CvssModifiedPrivilegesRequired.None => PrivilegesRequired.None,
+        CvssModifiedPrivilegesRequired.Low => PrivilegesRequired.Low,
+        CvssModifiedPrivilegesRequired.High => PrivilegesRequired.High,
+        _ => basePrivilegesRequired,
+    };
+
+    private static UserInteraction ResolveUserInteraction(
+        UserInteraction baseUserInteraction,
+        CvssModifiedUserInteraction modifiedUserInteraction
+    ) => modifiedUserInteraction == CvssModifiedUserInteraction.Required ? UserInteraction.Required :
+        modifiedUserInteraction == CvssModifiedUserInteraction.None ? UserInteraction.None :
+        baseUserInteraction;
+
+    private static ScopeMetric ResolveScope(ScopeMetric baseScope, CvssModifiedScope modifiedScope) =>
+        modifiedScope == CvssModifiedScope.Changed ? ScopeMetric.Changed :
+        modifiedScope == CvssModifiedScope.Unchanged ? ScopeMetric.Unchanged :
+        baseScope;
+
+    private static decimal ResolveImpact(decimal baseImpact, CvssModifiedImpact modifiedImpact) =>
+        modifiedImpact switch
+        {
+            CvssModifiedImpact.Low => 0.22m,
+            CvssModifiedImpact.High => 0.56m,
+            CvssModifiedImpact.None => 0m,
+            _ => baseImpact,
+        };
 
     private enum AttackVector
     {

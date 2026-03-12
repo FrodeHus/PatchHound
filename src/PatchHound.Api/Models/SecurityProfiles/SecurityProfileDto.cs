@@ -10,6 +10,14 @@ public record SecurityProfileDto(
     string ConfidentialityRequirement,
     string IntegrityRequirement,
     string AvailabilityRequirement,
+    string ModifiedAttackVector,
+    string ModifiedAttackComplexity,
+    string ModifiedPrivilegesRequired,
+    string ModifiedUserInteraction,
+    string ModifiedScope,
+    string ModifiedConfidentialityImpact,
+    string ModifiedIntegrityImpact,
+    string ModifiedAvailabilityImpact,
     DateTimeOffset UpdatedAt
 );
 
@@ -20,7 +28,15 @@ public record CreateSecurityProfileRequest(
     string InternetReachability,
     string ConfidentialityRequirement,
     string IntegrityRequirement,
-    string AvailabilityRequirement
+    string AvailabilityRequirement,
+    string ModifiedAttackVector,
+    string ModifiedAttackComplexity,
+    string ModifiedPrivilegesRequired,
+    string ModifiedUserInteraction,
+    string ModifiedScope,
+    string ModifiedConfidentialityImpact,
+    string ModifiedIntegrityImpact,
+    string ModifiedAvailabilityImpact
 );
 
 public record UpdateSecurityProfileRequest(
@@ -30,7 +46,15 @@ public record UpdateSecurityProfileRequest(
     string InternetReachability,
     string ConfidentialityRequirement,
     string IntegrityRequirement,
-    string AvailabilityRequirement
+    string AvailabilityRequirement,
+    string ModifiedAttackVector,
+    string ModifiedAttackComplexity,
+    string ModifiedPrivilegesRequired,
+    string ModifiedUserInteraction,
+    string ModifiedScope,
+    string ModifiedConfidentialityImpact,
+    string ModifiedIntegrityImpact,
+    string ModifiedAvailabilityImpact
 );
 
 public record AssignAssetSecurityProfileRequest(Guid? SecurityProfileId);

@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 
 type OpenBaoUnsealDialogProps = {
   isOpen: boolean
@@ -24,27 +27,30 @@ export function OpenBaoUnsealDialog({
   const isDisabled = isSubmitting || keys.some((key) => key.trim().length === 0)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-      <div className="w-full max-w-xl rounded-[28px] border border-border/70 bg-background p-6 shadow-2xl">
-        <div className="space-y-2">
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        onClose()
+      }
+    }}>
+      <DialogContent className="w-full max-w-xl rounded-2xl border-border/80 bg-card p-0 sm:max-w-xl">
+        <DialogHeader className="border-b border-border/60 px-6 py-5">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
             OpenBao recovery
           </p>
-          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Unseal vault</h2>
-          <p className="text-sm text-muted-foreground">
+          <DialogTitle className="text-2xl font-semibold tracking-[-0.03em]">Unseal vault</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
             Provide three unseal keys to reopen OpenBao so workers can resume credential-backed ingestion.
-          </p>
-        </div>
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="mt-5 space-y-3">
+        <div className="space-y-4 px-6 py-5">
           {keys.map((value, index) => (
             <label key={index} className="block space-y-2">
               <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                 Unseal key {index + 1}
               </span>
-              <input
+              <Input
                 type="password"
-                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
                 value={value}
                 onChange={(event) => {
                   const nextKeys = [...keys] as [string, string, string]
@@ -54,26 +60,19 @@ export function OpenBaoUnsealDialog({
               />
             </label>
           ))}
+
+          {errorMessage ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {errorMessage}
+            </div>
+          ) : null}
         </div>
-
-        {errorMessage ? (
-          <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {errorMessage}
-          </div>
-        ) : null}
-
-        <div className="mt-6 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            className="rounded-full border border-border/70 px-4 py-2 text-sm hover:bg-muted"
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
+        <DialogFooter className="border-t border-border/60 bg-card px-6 py-4">
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
             disabled={isDisabled}
             onClick={() => {
               onSubmit([
@@ -84,9 +83,9 @@ export function OpenBaoUnsealDialog({
             }}
           >
             {isSubmitting ? 'Unsealing...' : 'Unseal OpenBao'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
