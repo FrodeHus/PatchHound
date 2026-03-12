@@ -1704,6 +1704,7 @@ public class IngestionService
 
         while (true)
         {
+            batchNumber++;
             var batch = await batchSource.FetchVulnerabilityBatchAsync(
                 tenantId,
                 cursorJson,
@@ -1714,7 +1715,6 @@ public class IngestionService
 
             if (normalizedResults.Count > 0)
             {
-                batchNumber++;
                 totalResults += normalizedResults.Count;
                 await StageVulnerabilitiesAsync(
                     ingestionRunId,
@@ -1736,7 +1736,7 @@ public class IngestionService
                     ct
                 );
             }
-            else if (batch.IsComplete)
+            else
             {
                 await CommitCheckpointAsync(
                     ingestionRunId,
@@ -1746,7 +1746,7 @@ public class IngestionService
                     batchNumber,
                     batch.NextCursorJson,
                     0,
-                    "Completed",
+                    batch.IsComplete ? "Completed" : "Running",
                     ct
                 );
             }
