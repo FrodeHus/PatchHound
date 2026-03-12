@@ -608,8 +608,16 @@ function Metric({
 
 function describeSourceActivity(source: TenantIngestionSourceDraft) {
   if (source.runtime.activeIngestionRunId && source.runtime.activePhase) {
+    const runtimeStatus = source.runtime.lastStatus?.toLowerCase()
+    const title =
+      runtimeStatus === 'merging'
+        ? 'Merge in progress'
+        : runtimeStatus === 'mergepending'
+          ? 'Waiting to merge'
+          : 'Ingestion running'
+
     return {
-      title: 'Ingestion running',
+      title,
       description: `Lease active until ${formatTimestamp(source.runtime.leaseExpiresAt)}. Latest checkpoint ${formatTimestamp(source.runtime.activeCheckpointCommittedAt)}.`,
       phase: formatPhase(source.runtime.activePhase),
       batch:
@@ -621,11 +629,25 @@ function describeSourceActivity(source: TenantIngestionSourceDraft) {
   }
 
   const latestRun = source.recentRuns[0]
-  if (latestRun?.status.toLowerCase() === 'failed') {
+  const latestRunStatus = latestRun?.status.toLowerCase()
+  if (
+    latestRunStatus === 'failedrecoverable'
+    || latestRunStatus === 'failedterminal'
+    || latestRunStatus === 'failed'
+  ) {
     return {
-      title: 'Last run failed',
+      title:
+        latestRunStatus === 'failedrecoverable'
+          ? 'Recoverable failure'
+          : latestRunStatus === 'failedterminal'
+            ? 'Terminal failure'
+            : 'Last run failed',
       description:
-        'Failed staged snapshots are retained for up to 24 hours before they are discarded.',
+        latestRunStatus === 'failedrecoverable'
+          ? 'Staged snapshots are retained for up to 24 hours and can resume from the last committed checkpoint.'
+          : latestRunStatus === 'failedterminal'
+            ? 'This run requires operator action before retrying, but failed staged data will still be discarded after 24 hours.'
+            : 'Failed staged snapshots are retained for up to 24 hours before they are discarded.',
       phase: formatPhase(latestRun.latestPhase),
       batch:
         latestRun.latestBatchNumber !== null ? String(latestRun.latestBatchNumber) : '—',
@@ -697,7 +719,8 @@ function getSourceStatusTone(source: TenantIngestionSourceDraft): 'neutral' | 's
     return 'error'
   }
 
-  if (source.runtime.lastStatus?.toLowerCase() === 'running') {
+  const normalizedStatus = source.runtime.lastStatus?.toLowerCase()
+  if (normalizedStatus === 'staging' || normalizedStatus === 'mergepending' || normalizedStatus === 'merging') {
     return 'warning'
   }
 

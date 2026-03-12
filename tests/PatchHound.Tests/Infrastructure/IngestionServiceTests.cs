@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json.Nodes;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +45,9 @@ public class IngestionServiceTests : IDisposable
         _assetInventorySource = (IAssetInventorySource)_source;
         _source.SourceKey.Returns("test-source");
         _source.SourceName.Returns("TestSource");
+        _assetInventorySource
+            .FetchAssetsAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(new IngestionAssetInventorySnapshot([], []));
 
         var logger = Substitute.For<ILogger<IngestionService>>();
         var taskProjectionService = new RemediationTaskProjectionService(
@@ -537,6 +541,35 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RunIngestionAsync_WhenAuthFails_MarksRunAsFailedTerminal()
+    {
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(
+            TenantSourceConfiguration.Create(
+                _tenantId,
+                "test-source",
+                "Test Source",
+                true,
+                "0 * * * *"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        _source
+            .FetchVulnerabilitiesAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns<Task<IReadOnlyList<IngestionResult>>>(_ =>
+                throw new HttpRequestException("Unauthorized", null, HttpStatusCode.Unauthorized)
+            );
+
+        var started = await _service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        started.Should().BeTrue();
+
+        var run = await _dbContext.IngestionRuns.IgnoreQueryFilters().SingleAsync();
+        run.Status.Should().Be(IngestionRunStatuses.FailedTerminal);
+    }
+
+    [Fact]
     public async Task ProcessStagedAssetsAsync_UsesStagedSnapshotForMerge()
     {
         var run = IngestionRun.Start(_tenantId, "test-source", DateTimeOffset.UtcNow);
@@ -694,7 +727,7 @@ public class IngestionServiceTests : IDisposable
                 stagedVulnerabilities[0].PayloadJson
             )!
             .AffectedAssets.Should()
-            .BeEmpty();
+            .BeNullOrEmpty();
         stagedExposures.Should().ContainSingle();
         stagedExposures[0].AssetExternalId.Should().Be("DEVICE-1");
         stagedAssets.Should().HaveCount(2);
@@ -1333,6 +1366,7 @@ public class IngestionServiceTests : IDisposable
         failedRun.CompleteFailed(
             DateTimeOffset.UtcNow.AddHours(-30),
             "Timed out",
+            IngestionRunStatuses.FailedRecoverable,
             1,
             1,
             1,

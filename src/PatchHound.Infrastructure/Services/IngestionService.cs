@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -110,18 +111,18 @@ public class IngestionService
                         await ClearStagedDataForRunAsync(run.Id, ct);
                     }
 
-                    await UpdateRuntimeStateAsync(
-                        tenantId,
-                        source.SourceKey,
-                        runtime =>
-                        {
-                            runtime.ManualRequestedAt = null;
-                            runtime.LastStartedAt = DateTimeOffset.UtcNow;
-                            runtime.LastStatus = "Running";
-                            runtime.LastError = string.Empty;
-                        },
-                        ct
-                    );
+                        await UpdateRuntimeStateAsync(
+                            tenantId,
+                            source.SourceKey,
+                            runtime =>
+                            {
+                                runtime.ManualRequestedAt = null;
+                                runtime.LastStartedAt = DateTimeOffset.UtcNow;
+                                runtime.LastStatus = IngestionRunStatuses.Staging;
+                                runtime.LastError = string.Empty;
+                            },
+                            ct
+                        );
 
                     try
                     {
@@ -154,6 +155,13 @@ public class IngestionService
 
                         if (!assetStagingCompleted && source is IAssetInventoryBatchSource assetInventoryBatchSource)
                         {
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.Staging,
+                                ct
+                            );
                             var assetBatchSummary = await StageAssetBatchesAsync(
                                 run.Id,
                                 tenantId,
@@ -163,6 +171,20 @@ public class IngestionService
                             );
                             fetchedAssetCount = assetBatchSummary.AssetCount;
                             fetchedSoftwareInstallationCount = assetBatchSummary.LinkCount;
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.MergePending,
+                                ct
+                            );
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.Merging,
+                                ct
+                            );
                             assetMergeSummary = await ExecuteWithConcurrencyRetryAsync(
                                 () =>
                                     ProcessStagedAssetsAsync(
@@ -188,6 +210,8 @@ public class IngestionService
                                 "Completed",
                                 ct
                             );
+                            assetStagingCompleted = true;
+                            assetMergeCompleted = true;
                             _logger.LogInformation(
                                 "Asset inventory merge for {Source} tenant {TenantId}: stagedAssets={StagedAssetCount} mergedAssets={MergedAssetCount} stagedSoftwareLinks={StagedSoftwareLinkCount} resolvedSoftwareLinks={ResolvedSoftwareLinkCount} createdInstallations={InstallationsCreated} touchedInstallations={InstallationsTouched} openedEpisodes={EpisodesOpened} seenEpisodes={EpisodesSeen} staleInstallations={StaleInstallationsMarked} removedInstallations={InstallationsRemoved}",
                                 source.SourceName,
@@ -206,6 +230,13 @@ public class IngestionService
                         }
                         else if (!assetStagingCompleted && source is IAssetInventorySource assetInventorySource)
                         {
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.Staging,
+                                ct
+                            );
                             var assetSnapshot = await assetInventorySource.FetchAssetsAsync(
                                 tenantId,
                                 ct
@@ -234,6 +265,20 @@ public class IngestionService
                                 "Staged",
                                 ct
                             );
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.MergePending,
+                                ct
+                            );
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.Merging,
+                                ct
+                            );
                             assetMergeSummary = await ExecuteWithConcurrencyRetryAsync(
                                 () =>
                                     ProcessStagedAssetsAsync(
@@ -257,6 +302,8 @@ public class IngestionService
                                 "Completed",
                                 ct
                             );
+                            assetStagingCompleted = true;
+                            assetMergeCompleted = true;
                             _logger.LogInformation(
                                 "Asset inventory merge for {Source} tenant {TenantId}: stagedAssets={StagedAssetCount} mergedAssets={MergedAssetCount} stagedSoftwareLinks={StagedSoftwareLinkCount} resolvedSoftwareLinks={ResolvedSoftwareLinkCount} createdInstallations={InstallationsCreated} touchedInstallations={InstallationsTouched} openedEpisodes={EpisodesOpened} seenEpisodes={EpisodesSeen} staleInstallations={StaleInstallationsMarked} removedInstallations={InstallationsRemoved}",
                                 source.SourceName,
@@ -285,6 +332,20 @@ public class IngestionService
 
                         if (!assetMergeCompleted && assetStagingCompleted)
                         {
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.MergePending,
+                                ct
+                            );
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.Merging,
+                                ct
+                            );
                             assetMergeSummary = await ExecuteWithConcurrencyRetryAsync(
                                 () =>
                                     ProcessStagedAssetsAsync(
@@ -315,10 +376,18 @@ public class IngestionService
                                 "Completed",
                                 ct
                             );
+                            assetMergeCompleted = true;
                         }
 
                         if (!vulnerabilityStagingCompleted && source is IVulnerabilityBatchSource batchSource)
                         {
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.Staging,
+                                ct
+                            );
                             fetchedVulnerabilityCount = await StageVulnerabilityBatchesAsync(
                                 run.Id,
                                 tenantId,
@@ -326,9 +395,17 @@ public class IngestionService
                                 batchSource,
                                 ct
                             );
+                            vulnerabilityStagingCompleted = true;
                         }
                         else if (!vulnerabilityStagingCompleted)
                         {
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.Staging,
+                                ct
+                            );
                             var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
                             fetchedVulnerabilityCount = results.Count;
                             var normalizedResults = NormalizeResults(results);
@@ -351,6 +428,7 @@ public class IngestionService
                                 "Staged",
                                 ct
                             );
+                            vulnerabilityStagingCompleted = true;
                         }
                         else
                         {
@@ -361,6 +439,20 @@ public class IngestionService
 
                         if (!vulnerabilityMergeCompleted && vulnerabilityStagingCompleted)
                         {
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.MergePending,
+                                ct
+                            );
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.Merging,
+                                ct
+                            );
                             vulnerabilityMergeSummary = await ExecuteWithConcurrencyRetryAsync(
                                 () =>
                                     ProcessStagedResultsAsync(
@@ -390,6 +482,7 @@ public class IngestionService
                                 "Completed",
                                 ct
                             );
+                            vulnerabilityMergeCompleted = true;
                         }
 
                         await EnqueueEnrichmentJobsForRunAsync(run.Id, tenantId, ct);
@@ -432,7 +525,7 @@ public class IngestionService
                                 var now = DateTimeOffset.UtcNow;
                                 runtime.LastCompletedAt = now;
                                 runtime.LastSucceededAt = now;
-                                runtime.LastStatus = "Succeeded";
+                                runtime.LastStatus = IngestionRunStatuses.Succeeded;
                                 runtime.LastError = string.Empty;
                             },
                             ct
@@ -448,6 +541,7 @@ public class IngestionService
                             fetchedSoftwareInstallationCount,
                             vulnerabilityMergeSummary,
                             assetMergeSummary,
+                            null,
                             ct
                         );
                         runCompleted = true;
@@ -470,6 +564,9 @@ public class IngestionService
                     }
                     catch (Exception ex)
                     {
+                        var failureStatus = IsTerminalIngestionFailure(ex)
+                            ? IngestionRunStatuses.FailedTerminal
+                            : IngestionRunStatuses.FailedRecoverable;
                         _logger.LogError(
                             ex,
                             "Error during ingestion from {Source} for tenant {TenantId}",
@@ -483,7 +580,7 @@ public class IngestionService
                             runtime =>
                             {
                                 runtime.LastCompletedAt = DateTimeOffset.UtcNow;
-                                runtime.LastStatus = "Failed";
+                                runtime.LastStatus = failureStatus;
                                 runtime.LastError = $"Ingestion failed: {ex.GetType().Name}";
                             },
                             ct
@@ -499,6 +596,7 @@ public class IngestionService
                             fetchedSoftwareInstallationCount,
                             vulnerabilityMergeSummary,
                             assetMergeSummary,
+                            failureStatus,
                             ct
                         );
                         runCompleted = true;
@@ -567,6 +665,42 @@ public class IngestionService
             return;
         }
 
+        if (IsInMemoryProvider())
+        {
+            var trackedSource = await _dbContext
+                .TenantSourceConfigurations.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(
+                    item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
+                    ct
+                );
+
+            if (trackedSource is null)
+            {
+                return;
+            }
+
+            var runtime = new TenantIngestionRuntimeState(
+                trackedSource.ManualRequestedAt,
+                trackedSource.LastStartedAt,
+                trackedSource.LastCompletedAt,
+                trackedSource.LastSucceededAt,
+                trackedSource.LastStatus,
+                trackedSource.LastError
+            );
+            update(runtime);
+
+            trackedSource.UpdateRuntime(
+                runtime.ManualRequestedAt,
+                runtime.LastStartedAt,
+                runtime.LastCompletedAt,
+                runtime.LastSucceededAt,
+                runtime.LastStatus,
+                runtime.LastError
+            );
+            await _dbContext.SaveChangesAsync(ct);
+            return;
+        }
+
         var source = await _dbContext
             .TenantSourceConfigurations.IgnoreQueryFilters()
             .AsNoTracking()
@@ -580,7 +714,7 @@ public class IngestionService
             return;
         }
 
-        var runtime = new TenantIngestionRuntimeState(
+        var detachedRuntime = new TenantIngestionRuntimeState(
             source.ManualRequestedAt,
             source.LastStartedAt,
             source.LastCompletedAt,
@@ -588,21 +722,7 @@ public class IngestionService
             source.LastStatus,
             source.LastError
         );
-        update(runtime);
-        if (IsInMemoryProvider())
-        {
-            source.UpdateRuntime(
-                runtime.ManualRequestedAt,
-                runtime.LastStartedAt,
-                runtime.LastCompletedAt,
-                runtime.LastSucceededAt,
-                runtime.LastStatus,
-                runtime.LastError
-            );
-            _dbContext.TenantSourceConfigurations.Update(source);
-            await _dbContext.SaveChangesAsync(ct);
-            return;
-        }
+        update(detachedRuntime);
 
         await _dbContext
             .TenantSourceConfigurations.IgnoreQueryFilters()
@@ -610,14 +730,74 @@ public class IngestionService
             .ExecuteUpdateAsync(
                 setters =>
                     setters
-                        .SetProperty(item => item.ManualRequestedAt, runtime.ManualRequestedAt)
-                        .SetProperty(item => item.LastStartedAt, runtime.LastStartedAt)
-                        .SetProperty(item => item.LastCompletedAt, runtime.LastCompletedAt)
-                        .SetProperty(item => item.LastSucceededAt, runtime.LastSucceededAt)
-                        .SetProperty(item => item.LastStatus, runtime.LastStatus)
-                        .SetProperty(item => item.LastError, runtime.LastError),
+                        .SetProperty(item => item.ManualRequestedAt, detachedRuntime.ManualRequestedAt)
+                        .SetProperty(item => item.LastStartedAt, detachedRuntime.LastStartedAt)
+                        .SetProperty(item => item.LastCompletedAt, detachedRuntime.LastCompletedAt)
+                        .SetProperty(item => item.LastSucceededAt, detachedRuntime.LastSucceededAt)
+                        .SetProperty(item => item.LastStatus, detachedRuntime.LastStatus)
+                        .SetProperty(item => item.LastError, detachedRuntime.LastError),
                 ct
             );
+    }
+
+    private async Task UpdateActiveRunStatusAsync(
+        Guid runId,
+        Guid tenantId,
+        string sourceKey,
+        string status,
+        CancellationToken ct
+    )
+    {
+        await UpdateIngestionRunStatusAsync(runId, status, ct);
+        await UpdateRuntimeStateAsync(
+            tenantId,
+            sourceKey,
+            runtime => runtime.LastStatus = status,
+            ct
+        );
+    }
+
+    private async Task UpdateIngestionRunStatusAsync(Guid runId, string status, CancellationToken ct)
+    {
+        if (IsInMemoryProvider())
+        {
+            var run = await _dbContext
+                .IngestionRuns.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(item => item.Id == runId, ct);
+            run?.UpdateStatus(status);
+            if (run is not null)
+            {
+                _dbContext.IngestionRuns.Update(run);
+                await _dbContext.SaveChangesAsync(ct);
+            }
+
+            return;
+        }
+
+        await _dbContext
+            .IngestionRuns.IgnoreQueryFilters()
+            .Where(item => item.Id == runId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, status), ct);
+    }
+
+    private static bool IsActiveRunStatus(string status)
+    {
+        return status is IngestionRunStatuses.Staging
+            or IngestionRunStatuses.MergePending
+            or IngestionRunStatuses.Merging;
+    }
+
+    private static bool IsTerminalIngestionFailure(Exception ex)
+    {
+        return ex switch
+        {
+            IngestionTerminalException => true,
+            ArgumentException => true,
+            HttpRequestException httpEx when httpEx.StatusCode is HttpStatusCode.BadRequest
+                or HttpStatusCode.Unauthorized
+                or HttpStatusCode.Forbidden => true,
+            _ => false,
+        };
     }
 
     private async Task<AcquiredIngestionRun?> TryAcquireIngestionRunAsync(
@@ -662,7 +842,7 @@ public class IngestionService
                         .FirstOrDefaultAsync(
                             item =>
                                 item.Id == sourceConfiguration.ActiveIngestionRunId.Value
-                                && item.Status == "Running"
+                                && IsActiveRunStatus(item.Status)
                                 && !item.CompletedAt.HasValue,
                             ct
                         );
@@ -712,7 +892,7 @@ public class IngestionService
                     .FirstOrDefaultAsync(
                         item =>
                             item.Id == persistedSourceConfiguration.ActiveIngestionRunId.Value
-                            && item.Status == "Running"
+                            && IsActiveRunStatus(item.Status)
                             && !item.CompletedAt.HasValue,
                         ct
                     );
@@ -762,6 +942,7 @@ public class IngestionService
         int fetchedSoftwareInstallationCount,
         StagedVulnerabilityMergeSummary vulnerabilityMergeSummary,
         StagedAssetMergeSummary assetMergeSummary,
+        string? failureStatus,
         CancellationToken ct
     )
     {
@@ -810,6 +991,7 @@ public class IngestionService
                     run.CompleteFailed(
                         completedAt,
                         error ?? "Unknown ingestion failure",
+                        failureStatus ?? IngestionRunStatuses.FailedRecoverable,
                         fetchedVulnerabilityCount,
                         fetchedAssetCount,
                         fetchedSoftwareInstallationCount,
@@ -855,7 +1037,7 @@ public class IngestionService
                         setters =>
                             setters
                                 .SetProperty(item => item.CompletedAt, completedAt)
-                                .SetProperty(item => item.Status, "Succeeded")
+                                .SetProperty(item => item.Status, IngestionRunStatuses.Succeeded)
                                 .SetProperty(
                                     item => item.FetchedVulnerabilityCount,
                                     fetchedVulnerabilityCount
@@ -935,7 +1117,7 @@ public class IngestionService
                         setters =>
                             setters
                                 .SetProperty(item => item.CompletedAt, completedAt)
-                                .SetProperty(item => item.Status, "Failed")
+                                .SetProperty(item => item.Status, failureStatus ?? IngestionRunStatuses.FailedRecoverable)
                                 .SetProperty(
                                     item => item.FetchedVulnerabilityCount,
                                     fetchedVulnerabilityCount
@@ -1066,8 +1248,12 @@ public class IngestionService
             .Where(item =>
                 item.CompletedAt.HasValue
                 && (
-                    (item.Status == "Failed" && item.CompletedAt.Value < failedCutoff)
-                    || (item.Status != "Failed" && item.CompletedAt.Value < completedCutoff)
+                    ((item.Status == IngestionRunStatuses.FailedRecoverable
+                        || item.Status == IngestionRunStatuses.FailedTerminal)
+                        && item.CompletedAt.Value < failedCutoff)
+                    || ((item.Status != IngestionRunStatuses.FailedRecoverable
+                            && item.Status != IngestionRunStatuses.FailedTerminal)
+                        && item.CompletedAt.Value < completedCutoff)
                 )
             )
             .Select(item => item.Id)

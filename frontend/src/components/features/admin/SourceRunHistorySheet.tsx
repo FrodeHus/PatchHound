@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchTenantIngestionRuns } from '@/api/settings.functions'
 import type { TenantIngestionRun } from '@/api/settings.schemas'
+import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { PaginationControls } from '@/components/ui/pagination-controls'
+import { DataTableActiveFilters } from '@/components/ui/data-table-workbench'
 import {
   Sheet,
   SheetContent,
@@ -21,6 +23,13 @@ type SourceRunHistorySheetProps = {
   onOpenChange: (open: boolean) => void
 }
 
+type RunFilter = 'all' | 'active' | 'failed-recoverable' | 'failed-terminal' | 'succeeded'
+type RunActiveFilter = {
+  key: string
+  label: string
+  onClear: () => void
+}
+
 export function SourceRunHistorySheet({
   tenantId,
   sourceKey,
@@ -30,6 +39,7 @@ export function SourceRunHistorySheet({
 }: SourceRunHistorySheetProps) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [filter, setFilter] = useState<RunFilter>('all')
   const runsQuery = useQuery({
     queryKey: ['tenant-ingestion-runs', tenantId, sourceKey, page, pageSize],
     enabled: isOpen && Boolean(sourceKey),
@@ -46,15 +56,29 @@ export function SourceRunHistorySheet({
 
   const data = runsQuery.data
   const runs = data?.items ?? []
-  const succeededRuns = runs.filter((run) => run.status.toLowerCase() === 'succeeded').length
-  const failedRuns = runs.filter((run) => run.status.toLowerCase() === 'failed').length
-  const runningRuns = runs.filter((run) => run.status.toLowerCase() === 'running').length
+  const filteredRuns = runs.filter((run) => matchesRunFilter(run, filter))
+  const succeededRuns = runs.filter((run) => getRunTone(run.status) === 'success').length
+  const failedRuns = runs.filter((run) => getRunTone(run.status) === 'error').length
+  const runningRuns = runs.filter((run) => getRunTone(run.status) === 'warning').length
+  const recoverableFailedRuns = runs.filter((run) => getRunCategory(run.status) === 'failed-recoverable').length
+  const terminalFailedRuns = runs.filter((run) => getRunCategory(run.status) === 'failed-terminal').length
   const successRate = runs.length ? Math.round((succeededRuns / runs.length) * 100) : 0
+  const activeFilters: RunActiveFilter[] =
+    filter === 'all'
+      ? []
+      : [
+          {
+            key: 'status',
+            label: `Status: ${getFilterLabel(filter)}`,
+            onClear: () => setFilter('all'),
+          },
+        ]
 
   function handleOpenChange(open: boolean) {
     if (!open) {
       setPage(1)
       setPageSize(10)
+      setFilter('all')
     }
 
     onOpenChange(open)
@@ -90,7 +114,43 @@ export function SourceRunHistorySheet({
 
           {data?.items.length ? (
             <div className="space-y-3">
-              {data.items.map((run) => (
+              <div className="flex flex-wrap items-center gap-2">
+                <RunFilterButton active={filter === 'all'} count={runs.length} onClick={() => setFilter('all')}>
+                  All
+                </RunFilterButton>
+                <RunFilterButton active={filter === 'active'} count={runningRuns} onClick={() => setFilter('active')}>
+                  Active
+                </RunFilterButton>
+                <RunFilterButton
+                  active={filter === 'failed-recoverable'}
+                  count={recoverableFailedRuns}
+                  onClick={() => setFilter('failed-recoverable')}
+                >
+                  Recoverable failed
+                </RunFilterButton>
+                <RunFilterButton
+                  active={filter === 'failed-terminal'}
+                  count={terminalFailedRuns}
+                  onClick={() => setFilter('failed-terminal')}
+                >
+                  Terminal failed
+                </RunFilterButton>
+                <RunFilterButton
+                  active={filter === 'succeeded'}
+                  count={succeededRuns}
+                  onClick={() => setFilter('succeeded')}
+                >
+                  Succeeded
+                </RunFilterButton>
+              </div>
+
+              <DataTableActiveFilters filters={activeFilters} onClearAll={() => setFilter('all')} />
+            </div>
+          ) : null}
+
+          {data?.items.length ? (
+            <div className="space-y-3">
+              {filteredRuns.map((run) => (
                 <RunHistoryCard key={run.id} run={run} />
               ))}
               <PaginationControls
@@ -107,14 +167,37 @@ export function SourceRunHistorySheet({
             </div>
           ) : null}
 
-          {data && data.items.length === 0 ? (
+          {data && filteredRuns.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border/70 bg-background/20 px-4 py-8 text-sm text-muted-foreground">
-              No ingestion runs have been recorded for this source yet.
+              {runs.length === 0
+                ? 'No ingestion runs have been recorded for this source yet.'
+                : 'No runs on this page match the selected status filter.'}
             </div>
           ) : null}
         </div>
       </SheetContent>
     </Sheet>
+  )
+}
+
+function RunFilterButton({
+  active,
+  count,
+  onClick,
+  children,
+}: {
+  active: boolean
+  count: number
+  onClick: () => void
+  children: string
+}) {
+  return (
+    <Button type="button" size="sm" variant={active ? 'default' : 'outline'} className="rounded-full" onClick={onClick}>
+      {children}
+      <span className={cn('ml-1 rounded-full px-1.5 text-[11px]', active ? 'bg-primary-foreground/15 text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+        {count}
+      </span>
+    </Button>
   )
 }
 
@@ -144,6 +227,8 @@ function SummaryCard({
 }
 
 function RunHistoryCard({ run }: { run: TenantIngestionRun }) {
+  const tone = getRunTone(run.status)
+
   return (
     <div className="rounded-[26px] border border-border/70 bg-card/82 p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -152,9 +237,9 @@ function RunHistoryCard({ run }: { run: TenantIngestionRun }) {
             variant="outline"
             className={cn(
               'rounded-full',
-              run.status.toLowerCase() === 'succeeded' && 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300',
-              run.status.toLowerCase() === 'running' && 'border-amber-400/25 bg-amber-400/10 text-amber-300',
-              run.status.toLowerCase() === 'failed' && 'border-destructive/25 bg-destructive/10 text-destructive',
+              tone === 'success' && 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300',
+              tone === 'warning' && 'border-amber-400/25 bg-amber-400/10 text-amber-300',
+              tone === 'error' && 'border-destructive/25 bg-destructive/10 text-destructive',
             )}
           >
             {run.status}
@@ -205,6 +290,71 @@ function RunHistoryCard({ run }: { run: TenantIngestionRun }) {
       {run.error ? <p className="mt-3 text-xs text-destructive">Error: {run.error}</p> : null}
     </div>
   )
+}
+
+function getRunTone(status: string): 'neutral' | 'success' | 'warning' | 'error' {
+  const normalizedStatus = getRunCategory(status)
+
+  if (normalizedStatus === 'succeeded') {
+    return 'success'
+  }
+
+  if (normalizedStatus === 'failed-recoverable' || normalizedStatus === 'failed-terminal') {
+    return 'error'
+  }
+
+  if (normalizedStatus === 'active') {
+    return 'warning'
+  }
+
+  return 'neutral'
+}
+
+function getRunCategory(status: string): RunFilter | 'neutral' {
+  const normalizedStatus = status.trim().toLowerCase()
+
+  if (normalizedStatus === 'succeeded') {
+    return 'succeeded'
+  }
+
+  if (normalizedStatus === 'failedrecoverable') {
+    return 'failed-recoverable'
+  }
+
+  if (normalizedStatus === 'failedterminal') {
+    return 'failed-terminal'
+  }
+
+  if (normalizedStatus === 'failed') {
+    return 'failed-recoverable'
+  }
+
+  if (normalizedStatus === 'staging' || normalizedStatus === 'mergepending' || normalizedStatus === 'merging') {
+    return 'active'
+  }
+
+  return 'neutral'
+}
+
+function matchesRunFilter(run: TenantIngestionRun, filter: RunFilter) {
+  if (filter === 'all') {
+    return true
+  }
+
+  return getRunCategory(run.status) === filter
+}
+
+function getFilterLabel(filter: Exclude<RunFilter, 'all'>) {
+  switch (filter) {
+    case 'active':
+      return 'Active'
+    case 'failed-recoverable':
+      return 'Recoverable failed'
+    case 'failed-terminal':
+      return 'Terminal failed'
+    case 'succeeded':
+      return 'Succeeded'
+  }
 }
 
 function RunMetric({ label, value }: { label: string; value: number }) {

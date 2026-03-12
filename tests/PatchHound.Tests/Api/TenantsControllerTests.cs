@@ -239,6 +239,7 @@ public class TenantsControllerTests : IDisposable
         secondRun.CompleteFailed(
             DateTimeOffset.UtcNow.AddMinutes(-9),
             "Ingestion failed: TimeoutException",
+            IngestionRunStatuses.FailedRecoverable,
             4,
             2,
             1,
@@ -279,7 +280,7 @@ public class TenantsControllerTests : IDisposable
             .Subject;
         payload.TotalCount.Should().Be(2);
         payload.Items.Should().HaveCount(2);
-        payload.Items[0].Status.Should().Be("Failed");
+        payload.Items[0].Status.Should().Be("FailedRecoverable");
         payload.Items[0].Error.Should().Be("Ingestion failed: TimeoutException");
         payload.Items[1].FetchedVulnerabilityCount.Should().Be(10);
     }
