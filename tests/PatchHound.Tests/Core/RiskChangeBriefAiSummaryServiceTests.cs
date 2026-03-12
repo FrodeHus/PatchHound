@@ -94,6 +94,68 @@ public class RiskChangeBriefAiSummaryServiceTests
             );
     }
 
+    [Fact]
+    public async Task GenerateAsync_UsesPatchHoundManagedResearch_WhenConfigured()
+    {
+        var tenantId = Guid.NewGuid();
+        var profile = TenantAiProfileFactory.Create(
+            tenantId,
+            providerType: TenantAiProviderType.Ollama,
+            allowExternalResearch: true,
+            webResearchMode: TenantAiWebResearchMode.PatchHoundManaged,
+            allowedDomains: "nvd.nist.gov"
+        );
+        _resolver.ResolveDefaultAsync(tenantId, Arg.Any<CancellationToken>())
+            .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, string.Empty)));
+        _resolver.ResolveByIdAsync(tenantId, profile.Id, Arg.Any<CancellationToken>())
+            .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, string.Empty)));
+        _researchService.ResearchAsync(
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<AiWebResearchRequest>(),
+                Arg.Any<CancellationToken>()
+            )
+            .Returns(
+                Result<AiWebResearchBundle>.Success(
+                    new AiWebResearchBundle(
+                        "External research context:\nNVD summary",
+                        [new AiWebResearchSource("NVD", "https://nvd.nist.gov", null)]
+                    )
+                )
+            );
+        _provider.ProviderType.Returns(TenantAiProviderType.Ollama);
+        _provider
+            .GenerateTextAsync(
+                Arg.Any<AiTextGenerationRequest>(),
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<CancellationToken>()
+            )
+            .Returns(Task.FromResult("summary"));
+
+        var result = await _service.GenerateAsync(tenantId, CreateBrief(), CancellationToken.None);
+
+        result.Should().Be("summary");
+        await _researchService
+            .Received(1)
+            .ResearchAsync(
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Is<AiWebResearchRequest>(request =>
+                    request.Query.Contains("CVE-2026-0001")
+                    && request.AllowedDomains.Contains("nvd.nist.gov")
+                ),
+                Arg.Any<CancellationToken>()
+            );
+        await _provider
+            .Received(1)
+            .GenerateTextAsync(
+                Arg.Is<AiTextGenerationRequest>(request =>
+                    request.ExternalContext != null
+                    && request.ExternalContext.Contains("NVD summary")
+                ),
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<CancellationToken>()
+            );
+    }
+
     private static RiskChangeBriefSummaryInput CreateBrief()
     {
         return new RiskChangeBriefSummaryInput(

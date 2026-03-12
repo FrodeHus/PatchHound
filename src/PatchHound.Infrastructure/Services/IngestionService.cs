@@ -2024,8 +2024,6 @@ public class IngestionService
             )
             {
                 totalAssets += normalizedBatch.Assets.Count;
-                totalSoftware += normalizedBatch.RetrievedSoftwareCount;
-                totalLinks += normalizedBatch.DeviceSoftwareLinks.Count;
                 totalSoftwareWithoutMachineReferences +=
                     normalizedBatch.SoftwareWithoutMachineReferencesCount;
 
@@ -2071,6 +2069,25 @@ public class IngestionService
 
             cursorJson = batch.NextCursorJson;
         }
+
+        totalSoftware = await _dbContext
+            .StagedAssets.IgnoreQueryFilters()
+            .Where(
+                item =>
+                    item.IngestionRunId == ingestionRunId
+                    && EF.Functions.Like(item.ExternalId, "defender-sw::%")
+            )
+            .Select(item => item.ExternalId)
+            .Distinct()
+            .CountAsync(
+                ct
+            );
+        totalLinks = await _dbContext
+            .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == ingestionRunId)
+            .Select(item => new { item.DeviceExternalId, item.SoftwareExternalId })
+            .Distinct()
+            .CountAsync(ct);
 
         return new AssetBatchStageSummary(
             totalAssets,

@@ -27,6 +27,11 @@ export const tenantSoftwareDetailSchema = z.object({
   canonicalName: z.string(),
   canonicalVendor: z.string().nullable(),
   primaryCpe23Uri: z.string().nullable(),
+  description: z.string().nullable(),
+  descriptionGeneratedAt: isoDateTimeSchema.nullable(),
+  descriptionProviderType: z.string().nullable(),
+  descriptionProfileName: z.string().nullable(),
+  descriptionModel: z.string().nullable(),
   normalizationMethod: z.string(),
   confidence: z.string(),
   firstSeenAt: isoDateTimeSchema.nullable(),
@@ -121,6 +126,16 @@ export const tenantSoftwareAiReportSchema = z.object({
   generatedAt: isoDateTimeSchema,
 })
 
+export const tenantSoftwareDescriptionSchema = z.object({
+  tenantSoftwareId: z.string().uuid(),
+  normalizedSoftwareId: z.string().uuid(),
+  description: z.string(),
+  providerType: z.string(),
+  profileName: z.string(),
+  model: z.string(),
+  generatedAt: isoDateTimeSchema,
+})
+
 export type TenantSoftwareDetail = z.infer<typeof tenantSoftwareDetailSchema>
 export type TenantSoftwareListItem = z.infer<typeof tenantSoftwareListItemSchema>
 export type TenantSoftwareVersionCohort = z.infer<typeof tenantSoftwareVersionCohortSchema>
@@ -128,3 +143,4 @@ export type TenantSoftwareInstallation = z.infer<typeof tenantSoftwareInstallati
 export type PagedTenantSoftwareInstallations = z.infer<typeof pagedTenantSoftwareInstallationsSchema>
 export type TenantSoftwareVulnerability = z.infer<typeof tenantSoftwareVulnerabilitySchema>
 export type TenantSoftwareAiReport = z.infer<typeof tenantSoftwareAiReportSchema>
+export type TenantSoftwareDescription = z.infer<typeof tenantSoftwareDescriptionSchema>

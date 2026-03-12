@@ -6,6 +6,7 @@ import type {
   PagedTenantSoftwareInstallations,
 } from '@/api/software.schemas'
 import { SoftwareAiReportTab } from '@/components/features/software/SoftwareAiReportTab'
+import { SoftwareDescriptionPanel } from '@/components/features/software/SoftwareDescriptionPanel'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 
 type SoftwareDetailPageProps = {
@@ -282,6 +283,15 @@ export function SoftwareDetailPage({
         </div>
 
         <aside className="space-y-4">
+          <SoftwareDescriptionPanel
+            tenantSoftwareId={detail.id}
+            initialDescription={detail.description}
+            initialGeneratedAt={detail.descriptionGeneratedAt}
+            initialProviderType={detail.descriptionProviderType}
+            initialProfileName={detail.descriptionProfileName}
+            initialModel={detail.descriptionModel}
+          />
+
           <section className="rounded-2xl border border-border/70 bg-card p-5">
             <h2 className="text-lg font-semibold">Identity rail</h2>
             <div className="mt-4 grid gap-3">

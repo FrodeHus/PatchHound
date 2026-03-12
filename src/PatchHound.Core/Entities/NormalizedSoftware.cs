@@ -9,6 +9,11 @@ public class NormalizedSoftware
     public string? CanonicalVendor { get; private set; }
     public string CanonicalProductKey { get; private set; } = null!;
     public string? PrimaryCpe23Uri { get; private set; }
+    public string? Description { get; private set; }
+    public DateTimeOffset? DescriptionGeneratedAt { get; private set; }
+    public string? DescriptionProviderType { get; private set; }
+    public string? DescriptionProfileName { get; private set; }
+    public string? DescriptionModel { get; private set; }
     public SoftwareNormalizationMethod NormalizationMethod { get; private set; }
     public SoftwareNormalizationConfidence Confidence { get; private set; }
     public DateTimeOffset LastEvaluatedAt { get; private set; }
@@ -60,5 +65,21 @@ public class NormalizedSoftware
         Confidence = confidence;
         LastEvaluatedAt = evaluatedAt;
         UpdatedAt = evaluatedAt;
+    }
+
+    public void UpdateDescription(
+        string description,
+        DateTimeOffset generatedAt,
+        string providerType,
+        string profileName,
+        string model
+    )
+    {
+        Description = description.Trim();
+        DescriptionGeneratedAt = generatedAt;
+        DescriptionProviderType = providerType.Trim();
+        DescriptionProfileName = profileName.Trim();
+        DescriptionModel = model.Trim();
+        UpdatedAt = generatedAt;
     }
 }
