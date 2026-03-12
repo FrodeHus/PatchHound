@@ -46,6 +46,14 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 
         foreach (var chunk in Chunk(stagedAssets, AssetChunkSize))
         {
+            var chunkExternalIds = chunk.Select(item => item.ExternalId).Distinct().ToList();
+            var existingAssetsByExternalId = await dbContext
+                .Assets.IgnoreQueryFilters()
+                .Where(current =>
+                    current.TenantId == tenantId && chunkExternalIds.Contains(current.ExternalId)
+                )
+                .ToDictionaryAsync(current => current.ExternalId, StringComparer.Ordinal, ct);
+
             foreach (var staged in chunk)
             {
                 var asset = JsonSerializer.Deserialize<IngestionAsset>(
@@ -59,13 +67,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 
                 mergedAssetCount++;
 
-                var existing = await dbContext
-                    .Assets.IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(
-                        current =>
-                            current.ExternalId == asset.ExternalId && current.TenantId == tenantId,
-                        ct
-                    );
+                existingAssetsByExternalId.TryGetValue(asset.ExternalId, out var existing);
 
                 if (existing is null)
                 {
@@ -93,6 +95,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 
                     existing.UpdateMetadata(asset.Metadata);
                     await dbContext.Assets.AddAsync(existing, ct);
+                    existingAssetsByExternalId[asset.ExternalId] = existing;
                     continue;
                 }
 

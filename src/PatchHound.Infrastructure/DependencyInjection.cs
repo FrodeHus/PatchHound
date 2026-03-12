@@ -90,6 +90,7 @@ public static class DependencyInjection
         services.AddScoped<AiReportService>();
         services.AddScoped<TenantAiTextGenerationService>();
         services.AddScoped<SoftwareDescriptionGenerationService>();
+        services.AddScoped<SoftwareDescriptionJobService>();
         services.AddScoped<IRiskChangeBriefAiSummaryService, RiskChangeBriefAiSummaryService>();
         services.AddScoped<ITenantAiConfigurationResolver, TenantAiConfigurationResolver>();
         services

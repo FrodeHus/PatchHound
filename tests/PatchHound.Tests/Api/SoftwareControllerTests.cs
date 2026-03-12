@@ -6,6 +6,7 @@ using PatchHound.Api.Controllers;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Software;
 using PatchHound.Core.Common;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
@@ -24,7 +25,7 @@ public class SoftwareControllerTests : IDisposable
     private readonly ITenantAiConfigurationResolver _tenantAiConfigurationResolver;
     private readonly TenantAiTextGenerationService _tenantAiTextGenerationService;
     private readonly ITenantAiResearchService _tenantAiResearchService;
-    private readonly SoftwareDescriptionGenerationService _softwareDescriptionGenerationService;
+    private readonly SoftwareDescriptionJobService _softwareDescriptionJobService;
     private readonly SoftwareController _controller;
 
     public SoftwareControllerTests()
@@ -49,16 +50,11 @@ public class SoftwareControllerTests : IDisposable
             [_aiProvider],
             _tenantAiConfigurationResolver
         );
-        _softwareDescriptionGenerationService = new SoftwareDescriptionGenerationService(
-            _dbContext,
-            _tenantAiConfigurationResolver,
-            _tenantAiResearchService,
-            _tenantAiTextGenerationService
-        );
+        _softwareDescriptionJobService = new SoftwareDescriptionJobService(_dbContext);
         _controller = new SoftwareController(
             _dbContext,
             _tenantAiTextGenerationService,
-            _softwareDescriptionGenerationService,
+            _softwareDescriptionJobService,
             tenantContext
         );
     }
@@ -195,34 +191,9 @@ public class SoftwareControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GenerateDescription_PersistsProductDescription()
+    public async Task GenerateDescription_QueuesJob()
     {
         var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
-        var profile = TenantAiProfileFactory.Create(
-            _tenantId,
-            providerType: TenantAiProviderType.OpenAi,
-            name: "Default AI",
-            model: "gpt-5-mini",
-            systemPrompt: "system"
-        );
-        _tenantAiConfigurationResolver
-            .ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
-            .Returns(
-                Result<TenantAiProfileResolved>.Success(
-                    new TenantAiProfileResolved(profile, "api-key")
-                )
-            );
-        _aiProvider.ProviderType.Returns(TenantAiProviderType.OpenAi);
-        _aiProvider
-            .ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
-            .Returns(AiProviderValidationResult.Success());
-        _aiProvider
-            .GenerateTextAsync(
-                Arg.Any<AiTextGenerationRequest>(),
-                Arg.Any<TenantAiProfileResolved>(),
-                Arg.Any<CancellationToken>()
-            )
-            .Returns("Agent is a widely deployed enterprise endpoint management product.");
 
         var action = await _controller.GenerateDescription(
             graph.TenantSoftware.Id,
@@ -230,28 +201,38 @@ public class SoftwareControllerTests : IDisposable
             CancellationToken.None
         );
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var payload = result.Value.Should().BeOfType<TenantSoftwareDescriptionDto>().Subject;
+        var payload = result.Value.Should().BeOfType<TenantSoftwareDescriptionJobDto>().Subject;
 
         payload.TenantSoftwareId.Should().Be(graph.TenantSoftware.Id);
-        payload.Description.Should().Contain("enterprise endpoint management product");
+        payload.Status.Should().Be("Pending");
 
-        var normalizedSoftware = await _dbContext.NormalizedSoftware.FirstAsync(
-            item => item.Id == graph.TenantSoftware.NormalizedSoftwareId
+        var queuedJob = await _dbContext.SoftwareDescriptionJobs.FirstAsync(
+            item => item.TenantSoftwareId == graph.TenantSoftware.Id
         );
-        normalizedSoftware.Description.Should().Be(payload.Description);
-        normalizedSoftware.DescriptionProviderType.Should().Be("OpenAi");
+        queuedJob.Status.Should().Be(SoftwareDescriptionJobStatus.Pending);
+    }
 
-        await _aiProvider
-            .Received(1)
-            .GenerateTextAsync(
-                Arg.Is<AiTextGenerationRequest>(request =>
-                    request.UserPrompt.Contains("Primary software identity:")
-                    && request.UserPrompt.Contains("Contoso Agent")
-                    && request.UserPrompt.Contains("Known identity variants:")
-                ),
-                Arg.Any<TenantAiProfileResolved>(),
-                Arg.Any<CancellationToken>()
-            );
+    [Fact]
+    public async Task GetDescriptionStatus_ReturnsLatestJob()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var job = SoftwareDescriptionJob.Create(
+            _tenantId,
+            graph.TenantSoftware.Id,
+            graph.TenantSoftware.NormalizedSoftwareId,
+            null,
+            DateTimeOffset.UtcNow.AddMinutes(-1)
+        );
+        job.Start(DateTimeOffset.UtcNow);
+        await _dbContext.SoftwareDescriptionJobs.AddAsync(job);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetDescriptionStatus(graph.TenantSoftware.Id, CancellationToken.None);
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<TenantSoftwareDescriptionJobDto>().Subject;
+
+        payload.Id.Should().Be(job.Id);
+        payload.Status.Should().Be("Running");
     }
 
     public void Dispose()
