@@ -1,9 +1,13 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using PatchHound.Infrastructure.Data;
 
 #nullable disable
 
 namespace PatchHound.Infrastructure.Data.Migrations
 {
+    [DbContext(typeof(PatchHoundDbContext))]
+    [Migration("20260312093000_AddSecurityProfileCvssEnvironmentalMetrics")]
     public partial class AddSecurityProfileCvssEnvironmentalMetrics : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
