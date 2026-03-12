@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
-import { RotateCw, Trash2 } from 'lucide-react'
+import { RotateCw, Square, Trash2 } from 'lucide-react'
 import {
+  abortTenantIngestionRun,
   deleteTenantIngestionRun,
   fetchTenantIngestionRuns,
   triggerTenantIngestionSync,
@@ -45,6 +46,7 @@ export function SourceRunHistoryView({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [filter, setFilter] = useState<RunFilter>('all')
+  const [runPendingAbort, setRunPendingAbort] = useState<TenantIngestionRun | null>(null)
   const [runPendingDelete, setRunPendingDelete] = useState<TenantIngestionRun | null>(null)
   const runsQuery = useQuery({
     queryKey: ['tenant-ingestion-runs', tenantId, sourceKey, page, pageSize],
@@ -84,6 +86,21 @@ export function SourceRunHistoryView({
     },
     onSuccess: async () => {
       setRunPendingDelete(null)
+      await router.invalidate()
+    },
+  })
+  const abortMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      await abortTenantIngestionRun({
+        data: {
+          tenantId,
+          sourceKey,
+          runId,
+        },
+      })
+    },
+    onSuccess: async () => {
+      setRunPendingAbort(null)
       await router.invalidate()
     },
   })
@@ -178,10 +195,13 @@ export function SourceRunHistoryView({
               key={run.id}
               run={run}
               canResume={getRunCategory(run.status) === 'failed-recoverable'}
+              canAbort={getRunCategory(run.status) === 'active'}
               canDelete={getRunCategory(run.status) !== 'active'}
               isResuming={resumeMutation.isPending}
+              isAborting={abortMutation.isPending && runPendingAbort?.id === run.id}
               isDeleting={deleteMutation.isPending && runPendingDelete?.id === run.id}
               onResume={() => resumeMutation.mutate()}
+              onAbort={() => setRunPendingAbort(run)}
               onDelete={() => setRunPendingDelete(run)}
             />
           ))}
@@ -255,6 +275,52 @@ export function SourceRunHistoryView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={runPendingAbort !== null} onOpenChange={(open) => {
+        if (!open && !abortMutation.isPending) {
+          setRunPendingAbort(null)
+        }
+      }}>
+        <DialogContent className="w-full max-w-lg rounded-2xl border-border/80 bg-card p-0 sm:max-w-lg">
+          <DialogHeader className="border-b border-border/60 px-6 py-5">
+            <DialogTitle>Abort ingestion run</DialogTitle>
+            <DialogDescription>
+              This asks the worker to stop the active run after the current committed step. Staged data is retained so the run can be resumed later if it fails recoverably.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 px-6 py-5 text-sm text-muted-foreground">
+            <p>
+              <span className="font-medium text-foreground">Run:</span>{' '}
+              {runPendingAbort ? `${runPendingAbort.status} · ${formatTimestamp(runPendingAbort.startedAt)}` : '—'}
+            </p>
+            <p>
+              Current phase: {runPendingAbort?.latestPhase ? formatPhase(runPendingAbort.latestPhase) : 'Unknown'}
+            </p>
+          </div>
+          <DialogFooter className="border-t border-border/60 bg-card px-6 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={abortMutation.isPending}
+              onClick={() => setRunPendingAbort(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!runPendingAbort || abortMutation.isPending}
+              onClick={() => {
+                if (runPendingAbort) {
+                  abortMutation.mutate(runPendingAbort.id)
+                }
+              }}
+            >
+              {abortMutation.isPending ? 'Aborting...' : 'Abort ingestion'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -308,18 +374,24 @@ function SummaryCard({
 function RunHistoryCard({
   run,
   canResume,
+  canAbort,
   canDelete,
   isResuming,
+  isAborting,
   isDeleting,
   onResume,
+  onAbort,
   onDelete,
 }: {
   run: TenantIngestionRun
   canResume: boolean
+  canAbort: boolean
   canDelete: boolean
   isResuming: boolean
+  isAborting: boolean
   isDeleting: boolean
   onResume: () => void
+  onAbort: () => void
   onDelete: () => void
 }) {
   const tone = getRunTone(run.status)
@@ -352,6 +424,12 @@ function RunHistoryCard({
             <Button type="button" size="sm" variant="outline" disabled={isResuming} onClick={onResume}>
               <RotateCw className="size-4" />
               {isResuming ? 'Resuming...' : 'Resume ingestion'}
+            </Button>
+          ) : null}
+          {canAbort ? (
+            <Button type="button" size="sm" variant="outline" disabled={isAborting} onClick={onAbort}>
+              <Square className="size-4" />
+              {isAborting ? 'Aborting...' : 'Abort ingestion'}
             </Button>
           ) : null}
           {canDelete ? (

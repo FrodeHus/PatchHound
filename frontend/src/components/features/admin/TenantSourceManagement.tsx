@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
-import { ArrowLeft, CircleHelp, PenSquare, RotateCw } from 'lucide-react'
-import { triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
+import { ArrowLeft, CircleHelp, PenSquare, RotateCw, Square } from 'lucide-react'
+import { abortTenantIngestionRun, triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
 import type { TenantDetail, TenantIngestionSource } from '@/api/settings.schemas'
 import { SourceRunHistoryView } from '@/components/features/admin/SourceRunHistorySheet'
 import { Badge } from '@/components/ui/badge'
@@ -43,7 +43,9 @@ export function TenantSourceManagement({
   const [sources, setSources] = useState(() => tenant.ingestionSources.map(mapSourceToDraft))
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
   const [syncingSourceKey, setSyncingSourceKey] = useState<string | null>(null)
+  const [abortingRunId, setAbortingRunId] = useState<string | null>(null)
   const [syncState, setSyncState] = useState<'idle' | 'success' | 'error'>('idle')
+  const [abortState, setAbortState] = useState<'idle' | 'success' | 'error'>('idle')
 
   const editingSource = useMemo(
     () => sources.find((source) => source.key === editingSourceKey) ?? null,
@@ -97,6 +99,7 @@ export function TenantSourceManagement({
     onMutate: (sourceKey) => {
       setSyncingSourceKey(sourceKey)
       setSyncState('idle')
+      setAbortState('idle')
     },
     onSuccess: async () => {
       setSyncState('success')
@@ -107,6 +110,32 @@ export function TenantSourceManagement({
     },
     onSettled: () => {
       setSyncingSourceKey(null)
+    },
+  })
+  const abortMutation = useMutation({
+    mutationFn: async ({ sourceKey, runId }: { sourceKey: string; runId: string }) => {
+      await abortTenantIngestionRun({
+        data: {
+          tenantId: tenant.id,
+          sourceKey,
+          runId,
+        },
+      })
+    },
+    onMutate: ({ runId }) => {
+      setAbortingRunId(runId)
+      setSyncState('idle')
+      setAbortState('idle')
+    },
+    onSuccess: async () => {
+      setAbortState('success')
+      await router.invalidate()
+    },
+    onError: () => {
+      setAbortState('error')
+    },
+    onSettled: () => {
+      setAbortingRunId(null)
     },
   })
 
@@ -192,6 +221,8 @@ export function TenantSourceManagement({
                 {saveState === 'error' ? <StatusPill tone="error">Save failed</StatusPill> : null}
                 {syncState === 'success' ? <StatusPill tone="success">Sync queued</StatusPill> : null}
                 {syncState === 'error' ? <StatusPill tone="error">Sync failed</StatusPill> : null}
+                {abortState === 'success' ? <StatusPill tone="success">Abort requested</StatusPill> : null}
+                {abortState === 'error' ? <StatusPill tone="error">Abort failed</StatusPill> : null}
               </div>
             </div>
 
@@ -203,6 +234,7 @@ export function TenantSourceManagement({
                   const statusLabel = source.runtime.lastStatus ?? (isConfigured ? 'Configured' : 'Needs credentials')
                   const activity = describeSourceActivity(source)
                   const recoverableFailure = isRecoverableFailure(source)
+                  const activeRunId = source.runtime.activeIngestionRunId
 
                   return (
                     <InsetPanel key={source.key} className="space-y-4 p-4">
@@ -252,11 +284,22 @@ export function TenantSourceManagement({
                       ) : null}
 
                       <div className="flex flex-wrap gap-2">
+                        {activeRunId ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={abortMutation.isPending}
+                            onClick={() => abortMutation.mutate({ sourceKey: source.key, runId: activeRunId })}
+                          >
+                            <Square className="size-4" />
+                            {abortingRunId === activeRunId ? 'Aborting...' : 'Abort ingestion'}
+                          </Button>
+                        ) : null}
                         {source.supportsManualSync ? (
                           <Button
                             type="button"
                             variant="outline"
-                            disabled={syncMutation.isPending || !source.enabled}
+                            disabled={syncMutation.isPending || abortMutation.isPending || !source.enabled || Boolean(activeRunId)}
                             onClick={() => syncMutation.mutate(source.key)}
                           >
                             <RotateCw className="size-4" />

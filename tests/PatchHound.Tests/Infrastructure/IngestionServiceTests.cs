@@ -1591,6 +1591,154 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RunIngestionAsync_WhenAbortRequested_StopsRunAndMarksItFailedTerminal()
+    {
+        var batchSource = Substitute.For<
+            IVulnerabilitySource,
+            IAssetInventoryBatchSource,
+            IVulnerabilityBatchSource
+        >();
+        batchSource.SourceKey.Returns("abort-source");
+        batchSource.SourceName.Returns("AbortSource");
+
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(
+            TenantSourceConfiguration.Create(
+                _tenantId,
+                "abort-source",
+                "Abort Source",
+                true,
+                "0 * * * *"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        ((IAssetInventoryBatchSource)batchSource)
+            .FetchAssetBatchAsync(_tenantId, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(
+                new SourceBatchResult<IngestionAssetInventorySnapshot>(
+                    [new IngestionAssetInventorySnapshot([], [])],
+                    null,
+                    true
+                )
+            );
+
+        var vulnerabilityBatchInterface = (IVulnerabilityBatchSource)batchSource;
+        var fetchCount = 0;
+        vulnerabilityBatchInterface
+            .FetchVulnerabilityBatchAsync(
+                _tenantId,
+                Arg.Any<string?>(),
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>()
+            )
+            .Returns(_ =>
+            {
+                fetchCount++;
+                if (fetchCount == 1)
+                {
+                    var activeRun = _dbContext.IngestionRuns.IgnoreQueryFilters().Single();
+                    activeRun.RequestAbort(DateTimeOffset.UtcNow);
+                    _dbContext.SaveChanges();
+
+                    return Task.FromResult(
+                        new SourceBatchResult<IngestionResult>(
+                            [
+                                new IngestionResult(
+                                    "CVE-2026-ABORT-1",
+                                    "Abort vuln 1",
+                                    "Desc",
+                                    Severity.High,
+                                    8.2m,
+                                    null,
+                                    DateTimeOffset.UtcNow,
+                                    []
+                                ),
+                            ],
+                            "vulnerability-cursor-2",
+                            false
+                        )
+                    );
+                }
+
+                return Task.FromResult(
+                    new SourceBatchResult<IngestionResult>(
+                        [
+                            new IngestionResult(
+                                "CVE-2026-ABORT-2",
+                                "Abort vuln 2",
+                                "Desc",
+                                Severity.Critical,
+                                9.4m,
+                                null,
+                                DateTimeOffset.UtcNow,
+                                []
+                            ),
+                        ],
+                        null,
+                        true
+                    )
+                );
+            });
+
+        var logger = Substitute.For<ILogger<IngestionService>>();
+        var taskProjectionService = new RemediationTaskProjectionService(
+            _dbContext,
+            new SlaService()
+        );
+        var assessmentService = new VulnerabilityAssessmentService(
+            _dbContext,
+            new EnvironmentalSeverityCalculator()
+        );
+        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
+        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
+            _dbContext,
+            normalizedSoftwareResolver
+        );
+        var softwareMatchService = new SoftwareVulnerabilityMatchService(
+            _dbContext,
+            normalizedSoftwareProjectionService
+        );
+        var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
+            _dbContext,
+            Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
+        );
+        var stagedMergeService = new StagedVulnerabilityMergeService(
+            _dbContext,
+            assessmentService,
+            taskProjectionService
+        );
+        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
+        var service = new IngestionService(
+            _dbContext,
+            [batchSource],
+            enrichmentJobEnqueuer,
+            assessmentService,
+            softwareMatchService,
+            normalizedSoftwareProjectionService,
+            taskProjectionService,
+            stagedMergeService,
+            stagedAssetMergeService,
+            logger
+        );
+
+        var started = await service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        started.Should().BeTrue();
+        var run = await _dbContext
+            .IngestionRuns.IgnoreQueryFilters()
+            .SingleAsync(item => item.SourceKey == "abort-source");
+        run.Status.Should().Be(IngestionRunStatuses.FailedTerminal);
+        run.Error.Should().Be("Ingestion failed: the run was aborted by an operator.");
+        run.CompletedAt.Should().NotBeNull();
+        (
+            await _dbContext
+                .StagedVulnerabilities.IgnoreQueryFilters()
+                .CountAsync(item => item.IngestionRunId == run.Id)
+        ).Should().Be(1);
+    }
+
+    [Fact]
     public async Task RunIngestionAsync_PrunesExpiredStagingArtifactsForOldCompletedRuns()
     {
         var oldRun = IngestionRun.Start(

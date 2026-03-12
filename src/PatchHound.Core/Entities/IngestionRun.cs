@@ -17,6 +17,7 @@ public class IngestionRun
     public string SourceKey { get; private set; } = string.Empty;
     public DateTimeOffset StartedAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
+    public DateTimeOffset? AbortRequestedAt { get; private set; }
     public string Status { get; private set; } = string.Empty;
     public int FetchedVulnerabilityCount { get; private set; }
     public int FetchedAssetCount { get; private set; }
@@ -62,6 +63,16 @@ public class IngestionRun
     public void UpdateStatus(string status)
     {
         Status = status;
+    }
+
+    public void RequestAbort(DateTimeOffset requestedAt)
+    {
+        if (CompletedAt.HasValue)
+        {
+            return;
+        }
+
+        AbortRequestedAt = requestedAt;
     }
 
     public void CompleteSucceeded(
