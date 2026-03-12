@@ -652,6 +652,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<int>("FetchedAssetCount")
                         .HasColumnType("integer");
 
+                    b.Property<int>("FetchedSoftwareCount")
+                        .HasColumnType("integer");
+
                     b.Property<int>("FetchedSoftwareInstallationCount")
                         .HasColumnType("integer");
 
@@ -703,6 +706,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("StagedVulnerabilityCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SoftwareWithoutMachineReferencesCount")
                         .HasColumnType("integer");
 
                     b.Property<int>("StaleInstallationsMarked")

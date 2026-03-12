@@ -214,6 +214,8 @@ public class TenantsControllerTests : IDisposable
             10,
             5,
             2,
+            2,
+            0,
             10,
             12,
             12,
@@ -243,6 +245,8 @@ public class TenantsControllerTests : IDisposable
             4,
             2,
             1,
+            1,
+            0,
             4,
             4,
             4,
@@ -283,6 +287,8 @@ public class TenantsControllerTests : IDisposable
         payload.Items[0].Status.Should().Be("FailedRecoverable");
         payload.Items[0].Error.Should().Be("Ingestion failed: TimeoutException");
         payload.Items[1].FetchedVulnerabilityCount.Should().Be(10);
+        payload.Items[1].FetchedSoftwareCount.Should().Be(2);
+        payload.Items[1].SoftwareWithoutMachineReferencesCount.Should().Be(0);
     }
 
     public void Dispose()

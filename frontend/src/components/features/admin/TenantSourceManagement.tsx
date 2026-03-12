@@ -235,6 +235,9 @@ export function TenantSourceManagement({
                           </p>
                           <p className="text-sm font-medium text-foreground">{activity.title}</p>
                           <p className="text-xs text-muted-foreground">{activity.description}</p>
+                          {activity.metricsSummary ? (
+                            <p className="text-xs text-muted-foreground">{activity.metricsSummary}</p>
+                          ) : null}
                         </div>
                         <Metric label="Phase" value={activity.phase} compact />
                         <Metric label="Batch" value={activity.batch} compact />
@@ -703,6 +706,8 @@ function Metric({
 }
 
 function describeSourceActivity(source: TenantIngestionSourceDraft) {
+  const latestRun = source.recentRuns[0]
+
   if (source.runtime.activeIngestionRunId && source.runtime.activePhase) {
     const runtimeStatus = source.runtime.lastStatus?.toLowerCase()
     const title =
@@ -715,6 +720,9 @@ function describeSourceActivity(source: TenantIngestionSourceDraft) {
     return {
       title,
       description: `Lease active until ${formatTimestamp(source.runtime.leaseExpiresAt)}. Latest checkpoint ${formatTimestamp(source.runtime.activeCheckpointCommittedAt)}.`,
+      metricsSummary: latestRun
+        ? `${latestRun.fetchedSoftwareCount} software retrieved · ${latestRun.softwareWithoutMachineReferencesCount} missing machine references`
+        : null,
       phase: formatPhase(source.runtime.activePhase),
       batch:
         source.runtime.activeBatchNumber !== null
@@ -724,7 +732,6 @@ function describeSourceActivity(source: TenantIngestionSourceDraft) {
     }
   }
 
-  const latestRun = source.recentRuns[0]
   const latestRunStatus = latestRun?.status.toLowerCase()
   if (
     latestRunStatus === 'failedrecoverable'
@@ -744,6 +751,7 @@ function describeSourceActivity(source: TenantIngestionSourceDraft) {
           : latestRunStatus === 'failedterminal'
             ? 'This run requires operator action before retrying, but failed staged data will still be discarded after 24 hours.'
             : 'Failed staged snapshots are retained for up to 24 hours before they are discarded.',
+      metricsSummary: `${latestRun.fetchedSoftwareCount} software retrieved · ${latestRun.softwareWithoutMachineReferencesCount} missing machine references`,
       phase: formatPhase(latestRun.latestPhase),
       batch:
         latestRun.latestBatchNumber !== null ? String(latestRun.latestBatchNumber) : '—',
@@ -754,6 +762,9 @@ function describeSourceActivity(source: TenantIngestionSourceDraft) {
   return {
     title: 'Idle',
     description: `Last completed ${formatTimestamp(source.runtime.lastCompletedAt)}.`,
+    metricsSummary: latestRun
+      ? `${latestRun.fetchedSoftwareCount} software retrieved · ${latestRun.softwareWithoutMachineReferencesCount} missing machine references`
+      : null,
     phase: 'Ready',
     batch: '—',
     checkpoint: source.runtime.lastStatus || 'Idle',
