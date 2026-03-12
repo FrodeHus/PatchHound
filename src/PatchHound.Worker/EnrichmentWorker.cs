@@ -244,12 +244,32 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
             }
 
             var runCompletedAt = DateTimeOffset.UtcNow;
-            var runStatus =
-                failed > 0 && succeeded == 0 && noData == 0
-                    ? EnrichmentRunStatus.Failed
-                    : EnrichmentRunStatus.Succeeded;
-            var runtimeStatus = failed > 0 ? "SucceededWithFailures" : "Succeeded";
-            var runtimeError = failed > 0 ? $"{failed} enrichment job(s) failed." : string.Empty;
+            var runStatus = EnrichmentRunStatus.Succeeded;
+            var runtimeStatus = "Succeeded";
+            var runtimeError = string.Empty;
+
+            if (failed > 0 && succeeded == 0 && noData == 0 && retried == 0)
+            {
+                runStatus = EnrichmentRunStatus.Failed;
+                runtimeStatus = "Failed";
+                runtimeError = $"{failed} enrichment job(s) failed.";
+            }
+            else if (retried > 0 && succeeded == 0 && noData == 0 && failed == 0)
+            {
+                runStatus = EnrichmentRunStatus.RetryScheduled;
+                runtimeStatus = "RetryScheduled";
+                runtimeError = $"{retried} enrichment job(s) scheduled for retry.";
+            }
+            else if (failed > 0)
+            {
+                runtimeStatus = "SucceededWithFailures";
+                runtimeError = $"{failed} enrichment job(s) failed.";
+            }
+            else if (retried > 0)
+            {
+                runtimeStatus = "SucceededWithRetries";
+                runtimeError = $"{retried} enrichment job(s) scheduled for retry.";
+            }
 
             run.Complete(
                 runStatus,

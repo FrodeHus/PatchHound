@@ -55,7 +55,7 @@ public class EnrichmentJob
     {
         Priority = priority;
         NextAttemptAt = nextAttemptAt;
-        if (Status is EnrichmentJobStatus.Failed or EnrichmentJobStatus.RetryScheduled)
+        if (Status != EnrichmentJobStatus.Running)
         {
             Status = EnrichmentJobStatus.Pending;
             LastError = string.Empty;
