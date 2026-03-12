@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import {
@@ -44,15 +45,18 @@ function SoftwareDetailRoute() {
   const navigate = Route.useNavigate()
   const initialData = Route.useLoaderData()
   const { selectedTenantId } = useTenantScope()
+  const [initialTenantId] = useState(selectedTenantId)
+  const canUseInitialData = initialTenantId === selectedTenantId
 
   const detailQuery = useQuery({
     queryKey: softwareQueryKeys.detail(selectedTenantId, id),
     queryFn: () => fetchTenantSoftwareDetail({ data: { id } }),
-    initialData: initialData.detail,
+    initialData: canUseInitialData ? initialData.detail : undefined,
   })
+  const detail = detailQuery.data ?? (canUseInitialData ? initialData.detail : undefined)
 
   const selectedVersion =
-    search.version || normalizeVersion(detailQuery.data.versionCohorts[0]?.version ?? null)
+    search.version || normalizeVersion(detail?.versionCohorts[0]?.version ?? null)
 
   const installationsQuery = useQuery({
     queryKey: softwareQueryKeys.installations(selectedTenantId, id, selectedVersion, search.page, search.pageSize),
@@ -66,7 +70,9 @@ function SoftwareDetailRoute() {
           pageSize: search.pageSize,
         },
       }),
+    enabled: Boolean(detail),
     initialData:
+      canUseInitialData &&
       initialData.selectedVersion === selectedVersion &&
       initialData.installations.page === search.page &&
       initialData.installations.pageSize === search.pageSize
@@ -77,15 +83,20 @@ function SoftwareDetailRoute() {
   const vulnerabilitiesQuery = useQuery({
     queryKey: softwareQueryKeys.vulnerabilities(selectedTenantId, id),
     queryFn: () => fetchTenantSoftwareVulnerabilities({ data: { id } }),
-    initialData: initialData.vulnerabilities,
+    enabled: Boolean(detail),
+    initialData: canUseInitialData ? initialData.vulnerabilities : undefined,
   })
 
-  const installations = installationsQuery.data ?? initialData.installations
-  const vulnerabilities = vulnerabilitiesQuery.data ?? initialData.vulnerabilities
+  const installations = installationsQuery.data ?? (canUseInitialData ? initialData.installations : undefined)
+  const vulnerabilities = vulnerabilitiesQuery.data ?? (canUseInitialData ? initialData.vulnerabilities : undefined)
+
+  if (!detail || !installations || !vulnerabilities) {
+    return null
+  }
 
   return (
     <SoftwareDetailPage
-      detail={detailQuery.data}
+      detail={detail}
       selectedVersion={selectedVersion}
       installations={installations}
       vulnerabilities={vulnerabilities}

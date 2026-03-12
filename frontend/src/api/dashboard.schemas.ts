@@ -19,6 +19,27 @@ export const dashboardSummarySchema = z.object({
   totalTaskCount: z.number(),
   averageRemediationDays: z.number(),
   topCriticalVulnerabilities: z.array(topVulnerabilitySchema),
+  riskChangeBrief: z.object({
+    appearedCount: z.number(),
+    resolvedCount: z.number(),
+    appeared: z.array(z.object({
+      tenantVulnerabilityId: z.string().uuid(),
+      externalId: z.string(),
+      title: z.string(),
+      severity: z.string(),
+      affectedAssetCount: z.number(),
+      changedAt: z.string(),
+    })),
+    resolved: z.array(z.object({
+      tenantVulnerabilityId: z.string().uuid(),
+      externalId: z.string(),
+      title: z.string(),
+      severity: z.string(),
+      affectedAssetCount: z.number(),
+      changedAt: z.string(),
+    })),
+    aiSummary: z.string().nullable(),
+  }),
   recurringVulnerabilityCount: z.number(),
   recurrenceRatePercent: z.number(),
   topRecurringVulnerabilities: z.array(z.object({
@@ -46,7 +67,10 @@ export const trendDataSchema = z.object({
   items: z.array(trendItemSchema),
 })
 
+export const dashboardRiskChangeBriefSchema = dashboardSummarySchema.shape.riskChangeBrief
+
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>
 export type TopVulnerability = z.infer<typeof topVulnerabilitySchema>
 export type TrendData = z.infer<typeof trendDataSchema>
 export type TrendItem = z.infer<typeof trendItemSchema>
+export type DashboardRiskChangeBrief = z.infer<typeof dashboardRiskChangeBriefSchema>

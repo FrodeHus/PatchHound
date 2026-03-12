@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchTenantSoftware } from '@/api/software.functions'
@@ -26,22 +27,29 @@ function SoftwareIndexPage() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const { selectedTenantId } = useTenantScope()
+  const [initialTenantId] = useState(selectedTenantId)
+  const canUseInitialData = initialTenantId === selectedTenantId
   const searchActions = createListSearchUpdater<typeof search>(navigate)
   const query = useQuery({
     queryKey: softwareQueryKeys.list(selectedTenantId, search),
     queryFn: () => fetchTenantSoftware({ data: buildSoftwareListRequest(search) }),
-    initialData,
+    initialData: canUseInitialData ? initialData : undefined,
   })
+  const data = query.data ?? (canUseInitialData ? initialData : undefined)
+
+  if (!data) {
+    return null
+  }
 
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold">Software</h1>
       <SoftwareTable
-        items={query.data.items}
-        totalCount={query.data.totalCount}
-        page={query.data.page}
-        pageSize={query.data.pageSize}
-        totalPages={query.data.totalPages}
+        items={data.items}
+        totalCount={data.totalCount}
+        page={data.page}
+        pageSize={data.pageSize}
+        totalPages={data.totalPages}
         searchValue={search.search}
         confidenceFilter={search.confidence}
         vulnerableOnly={search.vulnerableOnly}

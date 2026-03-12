@@ -30,14 +30,17 @@ function AssetsPage() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const { selectedTenantId } = useTenantScope()
+  const [initialTenantId] = useState(selectedTenantId)
+  const canUseInitialData = initialTenantId === selectedTenantId
   const searchActions = createListSearchUpdater<typeof search>(navigate)
   const queryClient = useQueryClient()
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
   const assetsQuery = useQuery({
     queryKey: assetQueryKeys.list(selectedTenantId, search),
     queryFn: () => fetchAssets({ data: buildAssetsListRequest(search) }),
-    initialData,
+    initialData: canUseInitialData ? initialData : undefined,
   })
+  const assets = assetsQuery.data ?? (canUseInitialData ? initialData : undefined)
   const ownerMutation = useMutation({
     mutationFn: async (payload: { assetId: string; ownerType: 'User' | 'Team'; ownerId: string }) => {
       await assignAssetOwner({
@@ -97,12 +100,16 @@ function AssetsPage() {
     queryFn: () => fetchSecurityProfiles({ data: {} }),
   })
 
+  if (!assets) {
+    return null
+  }
+
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold">Assets</h1>
       <AssetManagementTable
-        assets={assetsQuery.data.items}
-        totalCount={assetsQuery.data.totalCount}
+        assets={assets.items}
+        totalCount={assets.totalCount}
         isUpdating={ownerMutation.isPending || criticalityMutation.isPending || securityProfileMutation.isPending}
         selectedAssetId={selectedAssetId}
         searchValue={search.search}
@@ -110,9 +117,9 @@ function AssetsPage() {
         criticalityFilter={search.criticality}
         ownerTypeFilter={search.ownerType}
         unassignedOnly={search.unassignedOnly}
-        page={assetsQuery.data.page}
-        pageSize={assetsQuery.data.pageSize}
-        totalPages={assetsQuery.data.totalPages}
+        page={assets.page}
+        pageSize={assets.pageSize}
+        totalPages={assets.totalPages}
         onSearchChange={(searchValue) => {
           searchActions.updateField('search', searchValue)
           setSelectedAssetId(null)

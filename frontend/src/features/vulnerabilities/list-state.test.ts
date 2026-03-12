@@ -27,8 +27,31 @@ describe('buildVulnerabilitiesListRequest', () => {
 describe('vulnerabilityQueryKeys', () => {
   it('builds stable detail-scoped keys for comments and timeline', () => {
     const detail = vulnerabilityQueryKeys.detail('vuln-1')
+    const list = vulnerabilityQueryKeys.list('tenant-1', {
+      search: '',
+      severity: '',
+      status: '',
+      source: '',
+      presentOnly: true,
+      recurrenceOnly: false,
+      page: 1,
+      pageSize: 25,
+    })
 
     expect(detail).toEqual(['vulnerabilities', 'detail', 'vuln-1'])
+    expect(list).toEqual([
+      'vulnerabilities',
+      'list',
+      'tenant-1',
+      '',
+      '',
+      '',
+      '',
+      true,
+      false,
+      1,
+      25,
+    ])
     expect(vulnerabilityQueryKeys.comments('tenant-1', 'vuln-1')).toEqual([
       'vulnerabilities',
       'detail',
