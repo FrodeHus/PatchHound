@@ -607,36 +607,7 @@ public class TenantsController : ControllerBase
         var now = DateTimeOffset.UtcNow;
         var abortedMessage = IngestionFailurePolicy.Describe(new IngestionAbortedException());
         run.RequestAbort(now);
-        run.CompleteFailed(
-            now,
-            abortedMessage,
-            IngestionRunStatuses.FailedTerminal,
-            run.FetchedVulnerabilityCount,
-            run.FetchedAssetCount,
-            run.FetchedSoftwareCount,
-            run.FetchedSoftwareInstallationCount,
-            run.SoftwareWithoutMachineReferencesCount,
-            run.StagedMachineCount,
-            run.StagedSoftwareCount,
-            run.StagedVulnerabilityCount,
-            run.PersistedMachineCount,
-            run.PersistedSoftwareCount,
-            run.PersistedVulnerabilityCount,
-            run.StagedExposureCount,
-            run.MergedExposureCount,
-            run.OpenedProjectionCount,
-            run.ResolvedProjectionCount,
-            run.StagedAssetCount,
-            run.MergedAssetCount,
-            run.StagedSoftwareLinkCount,
-            run.ResolvedSoftwareLinkCount,
-            run.InstallationsCreated,
-            run.InstallationsTouched,
-            run.InstallationEpisodesOpened,
-            run.InstallationEpisodesSeen,
-            run.StaleInstallationsMarked,
-            run.InstallationsRemoved
-        );
+        run.Abort(now, abortedMessage);
         source.ReleaseLease(runId);
         source.UpdateRuntime(
             source.ManualRequestedAt,
