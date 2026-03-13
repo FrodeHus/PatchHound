@@ -440,16 +440,14 @@ public class TenantsController : ControllerBase
         var snapshotsByRunId =
             runIds.Count == 0
                 ? new Dictionary<Guid, IngestionSnapshot>()
-                : await _dbContext
+                : (await _dbContext
                     .IngestionSnapshots.AsNoTracking()
                     .IgnoreQueryFilters()
                     .Where(snapshot => runIds.Contains(snapshot.IngestionRunId))
+                    .OrderByDescending(snapshot => snapshot.CreatedAt)
+                    .ToListAsync(ct))
                     .GroupBy(snapshot => snapshot.IngestionRunId)
-                    .ToDictionaryAsync(
-                        group => group.Key,
-                        group => group.OrderByDescending(item => item.CreatedAt).First(),
-                        ct
-                    );
+                    .ToDictionary(group => group.Key, group => group.First());
         var checkpointsByRunId =
             runIds.Count == 0
                 ? new Dictionary<Guid, IngestionCheckpoint>()

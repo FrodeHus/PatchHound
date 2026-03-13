@@ -14,6 +14,13 @@ public class RemediationTaskConfiguration : IEntityTypeConfiguration<Remediation
         builder.HasIndex(rt => rt.TenantVulnerabilityId);
         builder.HasIndex(rt => rt.Status);
         builder.HasIndex(rt => rt.AssigneeId);
+        builder.HasIndex(rt => new
+        {
+            rt.TenantId,
+            rt.TenantVulnerabilityId,
+            rt.AssetId,
+            rt.Status,
+        });
 
         builder.Property(rt => rt.Status).HasConversion<string>().HasMaxLength(32);
         builder.Property(rt => rt.Justification).HasMaxLength(2048);
