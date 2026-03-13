@@ -1,8 +1,19 @@
 import { useEffect, useRef } from 'react'
 
-type SSEEvent = 'NotificationCountUpdated' | 'CriticalVulnerabilityDetected' | 'TaskStatusChanged'
+type SSEEvent =
+  | 'NotificationCountUpdated'
+  | 'CriticalVulnerabilityDetected'
+  | 'TaskStatusChanged'
+  | 'IngestionRunProgress'
 
-export function useSSE(event: SSEEvent, handler: (data: unknown) => void) {
+export function useSSE(
+  event: SSEEvent,
+  handler: (data: unknown) => void,
+  options?: {
+    url?: string
+    enabled?: boolean
+  },
+) {
   const handlerRef = useRef(handler)
 
   useEffect(() => {
@@ -10,7 +21,11 @@ export function useSSE(event: SSEEvent, handler: (data: unknown) => void) {
   })
 
   useEffect(() => {
-    const eventSource = new EventSource('/api/events')
+    if (options?.enabled === false) {
+      return
+    }
+
+    const eventSource = new EventSource(options?.url ?? '/api/events')
 
     eventSource.addEventListener(event, (receivedEvent: Event) => {
       if (!(receivedEvent instanceof MessageEvent)) {
@@ -31,5 +46,5 @@ export function useSSE(event: SSEEvent, handler: (data: unknown) => void) {
     return () => {
       eventSource.close()
     }
-  }, [event])
+  }, [event, options?.enabled, options?.url])
 }

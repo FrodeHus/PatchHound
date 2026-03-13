@@ -64,7 +64,13 @@ public record TenantIngestionRuntimeDto(
     int? ActiveBatchNumber,
     string? ActiveCheckpointStatus,
     int? ActiveRecordsCommitted,
-    DateTimeOffset? ActiveCheckpointCommittedAt
+    DateTimeOffset? ActiveCheckpointCommittedAt,
+    int? ActiveStagedMachineCount,
+    int? ActiveStagedVulnerabilityCount,
+    int? ActiveStagedSoftwareCount,
+    int? ActivePersistedMachineCount,
+    int? ActivePersistedVulnerabilityCount,
+    int? ActivePersistedSoftwareCount
 );
 
 public record TenantIngestionRunDto(
