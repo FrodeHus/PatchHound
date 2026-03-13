@@ -199,6 +199,7 @@ public class IngestionService
                                 IngestionRunStatuses.Merging,
                                 ct
                             );
+                            var assetMergeStartedAt = DateTimeOffset.UtcNow;
                             assetMergeSummary = await ExecuteWithConcurrencyRetryAsync(
                                 () =>
                                     ProcessStagedAssetsAsync(
@@ -233,6 +234,11 @@ public class IngestionService
                                 assetMergeSummary.StagedSoftwareCount,
                                 assetMergeSummary.PersistedMachineCount,
                                 assetMergeSummary.PersistedSoftwareCount
+                            );
+                            _logger.LogInformation(
+                                "Asset merge phase completed for ingestion run {IngestionRunId}. Duration: {DurationMs} ms.",
+                                run.Id,
+                                (DateTimeOffset.UtcNow - assetMergeStartedAt).TotalMilliseconds
                             );
                         }
                         else if (!assetStagingCompleted && source is IAssetInventorySource assetInventorySource)
@@ -289,6 +295,7 @@ public class IngestionService
                                 IngestionRunStatuses.Merging,
                                 ct
                             );
+                            var assetMergeStartedAt = DateTimeOffset.UtcNow;
                             assetMergeSummary = await ExecuteWithConcurrencyRetryAsync(
                                 () =>
                                     ProcessStagedAssetsAsync(
@@ -324,6 +331,11 @@ public class IngestionService
                                 assetMergeSummary.PersistedMachineCount,
                                 assetMergeSummary.PersistedSoftwareCount
                             );
+                            _logger.LogInformation(
+                                "Asset merge phase completed for ingestion run {IngestionRunId}. Duration: {DurationMs} ms.",
+                                run.Id,
+                                (DateTimeOffset.UtcNow - assetMergeStartedAt).TotalMilliseconds
+                            );
                         }
                         else if (assetStagingCompleted)
                         {
@@ -352,6 +364,7 @@ public class IngestionService
                                 IngestionRunStatuses.Merging,
                                 ct
                             );
+                            var assetMergeStartedAt = DateTimeOffset.UtcNow;
                             assetMergeSummary = await ExecuteWithConcurrencyRetryAsync(
                                 () =>
                                     ProcessStagedAssetsAsync(
@@ -382,6 +395,11 @@ public class IngestionService
                                 ct
                             );
                             assetMergeCompleted = true;
+                            _logger.LogInformation(
+                                "Asset merge phase completed for ingestion run {IngestionRunId}. Duration: {DurationMs} ms.",
+                                run.Id,
+                                (DateTimeOffset.UtcNow - assetMergeStartedAt).TotalMilliseconds
+                            );
                         }
 
                         if (!vulnerabilityStagingCompleted && source is IVulnerabilityBatchSource batchSource)
@@ -461,6 +479,7 @@ public class IngestionService
                                 IngestionRunStatuses.Merging,
                                 ct
                             );
+                            var vulnerabilityMergeStartedAt = DateTimeOffset.UtcNow;
                             vulnerabilityMergeSummary = await ExecuteWithConcurrencyRetryAsync(
                                 () =>
                                     ProcessStagedResultsAsync(
@@ -492,6 +511,15 @@ public class IngestionService
                                 ct
                             );
                             vulnerabilityMergeCompleted = true;
+                            _logger.LogInformation(
+                                "Vulnerability merge phase completed for ingestion run {IngestionRunId}. Duration: {DurationMs} ms. Staged vulnerabilities: {StagedVulnerabilityCount}. Persisted vulnerabilities: {PersistedVulnerabilityCount}. Opened projections: {OpenedProjectionCount}. Resolved projections: {ResolvedProjectionCount}.",
+                                run.Id,
+                                (DateTimeOffset.UtcNow - vulnerabilityMergeStartedAt).TotalMilliseconds,
+                                vulnerabilityMergeSummary.StagedVulnerabilityCount,
+                                vulnerabilityMergeSummary.PersistedVulnerabilityCount,
+                                vulnerabilityMergeSummary.OpenedProjectionCount,
+                                vulnerabilityMergeSummary.ResolvedProjectionCount
+                            );
                         }
 
                         await EnqueueEnrichmentJobsForRunAsync(run.Id, tenantId, ct);
@@ -503,6 +531,7 @@ public class IngestionService
                                 run.Id,
                                 ct
                             );
+                            var softwareMatchStartedAt = DateTimeOffset.UtcNow;
                             await ExecuteWithConcurrencyRetryAsync(
                                 async () =>
                                 {
@@ -517,15 +546,29 @@ public class IngestionService
                                 tenantId,
                                 ct
                             );
+                            _logger.LogInformation(
+                                "Software vulnerability match sync completed for ingestion run {IngestionRunId}. Snapshot: {SnapshotId}. Duration: {DurationMs} ms.",
+                                run.Id,
+                                softwareSnapshot.Id,
+                                (DateTimeOffset.UtcNow - softwareMatchStartedAt).TotalMilliseconds
+                            );
+                            var snapshotPublishStartedAt = DateTimeOffset.UtcNow;
                             await PublishSnapshotAsync(
                                 tenantId,
                                 source.SourceKey,
                                 softwareSnapshot.Id,
                                 ct
                             );
+                            _logger.LogInformation(
+                                "Snapshot publish completed for ingestion run {IngestionRunId}. Snapshot: {SnapshotId}. Duration: {DurationMs} ms.",
+                                run.Id,
+                                softwareSnapshot.Id,
+                                (DateTimeOffset.UtcNow - snapshotPublishStartedAt).TotalMilliseconds
+                            );
                         }
                         else
                         {
+                            var softwareMatchStartedAt = DateTimeOffset.UtcNow;
                             await ExecuteWithConcurrencyRetryAsync(
                                 async () =>
                                 {
@@ -538,6 +581,11 @@ public class IngestionService
                                 source.SourceName,
                                 tenantId,
                                 ct
+                            );
+                            _logger.LogInformation(
+                                "Software vulnerability match sync completed for ingestion run {IngestionRunId}. Duration: {DurationMs} ms.",
+                                run.Id,
+                                (DateTimeOffset.UtcNow - softwareMatchStartedAt).TotalMilliseconds
                             );
                         }
                         _logger.LogInformation(
