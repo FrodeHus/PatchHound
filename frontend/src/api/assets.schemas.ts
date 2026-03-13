@@ -6,6 +6,7 @@ export const assetSchema = z.object({
   externalId: z.string(),
   name: z.string(),
   assetType: z.string(),
+  deviceGroupName: z.string().nullable(),
   criticality: z.string(),
   ownerType: z.string(),
   ownerUserId: z.string().uuid().nullable(),
@@ -70,6 +71,8 @@ export const assetDetailSchema = z.object({
   deviceLastSeenAt: z.string().nullable(),
   deviceLastIpAddress: z.string().nullable(),
   deviceAadDeviceId: z.string().nullable(),
+  deviceGroupId: z.string().nullable(),
+  deviceGroupName: z.string().nullable(),
   softwareCpeBinding: z.object({
     id: z.string().uuid(),
     cpe23Uri: z.string(),

@@ -176,6 +176,7 @@ export function DeviceSection({
     { label: 'Risk Score', value: asset.deviceRiskScore ?? 'Unknown' },
     { label: 'Last Seen', value: asset.deviceLastSeenAt ? formatDateTime(asset.deviceLastSeenAt) : 'Unknown' },
     { label: 'Last IP Address', value: asset.deviceLastIpAddress ?? 'Unknown' },
+    { label: 'Device Group', value: asset.deviceGroupName ?? 'Unknown' },
     { label: 'Entra Device ID', value: asset.deviceAadDeviceId ?? 'Unknown', mono: true },
   ]
 

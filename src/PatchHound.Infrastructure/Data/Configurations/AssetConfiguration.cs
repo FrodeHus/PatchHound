@@ -24,6 +24,8 @@ public class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.Property(a => a.DeviceRiskScore).HasMaxLength(64);
         builder.Property(a => a.DeviceLastIpAddress).HasMaxLength(128);
         builder.Property(a => a.DeviceAadDeviceId).HasMaxLength(128);
+        builder.Property(a => a.DeviceGroupId).HasMaxLength(128);
+        builder.Property(a => a.DeviceGroupName).HasMaxLength(256);
         builder.Property(a => a.AssetType).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.Criticality).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.OwnerType).HasConversion<string>().HasMaxLength(32);

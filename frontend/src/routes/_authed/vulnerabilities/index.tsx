@@ -82,6 +82,15 @@ function VulnerabilitiesPage() {
         onPresentOnlyChange={(value) => {
           searchActions.updateField('presentOnly', value)
         }}
+        onApplyStructuredFilters={(filters) => {
+          searchActions.updateFields({
+            severity: filters.severity,
+            status: filters.status,
+            source: filters.source,
+            recurrenceOnly: filters.recurrenceOnly,
+            presentOnly: filters.presentOnly,
+          })
+        }}
         onClearFilters={() => {
           searchActions.updateFields({
             search: '',

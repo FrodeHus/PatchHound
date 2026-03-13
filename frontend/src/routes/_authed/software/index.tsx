@@ -66,6 +66,13 @@ function SoftwareIndexPage() {
         onBoundOnlyChange={(value) => {
           searchActions.updateField('boundOnly', value)
         }}
+        onApplyStructuredFilters={(filters) => {
+          searchActions.updateFields({
+            confidence: filters.confidence,
+            vulnerableOnly: filters.vulnerableOnly,
+            boundOnly: filters.boundOnly,
+          })
+        }}
         onPageChange={(page) => {
           searchActions.updatePage(page)
         }}

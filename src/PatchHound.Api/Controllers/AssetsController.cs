@@ -104,6 +104,11 @@ public class AssetsController : ControllerBase
                 )
                 || a.ExternalId.Contains(filter.Search)
             );
+        if (!string.IsNullOrEmpty(filter.DeviceGroup))
+            query = query.Where(a =>
+                (a.DeviceGroupName != null && a.DeviceGroupName.Contains(filter.DeviceGroup))
+                || (a.DeviceGroupId != null && a.DeviceGroupId.Contains(filter.DeviceGroup))
+            );
 
         var totalCount = await query.CountAsync(ct);
 
@@ -139,6 +144,7 @@ public class AssetsController : ControllerBase
                 a.ExternalId,
                 Name = a.AssetType == AssetType.Device ? a.DeviceComputerDnsName ?? a.Name : a.Name,
                 AssetType = a.AssetType.ToString(),
+                a.DeviceGroupName,
                 Criticality = a.Criticality.ToString(),
                 OwnerType = a.OwnerType.ToString(),
                 a.OwnerUserId,
@@ -159,6 +165,7 @@ public class AssetsController : ControllerBase
                 a.ExternalId,
                 a.Name,
                 a.AssetType,
+                a.DeviceGroupName,
                 a.Criticality,
                 a.OwnerType,
                 a.OwnerUserId,
@@ -553,6 +560,8 @@ public class AssetsController : ControllerBase
                 asset.DeviceLastSeenAt,
                 asset.DeviceLastIpAddress,
                 asset.DeviceAadDeviceId,
+                asset.DeviceGroupId,
+                asset.DeviceGroupName,
                 asset.AssetType == AssetType.Software
                     && normalizedSoftwareIdsByExternalId.TryGetValue(asset.ExternalId, out var assetNormalizedSoftwareId)
                     ? cpeBindingsByNormalizedSoftwareId.GetValueOrDefault(assetNormalizedSoftwareId)

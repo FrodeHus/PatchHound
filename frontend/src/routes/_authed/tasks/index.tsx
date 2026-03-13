@@ -58,6 +58,9 @@ function TasksPage() {
         onStatusFilterChange={(value) => {
           searchActions.updateField('status', value)
         }}
+        onApplyStructuredFilters={(filters) => {
+          searchActions.updateFields({ status: filters.status })
+        }}
         onPageChange={(page) => {
           searchActions.updatePage(page)
         }}
