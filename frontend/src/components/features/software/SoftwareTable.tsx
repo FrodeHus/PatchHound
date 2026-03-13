@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { TenantSoftwareListItem } from '@/api/software.schemas'
@@ -57,6 +57,24 @@ export function SoftwareTable({
   onPageSizeChange,
   onClearFilters,
 }: SoftwareTableProps) {
+  const [searchInput, setSearchInput] = useState(searchValue)
+
+  useEffect(() => {
+    setSearchInput(searchValue)
+  }, [searchValue])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      if (searchInput !== searchValue) {
+        onSearchChange(searchInput)
+      }
+    }, 350)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [onSearchChange, searchInput, searchValue])
+
   const activeFilters = useMemo(
     () =>
       [
@@ -158,7 +176,7 @@ export function SoftwareTable({
             <DataTableField label="Search">
               <div className="relative min-w-[260px]">
                 <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={searchValue} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search normalized software" className="pl-9" />
+                <Input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search normalized software" className="pl-9" />
               </div>
             </DataTableField>
             <DataTableField label="Confidence">

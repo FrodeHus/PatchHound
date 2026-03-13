@@ -2394,7 +2394,10 @@ public class IngestionServiceTests : IDisposable
                         new IngestionAffectedAsset(
                             "machine-1",
                             "server01.contoso.local",
-                            AssetType.Device
+                            AssetType.Device,
+                            "7-zip",
+                            "7zip",
+                            "9.20"
                         ),
                     ],
                     "7-zip",
@@ -2417,6 +2420,86 @@ public class IngestionServiceTests : IDisposable
         match.VulnerabilityDefinition.ExternalId.Should().Be("CVE-2026-0001");
         match.SoftwareAsset.ExternalId.Should().Be("software-1");
         match.Evidence.Should().Contain("defender-direct");
+    }
+
+    [Fact]
+    public async Task ProcessResultsAsync_CreatesSoftwareVulnerabilityMatches_ForMultipleObservedVersions()
+    {
+        var observedAt = DateTimeOffset.UtcNow;
+        var snapshot = new IngestionAssetInventorySnapshot(
+            [
+                new IngestionAsset("machine-1", "reader-1", AssetType.Device),
+                new IngestionAsset("machine-2", "reader-2", AssetType.Device),
+                new IngestionAsset(
+                    "software-1",
+                    "Acrobat Reader DC 2025.1.20813.0",
+                    AssetType.Software,
+                    Metadata: """{"name":"acrobat_reader_dc","vendor":"adobe","version":"2025.1.20813.0"}"""
+                ),
+                new IngestionAsset(
+                    "software-2",
+                    "Acrobat Reader DC 2025.1.20814.0",
+                    AssetType.Software,
+                    Metadata: """{"name":"acrobat_reader_dc","vendor":"adobe","version":"2025.1.20814.0"}"""
+                ),
+            ],
+            [new("machine-1", "software-1", observedAt), new("machine-2", "software-2", observedAt)]
+        );
+
+        await _service.ProcessAssetsAsync(_tenantId, snapshot, CancellationToken.None);
+
+        await _service.ProcessResultsAsync(
+            _tenantId,
+            "MicrosoftDefender",
+            [
+                new IngestionResult(
+                    "CVE-2025-64899",
+                    "Acrobat Reader issue",
+                    "Desc",
+                    Severity.High,
+                    8.1m,
+                    "CVSS:3.1/AV:N",
+                    DateTimeOffset.UtcNow,
+                    [
+                        new IngestionAffectedAsset(
+                            "machine-1",
+                            "reader-1",
+                            AssetType.Device,
+                            "adobe",
+                            "acrobat_reader_dc",
+                            "2025.1.20813.0"
+                        ),
+                        new IngestionAffectedAsset(
+                            "machine-2",
+                            "reader-2",
+                            AssetType.Device,
+                            "adobe",
+                            "acrobat_reader_dc",
+                            "2025.1.20814.0"
+                        ),
+                    ],
+                    "adobe",
+                    "acrobat_reader_dc",
+                    "2025.1.20813.0",
+                    Sources: ["MicrosoftDefender"]
+                ),
+            ],
+            CancellationToken.None
+        );
+
+        var matches = await _dbContext
+            .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
+            .Include(item => item.SoftwareAsset)
+            .Where(item => item.VulnerabilityDefinition.ExternalId == "CVE-2025-64899")
+            .OrderBy(item => item.SoftwareAsset.ExternalId)
+            .ToListAsync();
+
+        matches.Should().HaveCount(2);
+        matches.Select(item => item.SoftwareAsset.ExternalId).Should().Equal("software-1", "software-2");
+        matches.Should().OnlyContain(item =>
+            item.MatchMethod == SoftwareVulnerabilityMatchMethod.DefenderDirect
+            && item.Confidence == MatchConfidence.High
+        );
     }
 
     [Fact]
