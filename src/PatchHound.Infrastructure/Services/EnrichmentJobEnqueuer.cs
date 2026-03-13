@@ -61,8 +61,7 @@ public class EnrichmentJobEnqueuer(
         var existingJobs = await dbContext
             .EnrichmentJobs.IgnoreQueryFilters()
             .Where(job =>
-                job.TenantId == tenantId
-                && job.TargetModel == EnrichmentTargetModel.Vulnerability
+                job.TargetModel == EnrichmentTargetModel.Vulnerability
                 && vulnerabilityDefinitionIds.Contains(job.TargetId)
             )
             .ToDictionaryAsync(job => (job.SourceKey, job.TargetId), ct);
