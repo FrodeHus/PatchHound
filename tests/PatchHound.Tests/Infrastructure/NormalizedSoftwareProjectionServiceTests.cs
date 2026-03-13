@@ -181,6 +181,120 @@ public class NormalizedSoftwareProjectionServiceTests : IDisposable
         projections[0].ResolvedAt.Should().BeNull();
     }
 
+    [Fact]
+    public async Task SyncTenantAsync_WithNewSnapshot_KeepsProjectionsBoundToCurrentSnapshotRows()
+    {
+        var observedAt = new DateTimeOffset(2026, 3, 10, 9, 0, 0, TimeSpan.Zero);
+        var oldSnapshotId = Guid.NewGuid();
+        var newSnapshotId = Guid.NewGuid();
+        var device = Asset.Create(_tenantId, "device-1", AssetType.Device, "Device 1", Criticality.Medium);
+        var software = Asset.Create(_tenantId, "defender-1", AssetType.Software, "Contoso Agent", Criticality.Low);
+        software.UpdateMetadata("""{"name":"Contoso Agent","vendor":"Contoso","version":"1.0"}""");
+
+        var normalizedSoftware = NormalizedSoftware.Create(
+            "Contoso Agent",
+            "Contoso",
+            "cpe:contoso:agent",
+            "cpe:2.3:a:contoso:agent:*:*:*:*:*:*:*:*",
+            SoftwareNormalizationMethod.Heuristic,
+            SoftwareNormalizationConfidence.High,
+            observedAt.AddDays(-5)
+        );
+        var oldTenantSoftware = TenantSoftware.Create(
+            _tenantId,
+            oldSnapshotId,
+            normalizedSoftware.Id,
+            observedAt.AddDays(-10),
+            observedAt.AddDays(-1)
+        );
+
+        var vulnerability = VulnerabilityDefinition.Create(
+            "CVE-2026-0001",
+            "Contoso Agent issue",
+            "Description",
+            Severity.High,
+            "NVD"
+        );
+        var tenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            vulnerability.Id,
+            VulnerabilityStatus.Open,
+            observedAt
+        );
+
+        await _dbContext.AddRangeAsync(
+            device,
+            software,
+            normalizedSoftware,
+            oldTenantSoftware,
+            vulnerability,
+            tenantVulnerability
+        );
+        await _dbContext.NormalizedSoftwareInstallations.AddAsync(
+            NormalizedSoftwareInstallation.Create(
+                _tenantId,
+                oldSnapshotId,
+                oldTenantSoftware.Id,
+                software.Id,
+                device.Id,
+                SoftwareIdentitySourceSystem.Defender,
+                "1.0",
+                observedAt.AddDays(-10),
+                observedAt.AddDays(-1),
+                null,
+                true,
+                1
+            )
+        );
+        await _dbContext.DeviceSoftwareInstallations.AddAsync(
+            DeviceSoftwareInstallation.Create(_tenantId, device.Id, software.Id, observedAt)
+        );
+        await _dbContext.DeviceSoftwareInstallationEpisodes.AddAsync(
+            DeviceSoftwareInstallationEpisode.Create(
+                _tenantId,
+                device.Id,
+                software.Id,
+                1,
+                observedAt.AddDays(-10)
+            )
+        );
+        await _dbContext.SoftwareVulnerabilityMatches.AddRangeAsync(
+            SoftwareVulnerabilityMatch.Create(
+                _tenantId,
+                oldSnapshotId,
+                software.Id,
+                vulnerability.Id,
+                SoftwareVulnerabilityMatchMethod.CpeBinding,
+                MatchConfidence.High,
+                "old-match",
+                observedAt.AddDays(-1)
+            ),
+            SoftwareVulnerabilityMatch.Create(
+                _tenantId,
+                newSnapshotId,
+                software.Id,
+                vulnerability.Id,
+                SoftwareVulnerabilityMatchMethod.CpeBinding,
+                MatchConfidence.High,
+                "new-match",
+                observedAt
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        await _service.SyncTenantAsync(_tenantId, newSnapshotId, CancellationToken.None);
+
+        var currentTenantSoftware = await _dbContext
+            .TenantSoftware.IgnoreQueryFilters()
+            .SingleAsync(item => item.TenantId == _tenantId && item.SnapshotId == newSnapshotId);
+        var currentProjection = await _dbContext
+            .NormalizedSoftwareVulnerabilityProjections.IgnoreQueryFilters()
+            .SingleAsync(item => item.TenantId == _tenantId && item.SnapshotId == newSnapshotId);
+
+        currentProjection.TenantSoftwareId.Should().Be(currentTenantSoftware.Id);
+        currentProjection.AffectedInstallCount.Should().Be(1);
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

@@ -548,19 +548,6 @@ public class SoftwareController(
         {
             return NotFound();
         }
-        var projections = await dbContext
-            .NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
-            .Where(item => item.TenantSoftwareId == id && item.SnapshotId == activeSnapshotId)
-            .Join(
-                dbContext.VulnerabilityDefinitions.AsNoTracking(),
-                projection => projection.VulnerabilityDefinitionId,
-                vulnerabilityDefinition => vulnerabilityDefinition.Id,
-                (projection, vulnerabilityDefinition) => new { projection, vulnerabilityDefinition }
-            )
-            .OrderByDescending(item => item.vulnerabilityDefinition.CvssScore)
-            .ThenByDescending(item => item.vulnerabilityDefinition.PublishedDate)
-            .ToListAsync(ct);
-
         var tenantVulnerabilityIdsByDefinitionId = await dbContext
             .TenantVulnerabilities.AsNoTracking()
             .Where(item => item.TenantId == tenantSoftware.TenantId)
@@ -583,20 +570,42 @@ public class SoftwareController(
                 match.SnapshotId == activeSnapshotId
                 && relevantSoftwareAssetIds.Contains(match.SoftwareAssetId)
             )
-            .Select(match => new { match.SoftwareAssetId, match.VulnerabilityDefinitionId, match.ResolvedAt })
+            .Select(match => new
+            {
+                match.SoftwareAssetId,
+                match.VulnerabilityDefinitionId,
+                match.ResolvedAt,
+                match.MatchMethod,
+                match.Confidence,
+                match.Evidence,
+                match.FirstSeenAt,
+                match.LastSeenAt,
+            })
+            .ToListAsync(ct);
+
+        var vulnerabilities = await dbContext
+            .VulnerabilityDefinitions.AsNoTracking()
+            .Where(item =>
+                openMatches.Select(match => match.VulnerabilityDefinitionId).Contains(item.Id)
+            )
+            .OrderByDescending(item => item.CvssScore)
+            .ThenByDescending(item => item.PublishedDate)
             .ToListAsync(ct);
 
         return Ok(
-            projections
-                .Select(item =>
+            vulnerabilities
+                .Select(vulnerability =>
                 {
                     var relatedSoftwareAssetIds = openMatches
-                        .Where(match => match.VulnerabilityDefinitionId == item.projection.VulnerabilityDefinitionId)
-                        .Where(match =>
-                            item.projection.ResolvedAt is null || match.ResolvedAt is null
-                        )
+                        .Where(match => match.VulnerabilityDefinitionId == vulnerability.Id)
+                        .Where(match => match.ResolvedAt is null)
                         .Select(match => match.SoftwareAssetId)
                         .ToHashSet();
+                    if (relatedSoftwareAssetIds.Count == 0)
+                    {
+                        return null;
+                    }
+
                     var affectedVersions = activeInstallations
                         .Where(installation =>
                             relatedSoftwareAssetIds.Contains(installation.SoftwareAssetId)
@@ -608,31 +617,65 @@ public class SoftwareController(
                         .OrderBy(version => version, StringComparer.OrdinalIgnoreCase)
                         .ToList();
 
-                    var tenantVulnerabilityId = tenantVulnerabilityIdsByDefinitionId[
-                        item.projection.VulnerabilityDefinitionId
-                    ];
+                    if (!tenantVulnerabilityIdsByDefinitionId.TryGetValue(vulnerability.Id, out var tenantVulnerabilityId))
+                    {
+                        return null;
+                    }
+
+                    var relatedMatches = openMatches
+                        .Where(match =>
+                            match.VulnerabilityDefinitionId == vulnerability.Id && match.ResolvedAt is null
+                        )
+                        .ToList();
+                    var bestMatch = relatedMatches
+                        .OrderByDescending(match => GetMethodPriority(match.MatchMethod))
+                        .ThenByDescending(match => GetConfidencePriority(match.Confidence))
+                        .ThenByDescending(match => match.LastSeenAt)
+                        .First();
 
                     return new TenantSoftwareVulnerabilityDto(
                         tenantVulnerabilityId,
-                        item.vulnerabilityDefinition.Id,
-                        item.vulnerabilityDefinition.ExternalId,
-                        item.vulnerabilityDefinition.Title,
-                        item.vulnerabilityDefinition.VendorSeverity.ToString(),
-                        item.vulnerabilityDefinition.CvssScore,
-                        item.vulnerabilityDefinition.PublishedDate,
-                        item.vulnerabilityDefinition.Source,
-                        item.projection.BestMatchMethod.ToString(),
-                        item.projection.BestConfidence.ToString(),
-                        item.projection.AffectedInstallCount,
-                        item.projection.AffectedDeviceCount,
-                        item.projection.AffectedVersionCount,
+                        vulnerability.Id,
+                        vulnerability.ExternalId,
+                        vulnerability.Title,
+                        vulnerability.VendorSeverity.ToString(),
+                        vulnerability.CvssScore,
+                        vulnerability.PublishedDate,
+                        vulnerability.Source,
+                        bestMatch.MatchMethod.ToString(),
+                        bestMatch.Confidence.ToString(),
+                        relatedMatches.Select(match => match.SoftwareAssetId).Distinct().Count(),
+                        activeInstallations
+                            .Where(installation =>
+                                relatedSoftwareAssetIds.Contains(installation.SoftwareAssetId)
+                            )
+                            .Select(installation => installation.DeviceAssetId)
+                            .Distinct()
+                            .Count(),
+                        affectedVersions.Count,
                         affectedVersions,
-                        item.projection.FirstSeenAt,
-                        item.projection.LastSeenAt,
-                        item.projection.ResolvedAt,
-                        ParseEvidence(item.projection.EvidenceJson)
+                        relatedMatches.Min(match => match.FirstSeenAt),
+                        relatedMatches.Max(match => match.LastSeenAt),
+                        null,
+                        relatedMatches
+                            .OrderByDescending(match => GetMethodPriority(match.MatchMethod))
+                            .ThenByDescending(match => GetConfidencePriority(match.Confidence))
+                            .ThenByDescending(match => match.LastSeenAt)
+                            .Select(match =>
+                                new TenantSoftwareVulnerabilityEvidenceDto(
+                                    match.MatchMethod.ToString(),
+                                    match.Confidence.ToString(),
+                                    match.Evidence,
+                                    match.FirstSeenAt,
+                                    match.LastSeenAt,
+                                    match.ResolvedAt
+                                )
+                            )
+                            .ToList()
                     );
                 })
+                .Where(item => item is not null)
+                .Cast<TenantSoftwareVulnerabilityDto>()
                 .ToList()
         );
     }
@@ -713,19 +756,6 @@ public class SoftwareController(
             })
             .ToListAsync(ct);
 
-        var projections = await dbContext
-            .NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
-            .Where(item => item.TenantSoftwareId == id && item.SnapshotId == activeSnapshotId)
-            .Join(
-                dbContext.VulnerabilityDefinitions.AsNoTracking(),
-                projection => projection.VulnerabilityDefinitionId,
-                vulnerabilityDefinition => vulnerabilityDefinition.Id,
-                (projection, vulnerabilityDefinition) => new { projection, vulnerabilityDefinition }
-            )
-            .OrderByDescending(item => item.vulnerabilityDefinition.CvssScore)
-            .ThenByDescending(item => item.vulnerabilityDefinition.PublishedDate)
-            .ToListAsync(ct);
-
         var tenantVulnerabilityIdsByDefinitionId = await dbContext
             .TenantVulnerabilities.AsNoTracking()
             .Where(item => item.TenantId == tenantSoftware.TenantId)
@@ -749,20 +779,33 @@ public class SoftwareController(
                 match.SoftwareAssetId,
                 match.VulnerabilityDefinitionId,
                 match.ResolvedAt,
+                match.MatchMethod,
+                match.Confidence,
                 Method = match.MatchMethod.ToString(),
-                Confidence = match.Confidence.ToString(),
+                ConfidenceLabel = match.Confidence.ToString(),
                 match.Evidence,
                 match.FirstSeenAt,
                 match.LastSeenAt,
             })
             .ToListAsync(ct);
 
-        var vulnerabilityPayload = projections.Select(item =>
+        var vulnerabilities = await dbContext
+            .VulnerabilityDefinitions.AsNoTracking()
+            .Where(item => matches.Select(match => match.VulnerabilityDefinitionId).Contains(item.Id))
+            .OrderByDescending(item => item.CvssScore)
+            .ThenByDescending(item => item.PublishedDate)
+            .ToListAsync(ct);
+
+        var vulnerabilityPayload = vulnerabilities.Select(vulnerability =>
         {
             var relatedMatches = matches
-                .Where(match => match.VulnerabilityDefinitionId == item.projection.VulnerabilityDefinitionId)
-                .Where(match => item.projection.ResolvedAt is null || match.ResolvedAt is null)
+                .Where(match => match.VulnerabilityDefinitionId == vulnerability.Id && match.ResolvedAt is null)
                 .ToList();
+            if (relatedMatches.Count == 0)
+            {
+                return null;
+            }
+
             var relatedSoftwareAssetIds = relatedMatches.Select(match => match.SoftwareAssetId).ToHashSet();
             var affectedVersions = activeInstallations
                 .Where(installation => relatedSoftwareAssetIds.Contains(installation.SoftwareAssetId))
@@ -772,37 +815,53 @@ public class SoftwareController(
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(version => version, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            if (!tenantVulnerabilityIdsByDefinitionId.TryGetValue(vulnerability.Id, out var tenantVulnerabilityId))
+            {
+                return null;
+            }
+
+            var bestMatch = relatedMatches
+                .OrderByDescending(match => GetMethodPriority(match.MatchMethod))
+                .ThenByDescending(match => GetConfidencePriority(match.Confidence))
+                .ThenByDescending(match => match.LastSeenAt)
+                .First();
 
             return new
             {
-                TenantVulnerabilityId = tenantVulnerabilityIdsByDefinitionId[item.projection.VulnerabilityDefinitionId],
-                item.vulnerabilityDefinition.Id,
-                item.vulnerabilityDefinition.ExternalId,
-                item.vulnerabilityDefinition.Title,
-                VendorSeverity = item.vulnerabilityDefinition.VendorSeverity.ToString(),
-                item.vulnerabilityDefinition.CvssScore,
-                item.vulnerabilityDefinition.PublishedDate,
-                item.vulnerabilityDefinition.Source,
-                BestMatchMethod = item.projection.BestMatchMethod.ToString(),
-                BestConfidence = item.projection.BestConfidence.ToString(),
-                item.projection.AffectedInstallCount,
-                item.projection.AffectedDeviceCount,
-                item.projection.AffectedVersionCount,
+                TenantVulnerabilityId = tenantVulnerabilityId,
+                vulnerability.Id,
+                vulnerability.ExternalId,
+                vulnerability.Title,
+                VendorSeverity = vulnerability.VendorSeverity.ToString(),
+                vulnerability.CvssScore,
+                vulnerability.PublishedDate,
+                vulnerability.Source,
+                BestMatchMethod = bestMatch.MatchMethod.ToString(),
+                BestConfidence = bestMatch.Confidence.ToString(),
+                AffectedInstallCount = relatedMatches.Select(match => match.SoftwareAssetId).Distinct().Count(),
+                AffectedDeviceCount = activeInstallations
+                    .Where(installation => relatedSoftwareAssetIds.Contains(installation.SoftwareAssetId))
+                    .Select(installation => installation.DeviceAssetId)
+                    .Distinct()
+                    .Count(),
+                AffectedVersionCount = affectedVersions.Count,
                 AffectedVersions = affectedVersions,
-                item.projection.FirstSeenAt,
-                item.projection.LastSeenAt,
-                item.projection.ResolvedAt,
+                FirstSeenAt = relatedMatches.Min(match => match.FirstSeenAt),
+                LastSeenAt = relatedMatches.Max(match => match.LastSeenAt),
+                ResolvedAt = (DateTimeOffset?)null,
                 Evidence = relatedMatches.Select(match => new
                 {
                     match.Method,
-                    match.Confidence,
+                    Confidence = match.ConfidenceLabel,
                     match.Evidence,
                     match.FirstSeenAt,
                     match.LastSeenAt,
                     match.ResolvedAt,
                 }),
             };
-        });
+        })
+            .Where(item => item is not null)
+            .ToList();
 
         var versionSummary = activeInstallations
             .GroupBy(item => string.IsNullOrWhiteSpace(item.DetectedVersion) ? "Unknown" : item.DetectedVersion!)
@@ -845,7 +904,7 @@ public class SoftwareController(
                 VulnerableInstallCount = activeInstallations.Count(item =>
                     matches.Any(match => match.SoftwareAssetId == item.SoftwareAssetId && match.ResolvedAt == null)
                 ),
-                ActiveVulnerabilityCount = projections.Count(item => item.projection.ResolvedAt == null),
+                ActiveVulnerabilityCount = vulnerabilityPayload.Count,
             },
             aliases,
             installationSummary = new
@@ -904,7 +963,7 @@ public class SoftwareController(
                     tenantSoftware.CanonicalVendor,
                     tenantSoftware.CanonicalName,
                     tenantSoftware.PrimaryCpe23Uri,
-                    projections.Select(item => item.vulnerabilityDefinition.ExternalId).ToList()
+                    vulnerabilities.Select(item => item.ExternalId).ToList()
                 );
                 var researchResult = await tenantAiResearchService.ResearchAsync(
                     resolvedProfile,
@@ -1007,6 +1066,26 @@ public class SoftwareController(
     private static string? RestoreVersion(string versionKey)
     {
         return string.IsNullOrWhiteSpace(versionKey) ? null : versionKey;
+    }
+
+    private static int GetMethodPriority(SoftwareVulnerabilityMatchMethod method)
+    {
+        return method switch
+        {
+            SoftwareVulnerabilityMatchMethod.DefenderDirect => 200,
+            SoftwareVulnerabilityMatchMethod.CpeBinding => 100,
+            _ => 0,
+        };
+    }
+
+    private static int GetConfidencePriority(MatchConfidence confidence)
+    {
+        return confidence switch
+        {
+            MatchConfidence.High => 30,
+            MatchConfidence.Medium => 20,
+            _ => 10,
+        };
     }
 
     private async Task<Guid?> ResolveActiveSoftwareSnapshotIdAsync(
