@@ -636,6 +636,7 @@ public class TenantsController : ControllerBase
     private static TenantIngestionSourceDto MapSourceDto(
         TenantSourceConfiguration source,
         IngestionCheckpoint? activeCheckpoint,
+        IngestionRun? activeRun,
         IngestionSnapshot? activeSnapshot,
         IngestionSnapshot? buildingSnapshot,
         IReadOnlyList<TenantIngestionRunDto> recentRuns
@@ -669,7 +670,13 @@ public class TenantsController : ControllerBase
                 activeCheckpoint?.BatchNumber,
                 activeCheckpoint?.Status,
                 activeCheckpoint?.RecordsCommitted,
-                activeCheckpoint?.LastCommittedAt
+                activeCheckpoint?.LastCommittedAt,
+                activeRun?.StagedMachineCount,
+                activeRun?.StagedVulnerabilityCount,
+                activeRun?.StagedSoftwareCount,
+                activeRun?.PersistedMachineCount,
+                activeRun?.PersistedVulnerabilityCount,
+                activeRun?.PersistedSoftwareCount
             ),
             recentRuns
         );
@@ -746,6 +753,9 @@ public class TenantsController : ControllerBase
                     .Where(run => run.TenantId == tenantId && sourceKeys.Contains(run.SourceKey))
                     .OrderByDescending(run => run.StartedAt)
                     .ToListAsync(ct);
+        var activeRunsById = recentRuns
+            .Where(run => activeRunIds.Contains(run.Id))
+            .ToDictionary(run => run.Id);
         var checkpointRunIds = recentRuns
             .Select(run => run.Id)
             .Concat(activeRunIds)
@@ -833,6 +843,9 @@ public class TenantsController : ControllerBase
                         source.ActiveIngestionRunId.HasValue
                             ? latestCheckpointsByRunId.GetValueOrDefault(source.ActiveIngestionRunId.Value)
                             : null,
+                        source.ActiveIngestionRunId.HasValue
+                            ? activeRunsById.GetValueOrDefault(source.ActiveIngestionRunId.Value)
+                            : null,
                         source.ActiveSnapshotId.HasValue
                             ? snapshotsById.GetValueOrDefault(source.ActiveSnapshotId.Value)
                             : null,
@@ -843,6 +856,66 @@ public class TenantsController : ControllerBase
                     )
                 )
                 .ToList()
+        );
+    }
+
+    [HttpGet("{id:guid}/ingestion-sources/{sourceKey}/runs/{runId:guid}/progress")]
+    [Authorize(Policy = Policies.ConfigureTenant)]
+    public async Task<ActionResult<TenantIngestionRunDto>> GetRunProgress(
+        Guid id,
+        string sourceKey,
+        Guid runId,
+        CancellationToken ct
+    )
+    {
+        if (!_tenantContext.HasAccessToTenant(id))
+            return Forbid();
+
+        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+        var run = await _dbContext
+            .IngestionRuns.AsNoTracking()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(
+                item => item.Id == runId && item.TenantId == id && item.SourceKey == normalizedSourceKey,
+                ct
+            );
+
+        if (run is null)
+            return NotFound();
+
+        var snapshot = await _dbContext
+            .IngestionSnapshots.AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == runId)
+            .OrderByDescending(item => item.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+        var checkpoint = await _dbContext
+            .IngestionCheckpoints.AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == runId)
+            .OrderByDescending(item => item.LastCommittedAt)
+            .FirstOrDefaultAsync(ct);
+
+        return Ok(
+            new TenantIngestionRunDto(
+                run.Id,
+                run.StartedAt,
+                run.CompletedAt,
+                run.Status,
+                run.StagedMachineCount,
+                run.StagedVulnerabilityCount,
+                run.StagedSoftwareCount,
+                run.PersistedMachineCount,
+                run.PersistedVulnerabilityCount,
+                run.PersistedSoftwareCount,
+                run.Error,
+                snapshot?.Status,
+                checkpoint?.Phase,
+                checkpoint?.BatchNumber,
+                checkpoint?.Status,
+                checkpoint?.RecordsCommitted,
+                checkpoint?.LastCommittedAt
+            )
         );
     }
 }

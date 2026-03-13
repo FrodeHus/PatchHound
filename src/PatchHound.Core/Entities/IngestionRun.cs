@@ -68,6 +68,20 @@ public class IngestionRun
         Error = error;
     }
 
+    public void UpdateVulnerabilityMergeProgress(
+        int stagedVulnerabilityCount,
+        int persistedVulnerabilityCount
+    )
+    {
+        if (CompletedAt.HasValue)
+        {
+            return;
+        }
+
+        StagedVulnerabilityCount = stagedVulnerabilityCount;
+        PersistedVulnerabilityCount = persistedVulnerabilityCount;
+    }
+
     public void CompleteSucceeded(
         DateTimeOffset completedAt,
         int stagedMachineCount,

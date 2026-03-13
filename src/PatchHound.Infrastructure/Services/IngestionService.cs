@@ -1921,8 +1921,51 @@ public class IngestionService
             sourceKey,
             snapshotId,
             sourceName,
+            UpdateVulnerabilityMergeProgressAsync,
             ct
         );
+
+        async Task UpdateVulnerabilityMergeProgressAsync(
+            int stagedVulnerabilityCount,
+            int persistedVulnerabilityCount,
+            CancellationToken callbackCt
+        )
+        {
+            if (_dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+            {
+                var run = await _dbContext
+                    .IngestionRuns.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(item => item.Id == ingestionRunId, callbackCt);
+                if (run is null)
+                {
+                    return;
+                }
+
+                run.UpdateVulnerabilityMergeProgress(
+                    stagedVulnerabilityCount,
+                    persistedVulnerabilityCount
+                );
+                await _dbContext.SaveChangesAsync(callbackCt);
+                return;
+            }
+
+            await _dbContext
+                .IngestionRuns.IgnoreQueryFilters()
+                .Where(item => item.Id == ingestionRunId && !item.CompletedAt.HasValue)
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(
+                                item => item.StagedVulnerabilityCount,
+                                stagedVulnerabilityCount
+                            )
+                            .SetProperty(
+                                item => item.PersistedVulnerabilityCount,
+                                persistedVulnerabilityCount
+                            ),
+                    callbackCt
+                );
+        }
     }
 
     internal async Task ProcessAssetsAsync(

@@ -796,9 +796,13 @@ function describeSourceActivity(source: TenantIngestionSourceDraft) {
     return {
       title,
       description: `Lease active until ${formatTimestamp(source.runtime.leaseExpiresAt)}. Latest checkpoint ${formatTimestamp(source.runtime.activeCheckpointCommittedAt)}.`,
-      metricsSummary: latestRun
-        ? `${latestRun.stagedSoftwareCount} staged software · ${latestRun.persistedSoftwareCount} persisted software`
-        : null,
+      metricsSummary:
+        source.runtime.activeStagedVulnerabilityCount !== null &&
+        source.runtime.activePersistedVulnerabilityCount !== null
+          ? `${source.runtime.activePersistedVulnerabilityCount}/${source.runtime.activeStagedVulnerabilityCount} vulnerabilities merged`
+          : latestRun
+            ? `${latestRun.persistedVulnerabilityCount}/${latestRun.stagedVulnerabilityCount} vulnerabilities merged`
+            : null,
       snapshotSummary: buildingSnapshotSummary ?? activeSnapshotSummary,
       phase: formatPhase(source.runtime.activePhase),
       batch:

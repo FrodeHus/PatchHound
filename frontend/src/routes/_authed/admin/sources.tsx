@@ -33,6 +33,14 @@ function SourcesAdministrationPage() {
     queryKey: ['tenant-detail', selectedTenantId],
     queryFn: () => fetchTenantDetail({ data: { tenantId: selectedTenantId! } }),
     enabled: activeView === 'tenant' && Boolean(selectedTenantId),
+    refetchInterval: (query) => {
+      const tenant = query.state.data
+      if (!tenant) {
+        return false
+      }
+
+      return tenant.ingestionSources.some((source) => source.runtime.activeIngestionRunId) ? 3000 : false
+    },
   })
   const enrichmentQuery = useQuery({
     queryKey: ['enrichment-sources'],

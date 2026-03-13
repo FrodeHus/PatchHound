@@ -25,6 +25,12 @@ export const tenantIngestionRuntimeSchema = z.object({
   activeCheckpointStatus: z.string().nullable(),
   activeRecordsCommitted: z.number().nullable(),
   activeCheckpointCommittedAt: nullableIsoDateTimeSchema,
+  activeStagedMachineCount: z.number().nullable(),
+  activeStagedVulnerabilityCount: z.number().nullable(),
+  activeStagedSoftwareCount: z.number().nullable(),
+  activePersistedMachineCount: z.number().nullable(),
+  activePersistedVulnerabilityCount: z.number().nullable(),
+  activePersistedSoftwareCount: z.number().nullable(),
 })
 
 export const tenantIngestionRunSchema = z.object({

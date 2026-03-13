@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
 import { RotateCw, Square, Trash2 } from 'lucide-react'
 import {
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import { DataTableActiveFilters } from '@/components/ui/data-table-workbench'
+import { useSSE } from '@/hooks/useSSE'
 import { cn } from '@/lib/utils'
 
 type SourceRunHistoryViewProps = {
@@ -43,6 +44,7 @@ export function SourceRunHistoryView({
   sourceDisplayName,
 }: SourceRunHistoryViewProps) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [filter, setFilter] = useState<RunFilter>('all')
@@ -107,6 +109,39 @@ export function SourceRunHistoryView({
 
   const data = runsQuery.data
   const runs = data?.items ?? []
+  const activeRun = runs.find((run) => getRunCategory(run.status) === 'active') ?? null
+
+  useSSE(
+    'IngestionRunProgress',
+    (payload) => {
+      if (!payload || typeof payload !== 'object' || !('id' in payload)) {
+        return
+      }
+
+      const progress = payload as TenantIngestionRun
+      queryClient.setQueryData(
+        ['tenant-ingestion-runs', tenantId, sourceKey, page, pageSize],
+        (current: typeof data | undefined) => {
+          if (!current) {
+            return current
+          }
+
+          return {
+            ...current,
+            items: current.items.map((item) => (item.id === progress.id ? { ...item, ...progress } : item)),
+          }
+        },
+      )
+    },
+    {
+      enabled: Boolean(activeRun),
+      url:
+        activeRun
+          ? `/api/ingestion-run-events?tenantId=${encodeURIComponent(tenantId)}&sourceKey=${encodeURIComponent(sourceKey)}&runId=${encodeURIComponent(activeRun.id)}`
+          : undefined,
+    },
+  )
+
   const filteredRuns = runs.filter((run) => matchesRunFilter(run, filter))
   const succeededRuns = runs.filter((run) => getRunTone(run.status) === 'success').length
   const failedRuns = runs.filter((run) => getRunTone(run.status) === 'error').length
