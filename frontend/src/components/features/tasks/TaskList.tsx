@@ -1,14 +1,14 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { RemediationTask } from '@/api/tasks.schemas'
 import { TaskStatusUpdate } from '@/components/features/tasks/TaskStatusUpdate'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
 import {
   DataTableActiveFilters,
   DataTableEmptyState,
   DataTableField,
-  DataTableFilterBar,
   DataTableSummaryStrip,
   DataTableToolbar,
   DataTableToolbarRow,
@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
 import { taskListStatusOptions } from '@/lib/options/tasks'
 
 type TaskListProps = {
@@ -33,6 +34,7 @@ type TaskListProps = {
   statusFilter: string
   isUpdating: boolean
   onStatusFilterChange: (value: string) => void
+  onApplyStructuredFilters: (filters: { status: string }) => void
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
   onClearFilters: () => void
@@ -59,11 +61,21 @@ export function TaskList({
   statusFilter,
   isUpdating,
   onStatusFilterChange,
+  onApplyStructuredFilters,
   onPageChange,
   onPageSizeChange,
   onClearFilters,
   onUpdateStatus,
 }: TaskListProps) {
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
+  const [draftFilters, setDraftFilters] = useState({ status: statusFilter })
+
+  useEffect(() => {
+    if (!isFilterDrawerOpen) {
+      setDraftFilters({ status: statusFilter })
+    }
+  }, [isFilterDrawerOpen, statusFilter])
+
   const summaryItems = useMemo(() => {
     const overdue = tasks.filter((task) => task.isOverdue).length
     const dueSoon = tasks.filter((task) => !task.isOverdue && getDueSoon(task)).length
@@ -171,6 +183,8 @@ export function TaskList({
     [onStatusFilterChange, statusFilter],
   )
 
+  const activeStructuredFilterCount = statusFilter ? 1 : 0
+
   return (
     <DataTableWorkbench
       title="Remediation Tasks"
@@ -180,15 +194,48 @@ export function TaskList({
       <DataTableToolbar>
         <DataTableToolbarRow>
           <DataTableSummaryStrip items={summaryItems} className="flex-1" />
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 rounded-xl border-border/70 bg-background/80 px-4"
+            onClick={() => {
+              setDraftFilters({ status: statusFilter })
+              setIsFilterDrawerOpen(true)
+            }}
+          >
+            {activeStructuredFilterCount > 0 ? `Filters (${activeStructuredFilterCount})` : 'Filters...'}
+          </Button>
         </DataTableToolbarRow>
 
-        <DataTableFilterBar className="lg:grid-cols-[minmax(220px,0.8fr)]">
+        <DataTableToolbarRow>
+          <DataTableActiveFilters filters={activeFilters} onClearAll={onClearFilters} className="flex-1" />
+        </DataTableToolbarRow>
+      </DataTableToolbar>
+
+      <WorkbenchFilterDrawer
+        open={isFilterDrawerOpen}
+        onOpenChange={setIsFilterDrawerOpen}
+        title="Task Filters"
+        description="Focus the remediation queue by task state while keeping the update workflow in view."
+        activeCount={activeStructuredFilterCount}
+        onResetDraft={() => {
+          setDraftFilters({ status: '' })
+        }}
+        onApply={() => {
+          onApplyStructuredFilters(draftFilters)
+          setIsFilterDrawerOpen(false)
+        }}
+      >
+        <WorkbenchFilterSection
+          title="Status"
+          description="Narrow the remediation queue to the stage you want to work through right now."
+        >
           <DataTableField label="Status">
             <Select
-              value={statusFilter || 'all'}
+              value={draftFilters.status || 'all'}
               onValueChange={(value) => {
                 const nextValue = value ?? 'all'
-                onStatusFilterChange(nextValue === 'all' ? '' : nextValue)
+                setDraftFilters({ status: nextValue === 'all' ? '' : nextValue })
               }}
             >
               <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
@@ -204,12 +251,8 @@ export function TaskList({
               </SelectContent>
             </Select>
           </DataTableField>
-        </DataTableFilterBar>
-
-        <DataTableToolbarRow>
-          <DataTableActiveFilters filters={activeFilters} onClearAll={onClearFilters} className="flex-1" />
-        </DataTableToolbarRow>
-      </DataTableToolbar>
+        </WorkbenchFilterSection>
+      </WorkbenchFilterDrawer>
 
       {tasks.length === 0 ? (
         <DataTableEmptyState

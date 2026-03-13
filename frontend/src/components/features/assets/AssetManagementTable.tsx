@@ -5,7 +5,6 @@ import {
   DataTableActiveFilters,
   DataTableEmptyState,
   DataTableField,
-  DataTableFilterBar,
   DataTableToolbar,
   DataTableToolbarRow,
   DataTableWorkbench,
@@ -23,6 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SearchIcon } from 'lucide-react'
+import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
 
 type AssetManagementTableProps = {
   assets: Asset[]
@@ -36,12 +36,21 @@ type AssetManagementTableProps = {
   assetTypeFilter: string
   criticalityFilter: string
   ownerTypeFilter: string
+  deviceGroupFilter: string
   unassignedOnly: boolean
   onSearchChange: (search: string) => void
   onAssetTypeFilterChange: (assetType: string) => void
   onCriticalityFilterChange: (criticality: string) => void
   onOwnerTypeFilterChange: (ownerType: string) => void
+  onDeviceGroupFilterChange: (deviceGroup: string) => void
   onUnassignedOnlyChange: (value: boolean) => void
+  onApplyStructuredFilters: (filters: {
+    assetType: string
+    criticality: string
+    ownerType: string
+    deviceGroup: string
+    unassignedOnly: boolean
+  }) => void
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
   onClearFilters: () => void
@@ -69,12 +78,15 @@ export function AssetManagementTable({
   assetTypeFilter,
   criticalityFilter,
   ownerTypeFilter,
+  deviceGroupFilter,
   unassignedOnly,
   onSearchChange,
   onAssetTypeFilterChange,
   onCriticalityFilterChange,
   onOwnerTypeFilterChange,
+  onDeviceGroupFilterChange,
   onUnassignedOnlyChange,
+  onApplyStructuredFilters,
   onPageChange,
   onPageSizeChange,
   onClearFilters,
@@ -85,6 +97,14 @@ export function AssetManagementTable({
   const [ownerType, setOwnerType] = useState<"User" | "Team">("User");
   const [ownerId, setOwnerId] = useState("");
   const [searchInput, setSearchInput] = useState(searchValue);
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
+  const [draftFilters, setDraftFilters] = useState({
+    assetType: assetTypeFilter,
+    criticality: criticalityFilter,
+    ownerType: ownerTypeFilter,
+    deviceGroup: deviceGroupFilter,
+    unassignedOnly,
+  })
 
   useEffect(() => {
     setSearchInput(searchValue);
@@ -101,6 +121,18 @@ export function AssetManagementTable({
       window.clearTimeout(timeoutId);
     };
   }, [onSearchChange, searchInput, searchValue]);
+
+  useEffect(() => {
+    if (!isFilterDrawerOpen) {
+      setDraftFilters({
+        assetType: assetTypeFilter,
+        criticality: criticalityFilter,
+        ownerType: ownerTypeFilter,
+        deviceGroup: deviceGroupFilter,
+        unassignedOnly,
+      })
+    }
+  }, [assetTypeFilter, criticalityFilter, deviceGroupFilter, isFilterDrawerOpen, ownerTypeFilter, unassignedOnly])
 
   const activeFilters = useMemo(
     () =>
@@ -144,6 +176,15 @@ export function AssetManagementTable({
               },
             }
           : null,
+        deviceGroupFilter
+          ? {
+              key: "deviceGroup",
+              label: `Device Group: ${deviceGroupFilter}`,
+              onClear: () => {
+                onDeviceGroupFilterChange("");
+              },
+            }
+          : null,
         unassignedOnly
           ? {
               key: "unassigned",
@@ -157,8 +198,10 @@ export function AssetManagementTable({
     [
       assetTypeFilter,
       criticalityFilter,
+      deviceGroupFilter,
       onAssetTypeFilterChange,
       onCriticalityFilterChange,
+      onDeviceGroupFilterChange,
       onOwnerTypeFilterChange,
       onSearchChange,
       onUnassignedOnlyChange,
@@ -167,6 +210,18 @@ export function AssetManagementTable({
       unassignedOnly,
     ],
   );
+
+  const activeStructuredFilterCount = useMemo(
+    () =>
+      [
+        assetTypeFilter,
+        criticalityFilter,
+        ownerTypeFilter,
+        deviceGroupFilter,
+        unassignedOnly ? 'unassigned' : '',
+      ].filter(Boolean).length,
+    [assetTypeFilter, criticalityFilter, deviceGroupFilter, ownerTypeFilter, unassignedOnly],
+  )
 
   const columns = useMemo<ColumnDef<Asset>[]>(
     () => [
@@ -200,6 +255,17 @@ export function AssetManagementTable({
           >
             {row.original.assetType}
           </Badge>
+        ),
+      },
+      {
+        accessorKey: "deviceGroupName",
+        header: "Device Group",
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {row.original.assetType === "Device"
+              ? row.original.deviceGroupName ?? "Unknown"
+              : "Not applicable"}
+          </span>
         ),
       },
       {
@@ -307,11 +373,11 @@ export function AssetManagementTable({
       totalCount={totalCount}
     >
       <DataTableToolbar>
-        <DataTableFilterBar>
+        <DataTableToolbarRow className="items-end gap-4">
           <DataTableField
             label="Search"
             hint="Matches displayed asset name, DNS name, and external ID."
-            className="lg:col-span-1"
+            className="flex-1"
           >
             <div className="relative">
               <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -325,90 +391,24 @@ export function AssetManagementTable({
               />
             </div>
           </DataTableField>
-
-          <DataTableField label="Type">
-            <Select
-              value={assetTypeFilter || "all"}
-              onValueChange={(value) => {
-                const nextValue = value ?? "all";
-                onAssetTypeFilterChange(nextValue === "all" ? "" : nextValue);
-              }}
-            >
-              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
-                <SelectValue placeholder="Any asset type" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                {assetTypeOptions.map((option) => (
-                  <SelectItem
-                    key={option}
-                    value={option === "All" ? "all" : option}
-                  >
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </DataTableField>
-
-          <DataTableField label="Criticality">
-            <Select
-              value={criticalityFilter || "all"}
-              onValueChange={(value) => {
-                const nextValue = value ?? "all";
-                onCriticalityFilterChange(nextValue === "all" ? "" : nextValue);
-              }}
-            >
-              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
-                <SelectValue placeholder="Any criticality" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                <SelectItem value="all">Any criticality</SelectItem>
-                {criticalityOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </DataTableField>
-
-          <DataTableField label="Ownership">
-            <div className="flex h-10 items-center gap-3 rounded-xl border border-border/70 bg-background/80 px-3">
-              <Select
-                value={ownerTypeFilter || "all"}
-                onValueChange={(value) => {
-                  const nextValue = value ?? "all";
-                  onOwnerTypeFilterChange(nextValue === "all" ? "" : nextValue);
-                }}
-              >
-                <SelectTrigger className="h-8 min-w-0 flex-1 rounded-lg border-none bg-transparent px-0 shadow-none">
-                  <SelectValue placeholder="Any ownership" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                  {ownershipFilterOptions.map((option) => (
-                    <SelectItem
-                      key={option.label}
-                      value={option.value || "all"}
-                    >
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={unassignedOnly}
-                  onChange={(event) => {
-                    onUnassignedOnlyChange(event.target.checked);
-                  }}
-                  className="size-4 rounded border-border/70"
-                />
-                <span>Unassigned</span>
-              </label>
-            </div>
-          </DataTableField>
-        </DataTableFilterBar>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 rounded-xl border-border/70 bg-background/80 px-4"
+            onClick={() => {
+              setDraftFilters({
+                assetType: assetTypeFilter,
+                criticality: criticalityFilter,
+                ownerType: ownerTypeFilter,
+                deviceGroup: deviceGroupFilter,
+                unassignedOnly,
+              })
+              setIsFilterDrawerOpen(true)
+            }}
+          >
+            {activeStructuredFilterCount > 0 ? `Filters (${activeStructuredFilterCount})` : 'Filters...'}
+          </Button>
+        </DataTableToolbarRow>
 
         <DataTableToolbarRow className="gap-4">
           <DataTableActiveFilters
@@ -448,6 +448,147 @@ export function AssetManagementTable({
           </div>
         </DataTableToolbarRow>
       </DataTableToolbar>
+
+      <WorkbenchFilterDrawer
+        open={isFilterDrawerOpen}
+        onOpenChange={setIsFilterDrawerOpen}
+        title="Asset Filters"
+        description="Apply inventory, ownership, and risk filters without crowding the workbench."
+        activeCount={activeStructuredFilterCount}
+        onResetDraft={() => {
+          setDraftFilters({
+            assetType: '',
+            criticality: '',
+            ownerType: '',
+            deviceGroup: '',
+            unassignedOnly: false,
+          })
+        }}
+        onApply={() => {
+          onApplyStructuredFilters(draftFilters)
+          setIsFilterDrawerOpen(false)
+        }}
+      >
+        <WorkbenchFilterSection
+          title="Inventory"
+          description="Narrow the device and software estate to the inventory slice you want to inspect."
+        >
+          <DataTableField label="Type">
+            <Select
+              value={draftFilters.assetType || "all"}
+              onValueChange={(value) => {
+                const nextValue = value ?? "all";
+                setDraftFilters((current) => ({
+                  ...current,
+                  assetType: nextValue === "all" ? "" : nextValue,
+                }))
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any asset type" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                {assetTypeOptions.map((option) => (
+                  <SelectItem key={option} value={option === "All" ? "all" : option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
+
+          <DataTableField
+            label="Device Group"
+            hint="Matches Defender device group name or immutable group ID."
+          >
+            <Input
+              value={draftFilters.deviceGroup}
+              onChange={(event) => {
+                setDraftFilters((current) => ({
+                  ...current,
+                  deviceGroup: event.target.value,
+                }))
+              }}
+              placeholder="Filter device group"
+              className="h-10 rounded-xl border-border/70 bg-background/80"
+            />
+          </DataTableField>
+        </WorkbenchFilterSection>
+
+        <WorkbenchFilterSection
+          title="Ownership"
+          description="Focus on assets by ownership model or isolate items that still need routing."
+        >
+          <DataTableField label="Owner Type">
+            <Select
+              value={draftFilters.ownerType || "all"}
+              onValueChange={(value) => {
+                const nextValue = value ?? "all";
+                setDraftFilters((current) => ({
+                  ...current,
+                  ownerType: nextValue === "all" ? "" : nextValue,
+                }))
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any ownership" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                {ownershipFilterOptions.map((option) => (
+                  <SelectItem key={option.label} value={option.value || "all"}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
+
+          <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-3 text-sm">
+            <input
+              type="checkbox"
+              checked={draftFilters.unassignedOnly}
+              onChange={(event) => {
+                setDraftFilters((current) => ({
+                  ...current,
+                  unassignedOnly: event.target.checked,
+                }))
+              }}
+              className="size-4 rounded border-border/70"
+            />
+            <span>Show unassigned assets only</span>
+          </label>
+        </WorkbenchFilterSection>
+
+        <WorkbenchFilterSection
+          title="Risk"
+          description="Reduce the list to the criticality band you want to work on."
+        >
+          <DataTableField label="Criticality">
+            <Select
+              value={draftFilters.criticality || "all"}
+              onValueChange={(value) => {
+                const nextValue = value ?? "all";
+                setDraftFilters((current) => ({
+                  ...current,
+                  criticality: nextValue === "all" ? "" : nextValue,
+                }))
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any criticality" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any criticality</SelectItem>
+                {criticalityOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
+        </WorkbenchFilterSection>
+      </WorkbenchFilterDrawer>
 
       {assets.length === 0 ? (
         <DataTableEmptyState

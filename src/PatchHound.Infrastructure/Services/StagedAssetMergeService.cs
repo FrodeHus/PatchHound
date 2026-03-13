@@ -127,7 +127,9 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                             asset.DeviceRiskScore,
                             asset.DeviceLastSeenAt,
                             asset.DeviceLastIpAddress,
-                            asset.DeviceAadDeviceId
+                            asset.DeviceAadDeviceId,
+                            asset.DeviceGroupId,
+                            asset.DeviceGroupName
                         );
                     }
 
@@ -161,7 +163,13 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                         : existing.DeviceLastIpAddress,
                     asset.AssetType == AssetType.Device
                         ? asset.DeviceAadDeviceId
-                        : existing.DeviceAadDeviceId
+                        : existing.DeviceAadDeviceId,
+                    asset.AssetType == AssetType.Device
+                        ? asset.DeviceGroupId
+                        : existing.DeviceGroupId,
+                    asset.AssetType == AssetType.Device
+                        ? asset.DeviceGroupName
+                        : existing.DeviceGroupName
                 );
                 existing.UpdateDetails(asset.Name, asset.Description);
                 existing.UpdateMetadata(asset.Metadata);

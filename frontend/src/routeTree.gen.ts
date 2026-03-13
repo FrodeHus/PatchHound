@@ -16,6 +16,7 @@ import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthLogoutRouteImport } from './routes/auth/logout'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as ApiIngestionRunEventsRouteImport } from './routes/api/ingestion-run-events'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as AuthedVulnerabilitiesIndexRouteImport } from './routes/_authed/vulnerabilities/index'
 import { Route as AuthedTasksIndexRouteImport } from './routes/_authed/tasks/index'
@@ -69,6 +70,11 @@ const AuthLoginRoute = AuthLoginRouteImport.update({
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIngestionRunEventsRoute = ApiIngestionRunEventsRouteImport.update({
+  id: '/api/ingestion-run-events',
+  path: '/api/ingestion-run-events',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEventsRoute = ApiEventsRouteImport.update({
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/ingestion-run-events': typeof ApiIngestionRunEventsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
@@ -206,6 +213,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/ingestion-run-events': typeof ApiIngestionRunEventsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
@@ -236,6 +244,7 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/ingestion-run-events': typeof ApiIngestionRunEventsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
@@ -267,6 +276,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/api/events'
+    | '/api/ingestion-run-events'
     | '/auth/callback'
     | '/auth/login'
     | '/auth/logout'
@@ -294,6 +304,7 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/api/events'
+    | '/api/ingestion-run-events'
     | '/auth/callback'
     | '/auth/login'
     | '/auth/logout'
@@ -323,6 +334,7 @@ export interface FileRouteTypes {
     | '/_authed'
     | '/login'
     | '/api/events'
+    | '/api/ingestion-run-events'
     | '/auth/callback'
     | '/auth/login'
     | '/auth/logout'
@@ -353,6 +365,7 @@ export interface RootRouteChildren {
   AuthedRoute: typeof AuthedRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiEventsRoute: typeof ApiEventsRoute
+  ApiIngestionRunEventsRoute: typeof ApiIngestionRunEventsRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthLogoutRoute: typeof AuthLogoutRoute
@@ -409,6 +422,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/callback'
       fullPath: '/auth/callback'
       preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ingestion-run-events': {
+      id: '/api/ingestion-run-events'
+      path: '/api/ingestion-run-events'
+      fullPath: '/api/ingestion-run-events'
+      preLoaderRoute: typeof ApiIngestionRunEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/events': {
@@ -605,6 +625,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiEventsRoute: ApiEventsRoute,
+  ApiIngestionRunEventsRoute: ApiIngestionRunEventsRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthLogoutRoute: AuthLogoutRoute,

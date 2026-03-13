@@ -2305,7 +2305,9 @@ public class IngestionServiceTests : IDisposable
                     "High",
                     lastSeenAt,
                     "10.0.0.15",
-                    "aad-device-1"
+                    "aad-device-1",
+                    "rbac-group-1",
+                    "Tier 0 Servers"
                 ),
             ],
             []
@@ -2329,6 +2331,8 @@ public class IngestionServiceTests : IDisposable
         asset.DeviceLastSeenAt.Should().Be(lastSeenAt);
         asset.DeviceLastIpAddress.Should().Be("10.0.0.15");
         asset.DeviceAadDeviceId.Should().Be("aad-device-1");
+        asset.DeviceGroupId.Should().Be("rbac-group-1");
+        asset.DeviceGroupName.Should().Be("Tier 0 Servers");
     }
 
     [Fact]

@@ -7,7 +7,6 @@ import {
   DataTableActiveFilters,
   DataTableEmptyState,
   DataTableField,
-  DataTableFilterBar,
   DataTableToolbar,
   DataTableToolbarRow,
   DataTableWorkbench,
@@ -15,6 +14,16 @@ import {
 import { Input } from '@/components/ui/input'
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
 import { formatDate, startCase } from '@/lib/formatting'
 import { SearchIcon } from 'lucide-react'
 
@@ -32,6 +41,11 @@ type SoftwareTableProps = {
   onConfidenceFilterChange: (value: string) => void
   onVulnerableOnlyChange: (value: boolean) => void
   onBoundOnlyChange: (value: boolean) => void
+  onApplyStructuredFilters: (filters: {
+    confidence: string
+    vulnerableOnly: boolean
+    boundOnly: boolean
+  }) => void
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
   onClearFilters: () => void
@@ -53,11 +67,18 @@ export function SoftwareTable({
   onConfidenceFilterChange,
   onVulnerableOnlyChange,
   onBoundOnlyChange,
+  onApplyStructuredFilters,
   onPageChange,
   onPageSizeChange,
   onClearFilters,
 }: SoftwareTableProps) {
   const [searchInput, setSearchInput] = useState(searchValue)
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
+  const [draftFilters, setDraftFilters] = useState({
+    confidence: confidenceFilter,
+    vulnerableOnly,
+    boundOnly,
+  })
 
   useEffect(() => {
     setSearchInput(searchValue)
@@ -75,6 +96,16 @@ export function SoftwareTable({
     }
   }, [onSearchChange, searchInput, searchValue])
 
+  useEffect(() => {
+    if (!isFilterDrawerOpen) {
+      setDraftFilters({
+        confidence: confidenceFilter,
+        vulnerableOnly,
+        boundOnly,
+      })
+    }
+  }, [boundOnly, confidenceFilter, isFilterDrawerOpen, vulnerableOnly])
+
   const activeFilters = useMemo(
     () =>
       [
@@ -84,6 +115,16 @@ export function SoftwareTable({
         boundOnly ? { key: 'bound', label: 'CPE bound only', onClear: () => onBoundOnlyChange(false) } : null,
       ].filter((item): item is NonNullable<typeof item> => item !== null),
     [boundOnly, confidenceFilter, onBoundOnlyChange, onConfidenceFilterChange, onSearchChange, onVulnerableOnlyChange, searchValue, vulnerableOnly],
+  )
+
+  const activeStructuredFilterCount = useMemo(
+    () =>
+      [
+        confidenceFilter,
+        vulnerableOnly ? 'vulnerable' : '',
+        boundOnly ? 'bound' : '',
+      ].filter(Boolean).length,
+    [boundOnly, confidenceFilter, vulnerableOnly],
   )
 
   const columns = useMemo<ColumnDef<TenantSoftwareListItem>[]>(
@@ -172,40 +213,117 @@ export function SoftwareTable({
     >
       <DataTableToolbar>
         <DataTableToolbarRow>
-          <DataTableFilterBar>
-            <DataTableField label="Search">
-              <div className="relative min-w-[260px]">
-                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search normalized software" className="pl-9" />
-              </div>
-            </DataTableField>
-            <DataTableField label="Confidence">
-              <select
-                className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                value={confidenceFilter || 'All'}
-                onChange={(event) => onConfidenceFilterChange(event.target.value === 'All' ? '' : event.target.value)}
-              >
-                {confidenceOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </DataTableField>
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" checked={vulnerableOnly} onChange={(event) => onVulnerableOnlyChange(event.target.checked)} />
-              Vulnerable only
-            </label>
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" checked={boundOnly} onChange={(event) => onBoundOnlyChange(event.target.checked)} />
-              CPE bound only
-            </label>
-          </DataTableFilterBar>
+          <DataTableField label="Search" className="flex-1">
+            <div className="relative min-w-[260px]">
+              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Search normalized software"
+                className="pl-9"
+              />
+            </div>
+          </DataTableField>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 rounded-xl border-border/70 bg-background/80 px-4"
+            onClick={() => {
+              setDraftFilters({
+                confidence: confidenceFilter,
+                vulnerableOnly,
+                boundOnly,
+              })
+              setIsFilterDrawerOpen(true)
+            }}
+          >
+            {activeStructuredFilterCount > 0 ? `Filters (${activeStructuredFilterCount})` : 'Filters...'}
+          </Button>
         </DataTableToolbarRow>
         <DataTableToolbarRow>
           <DataTableActiveFilters filters={activeFilters} onClearAll={onClearFilters} />
         </DataTableToolbarRow>
       </DataTableToolbar>
+
+      <WorkbenchFilterDrawer
+        open={isFilterDrawerOpen}
+        onOpenChange={setIsFilterDrawerOpen}
+        title="Software Filters"
+        description="Refine the normalized catalog by identity confidence and exposure state."
+        activeCount={activeStructuredFilterCount}
+        onResetDraft={() => {
+          setDraftFilters({
+            confidence: '',
+            vulnerableOnly: false,
+            boundOnly: false,
+          })
+        }}
+        onApply={() => {
+          onApplyStructuredFilters(draftFilters)
+          setIsFilterDrawerOpen(false)
+        }}
+      >
+        <WorkbenchFilterSection
+          title="Identity"
+          description="Focus on the confidence level of the normalized software identity."
+        >
+          <DataTableField label="Confidence">
+            <Select
+              value={draftFilters.confidence || 'all'}
+              onValueChange={(value) => {
+                const nextValue = value ?? 'all'
+                setDraftFilters((current) => ({
+                  ...current,
+                  confidence: nextValue === 'all' ? '' : nextValue,
+                }))
+              }}
+            >
+              <SelectTrigger className="h-10 rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any confidence" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any confidence</SelectItem>
+                {confidenceOptions.filter((option) => option !== 'All').map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
+        </WorkbenchFilterSection>
+
+        <WorkbenchFilterSection
+          title="Exposure"
+          description="Limit the catalog to software with current exposure or existing CPE coverage."
+        >
+          <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-3 text-sm">
+            <Checkbox
+              checked={draftFilters.vulnerableOnly}
+              onCheckedChange={(checked) => {
+                setDraftFilters((current) => ({
+                  ...current,
+                  vulnerableOnly: checked === true,
+                }))
+              }}
+            />
+            <span>Vulnerable only</span>
+          </label>
+
+          <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-3 text-sm">
+            <Checkbox
+              checked={draftFilters.boundOnly}
+              onCheckedChange={(checked) => {
+                setDraftFilters((current) => ({
+                  ...current,
+                  boundOnly: checked === true,
+                }))
+              }}
+            />
+            <span>CPE bound only</span>
+          </label>
+        </WorkbenchFilterSection>
+      </WorkbenchFilterDrawer>
 
       {items.length === 0 ? (
         <DataTableEmptyState

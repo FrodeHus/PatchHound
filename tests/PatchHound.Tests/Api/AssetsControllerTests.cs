@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using PatchHound.Api.Controllers;
+using PatchHound.Api.Models;
 using PatchHound.Api.Models.Assets;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
@@ -192,6 +193,66 @@ public class AssetsControllerTests : IDisposable
         softwarePayload.SoftwareCpeBinding.Should().NotBeNull();
         softwarePayload.SoftwareCpeBinding!.Cpe23Uri.Should().Contain("legacy:runtime");
         softwarePayload.SoftwareCpeBinding.BindingMethod.Should().Be("Manual");
+    }
+
+    [Fact]
+    public async Task List_FiltersByDeviceGroup_AndReturnsDeviceGroupName()
+    {
+        var matchingAsset = Asset.Create(
+            _tenantId,
+            "device-1",
+            AssetType.Device,
+            "Workstation 1",
+            Criticality.High
+        );
+        matchingAsset.UpdateDeviceDetails(
+            "ws-001.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "Medium",
+            new DateTimeOffset(2026, 3, 13, 8, 0, 0, TimeSpan.Zero),
+            "10.0.0.10",
+            "aad-1",
+            "rbac-group-1",
+            "Tier 0 Servers"
+        );
+
+        var otherAsset = Asset.Create(
+            _tenantId,
+            "device-2",
+            AssetType.Device,
+            "Workstation 2",
+            Criticality.Medium
+        );
+        otherAsset.UpdateDeviceDetails(
+            "ws-002.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "Low",
+            new DateTimeOffset(2026, 3, 13, 8, 5, 0, TimeSpan.Zero),
+            "10.0.0.11",
+            "aad-2",
+            "rbac-group-2",
+            "Field Devices"
+        );
+
+        await _dbContext.AddRangeAsync(matchingAsset, otherAsset);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new AssetFilterQuery(DeviceGroup: "Tier 0"),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<AssetDto>>().Subject;
+
+        payload.Items.Should().ContainSingle();
+        payload.Items[0].Id.Should().Be(matchingAsset.Id);
+        payload.Items[0].DeviceGroupName.Should().Be("Tier 0 Servers");
     }
 
     public void Dispose()

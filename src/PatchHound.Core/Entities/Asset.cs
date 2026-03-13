@@ -24,6 +24,8 @@ public class Asset
     public DateTimeOffset? DeviceLastSeenAt { get; private set; }
     public string? DeviceLastIpAddress { get; private set; }
     public string? DeviceAadDeviceId { get; private set; }
+    public string? DeviceGroupId { get; private set; }
+    public string? DeviceGroupName { get; private set; }
     public string Metadata { get; private set; } = "{}";
 
     private Asset() { }
@@ -93,7 +95,9 @@ public class Asset
         string? riskScore,
         DateTimeOffset? lastSeenAt,
         string? lastIpAddress,
-        string? aadDeviceId
+        string? aadDeviceId,
+        string? groupId = null,
+        string? groupName = null
     )
     {
         DeviceComputerDnsName = computerDnsName;
@@ -104,5 +108,7 @@ public class Asset
         DeviceLastSeenAt = lastSeenAt;
         DeviceLastIpAddress = lastIpAddress;
         DeviceAadDeviceId = aadDeviceId;
+        DeviceGroupId = groupId;
+        DeviceGroupName = groupName;
     }
 }

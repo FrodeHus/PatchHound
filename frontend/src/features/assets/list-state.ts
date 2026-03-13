@@ -3,6 +3,7 @@ type AssetsListSearch = {
   assetType: string
   criticality: string
   ownerType: string
+  deviceGroup: string
   unassignedOnly: boolean
   page: number
   pageSize: number
@@ -14,6 +15,7 @@ export function buildAssetsListRequest(search: AssetsListSearch) {
     ...(search.assetType ? { assetType: search.assetType } : {}),
     ...(search.criticality ? { criticality: search.criticality } : {}),
     ...(search.ownerType ? { ownerType: search.ownerType } : {}),
+    ...(search.deviceGroup ? { deviceGroup: search.deviceGroup } : {}),
     ...(search.unassignedOnly ? { unassignedOnly: true } : {}),
     page: search.page,
     pageSize: search.pageSize,
@@ -30,6 +32,7 @@ export const assetQueryKeys = {
     search.assetType,
     search.criticality,
     search.ownerType,
+    search.deviceGroup,
     search.unassignedOnly,
     search.page,
     search.pageSize,

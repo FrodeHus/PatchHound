@@ -52,6 +52,8 @@ public record IngestionAsset(
     DateTimeOffset? DeviceLastSeenAt = null,
     string? DeviceLastIpAddress = null,
     string? DeviceAadDeviceId = null,
+    string? DeviceGroupId = null,
+    string? DeviceGroupName = null,
     string Metadata = "{}"
 );
 

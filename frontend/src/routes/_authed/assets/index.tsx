@@ -15,6 +15,7 @@ const assetsSearchSchema = baseListSearchSchema.extend({
   assetType: searchStringSchema,
   criticality: searchStringSchema,
   ownerType: searchStringSchema,
+  deviceGroup: searchStringSchema,
   unassignedOnly: searchBooleanSchema,
 })
 
@@ -116,6 +117,7 @@ function AssetsPage() {
         assetTypeFilter={search.assetType}
         criticalityFilter={search.criticality}
         ownerTypeFilter={search.ownerType}
+        deviceGroupFilter={search.deviceGroup}
         unassignedOnly={search.unassignedOnly}
         page={assets.page}
         pageSize={assets.pageSize}
@@ -136,8 +138,22 @@ function AssetsPage() {
           searchActions.updateField('ownerType', ownerType)
           setSelectedAssetId(null)
         }}
+        onDeviceGroupFilterChange={(deviceGroup) => {
+          searchActions.updateField('deviceGroup', deviceGroup)
+          setSelectedAssetId(null)
+        }}
         onUnassignedOnlyChange={(value) => {
           searchActions.updateField('unassignedOnly', value)
+          setSelectedAssetId(null)
+        }}
+        onApplyStructuredFilters={(filters) => {
+          searchActions.updateFields({
+            assetType: filters.assetType,
+            criticality: filters.criticality,
+            ownerType: filters.ownerType,
+            deviceGroup: filters.deviceGroup,
+            unassignedOnly: filters.unassignedOnly,
+          })
           setSelectedAssetId(null)
         }}
         onPageChange={(page) => {
@@ -153,6 +169,7 @@ function AssetsPage() {
             assetType: '',
             criticality: '',
             ownerType: '',
+            deviceGroup: '',
             unassignedOnly: false,
           })
           setSelectedAssetId(null)

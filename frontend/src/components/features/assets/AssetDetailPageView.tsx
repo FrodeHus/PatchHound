@@ -37,6 +37,7 @@ export function AssetDetailPageView({
                 assetType: '',
                 criticality: '',
                 ownerType: '',
+                deviceGroup: '',
                 unassignedOnly: false,
               }}
               className="text-sm text-muted-foreground hover:text-foreground"
@@ -108,6 +109,7 @@ export function AssetDetailPageView({
                     <MetricCard label="Risk Score" value={asset.deviceRiskScore ?? 'Unknown'} />
                     <MetricCard label="Last Seen" value={asset.deviceLastSeenAt ? new Date(asset.deviceLastSeenAt).toLocaleString() : 'Unknown'} />
                     <MetricCard label="Last IP Address" value={asset.deviceLastIpAddress ?? 'Unknown'} />
+                    <MetricCard label="Device Group" value={asset.deviceGroupName ?? 'Unknown'} />
                     <MetricCard label="Entra Device ID" value={asset.deviceAadDeviceId ?? 'Unknown'} mono />
                   </div>
                 </section>
