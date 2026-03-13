@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { Asset } from '@/api/assets.schemas'
 import {
@@ -84,6 +84,23 @@ export function AssetManagementTable({
 }: AssetManagementTableProps) {
   const [ownerType, setOwnerType] = useState<"User" | "Team">("User");
   const [ownerId, setOwnerId] = useState("");
+  const [searchInput, setSearchInput] = useState(searchValue);
+
+  useEffect(() => {
+    setSearchInput(searchValue);
+  }, [searchValue]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      if (searchInput !== searchValue) {
+        onSearchChange(searchInput);
+      }
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [onSearchChange, searchInput, searchValue]);
 
   const activeFilters = useMemo(
     () =>
@@ -299,9 +316,9 @@ export function AssetManagementTable({
             <div className="relative">
               <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                value={searchValue}
+                value={searchInput}
                 onChange={(event) => {
-                  onSearchChange(event.target.value);
+                  setSearchInput(event.target.value);
                 }}
                 placeholder="Search assets"
                 className="h-10 rounded-xl border-border/70 bg-background/80 pl-10"

@@ -30,7 +30,14 @@ public record IngestionAffectedSoftware(
     string? VersionEndExcluding
 );
 
-public record IngestionAffectedAsset(string ExternalAssetId, string AssetName, AssetType AssetType);
+public record IngestionAffectedAsset(
+    string ExternalAssetId,
+    string AssetName,
+    AssetType AssetType,
+    string? ProductVendor = null,
+    string? ProductName = null,
+    string? ProductVersion = null
+);
 
 public record IngestionAsset(
     string ExternalId,
