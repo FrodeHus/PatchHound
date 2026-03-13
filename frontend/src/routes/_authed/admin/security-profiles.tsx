@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { CircleHelp, PenSquare, Plus, ShieldCheck, Signal, TriangleAlert } from 'lucide-react'
+import { z } from 'zod'
+import { ArrowLeft, CircleHelp, PenSquare, Plus, ShieldCheck, Signal, TriangleAlert } from 'lucide-react'
 import { fetchAuditLog } from '@/api/audit-log.functions'
 import { createSecurityProfile, fetchSecurityProfiles, updateSecurityProfile } from '@/api/security-profiles.functions'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
@@ -16,7 +17,6 @@ import { InsetPanel } from '@/components/ui/inset-panel'
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   securityProfileModifiedAttackComplexityHelp,
@@ -31,8 +31,6 @@ import {
   securityProfileModifiedScopeOptions,
   securityProfileModifiedUserInteractionHelp,
   securityProfileModifiedUserInteractionOptions,
-  securityProfileEnvironmentClassOptions,
-  securityProfileEnvironmentHelp,
   securityProfileFieldGuidance,
   securityProfileInternetReachabilityHelp,
   securityProfileInternetReachabilityOptions,
@@ -42,7 +40,10 @@ import {
 import { baseListSearchSchema } from '@/routes/-list-search'
 
 export const Route = createFileRoute('/_authed/admin/security-profiles')({
-  validateSearch: baseListSearchSchema,
+  validateSearch: baseListSearchSchema.extend({
+    mode: z.enum(['new', 'edit']).optional(),
+    profileId: z.string().optional(),
+  }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     return fetchSecurityProfiles({
@@ -58,7 +59,6 @@ export const Route = createFileRoute('/_authed/admin/security-profiles')({
 type SecurityProfileDraft = {
   name: string
   description: string
-  environmentClass: (typeof securityProfileEnvironmentClassOptions)[number]
   internetReachability: (typeof securityProfileInternetReachabilityOptions)[number]
   confidentialityRequirement: (typeof securityProfileRequirementOptions)[number]
   integrityRequirement: (typeof securityProfileRequirementOptions)[number]
@@ -76,7 +76,6 @@ type SecurityProfileDraft = {
 const defaultDraft = (): SecurityProfileDraft => ({
   name: '',
   description: '',
-  environmentClass: securityProfileEnvironmentClassOptions[0],
   internetReachability: securityProfileInternetReachabilityOptions[0],
   confidentialityRequirement: securityProfileRequirementOptions[1],
   integrityRequirement: securityProfileRequirementOptions[1],
@@ -95,7 +94,6 @@ function toDraft(profile: SecurityProfile): SecurityProfileDraft {
   return {
     name: profile.name,
     description: profile.description ?? '',
-    environmentClass: profile.environmentClass as (typeof securityProfileEnvironmentClassOptions)[number],
     internetReachability: profile.internetReachability as (typeof securityProfileInternetReachabilityOptions)[number],
     confidentialityRequirement: profile.confidentialityRequirement as (typeof securityProfileRequirementOptions)[number],
     integrityRequirement: profile.integrityRequirement as (typeof securityProfileRequirementOptions)[number],
@@ -123,8 +121,6 @@ function SecurityProfilesPage() {
   const initialProfiles = Route.useLoaderData()
   const queryClient = useQueryClient()
   const { selectedTenantId, tenants } = useTenantScope()
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [editingProfile, setEditingProfile] = useState<SecurityProfile | null>(null)
   const [draft, setDraft] = useState<SecurityProfileDraft>(defaultDraft)
   const tenantNames = new Map(tenants.map((tenant) => [tenant.id, tenant.name]))
   const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
@@ -155,7 +151,7 @@ function SecurityProfilesPage() {
       const payload = {
         name: draft.name,
         description: draft.description,
-        environmentClass: draft.environmentClass,
+        environmentClass: editingProfile?.environmentClass ?? 'Workstation',
         internetReachability: draft.internetReachability,
         confidentialityRequirement: draft.confidentialityRequirement,
         integrityRequirement: draft.integrityRequirement,
@@ -183,28 +179,69 @@ function SecurityProfilesPage() {
       await createSecurityProfile({ data: payload })
     },
     onSuccess: async () => {
-      setSheetOpen(false)
-      setEditingProfile(null)
-      setDraft(defaultDraft())
       await queryClient.invalidateQueries({ queryKey: ['security-profiles'] })
       if (canViewAudit) {
         await queryClient.invalidateQueries({ queryKey: ['audit-log', 'AssetSecurityProfile', selectedTenantId] })
       }
+      closeEditor()
     },
   })
 
   const profilePage = profilesQuery.data
   const recentAuditItems = recentAuditQuery.data?.items ?? []
   const canSave = !!selectedTenantId?.trim() && draft.name.trim().length > 0
+  const editingProfileId = search.mode === 'edit' ? search.profileId ?? null : null
+  const isCreateMode = search.mode === 'new'
+  const isEditorOpen = isCreateMode || !!editingProfileId
+  const editingProfile =
+    profilePage?.items.find((item) => item.id === editingProfileId) ?? null
   const sheetTitle = editingProfile ? 'Edit security profile' : 'Create security profile'
   const sheetDescription = editingProfile
     ? 'Update the severity context for this reusable tenant profile.'
     : 'Define a reusable environment profile for the tenant selected in the top bar.'
   const selectedTenantName = tenantNames.get(selectedTenantId ?? '') ?? 'No tenant selected'
 
+  function openNewProfile() {
+    setDraft(defaultDraft())
+    void navigate({
+      to: '/admin/security-profiles',
+      search: (prev) => ({ ...prev, mode: 'new', profileId: undefined }),
+    })
+  }
+
+  function openProfile(profile: SecurityProfile) {
+    setDraft(toDraft(profile))
+    void navigate({
+      to: '/admin/security-profiles',
+      search: (prev) => ({ ...prev, mode: 'edit', profileId: profile.id }),
+    })
+  }
+
+  function closeEditor() {
+    void navigate({
+      to: '/admin/security-profiles',
+      search: ({ mode, profileId, ...prev }) => prev,
+    })
+  }
+
   return (
     <TooltipProvider>
       <section className="space-y-4 pb-4">
+        {isEditorOpen ? (
+          <SecurityProfileEditorPage
+            title={sheetTitle}
+            description={sheetDescription}
+            selectedTenantName={selectedTenantName}
+            editingProfile={editingProfile}
+            draft={draft}
+            isSaving={saveMutation.isPending}
+            canSave={canSave}
+            onDraftChange={setDraft}
+            onSave={() => saveMutation.mutate()}
+            onBack={closeEditor}
+          />
+        ) : (
+          <>
         <Card className="rounded-2xl border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_52%),var(--color-card)]">
           <CardHeader className="space-y-3">
             <Badge variant="outline" className="w-fit rounded-full border-primary/20 bg-primary/10 text-primary">
@@ -254,11 +291,7 @@ function SecurityProfilesPage() {
                 <Button
                   type="button"
                   disabled={!selectedTenantId}
-                  onClick={() => {
-                    setEditingProfile(null)
-                    setDraft(defaultDraft())
-                    setSheetOpen(true)
-                  }}
+                  onClick={openNewProfile}
                 >
                   <Plus className="size-4" />
                   New profile
@@ -289,11 +322,7 @@ function SecurityProfilesPage() {
                 </div>
                 <Button
                   type="button"
-                  onClick={() => {
-                    setEditingProfile(null)
-                    setDraft(defaultDraft())
-                    setSheetOpen(true)
-                  }}
+                  onClick={openNewProfile}
                 >
                   <Plus className="size-4" />
                   Create profile
@@ -306,9 +335,6 @@ function SecurityProfilesPage() {
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-lg font-semibold">{profile.name}</p>
-                        <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/10 text-primary">
-                          {profile.environmentClass}
-                        </Badge>
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {profile.description ?? 'No description provided.'}
@@ -321,11 +347,7 @@ function SecurityProfilesPage() {
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => {
-                          setEditingProfile(profile)
-                          setDraft(toDraft(profile))
-                          setSheetOpen(true)
-                        }}
+                        onClick={() => openProfile(profile)}
                       >
                         <PenSquare className="size-4" />
                         Edit
@@ -417,33 +439,14 @@ function SecurityProfilesPage() {
             emptyMessage="No recent security profile changes have been recorded."
           />
         ) : null}
-
-        <SecurityProfileSheet
-          open={sheetOpen}
-          title={sheetTitle}
-          description={sheetDescription}
-          selectedTenantName={selectedTenantName}
-          editingProfile={editingProfile}
-          draft={draft}
-          isSaving={saveMutation.isPending}
-          canSave={canSave}
-          onOpenChange={(open) => {
-            setSheetOpen(open)
-            if (!open) {
-              setEditingProfile(null)
-              setDraft(defaultDraft())
-            }
-          }}
-          onDraftChange={setDraft}
-          onSave={() => saveMutation.mutate()}
-        />
+          </>
+        )}
       </section>
     </TooltipProvider>
   )
 }
 
-function SecurityProfileSheet({
-  open,
+function SecurityProfileEditorPage({
   title,
   description,
   selectedTenantName,
@@ -451,11 +454,10 @@ function SecurityProfileSheet({
   draft,
   isSaving,
   canSave,
-  onOpenChange,
   onDraftChange,
   onSave,
+  onBack,
 }: {
-  open: boolean
   title: string
   description: string
   selectedTenantName: string
@@ -463,77 +465,137 @@ function SecurityProfileSheet({
   draft: SecurityProfileDraft
   isSaving: boolean
   canSave: boolean
-  onOpenChange: (open: boolean) => void
   onDraftChange: React.Dispatch<React.SetStateAction<SecurityProfileDraft>>
   onSave: () => void
+  onBack: () => void
 }) {
   const saveLabel = editingProfile ? 'Save changes' : 'Create profile'
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl">
-        <SheetHeader className="border-b border-border/60">
-          <SheetTitle>{title}</SheetTitle>
-          <SheetDescription>{description}</SheetDescription>
-        </SheetHeader>
+    <div className="space-y-5">
+      <div className="space-y-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Back to profiles
+        </button>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={onBack}>
+              Cancel
+            </Button>
+            <Button disabled={!canSave || isSaving} onClick={onSave}>
+              {isSaving ? 'Saving...' : saveLabel}
+            </Button>
+          </div>
+        </div>
+      </div>
 
-        <div className="flex-1 space-y-6 overflow-y-auto p-5">
-          <FormSection
-            title="Identity"
-            description="Name the profile and confirm the tenant scope before defining how severity should be adjusted."
-          >
-            <div className="grid gap-5 md:grid-cols-2">
-              <FieldBlock
-                label="Active Tenant"
-                description="This form follows the tenant scope in the top navigation."
-                control={<div className="rounded-lg border border-border/75 bg-muted/55 px-3 py-3 text-sm font-medium">{selectedTenantName}</div>}
-              />
-              <FieldBlock
-                label="Profile Name"
-                description="Use a clear operational name such as “Internet-facing server” or “Internal workstation”."
-                control={(
-                  <Input
-                    placeholder="Internet-facing server"
-                    value={draft.name}
-                    onChange={(event) => onDraftChange((current) => ({ ...current, name: event.target.value }))}
-                    className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-                  />
-                )}
-              />
-            </div>
-          </FormSection>
-
-          <FormSection
-            title="Exposure Context"
-            description="Describe the environment this profile represents so PatchHound can weight exploitability correctly."
-          >
-            <div className="grid gap-5">
-              <FieldBlock
-                label="Description"
-                description="Write the assignment intent so admins know when this profile should be used."
-                control={(
-                  <Input
-                    placeholder="Use for production servers reachable from the public internet."
-                    value={draft.description}
-                    onChange={(event) => onDraftChange((current) => ({ ...current, description: event.target.value }))}
-                    className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-                  />
-                )}
-              />
-
-              <div className="grid gap-5 xl:grid-cols-2">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <Card className="rounded-2xl border-border/70 bg-card/85">
+          <CardContent className="space-y-6 p-5">
+          <div className="space-y-6">
+            <FormSection
+              title="Identity"
+              description="Name the profile and confirm the tenant scope before defining how severity should be adjusted."
+            >
+              <div className="grid gap-5 md:grid-cols-2">
                 <FieldBlock
-                  label={securityProfileFieldGuidance.environmentClass.label}
-                  description={securityProfileFieldGuidance.environmentClass.description}
-                  helper={securityProfileEnvironmentHelp[draft.environmentClass]}
+                  label="Active Tenant"
+                  description="This form follows the tenant scope in the top navigation."
+                  control={<div className="rounded-lg border border-border/75 bg-muted/55 px-3 py-3 text-sm font-medium">{selectedTenantName}</div>}
+                />
+                <FieldBlock
+                  label="Profile Name"
+                  description="Use a clear operational name such as “Internet-facing server” or “Internal workstation”."
+                  control={(
+                    <Input
+                      placeholder="Internet-facing server"
+                      value={draft.name}
+                      onChange={(event) => onDraftChange((current) => ({ ...current, name: event.target.value }))}
+                      className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                    />
+                  )}
+                />
+              </div>
+            </FormSection>
+
+            <FormSection
+              title="Exposure Context"
+              description="Keep only the settings that actually change the environmental CVSS score for this profile."
+            >
+              <div className="grid gap-5">
+                <FieldBlock
+                  label="Description"
+                  description="Write the assignment intent so admins know when this profile should be used."
+                  control={(
+                    <Input
+                      placeholder="Use for production servers reachable from the public internet."
+                      value={draft.description}
+                      onChange={(event) => onDraftChange((current) => ({ ...current, description: event.target.value }))}
+                      className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                    />
+                  )}
+                />
+
+                <div className="grid gap-5 xl:grid-cols-2">
+                  <FieldBlock
+                    label={securityProfileFieldGuidance.internetReachability.label}
+                    description={securityProfileFieldGuidance.internetReachability.description}
+                    helper={securityProfileInternetReachabilityHelp[draft.internetReachability]}
+                    control={(
+                      <Select
+                        value={draft.internetReachability}
+                        onValueChange={(value) => {
+                          if (value) {
+                            onDraftChange((current) => ({
+                              ...current,
+                              internetReachability: value,
+                            }))
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-11 w-full rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
+                          {securityProfileInternetReachabilityOptions.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+              </div>
+            </FormSection>
+
+            <FormSection
+              title="Impact Weighting"
+              description="Set how confidentiality, integrity, and availability should influence the effective severity for devices using this profile."
+            >
+              <div className="grid gap-5 xl:grid-cols-3">
+                <FieldBlock
+                  label={securityProfileFieldGuidance.confidentialityRequirement.label}
+                  description={securityProfileFieldGuidance.confidentialityRequirement.description}
+                  helper={securityProfileRequirementHelp[draft.confidentialityRequirement]}
                   control={(
                     <Select
-                      value={draft.environmentClass}
+                      value={draft.confidentialityRequirement}
                       onValueChange={(value) => {
                         if (value) {
                           onDraftChange((current) => ({
                             ...current,
-                            environmentClass: value,
+                            confidentialityRequirement: value,
                           }))
                         }
                       }}
@@ -542,7 +604,7 @@ function SecurityProfileSheet({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
-                        {securityProfileEnvironmentClassOptions.map((option) => (
+                        {securityProfileRequirementOptions.map((option) => (
                           <SelectItem key={option} value={option}>
                             {option}
                           </SelectItem>
@@ -552,17 +614,17 @@ function SecurityProfileSheet({
                   )}
                 />
                 <FieldBlock
-                  label={securityProfileFieldGuidance.internetReachability.label}
-                  description={securityProfileFieldGuidance.internetReachability.description}
-                  helper={securityProfileInternetReachabilityHelp[draft.internetReachability]}
+                  label={securityProfileFieldGuidance.integrityRequirement.label}
+                  description={securityProfileFieldGuidance.integrityRequirement.description}
+                  helper={securityProfileRequirementHelp[draft.integrityRequirement]}
                   control={(
                     <Select
-                      value={draft.internetReachability}
+                      value={draft.integrityRequirement}
                       onValueChange={(value) => {
                         if (value) {
                           onDraftChange((current) => ({
                             ...current,
-                            internetReachability: value,
+                            integrityRequirement: value,
                           }))
                         }
                       }}
@@ -571,7 +633,36 @@ function SecurityProfileSheet({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
-                        {securityProfileInternetReachabilityOptions.map((option) => (
+                        {securityProfileRequirementOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldBlock
+                  label={securityProfileFieldGuidance.availabilityRequirement.label}
+                  description={securityProfileFieldGuidance.availabilityRequirement.description}
+                  helper={securityProfileRequirementHelp[draft.availabilityRequirement]}
+                  control={(
+                    <Select
+                      value={draft.availabilityRequirement}
+                      onValueChange={(value) => {
+                        if (value) {
+                          onDraftChange((current) => ({
+                            ...current,
+                            availabilityRequirement: value,
+                          }))
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-11 w-full rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
+                        {securityProfileRequirementOptions.map((option) => (
                           <SelectItem key={option} value={option}>
                             {option}
                           </SelectItem>
@@ -581,249 +672,280 @@ function SecurityProfileSheet({
                   )}
                 />
               </div>
-            </div>
-          </FormSection>
+            </FormSection>
 
-          <FormSection
-            title="Impact Weighting"
-            description="Set how confidentiality, integrity, and availability should influence the effective severity for devices using this profile."
-          >
-            <div className="grid gap-5 xl:grid-cols-3">
-              <FieldBlock
-                label={securityProfileFieldGuidance.confidentialityRequirement.label}
-                description={securityProfileFieldGuidance.confidentialityRequirement.description}
-                helper={securityProfileRequirementHelp[draft.confidentialityRequirement]}
-                control={(
-                  <Select
-                    value={draft.confidentialityRequirement}
-                    onValueChange={(value) => {
-                      if (value) {
-                        onDraftChange((current) => ({
-                          ...current,
-                          confidentialityRequirement: value,
-                        }))
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-11 w-full rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
-                      {securityProfileRequirementOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldBlock
-                label={securityProfileFieldGuidance.integrityRequirement.label}
-                description={securityProfileFieldGuidance.integrityRequirement.description}
-                helper={securityProfileRequirementHelp[draft.integrityRequirement]}
-                control={(
-                  <Select
-                    value={draft.integrityRequirement}
-                    onValueChange={(value) => {
-                      if (value) {
-                        onDraftChange((current) => ({
-                          ...current,
-                          integrityRequirement: value,
-                        }))
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-11 w-full rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
-                      {securityProfileRequirementOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldBlock
-                label={securityProfileFieldGuidance.availabilityRequirement.label}
-                description={securityProfileFieldGuidance.availabilityRequirement.description}
-                helper={securityProfileRequirementHelp[draft.availabilityRequirement]}
-                control={(
-                  <Select
-                    value={draft.availabilityRequirement}
-                    onValueChange={(value) => {
-                      if (value) {
-                        onDraftChange((current) => ({
-                          ...current,
-                          availabilityRequirement: value,
-                        }))
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-11 w-full rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
-                      {securityProfileRequirementOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
-          </FormSection>
+            <FormSection
+              title="Environmental Overrides"
+              description="These explicit CVSS environmental fields are authoritative. Use Not Defined to inherit the vendor CVSS metric for that dimension."
+            >
+              <div className="grid gap-5 xl:grid-cols-2">
+                <FieldBlock
+                  label={securityProfileFieldGuidance.modifiedAttackVector.label}
+                  description={securityProfileFieldGuidance.modifiedAttackVector.description}
+                  helper={securityProfileModifiedAttackVectorHelp[draft.modifiedAttackVector]}
+                  control={(
+                    <ProfileSelect
+                      value={draft.modifiedAttackVector}
+                      options={securityProfileModifiedAttackVectorOptions}
+                      onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedAttackVector: value as SecurityProfileDraft['modifiedAttackVector'] }))}
+                    />
+                  )}
+                />
+                <FieldBlock
+                  label={securityProfileFieldGuidance.modifiedAttackComplexity.label}
+                  description={securityProfileFieldGuidance.modifiedAttackComplexity.description}
+                  helper={securityProfileModifiedAttackComplexityHelp[draft.modifiedAttackComplexity]}
+                  control={(
+                    <ProfileSelect
+                      value={draft.modifiedAttackComplexity}
+                      options={securityProfileModifiedAttackComplexityOptions}
+                      onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedAttackComplexity: value as SecurityProfileDraft['modifiedAttackComplexity'] }))}
+                    />
+                  )}
+                />
+                <FieldBlock
+                  label={securityProfileFieldGuidance.modifiedPrivilegesRequired.label}
+                  description={securityProfileFieldGuidance.modifiedPrivilegesRequired.description}
+                  helper={securityProfileModifiedPrivilegesRequiredHelp[draft.modifiedPrivilegesRequired]}
+                  control={(
+                    <ProfileSelect
+                      value={draft.modifiedPrivilegesRequired}
+                      options={securityProfileModifiedPrivilegesRequiredOptions}
+                      onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedPrivilegesRequired: value as SecurityProfileDraft['modifiedPrivilegesRequired'] }))}
+                    />
+                  )}
+                />
+                <FieldBlock
+                  label={securityProfileFieldGuidance.modifiedUserInteraction.label}
+                  description={securityProfileFieldGuidance.modifiedUserInteraction.description}
+                  helper={securityProfileModifiedUserInteractionHelp[draft.modifiedUserInteraction]}
+                  control={(
+                    <ProfileSelect
+                      value={draft.modifiedUserInteraction}
+                      options={securityProfileModifiedUserInteractionOptions}
+                      onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedUserInteraction: value as SecurityProfileDraft['modifiedUserInteraction'] }))}
+                    />
+                  )}
+                />
+                <FieldBlock
+                  label={securityProfileFieldGuidance.modifiedScope.label}
+                  description={securityProfileFieldGuidance.modifiedScope.description}
+                  helper={securityProfileModifiedScopeHelp[draft.modifiedScope]}
+                  control={(
+                    <ProfileSelect
+                      value={draft.modifiedScope}
+                      options={securityProfileModifiedScopeOptions}
+                      onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedScope: value as SecurityProfileDraft['modifiedScope'] }))}
+                    />
+                  )}
+                />
+              </div>
+              <div className="grid gap-5 xl:grid-cols-3">
+                <FieldBlock
+                  label={securityProfileFieldGuidance.modifiedConfidentialityImpact.label}
+                  description={securityProfileFieldGuidance.modifiedConfidentialityImpact.description}
+                  helper={securityProfileModifiedImpactHelp[draft.modifiedConfidentialityImpact]}
+                  control={(
+                    <ProfileSelect
+                      value={draft.modifiedConfidentialityImpact}
+                      options={securityProfileModifiedImpactOptions}
+                      onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedConfidentialityImpact: value as SecurityProfileDraft['modifiedConfidentialityImpact'] }))}
+                    />
+                  )}
+                />
+                <FieldBlock
+                  label={securityProfileFieldGuidance.modifiedIntegrityImpact.label}
+                  description={securityProfileFieldGuidance.modifiedIntegrityImpact.description}
+                  helper={securityProfileModifiedImpactHelp[draft.modifiedIntegrityImpact]}
+                  control={(
+                    <ProfileSelect
+                      value={draft.modifiedIntegrityImpact}
+                      options={securityProfileModifiedImpactOptions}
+                      onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedIntegrityImpact: value as SecurityProfileDraft['modifiedIntegrityImpact'] }))}
+                    />
+                  )}
+                />
+                <FieldBlock
+                  label={securityProfileFieldGuidance.modifiedAvailabilityImpact.label}
+                  description={securityProfileFieldGuidance.modifiedAvailabilityImpact.description}
+                  helper={securityProfileModifiedImpactHelp[draft.modifiedAvailabilityImpact]}
+                  control={(
+                    <ProfileSelect
+                      value={draft.modifiedAvailabilityImpact}
+                      options={securityProfileModifiedImpactOptions}
+                      onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedAvailabilityImpact: value as SecurityProfileDraft['modifiedAvailabilityImpact'] }))}
+                    />
+                  )}
+                />
+              </div>
+            </FormSection>
 
-          <FormSection
-            title="Environmental Overrides"
-            description="These explicit CVSS environmental fields are authoritative. Use Not Defined to inherit the vendor CVSS metric for that dimension."
-          >
-            <div className="grid gap-5 xl:grid-cols-2">
-              <FieldBlock
-                label={securityProfileFieldGuidance.modifiedAttackVector.label}
-                description={securityProfileFieldGuidance.modifiedAttackVector.description}
-                helper={securityProfileModifiedAttackVectorHelp[draft.modifiedAttackVector]}
-                control={(
-                  <ProfileSelect
-                    value={draft.modifiedAttackVector}
-                    options={securityProfileModifiedAttackVectorOptions}
-                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedAttackVector: value as SecurityProfileDraft['modifiedAttackVector'] }))}
-                  />
-                )}
+            <FormSection
+              title="CVSS Preview"
+              description="Use the calculator to see how this profile adjusts a vendor CVSS vector into an environmental score."
+            >
+              <CvssWorkbenchTrigger
+                securityProfile={{
+                  name: draft.name.trim() || null,
+                  internetReachability: draft.internetReachability,
+                  confidentialityRequirement: draft.confidentialityRequirement,
+                  integrityRequirement: draft.integrityRequirement,
+                  availabilityRequirement: draft.availabilityRequirement,
+                  modifiedAttackVector: draft.modifiedAttackVector,
+                  modifiedAttackComplexity: draft.modifiedAttackComplexity,
+                  modifiedPrivilegesRequired: draft.modifiedPrivilegesRequired,
+                  modifiedUserInteraction: draft.modifiedUserInteraction,
+                  modifiedScope: draft.modifiedScope,
+                  modifiedConfidentialityImpact: draft.modifiedConfidentialityImpact,
+                  modifiedIntegrityImpact: draft.modifiedIntegrityImpact,
+                  modifiedAvailabilityImpact: draft.modifiedAvailabilityImpact,
+                }}
+                title="Environmental scoring workbench"
+                description="Preview how this security profile changes a vendor CVSS vector, then open the full calculator only when you need to inspect the detailed metric breakdown."
               />
-              <FieldBlock
-                label={securityProfileFieldGuidance.modifiedAttackComplexity.label}
-                description={securityProfileFieldGuidance.modifiedAttackComplexity.description}
-                helper={securityProfileModifiedAttackComplexityHelp[draft.modifiedAttackComplexity]}
-                control={(
-                  <ProfileSelect
-                    value={draft.modifiedAttackComplexity}
-                    options={securityProfileModifiedAttackComplexityOptions}
-                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedAttackComplexity: value as SecurityProfileDraft['modifiedAttackComplexity'] }))}
-                  />
-                )}
-              />
-              <FieldBlock
-                label={securityProfileFieldGuidance.modifiedPrivilegesRequired.label}
-                description={securityProfileFieldGuidance.modifiedPrivilegesRequired.description}
-                helper={securityProfileModifiedPrivilegesRequiredHelp[draft.modifiedPrivilegesRequired]}
-                control={(
-                  <ProfileSelect
-                    value={draft.modifiedPrivilegesRequired}
-                    options={securityProfileModifiedPrivilegesRequiredOptions}
-                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedPrivilegesRequired: value as SecurityProfileDraft['modifiedPrivilegesRequired'] }))}
-                  />
-                )}
-              />
-              <FieldBlock
-                label={securityProfileFieldGuidance.modifiedUserInteraction.label}
-                description={securityProfileFieldGuidance.modifiedUserInteraction.description}
-                helper={securityProfileModifiedUserInteractionHelp[draft.modifiedUserInteraction]}
-                control={(
-                  <ProfileSelect
-                    value={draft.modifiedUserInteraction}
-                    options={securityProfileModifiedUserInteractionOptions}
-                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedUserInteraction: value as SecurityProfileDraft['modifiedUserInteraction'] }))}
-                  />
-                )}
-              />
-              <FieldBlock
-                label={securityProfileFieldGuidance.modifiedScope.label}
-                description={securityProfileFieldGuidance.modifiedScope.description}
-                helper={securityProfileModifiedScopeHelp[draft.modifiedScope]}
-                control={(
-                  <ProfileSelect
-                    value={draft.modifiedScope}
-                    options={securityProfileModifiedScopeOptions}
-                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedScope: value as SecurityProfileDraft['modifiedScope'] }))}
-                  />
-                )}
-              />
-            </div>
-            <div className="grid gap-5 xl:grid-cols-3">
-              <FieldBlock
-                label={securityProfileFieldGuidance.modifiedConfidentialityImpact.label}
-                description={securityProfileFieldGuidance.modifiedConfidentialityImpact.description}
-                helper={securityProfileModifiedImpactHelp[draft.modifiedConfidentialityImpact]}
-                control={(
-                  <ProfileSelect
-                    value={draft.modifiedConfidentialityImpact}
-                    options={securityProfileModifiedImpactOptions}
-                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedConfidentialityImpact: value as SecurityProfileDraft['modifiedConfidentialityImpact'] }))}
-                  />
-                )}
-              />
-              <FieldBlock
-                label={securityProfileFieldGuidance.modifiedIntegrityImpact.label}
-                description={securityProfileFieldGuidance.modifiedIntegrityImpact.description}
-                helper={securityProfileModifiedImpactHelp[draft.modifiedIntegrityImpact]}
-                control={(
-                  <ProfileSelect
-                    value={draft.modifiedIntegrityImpact}
-                    options={securityProfileModifiedImpactOptions}
-                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedIntegrityImpact: value as SecurityProfileDraft['modifiedIntegrityImpact'] }))}
-                  />
-                )}
-              />
-              <FieldBlock
-                label={securityProfileFieldGuidance.modifiedAvailabilityImpact.label}
-                description={securityProfileFieldGuidance.modifiedAvailabilityImpact.description}
-                helper={securityProfileModifiedImpactHelp[draft.modifiedAvailabilityImpact]}
-                control={(
-                  <ProfileSelect
-                    value={draft.modifiedAvailabilityImpact}
-                    options={securityProfileModifiedImpactOptions}
-                    onValueChange={(value) => onDraftChange((current) => ({ ...current, modifiedAvailabilityImpact: value as SecurityProfileDraft['modifiedAvailabilityImpact'] }))}
-                  />
-                )}
-              />
-            </div>
-          </FormSection>
+            </FormSection>
+          </div>
+          </CardContent>
+        </Card>
 
-          <FormSection
-            title="CVSS Preview"
-            description="Use the calculator to see how this profile adjusts a vendor CVSS vector into an environmental score."
-          >
-            <CvssWorkbenchTrigger
-              securityProfile={{
-                name: draft.name.trim() || null,
-                internetReachability: draft.internetReachability,
-                confidentialityRequirement: draft.confidentialityRequirement,
-                integrityRequirement: draft.integrityRequirement,
-                availabilityRequirement: draft.availabilityRequirement,
-                modifiedAttackVector: draft.modifiedAttackVector,
-                modifiedAttackComplexity: draft.modifiedAttackComplexity,
-                modifiedPrivilegesRequired: draft.modifiedPrivilegesRequired,
-                modifiedUserInteraction: draft.modifiedUserInteraction,
-                modifiedScope: draft.modifiedScope,
-                modifiedConfidentialityImpact: draft.modifiedConfidentialityImpact,
-                modifiedIntegrityImpact: draft.modifiedIntegrityImpact,
-                modifiedAvailabilityImpact: draft.modifiedAvailabilityImpact,
-              }}
-              title="Environmental scoring workbench"
-              description="Preview how this security profile changes a vendor CVSS vector, then open the full calculator only when you need to inspect the detailed metric breakdown."
-            />
-          </FormSection>
-        </div>
+          <div className="space-y-5">
+            <InsetPanel className="rounded-2xl border-border/70 bg-card px-4 py-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Readable Summary</p>
+              <div className="mt-4 space-y-3">
+                <GuideRow label="Tenant" value={selectedTenantName} />
+                <GuideRow label="Reachability" value={humanizeReachability(draft.internetReachability)} />
+                <GuideRow label="Impact priority" value={summarizeRequirements(draft)} />
+              </div>
+            </InsetPanel>
 
-        <SheetFooter className="border-t border-border/60">
-          <InsetPanel emphasis="subtle" className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-            <p className="text-sm text-muted-foreground">
-              Profiles can be assigned later from the asset inspector or the asset detail page.
-            </p>
-            <Button disabled={!canSave || isSaving} onClick={onSave}>
-              {isSaving ? 'Saving...' : saveLabel}
-            </Button>
-          </InsetPanel>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+            <InsetPanel className="rounded-2xl border-border/70 bg-card px-4 py-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Override Translation</p>
+              <div className="mt-4 space-y-3">
+                {buildOverrideNarratives(draft).map((item) => (
+                  <div key={item.label} className="rounded-xl border border-border/60 bg-background px-3 py-3">
+                    <p className="text-sm font-medium text-foreground">{item.label}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{item.text}</p>
+                  </div>
+                ))}
+              </div>
+            </InsetPanel>
+          </div>
+      </div>
+    </div>
   )
+}
+
+function GuideRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-background px-3 py-3">
+      <span className="text-sm font-medium text-foreground">{label}</span>
+      <span className="max-w-[14rem] text-right text-xs text-muted-foreground">{value}</span>
+    </div>
+  )
+}
+
+function humanizeReachability(value: SecurityProfileDraft['internetReachability']) {
+  switch (value) {
+    case 'Internet':
+      return 'Directly reachable from the internet.'
+    case 'InternalNetwork':
+      return 'Reachable only from the internal network.'
+    case 'AdjacentOnly':
+      return 'Reachable only from the same segment or adjacent network.'
+    case 'LocalOnly':
+      return 'Requires local presence or an existing foothold.'
+  }
+}
+
+function summarizeRequirements(draft: SecurityProfileDraft) {
+  const priorities = [
+    draft.confidentialityRequirement === 'High' ? 'confidentiality' : null,
+    draft.integrityRequirement === 'High' ? 'integrity' : null,
+    draft.availabilityRequirement === 'High' ? 'availability' : null,
+  ].filter(Boolean)
+
+  if (priorities.length === 0) {
+    return 'Balanced weighting across confidentiality, integrity, and availability.'
+  }
+
+  return `Emphasizes ${priorities.join(', ')}.`
+}
+
+function buildOverrideNarratives(draft: SecurityProfileDraft) {
+  return [
+    {
+      label: 'Attack path',
+      text:
+        draft.modifiedAttackVector === 'NotDefined'
+          ? `Reachability is described as "${humanizeReachability(draft.internetReachability)}" but CVSS attack vector still inherits the vendor metric.`
+          : `If this device is ${humanizeReachabilityShort(draft.internetReachability)}, modified attack vector is set to ${draft.modifiedAttackVector.toLowerCase()}.`,
+    },
+    {
+      label: 'Exploit conditions',
+      text:
+        draft.modifiedAttackComplexity === 'NotDefined'
+          ? 'Attack complexity still inherits the vendor metric.'
+          : `Exploit preconditions are treated as ${draft.modifiedAttackComplexity.toLowerCase()} complexity in this environment.`,
+    },
+    {
+      label: 'Access assumptions',
+      text:
+        draft.modifiedPrivilegesRequired === 'NotDefined' && draft.modifiedUserInteraction === 'NotDefined'
+          ? 'Privileges required and user interaction both inherit the vendor metrics.'
+          : [
+              draft.modifiedPrivilegesRequired !== 'NotDefined'
+                ? `privileges required is set to ${draft.modifiedPrivilegesRequired.toLowerCase()}`
+                : null,
+              draft.modifiedUserInteraction !== 'NotDefined'
+                ? `user interaction is set to ${draft.modifiedUserInteraction.toLowerCase()}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(', ') + '.',
+    },
+    {
+      label: 'Blast radius',
+      text:
+        draft.modifiedScope === 'NotDefined'
+          ? 'Scope still inherits the vendor metric.'
+          : `Scope is treated as ${draft.modifiedScope.toLowerCase()}, which ${draft.modifiedScope === 'Changed' ? 'assumes impact can cross a security boundary' : 'keeps impact within the original security boundary'}.`,
+    },
+    {
+      label: 'Impact overrides',
+      text: summarizeImpactOverrides(draft),
+    },
+  ] as const
+}
+
+function humanizeReachabilityShort(value: SecurityProfileDraft['internetReachability']) {
+  switch (value) {
+    case 'Internet':
+      return 'internet reachable'
+    case 'InternalNetwork':
+      return 'exposed to the local network only'
+    case 'AdjacentOnly':
+      return 'limited to an adjacent or segmented network'
+    case 'LocalOnly':
+      return 'only accessible locally'
+  }
+}
+
+function summarizeImpactOverrides(draft: SecurityProfileDraft) {
+  const items = [
+    draft.modifiedConfidentialityImpact !== 'NotDefined'
+      ? `confidentiality impact is ${draft.modifiedConfidentialityImpact.toLowerCase()}`
+      : null,
+    draft.modifiedIntegrityImpact !== 'NotDefined'
+      ? `integrity impact is ${draft.modifiedIntegrityImpact.toLowerCase()}`
+      : null,
+    draft.modifiedAvailabilityImpact !== 'NotDefined'
+      ? `availability impact is ${draft.modifiedAvailabilityImpact.toLowerCase()}`
+      : null,
+  ].filter(Boolean)
+
+  return items.length > 0
+    ? `${items.join(', ')}.`
+    : 'Confidentiality, integrity, and availability impacts all inherit the vendor metrics.'
 }
 
 function ProfileSelect({

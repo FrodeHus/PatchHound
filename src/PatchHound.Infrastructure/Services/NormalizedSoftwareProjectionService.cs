@@ -133,6 +133,7 @@ public class NormalizedSoftwareProjectionService(
             .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
             .Where(match =>
                 match.TenantId == tenantId
+                && match.SnapshotId == snapshotId
                 && resolutions.Keys.Contains(match.SoftwareAssetId)
             )
             .ToListAsync(ct);
@@ -144,7 +145,9 @@ public class NormalizedSoftwareProjectionService(
 
         var activeInstallations = await dbContext
             .NormalizedSoftwareInstallations.IgnoreQueryFilters()
-            .Where(item => item.TenantId == tenantId && item.IsActive)
+            .Where(item =>
+                item.TenantId == tenantId && item.SnapshotId == snapshotId && item.IsActive
+            )
             .ToListAsync(ct);
 
         var grouped = matches

@@ -117,8 +117,29 @@ public class SoftwareControllerTests : IDisposable
         payload[0].ExternalId.Should().Be("CVE-2026-1000");
         payload[0].AffectedInstallCount.Should().Be(2);
         payload[0].AffectedVersions.Should().BeEquivalentTo("1.0", "2.0");
-        payload[0].Evidence.Should().ContainSingle();
+        payload[0].Evidence.Should().HaveCount(2);
         payload[0].Evidence[0].Method.Should().Be("CpeBinding");
+    }
+
+    [Fact]
+    public async Task GetVulnerabilities_WhenProjectionIsMissing_ReturnsGroupedMatches()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+
+        _dbContext.NormalizedSoftwareVulnerabilityProjections.RemoveRange(
+            _dbContext.NormalizedSoftwareVulnerabilityProjections
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetVulnerabilities(graph.TenantSoftware.Id, CancellationToken.None);
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeAssignableTo<IReadOnlyList<TenantSoftwareVulnerabilityDto>>().Subject;
+
+        payload.Should().ContainSingle();
+        payload[0].ExternalId.Should().Be("CVE-2026-1000");
+        payload[0].AffectedInstallCount.Should().Be(2);
+        payload[0].AffectedVersions.Should().BeEquivalentTo("1.0", "2.0");
+        payload[0].Evidence.Should().HaveCount(2);
     }
 
     [Fact]
@@ -190,6 +211,55 @@ public class SoftwareControllerTests : IDisposable
                     && request.UserPrompt.Contains("\"vulnerabilities\"")
                     && request.UserPrompt.Contains("CVE-2026-1000")
                     && !request.UserPrompt.Contains("\"deviceName\"")
+                ),
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<CancellationToken>()
+            );
+    }
+
+    [Fact]
+    public async Task GenerateAiReport_WhenProjectionIsMissing_StillIncludesVulnerabilitiesFromMatches()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var profile = TenantAiProfileFactory.Create(
+            _tenantId,
+            providerType: TenantAiProviderType.Ollama,
+            name: "Default AI",
+            model: "llama3",
+            systemPrompt: "system"
+        );
+        _tenantAiConfigurationResolver
+            .ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(
+                Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, string.Empty))
+            );
+        _aiProvider.ProviderType.Returns(TenantAiProviderType.Ollama);
+        _aiProvider
+            .ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
+            .Returns(AiProviderValidationResult.Success());
+        _aiProvider
+            .GenerateTextAsync(Arg.Any<AiTextGenerationRequest>(), Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
+            .Returns("# Software report");
+
+        _dbContext.NormalizedSoftwareVulnerabilityProjections.RemoveRange(
+            _dbContext.NormalizedSoftwareVulnerabilityProjections
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GenerateAiReport(
+            graph.TenantSoftware.Id,
+            new GenerateTenantSoftwareAiReportRequest(null),
+            CancellationToken.None
+        );
+
+        action.Result.Should().BeOfType<OkObjectResult>();
+
+        await _aiProvider
+            .Received(1)
+            .GenerateTextAsync(
+                Arg.Is<AiTextGenerationRequest>(request =>
+                    request.UserPrompt.Contains("\"vulnerabilities\"")
+                    && request.UserPrompt.Contains("CVE-2026-1000")
                 ),
                 Arg.Any<TenantAiProfileResolved>(),
                 Arg.Any<CancellationToken>()
