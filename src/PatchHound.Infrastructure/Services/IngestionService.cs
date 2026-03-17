@@ -20,9 +20,6 @@ public class IngestionService
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan IngestionArtifactRetention = TimeSpan.FromDays(7);
     private static readonly TimeSpan FailedIngestionRetention = TimeSpan.FromHours(24);
-    private static readonly JsonSerializerOptions StagingJsonOptions = new(
-        JsonSerializerDefaults.Web
-    );
     private readonly PatchHoundDbContext _dbContext;
     private readonly IEnumerable<IVulnerabilitySource> _sources;
     private readonly EnrichmentJobEnqueuer _enrichmentJobEnqueuer;
@@ -1638,7 +1635,7 @@ public class IngestionService
                 result.ExternalId,
                 result.Title,
                 result.VendorSeverity,
-                JsonSerializer.Serialize(result with { AffectedAssets = [] }, StagingJsonOptions),
+                JsonSerializer.Serialize(result with { AffectedAssets = [] }, StagingSerializerOptions.Instance),
                 stagedAt,
                 batchNumber
             )
@@ -1653,7 +1650,7 @@ public class IngestionService
                     affectedAsset.ExternalAssetId,
                     affectedAsset.AssetName,
                     affectedAsset.AssetType,
-                    JsonSerializer.Serialize(affectedAsset, StagingJsonOptions),
+                    JsonSerializer.Serialize(affectedAsset, StagingSerializerOptions.Instance),
                     stagedAt,
                     batchNumber
                 )
@@ -1775,7 +1772,7 @@ public class IngestionService
                     asset.ExternalId,
                     asset.Name,
                     asset.AssetType,
-                    JsonSerializer.Serialize(asset, StagingJsonOptions),
+                    JsonSerializer.Serialize(asset, StagingSerializerOptions.Instance),
                     stagedAt,
                     batchNumber
                 )
@@ -1793,7 +1790,7 @@ public class IngestionService
                     link.DeviceExternalId,
                     link.SoftwareExternalId,
                     link.ObservedAt,
-                    JsonSerializer.Serialize(link, StagingJsonOptions),
+                    JsonSerializer.Serialize(link, StagingSerializerOptions.Instance),
                     stagedAt,
                     batchNumber
                 )

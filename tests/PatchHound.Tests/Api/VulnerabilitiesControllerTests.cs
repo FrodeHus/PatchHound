@@ -11,6 +11,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Tenants;
 using PatchHound.Infrastructure.VulnerabilitySources;
@@ -49,11 +50,20 @@ public class VulnerabilitiesControllerTests : IDisposable
         );
         var aiConfigurationResolver = Substitute.For<ITenantAiConfigurationResolver>();
 
+        var snapshotResolver = new TenantSnapshotResolver(_dbContext);
+        var aliasResolver = new PatchHound.Api.Services.TenantSoftwareAliasResolver(_dbContext);
+        var detailQueryService = new PatchHound.Api.Services.VulnerabilityDetailQueryService(
+            _dbContext,
+            snapshotResolver,
+            aliasResolver
+        );
         _controller = new VulnerabilitiesController(
             _dbContext,
             vulnerabilityService,
             new AiReportService([], aiConfigurationResolver),
-            _tenantContext
+            _tenantContext,
+            snapshotResolver,
+            detailQueryService
         );
     }
 

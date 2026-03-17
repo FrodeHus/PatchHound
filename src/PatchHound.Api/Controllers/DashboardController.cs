@@ -3,12 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models.Dashboard;
+using PatchHound.Api.Services;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
-using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
-using PatchHound.Infrastructure.Tenants;
+using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Api.Controllers;
 
@@ -18,18 +18,21 @@ namespace PatchHound.Api.Controllers;
 public class DashboardController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
-    private readonly IRiskChangeBriefAiSummaryService _riskChangeBriefAiSummaryService;
+    private readonly DashboardQueryService _dashboardQueryService;
     private readonly ITenantContext _tenantContext;
+    private readonly TenantSnapshotResolver _snapshotResolver;
 
     public DashboardController(
         PatchHoundDbContext dbContext,
-        IRiskChangeBriefAiSummaryService riskChangeBriefAiSummaryService,
-        ITenantContext tenantContext
+        DashboardQueryService dashboardQueryService,
+        ITenantContext tenantContext,
+        TenantSnapshotResolver snapshotResolver
     )
     {
         _dbContext = dbContext;
-        _riskChangeBriefAiSummaryService = riskChangeBriefAiSummaryService;
+        _dashboardQueryService = dashboardQueryService;
         _tenantContext = tenantContext;
+        _snapshotResolver = snapshotResolver;
     }
 
     [HttpGet("summary")]
@@ -39,10 +42,11 @@ public class DashboardController : ControllerBase
         {
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
-        var activeSnapshotId = await ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
+        var activeSnapshotId = await _snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
 
-        var riskChangeBrief = await BuildRiskChangeBriefAsync(
+        var riskChangeBrief = await _dashboardQueryService.BuildRiskChangeBriefAsync(
             tenantId,
+            _tenantContext.CurrentTenantId ?? Guid.Empty,
             limit: 3,
             highCriticalOnly: true,
             ct
@@ -171,102 +175,7 @@ public class DashboardController : ControllerBase
             ))
             .ToListAsync(ct);
 
-        var recurrenceRows = await _dbContext
-            .VulnerabilityAssetEpisodes.AsNoTracking()
-            .Where(episode => episode.TenantId == tenantId)
-            .GroupBy(episode => new { episode.TenantVulnerabilityId, episode.AssetId })
-            .Select(group => new
-            {
-                VulnerabilityId = group.Key.TenantVulnerabilityId,
-                group.Key.AssetId,
-                EpisodeCount = group.Count(),
-            })
-            .ToListAsync(ct);
-
-        var recurringPairs = recurrenceRows.Where(row => row.EpisodeCount > 1).ToList();
-        var recurringVulnerabilityIds = recurringPairs
-            .Select(row => row.VulnerabilityId)
-            .Distinct()
-            .ToList();
-
-        var recurrenceRatePercent =
-            recurrenceRows.Count == 0
-                ? 0
-                : Math.Round((decimal)recurringPairs.Count / recurrenceRows.Count * 100m, 1);
-
-        var topRecurringVulnerabilityCounts = recurringPairs
-            .GroupBy(row => row.VulnerabilityId)
-            .Select(group => new
-            {
-                VulnerabilityId = group.Key,
-                EpisodeCount = group.Sum(row => row.EpisodeCount),
-                ReappearanceCount = group.Sum(row => row.EpisodeCount - 1),
-            })
-            .OrderByDescending(row => row.ReappearanceCount)
-            .ThenByDescending(row => row.EpisodeCount)
-            .Take(5)
-            .ToList();
-
-        var topRecurringVulnerabilityIds = topRecurringVulnerabilityCounts
-            .Select(row => row.VulnerabilityId)
-            .ToList();
-
-        var recurringVulnerabilities = await _dbContext
-            .TenantVulnerabilities.AsNoTracking()
-            .Where(v => v.TenantId == tenantId && topRecurringVulnerabilityIds.Contains(v.Id))
-            .Select(v => new
-            {
-                v.Id,
-                v.VulnerabilityDefinition.ExternalId,
-                v.VulnerabilityDefinition.Title,
-            })
-            .ToDictionaryAsync(v => v.Id, ct);
-
-        var topRecurringVulnerabilities = topRecurringVulnerabilityCounts
-            .Select(row =>
-            {
-                var vulnerability = recurringVulnerabilities[row.VulnerabilityId];
-                return new RecurringVulnerabilityDto(
-                    vulnerability.Id,
-                    vulnerability.ExternalId,
-                    vulnerability.Title,
-                    row.EpisodeCount,
-                    row.ReappearanceCount
-                );
-            })
-            .ToList();
-
-        var topRecurringAssetCounts = recurringPairs
-            .GroupBy(row => row.AssetId)
-            .Select(group => new
-            {
-                AssetId = group.Key,
-                RecurringVulnerabilityCount = group.Count(),
-            })
-            .OrderByDescending(row => row.RecurringVulnerabilityCount)
-            .Take(5)
-            .ToList();
-
-        var recurringAssetIds = topRecurringAssetCounts.Select(row => row.AssetId).ToList();
-        var recurringAssets = await _dbContext
-            .Assets.AsNoTracking()
-            .Where(asset => asset.TenantId == tenantId && recurringAssetIds.Contains(asset.Id))
-            .ToDictionaryAsync(asset => asset.Id, ct);
-
-        var topRecurringAssets = topRecurringAssetCounts
-            .Select(row =>
-            {
-                var asset = recurringAssets[row.AssetId];
-                return new RecurringAssetDto(
-                    asset.Id,
-                    asset.AssetType == AssetType.Device
-                        ? asset.DeviceComputerDnsName ?? asset.Name
-                        : asset.Name,
-                    asset.AssetType.ToString(),
-                    row.RecurringVulnerabilityCount
-                );
-            })
-            .ToList();
+        var recurrence = await _dashboardQueryService.GetRecurrenceDataAsync(tenantId, ct);
 
         return Ok(
             new DashboardSummaryDto(
@@ -279,26 +188,12 @@ public class DashboardController : ControllerBase
                 avgRemediationDays,
                 topVulns,
                 riskChangeBrief,
-                recurringVulnerabilityIds.Count,
-                recurrenceRatePercent,
-                topRecurringVulnerabilities,
-                topRecurringAssets
+                recurrence.RecurringVulnerabilityCount,
+                recurrence.RecurrenceRatePercent,
+                recurrence.TopRecurringVulnerabilities,
+                recurrence.TopRecurringAssets
             )
         );
-    }
-
-    private async Task<Guid?> ResolveActiveVulnerabilitySnapshotIdAsync(
-        Guid tenantId,
-        CancellationToken ct
-    )
-    {
-        return await _dbContext
-            .TenantSourceConfigurations.AsNoTracking()
-            .Where(item =>
-                item.TenantId == tenantId && item.SourceKey == TenantSourceCatalog.DefenderSourceKey
-            )
-            .Select(item => item.ActiveSnapshotId)
-            .FirstOrDefaultAsync(ct);
     }
 
     [HttpGet("risk-changes")]
@@ -309,7 +204,7 @@ public class DashboardController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        return Ok(await BuildRiskChangeBriefAsync(tenantId, limit: null, highCriticalOnly: false, ct));
+        return Ok(await _dashboardQueryService.BuildRiskChangeBriefAsync(tenantId, _tenantContext.CurrentTenantId ?? Guid.Empty, limit: null, highCriticalOnly: false, ct));
     }
 
     [HttpGet("trends")]
@@ -397,142 +292,4 @@ public class DashboardController : ControllerBase
         }
     }
 
-    private async Task<DashboardRiskChangeBriefDto> BuildRiskChangeBriefAsync(
-        Guid tenantId,
-        int? limit,
-        bool highCriticalOnly,
-        CancellationToken ct
-    )
-    {
-        var activeSnapshotId = await ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
-        var cutoff = DateTimeOffset.UtcNow.AddHours(-24);
-
-        var candidateRows = await _dbContext
-            .TenantVulnerabilities.AsNoTracking()
-            .Where(v =>
-                v.TenantId == tenantId
-                && (v.CreatedAt >= cutoff || v.UpdatedAt >= cutoff)
-            )
-            .Select(v => new
-            {
-                v.Id,
-                HasOpenEpisodes = _dbContext.VulnerabilityAssetEpisodes.Any(e =>
-                    e.TenantVulnerabilityId == v.Id
-                    && e.Status == VulnerabilityStatus.Open
-                ),
-                v.CreatedAt,
-                v.UpdatedAt,
-                v.VulnerabilityDefinition.ExternalId,
-                v.VulnerabilityDefinition.Title,
-                VendorSeverity = v.VulnerabilityDefinition.VendorSeverity,
-                AdjustedSeverity = _dbContext
-                    .OrganizationalSeverities
-                    .Where(os => os.TenantVulnerabilityId == v.Id)
-                    .OrderByDescending(os => os.AdjustedAt)
-                    .Select(os => (Severity?)os.AdjustedSeverity)
-                    .FirstOrDefault(),
-                AffectedAssetCount = _dbContext.VulnerabilityAssets.Count(va =>
-                    va.TenantVulnerabilityId == v.Id && va.SnapshotId == activeSnapshotId
-                ),
-            })
-            .ToListAsync(ct);
-
-        var appearedRows = candidateRows
-            .Where(row =>
-                row.HasOpenEpisodes
-                && (row.CreatedAt >= cutoff || row.UpdatedAt >= cutoff)
-            )
-            .Select(row => new
-            {
-                Item = new DashboardRiskChangeItemDto(
-                    row.Id,
-                    row.ExternalId,
-                    row.Title,
-                    (row.AdjustedSeverity ?? row.VendorSeverity).ToString(),
-                    row.AffectedAssetCount,
-                    row.CreatedAt >= cutoff ? row.CreatedAt : row.UpdatedAt
-                ),
-                EffectiveSeverity = row.AdjustedSeverity ?? row.VendorSeverity,
-            })
-            .Where(row => !highCriticalOnly
-                || row.EffectiveSeverity == Severity.High
-                || row.EffectiveSeverity == Severity.Critical)
-            .OrderByDescending(row => row.Item.ChangedAt)
-            .ThenByDescending(row => row.Item.AffectedAssetCount)
-            .ToList();
-
-        var resolvedRows = candidateRows
-            .Where(row => !row.HasOpenEpisodes && row.UpdatedAt >= cutoff)
-            .Select(row => new
-            {
-                Item = new DashboardRiskChangeItemDto(
-                    row.Id,
-                    row.ExternalId,
-                    row.Title,
-                    (row.AdjustedSeverity ?? row.VendorSeverity).ToString(),
-                    row.AffectedAssetCount,
-                    row.UpdatedAt
-                ),
-                EffectiveSeverity = row.AdjustedSeverity ?? row.VendorSeverity,
-            })
-            .Where(row => !highCriticalOnly
-                || row.EffectiveSeverity == Severity.High
-                || row.EffectiveSeverity == Severity.Critical)
-            .OrderByDescending(row => row.Item.ChangedAt)
-            .ThenByDescending(row => row.Item.AffectedAssetCount)
-            .ToList();
-
-        var deterministicBrief = new DashboardRiskChangeBriefDto(
-            appearedRows.Count,
-            resolvedRows.Count,
-            (limit.HasValue ? appearedRows.Take(limit.Value) : appearedRows)
-                .Select(row => row.Item)
-                .ToList(),
-            (limit.HasValue ? resolvedRows.Take(limit.Value) : resolvedRows)
-                .Select(row => row.Item)
-                .ToList(),
-            null
-        );
-
-        if (limit != 3)
-        {
-            return deterministicBrief;
-        }
-
-        try
-        {
-            var aiSummary = await _riskChangeBriefAiSummaryService.GenerateAsync(
-                _tenantContext.CurrentTenantId ?? Guid.Empty,
-                new RiskChangeBriefSummaryInput(
-                    deterministicBrief.AppearedCount,
-                    deterministicBrief.ResolvedCount,
-                    deterministicBrief.Appeared
-                        .Select(item => new RiskChangeBriefSummaryItemInput(
-                            item.ExternalId,
-                            item.Title,
-                            item.Severity,
-                            item.AffectedAssetCount,
-                            item.ChangedAt
-                        ))
-                        .ToList(),
-                    deterministicBrief.Resolved
-                        .Select(item => new RiskChangeBriefSummaryItemInput(
-                            item.ExternalId,
-                            item.Title,
-                            item.Severity,
-                            item.AffectedAssetCount,
-                            item.ChangedAt
-                        ))
-                        .ToList()
-                ),
-                ct
-            );
-
-            return deterministicBrief with { AiSummary = aiSummary };
-        }
-        catch
-        {
-            return deterministicBrief;
-        }
-    }
 }

@@ -9,6 +9,7 @@ using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
@@ -39,7 +40,13 @@ public class DashboardControllerTests : IDisposable
         _riskChangeBriefAiSummaryService
             .GenerateAsync(Arg.Any<Guid>(), Arg.Any<RiskChangeBriefSummaryInput>(), Arg.Any<CancellationToken>())
             .Returns((string?)null);
-        _controller = new DashboardController(_dbContext, _riskChangeBriefAiSummaryService, tenantContext);
+        var snapshotResolver = new TenantSnapshotResolver(_dbContext);
+        var dashboardQueryService = new PatchHound.Api.Services.DashboardQueryService(
+            _dbContext,
+            _riskChangeBriefAiSummaryService,
+            snapshotResolver
+        );
+        _controller = new DashboardController(_dbContext, dashboardQueryService, tenantContext, snapshotResolver);
     }
 
     [Fact]

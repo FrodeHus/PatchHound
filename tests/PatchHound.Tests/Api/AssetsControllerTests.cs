@@ -52,12 +52,21 @@ public class AssetsControllerTests : IDisposable
             new NormalizedSoftwareResolver(_dbContext)
         );
 
+        var snapshotResolver = new TenantSnapshotResolver(_dbContext);
+        var aliasResolver = new PatchHound.Api.Services.TenantSoftwareAliasResolver(_dbContext);
+        var detailQueryService = new PatchHound.Api.Services.AssetDetailQueryService(
+            _dbContext,
+            snapshotResolver,
+            aliasResolver
+        );
         _controller = new AssetsController(
             _dbContext,
             assetService,
             assessmentService,
             normalizedSoftwareProjectionService,
-            _tenantContext
+            _tenantContext,
+            snapshotResolver,
+            detailQueryService
         );
     }
 
