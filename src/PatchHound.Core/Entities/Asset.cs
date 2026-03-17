@@ -26,6 +26,8 @@ public class Asset
     public string? DeviceAadDeviceId { get; private set; }
     public string? DeviceGroupId { get; private set; }
     public string? DeviceGroupName { get; private set; }
+    public string? DeviceExposureLevel { get; private set; }
+    public bool? DeviceIsAadJoined { get; private set; }
     public string Metadata { get; private set; } = "{}";
 
     private Asset() { }
@@ -97,7 +99,9 @@ public class Asset
         string? lastIpAddress,
         string? aadDeviceId,
         string? groupId = null,
-        string? groupName = null
+        string? groupName = null,
+        string? exposureLevel = null,
+        bool? isAadJoined = null
     )
     {
         DeviceComputerDnsName = computerDnsName;
@@ -110,5 +114,7 @@ public class Asset
         DeviceAadDeviceId = aadDeviceId;
         DeviceGroupId = groupId;
         DeviceGroupName = groupName;
+        DeviceExposureLevel = exposureLevel;
+        DeviceIsAadJoined = isAadJoined;
     }
 }
