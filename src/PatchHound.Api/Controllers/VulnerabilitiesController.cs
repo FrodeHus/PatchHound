@@ -94,7 +94,12 @@ public class VulnerabilitiesController : ControllerBase
         }
         if (filter.PresentOnly != false)
         {
-            query = query.Where(v => v.Status == VulnerabilityStatus.Open);
+            query = query.Where(v =>
+                _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open
+                )
+            );
         }
         if (filter.RecurrenceOnly == true)
         {
@@ -167,7 +172,12 @@ public class VulnerabilitiesController : ControllerBase
                 v.VulnerabilityDefinition.ExternalId,
                 Title = v.VulnerabilityDefinition.Title,
                 VendorSeverity = v.VulnerabilityDefinition.VendorSeverity.ToString(),
-                Status = v.Status.ToString(),
+                Status = _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open
+                )
+                    ? nameof(VulnerabilityStatus.Open)
+                    : nameof(VulnerabilityStatus.Resolved),
                 Source = v.VulnerabilityDefinition.Source,
                 CvssScore = v.VulnerabilityDefinition.CvssScore,
                 PublishedDate = v.VulnerabilityDefinition.PublishedDate,
@@ -406,7 +416,9 @@ public class VulnerabilitiesController : ControllerBase
             definition.Title,
             definition.Description,
             definition.VendorSeverity.ToString(),
-            tenantVulnerability.Status.ToString(),
+            episodeRows.Any(row => row.Status == VulnerabilityStatus.Open)
+                ? nameof(VulnerabilityStatus.Open)
+                : nameof(VulnerabilityStatus.Resolved),
             FormatSourceDisplay(definition.Source),
             definition.GetSources(),
             definition.CvssScore,
