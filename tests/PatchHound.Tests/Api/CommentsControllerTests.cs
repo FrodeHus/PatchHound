@@ -27,6 +27,7 @@ public class CommentsControllerTests : IDisposable
         _tenantContext.CurrentTenantId.Returns(_tenantId);
         _tenantContext.AccessibleTenantIds.Returns([_tenantId]);
         _tenantContext.CurrentUserId.Returns(_userId);
+        _tenantContext.HasAccessToTenant(_tenantId).Returns(true);
 
         var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())

@@ -95,6 +95,9 @@ public class RiskAcceptancesController : ControllerBase
         if (r is null)
             return NotFound();
 
+        if (!_tenantContext.HasAccessToTenant(r.TenantId))
+            return Forbid();
+
         return Ok(
             new RiskAcceptanceDto(
                 r.Id,
@@ -121,6 +124,14 @@ public class RiskAcceptancesController : ControllerBase
         CancellationToken ct
     )
     {
+        var riskAcceptance = await _dbContext
+            .RiskAcceptances.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (riskAcceptance is null)
+            return NotFound();
+        if (!_tenantContext.HasAccessToTenant(riskAcceptance.TenantId))
+            return Forbid();
+
         if (string.Equals(request.Action, "Approve", StringComparison.OrdinalIgnoreCase))
         {
             var result = await _riskAcceptanceService.ApproveAsync(

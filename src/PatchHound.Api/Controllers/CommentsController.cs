@@ -75,25 +75,28 @@ public class CommentsController : ControllerBase
         if (_tenantContext.CurrentTenantId is null)
             return Unauthorized();
 
-        // Verify the referenced entity exists within the caller's tenant scope
-        var entityExists = internalEntityType switch
+        // Verify the referenced entity exists and resolve its tenant
+        var entityTenantId = internalEntityType switch
         {
-            "TenantVulnerability" => await _dbContext.TenantVulnerabilities.AnyAsync(
-                v => v.Id == entityId,
-                ct
-            ),
-            "RemediationTask" => await _dbContext.RemediationTasks.AnyAsync(
-                t => t.Id == entityId,
-                ct
-            ),
-            _ => false,
+            "TenantVulnerability" => await _dbContext
+                .TenantVulnerabilities.Where(v => v.Id == entityId)
+                .Select(v => (Guid?)v.TenantId)
+                .FirstOrDefaultAsync(ct),
+            "RemediationTask" => await _dbContext
+                .RemediationTasks.Where(t => t.Id == entityId)
+                .Select(t => (Guid?)t.TenantId)
+                .FirstOrDefaultAsync(ct),
+            _ => null,
         };
 
-        if (!entityExists)
+        if (entityTenantId is null)
             return NotFound(new ProblemDetails { Title = "Referenced entity not found" });
 
+        if (!_tenantContext.HasAccessToTenant(entityTenantId.Value))
+            return Forbid();
+
         var comment = Comment.Create(
-            _tenantContext.CurrentTenantId.Value,
+            entityTenantId.Value,
             internalEntityType,
             entityId,
             _tenantContext.CurrentUserId,

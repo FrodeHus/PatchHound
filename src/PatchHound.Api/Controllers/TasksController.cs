@@ -111,6 +111,9 @@ public class TasksController : ControllerBase
         if (task is null)
             return NotFound();
 
+        if (!_tenantContext.HasAccessToTenant(task.TenantId))
+            return Forbid();
+
         var vulnTitle =
             await _dbContext
                 .TenantVulnerabilities.Where(v => v.Id == task.TenantVulnerabilityId)
@@ -156,6 +159,14 @@ public class TasksController : ControllerBase
     {
         if (!Enum.TryParse<RemediationTaskStatus>(request.Status, out var status))
             return BadRequest(new ProblemDetails { Title = "Invalid status value" });
+
+        var task = await _dbContext
+            .RemediationTasks.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (task is null)
+            return NotFound();
+        if (!_tenantContext.HasAccessToTenant(task.TenantId))
+            return Forbid();
 
         var result = await _taskService.UpdateStatusAsync(id, status, request.Justification, ct);
         if (!result.IsSuccess)

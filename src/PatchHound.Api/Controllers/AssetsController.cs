@@ -585,6 +585,12 @@ public class AssetsController : ControllerBase
         if (!Enum.TryParse<OwnerType>(request.OwnerType, out var ownerType))
             return BadRequest(new ProblemDetails { Title = "Invalid owner type" });
 
+        var asset = await _dbContext.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, ct);
+        if (asset is null)
+            return NotFound();
+        if (!_tenantContext.HasAccessToTenant(asset.TenantId))
+            return Forbid();
+
         var result = ownerType switch
         {
             OwnerType.User => await _assetService.AssignOwnerAsync(id, request.OwnerId, ct),
@@ -606,6 +612,12 @@ public class AssetsController : ControllerBase
         CancellationToken ct
     )
     {
+        var asset = await _dbContext.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, ct);
+        if (asset is null)
+            return NotFound();
+        if (!_tenantContext.HasAccessToTenant(asset.TenantId))
+            return Forbid();
+
         if (request.SecurityProfileId.HasValue)
         {
             var exists = await _dbContext
@@ -642,6 +654,12 @@ public class AssetsController : ControllerBase
         if (!Enum.TryParse<Criticality>(request.Criticality, out var criticality))
             return BadRequest(new ProblemDetails { Title = "Invalid criticality value" });
 
+        var asset = await _dbContext.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, ct);
+        if (asset is null)
+            return NotFound();
+        if (!_tenantContext.HasAccessToTenant(asset.TenantId))
+            return Forbid();
+
         var result = await _assetService.SetCriticalityAsync(id, criticality, ct);
         if (!result.IsSuccess)
             return NotFound(new ProblemDetails { Title = result.Error });
@@ -662,6 +680,9 @@ public class AssetsController : ControllerBase
         {
             return NotFound(new ProblemDetails { Title = "Asset not found" });
         }
+
+        if (!_tenantContext.HasAccessToTenant(asset.TenantId))
+            return Forbid();
 
         if (asset.AssetType != AssetType.Software)
         {
@@ -793,6 +814,15 @@ public class AssetsController : ControllerBase
     {
         if (!Enum.TryParse<OwnerType>(request.OwnerType, out var ownerType))
             return BadRequest(new ProblemDetails { Title = "Invalid owner type" });
+
+        var assetTenantIds = await _dbContext
+            .Assets.AsNoTracking()
+            .Where(a => request.AssetIds.Contains(a.Id))
+            .Select(a => a.TenantId)
+            .Distinct()
+            .ToListAsync(ct);
+        if (assetTenantIds.Any(tid => !_tenantContext.HasAccessToTenant(tid)))
+            return Forbid();
 
         var result = await _assetService.BulkAssignOwnerAsync(
             request.AssetIds,

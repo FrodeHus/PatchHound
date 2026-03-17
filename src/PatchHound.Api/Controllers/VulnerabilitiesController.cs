@@ -654,9 +654,12 @@ public class VulnerabilitiesController : ControllerBase
         if (!Enum.TryParse<Severity>(request.AdjustedSeverity, out var severity))
             return BadRequest(new ProblemDetails { Title = "Invalid severity value" });
 
+        if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
         var tenantVulnerabilityId = await _dbContext
             .TenantVulnerabilities.AsNoTracking()
-            .Where(item => item.Id == id)
+            .Where(item => item.Id == id && item.TenantId == currentTenantId)
             .Select(item => (Guid?)item.Id)
             .FirstOrDefaultAsync(ct);
 

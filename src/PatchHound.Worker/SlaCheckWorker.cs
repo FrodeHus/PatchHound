@@ -91,6 +91,7 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
                         ct
                     );
                     task.MarkSlaNotified();
+                    await dbContext.SaveChangesAsync(ct);
                     notificationsSent++;
                     break;
 
@@ -113,12 +114,11 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
                         ct
                     );
                     task.MarkSlaNotified();
+                    await dbContext.SaveChangesAsync(ct);
                     notificationsSent++;
                     break;
             }
         }
-
-        await dbContext.SaveChangesAsync(ct);
 
         logger.LogInformation(
             "Completed SLA check cycle at {CycleCompletedAt}. Active tasks evaluated: {ActiveTaskCount}. Notifications sent: {NotificationsSent}.",
