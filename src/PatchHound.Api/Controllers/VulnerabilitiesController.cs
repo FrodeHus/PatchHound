@@ -10,7 +10,6 @@ using PatchHound.Core.Services;
 using PatchHound.Api.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
-using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Api.Controllers;
 
