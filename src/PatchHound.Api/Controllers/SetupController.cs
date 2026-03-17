@@ -153,7 +153,7 @@ public class SetupController : ControllerBase
                 claim.Type == "roles"
                 || claim.Type == ClaimTypes.Role
                 || claim.Type == "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
-            ) && string.Equals(claim.Value, "Tenant.Admin", StringComparison.Ordinal)
+            ) && string.Equals(claim.Value, "Tenant.Admin", StringComparison.OrdinalIgnoreCase)
         );
     }
 

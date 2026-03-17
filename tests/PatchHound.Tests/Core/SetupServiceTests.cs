@@ -26,6 +26,20 @@ public class SetupServiceTests
         _enrichmentSourceRepository = Substitute.For<IRepository<EnrichmentSourceConfiguration>>();
         _tenantSlaRepository = Substitute.For<IRepository<TenantSlaConfiguration>>();
         _unitOfWork = Substitute.For<IUnitOfWork>();
+
+        _unitOfWork
+            .ExecuteResilientAsync(Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var operation = callInfo.Arg<Func<CancellationToken, Task>>();
+                return operation(callInfo.Arg<CancellationToken>());
+            });
+
+        var transaction = Substitute.For<IUnitOfWorkTransaction>();
+        _unitOfWork
+            .BeginTransactionAsync(Arg.Any<CancellationToken>())
+            .Returns(transaction);
+
         _service = new SetupService(
             _tenantRepository,
             _userRepository,

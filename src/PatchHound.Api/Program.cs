@@ -63,7 +63,7 @@ builder.Services.Configure<JwtBearerOptions>(
                     .Select(claim => claim.Value)
                     .ToArray();
 
-                logger.LogInformation(
+                logger.LogDebug(
                     "JWT token validated. Expected audiences: {ExpectedAudiences}. Token audiences: {TokenAudiences}",
                     validAudiences.Length > 0 ? string.Join(", ", validAudiences) : "<none>",
                     audiences is { Length: > 0 } ? string.Join(", ", audiences) : "<none>"
