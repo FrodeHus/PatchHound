@@ -7,7 +7,9 @@ using PatchHound.Api.Models.Vulnerabilities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
+using PatchHound.Api.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Api.Controllers;
@@ -17,39 +19,28 @@ namespace PatchHound.Api.Controllers;
 [Authorize]
 public class VulnerabilitiesController : ControllerBase
 {
-    private sealed record VulnerabilityEpisodeHistoryRow(
-        Guid AssetId,
-        int EpisodeNumber,
-        VulnerabilityStatus Status,
-        DateTimeOffset FirstSeenAt,
-        DateTimeOffset LastSeenAt,
-        DateTimeOffset? ResolvedAt
-    );
-
-    private sealed record SoftwareCorrelationRow(
-        Guid DeviceAssetId,
-        string Name,
-        int EpisodeNumber,
-        DateTimeOffset FirstSeenAt,
-        DateTimeOffset? RemovedAt
-    );
-
     private readonly PatchHoundDbContext _dbContext;
     private readonly VulnerabilityService _vulnerabilityService;
     private readonly AiReportService _aiReportService;
     private readonly ITenantContext _tenantContext;
+    private readonly TenantSnapshotResolver _snapshotResolver;
+    private readonly VulnerabilityDetailQueryService _detailQueryService;
 
     public VulnerabilitiesController(
         PatchHoundDbContext dbContext,
         VulnerabilityService vulnerabilityService,
         AiReportService aiReportService,
-        ITenantContext tenantContext
+        ITenantContext tenantContext,
+        TenantSnapshotResolver snapshotResolver,
+        VulnerabilityDetailQueryService detailQueryService
     )
     {
         _dbContext = dbContext;
         _vulnerabilityService = vulnerabilityService;
         _aiReportService = aiReportService;
         _tenantContext = tenantContext;
+        _snapshotResolver = snapshotResolver;
+        _detailQueryService = detailQueryService;
     }
 
     [HttpGet]
@@ -62,7 +53,7 @@ public class VulnerabilitiesController : ControllerBase
     {
         if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
-        var activeSnapshotId = await ResolveActiveVulnerabilitySnapshotIdAsync(currentTenantId, ct);
+        var activeSnapshotId = await _snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(currentTenantId, ct);
 
         var query = _dbContext
             .TenantVulnerabilities.AsNoTracking()
@@ -201,7 +192,7 @@ public class VulnerabilitiesController : ControllerBase
                 v.Title,
                 v.VendorSeverity,
                 v.Status,
-                FormatSourceDisplay(v.Source),
+                VulnerabilityDetailQueryService.FormatSourceDisplay(v.Source),
                 v.CvssScore,
                 v.PublishedDate,
                 v.AffectedAssetCount,
@@ -233,426 +224,12 @@ public class VulnerabilitiesController : ControllerBase
     {
         if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
-        var activeSnapshotId = await ResolveActiveVulnerabilitySnapshotIdAsync(currentTenantId, ct);
 
-        var tenantVulnerability = await _dbContext
-            .TenantVulnerabilities.AsNoTracking()
-            .Include(tv => tv.VulnerabilityDefinition)
-            .ThenInclude(definition => definition.AffectedSoftware)
-            .Include(tv => tv.VulnerabilityDefinition)
-            .ThenInclude(definition => definition.References)
-            .FirstOrDefaultAsync(tv => tv.Id == id && tv.TenantId == currentTenantId, ct);
-
-        if (tenantVulnerability is null)
+        var detail = await _detailQueryService.BuildAsync(currentTenantId, id, ct);
+        if (detail is null)
             return NotFound();
-        var definition = tenantVulnerability.VulnerabilityDefinition;
-
-        var orgSeverity = await _dbContext
-            .OrganizationalSeverities.AsNoTracking()
-            .Where(os => os.TenantVulnerabilityId == tenantVulnerability.Id)
-            .OrderByDescending(os => os.AdjustedAt)
-            .FirstOrDefaultAsync(ct);
-
-        var vulnerabilityAssets = await _dbContext
-            .VulnerabilityAssets.AsNoTracking()
-            .Where(link =>
-                link.TenantVulnerabilityId == tenantVulnerability.Id
-                && link.SnapshotId == activeSnapshotId
-            )
-            .ToListAsync(ct);
-
-        // Get asset names for affected assets
-        var assetIds = vulnerabilityAssets.Select(a => a.AssetId).ToList();
-        var assets = await _dbContext
-            .Assets.AsNoTracking()
-            .Where(a => assetIds.Contains(a.Id))
-            .ToDictionaryAsync(a => a.Id, ct);
-        var securityProfileIds = assets
-            .Values.Where(asset => asset.SecurityProfileId.HasValue)
-            .Select(asset => asset.SecurityProfileId!.Value)
-            .Distinct()
-            .ToList();
-        var securityProfileNamesById = await _dbContext
-            .AssetSecurityProfiles.AsNoTracking()
-            .Where(profile => securityProfileIds.Contains(profile.Id))
-            .ToDictionaryAsync(profile => profile.Id, profile => profile.Name, ct);
-
-        var assessmentsByAssetId = await _dbContext
-            .VulnerabilityAssetAssessments.AsNoTracking()
-            .Where(assessment =>
-                assessment.TenantVulnerabilityId == tenantVulnerability.Id
-                && assessment.SnapshotId == activeSnapshotId
-            )
-            .ToDictionaryAsync(assessment => assessment.AssetId, ct);
-
-        var episodeRows = await _dbContext
-            .VulnerabilityAssetEpisodes.AsNoTracking()
-            .Where(episode => episode.TenantVulnerabilityId == tenantVulnerability.Id)
-            .OrderBy(episode => episode.AssetId)
-            .ThenBy(episode => episode.EpisodeNumber)
-            .Select(episode => new VulnerabilityEpisodeHistoryRow(
-                episode.AssetId,
-                episode.EpisodeNumber,
-                episode.Status,
-                episode.FirstSeenAt,
-                episode.LastSeenAt,
-                episode.ResolvedAt
-            ))
-            .ToListAsync(ct);
-
-        var episodesByAssetId = episodeRows
-            .GroupBy(row => row.AssetId)
-            .ToDictionary(
-                group => group.Key,
-                group =>
-                    group
-                        .Select(row => new VulnerabilityEpisodeDto(
-                            row.EpisodeNumber,
-                            row.Status.ToString(),
-                            row.FirstSeenAt,
-                            row.LastSeenAt,
-                            row.ResolvedAt
-                        ))
-                        .ToList() as IReadOnlyList<VulnerabilityEpisodeDto>
-            );
-
-        var softwareEpisodeRows = await _dbContext
-            .DeviceSoftwareInstallationEpisodes.AsNoTracking()
-            .Where(episode => assetIds.Contains(episode.DeviceAssetId))
-            .Join(
-                _dbContext.Assets.AsNoTracking(),
-                episode => episode.SoftwareAssetId,
-                software => software.Id,
-                (episode, software) =>
-                    new SoftwareCorrelationRow(
-                        episode.DeviceAssetId,
-                        software.Name,
-                        episode.EpisodeNumber,
-                        episode.FirstSeenAt,
-                        episode.RemovedAt
-                    )
-            )
-            .ToListAsync(ct);
-
-        var matchedSoftwareRows = await _dbContext
-            .SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(match => match.VulnerabilityDefinitionId == tenantVulnerability.VulnerabilityDefinitionId && match.ResolvedAt == null)
-            .Join(
-                _dbContext.Assets.AsNoTracking(),
-                match => match.SoftwareAssetId,
-                software => software.Id,
-                (match, software) =>
-                    new
-                    {
-                        software.Id,
-                        software.Name,
-                        software.ExternalId,
-                        MatchMethod = match.MatchMethod.ToString(),
-                        Confidence = match.Confidence.ToString(),
-                        match.Evidence,
-                        match.FirstSeenAt,
-                        match.LastSeenAt,
-                        match.ResolvedAt,
-                    }
-            )
-            .OrderBy(item => item.Name)
-            .ToListAsync(ct);
-
-        var matchedSoftwareExternalIds = matchedSoftwareRows
-            .Select(item => item.ExternalId)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-        var tenantSoftwareIdsByExternalId = matchedSoftwareExternalIds.Count == 0
-            ? new Dictionary<string, Guid?>(StringComparer.Ordinal)
-            : await _dbContext
-                .TenantSoftware.AsNoTracking()
-                .Join(
-                    _dbContext.NormalizedSoftwareAliases.AsNoTracking(),
-                    tenantSoftware => tenantSoftware.NormalizedSoftwareId,
-                    alias => alias.NormalizedSoftwareId,
-                    (tenantSoftware, alias) => new
-                    {
-                        tenantSoftware.Id,
-                        tenantSoftware.TenantId,
-                        alias.SourceSystem,
-                        alias.ExternalSoftwareId,
-                    }
-                )
-                .Where(item =>
-                    item.TenantId == tenantVulnerability.TenantId
-                    && item.SourceSystem == SoftwareIdentitySourceSystem.Defender
-                    && matchedSoftwareExternalIds.Contains(item.ExternalSoftwareId)
-                )
-                .GroupBy(item => item.ExternalSoftwareId)
-                .Select(group => new { ExternalSoftwareId = group.Key, TenantSoftwareId = group.Select(item => item.Id).First() })
-                .ToDictionaryAsync(
-                    item => item.ExternalSoftwareId,
-                    item => (Guid?)item.TenantSoftwareId,
-                    ct
-                );
-
-        var matchedSoftware = matchedSoftwareRows
-            .Select(item => new MatchedSoftwareDto(
-                item.Id,
-                tenantSoftwareIdsByExternalId.TryGetValue(item.ExternalId, out var tenantSoftwareId)
-                    ? tenantSoftwareId
-                    : null,
-                item.Name,
-                item.ExternalId,
-                item.MatchMethod,
-                item.Confidence,
-                item.Evidence,
-                item.FirstSeenAt,
-                item.LastSeenAt,
-                item.ResolvedAt
-            ))
-            .ToList();
-
-        var tenantHistory = BuildTenantHistory(episodeRows);
-
-        var detail = new VulnerabilityDetailDto(
-            tenantVulnerability.Id,
-            definition.ExternalId,
-            definition.Title,
-            definition.Description,
-            definition.VendorSeverity.ToString(),
-            episodeRows.Any(row => row.Status == VulnerabilityStatus.Open)
-                ? nameof(VulnerabilityStatus.Open)
-                : nameof(VulnerabilityStatus.Resolved),
-            FormatSourceDisplay(definition.Source),
-            definition.GetSources(),
-            definition.CvssScore,
-            definition.CvssVector,
-            definition.PublishedDate,
-            definition
-                .AffectedSoftware.OrderBy(item => item.Criteria)
-                .Select(item => new VulnerabilityAffectedSoftwareDto(
-                    item.Vulnerable,
-                    item.Criteria,
-                    item.VersionStartIncluding,
-                    item.VersionStartExcluding,
-                    item.VersionEndIncluding,
-                    item.VersionEndExcluding
-                ))
-                .ToList(),
-            matchedSoftware,
-            definition
-                .References.OrderBy(reference => reference.Source)
-                .ThenBy(reference => reference.Url)
-                .Select(reference => new VulnerabilityReferenceDto(
-                    reference.Url,
-                    reference.Source,
-                    reference.GetTags()
-                ))
-                .ToList(),
-            tenantHistory,
-            vulnerabilityAssets
-                .Select(va =>
-                {
-                    assets.TryGetValue(va.AssetId, out var asset);
-                    assessmentsByAssetId.TryGetValue(va.AssetId, out var assessment);
-                    episodesByAssetId.TryGetValue(va.AssetId, out var episodeHistory);
-
-                    return new AffectedAssetDto(
-                        va.AssetId,
-                        asset?.Name ?? "Unknown",
-                        asset?.AssetType.ToString() ?? "Unknown",
-                        asset?.SecurityProfileId is Guid profileId
-                        && securityProfileNamesById.TryGetValue(profileId, out var profileName)
-                            ? profileName
-                            : null,
-                        va.Status.ToString(),
-                        definition.VendorSeverity.ToString(),
-                        assessment?.BaseScore ?? definition.CvssScore,
-                        assessment?.EffectiveSeverity.ToString()
-                            ?? definition.VendorSeverity.ToString(),
-                        assessment?.EffectiveScore ?? definition.CvssScore,
-                        assessment?.ReasonSummary,
-                        va.DetectedDate,
-                        va.ResolvedDate,
-                        episodeHistory?.Count ?? 0,
-                        episodeHistory ?? [],
-                        GetPossibleCorrelatedSoftware(
-                            softwareEpisodeRows
-                                .Where(row => row.DeviceAssetId == va.AssetId)
-                                .ToList(),
-                            episodeHistory ?? []
-                        )
-                    );
-                })
-                .ToList(),
-            orgSeverity is null
-                ? null
-                : new OrganizationalSeverityDto(
-                    orgSeverity.AdjustedSeverity.ToString(),
-                    orgSeverity.Justification,
-                    orgSeverity.AssetCriticalityFactor,
-                    orgSeverity.ExposureFactor,
-                    orgSeverity.CompensatingControls,
-                    orgSeverity.AdjustedAt
-                )
-        );
 
         return Ok(detail);
-    }
-
-    private async Task<Guid?> ResolveActiveVulnerabilitySnapshotIdAsync(
-        Guid tenantId,
-        CancellationToken ct
-    )
-    {
-        return await _dbContext
-            .TenantSourceConfigurations.AsNoTracking()
-            .Where(item =>
-                item.TenantId == tenantId && item.SourceKey == TenantSourceCatalog.DefenderSourceKey
-            )
-            .Select(item => item.ActiveSnapshotId)
-            .FirstOrDefaultAsync(ct);
-    }
-
-    private static string FormatSourceDisplay(string source)
-    {
-        return string.Join(
-            ", ",
-            source.Split(
-                '|',
-                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
-            )
-        );
-    }
-
-    private static VulnerabilityTenantHistoryDto BuildTenantHistory(
-        IReadOnlyList<VulnerabilityEpisodeHistoryRow> episodeRows
-    )
-    {
-        if (episodeRows.Count == 0)
-        {
-            return new VulnerabilityTenantHistoryDto(null, null, null, null, false, 0, 0, 0);
-        }
-
-        var events = episodeRows
-            .SelectMany(row =>
-            {
-                var list = new List<(DateTimeOffset Timestamp, int Delta)>
-                {
-                    (row.FirstSeenAt, +1),
-                };
-
-                if (row.ResolvedAt is DateTimeOffset resolvedAt)
-                {
-                    list.Add((resolvedAt, -1));
-                }
-
-                return list;
-            })
-            .OrderBy(item => item.Timestamp)
-            .ThenBy(item => item.Delta)
-            .ToList();
-
-        var openCount = 0;
-        DateTimeOffset? firstSeenAt = null;
-        DateTimeOffset? lastGoneAt = null;
-        DateTimeOffset? lastReappearedAt = null;
-        var reappearanceCount = 0;
-
-        foreach (var current in events)
-        {
-            var wasOpen = openCount > 0;
-            openCount += current.Delta;
-            var isOpen = openCount > 0;
-
-            if (!wasOpen && isOpen)
-            {
-                if (firstSeenAt is null)
-                {
-                    firstSeenAt = current.Timestamp;
-                }
-                else
-                {
-                    lastReappearedAt = current.Timestamp;
-                    reappearanceCount++;
-                }
-            }
-
-            if (wasOpen && !isOpen)
-            {
-                lastGoneAt = current.Timestamp;
-            }
-        }
-
-        return new VulnerabilityTenantHistoryDto(
-            firstSeenAt,
-            episodeRows.Max(row => (DateTimeOffset)row.LastSeenAt),
-            lastGoneAt,
-            lastReappearedAt,
-            episodeRows.Any(row => row.Status == VulnerabilityStatus.Open),
-            episodeRows.Count(row => row.Status == VulnerabilityStatus.Open),
-            episodeRows.Count,
-            reappearanceCount
-        );
-    }
-
-    private static IReadOnlyList<string> GetPossibleCorrelatedSoftware(
-        IReadOnlyList<SoftwareCorrelationRow> softwareRows,
-        IReadOnlyList<VulnerabilityEpisodeDto> episodes
-    )
-    {
-        return softwareRows
-            .Select(softwareRow =>
-            {
-                var matchingEpisodes = episodes
-                    .Where(episode =>
-                        softwareRow.FirstSeenAt <= episode.FirstSeenAt
-                        && (
-                            softwareRow.RemovedAt is null
-                            || softwareRow.RemovedAt >= episode.FirstSeenAt
-                        )
-                    )
-                    .Select(episode =>
-                    {
-                        var age = episode.FirstSeenAt - softwareRow.FirstSeenAt;
-                        var score = 0;
-
-                        if (softwareRow.EpisodeNumber > 1)
-                        {
-                            score += 200;
-                        }
-
-                        if (episode.EpisodeNumber > 1)
-                        {
-                            score += 100;
-                        }
-
-                        score += age.TotalDays switch
-                        {
-                            <= 1 => 80,
-                            <= 7 => 50,
-                            <= 30 => 20,
-                            _ => 0,
-                        };
-
-                        return new
-                        {
-                            softwareRow.Name,
-                            Score = score,
-                            Age = age,
-                        };
-                    })
-                    .OrderByDescending(item => item.Score)
-                    .ThenBy(item => item.Age)
-                    .FirstOrDefault();
-
-                return matchingEpisodes;
-            })
-            .Where(item => item is not null)
-            .GroupBy(item => item!.Name, StringComparer.Ordinal)
-            .Select(group =>
-                group.OrderByDescending(item => item!.Score).ThenBy(item => item!.Age).First()
-            )
-            .OrderByDescending(item => item!.Score)
-            .ThenBy(item => item!.Age)
-            .Select(item => item!.Name)
-            .ToList();
     }
 
     [HttpPut("{id:guid}/organizational-severity")]

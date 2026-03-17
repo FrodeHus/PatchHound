@@ -273,6 +273,10 @@ builder.Services.AddPatchHoundInfrastructure(builder.Configuration);
 
 // Tenant context (scoped - one per request)
 builder.Services.AddScoped<ITenantContext, TenantContext>();
+builder.Services.AddScoped<PatchHound.Api.Services.TenantSoftwareAliasResolver>();
+builder.Services.AddScoped<PatchHound.Api.Services.DashboardQueryService>();
+builder.Services.AddScoped<PatchHound.Api.Services.VulnerabilityDetailQueryService>();
+builder.Services.AddScoped<PatchHound.Api.Services.AssetDetailQueryService>();
 builder.Services.AddHttpContextAccessor();
 
 // SignalR

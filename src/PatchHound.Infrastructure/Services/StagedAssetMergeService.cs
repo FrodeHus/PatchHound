@@ -10,9 +10,6 @@ namespace PatchHound.Infrastructure.Services;
 public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 {
     private const int AssetChunkSize = 500;
-    private static readonly JsonSerializerOptions StagingJsonOptions = new(
-        JsonSerializerDefaults.Web
-    );
 
     public async Task<StagedAssetMergeSummary> ProcessAsync(
         Guid ingestionRunId,
@@ -89,7 +86,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
             {
                 var asset = JsonSerializer.Deserialize<IngestionAsset>(
                     staged.PayloadJson,
-                    StagingJsonOptions
+                    StagingSerializerOptions.Instance
                 );
                 if (asset is null)
                 {
@@ -140,38 +137,22 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                     continue;
                 }
 
-                existing.UpdateDeviceDetails(
-                    asset.AssetType == AssetType.Device
-                        ? asset.DeviceComputerDnsName
-                        : existing.DeviceComputerDnsName,
-                    asset.AssetType == AssetType.Device
-                        ? asset.DeviceHealthStatus
-                        : existing.DeviceHealthStatus,
-                    asset.AssetType == AssetType.Device
-                        ? asset.DeviceOsPlatform
-                        : existing.DeviceOsPlatform,
-                    asset.AssetType == AssetType.Device
-                        ? asset.DeviceOsVersion
-                        : existing.DeviceOsVersion,
-                    asset.AssetType == AssetType.Device
-                        ? asset.DeviceRiskScore
-                        : existing.DeviceRiskScore,
-                    asset.AssetType == AssetType.Device
-                        ? asset.DeviceLastSeenAt
-                        : existing.DeviceLastSeenAt,
-                    asset.AssetType == AssetType.Device
-                        ? asset.DeviceLastIpAddress
-                        : existing.DeviceLastIpAddress,
-                    asset.AssetType == AssetType.Device
-                        ? asset.DeviceAadDeviceId
-                        : existing.DeviceAadDeviceId,
-                    asset.AssetType == AssetType.Device
-                        ? asset.DeviceGroupId
-                        : existing.DeviceGroupId,
-                    asset.AssetType == AssetType.Device
-                        ? asset.DeviceGroupName
-                        : existing.DeviceGroupName
-                );
+                if (asset.AssetType == AssetType.Device)
+                {
+                    existing.UpdateDeviceDetails(
+                        asset.DeviceComputerDnsName,
+                        asset.DeviceHealthStatus,
+                        asset.DeviceOsPlatform,
+                        asset.DeviceOsVersion,
+                        asset.DeviceRiskScore,
+                        asset.DeviceLastSeenAt,
+                        asset.DeviceLastIpAddress,
+                        asset.DeviceAadDeviceId,
+                        asset.DeviceGroupId,
+                        asset.DeviceGroupName
+                    );
+                }
+
                 existing.UpdateDetails(asset.Name, asset.Description);
                 existing.UpdateMetadata(asset.Metadata);
             }
@@ -259,7 +240,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                 .Select(item =>
                     JsonSerializer.Deserialize<IngestionDeviceSoftwareLink>(
                         item.PayloadJson,
-                        StagingJsonOptions
+                        StagingSerializerOptions.Instance
                     )
                 )
                 .Where(item => item is not null)
