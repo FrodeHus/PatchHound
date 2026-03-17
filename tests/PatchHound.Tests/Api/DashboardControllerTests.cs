@@ -207,11 +207,29 @@ public class DashboardControllerTests : IDisposable
             DateTimeOffset.UtcNow
         );
 
+        var openAsset = Asset.Create(
+            _tenantId,
+            "device-sev-1",
+            AssetType.Device,
+            "Device Sev 1",
+            Criticality.High
+        );
+
         await _dbContext.AddRangeAsync(
             openDefinition,
             resolvedDefinition,
             openTenantVulnerability,
-            resolvedTenantVulnerability
+            resolvedTenantVulnerability,
+            openAsset
+        );
+        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                openTenantVulnerability.Id,
+                openAsset.Id,
+                1,
+                DateTimeOffset.UtcNow
+            )
         );
         await _dbContext.SaveChangesAsync();
 
@@ -340,6 +358,22 @@ public class DashboardControllerTests : IDisposable
             Criticality.High
         );
 
+        var appearedEpisode = VulnerabilityAssetEpisode.Create(
+            _tenantId,
+            appearedTenantVulnerability.Id,
+            appearedAsset.Id,
+            1,
+            DateTimeOffset.UtcNow.AddHours(-2)
+        );
+        var resolvedEpisode = VulnerabilityAssetEpisode.Create(
+            _tenantId,
+            resolvedTenantVulnerability.Id,
+            resolvedAsset.Id,
+            1,
+            DateTimeOffset.UtcNow.AddDays(-2)
+        );
+        resolvedEpisode.Resolve(DateTimeOffset.UtcNow.AddHours(-3));
+
         await _dbContext.AddRangeAsync(
             appearedDefinition,
             resolvedDefinition,
@@ -358,6 +392,7 @@ public class DashboardControllerTests : IDisposable
                 DateTimeOffset.UtcNow.AddDays(-2)
             )
         );
+        await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(appearedEpisode, resolvedEpisode);
         await _dbContext.SaveChangesAsync();
 
         var summaryAction = await _controller.GetSummary(CancellationToken.None);
@@ -410,11 +445,44 @@ public class DashboardControllerTests : IDisposable
             DateTimeOffset.UtcNow.AddHours(-1)
         );
 
+        var highAsset = Asset.Create(
+            _tenantId,
+            "device-sev-high",
+            AssetType.Device,
+            "Device Sev High",
+            Criticality.High
+        );
+        var mediumAsset = Asset.Create(
+            _tenantId,
+            "device-sev-medium",
+            AssetType.Device,
+            "Device Sev Medium",
+            Criticality.Medium
+        );
+
         await _dbContext.AddRangeAsync(
             highDefinition,
             mediumDefinition,
             highTenantVulnerability,
-            mediumTenantVulnerability
+            mediumTenantVulnerability,
+            highAsset,
+            mediumAsset
+        );
+        await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                highTenantVulnerability.Id,
+                highAsset.Id,
+                1,
+                DateTimeOffset.UtcNow.AddHours(-2)
+            ),
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                mediumTenantVulnerability.Id,
+                mediumAsset.Id,
+                1,
+                DateTimeOffset.UtcNow.AddHours(-1)
+            )
         );
         await _dbContext.SaveChangesAsync();
 
@@ -452,7 +520,24 @@ public class DashboardControllerTests : IDisposable
             DateTimeOffset.UtcNow
         );
 
-        await _dbContext.AddRangeAsync(definition, tenantVulnerability);
+        var aiAsset = Asset.Create(
+            _tenantId,
+            "device-ai-1",
+            AssetType.Device,
+            "Device AI 1",
+            Criticality.High
+        );
+
+        await _dbContext.AddRangeAsync(definition, tenantVulnerability, aiAsset);
+        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                tenantVulnerability.Id,
+                aiAsset.Id,
+                1,
+                DateTimeOffset.UtcNow
+            )
+        );
         await _dbContext.SaveChangesAsync();
 
         _riskChangeBriefAiSummaryService

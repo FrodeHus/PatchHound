@@ -2145,10 +2145,65 @@ public class IngestionService
             ingestionRunId,
             tenantId,
             sourceKey,
+            UpdateAssetMergeProgressAsync,
             ct
         );
         await _normalizedSoftwareProjectionService.SyncTenantAsync(tenantId, snapshotId, ct);
         return summary;
+
+        async Task UpdateAssetMergeProgressAsync(
+            int stagedMachineCount,
+            int stagedSoftwareCount,
+            int persistedMachineCount,
+            int persistedSoftwareCount,
+            CancellationToken callbackCt
+        )
+        {
+            if (_dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+            {
+                var run = await _dbContext
+                    .IngestionRuns.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(item => item.Id == ingestionRunId, callbackCt);
+                if (run is null)
+                {
+                    return;
+                }
+
+                run.UpdateAssetMergeProgress(
+                    stagedMachineCount,
+                    stagedSoftwareCount,
+                    persistedMachineCount,
+                    persistedSoftwareCount
+                );
+                await _dbContext.SaveChangesAsync(callbackCt);
+                return;
+            }
+
+            await _dbContext
+                .IngestionRuns.IgnoreQueryFilters()
+                .Where(item => item.Id == ingestionRunId && !item.CompletedAt.HasValue)
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(
+                                item => item.StagedMachineCount,
+                                stagedMachineCount
+                            )
+                            .SetProperty(
+                                item => item.StagedSoftwareCount,
+                                stagedSoftwareCount
+                            )
+                            .SetProperty(
+                                item => item.PersistedMachineCount,
+                                persistedMachineCount
+                            )
+                            .SetProperty(
+                                item => item.PersistedSoftwareCount,
+                                persistedSoftwareCount
+                            ),
+                    callbackCt
+                );
+        }
     }
 
     private static bool SupportsSoftwareSnapshots(string sourceKey)

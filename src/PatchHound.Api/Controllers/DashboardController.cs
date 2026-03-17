@@ -53,9 +53,9 @@ public class DashboardController : ControllerBase
             .TenantVulnerabilities.AsNoTracking()
             .Where(v =>
                 v.TenantId == tenantId
-                && (
-                    v.Status == VulnerabilityStatus.Open
-                    || v.Status == VulnerabilityStatus.InRemediation
+                && _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open
                 )
             )
             .GroupBy(v => v.VulnerabilityDefinition.VendorSeverity)
@@ -68,19 +68,28 @@ public class DashboardController : ControllerBase
                 s => bySeverity.FirstOrDefault(x => x.Severity == s)?.Count ?? 0
             );
 
-        // Vulnerability counts by status
-        var byStatus = await _dbContext
+        // Vulnerability counts by status (derived from episodes)
+        var totalTenantVulnerabilities = await _dbContext
             .TenantVulnerabilities.AsNoTracking()
             .Where(v => v.TenantId == tenantId)
-            .GroupBy(v => v.Status)
-            .Select(g => new { Status = g.Key, Count = g.Count() })
-            .ToListAsync(ct);
+            .CountAsync(ct);
 
-        var vulnsByStatus = Enum.GetValues<VulnerabilityStatus>()
-            .ToDictionary(
-                s => s.ToString(),
-                s => byStatus.FirstOrDefault(x => x.Status == s)?.Count ?? 0
-            );
+        var openVulnerabilityCount = await _dbContext
+            .TenantVulnerabilities.AsNoTracking()
+            .Where(v =>
+                v.TenantId == tenantId
+                && _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open
+                )
+            )
+            .CountAsync(ct);
+
+        var vulnsByStatus = new Dictionary<string, int>
+        {
+            [nameof(VulnerabilityStatus.Open)] = openVulnerabilityCount,
+            [nameof(VulnerabilityStatus.Resolved)] = totalTenantVulnerabilities - openVulnerabilityCount,
+        };
 
         // SLA compliance
         var tasks = await _dbContext
@@ -110,7 +119,7 @@ public class DashboardController : ControllerBase
         var vulnerabilityAssetPairs = await _dbContext
             .VulnerabilityAssets.AsNoTracking()
             .Where(va =>
-                va.Status != VulnerabilityStatus.Resolved && va.SnapshotId == activeSnapshotId
+                va.Status == VulnerabilityStatus.Open && va.SnapshotId == activeSnapshotId
             )
             .Join(
                 _dbContext.TenantVulnerabilities.AsNoTracking(),
@@ -137,9 +146,9 @@ public class DashboardController : ControllerBase
             .TenantVulnerabilities.AsNoTracking()
             .Where(v =>
                 v.TenantId == tenantId
-                && (
-                    v.Status == VulnerabilityStatus.Open
-                    || v.Status == VulnerabilityStatus.InRemediation
+                && _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open
                 )
             )
             .OrderByDescending(v => v.VulnerabilityDefinition.VendorSeverity)
@@ -402,21 +411,15 @@ public class DashboardController : ControllerBase
             .TenantVulnerabilities.AsNoTracking()
             .Where(v =>
                 v.TenantId == tenantId
-                && (
-                    (
-                        (
-                            v.Status == VulnerabilityStatus.Open
-                            || v.Status == VulnerabilityStatus.InRemediation
-                        )
-                        && (v.CreatedAt >= cutoff || v.UpdatedAt >= cutoff)
-                    )
-                    || (v.Status == VulnerabilityStatus.Resolved && v.UpdatedAt >= cutoff)
-                )
+                && (v.CreatedAt >= cutoff || v.UpdatedAt >= cutoff)
             )
             .Select(v => new
             {
                 v.Id,
-                v.Status,
+                HasOpenEpisodes = _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open
+                ),
                 v.CreatedAt,
                 v.UpdatedAt,
                 v.VulnerabilityDefinition.ExternalId,
@@ -436,10 +439,7 @@ public class DashboardController : ControllerBase
 
         var appearedRows = candidateRows
             .Where(row =>
-                (
-                    row.Status == VulnerabilityStatus.Open
-                    || row.Status == VulnerabilityStatus.InRemediation
-                )
+                row.HasOpenEpisodes
                 && (row.CreatedAt >= cutoff || row.UpdatedAt >= cutoff)
             )
             .Select(row => new
@@ -462,7 +462,7 @@ public class DashboardController : ControllerBase
             .ToList();
 
         var resolvedRows = candidateRows
-            .Where(row => row.Status == VulnerabilityStatus.Resolved && row.UpdatedAt >= cutoff)
+            .Where(row => !row.HasOpenEpisodes && row.UpdatedAt >= cutoff)
             .Select(row => new
             {
                 Item = new DashboardRiskChangeItemDto(

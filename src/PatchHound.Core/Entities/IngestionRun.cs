@@ -82,6 +82,24 @@ public class IngestionRun
         PersistedVulnerabilityCount = persistedVulnerabilityCount;
     }
 
+    public void UpdateAssetMergeProgress(
+        int stagedMachineCount,
+        int stagedSoftwareCount,
+        int persistedMachineCount,
+        int persistedSoftwareCount
+    )
+    {
+        if (CompletedAt.HasValue)
+        {
+            return;
+        }
+
+        StagedMachineCount = stagedMachineCount;
+        StagedSoftwareCount = stagedSoftwareCount;
+        PersistedMachineCount = persistedMachineCount;
+        PersistedSoftwareCount = persistedSoftwareCount;
+    }
+
     public void CompleteSucceeded(
         DateTimeOffset completedAt,
         int stagedMachineCount,

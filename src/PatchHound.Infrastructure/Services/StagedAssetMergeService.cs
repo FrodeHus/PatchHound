@@ -18,6 +18,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
         Guid ingestionRunId,
         Guid tenantId,
         string sourceKey,
+        Func<int, int, int, int, CancellationToken, Task>? onProgress,
         CancellationToken ct
     )
     {
@@ -178,6 +179,17 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
             await dbContext.SaveChangesAsync(ct);
             dbContext.ChangeTracker.Clear();
             lastProcessedAssetId = chunk[^1].Id;
+
+            if (onProgress is not null)
+            {
+                await onProgress(
+                    stagedMachineCount,
+                    stagedSoftwareCount,
+                    persistedMachineCount,
+                    persistedSoftwareCount,
+                    ct
+                );
+            }
         }
 
         var softwareLinkSummary = await ProcessDeviceSoftwareLinksAsync(
