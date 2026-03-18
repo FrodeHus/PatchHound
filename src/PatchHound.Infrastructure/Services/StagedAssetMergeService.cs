@@ -20,28 +20,19 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
     )
     {
         var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var stagedMachineCount = await dbContext
-            .StagedAssets.IgnoreQueryFilters()
-            .CountAsync(
-                item =>
-                    item.IngestionRunId == ingestionRunId
-                    && item.TenantId == tenantId
-                    && item.SourceKey == normalizedSourceKey
-                    && item.AssetType == AssetType.Device,
-                ct
-            );
-        var stagedSoftwareCount = await dbContext
-            .StagedAssets.IgnoreQueryFilters()
-            .CountAsync(
-                item =>
-                    item.IngestionRunId == ingestionRunId
-                    && item.TenantId == tenantId
-                    && item.SourceKey == normalizedSourceKey
-                    && item.AssetType == AssetType.Software,
-                ct
-            );
-        var stagedLinkCount = await dbContext
-            .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
+        var stagedCounts = await dbContext.StagedAssets.IgnoreQueryFilters()
+            .Where(item =>
+                item.IngestionRunId == ingestionRunId
+                && item.TenantId == tenantId
+                && item.SourceKey == normalizedSourceKey)
+            .GroupBy(item => item.AssetType)
+            .Select(group => new { AssetType = group.Key, Count = group.Count() })
+            .ToListAsync(ct);
+
+        var stagedMachineCount = stagedCounts.FirstOrDefault(c => c.AssetType == AssetType.Device)?.Count ?? 0;
+        var stagedSoftwareCount = stagedCounts.FirstOrDefault(c => c.AssetType == AssetType.Software)?.Count ?? 0;
+
+        var stagedLinkCount = await dbContext.StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
             .CountAsync(
                 item =>
                     item.IngestionRunId == ingestionRunId
