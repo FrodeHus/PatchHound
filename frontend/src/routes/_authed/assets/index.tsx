@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { assignAssetOwner, assignAssetSecurityProfile, assignSoftwareCpeBinding, fetchAssetDetail, fetchAssets, setAssetCriticality } from '@/api/assets.functions'
-import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
+import { assignAssetOwner, assignAssetSecurityProfile, fetchAssetDetail, fetchAssets, setAssetCriticality } from '@/api/assets.functions'
 import { AssetDetailPane } from '@/components/features/assets/AssetDetailPane'
 import { AssetManagementTable } from '@/components/features/assets/AssetManagementTable'
 import { useTenantScope } from '@/components/layout/tenant-scope'
@@ -85,27 +84,11 @@ function AssetsPage() {
       await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
     },
   })
-  const softwareCpeBindingMutation = useMutation({
-    mutationFn: async (payload: { assetId: string; cpe23Uri: string | null }) => {
-      await assignSoftwareCpeBinding({ data: payload })
-    },
-    onSuccess: async () => {
-      if (selectedAssetId) {
-        await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, selectedAssetId) })
-      }
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
-    },
-  })
   const assetDetailQuery = useQuery({
     queryKey: assetQueryKeys.detail(selectedTenantId, selectedAssetId),
     queryFn: () => fetchAssetDetail({ data: { assetId: selectedAssetId! } }),
     enabled: Boolean(selectedAssetId),
   })
-  const securityProfilesQuery = useQuery({
-    queryKey: ['security-profiles', selectedTenantId],
-    queryFn: () => fetchSecurityProfiles({ data: {} }),
-  })
-
   if (!assets) {
     return null
   }
@@ -224,17 +207,8 @@ function AssetsPage() {
       />
       <AssetDetailPane
         asset={assetDetailQuery.data ?? null}
-        securityProfiles={securityProfilesQuery.data?.items ?? []}
         isLoading={assetDetailQuery.isLoading}
-        isAssigningSecurityProfile={securityProfileMutation.isPending}
-        isAssigningSoftwareCpeBinding={softwareCpeBindingMutation.isPending}
         isOpen={selectedAssetId !== null}
-        onAssignSecurityProfile={(assetId, securityProfileId) => {
-          securityProfileMutation.mutate({ assetId, securityProfileId })
-        }}
-        onAssignSoftwareCpeBinding={(assetId, cpe23Uri) => {
-          softwareCpeBindingMutation.mutate({ assetId, cpe23Uri })
-        }}
         onOpenChange={(open) => {
           if (!open) {
             setSelectedAssetId(null)
