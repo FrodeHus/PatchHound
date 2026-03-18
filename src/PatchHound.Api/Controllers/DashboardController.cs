@@ -47,30 +47,7 @@ public class DashboardController : ControllerBase
         }
         var activeSnapshotId = await _snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
 
-        // Build filtered asset ID set based on platform/device group filters
-        HashSet<Guid>? filteredAssetIds = null;
-        if (!string.IsNullOrEmpty(filter.Platform) || !string.IsNullOrEmpty(filter.DeviceGroup))
-        {
-            var assetQuery = _dbContext.Assets.AsNoTracking()
-                .Where(a => a.TenantId == tenantId && a.AssetType == AssetType.Device);
-
-            if (!string.IsNullOrEmpty(filter.Platform))
-            {
-                assetQuery = assetQuery.Where(a => a.DeviceOsPlatform == filter.Platform);
-            }
-
-            if (!string.IsNullOrEmpty(filter.DeviceGroup))
-            {
-                assetQuery = assetQuery.Where(a => a.DeviceGroupName == filter.DeviceGroup);
-            }
-
-            filteredAssetIds = (await assetQuery.Select(a => a.Id).ToListAsync(ct)).ToHashSet();
-        }
-
-        // Compute minPublishedDate from MinAgeDays
-        DateTimeOffset? minPublishedDate = filter.MinAgeDays.HasValue
-            ? DateTimeOffset.UtcNow.AddDays(-filter.MinAgeDays.Value)
-            : null;
+        var (filteredAssetIds, minPublishedDate) = BuildFilterContext(tenantId, filter);
 
         var riskChangeBrief = await _dashboardQueryService.BuildRiskChangeBriefAsync(
             tenantId,
@@ -111,10 +88,24 @@ public class DashboardController : ControllerBase
             );
 
         // Vulnerability counts by status (derived from episodes)
-        var totalTenantVulnerabilities = await _dbContext
+        var totalTenantVulnQuery = _dbContext
             .TenantVulnerabilities.AsNoTracking()
-            .Where(v => v.TenantId == tenantId)
-            .CountAsync(ct);
+            .Where(v =>
+                v.TenantId == tenantId
+                && _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && (filteredAssetIds == null || filteredAssetIds.Contains(e.AssetId))
+                )
+            );
+
+        if (minPublishedDate.HasValue)
+        {
+            totalTenantVulnQuery = totalTenantVulnQuery.Where(v =>
+                v.VulnerabilityDefinition.PublishedDate <= minPublishedDate.Value
+            );
+        }
+
+        var totalTenantVulnerabilities = await totalTenantVulnQuery.CountAsync(ct);
 
         var openVulnQuery = _dbContext
             .TenantVulnerabilities.AsNoTracking()
@@ -142,7 +133,7 @@ public class DashboardController : ControllerBase
             [nameof(VulnerabilityStatus.Resolved)] = totalTenantVulnerabilities - openVulnerabilityCount,
         };
 
-        // SLA compliance
+        // SLA compliance and remediation metrics — tenant-wide, NOT affected by dashboard filters
         var tasks = await _dbContext
             .RemediationTasks.AsNoTracking()
             .Where(t => t.TenantId == tenantId)
@@ -245,9 +236,22 @@ public class DashboardController : ControllerBase
         var recurrence = await _dashboardQueryService.GetRecurrenceDataAsync(tenantId, ct);
 
         // Vulnerabilities by device group — top 10 by total count descending
-        var deviceGroupRows = await _dbContext
+        var deviceGroupQuery = _dbContext
             .VulnerabilityAssetEpisodes.AsNoTracking()
-            .Where(e => e.Status == VulnerabilityStatus.Open && e.TenantVulnerability.TenantId == tenantId)
+            .Where(e =>
+                e.Status == VulnerabilityStatus.Open
+                && e.TenantVulnerability.TenantId == tenantId
+                && (filteredAssetIds == null || filteredAssetIds.Contains(e.AssetId))
+            );
+
+        if (minPublishedDate.HasValue)
+        {
+            deviceGroupQuery = deviceGroupQuery.Where(e =>
+                e.TenantVulnerability.VulnerabilityDefinition.PublishedDate <= minPublishedDate.Value
+            );
+        }
+
+        var deviceGroupRows = await deviceGroupQuery
             .Join(
                 _dbContext.Assets.AsNoTracking(),
                 e => e.AssetId,
@@ -326,30 +330,7 @@ public class DashboardController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        // Build filtered asset ID set based on platform/device group filters
-        HashSet<Guid>? filteredAssetIds = null;
-        if (!string.IsNullOrEmpty(filter.Platform) || !string.IsNullOrEmpty(filter.DeviceGroup))
-        {
-            var assetQuery = _dbContext.Assets.AsNoTracking()
-                .Where(a => a.TenantId == tenantId && a.AssetType == AssetType.Device);
-
-            if (!string.IsNullOrEmpty(filter.Platform))
-            {
-                assetQuery = assetQuery.Where(a => a.DeviceOsPlatform == filter.Platform);
-            }
-
-            if (!string.IsNullOrEmpty(filter.DeviceGroup))
-            {
-                assetQuery = assetQuery.Where(a => a.DeviceGroupName == filter.DeviceGroup);
-            }
-
-            filteredAssetIds = (await assetQuery.Select(a => a.Id).ToListAsync(ct)).ToHashSet();
-        }
-
-        // Compute minPublishedDate from MinAgeDays
-        DateTimeOffset? minPublishedDate = filter.MinAgeDays.HasValue
-            ? DateTimeOffset.UtcNow.AddDays(-filter.MinAgeDays.Value)
-            : null;
+        var (filteredAssetIds, minPublishedDate) = BuildFilterContext(tenantId, filter);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var startDate = today.AddDays(-89);
@@ -456,6 +437,28 @@ public class DashboardController : ControllerBase
             .ToArrayAsync(ct);
 
         return Ok(new DashboardFilterOptionsDto(platforms, deviceGroups));
+    }
+
+    private (IQueryable<Guid>? FilteredAssetIdQuery, DateTimeOffset? MinPublishedDate) BuildFilterContext(
+        Guid tenantId, DashboardFilterQuery filter)
+    {
+        IQueryable<Guid>? filteredAssetIdQuery = null;
+        if (!string.IsNullOrEmpty(filter.Platform) || !string.IsNullOrEmpty(filter.DeviceGroup))
+        {
+            var assetQuery = _dbContext.Assets.AsNoTracking()
+                .Where(a => a.TenantId == tenantId && a.AssetType == AssetType.Device);
+            if (!string.IsNullOrEmpty(filter.Platform))
+                assetQuery = assetQuery.Where(a => a.DeviceOsPlatform == filter.Platform);
+            if (!string.IsNullOrEmpty(filter.DeviceGroup))
+                assetQuery = assetQuery.Where(a => a.DeviceGroupName != null && a.DeviceGroupName.Contains(filter.DeviceGroup));
+            filteredAssetIdQuery = assetQuery.Select(a => a.Id);
+        }
+
+        DateTimeOffset? minPublishedDate = filter.MinAgeDays.HasValue
+            ? DateTimeOffset.UtcNow.AddDays(-filter.MinAgeDays.Value)
+            : null;
+
+        return (filteredAssetIdQuery, minPublishedDate);
     }
 
     private static IEnumerable<DateOnly> EachDay(DateOnly startDate, DateOnly endDate)

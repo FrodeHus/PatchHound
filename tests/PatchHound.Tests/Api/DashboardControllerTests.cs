@@ -238,6 +238,15 @@ public class DashboardControllerTests : IDisposable
                 DateTimeOffset.UtcNow
             )
         );
+        var resolvedEpisode = VulnerabilityAssetEpisode.Create(
+            _tenantId,
+            resolvedTenantVulnerability.Id,
+            openAsset.Id,
+            1,
+            DateTimeOffset.UtcNow.AddDays(-5)
+        );
+        resolvedEpisode.Resolve(DateTimeOffset.UtcNow.AddDays(-1));
+        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(resolvedEpisode);
         await _dbContext.SaveChangesAsync();
 
         var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
