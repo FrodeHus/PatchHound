@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import type { MetadataRecord } from '@/components/features/assets/AssetDetailHelpers'
+import { toneBadge } from '@/lib/tone-classes'
 
 export function SectionHeader({
   eyebrow,
@@ -46,10 +47,10 @@ export function Badge({
 }) {
   const toneClass =
     tone === 'amber'
-      ? 'border-amber-300/70 bg-amber-50 text-amber-900'
+      ? toneBadge('warning')
       : tone === 'blue'
-        ? 'border-sky-300/70 bg-sky-50 text-sky-900'
-        : 'border-border/70 bg-background text-foreground'
+        ? toneBadge('info')
+        : toneBadge('neutral')
 
   return (
     <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] ${toneClass}`}>

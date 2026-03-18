@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Link } from '@tanstack/react-router'
 import { ExternalLinkIcon, SearchIcon } from 'lucide-react'
 import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
+import { toneBadge } from '@/lib/tone-classes'
 
 type AssetManagementTableProps = {
   assets: Asset[]
@@ -448,7 +449,7 @@ export function AssetManagementTable({
         header: "Recurring",
         cell: ({ row }) =>
           row.original.recurringVulnerabilityCount > 0 ? (
-            <Badge className="rounded-full border border-amber-300/70 bg-amber-50 text-amber-900 hover:bg-amber-50">
+            <Badge className={`rounded-full border hover:bg-transparent ${toneBadge('warning')}`}>
               {row.original.recurringVulnerabilityCount} recurring
             </Badge>
           ) : (

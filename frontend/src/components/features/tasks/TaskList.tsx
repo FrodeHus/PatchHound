@@ -3,6 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import type { RemediationTask } from '@/api/tasks.schemas'
 import { TaskStatusUpdate } from '@/components/features/tasks/TaskStatusUpdate'
 import { Badge } from '@/components/ui/badge'
+import { toneBadge } from '@/lib/tone-classes'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
 import {
@@ -114,11 +115,11 @@ export function TaskList({
                 Overdue
               </Badge>
             ) : getDueSoon(row.original) ? (
-              <Badge className="rounded-full border border-amber-300/70 bg-amber-50 text-amber-900 hover:bg-amber-50">
+              <Badge className={`rounded-full border ${toneBadge('warning')} hover:bg-tone-warning`}>
                 Due soon
               </Badge>
             ) : (
-              <Badge className="rounded-full border border-emerald-300/70 bg-emerald-50 text-emerald-900 hover:bg-emerald-50">
+              <Badge className={`rounded-full border ${toneBadge('success')} hover:bg-tone-success`}>
                 On track
               </Badge>
             )}

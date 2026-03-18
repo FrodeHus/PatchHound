@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { toneBadge, toneDot } from '@/lib/tone-classes'
 import { cn } from '@/lib/utils'
 
 type SetupWizardProps = {
@@ -117,7 +118,7 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
                     isActive
                       ? 'border-primary bg-primary text-primary-foreground'
                       : isComplete
-                        ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                        ? toneBadge('success')
                         : 'border-border bg-background text-muted-foreground',
                   )}
                   onClick={() => {
@@ -132,7 +133,7 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
                       isActive
                         ? 'bg-background text-foreground'
                         : isComplete
-                          ? 'bg-emerald-600 text-white'
+                          ? `${toneDot('success')} text-white`
                           : 'bg-muted text-muted-foreground',
                     )}
                   >

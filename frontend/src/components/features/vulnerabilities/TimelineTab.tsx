@@ -1,5 +1,6 @@
 import type { AuditLogItem } from '@/api/audit-log.schemas'
 import { InsetPanel } from '@/components/ui/inset-panel'
+import { toneBadge } from '@/lib/tone-classes'
 
 type TimelineTabProps = {
   items: AuditLogItem[]
@@ -31,7 +32,7 @@ export function TimelineTab({ items }: TimelineTabProps) {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-sky-300/70 bg-sky-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-sky-900">
+                  <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] ${toneBadge('info')}`}>
                     {item.action}
                   </span>
                   {item.entityLabel ? (

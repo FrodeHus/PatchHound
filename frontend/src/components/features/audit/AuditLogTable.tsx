@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatAuditEntityType, formatAuditKey, parseAuditValues } from '@/lib/audit'
+import { toneBadge } from '@/lib/tone-classes'
 type AuditLogTableProps = {
   items: AuditLogItem[]
   totalCount: number
@@ -282,7 +283,7 @@ function summarizeEntry(item: AuditLogItem) {
 function actionBadgeClassName(action: string) {
   switch (action) {
     case 'Created':
-      return 'rounded-full border border-emerald-300/70 bg-emerald-50 text-emerald-900 hover:bg-emerald-50'
+      return `rounded-full border ${toneBadge('success')} hover:bg-tone-success`
     case 'Updated':
       return 'rounded-full border border-primary/20 bg-primary/10 text-primary hover:bg-primary/10'
     case 'Deleted':

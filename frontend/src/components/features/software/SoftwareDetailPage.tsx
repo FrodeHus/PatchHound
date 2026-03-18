@@ -9,6 +9,7 @@ import type {
 import { SoftwareAiReportTab } from '@/components/features/software/SoftwareAiReportTab'
 import { SoftwareDescriptionPanel } from '@/components/features/software/SoftwareDescriptionPanel'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
+import { toneDot, toneText } from '@/lib/tone-classes'
 
 type SoftwareDetailPageProps = {
   detail: TenantSoftwareDetail
@@ -107,7 +108,7 @@ export function SoftwareDetailPage({
                 </div>
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
                   <div
-                    className={cohort.activeVulnerabilityCount > 0 ? 'h-full rounded-full bg-amber-500' : 'h-full rounded-full bg-emerald-500'}
+                    className={cohort.activeVulnerabilityCount > 0 ? `h-full rounded-full ${toneDot('warning')}` : `h-full rounded-full ${toneDot('success')}`}
                     style={{ width: `${Math.max(14, Math.min(100, (cohort.activeInstallCount / Math.max(detail.activeInstallCount, 1)) * 100))}%` }}
                   />
                 </div>
@@ -177,7 +178,7 @@ export function SoftwareDetailPage({
                         <td className="px-4 py-3 text-muted-foreground">{item.deviceCriticality}</td>
                         <td className="px-4 py-3 text-muted-foreground">{item.securityProfileName ?? 'None'}</td>
                         <td className="px-4 py-3">
-                          <span className={item.openVulnerabilityCount > 0 ? 'text-amber-700' : 'text-emerald-700'}>
+                          <span className={item.openVulnerabilityCount > 0 ? toneText('warning') : toneText('success')}>
                             {item.openVulnerabilityCount}
                           </span>
                         </td>
@@ -372,9 +373,7 @@ function Metric({
   return (
     <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
       <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-      <p className={`mt-2 text-sm ${mono ? 'font-mono text-xs break-all' : 'font-medium'} ${
-        tone === 'warning' ? 'text-amber-700' : tone === 'danger' ? 'text-rose-700' : 'text-foreground'
-      }`}>
+      <p className={`mt-2 text-sm ${mono ? 'font-mono text-xs break-all' : 'font-medium'} ${toneText(tone)}`}>
         {value}
       </p>
     </div>

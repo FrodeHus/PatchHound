@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatDateTime } from '@/lib/formatting'
+import { toneBadge } from '@/lib/tone-classes'
 import { vulnerabilitySeverityOptions } from '@/lib/options/vulnerabilities'
 
 type RiskChangeWorkbenchProps = {
@@ -152,11 +153,7 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
         cell: ({ row }) => (
           <Badge
             variant="outline"
-            className={
-              row.original.changeType === 'appeared'
-                ? 'rounded-full border-amber-300/30 bg-amber-500/10 text-amber-200'
-                : 'rounded-full border-emerald-300/30 bg-emerald-500/10 text-emerald-200'
-            }
+            className={`rounded-full ${row.original.changeType === 'appeared' ? toneBadge('warning') : toneBadge('success')}`}
           >
             {row.original.changeType === 'appeared' ? (
               <>
@@ -202,10 +199,10 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
             variant="outline"
             className={
               row.original.severity === 'Critical'
-                ? 'rounded-full border-destructive/30 bg-destructive/10 text-destructive'
+                ? `rounded-full ${toneBadge('danger')}`
                 : row.original.severity === 'High'
-                  ? 'rounded-full border-amber-300/30 bg-amber-500/10 text-amber-200'
-                  : 'rounded-full border-border/70 bg-background/70'
+                  ? `rounded-full ${toneBadge('warning')}`
+                  : `rounded-full ${toneBadge('neutral')}`
             }
           >
             {row.original.severity}

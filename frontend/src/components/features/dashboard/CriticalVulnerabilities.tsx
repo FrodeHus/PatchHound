@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
 import type { DashboardSummary, TopVulnerability } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
+import { toneBadge } from '@/lib/tone-classes'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -122,7 +123,7 @@ export function CriticalVulnerabilities({ items, summary, isLoading }: CriticalV
                     <p className="text-sm font-medium">{item.externalId}</p>
                     <p className="text-xs text-muted-foreground">{item.title}</p>
                   </div>
-                  <Badge variant="outline" className="rounded-full border-amber-300/70 bg-amber-50 text-amber-900">
+                  <Badge variant="outline" className={`rounded-full ${toneBadge('warning')}`}>
                     {item.reappearanceCount}x
                   </Badge>
                 </button>
