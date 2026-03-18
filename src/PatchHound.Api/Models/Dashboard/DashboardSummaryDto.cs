@@ -16,7 +16,11 @@ public record DashboardSummaryDto(
     List<RecurringAssetDto> TopRecurringAssets,
     List<DeviceGroupVulnerabilityDto> VulnerabilitiesByDeviceGroup,
     Dictionary<string, int> DeviceHealthBreakdown,
-    Dictionary<string, int> DeviceOnboardingBreakdown
+    Dictionary<string, int> DeviceOnboardingBreakdown,
+    List<SlaComplianceTrendPointDto>? SlaComplianceTrend = null,
+    MetricSparklinesDto? MetricSparklines = null,
+    List<VulnerabilityAgeBucketDto>? VulnerabilityAgeBuckets = null,
+    List<MttrBySeverityDto>? MttrBySeverity = null
 );
 
 public record TopVulnerabilityDto(
@@ -79,6 +83,34 @@ public record DashboardFilterOptionsDto(
     string[] Platforms,
     string[] DeviceGroups
 );
+
+public record SlaComplianceTrendPointDto(DateOnly Date, decimal Percent);
+
+public record MetricSparklinesDto(
+    List<int> CriticalBacklog,
+    List<int> OverdueActions,
+    List<int> HealthyTasks,
+    List<int> OpenStatuses
+);
+
+public record VulnerabilityAgeBucketDto(
+    string Bucket,
+    int Count,
+    int Critical,
+    int High,
+    int Medium,
+    int Low
+);
+
+public record MttrBySeverityDto(
+    string Severity,
+    decimal Days,
+    decimal? PreviousDays
+);
+
+public record BurndownPointDto(DateOnly Date, int Discovered, int Resolved, int NetOpen);
+
+public record BurndownTrendDto(List<BurndownPointDto> Items);
 
 public record TrendDataDto(List<TrendItem> Items);
 

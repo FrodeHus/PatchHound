@@ -3,9 +3,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { z } from 'zod'
 import { AlertTriangle, CheckCircle2, ShieldAlert, TimerReset } from 'lucide-react'
-import { fetchDashboardFilterOptions, fetchDashboardSummary, fetchDashboardTrends } from '@/api/dashboard.functions'
+import { fetchDashboardBurndown, fetchDashboardFilterOptions, fetchDashboardSummary, fetchDashboardTrends } from '@/api/dashboard.functions'
 import { Card, CardContent } from '@/components/ui/card'
 import { InsetPanel } from '@/components/ui/inset-panel'
+import { Sparkline } from '@/components/features/dashboard/Sparkline'
 import { CriticalVulnerabilities } from '@/components/features/dashboard/CriticalVulnerabilities'
 import { DashboardFilterBar } from '@/components/features/dashboard/DashboardFilterBar'
 import { DeviceGroupVulnerabilityChart } from '@/components/features/dashboard/DeviceGroupVulnerabilityChart'
@@ -15,6 +16,9 @@ import { ExposureSlaCard } from '@/components/features/dashboard/ExposureSlaCard
 import { RemediationVelocity } from '@/components/features/dashboard/RemediationVelocity'
 import { RiskChangeBriefCard } from '@/components/features/dashboard/RiskChangeBriefCard'
 import { TrendChart } from '@/components/features/dashboard/TrendChart'
+import { VulnerabilityAgeChart } from '@/components/features/dashboard/VulnerabilityAgeChart'
+import { MttrCard } from '@/components/features/dashboard/MttrCard'
+import { BurndownChart } from '@/components/features/dashboard/BurndownChart'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 
 const dashboardSearchSchema = z.object({
@@ -67,6 +71,11 @@ function DashboardPage() {
     initialData: canUseInitialData && !hasActiveFilters ? initialData.trends : undefined,
     staleTime: 30_000,
   })
+  const burndownQuery = useQuery({
+    queryKey: ['dashboard', 'burndown', selectedTenantId, minAgeDays, platform, deviceGroup],
+    queryFn: () => fetchDashboardBurndown({ data: filterParams }),
+    staleTime: 30_000,
+  })
   const filterOptionsQuery = useQuery({
     queryKey: ['dashboard', 'filter-options', selectedTenantId],
     queryFn: () => fetchDashboardFilterOptions(),
@@ -79,30 +88,39 @@ function DashboardPage() {
   if (!summary || !trends) {
     return null
   }
+  const sparklines = summary.metricSparklines
   const statCards = [
     {
       label: 'Critical backlog',
       value: summary.vulnerabilitiesBySeverity.Critical ?? 0,
       icon: ShieldAlert,
       tone: 'text-destructive',
+      sparkline: sparklines?.criticalBacklog,
+      sparkColor: 'var(--color-destructive)',
     },
     {
       label: 'Overdue actions',
       value: summary.overdueTaskCount,
       icon: TimerReset,
       tone: 'text-primary',
+      sparkline: sparklines?.overdueActions,
+      sparkColor: 'var(--color-primary)',
     },
     {
       label: 'Healthy tasks',
       value: Math.max(summary.totalTaskCount - summary.overdueTaskCount, 0),
       icon: CheckCircle2,
       tone: 'text-chart-3',
+      sparkline: sparklines?.healthyTasks,
+      sparkColor: 'var(--color-chart-3)',
     },
     {
       label: 'Open statuses',
       value: Object.values(summary.vulnerabilitiesByStatus).reduce((total, count) => total + count, 0),
       icon: AlertTriangle,
       tone: 'text-chart-2',
+      sparkline: sparklines?.openStatuses,
+      sparkColor: 'var(--color-chart-2)',
     },
   ]
 
@@ -148,6 +166,16 @@ function DashboardPage() {
                     <p className="mt-3 text-3xl font-semibold tracking-[-0.04em]">
                       {item.value}
                     </p>
+                    {item.sparkline && item.sparkline.length >= 2 ? (
+                      <Sparkline
+                        data={item.sparkline}
+                        width={80}
+                        height={20}
+                        strokeColor={item.sparkColor}
+                        fillColor={item.sparkColor}
+                        className="mt-2"
+                      />
+                    ) : null}
                   </InsetPanel>
                 );
               })}
@@ -177,10 +205,29 @@ function DashboardPage() {
             slaCompliancePercent={summary.slaCompliancePercent}
             overdueCount={summary.overdueTaskCount}
             totalCount={summary.totalTaskCount}
+            slaComplianceTrend={summary.slaComplianceTrend}
             isLoading={summaryQuery.isFetching}
           />
         </div>
       </div>
+
+      {summary.mttrBySeverity ? (
+        <MttrCard
+          data={summary.mttrBySeverity}
+          isLoading={summaryQuery.isFetching}
+        />
+      ) : null}
+
+      {summary.vulnerabilityAgeBuckets ? (
+        <div className="grid gap-4 xl:grid-cols-3">
+          <div className="xl:col-span-2">
+            <VulnerabilityAgeChart
+              data={summary.vulnerabilityAgeBuckets}
+              isLoading={summaryQuery.isFetching}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2">
@@ -191,6 +238,11 @@ function DashboardPage() {
           />
         </div>
       </div>
+
+      <BurndownChart
+        data={burndownQuery.data}
+        isLoading={burndownQuery.isFetching}
+      />
 
       <RiskChangeBriefCard
         brief={summary.riskChangeBrief}
