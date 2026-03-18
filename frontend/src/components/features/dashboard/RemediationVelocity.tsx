@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 type RemediationVelocityProps = {
   averageDays: number
   vulnerabilitiesBySeverity: Record<string, number>
+  isLoading?: boolean
 }
 
 type VelocityPoint = {
@@ -28,7 +29,7 @@ function getChartData(vulnerabilitiesBySeverity: Record<string, number>): Veloci
   }))
 }
 
-export function RemediationVelocity({ averageDays, vulnerabilitiesBySeverity }: RemediationVelocityProps) {
+export function RemediationVelocity({ averageDays, vulnerabilitiesBySeverity, isLoading }: RemediationVelocityProps) {
   const chartData = getChartData(vulnerabilitiesBySeverity)
 
   return (
@@ -48,25 +49,29 @@ export function RemediationVelocity({ averageDays, vulnerabilitiesBySeverity }: 
         </div>
       </CardHeader>
       <CardContent className="pt-4">
-        <div className="h-[250px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData}>
-            <CartesianGrid vertical={false} stroke="color-mix(in oklab, var(--border) 85%, transparent)" />
-            <XAxis dataKey="severity" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} />
-            <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} />
-            <Tooltip
-              cursor={{ fill: 'color-mix(in oklab, var(--accent) 32%, transparent)' }}
-              contentStyle={{
-                background: 'var(--color-popover)',
-                border: '1px solid color-mix(in oklab, var(--border) 90%, transparent)',
-                borderRadius: '16px',
-                color: 'var(--color-popover-foreground)',
-              }}
-            />
-            <Bar dataKey="volume" fill="var(--color-primary)" radius={[10, 10, 4, 4]} />
-          </BarChart>
-        </ResponsiveContainer>
-        </div>
+        {isLoading ? (
+          <div className="h-[250px] w-full animate-pulse rounded-2xl bg-muted/60" />
+        ) : (
+          <div className="h-[250px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData}>
+              <CartesianGrid vertical={false} stroke="color-mix(in oklab, var(--border) 85%, transparent)" />
+              <XAxis dataKey="severity" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} />
+              <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }} />
+              <Tooltip
+                cursor={{ fill: 'color-mix(in oklab, var(--accent) 32%, transparent)' }}
+                contentStyle={{
+                  background: 'var(--color-popover)',
+                  border: '1px solid color-mix(in oklab, var(--border) 90%, transparent)',
+                  borderRadius: '16px',
+                  color: 'var(--color-popover-foreground)',
+                }}
+              />
+              <Bar dataKey="volume" fill="var(--color-primary)" radius={[10, 10, 4, 4]} />
+            </BarChart>
+          </ResponsiveContainer>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

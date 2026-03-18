@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 type TrendChartProps = {
   data: TrendData
   embedded?: boolean
+  isLoading?: boolean
 }
 
 type ChartPoint = {
@@ -58,7 +59,7 @@ function formatAxisDate(value: string) {
   }).format(date)
 }
 
-export function TrendChart({ data, embedded = false }: TrendChartProps) {
+export function TrendChart({ data, embedded = false, isLoading }: TrendChartProps) {
   const points = formatChartData(data)
   const legend = [
     { label: 'Low', className: 'bg-chart-2' },
@@ -86,7 +87,9 @@ export function TrendChart({ data, embedded = false }: TrendChartProps) {
     </>
   )
 
-  const chart = (
+  const chart = isLoading ? (
+    <div className="h-[320px] w-full animate-pulse rounded-2xl bg-muted/60" />
+  ) : (
     <div className={embedded ? 'mt-5 h-[320px] w-full' : 'h-[320px] w-full'}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points}>
