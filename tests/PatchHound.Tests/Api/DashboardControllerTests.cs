@@ -169,7 +169,7 @@ public class DashboardControllerTests : IDisposable
         );
         await _dbContext.SaveChangesAsync();
 
-        var action = await _controller.GetSummary(CancellationToken.None);
+        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
@@ -240,7 +240,7 @@ public class DashboardControllerTests : IDisposable
         );
         await _dbContext.SaveChangesAsync();
 
-        var action = await _controller.GetSummary(CancellationToken.None);
+        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
@@ -299,7 +299,7 @@ public class DashboardControllerTests : IDisposable
         episode.Resolve(resolvedAt);
         await _dbContext.SaveChangesAsync();
 
-        var action = await _controller.GetTrends(CancellationToken.None);
+        var action = await _controller.GetTrends(new DashboardFilterQuery(), CancellationToken.None);
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<TrendDataDto>().Subject;
@@ -402,7 +402,7 @@ public class DashboardControllerTests : IDisposable
         await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(appearedEpisode, resolvedEpisode);
         await _dbContext.SaveChangesAsync();
 
-        var summaryAction = await _controller.GetSummary(CancellationToken.None);
+        var summaryAction = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
         var summaryPayload = summaryAction.Result.Should().BeOfType<OkObjectResult>().Subject.Value
             .Should().BeOfType<DashboardSummaryDto>().Subject;
 
@@ -493,7 +493,7 @@ public class DashboardControllerTests : IDisposable
         );
         await _dbContext.SaveChangesAsync();
 
-        var summaryAction = await _controller.GetSummary(CancellationToken.None);
+        var summaryAction = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
         var summaryPayload = summaryAction.Result.Should().BeOfType<OkObjectResult>().Subject.Value
             .Should().BeOfType<DashboardSummaryDto>().Subject;
 
@@ -551,7 +551,7 @@ public class DashboardControllerTests : IDisposable
             .GenerateAsync(_tenantId, Arg.Any<RiskChangeBriefSummaryInput>(), Arg.Any<CancellationToken>())
             .Returns("1 critical issue appeared in the last 24 hours.");
 
-        var action = await _controller.GetSummary(CancellationToken.None);
+        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
@@ -616,7 +616,7 @@ public class DashboardControllerTests : IDisposable
         );
         await _dbContext.SaveChangesAsync();
 
-        var action = await _controller.GetTrends(CancellationToken.None);
+        var action = await _controller.GetTrends(new DashboardFilterQuery(), CancellationToken.None);
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<TrendDataDto>().Subject;
