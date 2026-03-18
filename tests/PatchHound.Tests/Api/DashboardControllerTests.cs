@@ -637,5 +637,231 @@ public class DashboardControllerTests : IDisposable
         todayHigh.Count.Should().Be(1);
     }
 
+    [Fact]
+    public async Task GetSummary_ReturnsVulnerabilitiesByDeviceGroup()
+    {
+        var asset1 = Asset.Create(
+            _tenantId,
+            "device-grp-1",
+            AssetType.Device,
+            "Device Group 1",
+            Criticality.High
+        );
+        asset1.UpdateDeviceDetails(
+            "device-grp-1.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "High",
+            DateTimeOffset.UtcNow,
+            "10.0.0.1",
+            "aad-grp-1",
+            groupId: "grp-tier0",
+            groupName: "Tier 0 Servers"
+        );
+
+        var asset2 = Asset.Create(
+            _tenantId,
+            "device-grp-2",
+            AssetType.Device,
+            "Device Group 2",
+            Criticality.Medium
+        );
+        asset2.UpdateDeviceDetails(
+            "device-grp-2.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "Medium",
+            DateTimeOffset.UtcNow,
+            "10.0.0.2",
+            "aad-grp-2",
+            groupId: "grp-field",
+            groupName: "Field Devices"
+        );
+
+        var definition = VulnerabilityDefinition.Create(
+            "CVE-2026-7000",
+            "Device group vulnerability",
+            "Desc",
+            Severity.High,
+            "MicrosoftDefender"
+        );
+        var tenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            definition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow
+        );
+
+        await _dbContext.AddRangeAsync(asset1, asset2, definition, tenantVulnerability);
+        await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                tenantVulnerability.Id,
+                asset1.Id,
+                1,
+                DateTimeOffset.UtcNow.AddDays(-5)
+            ),
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                tenantVulnerability.Id,
+                asset2.Id,
+                1,
+                DateTimeOffset.UtcNow.AddDays(-3)
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
+
+        payload.VulnerabilitiesByDeviceGroup.Should().HaveCountGreaterThanOrEqualTo(1);
+        payload.VulnerabilitiesByDeviceGroup
+            .Select(g => g.DeviceGroupName)
+            .Should().Contain("Tier 0 Servers");
+    }
+
+    [Fact]
+    public async Task GetSummary_ReturnsDeviceHealthBreakdown()
+    {
+        var activeAsset = Asset.Create(
+            _tenantId,
+            "device-health-1",
+            AssetType.Device,
+            "Device Health Active",
+            Criticality.High
+        );
+        activeAsset.UpdateDeviceDetails(
+            "device-health-1.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "High",
+            DateTimeOffset.UtcNow,
+            "10.0.0.1",
+            "aad-health-1"
+        );
+
+        var inactiveAsset = Asset.Create(
+            _tenantId,
+            "device-health-2",
+            AssetType.Device,
+            "Device Health Inactive",
+            Criticality.Medium
+        );
+        inactiveAsset.UpdateDeviceDetails(
+            "device-health-2.contoso.local",
+            "Inactive",
+            "Windows",
+            "11",
+            "Medium",
+            DateTimeOffset.UtcNow,
+            "10.0.0.2",
+            "aad-health-2"
+        );
+
+        await _dbContext.AddRangeAsync(activeAsset, inactiveAsset);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
+
+        payload.DeviceHealthBreakdown.Should().ContainKey("Active").WhoseValue.Should().Be(1);
+        payload.DeviceHealthBreakdown.Should().ContainKey("Inactive").WhoseValue.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetSummary_FiltersByMinAgeDays()
+    {
+        var asset = Asset.Create(
+            _tenantId,
+            "device-age-1",
+            AssetType.Device,
+            "Device Age 1",
+            Criticality.High
+        );
+        asset.UpdateDeviceDetails(
+            "device-age-1.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "High",
+            DateTimeOffset.UtcNow,
+            "10.0.0.1",
+            "aad-age-1"
+        );
+
+        var oldDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-8000",
+            "Old vulnerability",
+            "Desc",
+            Severity.High,
+            "MicrosoftDefender",
+            publishedDate: DateTimeOffset.UtcNow.AddDays(-100)
+        );
+        var oldTenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            oldDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow
+        );
+
+        var recentDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-8001",
+            "Recent vulnerability",
+            "Desc",
+            Severity.Medium,
+            "MicrosoftDefender",
+            publishedDate: DateTimeOffset.UtcNow.AddDays(-10)
+        );
+        var recentTenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            recentDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow
+        );
+
+        await _dbContext.AddRangeAsync(
+            asset,
+            oldDefinition,
+            recentDefinition,
+            oldTenantVulnerability,
+            recentTenantVulnerability
+        );
+        await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                oldTenantVulnerability.Id,
+                asset.Id,
+                1,
+                DateTimeOffset.UtcNow.AddDays(-100)
+            ),
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                recentTenantVulnerability.Id,
+                asset.Id,
+                1,
+                DateTimeOffset.UtcNow.AddDays(-10)
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetSummary(
+            new DashboardFilterQuery(MinAgeDays: 90),
+            CancellationToken.None
+        );
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
+
+        payload.VulnerabilitiesBySeverity.Should().ContainKey("High").WhoseValue.Should().Be(1);
+        payload.VulnerabilitiesBySeverity.GetValueOrDefault("Medium", 0).Should().Be(0);
+    }
+
     public void Dispose() => _dbContext.Dispose();
 }
