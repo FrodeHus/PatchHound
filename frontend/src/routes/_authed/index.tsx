@@ -128,26 +128,46 @@ function DashboardPage() {
         <CardContent className="p-6 sm:p-7">
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(22rem,1fr)]">
             <InsetPanel emphasis="subtle" className="p-5 backdrop-blur-sm">
-              <TrendChart data={trends} embedded isLoading={trendsQuery.isFetching} />
+              <TrendChart
+                data={trends}
+                embedded
+                isLoading={trendsQuery.isFetching}
+              />
             </InsetPanel>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
               {statCards.map((item) => {
-                const Icon = item.icon
+                const Icon = item.icon;
                 return (
                   <InsetPanel key={item.label} className="p-4 backdrop-blur-sm">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{item.label}</p>
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                        {item.label}
+                      </p>
                       <Icon className={`size-4 ${item.tone}`} />
                     </div>
-                    <p className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{item.value}</p>
+                    <p className="mt-3 text-3xl font-semibold tracking-[-0.04em]">
+                      {item.value}
+                    </p>
                   </InsetPanel>
-                )
+                );
               })}
             </div>
           </div>
         </CardContent>
       </Card>
 
+      <DeviceGroupVulnerabilityChart
+        data={summary.vulnerabilitiesByDeviceGroup}
+        isLoading={summaryQuery.isFetching}
+      />
+      <DeviceHealthCard
+        healthBreakdown={summary.deviceHealthBreakdown}
+        isLoading={summaryQuery.isFetching}
+      />
+      <OnboardingStatusCard
+        onboardingBreakdown={summary.deviceOnboardingBreakdown}
+        isLoading={summaryQuery.isFetching}
+      />
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2">
           <ExposureSlaCard
@@ -158,14 +178,6 @@ function DashboardPage() {
             isLoading={summaryQuery.isFetching}
           />
         </div>
-        <DeviceHealthCard
-          healthBreakdown={summary.deviceHealthBreakdown}
-          isLoading={summaryQuery.isFetching}
-        />
-        <OnboardingStatusCard
-          onboardingBreakdown={summary.deviceOnboardingBreakdown}
-          isLoading={summaryQuery.isFetching}
-        />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
@@ -178,18 +190,20 @@ function DashboardPage() {
         </div>
       </div>
 
-      <DeviceGroupVulnerabilityChart
-        data={summary.vulnerabilitiesByDeviceGroup}
+      <RiskChangeBriefCard
+        brief={summary.riskChangeBrief}
         isLoading={summaryQuery.isFetching}
       />
 
-      <RiskChangeBriefCard brief={summary.riskChangeBrief} isLoading={summaryQuery.isFetching} />
-
       <div className="grid gap-4 xl:grid-cols-5">
         <div className="xl:col-span-5">
-          <CriticalVulnerabilities items={summary.topCriticalVulnerabilities} summary={summary} isLoading={summaryQuery.isFetching} />
+          <CriticalVulnerabilities
+            items={summary.topCriticalVulnerabilities}
+            summary={summary}
+            isLoading={summaryQuery.isFetching}
+          />
         </div>
       </div>
     </section>
-  )
+  );
 }
