@@ -264,6 +264,77 @@ public class AssetsControllerTests : IDisposable
         payload.Items[0].DeviceGroupName.Should().Be("Tier 0 Servers");
     }
 
+    [Fact]
+    public async Task List_ReturnsHealthStatusRiskScoreExposureLevelAndTags()
+    {
+        var asset = Asset.Create(_tenantId, "dev-tag-1", AssetType.Device, "Tagged Host", Criticality.High);
+        asset.UpdateDeviceDetails(
+            "tagged.contoso.local", "Active", "Windows", "11",
+            "High", new DateTimeOffset(2026, 3, 17, 8, 0, 0, TimeSpan.Zero),
+            "10.0.0.50", "aad-tag-1", null, null, "Medium", true
+        );
+        await _dbContext.Assets.AddAsync(asset);
+        await _dbContext.SaveChangesAsync();
+
+        _dbContext.AssetTags.Add(AssetTag.Create(_tenantId, asset.Id, "production", "Defender"));
+        _dbContext.AssetTags.Add(AssetTag.Create(_tenantId, asset.Id, "tier-0", "Defender"));
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(new AssetFilterQuery(), new PaginationQuery(), CancellationToken.None);
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<AssetDto>>().Subject;
+
+        payload.Items.Should().ContainSingle();
+        var item = payload.Items[0];
+        item.HealthStatus.Should().Be("Active");
+        item.RiskScore.Should().Be("High");
+        item.ExposureLevel.Should().Be("Medium");
+        item.Tags.Should().BeEquivalentTo("production", "tier-0");
+    }
+
+    [Fact]
+    public async Task List_FiltersByExposureLevel()
+    {
+        var highExposure = Asset.Create(_tenantId, "dev-high", AssetType.Device, "High Exp", Criticality.Medium);
+        highExposure.UpdateDeviceDetails("h.local", "Active", "Windows", "11", "Low", DateTimeOffset.UtcNow, "10.0.0.1", null, null, null, "High", null);
+
+        var lowExposure = Asset.Create(_tenantId, "dev-low", AssetType.Device, "Low Exp", Criticality.Medium);
+        lowExposure.UpdateDeviceDetails("l.local", "Active", "Windows", "11", "Low", DateTimeOffset.UtcNow, "10.0.0.2", null, null, null, "Low", null);
+
+        await _dbContext.Assets.AddRangeAsync(highExposure, lowExposure);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(new AssetFilterQuery(ExposureLevel: "High"), new PaginationQuery(), CancellationToken.None);
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<AssetDto>>().Subject;
+
+        payload.Items.Should().ContainSingle();
+        payload.Items[0].Id.Should().Be(highExposure.Id);
+    }
+
+    [Fact]
+    public async Task List_FiltersByTag()
+    {
+        var tagged = Asset.Create(_tenantId, "dev-tagged", AssetType.Device, "Tagged", Criticality.Medium);
+        tagged.UpdateDeviceDetails("t.local", "Active", "Windows", "11", "Low", DateTimeOffset.UtcNow, "10.0.0.3", null);
+
+        var untagged = Asset.Create(_tenantId, "dev-untagged", AssetType.Device, "Untagged", Criticality.Medium);
+        untagged.UpdateDeviceDetails("u.local", "Active", "Windows", "11", "Low", DateTimeOffset.UtcNow, "10.0.0.4", null);
+
+        await _dbContext.Assets.AddRangeAsync(tagged, untagged);
+        await _dbContext.SaveChangesAsync();
+
+        _dbContext.AssetTags.Add(AssetTag.Create(_tenantId, tagged.Id, "production", "Defender"));
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(new AssetFilterQuery(Tag: "prod"), new PaginationQuery(), CancellationToken.None);
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<AssetDto>>().Subject;
+
+        payload.Items.Should().ContainSingle();
+        payload.Items[0].Id.Should().Be(tagged.Id);
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

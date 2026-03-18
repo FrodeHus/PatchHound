@@ -330,6 +330,12 @@ public class AssetDetailQueryService(
             ))
             .ToList();
 
+        var tags = await dbContext.AssetTags
+            .AsNoTracking()
+            .Where(t => t.AssetId == assetId)
+            .Select(t => t.Tag)
+            .ToArrayAsync(ct);
+
         return new AssetDetailDto(
             asset.Id,
             asset.AssetType == AssetType.Software
@@ -356,6 +362,9 @@ public class AssetDetailQueryService(
             asset.DeviceAadDeviceId,
             asset.DeviceGroupId,
             asset.DeviceGroupName,
+            asset.DeviceExposureLevel,
+            asset.DeviceIsAadJoined,
+            tags,
             asset.AssetType == AssetType.Software
                 && normalizedSoftwareIdsByExternalId.TryGetValue(asset.ExternalId, out var assetNormalizedSoftwareId)
                 ? cpeBindingsByNormalizedSoftwareId.GetValueOrDefault(assetNormalizedSoftwareId)

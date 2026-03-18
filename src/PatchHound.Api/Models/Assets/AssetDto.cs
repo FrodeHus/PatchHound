@@ -12,7 +12,11 @@ public record AssetDto(
     Guid? OwnerTeamId,
     string? SecurityProfileName,
     int VulnerabilityCount,
-    int RecurringVulnerabilityCount
+    int RecurringVulnerabilityCount,
+    string? HealthStatus,
+    string? RiskScore,
+    string? ExposureLevel,
+    string[] Tags
 );
 
 public record AssetDetailDto(
@@ -38,6 +42,9 @@ public record AssetDetailDto(
     string? DeviceAadDeviceId,
     string? DeviceGroupId,
     string? DeviceGroupName,
+    string? DeviceExposureLevel,
+    bool? DeviceIsAadJoined,
+    string[] Tags,
     SoftwareCpeBindingDto? SoftwareCpeBinding,
     string Metadata,
     IReadOnlyList<AssetVulnerabilityDto> Vulnerabilities,
@@ -135,5 +142,9 @@ public record AssetFilterQuery(
     bool? UnassignedOnly = null,
     Guid? OwnerId = null,
     Guid? TenantId = null,
-    string? Search = null
+    string? Search = null,
+    string? HealthStatus = null,
+    string? RiskScore = null,
+    string? ExposureLevel = null,
+    string? Tag = null
 );
