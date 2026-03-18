@@ -150,13 +150,14 @@ public class NormalizedSoftwareProjectionService(
             )
             .ToListAsync(ct);
 
+        var tenantSoftwareIdBySoftwareAssetId = activeInstallations
+            .ToDictionary(item => item.SoftwareAssetId, item => item.TenantSoftwareId);
+
         var grouped = matches
+            .Where(match => tenantSoftwareIdBySoftwareAssetId.ContainsKey(match.SoftwareAssetId))
             .GroupBy(match => new
             {
-                TenantSoftwareId = activeInstallations
-                    .Where(item => item.SoftwareAssetId == match.SoftwareAssetId)
-                    .Select(item => item.TenantSoftwareId)
-                    .First(),
+                TenantSoftwareId = tenantSoftwareIdBySoftwareAssetId[match.SoftwareAssetId],
                 match.VulnerabilityDefinitionId,
             })
             .ToList();
