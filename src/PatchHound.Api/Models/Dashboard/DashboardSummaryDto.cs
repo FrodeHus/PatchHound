@@ -13,7 +13,9 @@ public record DashboardSummaryDto(
     int RecurringVulnerabilityCount,
     decimal RecurrenceRatePercent,
     List<RecurringVulnerabilityDto> TopRecurringVulnerabilities,
-    List<RecurringAssetDto> TopRecurringAssets
+    List<RecurringAssetDto> TopRecurringAssets,
+    List<DeviceGroupVulnerabilityDto> VulnerabilitiesByDeviceGroup,
+    Dictionary<string, int> DeviceHealthBreakdown
 );
 
 public record TopVulnerabilityDto(
@@ -56,6 +58,25 @@ public record DashboardRiskChangeItemDto(
     string Severity,
     int AffectedAssetCount,
     DateTimeOffset ChangedAt
+);
+
+public record DashboardFilterQuery(
+    int? MinAgeDays = null,
+    string? Platform = null,
+    string? DeviceGroup = null
+);
+
+public record DeviceGroupVulnerabilityDto(
+    string DeviceGroupName,
+    int Critical,
+    int High,
+    int Medium,
+    int Low
+);
+
+public record DashboardFilterOptionsDto(
+    string[] Platforms,
+    string[] DeviceGroups
 );
 
 public record TrendDataDto(List<TrendItem> Items);
