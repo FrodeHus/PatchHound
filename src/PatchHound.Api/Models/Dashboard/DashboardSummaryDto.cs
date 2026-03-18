@@ -15,7 +15,8 @@ public record DashboardSummaryDto(
     List<RecurringVulnerabilityDto> TopRecurringVulnerabilities,
     List<RecurringAssetDto> TopRecurringAssets,
     List<DeviceGroupVulnerabilityDto> VulnerabilitiesByDeviceGroup,
-    Dictionary<string, int> DeviceHealthBreakdown
+    Dictionary<string, int> DeviceHealthBreakdown,
+    Dictionary<string, int> DeviceOnboardingBreakdown
 );
 
 public record TopVulnerabilityDto(

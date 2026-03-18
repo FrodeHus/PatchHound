@@ -16,7 +16,8 @@ public record AssetDto(
     string? HealthStatus,
     string? RiskScore,
     string? ExposureLevel,
-    string[] Tags
+    string[] Tags,
+    string? OnboardingStatus
 );
 
 public record AssetDetailDto(
@@ -44,6 +45,7 @@ public record AssetDetailDto(
     string? DeviceGroupName,
     string? DeviceExposureLevel,
     bool? DeviceIsAadJoined,
+    string? DeviceOnboardingStatus,
     string[] Tags,
     SoftwareCpeBindingDto? SoftwareCpeBinding,
     string Metadata,
@@ -146,5 +148,6 @@ public record AssetFilterQuery(
     string? HealthStatus = null,
     string? RiskScore = null,
     string? ExposureLevel = null,
-    string? Tag = null
+    string? Tag = null,
+    string? OnboardingStatus = null
 );
