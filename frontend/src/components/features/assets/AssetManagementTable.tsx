@@ -37,18 +37,30 @@ type AssetManagementTableProps = {
   criticalityFilter: string
   ownerTypeFilter: string
   deviceGroupFilter: string
+  healthStatusFilter: string
+  riskScoreFilter: string
+  exposureLevelFilter: string
+  tagFilter: string
   unassignedOnly: boolean
   onSearchChange: (search: string) => void
   onAssetTypeFilterChange: (assetType: string) => void
   onCriticalityFilterChange: (criticality: string) => void
   onOwnerTypeFilterChange: (ownerType: string) => void
   onDeviceGroupFilterChange: (deviceGroup: string) => void
+  onHealthStatusFilterChange: (healthStatus: string) => void
+  onRiskScoreFilterChange: (riskScore: string) => void
+  onExposureLevelFilterChange: (exposureLevel: string) => void
+  onTagFilterChange: (tag: string) => void
   onUnassignedOnlyChange: (value: boolean) => void
   onApplyStructuredFilters: (filters: {
     assetType: string
     criticality: string
     ownerType: string
     deviceGroup: string
+    healthStatus: string
+    riskScore: string
+    exposureLevel: string
+    tag: string
     unassignedOnly: boolean
   }) => void
   onPageChange: (page: number) => void
@@ -60,6 +72,9 @@ type AssetManagementTableProps = {
 }
 
 const criticalityOptions = ['Low', 'Medium', 'High', 'Critical']
+const healthStatusOptions = ['Active', 'Inactive', 'ImpairedCommunication', 'NoSensorData', 'NoSensorDataImpairedCommunication']
+const riskScoreOptions = ['None', 'Low', 'Medium', 'High']
+const exposureLevelOptions = ['None', 'Low', 'Medium', 'High']
 const assetTypeOptions = ['All', 'Device', 'Software', 'CloudResource']
 const ownershipFilterOptions = [
   { label: 'Any ownership', value: '' },
@@ -79,12 +94,20 @@ export function AssetManagementTable({
   criticalityFilter,
   ownerTypeFilter,
   deviceGroupFilter,
+  healthStatusFilter,
+  riskScoreFilter,
+  exposureLevelFilter,
+  tagFilter,
   unassignedOnly,
   onSearchChange,
   onAssetTypeFilterChange,
   onCriticalityFilterChange,
   onOwnerTypeFilterChange,
   onDeviceGroupFilterChange,
+  onHealthStatusFilterChange,
+  onRiskScoreFilterChange,
+  onExposureLevelFilterChange,
+  onTagFilterChange,
   onUnassignedOnlyChange,
   onApplyStructuredFilters,
   onPageChange,
@@ -103,6 +126,10 @@ export function AssetManagementTable({
     criticality: criticalityFilter,
     ownerType: ownerTypeFilter,
     deviceGroup: deviceGroupFilter,
+    healthStatus: healthStatusFilter,
+    riskScore: riskScoreFilter,
+    exposureLevel: exposureLevelFilter,
+    tag: tagFilter,
     unassignedOnly,
   })
 
@@ -129,10 +156,14 @@ export function AssetManagementTable({
         criticality: criticalityFilter,
         ownerType: ownerTypeFilter,
         deviceGroup: deviceGroupFilter,
+        healthStatus: healthStatusFilter,
+        riskScore: riskScoreFilter,
+        exposureLevel: exposureLevelFilter,
+        tag: tagFilter,
         unassignedOnly,
       })
     }
-  }, [assetTypeFilter, criticalityFilter, deviceGroupFilter, isFilterDrawerOpen, ownerTypeFilter, unassignedOnly])
+  }, [assetTypeFilter, criticalityFilter, deviceGroupFilter, exposureLevelFilter, healthStatusFilter, isFilterDrawerOpen, ownerTypeFilter, riskScoreFilter, tagFilter, unassignedOnly])
 
   const activeFilters = useMemo(
     () =>
@@ -185,6 +216,42 @@ export function AssetManagementTable({
               },
             }
           : null,
+        healthStatusFilter
+          ? {
+              key: "healthStatus",
+              label: `Health: ${healthStatusFilter}`,
+              onClear: () => {
+                onHealthStatusFilterChange("");
+              },
+            }
+          : null,
+        riskScoreFilter
+          ? {
+              key: "riskScore",
+              label: `Risk: ${riskScoreFilter}`,
+              onClear: () => {
+                onRiskScoreFilterChange("");
+              },
+            }
+          : null,
+        exposureLevelFilter
+          ? {
+              key: "exposureLevel",
+              label: `Exposure: ${exposureLevelFilter}`,
+              onClear: () => {
+                onExposureLevelFilterChange("");
+              },
+            }
+          : null,
+        tagFilter
+          ? {
+              key: "tag",
+              label: `Tag: ${tagFilter}`,
+              onClear: () => {
+                onTagFilterChange("");
+              },
+            }
+          : null,
         unassignedOnly
           ? {
               key: "unassigned",
@@ -199,14 +266,22 @@ export function AssetManagementTable({
       assetTypeFilter,
       criticalityFilter,
       deviceGroupFilter,
+      exposureLevelFilter,
+      healthStatusFilter,
       onAssetTypeFilterChange,
       onCriticalityFilterChange,
       onDeviceGroupFilterChange,
+      onExposureLevelFilterChange,
+      onHealthStatusFilterChange,
       onOwnerTypeFilterChange,
+      onRiskScoreFilterChange,
       onSearchChange,
+      onTagFilterChange,
       onUnassignedOnlyChange,
       ownerTypeFilter,
+      riskScoreFilter,
       searchValue,
+      tagFilter,
       unassignedOnly,
     ],
   );
@@ -218,9 +293,13 @@ export function AssetManagementTable({
         criticalityFilter,
         ownerTypeFilter,
         deviceGroupFilter,
+        healthStatusFilter,
+        riskScoreFilter,
+        exposureLevelFilter,
+        tagFilter,
         unassignedOnly ? 'unassigned' : '',
       ].filter(Boolean).length,
-    [assetTypeFilter, criticalityFilter, deviceGroupFilter, ownerTypeFilter, unassignedOnly],
+    [assetTypeFilter, criticalityFilter, deviceGroupFilter, exposureLevelFilter, healthStatusFilter, ownerTypeFilter, riskScoreFilter, tagFilter, unassignedOnly],
   )
 
   const columns = useMemo<ColumnDef<Asset>[]>(
@@ -267,6 +346,48 @@ export function AssetManagementTable({
               : "Not applicable"}
           </span>
         ),
+      },
+      {
+        accessorKey: "healthStatus",
+        header: "Health",
+        cell: ({ row }) => {
+          const value = row.original.healthStatus
+          if (!value) return <span className="text-muted-foreground">—</span>
+          return <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">{value}</Badge>
+        },
+      },
+      {
+        accessorKey: "riskScore",
+        header: "Risk",
+        cell: ({ row }) => {
+          const value = row.original.riskScore
+          if (!value) return <span className="text-muted-foreground">—</span>
+          return <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">{value}</Badge>
+        },
+      },
+      {
+        accessorKey: "exposureLevel",
+        header: "Exposure",
+        cell: ({ row }) => {
+          const value = row.original.exposureLevel
+          if (!value) return <span className="text-muted-foreground">—</span>
+          return <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">{value}</Badge>
+        },
+      },
+      {
+        accessorKey: "tags",
+        header: "Tags",
+        cell: ({ row }) => {
+          const tags = row.original.tags
+          if (!tags?.length) return <span className="text-muted-foreground">—</span>
+          return (
+            <div className="flex flex-wrap gap-1">
+              {tags.map((tag) => (
+                <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+              ))}
+            </div>
+          )
+        },
       },
       {
         accessorKey: "securityProfileName",
@@ -401,6 +522,10 @@ export function AssetManagementTable({
                 criticality: criticalityFilter,
                 ownerType: ownerTypeFilter,
                 deviceGroup: deviceGroupFilter,
+                healthStatus: healthStatusFilter,
+                riskScore: riskScoreFilter,
+                exposureLevel: exposureLevelFilter,
+                tag: tagFilter,
                 unassignedOnly,
               })
               setIsFilterDrawerOpen(true)
@@ -461,6 +586,10 @@ export function AssetManagementTable({
             criticality: '',
             ownerType: '',
             deviceGroup: '',
+            healthStatus: '',
+            riskScore: '',
+            exposureLevel: '',
+            tag: '',
             unassignedOnly: false,
           })
         }}
@@ -586,6 +715,103 @@ export function AssetManagementTable({
                 ))}
               </SelectContent>
             </Select>
+          </DataTableField>
+        </WorkbenchFilterSection>
+
+        <WorkbenchFilterSection
+          title="Device Risk"
+          description="Filter by Defender health status, risk score, exposure level, and device tags."
+        >
+          <DataTableField label="Health Status">
+            <Select
+              value={draftFilters.healthStatus || "all"}
+              onValueChange={(value) => {
+                const nextValue = value ?? "all";
+                setDraftFilters((current) => ({
+                  ...current,
+                  healthStatus: nextValue === "all" ? "" : nextValue,
+                }))
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any health status" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any health status</SelectItem>
+                {healthStatusOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
+
+          <DataTableField label="Risk Score">
+            <Select
+              value={draftFilters.riskScore || "all"}
+              onValueChange={(value) => {
+                const nextValue = value ?? "all";
+                setDraftFilters((current) => ({
+                  ...current,
+                  riskScore: nextValue === "all" ? "" : nextValue,
+                }))
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any risk score" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any risk score</SelectItem>
+                {riskScoreOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
+
+          <DataTableField label="Exposure Level">
+            <Select
+              value={draftFilters.exposureLevel || "all"}
+              onValueChange={(value) => {
+                const nextValue = value ?? "all";
+                setDraftFilters((current) => ({
+                  ...current,
+                  exposureLevel: nextValue === "all" ? "" : nextValue,
+                }))
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any exposure level" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any exposure level</SelectItem>
+                {exposureLevelOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
+
+          <DataTableField
+            label="Tag"
+            hint="Filter assets by a specific Defender machine tag."
+          >
+            <Input
+              value={draftFilters.tag}
+              onChange={(event) => {
+                setDraftFilters((current) => ({
+                  ...current,
+                  tag: event.target.value,
+                }))
+              }}
+              placeholder="Filter by tag"
+              className="h-10 rounded-xl border-border/70 bg-background/80"
+            />
           </DataTableField>
         </WorkbenchFilterSection>
       </WorkbenchFilterDrawer>

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { AssetDetail } from '@/api/assets.schemas'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -177,6 +178,8 @@ export function DeviceSection({
     { label: 'Last Seen', value: asset.deviceLastSeenAt ? formatDateTime(asset.deviceLastSeenAt) : 'Unknown' },
     { label: 'Last IP Address', value: asset.deviceLastIpAddress ?? 'Unknown' },
     { label: 'Device Group', value: asset.deviceGroupName ?? 'Unknown' },
+    { label: 'Exposure Level', value: asset.deviceExposureLevel ?? 'Unknown' },
+    { label: 'AAD Joined', value: asset.deviceIsAadJoined === true ? 'Yes' : asset.deviceIsAadJoined === false ? 'No' : 'Unknown' },
     { label: 'Entra Device ID', value: asset.deviceAadDeviceId ?? 'Unknown', mono: true },
   ]
 
@@ -192,6 +195,16 @@ export function DeviceSection({
           <DataCard key={field.label} label={field.label} value={field.value} mono={field.mono === true} />
         ))}
       </div>
+      {asset.tags && asset.tags.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground mb-1">Tags</p>
+          <div className="flex flex-wrap gap-1">
+            {asset.tags.map((tag) => (
+              <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
       {Object.keys(metadata).length > 0 ? (
         <div className="mt-4">
           <SectionHeader
