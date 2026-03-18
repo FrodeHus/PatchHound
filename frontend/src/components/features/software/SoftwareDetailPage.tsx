@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
+import { ArrowLeftIcon } from 'lucide-react'
 import type {
   TenantSoftwareDetail,
   TenantSoftwareVulnerability,
@@ -26,6 +27,7 @@ export function SoftwareDetailPage({
   onSelectVersion,
   onPageChange,
 }: SoftwareDetailPageProps) {
+  const router = useRouter()
   const [activeInsightTab, setActiveInsightTab] = useState<'vulnerabilities' | 'ai'>('vulnerabilities')
   const activeVersion =
     detail.versionCohorts.find((cohort) => normalizeVersion(cohort.version) === selectedVersion) ??
@@ -37,9 +39,14 @@ export function SoftwareDetailPage({
       <header className="overflow-hidden rounded-2xl border border-border/70 bg-[linear-gradient(140deg,color-mix(in_oklab,var(--primary)_12%,transparent),transparent_45%),linear-gradient(180deg,color-mix(in_oklab,var(--foreground)_4%,transparent),transparent_60%),var(--color-card)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-3">
-            <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-              Workspace
-            </Link>
+            <button
+              type="button"
+              onClick={() => router.history.back()}
+              className="flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
+            >
+              <ArrowLeftIcon className="size-3.5" />
+              Back
+            </button>
             <div className="flex flex-wrap gap-2">
               <Pill>{detail.normalizationMethod}</Pill>
               <Pill>{detail.confidence} confidence</Pill>
