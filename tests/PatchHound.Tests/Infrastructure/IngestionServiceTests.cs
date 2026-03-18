@@ -2955,14 +2955,16 @@ public class IngestionServiceTests : IDisposable
 
     private async Task<TenantVulnerability> CreateTenantVulnerabilityAsync(
         VulnerabilityDefinition vulnerability,
-        VulnerabilityStatus status = VulnerabilityStatus.Open
+        VulnerabilityStatus status = VulnerabilityStatus.Open,
+        string sourceKey = "TestSource"
     )
     {
         var tenantVulnerability = TenantVulnerability.Create(
             _tenantId,
             vulnerability.Id,
             status,
-            DateTimeOffset.UtcNow
+            DateTimeOffset.UtcNow,
+            sourceKey
         );
 
         await _dbContext.TenantVulnerabilities.AddAsync(tenantVulnerability);
