@@ -17,6 +17,7 @@ const assetsSearchSchema = baseListSearchSchema.extend({
   ownerType: searchStringSchema,
   deviceGroup: searchStringSchema,
   healthStatus: searchStringSchema,
+  onboardingStatus: searchStringSchema,
   riskScore: searchStringSchema,
   exposureLevel: searchStringSchema,
   tag: searchStringSchema,
@@ -123,6 +124,7 @@ function AssetsPage() {
         ownerTypeFilter={search.ownerType}
         deviceGroupFilter={search.deviceGroup}
         healthStatusFilter={search.healthStatus}
+        onboardingStatusFilter={search.onboardingStatus}
         riskScoreFilter={search.riskScore}
         exposureLevelFilter={search.exposureLevel}
         tagFilter={search.tag}
@@ -154,6 +156,10 @@ function AssetsPage() {
           searchActions.updateField('healthStatus', healthStatus)
           setSelectedAssetId(null)
         }}
+        onOnboardingStatusFilterChange={(onboardingStatus) => {
+          searchActions.updateField('onboardingStatus', onboardingStatus)
+          setSelectedAssetId(null)
+        }}
         onRiskScoreFilterChange={(riskScore) => {
           searchActions.updateField('riskScore', riskScore)
           setSelectedAssetId(null)
@@ -177,6 +183,7 @@ function AssetsPage() {
             ownerType: filters.ownerType,
             deviceGroup: filters.deviceGroup,
             healthStatus: filters.healthStatus,
+            onboardingStatus: filters.onboardingStatus,
             riskScore: filters.riskScore,
             exposureLevel: filters.exposureLevel,
             tag: filters.tag,
@@ -199,6 +206,7 @@ function AssetsPage() {
             ownerType: '',
             deviceGroup: '',
             healthStatus: '',
+            onboardingStatus: '',
             riskScore: '',
             exposureLevel: '',
             tag: '',

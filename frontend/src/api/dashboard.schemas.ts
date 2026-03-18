@@ -63,6 +63,7 @@ export const dashboardSummarySchema = z.object({
     low: z.number(),
   })),
   deviceHealthBreakdown: z.record(z.string(), z.number()),
+  deviceOnboardingBreakdown: z.record(z.string(), z.number()),
 })
 
 export const trendItemSchema = z.object({
