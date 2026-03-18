@@ -18,6 +18,7 @@ export const assetSchema = z.object({
   riskScore: z.string().nullable(),
   exposureLevel: z.string().nullable(),
   tags: z.array(z.string()),
+  onboardingStatus: z.string().nullable(),
 })
 
 export const assetVulnerabilitySchema = z.object({
@@ -79,6 +80,7 @@ export const assetDetailSchema = z.object({
   deviceGroupName: z.string().nullable(),
   deviceExposureLevel: z.string().nullable(),
   deviceIsAadJoined: z.boolean().nullable(),
+  deviceOnboardingStatus: z.string().nullable(),
   tags: z.array(z.string()),
   softwareCpeBinding: z.object({
     id: z.string().uuid(),

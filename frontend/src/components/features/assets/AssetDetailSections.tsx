@@ -180,6 +180,7 @@ export function DeviceSection({
     { label: 'Device Group', value: asset.deviceGroupName ?? 'Unknown' },
     { label: 'Exposure Level', value: asset.deviceExposureLevel ?? 'Unknown' },
     { label: 'AAD Joined', value: asset.deviceIsAadJoined === true ? 'Yes' : asset.deviceIsAadJoined === false ? 'No' : 'Unknown' },
+    { label: 'Onboarding Status', value: asset.deviceOnboardingStatus ?? 'Unknown' },
     { label: 'Entra Device ID', value: asset.deviceAadDeviceId ?? 'Unknown', mono: true },
   ]
 

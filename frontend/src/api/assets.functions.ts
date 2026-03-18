@@ -22,6 +22,7 @@ export const fetchAssets = createServerFn({ method: 'GET' })
       riskScore: z.string().optional(),
       exposureLevel: z.string().optional(),
       tag: z.string().optional(),
+      onboardingStatus: z.string().optional(),
     }),
   )
   .handler(async ({ context, data: filters }) => {

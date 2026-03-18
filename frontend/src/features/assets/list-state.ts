@@ -5,6 +5,7 @@ type AssetsListSearch = {
   ownerType: string
   deviceGroup: string
   healthStatus: string
+  onboardingStatus: string
   riskScore: string
   exposureLevel: string
   tag: string
@@ -21,6 +22,7 @@ export function buildAssetsListRequest(search: AssetsListSearch) {
     ...(search.ownerType ? { ownerType: search.ownerType } : {}),
     ...(search.deviceGroup ? { deviceGroup: search.deviceGroup } : {}),
     ...(search.healthStatus ? { healthStatus: search.healthStatus } : {}),
+    ...(search.onboardingStatus ? { onboardingStatus: search.onboardingStatus } : {}),
     ...(search.riskScore ? { riskScore: search.riskScore } : {}),
     ...(search.exposureLevel ? { exposureLevel: search.exposureLevel } : {}),
     ...(search.tag ? { tag: search.tag } : {}),
@@ -42,6 +44,7 @@ export const assetQueryKeys = {
     search.ownerType,
     search.deviceGroup,
     search.healthStatus,
+    search.onboardingStatus,
     search.riskScore,
     search.exposureLevel,
     search.tag,

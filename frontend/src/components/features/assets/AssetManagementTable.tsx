@@ -38,6 +38,7 @@ type AssetManagementTableProps = {
   ownerTypeFilter: string
   deviceGroupFilter: string
   healthStatusFilter: string
+  onboardingStatusFilter: string
   riskScoreFilter: string
   exposureLevelFilter: string
   tagFilter: string
@@ -48,6 +49,7 @@ type AssetManagementTableProps = {
   onOwnerTypeFilterChange: (ownerType: string) => void
   onDeviceGroupFilterChange: (deviceGroup: string) => void
   onHealthStatusFilterChange: (healthStatus: string) => void
+  onOnboardingStatusFilterChange: (onboardingStatus: string) => void
   onRiskScoreFilterChange: (riskScore: string) => void
   onExposureLevelFilterChange: (exposureLevel: string) => void
   onTagFilterChange: (tag: string) => void
@@ -58,6 +60,7 @@ type AssetManagementTableProps = {
     ownerType: string
     deviceGroup: string
     healthStatus: string
+    onboardingStatus: string
     riskScore: string
     exposureLevel: string
     tag: string
@@ -73,6 +76,7 @@ type AssetManagementTableProps = {
 
 const criticalityOptions = ['Low', 'Medium', 'High', 'Critical']
 const healthStatusOptions = ['Active', 'Inactive', 'ImpairedCommunication', 'NoSensorData', 'NoSensorDataImpairedCommunication']
+const onboardingStatusOptions = ['Onboarded', 'CanBeOnboarded', 'Unsupported', 'InsufficientInfo']
 const riskScoreOptions = ['None', 'Low', 'Medium', 'High']
 const exposureLevelOptions = ['None', 'Low', 'Medium', 'High']
 const assetTypeOptions = ['All', 'Device', 'Software', 'CloudResource']
@@ -95,6 +99,7 @@ export function AssetManagementTable({
   ownerTypeFilter,
   deviceGroupFilter,
   healthStatusFilter,
+  onboardingStatusFilter,
   riskScoreFilter,
   exposureLevelFilter,
   tagFilter,
@@ -105,6 +110,7 @@ export function AssetManagementTable({
   onOwnerTypeFilterChange,
   onDeviceGroupFilterChange,
   onHealthStatusFilterChange,
+  onOnboardingStatusFilterChange,
   onRiskScoreFilterChange,
   onExposureLevelFilterChange,
   onTagFilterChange,
@@ -127,6 +133,7 @@ export function AssetManagementTable({
     ownerType: ownerTypeFilter,
     deviceGroup: deviceGroupFilter,
     healthStatus: healthStatusFilter,
+    onboardingStatus: onboardingStatusFilter,
     riskScore: riskScoreFilter,
     exposureLevel: exposureLevelFilter,
     tag: tagFilter,
@@ -157,13 +164,14 @@ export function AssetManagementTable({
         ownerType: ownerTypeFilter,
         deviceGroup: deviceGroupFilter,
         healthStatus: healthStatusFilter,
+        onboardingStatus: onboardingStatusFilter,
         riskScore: riskScoreFilter,
         exposureLevel: exposureLevelFilter,
         tag: tagFilter,
         unassignedOnly,
       })
     }
-  }, [assetTypeFilter, criticalityFilter, deviceGroupFilter, exposureLevelFilter, healthStatusFilter, isFilterDrawerOpen, ownerTypeFilter, riskScoreFilter, tagFilter, unassignedOnly])
+  }, [assetTypeFilter, criticalityFilter, deviceGroupFilter, exposureLevelFilter, healthStatusFilter, isFilterDrawerOpen, onboardingStatusFilter, ownerTypeFilter, riskScoreFilter, tagFilter, unassignedOnly])
 
   const activeFilters = useMemo(
     () =>
@@ -225,6 +233,15 @@ export function AssetManagementTable({
               },
             }
           : null,
+        onboardingStatusFilter
+          ? {
+              key: "onboardingStatus",
+              label: `Onboarding: ${onboardingStatusFilter}`,
+              onClear: () => {
+                onOnboardingStatusFilterChange("");
+              },
+            }
+          : null,
         riskScoreFilter
           ? {
               key: "riskScore",
@@ -273,11 +290,13 @@ export function AssetManagementTable({
       onDeviceGroupFilterChange,
       onExposureLevelFilterChange,
       onHealthStatusFilterChange,
+      onOnboardingStatusFilterChange,
       onOwnerTypeFilterChange,
       onRiskScoreFilterChange,
       onSearchChange,
       onTagFilterChange,
       onUnassignedOnlyChange,
+      onboardingStatusFilter,
       ownerTypeFilter,
       riskScoreFilter,
       searchValue,
@@ -294,12 +313,13 @@ export function AssetManagementTable({
         ownerTypeFilter,
         deviceGroupFilter,
         healthStatusFilter,
+        onboardingStatusFilter,
         riskScoreFilter,
         exposureLevelFilter,
         tagFilter,
         unassignedOnly ? 'unassigned' : '',
       ].filter(Boolean).length,
-    [assetTypeFilter, criticalityFilter, deviceGroupFilter, exposureLevelFilter, healthStatusFilter, ownerTypeFilter, riskScoreFilter, tagFilter, unassignedOnly],
+    [assetTypeFilter, criticalityFilter, deviceGroupFilter, exposureLevelFilter, healthStatusFilter, onboardingStatusFilter, ownerTypeFilter, riskScoreFilter, tagFilter, unassignedOnly],
   )
 
   const columns = useMemo<ColumnDef<Asset>[]>(
@@ -352,6 +372,15 @@ export function AssetManagementTable({
         header: "Health",
         cell: ({ row }) => {
           const value = row.original.healthStatus
+          if (!value) return <span className="text-muted-foreground">—</span>
+          return <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">{value}</Badge>
+        },
+      },
+      {
+        accessorKey: "onboardingStatus",
+        header: "Onboarding",
+        cell: ({ row }) => {
+          const value = row.original.onboardingStatus
           if (!value) return <span className="text-muted-foreground">—</span>
           return <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">{value}</Badge>
         },
@@ -523,6 +552,7 @@ export function AssetManagementTable({
                 ownerType: ownerTypeFilter,
                 deviceGroup: deviceGroupFilter,
                 healthStatus: healthStatusFilter,
+                onboardingStatus: onboardingStatusFilter,
                 riskScore: riskScoreFilter,
                 exposureLevel: exposureLevelFilter,
                 tag: tagFilter,
@@ -587,6 +617,7 @@ export function AssetManagementTable({
             ownerType: '',
             deviceGroup: '',
             healthStatus: '',
+            onboardingStatus: '',
             riskScore: '',
             exposureLevel: '',
             tag: '',
@@ -739,6 +770,31 @@ export function AssetManagementTable({
               <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
                 <SelectItem value="all">Any health status</SelectItem>
                 {healthStatusOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
+
+          <DataTableField label="Onboarding Status">
+            <Select
+              value={draftFilters.onboardingStatus || "all"}
+              onValueChange={(value) => {
+                const nextValue = value ?? "all";
+                setDraftFilters((current) => ({
+                  ...current,
+                  onboardingStatus: nextValue === "all" ? "" : nextValue,
+                }))
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any onboarding status" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any onboarding status</SelectItem>
+                {onboardingStatusOptions.map((option) => (
                   <SelectItem key={option} value={option}>
                     {option}
                   </SelectItem>

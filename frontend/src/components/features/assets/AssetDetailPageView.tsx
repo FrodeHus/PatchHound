@@ -39,6 +39,7 @@ export function AssetDetailPageView({
                 ownerType: '',
                 deviceGroup: '',
                 healthStatus: '',
+                onboardingStatus: '',
                 riskScore: '',
                 exposureLevel: '',
                 tag: '',

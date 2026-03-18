@@ -33,6 +33,7 @@ const assetFixture: AssetDetail = {
   deviceGroupName: null,
   deviceExposureLevel: null,
   deviceIsAadJoined: null,
+  deviceOnboardingStatus: null,
   tags: [],
   softwareCpeBinding: {
     id: '44444444-4444-4444-4444-444444444444',
