@@ -82,6 +82,15 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                 )
                 .ToDictionaryAsync(current => current.ExternalId, StringComparer.Ordinal, ct);
 
+            var chunkAssetIds = existingAssetsByExternalId.Values.Select(a => a.Id).ToList();
+            var tagsByAssetId = chunkAssetIds.Count == 0
+                ? new Dictionary<Guid, List<AssetTag>>()
+                : (await dbContext.AssetTags
+                    .Where(t => chunkAssetIds.Contains(t.AssetId) && t.Source == "Defender")
+                    .ToListAsync(ct))
+                    .GroupBy(t => t.AssetId)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
             foreach (var staged in chunk)
             {
                 var asset = JsonSerializer.Deserialize<IngestionAsset>(
@@ -133,7 +142,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                             asset.DeviceOnboardingStatus
                         );
 
-                        await SyncDefenderTagsAsync(dbContext, tenantId, existing.Id, asset.MachineTags, ct);
+                        SyncDefenderTags(dbContext, tenantId, existing.Id, asset.MachineTags, tagsByAssetId);
                     }
 
                     existing.UpdateMetadata(asset.Metadata);
@@ -160,7 +169,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                         asset.DeviceOnboardingStatus
                     );
 
-                    await SyncDefenderTagsAsync(dbContext, tenantId, existing.Id, asset.MachineTags, ct);
+                    SyncDefenderTags(dbContext, tenantId, existing.Id, asset.MachineTags, tagsByAssetId);
                 }
 
                 existing.UpdateDetails(asset.Name, asset.Description);
@@ -572,17 +581,16 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
             return new StagedAssetStaleLinkSummary(0, 0);
         }
 
+        var staleDeviceAssetIds = staleInstallations.Select(item => item.DeviceAssetId).Distinct().ToList();
+        var staleSoftwareAssetIds = staleInstallations.Select(item => item.SoftwareAssetId).Distinct().ToList();
+
         var staleOpenEpisodes = await dbContext
             .DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters()
             .Where(current =>
                 current.TenantId == tenantId
                 && current.RemovedAt == null
-                && staleInstallations
-                    .Select(item => item.DeviceAssetId)
-                    .Contains(current.DeviceAssetId)
-                && staleInstallations
-                    .Select(item => item.SoftwareAssetId)
-                    .Contains(current.SoftwareAssetId)
+                && staleDeviceAssetIds.Contains(current.DeviceAssetId)
+                && staleSoftwareAssetIds.Contains(current.SoftwareAssetId)
             )
             .ToListAsync(ct);
         var staleOpenEpisodeByPair = staleOpenEpisodes.ToDictionary(current =>
@@ -617,20 +625,17 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
         return new StagedAssetStaleLinkSummary(staleInstallations.Count, installationsRemoved);
     }
 
-    private static async Task SyncDefenderTagsAsync(
+    private static void SyncDefenderTags(
         PatchHoundDbContext dbContext,
         Guid tenantId,
         Guid assetId,
         List<string>? machineTags,
-        CancellationToken ct
-    )
+        Dictionary<Guid, List<AssetTag>> tagsByAssetId)
     {
+        var existingTags = tagsByAssetId.GetValueOrDefault(assetId) ?? [];
+
         if (machineTags is { Count: > 0 })
         {
-            var existingTags = await dbContext.AssetTags
-                .Where(t => t.AssetId == assetId && t.Source == "Defender")
-                .ToListAsync(ct);
-
             var incomingSet = machineTags.ToHashSet(StringComparer.OrdinalIgnoreCase);
             var existingSet = existingTags.Select(t => t.Tag).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -646,9 +651,6 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
         }
         else
         {
-            var existingTags = await dbContext.AssetTags
-                .Where(t => t.AssetId == assetId && t.Source == "Defender")
-                .ToListAsync(ct);
             if (existingTags.Count > 0)
                 dbContext.AssetTags.RemoveRange(existingTags);
         }
