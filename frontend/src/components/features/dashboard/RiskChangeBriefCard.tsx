@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { ArrowRight, ArrowUpRight, CheckCircle2 } from 'lucide-react'
 import type { DashboardRiskChangeBrief } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
+import { toneBadge, toneText } from '@/lib/tone-classes'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { InsetPanel } from '@/components/ui/inset-panel'
 
@@ -76,8 +77,8 @@ type RiskChangeLaneProps = {
 function RiskChangeLane({ title, count, tone, emptyText, items }: RiskChangeLaneProps) {
   const countClassName =
     tone === 'new'
-      ? 'border-amber-300/30 bg-amber-500/10 text-amber-200'
-      : 'border-emerald-300/30 bg-emerald-500/10 text-emerald-200'
+      ? toneBadge('warning')
+      : toneBadge('success')
 
   return (
     <InsetPanel className="p-4">
@@ -110,7 +111,7 @@ function RiskChangeLane({ title, count, tone, emptyText, items }: RiskChangeLane
                     className={
                       item.severity === 'Critical'
                         ? 'rounded-full border-destructive/30 bg-destructive/10 text-destructive'
-                        : 'rounded-full border-amber-300/30 bg-amber-500/10 text-amber-200'
+                        : `rounded-full ${toneBadge('warning')}`
                     }
                   >
                     {item.severity}
@@ -122,9 +123,9 @@ function RiskChangeLane({ title, count, tone, emptyText, items }: RiskChangeLane
                 </p>
               </div>
               {tone === 'new' ? (
-                <ArrowUpRight className="mt-1 size-4 shrink-0 text-amber-200" />
+                <ArrowUpRight className={`mt-1 size-4 shrink-0 ${toneText('warning')}`} />
               ) : (
-                <CheckCircle2 className="mt-1 size-4 shrink-0 text-emerald-200" />
+                <CheckCircle2 className={`mt-1 size-4 shrink-0 ${toneText('success')}`} />
               )}
             </Link>
           ))

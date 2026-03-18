@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { vulnerabilitySeverityOptions } from '@/lib/options/vulnerabilities'
+import { toneBadge, toneText } from '@/lib/tone-classes'
 
 type OrgSeverityPanelProps = {
   vulnerability: VulnerabilityDetail
@@ -39,7 +40,7 @@ export function OrgSeverityPanel({ vulnerability }: OrgSeverityPanelProps) {
         <span
           className={`rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] ${
             hasExistingAdjustment
-              ? 'border-amber-300/70 bg-amber-50 text-amber-900'
+              ? toneBadge('warning')
               : 'border-border/70 bg-card text-muted-foreground'
           }`}
         >
@@ -104,7 +105,7 @@ export function OrgSeverityPanel({ vulnerability }: OrgSeverityPanelProps) {
       </div>
 
       {mutation.isError ? <p className="text-sm text-destructive">Unable to save severity adjustment.</p> : null}
-      {mutation.isSuccess ? <p className="text-sm text-emerald-600">Severity adjustment saved.</p> : null}
+      {mutation.isSuccess ? <p className={`text-sm ${toneText('success')}`}>Severity adjustment saved.</p> : null}
     </section>
   )
 }

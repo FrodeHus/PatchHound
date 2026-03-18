@@ -45,16 +45,16 @@ function MetricCard({
 }) {
   const toneClasses = {
     default: 'border-border/70 bg-background',
-    danger: 'border-red-200/70 bg-red-50/50',
-    warning: 'border-amber-200/70 bg-amber-50/50',
-    success: 'border-emerald-200/70 bg-emerald-50/50',
+    danger: 'border-tone-danger-border bg-tone-danger',
+    warning: 'border-tone-warning-border bg-tone-warning',
+    success: 'border-tone-success-border bg-tone-success',
   }
 
   const valueToneClasses = {
     default: 'text-foreground',
-    danger: 'text-red-700',
-    warning: 'text-amber-700',
-    success: 'text-emerald-700',
+    danger: 'text-tone-danger-foreground',
+    warning: 'text-tone-warning-foreground',
+    success: 'text-tone-success-foreground',
   }
 
   return (
@@ -301,10 +301,10 @@ export function AssetDetailPane({
                           </p>
                         </div>
                         <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
                             vuln.status === 'Open'
-                              ? 'border border-red-200/70 bg-red-50 text-red-700'
-                              : 'border border-emerald-200/70 bg-emerald-50 text-emerald-700'
+                              ? 'border-tone-danger-border bg-tone-danger text-tone-danger-foreground'
+                              : 'border-tone-success-border bg-tone-success text-tone-success-foreground'
                           }`}
                         >
                           {vuln.status}

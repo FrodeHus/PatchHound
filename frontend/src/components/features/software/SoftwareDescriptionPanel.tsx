@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { MarkdownViewer } from '@/components/ui/markdown-viewer'
 import { softwareQueryKeys } from '@/features/software/list-state'
 import { formatDateTime } from '@/lib/formatting'
+import { toneSurface } from '@/lib/tone-classes'
 
 type SoftwareDescriptionPanelProps = {
   tenantSoftwareId: string
@@ -129,14 +130,14 @@ export function SoftwareDescriptionPanel({
       )}
 
       {defaultProfile && !defaultProfileIsUsable ? (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300/25 bg-amber-500/8 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+        <div className={`mt-4 flex items-start gap-2 rounded-xl ${toneSurface('warning')} px-3 py-2 text-sm text-tone-warning-foreground`}>
           <CircleAlert className="mt-0.5 size-4 shrink-0" />
           <p>Product description generation is disabled until the default AI profile validates successfully.</p>
         </div>
       ) : null}
 
       {descriptionJobIsActive ? (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-blue-300/25 bg-blue-500/8 px-3 py-2 text-sm text-blue-900 dark:text-blue-200">
+        <div className={`mt-4 flex items-start gap-2 rounded-xl ${toneSurface('info')} px-3 py-2 text-sm text-tone-info-foreground`}>
           <Bot className="mt-0.5 size-4 shrink-0" />
           <p>
             Product description generation is queued in the background. This page will refresh when the job completes.
@@ -145,7 +146,7 @@ export function SoftwareDescriptionPanel({
       ) : null}
 
       {mutation.isSuccess ? (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-300/25 bg-emerald-500/8 px-3 py-2 text-sm text-emerald-900 dark:text-emerald-200">
+        <div className={`mt-4 flex items-start gap-2 rounded-xl ${toneSurface('success')} px-3 py-2 text-sm text-tone-success-foreground`}>
           <CircleCheckBig className="mt-0.5 size-4 shrink-0" />
           <p>Product description job queued successfully.</p>
         </div>

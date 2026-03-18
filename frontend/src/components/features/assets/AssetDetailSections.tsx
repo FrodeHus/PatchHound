@@ -18,6 +18,7 @@ import {
   SectionHeader,
 } from '@/components/features/assets/AssetDetailShared'
 import { formatDate, formatDateTime } from '@/lib/formatting'
+import { toneBadge, toneDot, type Tone } from '@/lib/tone-classes'
 
 export function DeviceSecurityProfileSection({
   asset,
@@ -145,10 +146,10 @@ export function SoftwareSection({
                     <p className="mt-2 text-xs text-muted-foreground">{item.evidence}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <span className="rounded-full border border-emerald-300/60 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-emerald-950">
+                    <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] ${toneBadge('success')}`}>
                       {item.matchMethod}
                     </span>
-                    <span className="rounded-full border border-sky-300/60 bg-sky-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-sky-900">
+                    <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] ${toneBadge('info')}`}>
                       {item.confidence}
                     </span>
                   </div>
@@ -275,7 +276,7 @@ export function DeviceActivityTimeline({ asset }: { asset: AssetDetail }) {
             at: episode.firstSeenAt,
             title: `${vulnerability.externalId} detected`,
             detail: `${vulnerability.title} appeared on this device as episode #${episode.episodeNumber}.`,
-            tone: episode.episodeNumber > 1 ? 'amber' : 'blue',
+            tone: episode.episodeNumber > 1 ? 'warning' : 'info',
           },
         ]
 
@@ -285,7 +286,7 @@ export function DeviceActivityTimeline({ asset }: { asset: AssetDetail }) {
             at: episode.resolvedAt,
             title: `${vulnerability.externalId} resolved`,
             detail: `${vulnerability.title} was no longer detected on this device.`,
-            tone: 'slate',
+            tone: 'neutral',
           })
         }
 
@@ -301,7 +302,7 @@ export function DeviceActivityTimeline({ asset }: { asset: AssetDetail }) {
             at: episode.firstSeenAt,
             title: `${software.name} installed`,
             detail: `${software.externalId} was present on the device in episode #${episode.episodeNumber}.`,
-            tone: episode.episodeNumber > 1 ? 'amber' : 'blue',
+            tone: episode.episodeNumber > 1 ? 'warning' : 'info',
           },
         ]
 
@@ -311,7 +312,7 @@ export function DeviceActivityTimeline({ asset }: { asset: AssetDetail }) {
             at: episode.removedAt,
             title: `${software.name} removed`,
             detail: `${software.externalId} was no longer present on the device.`,
-            tone: 'slate',
+            tone: 'neutral',
           })
         }
 
@@ -340,13 +341,7 @@ export function DeviceActivityTimeline({ asset }: { asset: AssetDetail }) {
           <div key={item.id} className="flex gap-3">
             <div className="flex w-5 flex-col items-center">
               <span
-                className={`mt-1 h-2.5 w-2.5 rounded-full ${
-                  item.tone === 'amber'
-                    ? 'bg-amber-500'
-                    : item.tone === 'blue'
-                      ? 'bg-sky-500'
-                      : 'bg-slate-400'
-                }`}
+                className={`mt-1 h-2.5 w-2.5 rounded-full ${toneDot(item.tone)}`}
               />
               {index < items.length - 1 ? <span className="mt-1 h-full w-px bg-border/80" /> : null}
             </div>
@@ -386,7 +381,7 @@ type DeviceActivityItem = {
   at: string
   title: string
   detail: string
-  tone: 'blue' | 'amber' | 'slate'
+  tone: Tone
 }
 
 function SoftwareCpeBindingSummary({

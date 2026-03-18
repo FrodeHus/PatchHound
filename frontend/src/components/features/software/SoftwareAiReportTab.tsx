@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { MarkdownViewer } from '@/components/ui/markdown-viewer'
 import { Separator } from '@/components/ui/separator'
 import { formatDateTime } from '@/lib/formatting'
+import { toneSurface } from '@/lib/tone-classes'
 
 type SoftwareAiReportTabProps = {
   tenantSoftwareId: string
@@ -77,7 +78,7 @@ export function SoftwareAiReportTab({ tenantSoftwareId }: SoftwareAiReportTabPro
                 : 'Not validated yet.'}
             </p>
             {defaultProfile.lastValidationStatus !== 'Valid' ? (
-              <div className="mt-3 flex items-start gap-2 rounded-[16px] border border-amber-300/25 bg-amber-500/8 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+              <div className={`mt-3 flex items-start gap-2 rounded-[16px] ${toneSurface('warning')} px-3 py-2 text-sm text-tone-warning-foreground`}>
                 <CircleAlert className="mt-0.5 size-4 shrink-0" />
                 <p>Software AI report generation is disabled until the default profile validates successfully.</p>
               </div>

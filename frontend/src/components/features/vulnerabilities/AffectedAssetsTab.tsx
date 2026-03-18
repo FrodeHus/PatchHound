@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { AffectedAsset } from '@/api/vulnerabilities.schemas'
+import { toneBadge, toneDot, toneSurface } from '@/lib/tone-classes'
 
 type AffectedAssetsTabProps = {
   assets: AffectedAsset[]
@@ -63,7 +64,7 @@ export function AffectedAssetsTab({ assets }: AffectedAssetsTabProps) {
                     </div>
 
                     {asset.assessmentReasonSummary ? (
-                      <div className="rounded-lg border border-sky-200/70 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+                      <div className={`rounded-lg border px-3 py-2 text-sm ${toneSurface('info')} text-tone-info-foreground`}>
                         {asset.assessmentReasonSummary}
                       </div>
                     ) : null}
@@ -75,7 +76,7 @@ export function AffectedAssetsTab({ assets }: AffectedAssetsTabProps) {
                           {asset.possibleCorrelatedSoftware.map((software) => (
                             <span
                               key={software}
-                              className="rounded-full border border-amber-300/70 bg-amber-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-amber-900"
+                              className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${toneBadge('warning')}`}
                             >
                               {software}
                             </span>
@@ -119,7 +120,7 @@ export function AffectedAssetsTab({ assets }: AffectedAssetsTabProps) {
                           <div className="flex w-5 flex-col items-center">
                             <span
                               className={`mt-1 h-2.5 w-2.5 rounded-full ${
-                                episode.episodeNumber > 1 ? 'bg-amber-500' : 'bg-sky-500'
+                                episode.episodeNumber > 1 ? toneDot('warning') : toneDot('info')
                               }`}
                             />
                             {index < asset.episodes.length - 1 ? <span className="mt-1 h-full w-px bg-border/80" /> : null}
@@ -167,12 +168,12 @@ function Badge({
 }) {
   const className =
     tone === 'amber'
-      ? 'border-amber-300/70 bg-amber-50 text-amber-900'
+      ? toneBadge('warning')
       : tone === 'blue'
-        ? 'border-sky-300/70 bg-sky-50 text-sky-900'
+        ? toneBadge('info')
         : tone === 'muted'
           ? 'border-border/70 bg-card text-muted-foreground'
-          : 'border-border/70 bg-card text-foreground'
+          : toneBadge('neutral')
 
   return (
     <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${className}`}>

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { toneBadge, toneText } from '@/lib/tone-classes'
 import {
   buildCvssVector,
   buildEnvironmentalPresentation,
@@ -340,10 +341,10 @@ function MetricStrip({
             <Tooltip key={`${metric.key}:${metric.value}`}>
               <TooltipTrigger
                 render={
-                  <span className="inline-flex items-center gap-2 rounded-full border border-sky-300/50 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-950" />
+                  <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${toneBadge('info')}`} />
                 }
               >
-                <span className="text-[11px] uppercase tracking-[0.18em] text-sky-700">{metric.key}</span>
+                <span className={`text-[11px] uppercase tracking-[0.18em] ${toneText('info')}`}>{metric.key}</span>
                 <span>{metric.valueLabel}</span>
               </TooltipTrigger>
               <TooltipContent className="max-w-sm">

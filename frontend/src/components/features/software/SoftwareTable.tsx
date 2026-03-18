@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select'
 import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
 import { formatDate, startCase } from '@/lib/formatting'
+import { toneText } from '@/lib/tone-classes'
 import { SearchIcon } from 'lucide-react'
 
 type SoftwareTableProps = {
@@ -187,7 +188,7 @@ export function SoftwareTable({
         accessorKey: 'activeVulnerabilityCount',
         header: 'Open vulns',
         cell: ({ row }) => (
-          <span className={row.original.activeVulnerabilityCount > 0 ? 'font-medium text-amber-700' : 'text-muted-foreground'}>
+          <span className={row.original.activeVulnerabilityCount > 0 ? `font-medium ${toneText('warning')}` : 'text-muted-foreground'}>
             {row.original.activeVulnerabilityCount}
           </span>
         ),

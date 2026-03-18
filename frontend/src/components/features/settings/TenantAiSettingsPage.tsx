@@ -35,6 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatDateTime } from '@/lib/formatting'
+import { toneText } from '@/lib/tone-classes'
 
 const recommendedPrompt = `You are a PatchHound vulnerability analysis assistant.
 Use only the vulnerability and tenant asset context provided.
@@ -649,7 +650,7 @@ function AiProfileEditorPage({
                   {profile?.lastValidationStatus === 'Invalid' &&
                   draft.providerType === 'Ollama' &&
                   extractMissingOllamaModel(profile.lastValidationError, draft.model) ? (
-                    <div className="rounded-[16px] border border-amber-300/25 bg-amber-500/8 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+                    <div className={`rounded-[16px] border border-tone-warning-border/25 bg-tone-warning/8 px-3 py-2 text-xs ${toneText('warning')}`}>
                       Ollama could not find <code>{draft.model}</code>. Run <code>ollama pull {draft.model}</code> on the Ollama host, then validate again.
                     </div>
                   ) : null}
@@ -934,7 +935,7 @@ function AiProfileEditorPage({
 
         <div className="space-y-4">
           {saveBanner ? (
-            <InsetPanel className="px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
+            <InsetPanel className={`px-4 py-3 text-sm ${toneText('success')}`}>
               {saveBanner}
             </InsetPanel>
           ) : null}

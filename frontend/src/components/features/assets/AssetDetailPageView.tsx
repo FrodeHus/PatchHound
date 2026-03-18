@@ -4,6 +4,7 @@ import { ArrowLeftIcon } from 'lucide-react'
 import type { AssetDetail } from '@/api/assets.schemas'
 import { formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
+import { toneDot, toneText, type Tone } from '@/lib/tone-classes'
 
 type AssetDetailPageViewProps = {
   asset: AssetDetail
@@ -191,7 +192,7 @@ export function AssetDetailPageView({
                       </div>
                       <p className="text-sm text-muted-foreground">{vulnerability.description}</p>
                       {vulnerability.assessmentReasonSummary ? (
-                        <p className="text-xs text-sky-700">{vulnerability.assessmentReasonSummary}</p>
+                        <p className={`text-xs ${toneText('info')}`}>{vulnerability.assessmentReasonSummary}</p>
                       ) : null}
                       <div className="flex flex-wrap gap-1">
                         {vulnerability.episodes.map((episode) => (
@@ -254,7 +255,7 @@ export function AssetDetailPageView({
               ) : timelineItems.map((item, index) => (
                 <div key={item.id} className="flex gap-3">
                   <div className="flex w-5 flex-col items-center">
-                    <span className={`mt-1 h-2.5 w-2.5 rounded-full ${item.tone === 'amber' ? 'bg-amber-500' : item.tone === 'blue' ? 'bg-sky-500' : 'bg-slate-400'}`} />
+                    <span className={`mt-1 h-2.5 w-2.5 rounded-full ${toneDot(item.tone)}`} />
                     {index < timelineItems.length - 1 ? <span className="mt-1 h-full w-px bg-border/80" /> : null}
                   </div>
                   <div className="flex-1 rounded-xl border border-border/70 bg-background px-3 py-3">
@@ -395,7 +396,7 @@ function SoftwareCpeBindingPanel({
   )
 }
 
-type TimelineItem = { id: string; at: string; title: string; detail: string; tone: 'blue' | 'amber' | 'slate' }
+type TimelineItem = { id: string; at: string; title: string; detail: string; tone: Tone }
 
 function buildTimelineItems(asset: AssetDetail): TimelineItem[] {
   const vulnerabilityEvents = asset.vulnerabilities.flatMap((vulnerability) =>
@@ -405,7 +406,7 @@ function buildTimelineItems(asset: AssetDetail): TimelineItem[] {
         at: episode.firstSeenAt,
         title: `${vulnerability.externalId} detected`,
         detail: `${vulnerability.title} appeared on this asset as episode #${episode.episodeNumber}.`,
-        tone: episode.episodeNumber > 1 ? 'amber' : 'blue',
+        tone: episode.episodeNumber > 1 ? 'warning' : 'info',
       }]
       if (episode.resolvedAt) {
         events.push({
@@ -413,7 +414,7 @@ function buildTimelineItems(asset: AssetDetail): TimelineItem[] {
           at: episode.resolvedAt,
           title: `${vulnerability.externalId} resolved`,
           detail: `${vulnerability.title} was no longer detected on this asset.`,
-          tone: 'slate',
+          tone: 'neutral',
         })
       }
       return events
@@ -427,7 +428,7 @@ function buildTimelineItems(asset: AssetDetail): TimelineItem[] {
         at: episode.firstSeenAt,
         title: `${software.name} installed`,
         detail: `${software.externalId} was present in episode #${episode.episodeNumber}.`,
-        tone: episode.episodeNumber > 1 ? 'amber' : 'blue',
+        tone: episode.episodeNumber > 1 ? 'warning' : 'info',
       }]
       if (episode.removedAt) {
         events.push({
@@ -435,7 +436,7 @@ function buildTimelineItems(asset: AssetDetail): TimelineItem[] {
           at: episode.removedAt,
           title: `${software.name} removed`,
           detail: `${software.externalId} was no longer present on the asset.`,
-          tone: 'slate',
+          tone: 'neutral',
         })
       }
       return events

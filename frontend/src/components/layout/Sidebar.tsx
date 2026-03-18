@@ -90,7 +90,8 @@ export function Sidebar({ user, onNavigate, compact = false }: SidebarProps) {
           return (
             <Link
               key={item.to}
-              to={item.to}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              {...({ to: item.to, search: {}, params: {} } as any)}
               onClick={onNavigate}
               className="group flex items-center gap-3 rounded-2xl border border-transparent px-3.5 py-3 text-sm text-sidebar-foreground/84 transition-colors hover:border-sidebar-border/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground"
               activeProps={{

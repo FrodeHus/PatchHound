@@ -707,7 +707,7 @@ function StatusPanel({
     <InsetPanel
       className={cn(
         'px-4 py-3 text-sm',
-        tone === 'success' ? 'text-emerald-700 dark:text-emerald-300' : 'text-destructive',
+        tone === 'success' ? 'text-tone-success-foreground' : 'text-destructive',
       )}
     >
       {message}
