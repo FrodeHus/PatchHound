@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
+import { ArrowLeftIcon } from 'lucide-react'
 import type { AssetDetail } from '@/api/assets.schemas'
 import { formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
@@ -19,6 +20,7 @@ export function AssetDetailPageView({
   isAssigningSecurityProfile,
   onAssignSecurityProfile,
 }: AssetDetailPageViewProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<DetailTab>('overview')
   const metadata = useMemo(() => parseMetadata(asset.metadata), [asset.metadata])
   const timelineItems = useMemo(() => buildTimelineItems(asset), [asset])
@@ -28,27 +30,14 @@ export function AssetDetailPageView({
       <header className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-3">
-            <Link
-              to="/assets"
-              search={{
-                page: 1,
-                pageSize: 25,
-                search: '',
-                assetType: '',
-                criticality: '',
-                ownerType: '',
-                deviceGroup: '',
-                healthStatus: '',
-                onboardingStatus: '',
-                riskScore: '',
-                exposureLevel: '',
-                tag: '',
-                unassignedOnly: false,
-              }}
-              className="text-sm text-muted-foreground hover:text-foreground"
+            <button
+              type="button"
+              onClick={() => router.history.back()}
+              className="flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
             >
-              Back to assets
-            </Link>
+              <ArrowLeftIcon className="size-3.5" />
+              Back
+            </button>
             <div className="flex flex-wrap gap-2">
               <Pill>{asset.assetType}</Pill>
               <Pill>{asset.criticality} criticality</Pill>
