@@ -863,5 +863,25 @@ public class DashboardControllerTests : IDisposable
         payload.VulnerabilitiesBySeverity.GetValueOrDefault("Medium", 0).Should().Be(0);
     }
 
+    [Fact]
+    public async Task GetSummary_ReturnsDeviceOnboardingBreakdown()
+    {
+        var onboarded = Asset.Create(_tenantId, "dev-onboarded", AssetType.Device, "Onboarded Device", Criticality.Medium);
+        onboarded.UpdateDeviceDetails("onb.local", "Active", "Windows", "11", "Low", DateTimeOffset.UtcNow, "10.0.0.1", null, onboardingStatus: "Onboarded");
+
+        var canBeOnboarded = Asset.Create(_tenantId, "dev-can-onboard", AssetType.Device, "Can Be Onboarded", Criticality.Medium);
+        canBeOnboarded.UpdateDeviceDetails("can.local", "Active", "Windows", "11", "Low", DateTimeOffset.UtcNow, "10.0.0.2", null, onboardingStatus: "CanBeOnboarded");
+
+        await _dbContext.AddRangeAsync(onboarded, canBeOnboarded);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
+
+        payload.DeviceOnboardingBreakdown.Should().ContainKey("Onboarded").WhoseValue.Should().Be(1);
+        payload.DeviceOnboardingBreakdown.Should().ContainKey("CanBeOnboarded").WhoseValue.Should().Be(1);
+    }
+
     public void Dispose() => _dbContext.Dispose();
 }
