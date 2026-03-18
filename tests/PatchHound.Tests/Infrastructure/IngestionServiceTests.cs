@@ -71,10 +71,14 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
+        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
+        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
+            dbContextFactory,
             assessmentService,
-            taskProjectionService
+            taskProjectionService,
+            new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         _service = new IngestionService(
@@ -951,10 +955,14 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
+        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
+        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
+            dbContextFactory,
             assessmentService,
-            taskProjectionService
+            taskProjectionService,
+            new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
@@ -1089,10 +1097,14 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
+        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
+        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
+            dbContextFactory,
             assessmentService,
-            taskProjectionService
+            taskProjectionService,
+            new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
@@ -1252,10 +1264,14 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
+        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
+        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
+            dbContextFactory,
             assessmentService,
-            taskProjectionService
+            taskProjectionService,
+            new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
@@ -1385,10 +1401,14 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
+        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
+        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
+            dbContextFactory,
             assessmentService,
-            taskProjectionService
+            taskProjectionService,
+            new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
@@ -1550,10 +1570,14 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
+        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
+        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
+            dbContextFactory,
             assessmentService,
-            taskProjectionService
+            taskProjectionService,
+            new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
@@ -1706,10 +1730,14 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
+        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
+        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
+            dbContextFactory,
             assessmentService,
-            taskProjectionService
+            taskProjectionService,
+            new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
@@ -1821,10 +1849,14 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
+        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
+        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
+            dbContextFactory,
             assessmentService,
-            taskProjectionService
+            taskProjectionService,
+            new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
@@ -2821,11 +2853,13 @@ public class IngestionServiceTests : IDisposable
             new RemediationTaskProjectionService(_dbContext, new SlaService()),
             new StagedVulnerabilityMergeService(
                 _dbContext,
+                CreateDbContextFactory(),
                 new VulnerabilityAssessmentService(
                     _dbContext,
                     new EnvironmentalSeverityCalculator()
                 ),
-                new RemediationTaskProjectionService(_dbContext, new SlaService())
+                new RemediationTaskProjectionService(_dbContext, new SlaService()),
+                new IngestionStateCache()
             ),
             new StagedAssetMergeService(_dbContext),
             Substitute.For<ILogger<IngestionService>>()
@@ -2986,5 +3020,12 @@ public class IngestionServiceTests : IDisposable
                 }
             );
         }
+    }
+
+    private IDbContextFactory<PatchHoundDbContext> CreateDbContextFactory()
+    {
+        var factory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
+        factory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
+        return factory;
     }
 }
