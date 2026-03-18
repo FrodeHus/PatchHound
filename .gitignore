@@ -7,3 +7,4 @@ obj/
 node_modules/
 dist/
 *.DotSettings.user
+.worktrees/
