@@ -7,9 +7,10 @@ import { InsetPanel } from '@/components/ui/inset-panel'
 
 type RiskChangeBriefCardProps = {
   brief: DashboardRiskChangeBrief
+  isLoading?: boolean
 }
 
-export function RiskChangeBriefCard({ brief }: RiskChangeBriefCardProps) {
+export function RiskChangeBriefCard({ brief, isLoading }: RiskChangeBriefCardProps) {
   return (
     <Card className="overflow-hidden rounded-2xl border-border/70 bg-card/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <CardHeader className="p-5 pb-2">
@@ -27,32 +28,38 @@ export function RiskChangeBriefCard({ brief }: RiskChangeBriefCardProps) {
         ) : null}
       </CardHeader>
       <CardContent className="p-5 pt-2">
-        <div className="grid gap-4 lg:grid-cols-2">
-          <RiskChangeLane
-            title="New"
-            count={brief.appearedCount}
-            tone="new"
-            emptyText="No new high or critical vulnerabilities in the last 24 hours."
-            items={brief.appeared}
-          />
-          <RiskChangeLane
-            title="Resolved"
-            count={brief.resolvedCount}
-            tone="resolved"
-            emptyText="No high or critical vulnerabilities resolved in the last 24 hours."
-            items={brief.resolved}
-          />
-        </div>
+        {isLoading ? (
+          <div className="h-32 animate-pulse rounded-2xl bg-muted/60" />
+        ) : (
+        <>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <RiskChangeLane
+              title="New"
+              count={brief.appearedCount}
+              tone="new"
+              emptyText="No new high or critical vulnerabilities in the last 24 hours."
+              items={brief.appeared}
+            />
+            <RiskChangeLane
+              title="Resolved"
+              count={brief.resolvedCount}
+              tone="resolved"
+              emptyText="No high or critical vulnerabilities resolved in the last 24 hours."
+              items={brief.resolved}
+            />
+          </div>
 
-        <div className="mt-4 flex justify-end">
-          <Link
-            to="/vulnerabilities/changes"
-            className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-          >
-            Open full change log
-            <ArrowRight className="size-4" />
-          </Link>
-        </div>
+          <div className="mt-4 flex justify-end">
+            <Link
+              to="/vulnerabilities/changes"
+              className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+            >
+              Open full change log
+              <ArrowRight className="size-4" />
+            </Link>
+          </div>
+        </>
+        )}
       </CardContent>
     </Card>
   )

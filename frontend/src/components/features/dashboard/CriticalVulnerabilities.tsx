@@ -14,9 +14,10 @@ import {
 type CriticalVulnerabilitiesProps = {
   items: TopVulnerability[]
   summary: DashboardSummary
+  isLoading?: boolean
 }
 
-export function CriticalVulnerabilities({ items, summary }: CriticalVulnerabilitiesProps) {
+export function CriticalVulnerabilities({ items, summary, isLoading }: CriticalVulnerabilitiesProps) {
   const navigate = useNavigate()
 
   return (
@@ -33,6 +34,10 @@ export function CriticalVulnerabilities({ items, summary }: CriticalVulnerabilit
         </div>
       </CardHeader>
       <CardContent className="overflow-x-auto p-5 pt-1">
+        {isLoading ? (
+          <div className="h-64 animate-pulse rounded-2xl bg-muted/60" />
+        ) : (
+        <>
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-border/70 bg-background/35 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Recurring vulnerabilities</p>
@@ -125,6 +130,8 @@ export function CriticalVulnerabilities({ items, summary }: CriticalVulnerabilit
             </div>
           </div>
         ) : null}
+        </>
+        )}
       </CardContent>
     </Card>
   )
