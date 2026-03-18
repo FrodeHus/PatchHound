@@ -297,6 +297,164 @@ public class DashboardController : ControllerBase
 
         var deviceOnboardingBreakdown = deviceOnboardingRows.ToDictionary(r => r.Status, r => r.Count);
 
+        // ────────────────────────────────────────────────────
+        // SLA compliance trend — 30 daily data points
+        // ────────────────────────────────────────────────────
+        var slaComplianceTrend = new List<SlaComplianceTrendPointDto>();
+        var todayDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        for (var dayOffset = 29; dayOffset >= 0; dayOffset--)
+        {
+            var snapshotDate = todayDate.AddDays(-dayOffset);
+            var snapshotInstant = new DateTimeOffset(snapshotDate.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
+            // Tasks that existed on this date: created on or before snapshotInstant
+            var tasksOnDate = tasks.Where(t => t.CreatedAt <= snapshotInstant).ToList();
+            if (tasksOnDate.Count == 0)
+            {
+                slaComplianceTrend.Add(new SlaComplianceTrendPointDto(snapshotDate, 100m));
+                continue;
+            }
+            var taskTuplesOnDate = tasksOnDate.Select(t => (t.Status, t.DueDate)).ToList();
+            var (dailySlaPercent, _) = DashboardService.CalculateSlaCompliance(taskTuplesOnDate, snapshotInstant);
+            slaComplianceTrend.Add(new SlaComplianceTrendPointDto(snapshotDate, dailySlaPercent));
+        }
+
+        // ────────────────────────────────────────────────────
+        // Metric sparklines — 30 daily data points for 4 metrics
+        // ────────────────────────────────────────────────────
+        var sparkCriticalBacklog = new List<int>();
+        var sparkOverdueActions = new List<int>();
+        var sparkHealthyTasks = new List<int>();
+        var sparkOpenStatuses = new List<int>();
+
+        // Pre-fetch open episode data for sparklines
+        var sparkEpisodes = await _dbContext.VulnerabilityAssetEpisodes.AsNoTracking()
+            .Where(e => e.TenantVulnerability.TenantId == tenantId)
+            .Select(e => new
+            {
+                e.TenantVulnerabilityId,
+                e.FirstSeenAt,
+                e.ResolvedAt,
+                e.TenantVulnerability.VulnerabilityDefinition.VendorSeverity,
+            })
+            .ToListAsync(ct);
+
+        for (var dayOffset = 29; dayOffset >= 0; dayOffset--)
+        {
+            var snapshotDate = todayDate.AddDays(-dayOffset);
+            var snapshotInstant = new DateTimeOffset(snapshotDate.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
+
+            // Critical backlog on this date
+            var criticalOnDate = sparkEpisodes.Count(e =>
+                e.VendorSeverity == Severity.Critical
+                && DateOnly.FromDateTime(e.FirstSeenAt.UtcDateTime) <= snapshotDate
+                && (e.ResolvedAt == null || DateOnly.FromDateTime(e.ResolvedAt.Value.UtcDateTime) > snapshotDate));
+            sparkCriticalBacklog.Add(criticalOnDate);
+
+            // Open episodes on this date (all severities, distinct by TenantVulnerabilityId)
+            var openOnDate = sparkEpisodes
+                .Where(e =>
+                    DateOnly.FromDateTime(e.FirstSeenAt.UtcDateTime) <= snapshotDate
+                    && (e.ResolvedAt == null || DateOnly.FromDateTime(e.ResolvedAt.Value.UtcDateTime) > snapshotDate))
+                .Select(e => e.TenantVulnerabilityId)
+                .Distinct()
+                .Count();
+            sparkOpenStatuses.Add(openOnDate);
+
+            // Task-based sparklines
+            var tasksOnDate = tasks.Where(t => t.CreatedAt <= snapshotInstant).ToList();
+            var overdueOnDate = tasksOnDate.Count(t =>
+                t.Status != RemediationTaskStatus.Completed
+                && t.Status != RemediationTaskStatus.RiskAccepted
+                && t.DueDate < snapshotInstant);
+            sparkOverdueActions.Add(overdueOnDate);
+            sparkHealthyTasks.Add(Math.Max(tasksOnDate.Count - overdueOnDate, 0));
+        }
+
+        var metricSparklines = new MetricSparklinesDto(
+            sparkCriticalBacklog, sparkOverdueActions, sparkHealthyTasks, sparkOpenStatuses);
+
+        // ────────────────────────────────────────────────────
+        // Vulnerability age buckets — open vulnerabilities by dwell time
+        // ────────────────────────────────────────────────────
+        var ageRows = await _dbContext.TenantVulnerabilities.AsNoTracking()
+            .Where(v =>
+                v.TenantId == tenantId
+                && _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open))
+            .Select(v => new
+            {
+                v.VulnerabilityDefinition.VendorSeverity,
+                v.VulnerabilityDefinition.PublishedDate,
+            })
+            .ToListAsync(ct);
+
+        var ageBucketDefinitions = new (string Label, int MinDays, int MaxDays)[]
+        {
+            ("0-7 days", 0, 7),
+            ("8-30 days", 8, 30),
+            ("31-90 days", 31, 90),
+            ("91-180 days", 91, 180),
+            ("180+ days", 181, int.MaxValue),
+        };
+
+        var ageBuckets = ageBucketDefinitions.Select(bucket =>
+        {
+            var inBucket = ageRows.Where(r =>
+            {
+                if (!r.PublishedDate.HasValue) return bucket.Label == "180+ days";
+                var days = (int)(now - r.PublishedDate.Value).TotalDays;
+                return days >= bucket.MinDays && days <= bucket.MaxDays;
+            }).ToList();
+
+            return new VulnerabilityAgeBucketDto(
+                bucket.Label,
+                inBucket.Count,
+                inBucket.Count(r => r.VendorSeverity == Severity.Critical),
+                inBucket.Count(r => r.VendorSeverity == Severity.High),
+                inBucket.Count(r => r.VendorSeverity == Severity.Medium),
+                inBucket.Count(r => r.VendorSeverity == Severity.Low));
+        }).ToList();
+
+        // ────────────────────────────────────────────────────
+        // MTTR by severity — current 30d vs prior 30d
+        // ────────────────────────────────────────────────────
+        var completedTasksWithSeverity = await _dbContext.RemediationTasks.AsNoTracking()
+            .Where(t => t.TenantId == tenantId && t.Status == RemediationTaskStatus.Completed)
+            .Join(
+                _dbContext.TenantVulnerabilities.AsNoTracking(),
+                t => t.TenantVulnerabilityId,
+                v => v.Id,
+                (t, v) => new
+                {
+                    v.VulnerabilityDefinition.VendorSeverity,
+                    t.CreatedAt,
+                    t.UpdatedAt,
+                })
+            .ToListAsync(ct);
+
+        var currentPeriodStart = now.AddDays(-30);
+        var priorPeriodStart = now.AddDays(-60);
+
+        var mttrBySeverity = Enum.GetValues<Severity>().Select(severity =>
+        {
+            var currentPeriod = completedTasksWithSeverity
+                .Where(t => t.VendorSeverity == severity && t.UpdatedAt >= currentPeriodStart)
+                .ToList();
+            var priorPeriod = completedTasksWithSeverity
+                .Where(t => t.VendorSeverity == severity && t.UpdatedAt >= priorPeriodStart && t.UpdatedAt < currentPeriodStart)
+                .ToList();
+
+            var currentMttr = currentPeriod.Count > 0
+                ? Math.Round((decimal)(currentPeriod.Sum(t => (t.UpdatedAt - t.CreatedAt).TotalDays) / currentPeriod.Count), 1)
+                : 0m;
+            decimal? priorMttr = priorPeriod.Count > 0
+                ? Math.Round((decimal)(priorPeriod.Sum(t => (t.UpdatedAt - t.CreatedAt).TotalDays) / priorPeriod.Count), 1)
+                : null;
+
+            return new MttrBySeverityDto(severity.ToString(), currentMttr, priorMttr);
+        }).ToList();
+
         return Ok(
             new DashboardSummaryDto(
                 exposureScore,
@@ -314,7 +472,11 @@ public class DashboardController : ControllerBase
                 recurrence.TopRecurringAssets,
                 vulnsByDeviceGroup,
                 deviceHealthBreakdown,
-                deviceOnboardingBreakdown
+                deviceOnboardingBreakdown,
+                slaComplianceTrend,
+                metricSparklines,
+                ageBuckets,
+                mttrBySeverity
             )
         );
     }
@@ -423,6 +585,68 @@ public class DashboardController : ControllerBase
         }
 
         return Ok(new TrendDataDto(items));
+    }
+
+    [HttpGet("burndown")]
+    public async Task<ActionResult<BurndownTrendDto>> GetBurndown(
+        [FromQuery] DashboardFilterQuery filter,
+        CancellationToken ct
+    )
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var (filteredAssetIds, minPublishedDate) = BuildFilterContext(tenantId, filter);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var startDate = today.AddDays(-89);
+
+        // Fetch all episodes that overlap the 90-day window
+        var episodeQuery = _dbContext.VulnerabilityAssetEpisodes.AsNoTracking()
+            .Where(e =>
+                e.TenantVulnerability.TenantId == tenantId
+                && DateOnly.FromDateTime(e.FirstSeenAt.UtcDateTime) <= today
+                && (e.ResolvedAt == null || DateOnly.FromDateTime(e.ResolvedAt.Value.UtcDateTime) >= startDate));
+
+        if (filteredAssetIds != null)
+            episodeQuery = episodeQuery.Where(e => filteredAssetIds.Contains(e.AssetId));
+
+        if (minPublishedDate.HasValue)
+            episodeQuery = episodeQuery.Where(e =>
+                e.TenantVulnerability.VulnerabilityDefinition.PublishedDate <= minPublishedDate.Value);
+
+        var episodes = await episodeQuery
+            .Select(e => new
+            {
+                e.TenantVulnerabilityId,
+                e.FirstSeenAt,
+                e.ResolvedAt,
+            })
+            .ToListAsync(ct);
+
+        var items = new List<BurndownPointDto>();
+        var runningNetOpen = 0;
+
+        // Count episodes that were already open before the window
+        var preWindowOpen = episodes.Count(e =>
+            DateOnly.FromDateTime(e.FirstSeenAt.UtcDateTime) < startDate
+            && (e.ResolvedAt == null || DateOnly.FromDateTime(e.ResolvedAt.Value.UtcDateTime) >= startDate));
+        runningNetOpen = preWindowOpen;
+
+        foreach (var date in EachDay(startDate, today))
+        {
+            var discovered = episodes.Count(e =>
+                DateOnly.FromDateTime(e.FirstSeenAt.UtcDateTime) == date);
+            var resolved = episodes.Count(e =>
+                e.ResolvedAt.HasValue && DateOnly.FromDateTime(e.ResolvedAt.Value.UtcDateTime) == date);
+
+            runningNetOpen += discovered - resolved;
+            items.Add(new BurndownPointDto(date, discovered, resolved, runningNetOpen));
+        }
+
+        return Ok(new BurndownTrendDto(items));
     }
 
     [HttpGet("filter-options")]

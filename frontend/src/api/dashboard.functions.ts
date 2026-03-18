@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet } from '@/server/api'
-import { dashboardFilterOptionsSchema, dashboardRiskChangeBriefSchema, dashboardSummarySchema, trendDataSchema } from './dashboard.schemas'
+import { burndownTrendSchema, dashboardFilterOptionsSchema, dashboardRiskChangeBriefSchema, dashboardSummarySchema, trendDataSchema } from './dashboard.schemas'
 import { z } from 'zod'
 
 const dashboardFilterSchema = z.object({
@@ -50,6 +50,15 @@ export const fetchDashboardRiskChanges = createServerFn({ method: 'GET' })
   .handler(async ({ context }) => {
     const data = await apiGet('/dashboard/risk-changes', context)
     return dashboardRiskChangeBriefSchema.parse(data)
+  })
+
+export const fetchDashboardBurndown = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(dashboardFilterSchema)
+  .handler(async ({ context, data: filters }) => {
+    const qs = buildDashboardParams(filters)
+    const data = await apiGet(`/dashboard/burndown${qs}`, context)
+    return burndownTrendSchema.parse(data)
   })
 
 export const fetchDashboardFilterOptions = createServerFn({ method: 'GET' })

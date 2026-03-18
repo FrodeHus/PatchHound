@@ -64,6 +64,29 @@ export const dashboardSummarySchema = z.object({
   })),
   deviceHealthBreakdown: z.record(z.string(), z.number()),
   deviceOnboardingBreakdown: z.record(z.string(), z.number()),
+  slaComplianceTrend: z.array(z.object({
+    date: z.string(),
+    percent: z.number(),
+  })).optional(),
+  metricSparklines: z.object({
+    criticalBacklog: z.array(z.number()),
+    overdueActions: z.array(z.number()),
+    healthyTasks: z.array(z.number()),
+    openStatuses: z.array(z.number()),
+  }).optional(),
+  vulnerabilityAgeBuckets: z.array(z.object({
+    bucket: z.string(),
+    count: z.number(),
+    critical: z.number(),
+    high: z.number(),
+    medium: z.number(),
+    low: z.number(),
+  })).optional(),
+  mttrBySeverity: z.array(z.object({
+    severity: z.string(),
+    days: z.number(),
+    previousDays: z.number().nullable(),
+  })).optional(),
 })
 
 export const trendItemSchema = z.object({
@@ -83,6 +106,17 @@ export type TopVulnerability = z.infer<typeof topVulnerabilitySchema>
 export type TrendData = z.infer<typeof trendDataSchema>
 export type TrendItem = z.infer<typeof trendItemSchema>
 export type DashboardRiskChangeBrief = z.infer<typeof dashboardRiskChangeBriefSchema>
+
+export const burndownTrendSchema = z.object({
+  items: z.array(z.object({
+    date: z.string(),
+    discovered: z.number(),
+    resolved: z.number(),
+    netOpen: z.number(),
+  })),
+})
+
+export type BurndownTrend = z.infer<typeof burndownTrendSchema>
 
 export const dashboardFilterOptionsSchema = z.object({
   platforms: z.array(z.string()),
