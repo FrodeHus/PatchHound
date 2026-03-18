@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useCallback, useState } from 'react'
 import { z } from 'zod'
 import { AlertTriangle, CheckCircle2, ShieldAlert, TimerReset } from 'lucide-react'
 import { fetchDashboardBurndown, fetchDashboardFilterOptions, fetchDashboardSummary, fetchDashboardTrends } from '@/api/dashboard.functions'
@@ -16,6 +16,7 @@ import { ExposureSlaCard } from '@/components/features/dashboard/ExposureSlaCard
 import { RemediationVelocity } from '@/components/features/dashboard/RemediationVelocity'
 import { RiskChangeBriefCard } from '@/components/features/dashboard/RiskChangeBriefCard'
 import { TrendChart } from '@/components/features/dashboard/TrendChart'
+import { RiskHeatmap } from '@/components/features/dashboard/RiskHeatmap'
 import { VulnerabilityAgeChart } from '@/components/features/dashboard/VulnerabilityAgeChart'
 import { MttrCard } from '@/components/features/dashboard/MttrCard'
 import { BurndownChart } from '@/components/features/dashboard/BurndownChart'
@@ -81,6 +82,25 @@ function DashboardPage() {
     queryFn: () => fetchDashboardFilterOptions(),
     staleTime: 60_000,
   })
+
+  const globalNavigate = useNavigate()
+
+  const drillToVulnerabilities = useCallback(
+    (params: { severity?: string; presentOnly?: boolean }) => {
+      void globalNavigate({
+        to: '/vulnerabilities',
+        search: { page: 1, pageSize: 25, search: '', severity: params.severity ?? '', status: '', source: '', presentOnly: params.presentOnly ?? true, recurrenceOnly: false },
+      } as never)
+    },
+    [globalNavigate],
+  )
+
+  const drillToAssets = useCallback(
+    (deviceGroup: string) => {
+      void navigate({ search: (prev) => ({ ...prev, deviceGroup }) })
+    },
+    [navigate],
+  )
 
   const summary = summaryQuery.data ?? (canUseInitialData && !hasActiveFilters ? initialData.summary : undefined)
   const trends = trendsQuery.data ?? (canUseInitialData && !hasActiveFilters ? initialData.trends : undefined)
@@ -150,6 +170,7 @@ function DashboardPage() {
                 data={trends}
                 embedded
                 isLoading={trendsQuery.isFetching}
+                onSeverityClick={(severity) => drillToVulnerabilities({ severity })}
               />
             </InsetPanel>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
@@ -187,6 +208,14 @@ function DashboardPage() {
       <DeviceGroupVulnerabilityChart
         data={summary.vulnerabilitiesByDeviceGroup}
         isLoading={summaryQuery.isFetching}
+        onBarClick={drillToAssets}
+      />
+      <RiskHeatmap
+        data={summary.vulnerabilitiesByDeviceGroup}
+        isLoading={summaryQuery.isFetching}
+        onCellClick={(group, _severity) => {
+          void navigate({ search: (prev) => ({ ...prev, deviceGroup: group }) })
+        }}
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
         <DeviceHealthCard
@@ -224,6 +253,19 @@ function DashboardPage() {
             <VulnerabilityAgeChart
               data={summary.vulnerabilityAgeBuckets}
               isLoading={summaryQuery.isFetching}
+              onBucketClick={(bucket) => {
+                const ageMap: Record<string, string> = {
+                  '0-7 days': '',
+                  '8-30 days': '8',
+                  '31-90 days': '31',
+                  '91-180 days': '91',
+                  '180+ days': '181',
+                }
+                const days = ageMap[bucket]
+                if (days !== undefined) {
+                  void navigate({ search: (prev) => ({ ...prev, minAgeDays: days }) })
+                }
+              }}
             />
           </div>
         </div>

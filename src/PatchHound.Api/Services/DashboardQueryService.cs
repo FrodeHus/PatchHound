@@ -133,11 +133,12 @@ public class DashboardQueryService(
         Guid currentTenantId,
         int? limit,
         bool highCriticalOnly,
-        CancellationToken ct
+        CancellationToken ct,
+        int cutoffHours = 24
     )
     {
         var activeSnapshotId = await snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
-        var cutoff = DateTimeOffset.UtcNow.AddHours(-24);
+        var cutoff = DateTimeOffset.UtcNow.AddHours(-cutoffHours);
 
         var candidateRows = await dbContext
             .TenantVulnerabilities.AsNoTracking()

@@ -47,8 +47,10 @@ export const fetchDashboardTrends = createServerFn({ method: 'GET' })
 
 export const fetchDashboardRiskChanges = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const data = await apiGet('/dashboard/risk-changes', context)
+  .inputValidator(z.object({ days: z.number().optional() }))
+  .handler(async ({ context, data: { days } }) => {
+    const qs = days && days > 1 ? `?days=${days}` : ''
+    const data = await apiGet(`/dashboard/risk-changes${qs}`, context)
     return dashboardRiskChangeBriefSchema.parse(data)
   })
 

@@ -1,7 +1,11 @@
+import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, ArrowUpRight, CheckCircle2 } from 'lucide-react'
 import type { DashboardRiskChangeBrief } from '@/api/dashboard.schemas'
+import { fetchDashboardRiskChanges } from '@/api/dashboard.functions'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { toneBadge, toneText } from '@/lib/tone-classes'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { InsetPanel } from '@/components/ui/inset-panel'
@@ -11,7 +15,22 @@ type RiskChangeBriefCardProps = {
   isLoading?: boolean
 }
 
+type TimeWindow = '24h' | '7d'
+
 export function RiskChangeBriefCard({ brief, isLoading }: RiskChangeBriefCardProps) {
+  const [window, setWindow] = useState<TimeWindow>('24h')
+
+  const extendedQuery = useQuery({
+    queryKey: ['dashboard', 'risk-changes', 7],
+    queryFn: () => fetchDashboardRiskChanges({ data: { days: 7 } }),
+    staleTime: 30_000,
+    enabled: window === '7d',
+  })
+
+  const activeBrief = window === '7d' && extendedQuery.data ? extendedQuery.data : brief
+  const activeLoading = window === '7d' ? extendedQuery.isFetching : isLoading
+  const windowLabel = window === '24h' ? 'Last 24 hours' : 'Last 7 days'
+
   return (
     <Card className="overflow-hidden rounded-2xl border-border/70 bg-card/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <CardHeader className="p-5 pb-2">
@@ -20,45 +39,84 @@ export function RiskChangeBriefCard({ brief, isLoading }: RiskChangeBriefCardPro
             <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Change brief</p>
             <CardTitle className="mt-2 text-xl font-semibold tracking-tight">Risk change brief</CardTitle>
           </div>
-          <Badge variant="outline" className="rounded-full border-border/70 bg-muted text-foreground">
-            Last 24 hours
-          </Badge>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-full border border-border/70 bg-muted/50 p-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                className={`h-7 rounded-full px-3 text-xs ${window === '24h' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+                onClick={() => setWindow('24h')}
+              >
+                24h
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className={`h-7 rounded-full px-3 text-xs ${window === '7d' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+                onClick={() => setWindow('7d')}
+              >
+                7d
+              </Button>
+            </div>
+            <Badge variant="outline" className="rounded-full border-border/70 bg-muted text-foreground">
+              {windowLabel}
+            </Badge>
+          </div>
         </div>
-        {brief.aiSummary ? (
-          <p className="mt-3 max-w-3xl text-sm text-muted-foreground">{brief.aiSummary}</p>
+        {activeBrief.aiSummary ? (
+          <p className="mt-3 max-w-3xl text-sm text-muted-foreground">{activeBrief.aiSummary}</p>
         ) : null}
       </CardHeader>
       <CardContent className="p-5 pt-2">
-        {isLoading ? (
+        {activeLoading ? (
           <div className="h-32 animate-pulse rounded-2xl bg-muted/60" />
         ) : (
         <>
           <div className="grid gap-4 lg:grid-cols-2">
             <RiskChangeLane
               title="New"
-              count={brief.appearedCount}
+              count={activeBrief.appearedCount}
               tone="new"
-              emptyText="No new high or critical vulnerabilities in the last 24 hours."
-              items={brief.appeared}
+              emptyText={`No new high or critical vulnerabilities in the ${windowLabel.toLowerCase()}.`}
+              items={activeBrief.appeared}
             />
             <RiskChangeLane
               title="Resolved"
-              count={brief.resolvedCount}
+              count={activeBrief.resolvedCount}
               tone="resolved"
-              emptyText="No high or critical vulnerabilities resolved in the last 24 hours."
-              items={brief.resolved}
+              emptyText={`No high or critical vulnerabilities resolved in the ${windowLabel.toLowerCase()}.`}
+              items={activeBrief.resolved}
             />
           </div>
 
-          <div className="mt-4 flex justify-end">
-            <Link
-              to="/vulnerabilities/changes"
-              className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-            >
-              Open full change log
-              <ArrowRight className="size-4" />
-            </Link>
-          </div>
+          {activeBrief.appearedCount > 0 || activeBrief.resolvedCount > 0 ? (
+            <InsetPanel className="mt-4 flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-muted-foreground">Net delta:</span>
+                <span className={`font-semibold tabular-nums ${activeBrief.appearedCount > activeBrief.resolvedCount ? 'text-tone-danger-foreground' : 'text-tone-success-foreground'}`}>
+                  {activeBrief.appearedCount > activeBrief.resolvedCount ? '+' : ''}
+                  {activeBrief.appearedCount - activeBrief.resolvedCount}
+                </span>
+              </div>
+              <Link
+                to="/vulnerabilities/changes"
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+              >
+                Open full change log
+                <ArrowRight className="size-4" />
+              </Link>
+            </InsetPanel>
+          ) : (
+            <div className="mt-4 flex justify-end">
+              <Link
+                to="/vulnerabilities/changes"
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+              >
+                Open full change log
+                <ArrowRight className="size-4" />
+              </Link>
+            </div>
+          )}
         </>
         )}
       </CardContent>

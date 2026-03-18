@@ -1,7 +1,9 @@
+import { useMemo } from 'react'
 import {
+  Area,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -15,6 +17,7 @@ type TrendChartProps = {
   data: TrendData
   embedded?: boolean
   isLoading?: boolean
+  onSeverityClick?: (severity: string) => void
 }
 
 type ChartPoint = {
@@ -23,12 +26,13 @@ type ChartPoint = {
   Medium: number
   High: number
   Critical: number
+  NetChange: number
 }
 
 function formatChartData(data: TrendData): ChartPoint[] {
-  const map = new Map<string, ChartPoint>()
+  const map = new Map<string, Omit<ChartPoint, 'NetChange'>>()
 
-  data.items.forEach((item) => {
+  for (const item of data.items) {
     const existing = map.get(item.date) ?? {
       date: item.date,
       Low: 0,
@@ -42,49 +46,62 @@ function formatChartData(data: TrendData): ChartPoint[] {
     }
 
     map.set(item.date, existing)
-  })
+  }
 
-  return Array.from(map.values())
+  const raw = Array.from(map.values())
+
+  return raw.map((point, index) => {
+    const total = point.Low + point.Medium + point.High + point.Critical
+    const prevTotal = index > 0
+      ? raw[index - 1].Low + raw[index - 1].Medium + raw[index - 1].High + raw[index - 1].Critical
+      : total
+    return { ...point, NetChange: total - prevTotal }
+  })
 }
 
 function formatAxisDate(value: string) {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-  }).format(date)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(date)
 }
 
-export function TrendChart({ data, embedded = false, isLoading }: TrendChartProps) {
-  const points = formatChartData(data)
+const severities = [
+  { key: 'Critical', stroke: 'var(--color-destructive)', fill: 'var(--color-destructive)', dot: 'bg-destructive' },
+  { key: 'High', stroke: 'var(--color-chart-1)', fill: 'var(--color-chart-1)', dot: 'bg-chart-1' },
+  { key: 'Medium', stroke: 'var(--color-chart-4)', fill: 'var(--color-chart-4)', dot: 'bg-chart-4' },
+  { key: 'Low', stroke: 'var(--color-chart-2)', fill: 'var(--color-chart-2)', dot: 'bg-chart-2' },
+] as const
+
+export function TrendChart({ data, embedded = false, isLoading, onSeverityClick }: TrendChartProps) {
+  const points = useMemo(() => formatChartData(data), [data])
+
   const legend = [
-    { label: 'Low', className: 'bg-chart-2' },
-    { label: 'Medium', className: 'bg-chart-4' },
-    { label: 'High', className: 'bg-chart-1' },
-    { label: 'Critical', className: 'bg-destructive' },
+    ...severities.map((s) => ({ label: s.key, className: s.dot })),
+    { label: 'Net change', className: 'bg-foreground' },
   ]
 
   const header = (
-    <>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Trendline</p>
-          <CardTitle className="mt-2 text-xl font-semibold tracking-tight">Open vulnerability trend over 90 days</CardTitle>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {legend.map((item) => (
-            <Badge key={item.label} variant="outline" className="rounded-full border-border/70 bg-background/30 px-2.5 py-1 text-xs text-foreground">
-              <span className={`mr-2 inline-block size-2 rounded-full ${item.className}`} />
-              {item.label}
-            </Badge>
-          ))}
-        </div>
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Trendline</p>
+        <CardTitle className="mt-2 text-xl font-semibold tracking-tight">Open vulnerability trend over 90 days</CardTitle>
       </div>
-    </>
+      <div className="flex flex-wrap gap-2">
+        {legend.map((item) => (
+          <Badge
+            key={item.label}
+            variant="outline"
+            className={`rounded-full border-border/70 bg-background/30 px-2.5 py-1 text-xs text-foreground ${onSeverityClick && item.label !== 'Net change' ? 'cursor-pointer hover:bg-accent/40' : ''}`}
+            onClick={() => {
+              if (onSeverityClick && item.label !== 'Net change') onSeverityClick(item.label)
+            }}
+          >
+            <span className={`mr-2 inline-block size-2 rounded-full ${item.className}`} />
+            {item.label}
+          </Badge>
+        ))}
+      </div>
+    </div>
   )
 
   const chart = isLoading ? (
@@ -92,7 +109,7 @@ export function TrendChart({ data, embedded = false, isLoading }: TrendChartProp
   ) : (
     <div className={embedded ? 'mt-5 h-[320px] w-full' : 'h-[320px] w-full'}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={points}>
+        <ComposedChart data={points}>
           <CartesianGrid vertical={false} stroke="color-mix(in oklab, var(--border) 85%, transparent)" />
           <XAxis
             dataKey="date"
@@ -112,11 +129,31 @@ export function TrendChart({ data, embedded = false, isLoading }: TrendChartProp
               color: 'var(--color-popover-foreground)',
             }}
           />
-          <Line type="monotone" dataKey="Low" stroke="var(--color-chart-2)" strokeWidth={2.5} dot={false} />
-          <Line type="monotone" dataKey="Medium" stroke="var(--color-chart-4)" strokeWidth={2.5} dot={false} />
-          <Line type="monotone" dataKey="High" stroke="var(--color-chart-1)" strokeWidth={2.5} dot={false} />
-          <Line type="monotone" dataKey="Critical" stroke="var(--color-destructive)" strokeWidth={2.5} dot={false} />
-        </LineChart>
+          {severities.map((s) => (
+            <Area
+              key={s.key}
+              type="monotone"
+              dataKey={s.key}
+              stroke={s.stroke}
+              fill={s.fill}
+              fillOpacity={0.06}
+              strokeWidth={2}
+              dot={false}
+              style={onSeverityClick ? { cursor: 'pointer' } : undefined}
+              onClick={() => onSeverityClick?.(s.key)}
+            />
+          ))}
+          <Line
+            type="monotone"
+            dataKey="NetChange"
+            stroke="var(--color-foreground)"
+            strokeWidth={1.5}
+            strokeDasharray="5 3"
+            strokeOpacity={0.5}
+            dot={false}
+            name="Net change"
+          />
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   )
