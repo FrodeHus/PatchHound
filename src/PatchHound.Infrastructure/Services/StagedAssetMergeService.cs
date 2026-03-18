@@ -129,7 +129,8 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                             asset.DeviceGroupId,
                             asset.DeviceGroupName,
                             asset.DeviceExposureLevel,
-                            asset.DeviceIsAadJoined
+                            asset.DeviceIsAadJoined,
+                            asset.DeviceOnboardingStatus
                         );
 
                         await SyncDefenderTagsAsync(dbContext, tenantId, existing.Id, asset.MachineTags, ct);
@@ -155,7 +156,8 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                         asset.DeviceGroupId,
                         asset.DeviceGroupName,
                         asset.DeviceExposureLevel,
-                        asset.DeviceIsAadJoined
+                        asset.DeviceIsAadJoined,
+                        asset.DeviceOnboardingStatus
                     );
 
                     await SyncDefenderTagsAsync(dbContext, tenantId, existing.Id, asset.MachineTags, ct);
