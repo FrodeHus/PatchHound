@@ -55,6 +55,14 @@ export const dashboardSummarySchema = z.object({
     assetType: z.string(),
     recurringVulnerabilityCount: z.number(),
   })),
+  vulnerabilitiesByDeviceGroup: z.array(z.object({
+    deviceGroupName: z.string(),
+    critical: z.number(),
+    high: z.number(),
+    medium: z.number(),
+    low: z.number(),
+  })),
+  deviceHealthBreakdown: z.record(z.string(), z.number()),
 })
 
 export const trendItemSchema = z.object({
@@ -74,3 +82,11 @@ export type TopVulnerability = z.infer<typeof topVulnerabilitySchema>
 export type TrendData = z.infer<typeof trendDataSchema>
 export type TrendItem = z.infer<typeof trendItemSchema>
 export type DashboardRiskChangeBrief = z.infer<typeof dashboardRiskChangeBriefSchema>
+
+export const dashboardFilterOptionsSchema = z.object({
+  platforms: z.array(z.string()),
+  deviceGroups: z.array(z.string()),
+})
+
+export type DashboardFilterOptions = z.infer<typeof dashboardFilterOptionsSchema>
+export type DeviceGroupVulnerability = z.infer<typeof dashboardSummarySchema>['vulnerabilitiesByDeviceGroup'][number]

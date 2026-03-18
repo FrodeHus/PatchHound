@@ -15,8 +15,8 @@ import { useTenantScope } from '@/components/layout/tenant-scope'
 export const Route = createFileRoute('/_authed/')({
   loader: async () => {
     const [summary, trends] = await Promise.all([
-      fetchDashboardSummary(),
-      fetchDashboardTrends(),
+      fetchDashboardSummary({ data: {} }),
+      fetchDashboardTrends({ data: {} }),
     ])
     return { summary, trends }
   },
@@ -30,13 +30,13 @@ function DashboardPage() {
   const canUseInitialData = initialTenantId === selectedTenantId
   const summaryQuery = useQuery({
     queryKey: ['dashboard', 'summary', selectedTenantId],
-    queryFn: () => fetchDashboardSummary(),
+    queryFn: () => fetchDashboardSummary({ data: {} }),
     initialData: canUseInitialData ? initialData.summary : undefined,
     staleTime: 30_000,
   })
   const trendsQuery = useQuery({
     queryKey: ['dashboard', 'trends', selectedTenantId],
-    queryFn: () => fetchDashboardTrends(),
+    queryFn: () => fetchDashboardTrends({ data: {} }),
     initialData: canUseInitialData ? initialData.trends : undefined,
     staleTime: 30_000,
   })
