@@ -14,6 +14,10 @@ export const assetSchema = z.object({
   securityProfileName: z.string().nullable(),
   vulnerabilityCount: z.number(),
   recurringVulnerabilityCount: z.number(),
+  healthStatus: z.string().nullable(),
+  riskScore: z.string().nullable(),
+  exposureLevel: z.string().nullable(),
+  tags: z.array(z.string()),
 })
 
 export const assetVulnerabilitySchema = z.object({
@@ -73,6 +77,9 @@ export const assetDetailSchema = z.object({
   deviceAadDeviceId: z.string().nullable(),
   deviceGroupId: z.string().nullable(),
   deviceGroupName: z.string().nullable(),
+  deviceExposureLevel: z.string().nullable(),
+  deviceIsAadJoined: z.boolean().nullable(),
+  tags: z.array(z.string()),
   softwareCpeBinding: z.object({
     id: z.string().uuid(),
     cpe23Uri: z.string(),

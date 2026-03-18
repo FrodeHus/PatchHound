@@ -16,6 +16,10 @@ const assetsSearchSchema = baseListSearchSchema.extend({
   criticality: searchStringSchema,
   ownerType: searchStringSchema,
   deviceGroup: searchStringSchema,
+  healthStatus: searchStringSchema,
+  riskScore: searchStringSchema,
+  exposureLevel: searchStringSchema,
+  tag: searchStringSchema,
   unassignedOnly: searchBooleanSchema,
 })
 
@@ -118,6 +122,10 @@ function AssetsPage() {
         criticalityFilter={search.criticality}
         ownerTypeFilter={search.ownerType}
         deviceGroupFilter={search.deviceGroup}
+        healthStatusFilter={search.healthStatus}
+        riskScoreFilter={search.riskScore}
+        exposureLevelFilter={search.exposureLevel}
+        tagFilter={search.tag}
         unassignedOnly={search.unassignedOnly}
         page={assets.page}
         pageSize={assets.pageSize}
@@ -142,6 +150,22 @@ function AssetsPage() {
           searchActions.updateField('deviceGroup', deviceGroup)
           setSelectedAssetId(null)
         }}
+        onHealthStatusFilterChange={(healthStatus) => {
+          searchActions.updateField('healthStatus', healthStatus)
+          setSelectedAssetId(null)
+        }}
+        onRiskScoreFilterChange={(riskScore) => {
+          searchActions.updateField('riskScore', riskScore)
+          setSelectedAssetId(null)
+        }}
+        onExposureLevelFilterChange={(exposureLevel) => {
+          searchActions.updateField('exposureLevel', exposureLevel)
+          setSelectedAssetId(null)
+        }}
+        onTagFilterChange={(tag) => {
+          searchActions.updateField('tag', tag)
+          setSelectedAssetId(null)
+        }}
         onUnassignedOnlyChange={(value) => {
           searchActions.updateField('unassignedOnly', value)
           setSelectedAssetId(null)
@@ -152,6 +176,10 @@ function AssetsPage() {
             criticality: filters.criticality,
             ownerType: filters.ownerType,
             deviceGroup: filters.deviceGroup,
+            healthStatus: filters.healthStatus,
+            riskScore: filters.riskScore,
+            exposureLevel: filters.exposureLevel,
+            tag: filters.tag,
             unassignedOnly: filters.unassignedOnly,
           })
           setSelectedAssetId(null)
@@ -170,6 +198,10 @@ function AssetsPage() {
             criticality: '',
             ownerType: '',
             deviceGroup: '',
+            healthStatus: '',
+            riskScore: '',
+            exposureLevel: '',
+            tag: '',
             unassignedOnly: false,
           })
           setSelectedAssetId(null)

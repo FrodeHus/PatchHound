@@ -38,6 +38,10 @@ export function AssetDetailPageView({
                 criticality: '',
                 ownerType: '',
                 deviceGroup: '',
+                healthStatus: '',
+                riskScore: '',
+                exposureLevel: '',
+                tag: '',
                 unassignedOnly: false,
               }}
               className="text-sm text-muted-foreground hover:text-foreground"

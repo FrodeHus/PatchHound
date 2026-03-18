@@ -18,6 +18,10 @@ export const fetchAssets = createServerFn({ method: 'GET' })
       search: z.string().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
+      healthStatus: z.string().optional(),
+      riskScore: z.string().optional(),
+      exposureLevel: z.string().optional(),
+      tag: z.string().optional(),
     }),
   )
   .handler(async ({ context, data: filters }) => {

@@ -31,6 +31,9 @@ const assetFixture: AssetDetail = {
   deviceAadDeviceId: null,
   deviceGroupId: null,
   deviceGroupName: null,
+  deviceExposureLevel: null,
+  deviceIsAadJoined: null,
+  tags: [],
   softwareCpeBinding: {
     id: '44444444-4444-4444-4444-444444444444',
     cpe23Uri: 'cpe:2.3:a:contoso:agent:2.1.0:*:*:*:*:*:*:*',
