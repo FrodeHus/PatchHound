@@ -33,19 +33,23 @@ public static class DependencyInjection
 
         // Database
         services.AddScoped<AuditSaveChangesInterceptor>();
+        void ConfigureDbContext(IServiceProvider sp, DbContextOptionsBuilder options) =>
+            options
+                .UseNpgsql(
+                    configuration.GetConnectionString("PatchHound"),
+                    npgsql =>
+                        npgsql.EnableRetryOnFailure(
+                            maxRetryCount: 5,
+                            maxRetryDelay: TimeSpan.FromSeconds(10),
+                            errorCodesToAdd: null
+                        )
+                )
+                .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>());
+
+        services.AddDbContext<PatchHoundDbContext>(ConfigureDbContext);
         services.AddDbContextFactory<PatchHoundDbContext>(
-            (sp, options) =>
-                options
-                    .UseNpgsql(
-                        configuration.GetConnectionString("PatchHound"),
-                        npgsql =>
-                            npgsql.EnableRetryOnFailure(
-                                maxRetryCount: 5,
-                                maxRetryDelay: TimeSpan.FromSeconds(10),
-                                errorCodesToAdd: null
-                            )
-                    )
-                    .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>())
+            ConfigureDbContext,
+            ServiceLifetime.Scoped
         );
 
         // Unit of Work
