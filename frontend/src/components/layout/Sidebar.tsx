@@ -90,13 +90,16 @@ export function Sidebar({ user, onNavigate, compact = false }: SidebarProps) {
           return (
             <Link
               key={item.to}
-              to={item.to}
-              onClick={onNavigate}
-              className="group flex items-center gap-3 rounded-2xl border border-transparent px-3.5 py-3 text-sm text-sidebar-foreground/84 transition-colors hover:border-sidebar-border/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground"
-              activeProps={{
-                className:
-                  "group flex items-center gap-3 rounded-2xl border border-primary/16 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_72%),var(--color-card)] px-3.5 py-3 text-sm font-medium text-sidebar-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] [&>span:first-child]:text-primary",
-              }}
+              {...{
+                to: item.to,
+                onClick: onNavigate,
+                className: "group flex items-center gap-3 rounded-2xl border border-transparent px-3.5 py-3 text-sm text-sidebar-foreground/84 transition-colors hover:border-sidebar-border/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground",
+                activeProps: {
+                  className:
+                    "group flex items-center gap-3 rounded-2xl border border-primary/16 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_72%),var(--color-card)] px-3.5 py-3 text-sm font-medium text-sidebar-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] [&>span:first-child]:text-primary",
+                },
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              } as any}
             >
               <span className="flex size-9 items-center justify-center rounded-xl border border-border/60 bg-background/30 text-muted-foreground transition-colors group-hover:text-primary">
                 <Icon className="size-4" />
