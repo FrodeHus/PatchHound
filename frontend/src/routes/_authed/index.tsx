@@ -160,14 +160,16 @@ function DashboardPage() {
         data={summary.vulnerabilitiesByDeviceGroup}
         isLoading={summaryQuery.isFetching}
       />
-      <DeviceHealthCard
-        healthBreakdown={summary.deviceHealthBreakdown}
-        isLoading={summaryQuery.isFetching}
-      />
-      <OnboardingStatusCard
-        onboardingBreakdown={summary.deviceOnboardingBreakdown}
-        isLoading={summaryQuery.isFetching}
-      />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
+        <DeviceHealthCard
+          healthBreakdown={summary.deviceHealthBreakdown}
+          isLoading={summaryQuery.isFetching}
+        />
+        <OnboardingStatusCard
+          onboardingBreakdown={summary.deviceOnboardingBreakdown}
+          isLoading={summaryQuery.isFetching}
+        />
+      </div>
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2">
           <ExposureSlaCard
