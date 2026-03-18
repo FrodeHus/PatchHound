@@ -117,6 +117,8 @@ public class AssetsController : ControllerBase
             query = query.Where(a =>
                 _dbContext.AssetTags.Any(t => t.AssetId == a.Id && t.Tag.Contains(filter.Tag))
             );
+        if (!string.IsNullOrEmpty(filter.OnboardingStatus))
+            query = query.Where(a => a.DeviceOnboardingStatus == filter.OnboardingStatus);
 
         var totalCount = await query.CountAsync(ct);
 
@@ -167,6 +169,7 @@ public class AssetsController : ControllerBase
                 a.DeviceHealthStatus,
                 a.DeviceRiskScore,
                 a.DeviceExposureLevel,
+                a.DeviceOnboardingStatus,
             })
             .ToListAsync(ct);
 
@@ -196,7 +199,8 @@ public class AssetsController : ControllerBase
                 a.DeviceHealthStatus,
                 a.DeviceRiskScore,
                 a.DeviceExposureLevel,
-                assetTagsByAssetId.TryGetValue(a.Id, out var tags) ? tags : Array.Empty<string>()
+                assetTagsByAssetId.TryGetValue(a.Id, out var tags) ? tags : Array.Empty<string>(),
+                a.DeviceOnboardingStatus
             ))
             .ToList();
 

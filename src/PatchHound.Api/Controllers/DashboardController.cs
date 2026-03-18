@@ -287,6 +287,16 @@ public class DashboardController : ControllerBase
 
         var deviceHealthBreakdown = deviceHealthRows.ToDictionary(r => r.HealthStatus, r => r.Count);
 
+        // Device onboarding status breakdown — NOT affected by vulnerability filters
+        var deviceOnboardingRows = await _dbContext
+            .Assets.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && a.AssetType == AssetType.Device && a.DeviceOnboardingStatus != null)
+            .GroupBy(a => a.DeviceOnboardingStatus!)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var deviceOnboardingBreakdown = deviceOnboardingRows.ToDictionary(r => r.Status, r => r.Count);
+
         return Ok(
             new DashboardSummaryDto(
                 exposureScore,
@@ -303,7 +313,8 @@ public class DashboardController : ControllerBase
                 recurrence.TopRecurringVulnerabilities,
                 recurrence.TopRecurringAssets,
                 vulnsByDeviceGroup,
-                deviceHealthBreakdown
+                deviceHealthBreakdown,
+                deviceOnboardingBreakdown
             )
         );
     }
