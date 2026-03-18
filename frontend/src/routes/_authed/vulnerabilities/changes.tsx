@@ -3,7 +3,7 @@ import { fetchDashboardRiskChanges } from '@/api/dashboard.functions'
 import { RiskChangeWorkbench } from '@/components/features/vulnerabilities/RiskChangeWorkbench'
 
 export const Route = createFileRoute('/_authed/vulnerabilities/changes')({
-  loader: () => fetchDashboardRiskChanges(),
+  loader: () => fetchDashboardRiskChanges({ data: {} }),
   component: VulnerabilityChangesPage,
 })
 

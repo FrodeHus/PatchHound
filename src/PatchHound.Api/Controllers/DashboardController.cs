@@ -482,14 +482,20 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("risk-changes")]
-    public async Task<ActionResult<DashboardRiskChangeBriefDto>> GetRiskChanges(CancellationToken ct)
+    public async Task<ActionResult<DashboardRiskChangeBriefDto>> GetRiskChanges(
+        [FromQuery] int days = 1,
+        CancellationToken ct = default
+    )
     {
         if (_tenantContext.CurrentTenantId is not Guid tenantId)
         {
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        return Ok(await _dashboardQueryService.BuildRiskChangeBriefAsync(tenantId, _tenantContext.CurrentTenantId ?? Guid.Empty, limit: null, highCriticalOnly: false, ct));
+        var cutoffHours = Math.Clamp(days, 1, 30) * 24;
+        return Ok(await _dashboardQueryService.BuildRiskChangeBriefAsync(
+            tenantId, _tenantContext.CurrentTenantId ?? Guid.Empty,
+            limit: null, highCriticalOnly: false, ct, cutoffHours));
     }
 
     [HttpGet("trends")]

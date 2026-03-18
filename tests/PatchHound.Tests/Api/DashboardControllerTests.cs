@@ -422,7 +422,7 @@ public class DashboardControllerTests : IDisposable
         summaryPayload.RiskChangeBrief.Resolved.Should().ContainSingle();
         summaryPayload.RiskChangeBrief.Resolved[0].ExternalId.Should().Be("CVE-2026-4001");
 
-        var detailAction = await _controller.GetRiskChanges(CancellationToken.None);
+        var detailAction = await _controller.GetRiskChanges(days: 1, ct: CancellationToken.None);
         var detailPayload = detailAction.Result.Should().BeOfType<OkObjectResult>().Subject.Value
             .Should().BeOfType<DashboardRiskChangeBriefDto>().Subject;
 
@@ -509,7 +509,7 @@ public class DashboardControllerTests : IDisposable
         summaryPayload.RiskChangeBrief.Appeared.Should().ContainSingle();
         summaryPayload.RiskChangeBrief.Appeared[0].ExternalId.Should().Be("CVE-2026-4100");
 
-        var detailAction = await _controller.GetRiskChanges(CancellationToken.None);
+        var detailAction = await _controller.GetRiskChanges(days: 1, ct: CancellationToken.None);
         var detailPayload = detailAction.Result.Should().BeOfType<OkObjectResult>().Subject.Value
             .Should().BeOfType<DashboardRiskChangeBriefDto>().Subject;
 
