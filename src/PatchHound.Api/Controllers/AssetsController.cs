@@ -107,6 +107,16 @@ public class AssetsController : ControllerBase
                 (a.DeviceGroupName != null && a.DeviceGroupName.Contains(filter.DeviceGroup))
                 || (a.DeviceGroupId != null && a.DeviceGroupId.Contains(filter.DeviceGroup))
             );
+        if (!string.IsNullOrEmpty(filter.HealthStatus))
+            query = query.Where(a => a.DeviceHealthStatus == filter.HealthStatus);
+        if (!string.IsNullOrEmpty(filter.RiskScore))
+            query = query.Where(a => a.DeviceRiskScore == filter.RiskScore);
+        if (!string.IsNullOrEmpty(filter.ExposureLevel))
+            query = query.Where(a => a.DeviceExposureLevel == filter.ExposureLevel);
+        if (!string.IsNullOrEmpty(filter.Tag))
+            query = query.Where(a =>
+                _dbContext.AssetTags.Any(t => t.AssetId == a.Id && t.Tag.Contains(filter.Tag))
+            );
 
         var totalCount = await query.CountAsync(ct);
 
@@ -154,8 +164,18 @@ public class AssetsController : ControllerBase
                 VulnerabilityCount = _dbContext.VulnerabilityAssets.Count(va =>
                     va.AssetId == a.Id && va.SnapshotId == activeSnapshotId
                 ),
+                a.DeviceHealthStatus,
+                a.DeviceRiskScore,
+                a.DeviceExposureLevel,
             })
             .ToListAsync(ct);
+
+        var assetTagsByAssetId = await _dbContext.AssetTags
+            .AsNoTracking()
+            .Where(t => assetIds.Contains(t.AssetId))
+            .GroupBy(t => t.AssetId)
+            .Select(g => new { AssetId = g.Key, Tags = g.Select(t => t.Tag).ToArray() })
+            .ToDictionaryAsync(g => g.AssetId, g => g.Tags, ct);
 
         var items = itemRows
             .Select(a => new AssetDto(
@@ -172,7 +192,11 @@ public class AssetsController : ControllerBase
                 a.VulnerabilityCount,
                 recurringCountsByAssetId.TryGetValue(a.Id, out var recurringCount)
                     ? recurringCount
-                    : 0
+                    : 0,
+                a.DeviceHealthStatus,
+                a.DeviceRiskScore,
+                a.DeviceExposureLevel,
+                assetTagsByAssetId.TryGetValue(a.Id, out var tags) ? tags : Array.Empty<string>()
             ))
             .ToList();
 
