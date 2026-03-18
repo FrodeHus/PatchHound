@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { AlertTriangle, CheckCircle2, ShieldAlert, TimerReset } from 'lucide-react'
 import { fetchDashboardBurndown, fetchDashboardFilterOptions, fetchDashboardSummary, fetchDashboardTrends } from '@/api/dashboard.functions'
 import { Card, CardContent } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Sparkline } from '@/components/features/dashboard/Sparkline'
 import { CriticalVulnerabilities } from '@/components/features/dashboard/CriticalVulnerabilities'
@@ -22,7 +23,11 @@ import { MttrCard } from '@/components/features/dashboard/MttrCard'
 import { BurndownChart } from '@/components/features/dashboard/BurndownChart'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 
+const TAB_VALUES = ['risk', 'remediation', 'infrastructure'] as const
+type DashboardTab = (typeof TAB_VALUES)[number]
+
 const dashboardSearchSchema = z.object({
+  tab: z.enum(TAB_VALUES).optional().catch(undefined),
   minAgeDays: z.string().optional().catch(undefined),
   platform: z.string().optional().catch(undefined),
   deviceGroup: z.string().optional().catch(undefined),
@@ -48,6 +53,7 @@ function DashboardPage() {
   const [initialTenantId] = useState(selectedTenantId)
   const canUseInitialData = initialTenantId === selectedTenantId
 
+  const activeTab: DashboardTab = search.tab ?? 'risk'
   const minAgeDays = search.minAgeDays ?? ''
   const platform = search.platform ?? ''
   const deviceGroup = search.deviceGroup ?? ''
@@ -205,30 +211,69 @@ function DashboardPage() {
         </CardContent>
       </Card>
 
-      <DeviceGroupVulnerabilityChart
-        data={summary.vulnerabilitiesByDeviceGroup}
-        isLoading={summaryQuery.isFetching}
-        onBarClick={drillToAssets}
-      />
-      <RiskHeatmap
-        data={summary.vulnerabilitiesByDeviceGroup}
-        isLoading={summaryQuery.isFetching}
-        onCellClick={(group, _severity) => {
-          void navigate({ search: (prev) => ({ ...prev, deviceGroup: group }) })
-        }}
-      />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
-        <DeviceHealthCard
-          healthBreakdown={summary.deviceHealthBreakdown}
-          isLoading={summaryQuery.isFetching}
-        />
-        <OnboardingStatusCard
-          onboardingBreakdown={summary.deviceOnboardingBreakdown}
-          isLoading={summaryQuery.isFetching}
-        />
-      </div>
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="xl:col-span-2">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) =>
+          void navigate({ search: (prev) => ({ ...prev, tab: value as DashboardTab }) })
+        }
+      >
+        <TabsList className="h-10 w-full justify-start rounded-xl bg-muted/60 p-1">
+          <TabsTrigger value="risk" className="rounded-lg px-4 text-sm">
+            Risk Overview
+          </TabsTrigger>
+          <TabsTrigger value="remediation" className="rounded-lg px-4 text-sm">
+            Remediation
+          </TabsTrigger>
+          <TabsTrigger value="infrastructure" className="rounded-lg px-4 text-sm">
+            Infrastructure
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="risk" className="space-y-6 pt-2">
+          <RiskHeatmap
+            data={summary.vulnerabilitiesByDeviceGroup}
+            isLoading={summaryQuery.isFetching}
+            onCellClick={(group, _severity) => {
+              void navigate({ search: (prev) => ({ ...prev, deviceGroup: group }) })
+            }}
+          />
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            {summary.vulnerabilityAgeBuckets ? (
+              <VulnerabilityAgeChart
+                data={summary.vulnerabilityAgeBuckets}
+                isLoading={summaryQuery.isFetching}
+                onBucketClick={(bucket) => {
+                  const ageMap: Record<string, string> = {
+                    '0-7 days': '',
+                    '8-30 days': '8',
+                    '31-90 days': '31',
+                    '91-180 days': '91',
+                    '180+ days': '181',
+                  }
+                  const days = ageMap[bucket]
+                  if (days !== undefined) {
+                    void navigate({ search: (prev) => ({ ...prev, minAgeDays: days }) })
+                  }
+                }}
+              />
+            ) : null}
+            {summary.mttrBySeverity ? (
+              <MttrCard
+                data={summary.mttrBySeverity}
+                isLoading={summaryQuery.isFetching}
+              />
+            ) : null}
+          </div>
+
+          <CriticalVulnerabilities
+            items={summary.topCriticalVulnerabilities}
+            summary={summary}
+            isLoading={summaryQuery.isFetching}
+          />
+        </TabsContent>
+
+        <TabsContent value="remediation" className="space-y-6 pt-2">
           <ExposureSlaCard
             exposureScore={summary.exposureScore}
             slaCompliancePercent={summary.slaCompliancePercent}
@@ -237,69 +282,43 @@ function DashboardPage() {
             slaComplianceTrend={summary.slaComplianceTrend}
             isLoading={summaryQuery.isFetching}
           />
-        </div>
-      </div>
 
-      {summary.mttrBySeverity ? (
-        <MttrCard
-          data={summary.mttrBySeverity}
-          isLoading={summaryQuery.isFetching}
-        />
-      ) : null}
+          <BurndownChart
+            data={burndownQuery.data}
+            isLoading={burndownQuery.isFetching}
+          />
 
-      {summary.vulnerabilityAgeBuckets ? (
-        <div className="grid gap-4 xl:grid-cols-3">
-          <div className="xl:col-span-2">
-            <VulnerabilityAgeChart
-              data={summary.vulnerabilityAgeBuckets}
-              isLoading={summaryQuery.isFetching}
-              onBucketClick={(bucket) => {
-                const ageMap: Record<string, string> = {
-                  '0-7 days': '',
-                  '8-30 days': '8',
-                  '31-90 days': '31',
-                  '91-180 days': '91',
-                  '180+ days': '181',
-                }
-                const days = ageMap[bucket]
-                if (days !== undefined) {
-                  void navigate({ search: (prev) => ({ ...prev, minAgeDays: days }) })
-                }
-              }}
-            />
-          </div>
-        </div>
-      ) : null}
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="xl:col-span-2">
           <RemediationVelocity
             averageDays={summary.averageRemediationDays}
             vulnerabilitiesBySeverity={summary.vulnerabilitiesBySeverity}
             isLoading={summaryQuery.isFetching}
           />
-        </div>
-      </div>
 
-      <BurndownChart
-        data={burndownQuery.data}
-        isLoading={burndownQuery.isFetching}
-      />
-
-      <RiskChangeBriefCard
-        brief={summary.riskChangeBrief}
-        isLoading={summaryQuery.isFetching}
-      />
-
-      <div className="grid gap-4 xl:grid-cols-5">
-        <div className="xl:col-span-5">
-          <CriticalVulnerabilities
-            items={summary.topCriticalVulnerabilities}
-            summary={summary}
+          <RiskChangeBriefCard
+            brief={summary.riskChangeBrief}
             isLoading={summaryQuery.isFetching}
           />
-        </div>
-      </div>
+        </TabsContent>
+
+        <TabsContent value="infrastructure" className="space-y-6 pt-2">
+          <DeviceGroupVulnerabilityChart
+            data={summary.vulnerabilitiesByDeviceGroup}
+            isLoading={summaryQuery.isFetching}
+            onBarClick={drillToAssets}
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DeviceHealthCard
+              healthBreakdown={summary.deviceHealthBreakdown}
+              isLoading={summaryQuery.isFetching}
+            />
+            <OnboardingStatusCard
+              onboardingBreakdown={summary.deviceOnboardingBreakdown}
+              isLoading={summaryQuery.isFetching}
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }
