@@ -23,9 +23,17 @@ public static class DependencyInjection
         IConfiguration configuration
     )
     {
+        // Redis (optional — ingestion cache)
+        var redisConnectionString = configuration.GetConnectionString("Redis");
+        if (!string.IsNullOrWhiteSpace(redisConnectionString))
+        {
+            services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(
+                StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnectionString));
+        }
+
         // Database
         services.AddScoped<AuditSaveChangesInterceptor>();
-        services.AddDbContext<PatchHoundDbContext>(
+        services.AddDbContextFactory<PatchHoundDbContext>(
             (sp, options) =>
                 options
                     .UseNpgsql(

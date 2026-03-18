@@ -34,6 +34,16 @@ services:
       timeout: 5s
       retries: 12
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   api:
     build:
       context: .
@@ -52,6 +62,7 @@ services:
       Smtp__Port: ${SMTP_PORT}
       Smtp__Username: ${SMTP_USERNAME}
       Smtp__Password: ${SMTP_PASSWORD}
+      ConnectionStrings__Redis: redis:6379
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,6 +86,7 @@ services:
       OpenBao__Address: ${OPENBAO_INTERNAL_ADDR:-http://openbao:8200}
       OpenBao__Token: ${OPENBAO_TOKEN:-}
       OpenBao__KvMount: ${OPENBAO_KV_MOUNT:-patchhound}
+      ConnectionStrings__Redis: redis:6379
     depends_on:
       postgres:
         condition: service_healthy
