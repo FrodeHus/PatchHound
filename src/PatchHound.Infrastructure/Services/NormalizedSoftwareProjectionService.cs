@@ -151,7 +151,8 @@ public class NormalizedSoftwareProjectionService(
             .ToListAsync(ct);
 
         var tenantSoftwareIdBySoftwareAssetId = activeInstallations
-            .ToDictionary(item => item.SoftwareAssetId, item => item.TenantSoftwareId);
+            .GroupBy(item => item.SoftwareAssetId)
+            .ToDictionary(group => group.Key, group => group.First().TenantSoftwareId);
 
         var grouped = matches
             .Where(match => tenantSoftwareIdBySoftwareAssetId.ContainsKey(match.SoftwareAssetId))
