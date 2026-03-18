@@ -10,6 +10,7 @@ import { CriticalVulnerabilities } from '@/components/features/dashboard/Critica
 import { DashboardFilterBar } from '@/components/features/dashboard/DashboardFilterBar'
 import { DeviceGroupVulnerabilityChart } from '@/components/features/dashboard/DeviceGroupVulnerabilityChart'
 import { DeviceHealthCard } from '@/components/features/dashboard/DeviceHealthCard'
+import { OnboardingStatusCard } from '@/components/features/dashboard/OnboardingStatusCard'
 import { ExposureSlaCard } from '@/components/features/dashboard/ExposureSlaCard'
 import { RemediationVelocity } from '@/components/features/dashboard/RemediationVelocity'
 import { RiskChangeBriefCard } from '@/components/features/dashboard/RiskChangeBriefCard'
@@ -159,6 +160,10 @@ function DashboardPage() {
         </div>
         <DeviceHealthCard
           healthBreakdown={summary.deviceHealthBreakdown}
+          isLoading={summaryQuery.isFetching}
+        />
+        <OnboardingStatusCard
+          onboardingBreakdown={summary.deviceOnboardingBreakdown}
           isLoading={summaryQuery.isFetching}
         />
       </div>
