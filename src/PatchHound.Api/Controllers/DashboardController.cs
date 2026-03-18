@@ -450,7 +450,7 @@ public class DashboardController : ControllerBase
             if (!string.IsNullOrEmpty(filter.Platform))
                 assetQuery = assetQuery.Where(a => a.DeviceOsPlatform == filter.Platform);
             if (!string.IsNullOrEmpty(filter.DeviceGroup))
-                assetQuery = assetQuery.Where(a => a.DeviceGroupName != null && a.DeviceGroupName.Contains(filter.DeviceGroup));
+                assetQuery = assetQuery.Where(a => a.DeviceGroupName == filter.DeviceGroup);
             filteredAssetIdQuery = assetQuery.Select(a => a.Id);
         }
 
