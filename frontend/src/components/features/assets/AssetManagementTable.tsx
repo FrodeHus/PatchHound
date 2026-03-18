@@ -21,7 +21,8 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { SearchIcon } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { ExternalLinkIcon, SearchIcon } from 'lucide-react'
 import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
 
 type AssetManagementTableProps = {
@@ -329,15 +330,25 @@ export function AssetManagementTable({
         header: "Asset",
         cell: ({ row }) => (
           <div className="space-y-1">
-            <button
-              type="button"
-              className="text-left font-medium tracking-tight underline decoration-border/70 underline-offset-4 transition hover:decoration-foreground"
-              onClick={() => {
-                onSelectAsset(row.original.id);
-              }}
-            >
-              {row.original.name}
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                className="text-left font-medium tracking-tight underline decoration-border/70 underline-offset-4 transition hover:decoration-foreground"
+                onClick={() => {
+                  onSelectAsset(row.original.id);
+                }}
+              >
+                {row.original.name}
+              </button>
+              <Link
+                to="/assets/$id"
+                params={{ id: row.original.id }}
+                className="shrink-0 text-muted-foreground transition hover:text-foreground"
+                title="Open full detail view"
+              >
+                <ExternalLinkIcon className="size-3.5" />
+              </Link>
+            </div>
             <p className="font-mono text-[11px] text-muted-foreground">
               {row.original.externalId}
             </p>

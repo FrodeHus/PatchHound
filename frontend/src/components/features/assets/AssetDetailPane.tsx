@@ -1,21 +1,21 @@
 import { useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
+import {
+  ArrowRightIcon,
+  MonitorIcon,
+  ShieldAlertIcon,
+  ShieldCheckIcon,
+  ActivityIcon,
+  UserIcon,
+  UsersIcon,
+  PackageIcon,
+} from 'lucide-react'
 import type { AssetDetail } from '@/api/assets.schemas'
-import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import {
   getDefaultDescription,
-  parseMetadata,
 } from '@/components/features/assets/AssetDetailHelpers'
 import {
-  DeviceActivityTimeline,
-  DeviceSection,
-  DeviceSecurityProfileSection,
-  GenericMetadataSection,
-  SoftwareSection,
-} from '@/components/features/assets/AssetDetailSections'
-import {
   Badge,
-  DataCard,
   SkeletonBlock,
 } from '@/components/features/assets/AssetDetailShared'
 import {
@@ -29,44 +29,82 @@ import { InsetPanel } from '@/components/ui/inset-panel'
 
 type AssetDetailPaneProps = {
   asset: AssetDetail | null
-  securityProfiles: SecurityProfile[]
   isLoading: boolean
-  isAssigningSecurityProfile: boolean
-  isAssigningSoftwareCpeBinding: boolean
   isOpen: boolean
-  onAssignSecurityProfile: (assetId: string, securityProfileId: string | null) => void
-  onAssignSoftwareCpeBinding: (assetId: string, cpe23Uri: string | null) => void
   onOpenChange: (open: boolean) => void
+}
+
+function MetricCard({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string
+  value: string | number
+  tone?: 'default' | 'danger' | 'warning' | 'success'
+}) {
+  const toneClasses = {
+    default: 'border-border/70 bg-background',
+    danger: 'border-red-200/70 bg-red-50/50',
+    warning: 'border-amber-200/70 bg-amber-50/50',
+    success: 'border-emerald-200/70 bg-emerald-50/50',
+  }
+
+  const valueToneClasses = {
+    default: 'text-foreground',
+    danger: 'text-red-700',
+    warning: 'text-amber-700',
+    success: 'text-emerald-700',
+  }
+
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 ${toneClasses[tone]}`}>
+      <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+      <p className={`mt-0.5 text-lg font-semibold tabular-nums ${valueToneClasses[tone]}`}>{value}</p>
+    </div>
+  )
 }
 
 export function AssetDetailPane({
   asset,
-  securityProfiles,
   isLoading,
-  isAssigningSecurityProfile,
-  isAssigningSoftwareCpeBinding,
   isOpen,
-  onAssignSecurityProfile,
-  onAssignSoftwareCpeBinding,
   onOpenChange,
 }: AssetDetailPaneProps) {
-  const metadata = useMemo(() => parseMetadata(asset?.metadata), [asset?.metadata])
+  const openVulnCount = useMemo(
+    () => asset?.vulnerabilities.filter((v) => v.status === 'Open').length ?? 0,
+    [asset?.vulnerabilities],
+  )
+  const resolvedVulnCount = useMemo(
+    () => asset?.vulnerabilities.filter((v) => v.status !== 'Open').length ?? 0,
+    [asset?.vulnerabilities],
+  )
+  const recurringCount = useMemo(
+    () => asset?.vulnerabilities.filter((v) => v.episodeCount > 1).length ?? 0,
+    [asset?.vulnerabilities],
+  )
+  const criticalHighCount = useMemo(
+    () =>
+      asset?.vulnerabilities.filter(
+        (v) =>
+          v.status === 'Open' &&
+          (v.effectiveSeverity === 'Critical' || v.effectiveSeverity === 'High'),
+      ).length ?? 0,
+    [asset?.vulnerabilities],
+  )
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto border-l border-border/80 bg-card p-0 sm:max-w-2xl">
+      <SheetContent side="right" className="w-full overflow-y-auto border-l border-border/80 bg-card p-0 sm:max-w-md">
         <SheetHeader className="border-b border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_96%,black),var(--card))]">
-          <SheetTitle>{asset?.name ?? 'Asset detail'}</SheetTitle>
-          <SheetDescription>
-            Inspect operational context, ownership, and type-specific signals without leaving the asset table.
-          </SheetDescription>
+          <SheetTitle>{asset?.name ?? 'Asset summary'}</SheetTitle>
+          <SheetDescription>Quick context and metrics overview.</SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-6 p-5">
+        <div className="space-y-4 p-4">
           {isLoading ? (
             <div className="space-y-3">
-              <SkeletonBlock className="h-24" />
-              <SkeletonBlock className="h-40" />
+              <SkeletonBlock className="h-20" />
               <SkeletonBlock className="h-32" />
             </div>
           ) : null}
@@ -79,174 +117,237 @@ export function AssetDetailPane({
 
           {!isLoading && asset ? (
             <>
-              <section className="rounded-2xl border border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_94%,black),var(--card))] p-4 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      <Badge tone="slate">{asset.assetType}</Badge>
-                      <Badge tone={asset.criticality === 'Critical' ? 'amber' : 'blue'}>
-                        {asset.criticality} criticality
-                      </Badge>
-                    </div>
-                    <h2 className="text-2xl font-semibold tracking-[-0.03em]">{asset.name}</h2>
-                    <p className="max-w-2xl text-sm text-muted-foreground">
-                      {asset.description ?? getDefaultDescription(asset.assetType)}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Link
-                        to="/assets/$id"
-                        params={{ id: asset.id }}
-                        className="inline-flex rounded-full border border-border/70 bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/20"
-                      >
-                        Open detail view
-                      </Link>
-                      {asset.assetType === 'Software' && asset.tenantSoftwareId ? (
-                        <Link
-                          to="/software/$id"
-                          params={{ id: asset.tenantSoftwareId }}
-                          search={{ page: 1, pageSize: 25, version: '' }}
-                          className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
-                        >
-                          Open software workspace
-                        </Link>
-                      ) : null}
-                    </div>
-                  </div>
-                  <InsetPanel emphasis="strong" className="px-3 py-2 text-right">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      External ID
-                    </p>
-                    <code className="text-xs">{asset.externalId}</code>
-                  </InsetPanel>
+              {/* Identity */}
+              <section className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone="slate">{asset.assetType}</Badge>
+                  <Badge tone={asset.criticality === 'Critical' ? 'amber' : 'blue'}>
+                    {asset.criticality}
+                  </Badge>
+                  {asset.securityProfile ? (
+                    <Badge tone="blue">{asset.securityProfile.name}</Badge>
+                  ) : null}
                 </div>
+                <p className="text-sm text-muted-foreground">
+                  {asset.description ?? getDefaultDescription(asset.assetType)}
+                </p>
+                <code className="block text-xs text-muted-foreground">{asset.externalId}</code>
               </section>
 
-              <section className="grid gap-3 md:grid-cols-2">
-                {asset.ownerType === 'Team' ? (
-                  <DataCard label="Assignment Group" value={asset.ownerTeamId ?? 'Unassigned'} mono />
-                ) : (
-                  <DataCard label="Owner User" value={asset.ownerUserId ?? 'Unassigned'} mono />
-                )}
-                <DataCard label="Fallback Assignment Group" value={asset.fallbackTeamId ?? 'None'} mono />
-              </section>
-
+              {/* Device context */}
               {asset.assetType === 'Device' ? (
-                <DeviceSecurityProfileSection
-                  asset={asset}
-                  securityProfiles={securityProfiles}
-                  isAssigningSecurityProfile={isAssigningSecurityProfile}
-                  onAssignSecurityProfile={onAssignSecurityProfile}
-                />
+                <section className="rounded-xl border border-border/70 bg-muted/30 p-3">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    <MonitorIcon className="size-3.5" />
+                    Device context
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                    {asset.deviceComputerDnsName ? (
+                      <>
+                        <span className="text-muted-foreground">DNS name</span>
+                        <span className="truncate font-medium">{asset.deviceComputerDnsName}</span>
+                      </>
+                    ) : null}
+                    {asset.deviceOsPlatform ? (
+                      <>
+                        <span className="text-muted-foreground">OS</span>
+                        <span className="font-medium">{asset.deviceOsPlatform}{asset.deviceOsVersion ? ` ${asset.deviceOsVersion}` : ''}</span>
+                      </>
+                    ) : null}
+                    {asset.deviceHealthStatus ? (
+                      <>
+                        <span className="text-muted-foreground">Health</span>
+                        <span className="font-medium">{asset.deviceHealthStatus}</span>
+                      </>
+                    ) : null}
+                    {asset.deviceRiskScore ? (
+                      <>
+                        <span className="text-muted-foreground">Risk score</span>
+                        <span className="font-medium">{asset.deviceRiskScore}</span>
+                      </>
+                    ) : null}
+                    {asset.deviceExposureLevel ? (
+                      <>
+                        <span className="text-muted-foreground">Exposure</span>
+                        <span className="font-medium">{asset.deviceExposureLevel}</span>
+                      </>
+                    ) : null}
+                    {asset.deviceLastSeenAt ? (
+                      <>
+                        <span className="text-muted-foreground">Last seen</span>
+                        <span className="font-medium">{new Date(asset.deviceLastSeenAt).toLocaleDateString()}</span>
+                      </>
+                    ) : null}
+                    {asset.deviceLastIpAddress ? (
+                      <>
+                        <span className="text-muted-foreground">IP address</span>
+                        <span className="truncate font-mono text-xs font-medium">{asset.deviceLastIpAddress}</span>
+                      </>
+                    ) : null}
+                    {asset.deviceGroupName ? (
+                      <>
+                        <span className="text-muted-foreground">Group</span>
+                        <span className="truncate font-medium">{asset.deviceGroupName}</span>
+                      </>
+                    ) : null}
+                  </div>
+                </section>
               ) : null}
 
+              {/* Software context */}
               {asset.assetType === 'Software' ? (
-                <SoftwareSection
-                  asset={asset}
-                  metadata={metadata}
-                  isAssigningSoftwareCpeBinding={isAssigningSoftwareCpeBinding}
-                  onAssignSoftwareCpeBinding={onAssignSoftwareCpeBinding}
-                />
-              ) : asset.assetType === 'Device' ? (
-                <DeviceSection asset={asset} metadata={metadata} />
-              ) : (
-                <GenericMetadataSection metadata={metadata} />
-              )}
-
-              {asset.assetType === 'Device' ? <DeviceActivityTimeline asset={asset} /> : null}
-
-              <section className="rounded-2xl border border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_94%,black),var(--card))] p-4">
-                <div className="mb-4 flex items-end justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Exposure
-                    </p>
-                    <h3 className="text-lg font-semibold">Linked vulnerabilities</h3>
+                <section className="rounded-xl border border-border/70 bg-muted/30 p-3">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    <PackageIcon className="size-3.5" />
+                    Software context
                   </div>
-                  <InsetPanel emphasis="subtle" className="px-3 py-1 text-sm">
-                    {asset.vulnerabilities.length} linked
-                  </InsetPanel>
-                </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                    {asset.softwareCpeBinding?.matchedVendor ? (
+                      <>
+                        <span className="text-muted-foreground">Vendor</span>
+                        <span className="font-medium">{asset.softwareCpeBinding.matchedVendor}</span>
+                      </>
+                    ) : null}
+                    {asset.softwareCpeBinding?.matchedVersion ? (
+                      <>
+                        <span className="text-muted-foreground">Version</span>
+                        <span className="font-mono text-xs font-medium">{asset.softwareCpeBinding.matchedVersion}</span>
+                      </>
+                    ) : null}
+                    {asset.softwareInventory.length > 0 ? (
+                      <>
+                        <span className="text-muted-foreground">Installations</span>
+                        <span className="font-medium">{asset.softwareInventory.length}</span>
+                      </>
+                    ) : null}
+                    {asset.knownSoftwareVulnerabilities.length > 0 ? (
+                      <>
+                        <span className="text-muted-foreground">Known vulns</span>
+                        <span className="font-medium">{asset.knownSoftwareVulnerabilities.length}</span>
+                      </>
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
 
-                {asset.vulnerabilities.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No active or historical vulnerability links recorded for this asset.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {asset.vulnerabilities.map((vulnerability) => (
+              {/* Ownership */}
+              <section className="rounded-xl border border-border/70 bg-muted/30 p-3">
+                <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  {asset.ownerType === 'Team' ? <UsersIcon className="size-3.5" /> : <UserIcon className="size-3.5" />}
+                  Ownership
+                </div>
+                <p className="text-sm font-medium">
+                  {asset.ownerType === 'Team'
+                    ? asset.ownerTeamId ?? 'Unassigned'
+                    : asset.ownerUserId ?? 'Unassigned'}
+                </p>
+              </section>
+
+              {/* Vulnerability metrics */}
+              <section className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  <ShieldAlertIcon className="size-3.5" />
+                  Vulnerability metrics
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <MetricCard
+                    label="Open"
+                    value={openVulnCount}
+                    tone={openVulnCount > 0 ? 'danger' : 'success'}
+                  />
+                  <MetricCard
+                    label="Critical / High"
+                    value={criticalHighCount}
+                    tone={criticalHighCount > 0 ? 'danger' : 'default'}
+                  />
+                  <MetricCard
+                    label="Recurring"
+                    value={recurringCount}
+                    tone={recurringCount > 0 ? 'warning' : 'default'}
+                  />
+                  <MetricCard
+                    label="Resolved"
+                    value={resolvedVulnCount}
+                    tone={resolvedVulnCount > 0 ? 'success' : 'default'}
+                  />
+                </div>
+              </section>
+
+              {/* Top vulnerabilities (compact list, max 5) */}
+              {asset.vulnerabilities.length > 0 ? (
+                <section className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                      <ActivityIcon className="size-3.5" />
+                      Recent vulnerabilities
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {asset.vulnerabilities.length} total
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {asset.vulnerabilities.slice(0, 5).map((vuln) => (
                       <Link
-                        key={vulnerability.vulnerabilityId}
+                        key={vuln.vulnerabilityId}
                         to="/vulnerabilities/$id"
-                        params={{ id: vulnerability.vulnerabilityId }}
-                        className="block rounded-xl border border-border/80 bg-muted/55 px-3 py-3 transition hover:border-foreground/20 hover:bg-muted/70"
+                        params={{ id: vuln.vulnerabilityId }}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 transition hover:border-foreground/20 hover:bg-muted/40"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-medium">{vulnerability.title}</p>
-                              {vulnerability.episodeCount > 1 ? (
-                                <span className="rounded-full border border-amber-300/70 bg-amber-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.14em] text-amber-900">
-                                  Recurred {vulnerability.episodeCount - 1}x
-                                </span>
-                              ) : null}
-                            </div>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {vulnerability.externalId} • {vulnerability.vendorSeverity} • {vulnerability.status}
-                            </p>
-                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                              <DataCard
-                                label="Vendor Severity"
-                                value={vulnerability.vendorScore
-                                  ? `${vulnerability.vendorSeverity} (${vulnerability.vendorScore.toFixed(1)})`
-                                  : vulnerability.vendorSeverity}
-                              />
-                              <DataCard
-                                label="CVSS Vector"
-                                value={vulnerability.cvssVector ?? 'Not available'}
-                              />
-                              <DataCard
-                                label="Effective Severity"
-                                value={vulnerability.effectiveScore
-                                  ? `${vulnerability.effectiveSeverity} (${vulnerability.effectiveScore.toFixed(1)})`
-                                  : vulnerability.effectiveSeverity}
-                              />
-                              <DataCard
-                                label="Published"
-                                value={vulnerability.publishedDate
-                                  ? new Date(vulnerability.publishedDate).toLocaleDateString()
-                                  : 'Unknown'}
-                              />
-                            </div>
-                            <p className="mt-2 text-sm text-muted-foreground">
-                              {vulnerability.description}
-                            </p>
-                            {vulnerability.assessmentReasonSummary ? (
-                              <p className="mt-2 text-xs text-sky-700">
-                                {vulnerability.assessmentReasonSummary}
-                              </p>
-                            ) : null}
-                            {vulnerability.possibleCorrelatedSoftware.length > 0 ? (
-                              <p className="mt-2 text-xs text-amber-700">
-                                Possible correlation: {vulnerability.possibleCorrelatedSoftware.join(', ')}
-                              </p>
-                            ) : null}
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {vulnerability.episodes.map((episode) => (
-                                <span key={episode.episodeNumber} className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-[11px] text-muted-foreground">
-                                  #{episode.episodeNumber} {episode.status === 'Open' ? 'open' : 'resolved'}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{vuln.title}</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(vulnerability.detectedDate).toLocaleDateString()}
+                            {vuln.externalId} · {vuln.effectiveSeverity ?? vuln.vendorSeverity}
+                            {vuln.episodeCount > 1 ? ` · ${vuln.episodeCount - 1}x recurred` : ''}
                           </p>
                         </div>
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                            vuln.status === 'Open'
+                              ? 'border border-red-200/70 bg-red-50 text-red-700'
+                              : 'border border-emerald-200/70 bg-emerald-50 text-emerald-700'
+                          }`}
+                        >
+                          {vuln.status}
+                        </span>
                       </Link>
                     ))}
                   </div>
-                )}
-              </section>
+                  {asset.vulnerabilities.length > 5 ? (
+                    <p className="text-center text-xs text-muted-foreground">
+                      +{asset.vulnerabilities.length - 5} more — open detail view to see all
+                    </p>
+                  ) : null}
+                </section>
+              ) : (
+                <section className="rounded-xl border border-border/60 bg-background p-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <ShieldCheckIcon className="size-4 text-emerald-600" />
+                    No vulnerabilities linked to this asset.
+                  </div>
+                </section>
+              )}
+
+              {/* Detail link */}
+              <div className="flex gap-2">
+                <Link
+                  to="/assets/$id"
+                  params={{ id: asset.id }}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border/70 bg-background px-4 py-2.5 text-sm font-medium transition hover:bg-muted/30"
+                >
+                  Open full detail view
+                  <ArrowRightIcon className="size-4" />
+                </Link>
+                {asset.assetType === 'Software' && asset.tenantSoftwareId ? (
+                  <Link
+                    to="/software/$id"
+                    params={{ id: asset.tenantSoftwareId }}
+                    search={{ page: 1, pageSize: 25, version: '' }}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary transition hover:bg-primary/15"
+                  >
+                    Software workspace
+                  </Link>
+                ) : null}
+              </div>
             </>
           ) : null}
         </div>
