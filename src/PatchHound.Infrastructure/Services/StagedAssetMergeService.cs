@@ -127,8 +127,12 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                             asset.DeviceLastIpAddress,
                             asset.DeviceAadDeviceId,
                             asset.DeviceGroupId,
-                            asset.DeviceGroupName
+                            asset.DeviceGroupName,
+                            asset.DeviceExposureLevel,
+                            asset.DeviceIsAadJoined
                         );
+
+                        await SyncDefenderTagsAsync(dbContext, tenantId, existing.Id, asset.MachineTags, ct);
                     }
 
                     existing.UpdateMetadata(asset.Metadata);
@@ -149,8 +153,12 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                         asset.DeviceLastIpAddress,
                         asset.DeviceAadDeviceId,
                         asset.DeviceGroupId,
-                        asset.DeviceGroupName
+                        asset.DeviceGroupName,
+                        asset.DeviceExposureLevel,
+                        asset.DeviceIsAadJoined
                     );
+
+                    await SyncDefenderTagsAsync(dbContext, tenantId, existing.Id, asset.MachineTags, ct);
                 }
 
                 existing.UpdateDetails(asset.Name, asset.Description);
@@ -605,6 +613,43 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
         }
 
         return new StagedAssetStaleLinkSummary(staleInstallations.Count, installationsRemoved);
+    }
+
+    private static async Task SyncDefenderTagsAsync(
+        PatchHoundDbContext dbContext,
+        Guid tenantId,
+        Guid assetId,
+        List<string>? machineTags,
+        CancellationToken ct
+    )
+    {
+        if (machineTags is { Count: > 0 })
+        {
+            var existingTags = await dbContext.AssetTags
+                .Where(t => t.AssetId == assetId && t.Source == "Defender")
+                .ToListAsync(ct);
+
+            var incomingSet = machineTags.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var existingSet = existingTags.Select(t => t.Tag).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var toRemove = existingTags.Where(t => !incomingSet.Contains(t.Tag)).ToList();
+            if (toRemove.Count > 0)
+                dbContext.AssetTags.RemoveRange(toRemove);
+
+            var toAdd = incomingSet.Where(t => !existingSet.Contains(t)).ToList();
+            foreach (var tag in toAdd)
+            {
+                dbContext.AssetTags.Add(AssetTag.Create(tenantId, assetId, tag, "Defender"));
+            }
+        }
+        else
+        {
+            var existingTags = await dbContext.AssetTags
+                .Where(t => t.AssetId == assetId && t.Source == "Defender")
+                .ToListAsync(ct);
+            if (existingTags.Count > 0)
+                dbContext.AssetTags.RemoveRange(existingTags);
+        }
     }
 
     private static string BuildPairKey(Guid leftId, Guid rightId)
