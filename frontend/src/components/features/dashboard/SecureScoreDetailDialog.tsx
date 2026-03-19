@@ -10,25 +10,12 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import type { SecureScoreSummary, AssetScoreSummary } from '@/api/secure-score.schemas'
+import { scorePosture, postureText, postureBar } from "@/lib/score-posture";
 
 type SecureScoreDetailDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   summary: SecureScoreSummary
-}
-
-function scoreTone(score: number): string {
-  if (score >= 75) return 'text-tone-danger-foreground'
-  if (score >= 50) return 'text-tone-warning-foreground'
-  if (score >= 25) return 'text-tone-info-foreground'
-  return 'text-tone-success-foreground'
-}
-
-function scoreBarColor(score: number): string {
-  if (score >= 75) return 'bg-tone-danger-foreground/80'
-  if (score >= 50) return 'bg-tone-warning-foreground/80'
-  if (score >= 25) return 'bg-tone-info-foreground/80'
-  return 'bg-tone-success-foreground/80'
 }
 
 export function SecureScoreDetailDialog({
@@ -45,9 +32,16 @@ export function SecureScoreDetailDialog({
             Secure Score Breakdown
           </DialogTitle>
           <DialogDescription>
-            Tenant score: <span className={`font-semibold ${scoreTone(summary.overallScore)}`}>{summary.overallScore.toFixed(1)}</span>
-            {' / '}target: {summary.targetScore.toFixed(0)}
-            {' — '}{summary.assetCount} assets, {summary.assetsAboveTarget} above target
+            Tenant score:{" "}
+            <span
+              className={`font-semibold ${postureText(scorePosture(summary.overallScore, summary.targetScore).tone)}`}
+            >
+              {summary.overallScore.toFixed(1)}
+            </span>
+            {" / "}target: {summary.targetScore.toFixed(0)}
+            {" — "}
+            {summary.assetCount} assets, {summary.assetsAboveTarget} above
+            target
           </DialogDescription>
         </DialogHeader>
 
@@ -56,19 +50,26 @@ export function SecureScoreDetailDialog({
             Top Risk Assets
           </p>
           {summary.topRiskAssets.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No scores calculated yet.</p>
+            <p className="text-sm text-muted-foreground">
+              No scores calculated yet.
+            </p>
           ) : (
             summary.topRiskAssets.map((asset) => (
-              <AssetScoreRow key={asset.assetId} asset={asset} targetScore={summary.targetScore} />
+              <AssetScoreRow
+                key={asset.assetId}
+                asset={asset}
+                targetScore={summary.targetScore}
+              />
             ))
           )}
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function AssetScoreRow({ asset, targetScore }: { asset: AssetScoreSummary; targetScore: number }) {
+  const posture = scorePosture(asset.overallScore, targetScore);
   const aboveTarget = asset.overallScore > targetScore
 
   return (
@@ -81,7 +82,9 @@ function AssetScoreRow({ asset, targetScore }: { asset: AssetScoreSummary; targe
         >
           {asset.assetName}
         </Link>
-        <span className={`text-lg font-semibold tabular-nums ${scoreTone(asset.overallScore)}`}>
+        <span
+          className={`text-lg font-semibold tabular-nums ${postureText(posture.tone)}`}
+        >
           {asset.overallScore.toFixed(1)}
         </span>
       </div>
@@ -89,7 +92,7 @@ function AssetScoreRow({ asset, targetScore }: { asset: AssetScoreSummary; targe
       {/* Score bar */}
       <div className="relative h-1.5 overflow-hidden rounded-full bg-muted/80">
         <div
-          className={`absolute inset-y-0 left-0 rounded-full transition-all ${scoreBarColor(asset.overallScore)}`}
+          className={`absolute inset-y-0 left-0 rounded-full transition-all ${postureBar(posture.tone)}`}
           style={{ width: `${Math.min(100, asset.overallScore)}%` }}
         />
         <div
@@ -124,5 +127,5 @@ function AssetScoreRow({ asset, targetScore }: { asset: AssetScoreSummary; targe
         )}
       </div>
     </InsetPanel>
-  )
+  );
 }

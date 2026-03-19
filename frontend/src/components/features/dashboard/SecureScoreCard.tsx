@@ -5,17 +5,11 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { fetchSecureScoreSummary } from '@/api/secure-score.functions'
 import type { SecureScoreSummary } from '@/api/secure-score.schemas'
+import { scorePosture, postureBadge, postureIcon } from "@/lib/score-posture";
 import { SecureScoreDetailDialog } from './SecureScoreDetailDialog'
 
 type SecureScoreCardProps = {
   isLoading?: boolean
-}
-
-function scorePosture(score: number): { label: string; badgeClass: string } {
-  if (score >= 75) return { label: 'Critical', badgeClass: 'border-tone-danger-border bg-tone-danger text-tone-danger-foreground' }
-  if (score >= 50) return { label: 'Elevated', badgeClass: 'border-tone-warning-border bg-tone-warning text-tone-warning-foreground' }
-  if (score >= 25) return { label: 'Guarded', badgeClass: 'border-tone-info-border bg-tone-info text-tone-info-foreground' }
-  return { label: 'Stable', badgeClass: 'border-tone-success-border bg-tone-success text-tone-success-foreground' }
 }
 
 export function SecureScoreCard({ isLoading: parentLoading }: SecureScoreCardProps) {
@@ -45,7 +39,7 @@ export function SecureScoreCard({ isLoading: parentLoading }: SecureScoreCardPro
 
   if (!summary) return null
 
-  const posture = scorePosture(summary.overallScore)
+  const posture = scorePosture(summary.overallScore, summary.targetScore);
   const meetsTarget = summary.overallScore <= summary.targetScore
   const scoreDelta = summary.overallScore - summary.targetScore
 
@@ -70,7 +64,9 @@ export function SecureScoreCard({ isLoading: parentLoading }: SecureScoreCardPro
                 </span>
               </div>
               <div className="mt-5 flex items-center justify-between gap-3">
-                <Badge className={`rounded-full border px-2.5 py-1 text-xs ${posture.badgeClass}`}>
+                <Badge
+                  className={`rounded-full border px-2.5 py-1 text-xs ${postureBadge(posture.tone)}`}
+                >
                   {posture.label}
                 </Badge>
                 <button
@@ -95,7 +91,9 @@ export function SecureScoreCard({ isLoading: parentLoading }: SecureScoreCardPro
                     {summary.targetScore.toFixed(0)}
                   </p>
                 </div>
-                <span className={`flex size-12 items-center justify-center rounded-2xl border ${meetsTarget ? 'border-chart-3/20 bg-chart-3/10 text-chart-3' : 'border-destructive/20 bg-destructive/10 text-destructive'}`}>
+                <span
+                  className={`flex size-12 items-center justify-center rounded-2xl border ${postureIcon(posture.tone)}`}
+                >
                   <Target className="size-5" />
                 </span>
               </div>
@@ -104,8 +102,10 @@ export function SecureScoreCard({ isLoading: parentLoading }: SecureScoreCardPro
                 {/* Score vs target bar */}
                 <div className="relative h-2.5 overflow-hidden rounded-full bg-muted/80">
                   <div
-                    className={`absolute inset-y-0 left-0 rounded-full transition-all ${meetsTarget ? 'bg-chart-3' : 'bg-destructive/80'}`}
-                    style={{ width: `${Math.min(100, (summary.overallScore / 100) * 100)}%` }}
+                    className={`absolute inset-y-0 left-0 rounded-full transition-all ${posture.tone === "success" ? "bg-chart-3" : posture.tone === "warning" ? "bg-tone-warning-foreground/80" : "bg-destructive/80"}`}
+                    style={{
+                      width: `${Math.min(100, (summary.overallScore / 100) * 100)}%`,
+                    }}
                   />
                   <div
                     className="absolute inset-y-0 w-0.5 bg-foreground/50"
@@ -114,11 +114,17 @@ export function SecureScoreCard({ isLoading: parentLoading }: SecureScoreCardPro
                 </div>
 
                 <div className="flex items-center justify-between text-xs">
-                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/30 text-foreground">
+                  <Badge
+                    variant="outline"
+                    className="rounded-full border-border/70 bg-background/30 text-foreground"
+                  >
                     {summary.assetCount} assets scored
                   </Badge>
-                  <span className={`font-medium ${meetsTarget ? 'text-chart-3' : 'text-destructive'}`}>
-                    {meetsTarget ? '' : '+'}{scoreDelta.toFixed(1)} vs target
+                  <span
+                    className={`font-medium ${posture.tone === "success" ? "text-chart-3" : posture.tone === "warning" ? "text-tone-warning-foreground" : "text-destructive"}`}
+                  >
+                    {meetsTarget ? "" : "+"}
+                    {scoreDelta.toFixed(1)} vs target
                   </span>
                 </div>
               </div>
@@ -133,5 +139,5 @@ export function SecureScoreCard({ isLoading: parentLoading }: SecureScoreCardPro
         summary={summary}
       />
     </>
-  )
+  );
 }
