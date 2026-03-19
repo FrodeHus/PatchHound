@@ -79,6 +79,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<SoftwareDescriptionJob> SoftwareDescriptionJobs => Set<SoftwareDescriptionJob>();
     public DbSet<AssetTag> AssetTags => Set<AssetTag>();
     public DbSet<AssetRule> AssetRules => Set<AssetRule>();
+    public DbSet<AssetSecureScore> AssetSecureScores => Set<AssetSecureScore>();
+    public DbSet<TenantSecureScoreTarget> TenantSecureScoreTargets =>
+        Set<TenantSecureScoreTarget>();
 
     public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken ct = default)
     {
@@ -242,6 +245,12 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantSlaConfiguration>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<AssetSecureScore>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<TenantSecureScoreTarget>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
     }
 }

@@ -13,7 +13,7 @@ import { DashboardFilterBar } from '@/components/features/dashboard/DashboardFil
 import { DeviceGroupVulnerabilityChart } from '@/components/features/dashboard/DeviceGroupVulnerabilityChart'
 import { DeviceHealthCard } from '@/components/features/dashboard/DeviceHealthCard'
 import { OnboardingStatusCard } from '@/components/features/dashboard/OnboardingStatusCard'
-import { ExposureSlaCard } from '@/components/features/dashboard/ExposureSlaCard'
+import { SecureScoreCard } from '@/components/features/dashboard/SecureScoreCard'
 import { RemediationVelocity } from '@/components/features/dashboard/RemediationVelocity'
 import { RiskChangeBriefCard } from '@/components/features/dashboard/RiskChangeBriefCard'
 import { TrendChart } from '@/components/features/dashboard/TrendChart'
@@ -280,12 +280,7 @@ function DashboardPage() {
         </TabsContent>
 
         <TabsContent value="remediation" className="space-y-6 pt-2">
-          <ExposureSlaCard
-            exposureScore={summary.exposureScore}
-            slaCompliancePercent={summary.slaCompliancePercent}
-            overdueCount={summary.overdueTaskCount}
-            totalCount={summary.totalTaskCount}
-            slaComplianceTrend={summary.slaComplianceTrend}
+          <SecureScoreCard
             isLoading={summaryQuery.isFetching}
           />
 

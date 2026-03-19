@@ -98,7 +98,7 @@ export function DataTableSummaryStrip({
             item.tone === 'accent'
               ? 'border-primary/20 bg-primary/8'
               : item.tone === 'warning'
-                ? 'border-amber-400/30 bg-amber-400/8'
+                ? 'border-tone-warning-border bg-tone-warning'
                 : 'border border-border/80 bg-card',
           )}
         >
