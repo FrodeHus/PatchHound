@@ -5,6 +5,7 @@ type VulnerabilitiesListSearch = {
   source: string
   presentOnly: boolean
   recurrenceOnly: boolean
+  minAgeDays: string
   page: number
   pageSize: number
 }
@@ -17,6 +18,7 @@ export function buildVulnerabilitiesListRequest(search: VulnerabilitiesListSearc
     ...(search.source ? { source: search.source } : {}),
     ...(search.presentOnly ? { presentOnly: true } : { presentOnly: false }),
     ...(search.recurrenceOnly ? { recurrenceOnly: true } : {}),
+    ...(search.minAgeDays ? { minAgeDays: Number(search.minAgeDays) } : {}),
     page: search.page,
     pageSize: search.pageSize,
   }
@@ -34,6 +36,7 @@ export const vulnerabilityQueryKeys = {
     search.source,
     search.presentOnly,
     search.recurrenceOnly,
+    search.minAgeDays,
     search.page,
     search.pageSize,
   ] as const,
