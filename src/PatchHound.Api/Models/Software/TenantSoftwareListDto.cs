@@ -12,6 +12,7 @@ public record TenantSoftwareListItemDto(
     int UniqueDeviceCount,
     int ActiveVulnerabilityCount,
     int VersionCount,
+    decimal? ExposureImpactScore,
     DateTimeOffset? LastSeenAt
 );
 

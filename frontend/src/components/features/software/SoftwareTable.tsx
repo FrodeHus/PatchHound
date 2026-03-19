@@ -194,6 +194,16 @@ export function SoftwareTable({
         ),
       },
       {
+        accessorKey: 'exposureImpactScore',
+        header: 'Impact',
+        cell: ({ row }) => {
+          const score = row.original.exposureImpactScore
+          if (score == null) return <span className="text-muted-foreground">—</span>
+          const tone = score >= 75 ? 'danger' : score >= 40 ? 'warning' : score >= 10 ? 'info' : 'success'
+          return <span className={`font-medium ${toneText(tone)}`}>{score.toFixed(1)}</span>
+        },
+      },
+      {
           accessorKey: 'lastSeenAt',
           header: 'Last seen',
           cell: ({ row }) => (

@@ -20,6 +20,7 @@ public record TenantSoftwareDetailDto(
     int VulnerableInstallCount,
     int ActiveVulnerabilityCount,
     int VersionCount,
+    decimal? ExposureImpactScore,
     IReadOnlyList<TenantSoftwareVersionCohortDto> VersionCohorts,
     IReadOnlyList<TenantSoftwareSourceAliasDto> SourceAliases
 );

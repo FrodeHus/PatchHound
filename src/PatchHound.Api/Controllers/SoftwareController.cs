@@ -160,6 +160,10 @@ public class SoftwareController(
                         ct
                     ),
                 versionCohorts.Count,
+                await dbContext.Assets.AsNoTracking()
+                    .Where(a => softwareAssetIds.Contains(a.Id))
+                    .Select(a => a.ExposureImpactScore)
+                    .MaxAsync(ct),
                 versionCohorts,
                 aliases
                     .Select(item => new TenantSoftwareSourceAliasDto(
@@ -376,6 +380,15 @@ public class SoftwareController(
                     )
                     .Select(installation => (DateTimeOffset?)installation.LastSeenAt)
                     .Max(),
+                ExposureImpactScore = dbContext
+                    .NormalizedSoftwareInstallations
+                    .Where(installation =>
+                        installation.TenantSoftwareId == item.Id
+                        && installation.SnapshotId == activeSnapshotId
+                        && installation.IsActive
+                    )
+                    .Select(installation => installation.SoftwareAsset.ExposureImpactScore)
+                    .Max(),
             })
             .ToListAsync(ct);
 
@@ -394,6 +407,7 @@ public class SoftwareController(
                         item.UniqueDeviceCount,
                         item.ActiveVulnerabilityCount,
                         item.VersionCount,
+                        item.ExposureImpactScore,
                         item.LastSeenAt
                     ))
                     .ToList(),

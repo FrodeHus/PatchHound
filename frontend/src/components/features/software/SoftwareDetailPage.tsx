@@ -83,6 +83,21 @@ export function SoftwareDetailPage({
               value={String(detail.activeVulnerabilityCount)}
               tone={detail.activeVulnerabilityCount > 0 ? "warning" : "neutral"}
             />
+            <Metric
+              label="Exposure impact"
+              value={detail.exposureImpactScore != null ? detail.exposureImpactScore.toFixed(1) : "—"}
+              tone={
+                detail.exposureImpactScore == null
+                  ? "neutral"
+                  : detail.exposureImpactScore >= 75
+                    ? "danger"
+                    : detail.exposureImpactScore >= 40
+                      ? "warning"
+                      : detail.exposureImpactScore >= 10
+                        ? "info"
+                        : "success"
+              }
+            />
           </div>
         </div>
       </header>
@@ -490,7 +505,7 @@ function Metric({
   label: string
   value: string
   mono?: boolean
-  tone?: 'neutral' | 'warning' | 'danger'
+  tone?: 'neutral' | 'success' | 'info' | 'warning' | 'danger'
 }) {
   return (
     <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">

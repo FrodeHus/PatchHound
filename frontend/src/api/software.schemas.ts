@@ -41,6 +41,7 @@ export const tenantSoftwareDetailSchema = z.object({
   vulnerableInstallCount: z.number(),
   activeVulnerabilityCount: z.number(),
   versionCount: z.number(),
+  exposureImpactScore: z.number().nullable(),
   versionCohorts: z.array(tenantSoftwareVersionCohortSchema),
   sourceAliases: z.array(tenantSoftwareSourceAliasSchema),
 })
@@ -57,6 +58,7 @@ export const tenantSoftwareListItemSchema = z.object({
   uniqueDeviceCount: z.number(),
   activeVulnerabilityCount: z.number(),
   versionCount: z.number(),
+  exposureImpactScore: z.number().nullable(),
   lastSeenAt: isoDateTimeSchema.nullable(),
 })
 
