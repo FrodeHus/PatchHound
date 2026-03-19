@@ -95,7 +95,7 @@ function DashboardPage() {
     (params: { severity?: string; presentOnly?: boolean }) => {
       void globalNavigate({
         to: '/vulnerabilities',
-        search: { page: 1, pageSize: 25, search: '', severity: params.severity ?? '', status: '', source: '', presentOnly: params.presentOnly ?? true, recurrenceOnly: false },
+        search: { page: 1, pageSize: 25, search: '', severity: params.severity ?? '', status: '', source: '', presentOnly: params.presentOnly ?? true, recurrenceOnly: false, minAgeDays: '' },
       } as never)
     },
     [globalNavigate],
@@ -103,9 +103,12 @@ function DashboardPage() {
 
   const drillToAssets = useCallback(
     (deviceGroup: string) => {
-      void navigate({ search: (prev) => ({ ...prev, deviceGroup }) })
+      void globalNavigate({
+        to: '/assets',
+        search: { page: 1, pageSize: 25, search: '', assetType: '', criticality: '', ownerType: '', deviceGroup, healthStatus: '', onboardingStatus: '', riskScore: '', exposureLevel: '', tag: '', unassignedOnly: false },
+      } as never)
     },
-    [navigate],
+    [globalNavigate],
   )
 
   const summary = summaryQuery.data ?? (canUseInitialData && !hasActiveFilters ? initialData.summary : undefined)
@@ -233,8 +236,8 @@ function DashboardPage() {
           <RiskHeatmap
             data={summary.vulnerabilitiesByDeviceGroup}
             isLoading={summaryQuery.isFetching}
-            onCellClick={(group, _severity) => {
-              void navigate({ search: (prev) => ({ ...prev, deviceGroup: group }) })
+            onCellClick={(_group, severity) => {
+              drillToVulnerabilities({ severity, presentOnly: true })
             }}
           />
 
@@ -253,7 +256,10 @@ function DashboardPage() {
                   }
                   const days = ageMap[bucket]
                   if (days !== undefined) {
-                    void navigate({ search: (prev) => ({ ...prev, minAgeDays: days }) })
+                    void globalNavigate({
+                      to: '/vulnerabilities',
+                      search: { page: 1, pageSize: 25, search: '', severity: '', status: '', source: '', presentOnly: true, recurrenceOnly: false, minAgeDays: days },
+                    } as never)
                   }
                 }}
               />

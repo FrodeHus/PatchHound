@@ -21,6 +21,7 @@ export const fetchVulnerabilities = createServerFn({ method: 'GET' })
       search: z.string().optional(),
       recurrenceOnly: z.boolean().optional(),
       presentOnly: z.boolean().optional(),
+      minAgeDays: z.number().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
     }),

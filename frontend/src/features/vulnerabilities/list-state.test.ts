@@ -11,6 +11,7 @@ describe('buildVulnerabilitiesListRequest', () => {
         source: '',
         presentOnly: false,
         recurrenceOnly: true,
+        minAgeDays: '',
         page: 2,
         pageSize: 50,
       }),
@@ -34,6 +35,7 @@ describe('vulnerabilityQueryKeys', () => {
       source: '',
       presentOnly: true,
       recurrenceOnly: false,
+      minAgeDays: '',
       page: 1,
       pageSize: 25,
     })
@@ -49,6 +51,7 @@ describe('vulnerabilityQueryKeys', () => {
       '',
       true,
       false,
+      '',
       1,
       25,
     ])

@@ -15,6 +15,7 @@ const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
   source: searchStringSchema,
   recurrenceOnly: searchBooleanSchema,
   presentOnly: searchBooleanSchema.catch(true),
+  minAgeDays: searchStringSchema,
 })
 
 export const Route = createFileRoute('/_authed/vulnerabilities/')({
@@ -58,6 +59,7 @@ function VulnerabilitiesPage() {
         sourceFilter={search.source}
         presentOnly={search.presentOnly}
         recurrenceOnly={search.recurrenceOnly}
+        minAgeDays={search.minAgeDays}
         onSearchChange={(value) => {
           searchActions.updateField('search', value)
         }}
@@ -82,6 +84,9 @@ function VulnerabilitiesPage() {
         onPresentOnlyChange={(value) => {
           searchActions.updateField('presentOnly', value)
         }}
+        onMinAgeDaysChange={(value) => {
+          searchActions.updateField('minAgeDays', value)
+        }}
         onApplyStructuredFilters={(filters) => {
           searchActions.updateFields({
             severity: filters.severity,
@@ -89,6 +94,7 @@ function VulnerabilitiesPage() {
             source: filters.source,
             recurrenceOnly: filters.recurrenceOnly,
             presentOnly: filters.presentOnly,
+            minAgeDays: filters.minAgeDays,
           })
         }}
         onClearFilters={() => {
@@ -99,6 +105,7 @@ function VulnerabilitiesPage() {
             source: '',
             recurrenceOnly: false,
             presentOnly: true,
+            minAgeDays: '',
           })
         }}
       />

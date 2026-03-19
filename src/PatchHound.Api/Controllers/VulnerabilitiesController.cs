@@ -82,6 +82,11 @@ public class VulnerabilitiesController : ControllerBase
                 return Forbid();
             query = query.Where(v => v.TenantId == filter.TenantId.Value);
         }
+        if (filter.MinAgeDays.HasValue)
+        {
+            var cutoff = DateTimeOffset.UtcNow.AddDays(-filter.MinAgeDays.Value);
+            query = query.Where(v => v.VulnerabilityDefinition.PublishedDate <= cutoff);
+        }
         if (filter.PresentOnly != false)
         {
             query = query.Where(v =>
