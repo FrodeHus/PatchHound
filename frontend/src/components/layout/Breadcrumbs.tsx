@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, useMatches, useRouterState } from '@tanstack/react-router'
 import { ChevronRight, Home } from 'lucide-react'
 
@@ -26,36 +27,53 @@ function isUuid(segment: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment)
 }
 
+/** Module-level cache of search params per pathname (survives re-renders, does not trigger them). */
+const searchParamsCache = new Map<string, Record<string, unknown>>()
+
 export function Breadcrumbs() {
   const matches = useMatches()
   const loaderData = useRouterState({ select: (state) => state.matches })
 
-  const crumbs: { label: string; to: string }[] = []
+  // Snapshot search params for every non-layout match after each navigation
+  useEffect(() => {
+    for (const match of matches) {
+      if (layoutRouteIds.has(match.routeId as string)) continue
+      const search = match.search as Record<string, unknown> | undefined
+      if (search && Object.keys(search).length > 0) {
+        searchParamsCache.set(match.pathname.replace(/\/$/, ''), { ...search })
+      }
+    }
+  })
 
-  for (const match of matches) {
-    const routeId = match.routeId as string
-    if (layoutRouteIds.has(routeId)) continue
+  const crumbs: { label: string; to: string; search: Record<string, unknown> }[] = []
 
-    const pathSegments = match.pathname.replace(/\/$/, '').split('/').filter(Boolean)
-    const lastSegment = pathSegments[pathSegments.length - 1]
-    if (!lastSegment) continue
+  // Find the deepest non-layout match to build crumbs from its full path
+  const leafMatch = [...matches].reverse().find((m) => !layoutRouteIds.has(m.routeId as string))
+  if (!leafMatch) return null
 
-    if (crumbs.some((crumb) => crumb.to === match.pathname)) continue
+  const pathSegments = leafMatch.pathname.replace(/\/$/, '').split('/').filter(Boolean)
+
+  for (let i = 0; i < pathSegments.length; i++) {
+    const segment = pathSegments[i]
+    const to = '/' + pathSegments.slice(0, i + 1).join('/')
+
+    if (crumbs.some((crumb) => crumb.to === to)) continue
 
     let label: string
-    if (isUuid(lastSegment)) {
-      const data = loaderData.find((m) => m.routeId === routeId)
-      const loaderResult = data?.loaderData as Record<string, unknown> | undefined
+    if (isUuid(segment)) {
+      // Look for loader data from a matching route
+      const routeMatch = loaderData.find((m) => m.pathname === to || m.pathname === to + '/')
+      const loaderResult = routeMatch?.loaderData as Record<string, unknown> | undefined
       label = (loaderResult?.name as string)
         ?? (loaderResult?.title as string)
         ?? (loaderResult?.canonicalName as string)
         ?? (loaderResult?.externalId as string)
-        ?? lastSegment.slice(0, 8)
+        ?? segment.slice(0, 8)
     } else {
-      label = segmentLabels[lastSegment] ?? lastSegment.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+      label = segmentLabels[segment] ?? segment.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
     }
 
-    crumbs.push({ label, to: match.pathname })
+    crumbs.push({ label, to, search: searchParamsCache.get(to) ?? {} })
   }
 
   if (crumbs.length === 0) return null
@@ -75,7 +93,7 @@ export function Breadcrumbs() {
               <span className="max-w-[200px] truncate font-medium text-foreground">{crumb.label}</span>
             ) : (
               // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-              <Link to={crumb.to as any} search={{} as any} className="text-muted-foreground/70 transition hover:text-foreground">
+              <Link to={crumb.to as any} search={crumb.search as any} className="text-muted-foreground/70 transition hover:text-foreground">
                 {crumb.label}
               </Link>
             )}
