@@ -91,6 +91,7 @@ public class IngestionServiceTests : IDisposable
             taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
+            Substitute.For<IAssetRuleEvaluationService>(),
             logger
         );
     }
@@ -975,6 +976,7 @@ public class IngestionServiceTests : IDisposable
             taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
+            Substitute.For<IAssetRuleEvaluationService>(),
             logger
         );
 
@@ -1117,6 +1119,7 @@ public class IngestionServiceTests : IDisposable
             taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
+            Substitute.For<IAssetRuleEvaluationService>(),
             logger
         );
 
@@ -1284,6 +1287,7 @@ public class IngestionServiceTests : IDisposable
             taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
+            Substitute.For<IAssetRuleEvaluationService>(),
             logger
         );
 
@@ -1421,6 +1425,7 @@ public class IngestionServiceTests : IDisposable
             taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
+            Substitute.For<IAssetRuleEvaluationService>(),
             logger
         );
 
@@ -1590,6 +1595,7 @@ public class IngestionServiceTests : IDisposable
             taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
+            Substitute.For<IAssetRuleEvaluationService>(),
             logger
         );
 
@@ -1750,6 +1756,7 @@ public class IngestionServiceTests : IDisposable
             taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
+            Substitute.For<IAssetRuleEvaluationService>(),
             logger
         );
 
@@ -1869,6 +1876,7 @@ public class IngestionServiceTests : IDisposable
             taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
+            Substitute.For<IAssetRuleEvaluationService>(),
             logger
         );
 
@@ -2862,6 +2870,7 @@ public class IngestionServiceTests : IDisposable
                 new IngestionStateCache()
             ),
             new StagedAssetMergeService(_dbContext),
+            Substitute.For<IAssetRuleEvaluationService>(),
             Substitute.For<ILogger<IngestionService>>()
         );
 

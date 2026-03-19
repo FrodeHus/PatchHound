@@ -1,0 +1,426 @@
+import { useMutation } from '@tanstack/react-query'
+import { useRouter } from '@tanstack/react-router'
+import { ArrowLeft, ArrowRight, Check, Eye, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import {
+  createAssetRule,
+  previewAssetRuleFilter,
+  updateAssetRule,
+} from '@/api/asset-rules.functions'
+import type {
+  AssetRule,
+  AssetRuleOperation,
+  FilterCondition,
+  FilterGroup,
+  FilterPreview,
+} from '@/api/asset-rules.schemas'
+import type { SecurityProfile } from '@/api/security-profiles.schemas'
+import type { TeamItem } from '@/api/teams.schemas'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { InsetPanel } from '@/components/ui/inset-panel'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import { FilterBuilder } from './FilterBuilder'
+
+type AssetRuleWizardProps = {
+  mode: 'create' | 'edit'
+  initialData?: AssetRule
+  securityProfiles: SecurityProfile[]
+  teams: TeamItem[]
+}
+
+const steps = ['Basic Info', 'Filters', 'Operations', 'Summary'] as const
+
+const emptyFilter: FilterGroup = { type: 'group', operator: 'AND', conditions: [] }
+
+export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: AssetRuleWizardProps) {
+  const router = useRouter()
+  const [step, setStep] = useState(0)
+  const [name, setName] = useState(initialData?.name ?? '')
+  const [description, setDescription] = useState(initialData?.description ?? '')
+  const [filter, setFilter] = useState<FilterGroup>(
+    initialData?.filterDefinition?.type === 'group'
+      ? (initialData.filterDefinition as FilterGroup)
+      : emptyFilter,
+  )
+  const [operations, setOperations] = useState<AssetRuleOperation[]>(
+    initialData?.operations ?? [],
+  )
+  const [preview, setPreview] = useState<FilterPreview | null>(null)
+
+  const previewMutation = useMutation({
+    mutationFn: async () => previewAssetRuleFilter({ data: { filterDefinition: filter } }),
+    onSuccess: (data) => setPreview(data),
+  })
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (mode === 'edit' && initialData) {
+        return updateAssetRule({
+          data: {
+            id: initialData.id,
+            name,
+            description: description || undefined,
+            enabled: initialData.enabled,
+            filterDefinition: filter,
+            operations,
+          },
+        })
+      }
+      return createAssetRule({
+        data: {
+          name,
+          description: description || undefined,
+          filterDefinition: filter,
+          operations,
+        },
+      })
+    },
+    onSuccess: async () => {
+      await router.navigate({ to: '/admin/asset-rules', search: { page: 1, pageSize: 25 } })
+      await router.invalidate()
+    },
+  })
+
+  const canContinue = () => {
+    switch (step) {
+      case 0:
+        return name.trim().length > 0
+      case 1:
+        return filter.conditions.length > 0
+      case 2:
+        return operations.length > 0
+      default:
+        return true
+    }
+  }
+
+  return (
+    <section className="mx-auto max-w-3xl space-y-5">
+      {/* Step indicator */}
+      <div className="flex items-center gap-2">
+        {steps.map((label, i) => (
+          <button
+            key={label}
+            type="button"
+            className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              i === step
+                ? 'border-primary/40 bg-primary/10 text-primary'
+                : i < step
+                  ? 'border-border/50 bg-muted/50 text-muted-foreground'
+                  : 'border-border/30 text-muted-foreground/50'
+            }`}
+            onClick={() => i < step && setStep(i)}
+            disabled={i > step}
+          >
+            <span className="flex size-5 items-center justify-center rounded-full border border-current text-[10px] font-bold">
+              {i < step ? <Check className="size-3" /> : i + 1}
+            </span>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Step content */}
+      {step === 0 && (
+        <Card className="rounded-2xl border-border/70">
+          <CardHeader>
+            <CardTitle>Basic Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Rule name</label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Production servers — high security"
+                className="rounded-lg"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Description (optional)</label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What does this rule do?"
+                rows={3}
+                className="rounded-lg"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 1 && (
+        <Card className="rounded-2xl border-border/70">
+          <CardHeader>
+            <CardTitle>Filter Conditions</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Define which assets this rule applies to. Use groups to combine conditions with AND/OR logic.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FilterBuilder value={filter} onChange={setFilter} />
+
+            {filter.conditions.length > 0 && (
+              <div className="space-y-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => previewMutation.mutate()}
+                  disabled={previewMutation.isPending}
+                >
+                  {previewMutation.isPending ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Eye className="size-3.5" />
+                  )}
+                  Preview matches
+                </Button>
+
+                {preview && (
+                  <InsetPanel className="space-y-2 px-4 py-3">
+                    <p className="text-sm font-medium">
+                      {preview.count} asset{preview.count !== 1 ? 's' : ''} match
+                    </p>
+                    {preview.samples.length > 0 && (
+                      <div className="space-y-1">
+                        {preview.samples.map((s) => (
+                          <div key={s.id} className="flex items-center gap-2 text-xs">
+                            <Badge variant="outline" className="font-mono text-[10px]">
+                              {s.assetType}
+                            </Badge>
+                            <span>{s.name}</span>
+                          </div>
+                        ))}
+                        {preview.count > preview.samples.length && (
+                          <p className="text-xs text-muted-foreground">
+                            and {preview.count - preview.samples.length} more...
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </InsetPanel>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 2 && (
+        <Card className="rounded-2xl border-border/70">
+          <CardHeader>
+            <CardTitle>Operations</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Select one or more operations to apply to matching assets.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <OperationEditor
+              type="AssignSecurityProfile"
+              label="Assign Security Profile"
+              description="Set the security profile on matching assets for environmental CVSS scoring."
+              options={securityProfiles.map((p) => ({ value: p.id, label: p.name }))}
+              paramKey="securityProfileId"
+              operations={operations}
+              onChange={setOperations}
+            />
+            <OperationEditor
+              type="AssignTeam"
+              label="Assign Team"
+              description="Set the fallback assignment group for task routing on matching assets."
+              options={teams.map((t) => ({ value: t.id, label: t.name }))}
+              paramKey="teamId"
+              operations={operations}
+              onChange={setOperations}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 3 && (
+        <Card className="rounded-2xl border-border/70">
+          <CardHeader>
+            <CardTitle>Summary</CardTitle>
+            <p className="text-sm text-muted-foreground">Review your rule before saving.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <InsetPanel className="space-y-2 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Name</p>
+              <p className="text-sm font-medium">{name}</p>
+              {description && <p className="text-sm text-muted-foreground">{description}</p>}
+            </InsetPanel>
+
+            <InsetPanel className="space-y-2 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Filter</p>
+              <FilterSummary group={filter} />
+            </InsetPanel>
+
+            <InsetPanel className="space-y-2 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Operations</p>
+              <div className="space-y-1">
+                {operations.map((op, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm">
+                    <Badge variant="outline" className="text-[10px]">
+                      {op.type === 'AssignSecurityProfile' ? 'Security Profile' : 'Team'}
+                    </Badge>
+                    <span>
+                      {op.type === 'AssignSecurityProfile'
+                        ? securityProfiles.find((p) => p.id === op.parameters.securityProfileId)?.name ?? op.parameters.securityProfileId
+                        : teams.find((t) => t.id === op.parameters.teamId)?.name ?? op.parameters.teamId}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </InsetPanel>
+
+            {saveMutation.isError && (
+              <p className="text-sm text-destructive">Failed to save rule. Please try again.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={step === 0}
+          onClick={() => setStep((s) => s - 1)}
+        >
+          <ArrowLeft className="size-3.5" />
+          Back
+        </Button>
+        {step < 3 ? (
+          <Button
+            type="button"
+            disabled={!canContinue()}
+            onClick={() => setStep((s) => s + 1)}
+          >
+            Continue
+            <ArrowRight className="size-3.5" />
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+          >
+            {saveMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
+            {mode === 'create' ? 'Create rule' : 'Save changes'}
+          </Button>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function OperationEditor({
+  type,
+  label,
+  description,
+  options,
+  paramKey,
+  operations,
+  onChange,
+}: {
+  type: string
+  label: string
+  description: string
+  options: { value: string; label: string }[]
+  paramKey: string
+  operations: AssetRuleOperation[]
+  onChange: (ops: AssetRuleOperation[]) => void
+}) {
+  const existing = operations.find((op) => op.type === type)
+  const isActive = !!existing
+  const selectedValue = existing?.parameters[paramKey] ?? ''
+
+  const toggle = () => {
+    if (isActive) {
+      onChange(operations.filter((op) => op.type !== type))
+    } else {
+      onChange([...operations, { type, parameters: { [paramKey]: options[0]?.value ?? '' } }])
+    }
+  }
+
+  const updateValue = (value: string) => {
+    onChange(
+      operations.map((op) =>
+        op.type === type ? { ...op, parameters: { [paramKey]: value } } : op,
+      ),
+    )
+  }
+
+  return (
+    <InsetPanel className={`space-y-3 px-4 py-3 ${isActive ? 'border-primary/30' : ''}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+        <Button
+          type="button"
+          variant={isActive ? 'default' : 'outline'}
+          size="sm"
+          className="h-7 text-xs"
+          onClick={toggle}
+        >
+          {isActive ? 'Active' : 'Add'}
+        </Button>
+      </div>
+      {isActive && (
+        <Select value={selectedValue} onValueChange={(v) => v && updateValue(v)}>
+          <SelectTrigger className="h-9 rounded-lg text-sm">
+            <SelectValue placeholder={`Select ${label.toLowerCase()}...`} />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </InsetPanel>
+  )
+}
+
+function FilterSummary({ group }: { group: FilterGroup }) {
+  if (group.conditions.length === 0) {
+    return <p className="text-sm text-muted-foreground">No conditions defined</p>
+  }
+
+  return (
+    <div className="space-y-1 text-sm">
+      {group.conditions.map((child, i) => (
+        <div key={i} className="flex items-start gap-1">
+          {i > 0 && (
+            <span className="shrink-0 font-mono text-xs font-bold text-muted-foreground">
+              {group.operator}
+            </span>
+          )}
+          {child.type === 'group' ? (
+            <div className="rounded border border-border/50 px-2 py-1">
+              <FilterSummary group={child as FilterGroup} />
+            </div>
+          ) : (
+            <span>
+              {(child as FilterCondition).field}{' '}
+              <span className="text-muted-foreground">{(child as FilterCondition).operator.toLowerCase()}</span>{' '}
+              <span className="font-medium">&ldquo;{(child as FilterCondition).value}&rdquo;</span>
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+

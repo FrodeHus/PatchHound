@@ -29,6 +29,7 @@ public class IngestionService
     private readonly RemediationTaskProjectionService _remediationTaskProjectionService;
     private readonly StagedVulnerabilityMergeService _stagedVulnerabilityMergeService;
     private readonly StagedAssetMergeService _stagedAssetMergeService;
+    private readonly IAssetRuleEvaluationService _assetRuleEvaluationService;
     private readonly ILogger<IngestionService> _logger;
 
     private sealed record AcquiredIngestionRun(IngestionRun Run, bool Resumed);
@@ -43,6 +44,7 @@ public class IngestionService
         RemediationTaskProjectionService remediationTaskProjectionService,
         StagedVulnerabilityMergeService stagedVulnerabilityMergeService,
         StagedAssetMergeService stagedAssetMergeService,
+        IAssetRuleEvaluationService assetRuleEvaluationService,
         ILogger<IngestionService> logger
     )
     {
@@ -55,6 +57,7 @@ public class IngestionService
         _remediationTaskProjectionService = remediationTaskProjectionService;
         _stagedVulnerabilityMergeService = stagedVulnerabilityMergeService;
         _stagedAssetMergeService = stagedAssetMergeService;
+        _assetRuleEvaluationService = assetRuleEvaluationService;
         _logger = logger;
     }
 
@@ -520,6 +523,9 @@ public class IngestionService
                         }
 
                         await EnqueueEnrichmentJobsForRunAsync(run.Id, tenantId, ct);
+
+                        await _assetRuleEvaluationService.EvaluateRulesAsync(tenantId, ct);
+
                         if (SupportsSoftwareSnapshots(source.SourceKey))
                         {
                             softwareSnapshot ??= await GetOrCreateBuildingSoftwareSnapshotAsync(

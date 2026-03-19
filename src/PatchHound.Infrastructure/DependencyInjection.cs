@@ -151,6 +151,10 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        // Asset Rules
+        services.AddScoped<AssetRuleFilterBuilder>();
+        services.AddScoped<IAssetRuleEvaluationService, AssetRuleEvaluationService>();
+
         // Ingestion
         services.AddScoped<IngestionService>();
 

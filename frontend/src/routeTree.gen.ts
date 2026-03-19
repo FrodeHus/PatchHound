@@ -36,7 +36,10 @@ import { Route as AuthedAdminTeamsRouteImport } from './routes/_authed/admin/tea
 import { Route as AuthedAdminSourcesRouteImport } from './routes/_authed/admin/sources'
 import { Route as AuthedAdminSecurityProfilesRouteImport } from './routes/_authed/admin/security-profiles'
 import { Route as AuthedAdminTenantsIndexRouteImport } from './routes/_authed/admin/tenants/index'
+import { Route as AuthedAdminAssetRulesIndexRouteImport } from './routes/_authed/admin/asset-rules/index'
 import { Route as AuthedAdminTenantsIdRouteImport } from './routes/_authed/admin/tenants/$id'
+import { Route as AuthedAdminAssetRulesNewRouteImport } from './routes/_authed/admin/asset-rules/new'
+import { Route as AuthedAdminAssetRulesIdRouteImport } from './routes/_authed/admin/asset-rules/$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -175,9 +178,26 @@ const AuthedAdminTenantsIndexRoute = AuthedAdminTenantsIndexRouteImport.update({
   path: '/admin/tenants/',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAdminAssetRulesIndexRoute =
+  AuthedAdminAssetRulesIndexRouteImport.update({
+    id: '/admin/asset-rules/',
+    path: '/admin/asset-rules/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAdminTenantsIdRoute = AuthedAdminTenantsIdRouteImport.update({
   id: '/admin/tenants/$id',
   path: '/admin/tenants/$id',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAdminAssetRulesNewRoute =
+  AuthedAdminAssetRulesNewRouteImport.update({
+    id: '/admin/asset-rules/new',
+    path: '/admin/asset-rules/new',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAdminAssetRulesIdRoute = AuthedAdminAssetRulesIdRouteImport.update({
+  id: '/admin/asset-rules/$id',
+  path: '/admin/asset-rules/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
 
@@ -207,7 +227,10 @@ export interface FileRoutesByFullPath {
   '/software/': typeof AuthedSoftwareIndexRoute
   '/tasks/': typeof AuthedTasksIndexRoute
   '/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
+  '/admin/asset-rules/$id': typeof AuthedAdminAssetRulesIdRoute
+  '/admin/asset-rules/new': typeof AuthedAdminAssetRulesNewRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
+  '/admin/asset-rules/': typeof AuthedAdminAssetRulesIndexRoute
   '/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -236,7 +259,10 @@ export interface FileRoutesByTo {
   '/software': typeof AuthedSoftwareIndexRoute
   '/tasks': typeof AuthedTasksIndexRoute
   '/vulnerabilities': typeof AuthedVulnerabilitiesIndexRoute
+  '/admin/asset-rules/$id': typeof AuthedAdminAssetRulesIdRoute
+  '/admin/asset-rules/new': typeof AuthedAdminAssetRulesNewRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
+  '/admin/asset-rules': typeof AuthedAdminAssetRulesIndexRoute
   '/admin/tenants': typeof AuthedAdminTenantsIndexRoute
 }
 export interface FileRoutesById {
@@ -267,7 +293,10 @@ export interface FileRoutesById {
   '/_authed/software/': typeof AuthedSoftwareIndexRoute
   '/_authed/tasks/': typeof AuthedTasksIndexRoute
   '/_authed/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
+  '/_authed/admin/asset-rules/$id': typeof AuthedAdminAssetRulesIdRoute
+  '/_authed/admin/asset-rules/new': typeof AuthedAdminAssetRulesNewRoute
   '/_authed/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
+  '/_authed/admin/asset-rules/': typeof AuthedAdminAssetRulesIndexRoute
   '/_authed/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
 }
 export interface FileRouteTypes {
@@ -298,7 +327,10 @@ export interface FileRouteTypes {
     | '/software/'
     | '/tasks/'
     | '/vulnerabilities/'
+    | '/admin/asset-rules/$id'
+    | '/admin/asset-rules/new'
     | '/admin/tenants/$id'
+    | '/admin/asset-rules/'
     | '/admin/tenants/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -327,7 +359,10 @@ export interface FileRouteTypes {
     | '/software'
     | '/tasks'
     | '/vulnerabilities'
+    | '/admin/asset-rules/$id'
+    | '/admin/asset-rules/new'
     | '/admin/tenants/$id'
+    | '/admin/asset-rules'
     | '/admin/tenants'
   id:
     | '__root__'
@@ -357,7 +392,10 @@ export interface FileRouteTypes {
     | '/_authed/software/'
     | '/_authed/tasks/'
     | '/_authed/vulnerabilities/'
+    | '/_authed/admin/asset-rules/$id'
+    | '/_authed/admin/asset-rules/new'
     | '/_authed/admin/tenants/$id'
+    | '/_authed/admin/asset-rules/'
     | '/_authed/admin/tenants/'
   fileRoutesById: FileRoutesById
 }
@@ -564,11 +602,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminTenantsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/asset-rules/': {
+      id: '/_authed/admin/asset-rules/'
+      path: '/admin/asset-rules'
+      fullPath: '/admin/asset-rules/'
+      preLoaderRoute: typeof AuthedAdminAssetRulesIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/admin/tenants/$id': {
       id: '/_authed/admin/tenants/$id'
       path: '/admin/tenants/$id'
       fullPath: '/admin/tenants/$id'
       preLoaderRoute: typeof AuthedAdminTenantsIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/admin/asset-rules/new': {
+      id: '/_authed/admin/asset-rules/new'
+      path: '/admin/asset-rules/new'
+      fullPath: '/admin/asset-rules/new'
+      preLoaderRoute: typeof AuthedAdminAssetRulesNewRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/admin/asset-rules/$id': {
+      id: '/_authed/admin/asset-rules/$id'
+      path: '/admin/asset-rules/$id'
+      fullPath: '/admin/asset-rules/$id'
+      preLoaderRoute: typeof AuthedAdminAssetRulesIdRouteImport
       parentRoute: typeof AuthedRoute
     }
   }
@@ -592,7 +651,10 @@ interface AuthedRouteChildren {
   AuthedSoftwareIndexRoute: typeof AuthedSoftwareIndexRoute
   AuthedTasksIndexRoute: typeof AuthedTasksIndexRoute
   AuthedVulnerabilitiesIndexRoute: typeof AuthedVulnerabilitiesIndexRoute
+  AuthedAdminAssetRulesIdRoute: typeof AuthedAdminAssetRulesIdRoute
+  AuthedAdminAssetRulesNewRoute: typeof AuthedAdminAssetRulesNewRoute
   AuthedAdminTenantsIdRoute: typeof AuthedAdminTenantsIdRoute
+  AuthedAdminAssetRulesIndexRoute: typeof AuthedAdminAssetRulesIndexRoute
   AuthedAdminTenantsIndexRoute: typeof AuthedAdminTenantsIndexRoute
 }
 
@@ -614,7 +676,10 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSoftwareIndexRoute: AuthedSoftwareIndexRoute,
   AuthedTasksIndexRoute: AuthedTasksIndexRoute,
   AuthedVulnerabilitiesIndexRoute: AuthedVulnerabilitiesIndexRoute,
+  AuthedAdminAssetRulesIdRoute: AuthedAdminAssetRulesIdRoute,
+  AuthedAdminAssetRulesNewRoute: AuthedAdminAssetRulesNewRoute,
   AuthedAdminTenantsIdRoute: AuthedAdminTenantsIdRoute,
+  AuthedAdminAssetRulesIndexRoute: AuthedAdminAssetRulesIndexRoute,
   AuthedAdminTenantsIndexRoute: AuthedAdminTenantsIndexRoute,
 }
 
