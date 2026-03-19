@@ -65,9 +65,16 @@ public class DashboardController : ControllerBase
                 && _dbContext.VulnerabilityAssetEpisodes.Any(e =>
                     e.TenantVulnerabilityId == v.Id
                     && e.Status == VulnerabilityStatus.Open
-                    && (filteredAssetIds == null || filteredAssetIds.Contains(e.AssetId))
                 )
             );
+        if (filteredAssetIds != null)
+        {
+            bySeverityQuery = bySeverityQuery.Where(v =>
+                _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open
+                    && filteredAssetIds.Contains(e.AssetId)));
+        }
 
         if (minPublishedDate.HasValue)
         {
@@ -94,9 +101,15 @@ public class DashboardController : ControllerBase
                 v.TenantId == tenantId
                 && _dbContext.VulnerabilityAssetEpisodes.Any(e =>
                     e.TenantVulnerabilityId == v.Id
-                    && (filteredAssetIds == null || filteredAssetIds.Contains(e.AssetId))
                 )
             );
+        if (filteredAssetIds != null)
+        {
+            totalTenantVulnQuery = totalTenantVulnQuery.Where(v =>
+                _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && filteredAssetIds.Contains(e.AssetId)));
+        }
 
         if (minPublishedDate.HasValue)
         {
@@ -114,9 +127,16 @@ public class DashboardController : ControllerBase
                 && _dbContext.VulnerabilityAssetEpisodes.Any(e =>
                     e.TenantVulnerabilityId == v.Id
                     && e.Status == VulnerabilityStatus.Open
-                    && (filteredAssetIds == null || filteredAssetIds.Contains(e.AssetId))
                 )
             );
+        if (filteredAssetIds != null)
+        {
+            openVulnQuery = openVulnQuery.Where(v =>
+                _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open
+                    && filteredAssetIds.Contains(e.AssetId)));
+        }
 
         if (minPublishedDate.HasValue)
         {
@@ -158,12 +178,16 @@ public class DashboardController : ControllerBase
         var avgRemediationDays = DashboardService.CalculateAverageRemediationDays(completedTasks);
 
         // Exposure score: vulnerability severity × asset criticality for open vulnerability-asset pairs
-        var vulnerabilityAssetPairsQuery = _dbContext
+        var baseVaQuery = _dbContext
             .VulnerabilityAssets.AsNoTracking()
             .Where(va =>
                 va.Status == VulnerabilityStatus.Open && va.SnapshotId == activeSnapshotId
-                && (filteredAssetIds == null || filteredAssetIds.Contains(va.AssetId))
-            )
+            );
+        if (filteredAssetIds != null)
+        {
+            baseVaQuery = baseVaQuery.Where(va => filteredAssetIds.Contains(va.AssetId));
+        }
+        var vulnerabilityAssetPairsQuery = baseVaQuery
             .Join(
                 _dbContext.TenantVulnerabilities.AsNoTracking(),
                 va => va.TenantVulnerabilityId,
@@ -201,9 +225,16 @@ public class DashboardController : ControllerBase
                 && _dbContext.VulnerabilityAssetEpisodes.Any(e =>
                     e.TenantVulnerabilityId == v.Id
                     && e.Status == VulnerabilityStatus.Open
-                    && (filteredAssetIds == null || filteredAssetIds.Contains(e.AssetId))
                 )
             );
+        if (filteredAssetIds != null)
+        {
+            topVulnsQuery = topVulnsQuery.Where(v =>
+                _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open
+                    && filteredAssetIds.Contains(e.AssetId)));
+        }
 
         if (minPublishedDate.HasValue)
         {
@@ -241,8 +272,11 @@ public class DashboardController : ControllerBase
             .Where(e =>
                 e.Status == VulnerabilityStatus.Open
                 && e.TenantVulnerability.TenantId == tenantId
-                && (filteredAssetIds == null || filteredAssetIds.Contains(e.AssetId))
             );
+        if (filteredAssetIds != null)
+        {
+            deviceGroupQuery = deviceGroupQuery.Where(e => filteredAssetIds.Contains(e.AssetId));
+        }
 
         if (minPublishedDate.HasValue)
         {
