@@ -71,17 +71,17 @@ public class DashboardService
     }
 
     /// <summary>
-    /// Calculates the average number of days to complete remediation tasks.
-    /// Only considers tasks with Completed status.
+    /// Calculates the average number of days from first seen to resolution
+    /// for resolved vulnerability episodes.
     /// </summary>
     public static decimal CalculateAverageRemediationDays(
-        IReadOnlyList<(DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt)> completedTasks
+        IReadOnlyList<(DateTimeOffset FirstSeenAt, DateTimeOffset ResolvedAt)> resolvedEpisodes
     )
     {
-        if (completedTasks.Count == 0)
+        if (resolvedEpisodes.Count == 0)
             return 0m;
 
-        var totalDays = completedTasks.Sum(t => (t.UpdatedAt - t.CreatedAt).TotalDays);
-        return Math.Round((decimal)(totalDays / completedTasks.Count), 1);
+        var totalDays = resolvedEpisodes.Sum(e => (e.ResolvedAt - e.FirstSeenAt).TotalDays);
+        return Math.Round((decimal)(totalDays / resolvedEpisodes.Count), 1);
     }
 }

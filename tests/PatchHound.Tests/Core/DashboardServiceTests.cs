@@ -62,11 +62,11 @@ public class DashboardServiceTests
     // --- Average Remediation Days Tests ---
 
     [Fact]
-    public void AverageRemediationDays_NoCompletedTasks_ReturnsZero()
+    public void AverageRemediationDays_NoResolvedEpisodes_ReturnsZero()
     {
-        var tasks = Array.Empty<(DateTimeOffset, DateTimeOffset)>();
+        var episodes = Array.Empty<(DateTimeOffset, DateTimeOffset)>();
 
-        var avg = DashboardService.CalculateAverageRemediationDays(tasks);
+        var avg = DashboardService.CalculateAverageRemediationDays(episodes);
 
         avg.Should().Be(0m);
     }
@@ -74,11 +74,11 @@ public class DashboardServiceTests
     [Theory]
     [MemberData(nameof(AverageRemediationDayCases))]
     public void AverageRemediationDays_ReturnsExpectedAverage(
-        (DateTimeOffset, DateTimeOffset)[] tasks,
+        (DateTimeOffset, DateTimeOffset)[] episodes,
         decimal expected
     )
     {
-        var avg = DashboardService.CalculateAverageRemediationDays(tasks);
+        var avg = DashboardService.CalculateAverageRemediationDays(episodes);
 
         avg.Should().BeApproximately(expected, 0.1m);
     }
