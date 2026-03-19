@@ -1,6 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table'
 import type { VulnerabilityDetail } from '@/api/vulnerabilities.schemas'
 import { DataTable } from '@/components/ui/data-table'
+import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import { toneBadge } from '@/lib/tone-classes'
 import { ExternalLinkIcon } from 'lucide-react'
 
@@ -13,7 +14,7 @@ type ReferencesTabProps = {
 const columns: ColumnDef<Reference>[] = [
   {
     accessorKey: 'source',
-    header: 'Source',
+    header: ({ column }) => <SortableColumnHeader column={column} title="Source" />,
     cell: ({ row }) => (
       <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${toneBadge('neutral')}`}>
         {row.original.source}
@@ -22,7 +23,7 @@ const columns: ColumnDef<Reference>[] = [
   },
   {
     accessorKey: 'url',
-    header: 'URL',
+    header: ({ column }) => <SortableColumnHeader column={column} title="URL" />,
     cell: ({ row }) => (
       <a
         href={row.original.url}
@@ -38,6 +39,7 @@ const columns: ColumnDef<Reference>[] = [
   {
     accessorKey: 'tags',
     header: 'Tags',
+    enableSorting: false,
     cell: ({ row }) =>
       row.original.tags.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">

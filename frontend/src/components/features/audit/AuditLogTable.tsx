@@ -3,6 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import type { AuditLogItem } from '@/api/audit-log.schemas'
 import { AuditDetailDialog } from '@/components/features/audit/AuditDetailDialog'
 import { Badge } from '@/components/ui/badge'
+import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
 import {
@@ -105,7 +106,7 @@ export function AuditLogTable({
     () => [
       {
         accessorKey: 'timestamp',
-        header: 'Time',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Time" />,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
             {new Date(row.original.timestamp).toLocaleString()}
@@ -114,12 +115,12 @@ export function AuditLogTable({
       },
       {
         accessorKey: 'action',
-        header: 'Action',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Action" />,
         cell: ({ row }) => <Badge className={actionBadgeClassName(row.original.action)}>{row.original.action}</Badge>,
       },
       {
         accessorKey: 'entityType',
-        header: 'Entity',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Entity" />,
         cell: ({ row }) => (
           <div className="space-y-1">
             <p className="font-medium">{formatAuditEntityType(row.original.entityType)}</p>
@@ -129,7 +130,7 @@ export function AuditLogTable({
       },
       {
         accessorKey: 'userDisplayName',
-        header: 'Actor',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Actor" />,
         cell: ({ row }) => (
           <div className="space-y-1">
             <p className="font-medium">{row.original.userDisplayName ?? 'Unknown operator'}</p>
@@ -140,11 +141,13 @@ export function AuditLogTable({
       {
         id: 'summary',
         header: 'Summary',
+        enableSorting: false,
         cell: ({ row }) => <span className="text-sm text-muted-foreground">{summarizeEntry(row.original)}</span>,
       },
       {
         id: 'details',
         header: () => <div className="text-right">Details</div>,
+        enableSorting: false,
         cell: ({ row }) => (
           <div className="text-right">
             <Button

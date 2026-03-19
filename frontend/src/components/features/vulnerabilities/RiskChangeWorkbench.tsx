@@ -4,6 +4,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, SearchIcon } from 'lucide-react'
 import type { DashboardRiskChangeBrief } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
+import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
 import {
@@ -149,7 +150,7 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
     () => [
       {
         accessorKey: 'changeType',
-        header: 'Change',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Change" />,
         cell: ({ row }) => (
           <Badge
             variant="outline"
@@ -171,7 +172,7 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
       },
       {
         accessorKey: 'externalId',
-        header: 'CVE',
+        header: ({ column }) => <SortableColumnHeader column={column} title="CVE" />,
         cell: ({ row }) => (
           <Link
             to="/vulnerabilities/$id"
@@ -184,7 +185,7 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
       },
       {
         accessorKey: 'title',
-        header: 'Title',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Title" />,
         cell: ({ row }) => (
           <div className="max-w-[30rem]">
             <p className="truncate text-sm text-foreground">{row.original.title}</p>
@@ -193,7 +194,7 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
       },
       {
         accessorKey: 'severity',
-        header: 'Severity',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Severity" />,
         cell: ({ row }) => (
           <Badge
             variant="outline"
@@ -211,12 +212,12 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
       },
       {
         accessorKey: 'affectedAssetCount',
-        header: 'Affected assets',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Affected assets" />,
         cell: ({ row }) => <span className="text-sm font-medium">{row.original.affectedAssetCount}</span>,
       },
       {
         accessorKey: 'changedAt',
-        header: 'Changed',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Changed" />,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">{formatDateTime(row.original.changedAt)}</span>
         ),

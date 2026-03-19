@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { AffectedAsset } from '@/api/vulnerabilities.schemas'
 import { DataTable } from '@/components/ui/data-table'
+import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -24,7 +25,7 @@ const PAGE_SIZE = 25
 const columns: ColumnDef<AffectedAsset>[] = [
   {
     accessorKey: 'assetName',
-    header: 'Asset',
+    header: ({ column }) => <SortableColumnHeader column={column} title="Asset" />,
     cell: ({ row }) => (
       <div className="space-y-0.5">
         <Link
@@ -40,7 +41,7 @@ const columns: ColumnDef<AffectedAsset>[] = [
   },
   {
     accessorKey: 'status',
-    header: 'Status',
+    header: ({ column }) => <SortableColumnHeader column={column} title="Status" />,
     cell: ({ row }) => (
       <span
         className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
@@ -53,7 +54,7 @@ const columns: ColumnDef<AffectedAsset>[] = [
   },
   {
     accessorKey: 'effectiveSeverity',
-    header: 'Eff. severity',
+    header: ({ column }) => <SortableColumnHeader column={column} title="Eff. severity" />,
     cell: ({ row }) => {
       const { effectiveSeverity, effectiveScore } = row.original
       const tone = severityTone(effectiveSeverity)
@@ -67,7 +68,7 @@ const columns: ColumnDef<AffectedAsset>[] = [
   },
   {
     accessorKey: 'securityProfileName',
-    header: 'Profile',
+    header: ({ column }) => <SortableColumnHeader column={column} title="Profile" />,
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground">
         {row.original.securityProfileName ?? 'None'}
@@ -76,7 +77,7 @@ const columns: ColumnDef<AffectedAsset>[] = [
   },
   {
     accessorKey: 'episodeCount',
-    header: 'Episodes',
+    header: ({ column }) => <SortableColumnHeader column={column} title="Episodes" />,
     cell: ({ row }) => {
       const count = row.original.episodeCount
       return (
@@ -89,14 +90,14 @@ const columns: ColumnDef<AffectedAsset>[] = [
   },
   {
     accessorKey: 'detectedDate',
-    header: 'Detected',
+    header: ({ column }) => <SortableColumnHeader column={column} title="Detected" />,
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground">{formatDateTime(row.original.detectedDate)}</span>
     ),
   },
   {
     accessorKey: 'resolvedDate',
-    header: 'Resolved',
+    header: ({ column }) => <SortableColumnHeader column={column} title="Resolved" />,
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground">
         {row.original.resolvedDate ? formatDateTime(row.original.resolvedDate) : '—'}

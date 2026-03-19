@@ -4,6 +4,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { BadgeCheck, Building2, DatabaseZap, KeyRound, ShieldCheck } from 'lucide-react'
 import type { TenantListItem } from '@/api/settings.schemas'
 import { Badge } from '@/components/ui/badge'
+import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
@@ -63,7 +64,7 @@ export function TenantAdministrationList({
     () => [
       {
         accessorKey: 'name',
-        header: 'Tenant',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Tenant" />,
         cell: ({ row }) => (
           <div className="space-y-1">
             <Link
@@ -79,12 +80,12 @@ export function TenantAdministrationList({
       },
       {
         accessorKey: 'entraTenantId',
-        header: 'Entra tenant ID',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Entra tenant ID" />,
         cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.entraTenantId}</span>,
       },
       {
         accessorKey: 'configuredIngestionSourceCount',
-        header: 'Configured sources',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Configured sources" />,
         cell: ({ row }) => (
           <Badge variant="outline" className="rounded-full border-border/70 bg-background/70 text-foreground">
             {row.original.configuredIngestionSourceCount}
@@ -94,6 +95,7 @@ export function TenantAdministrationList({
       {
         id: 'open',
         header: () => <div className="text-right">Open</div>,
+        enableSorting: false,
         cell: ({ row }) => (
           <div className="text-right">
             <Link
