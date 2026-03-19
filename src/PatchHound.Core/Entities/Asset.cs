@@ -30,6 +30,7 @@ public class Asset
     public bool? DeviceIsAadJoined { get; private set; }
     public string? DeviceOnboardingStatus { get; private set; }
     public string? DeviceValue { get; private set; }
+    public decimal? ExposureImpactScore { get; private set; }
     public string Metadata { get; private set; } = "{}";
 
     private Asset() { }
@@ -122,5 +123,10 @@ public class Asset
         DeviceIsAadJoined = isAadJoined;
         DeviceOnboardingStatus = onboardingStatus;
         DeviceValue = deviceValue;
+    }
+
+    public void SetExposureImpactScore(decimal? score)
+    {
+        ExposureImpactScore = score.HasValue ? Math.Clamp(Math.Round(score.Value, 1), 0m, 100m) : null;
     }
 }
