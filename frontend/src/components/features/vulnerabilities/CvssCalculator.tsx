@@ -140,23 +140,22 @@ export function CvssCalculator({
   securityProfile,
   interactive = true,
 }: CvssCalculatorProps) {
-  const initialMetrics = useMemo(() => parseCvssVector(vector ?? null) ?? defaultMetrics, [vector])
-  const [metrics, setMetrics] = useState<CvssBaseMetrics>(initialMetrics)
+  const vendorMetrics = useMemo(() => parseCvssVector(vector ?? null) ?? defaultMetrics, [vector])
+  const [metrics, setMetrics] = useState<CvssBaseMetrics>(vendorMetrics)
 
-  const effectiveMetrics = vector ? parseCvssVector(vector) ?? metrics : metrics
-  const vendorScore = baseScore ?? calculateCvssBaseScore(effectiveMetrics)
+  const vendorScore = baseScore ?? calculateCvssBaseScore(vendorMetrics)
   const vendorSeverity = cvssSeverity(vendorScore)
   const vendorTone = severityTone(vendorScore)
-  const computedVector = buildCvssVector(effectiveMetrics)
-  const vendorMetricPresentation = buildMetricPresentation(effectiveMetrics)
+  const vendorVector = vector ?? buildCvssVector(vendorMetrics)
+  const vendorMetricPresentation = buildMetricPresentation(vendorMetrics)
   const environmental = securityProfile
-    ? calculateCvssEnvironmentalScore(effectiveMetrics, securityProfile)
+    ? calculateCvssEnvironmentalScore(vendorMetrics, securityProfile)
     : null
 
   const calculatedScore = calculateCvssBaseScore(metrics)
   const calculatedSeverity = cvssSeverity(calculatedScore)
   const calculatedTone = severityTone(calculatedScore)
-  const isModified = buildCvssVector(metrics) !== (vector ?? computedVector)
+  const isModified = buildCvssVector(metrics) !== vendorVector
 
   return (
     <div className="space-y-4">
@@ -193,7 +192,7 @@ export function CvssCalculator({
         <div className="flex items-center justify-between">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Vendor vector</p>
           <code className="rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
-            {vector ?? computedVector}
+            {vendorVector}
           </code>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -263,7 +262,7 @@ export function CvssCalculator({
                 variant="ghost"
                 size="sm"
                 className="h-7 gap-1.5 text-xs"
-                onClick={() => setMetrics(initialMetrics)}
+                onClick={() => setMetrics(vendorMetrics)}
               >
                 <RotateCcw className="size-3" />
                 Reset to vendor
