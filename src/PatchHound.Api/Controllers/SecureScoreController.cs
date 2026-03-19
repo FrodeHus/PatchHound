@@ -72,12 +72,18 @@ public class SecureScoreController : ControllerBase
             s.ActiveVulnerabilityCount
         )).ToList();
 
+        var snapshots = await _secureScoreService.GetScoreHistoryAsync(tenantId, ct);
+        var historyDtos = snapshots
+            .Select(s => new ScoreSnapshotDto(s.Date, s.OverallScore, s.AssetCount))
+            .ToList();
+
         return Ok(new SecureScoreSummaryDto(
             tenantScore.OverallScore,
             target,
             tenantScore.AssetCount,
             tenantScore.AssetsAboveThreshold,
-            topRiskDtos
+            topRiskDtos,
+            historyDtos
         ));
     }
 

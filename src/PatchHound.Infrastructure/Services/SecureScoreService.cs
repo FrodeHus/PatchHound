@@ -45,6 +45,9 @@ public class SecureScoreService
         await CalculateSecureScoresAsync(tenantId, assets, assetIds, ct);
 
         await _dbContext.SaveChangesAsync(ct);
+
+        // ── Record daily snapshot for sparkline history ──
+        await RecordDailySnapshotAsync(tenantId, ct);
     }
 
     private async Task CalculateSoftwareExposureImpactsAsync(
@@ -292,6 +295,48 @@ public class SecureScoreService
             tenantId,
             results.Count
         );
+    }
+
+    private async Task RecordDailySnapshotAsync(Guid tenantId, CancellationToken ct)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var tenantScore = await GetTenantScoreAsync(tenantId, ct);
+
+        var existing = await _dbContext.TenantSecureScoreSnapshots
+            .FirstOrDefaultAsync(s => s.TenantId == tenantId && s.Date == today, ct);
+
+        if (existing is not null)
+        {
+            existing.Update(tenantScore.OverallScore, tenantScore.AssetCount);
+        }
+        else
+        {
+            _dbContext.TenantSecureScoreSnapshots.Add(
+                TenantSecureScoreSnapshot.Create(tenantId, today, tenantScore.OverallScore, tenantScore.AssetCount));
+        }
+
+        // Prune snapshots older than 30 days
+        var cutoff = today.AddDays(-30);
+        var stale = await _dbContext.TenantSecureScoreSnapshots
+            .Where(s => s.TenantId == tenantId && s.Date < cutoff)
+            .ToListAsync(ct);
+        if (stale.Count > 0)
+            _dbContext.TenantSecureScoreSnapshots.RemoveRange(stale);
+
+        await _dbContext.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Returns the last 30 days of daily score snapshots for the tenant.
+    /// </summary>
+    public async Task<List<TenantSecureScoreSnapshot>> GetScoreHistoryAsync(
+        Guid tenantId, CancellationToken ct)
+    {
+        var cutoff = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-30);
+        return await _dbContext.TenantSecureScoreSnapshots
+            .Where(s => s.TenantId == tenantId && s.Date >= cutoff)
+            .OrderBy(s => s.Date)
+            .ToListAsync(ct);
     }
 
     /// <summary>

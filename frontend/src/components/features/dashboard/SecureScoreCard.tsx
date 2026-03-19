@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { fetchSecureScoreSummary } from '@/api/secure-score.functions'
-import type { SecureScoreSummary } from '@/api/secure-score.schemas'
+import type { ScoreSnapshot, SecureScoreSummary } from '@/api/secure-score.schemas'
 import { scorePosture, postureBadge, postureIcon } from "@/lib/score-posture";
 import { SecureScoreDetailDialog } from './SecureScoreDetailDialog'
 
@@ -63,7 +63,16 @@ export function SecureScoreCard({ isLoading: parentLoading }: SecureScoreCardPro
                   <Shield className="size-5" />
                 </span>
               </div>
-              <div className="mt-5 flex items-center justify-between gap-3">
+              {summary.history.length > 1 && (
+                <div className="mt-4">
+                  <Sparkline
+                    data={summary.history}
+                    targetScore={summary.targetScore}
+                    tone={posture.tone}
+                  />
+                </div>
+              )}
+              <div className="mt-3 flex items-center justify-between gap-3">
                 <Badge
                   className={`rounded-full border px-2.5 py-1 text-xs ${postureBadge(posture.tone)}`}
                 >
@@ -140,4 +149,69 @@ export function SecureScoreCard({ isLoading: parentLoading }: SecureScoreCardPro
       />
     </>
   );
+}
+
+const sparklineW = 200
+const sparklineH = 32
+const sparklinePad = 2
+
+function Sparkline({
+  data,
+  targetScore,
+  tone,
+}: {
+  data: ScoreSnapshot[]
+  targetScore: number
+  tone: 'success' | 'warning' | 'danger'
+}) {
+  const scores = data.map((d) => d.overallScore)
+  const min = Math.min(...scores, targetScore) - 2
+  const max = Math.max(...scores, targetScore) + 2
+  const range = max - min || 1
+
+  const toX = (i: number) => sparklinePad + (i / (scores.length - 1)) * (sparklineW - sparklinePad * 2)
+  const toY = (v: number) => sparklinePad + (1 - (v - min) / range) * (sparklineH - sparklinePad * 2)
+
+  const points = scores.map((s, i) => `${toX(i)},${toY(s)}`).join(' ')
+  const targetY = toY(targetScore)
+
+  const strokeColor =
+    tone === 'success'
+      ? 'var(--color-chart-3)'
+      : tone === 'warning'
+        ? 'var(--color-tone-warning-foreground)'
+        : 'var(--color-destructive)'
+
+  return (
+    <svg
+      viewBox={`0 0 ${sparklineW} ${sparklineH}`}
+      className="h-8 w-full"
+      preserveAspectRatio="none"
+    >
+      <line
+        x1={sparklinePad}
+        y1={targetY}
+        x2={sparklineW - sparklinePad}
+        y2={targetY}
+        stroke="currentColor"
+        strokeOpacity={0.2}
+        strokeDasharray="3 3"
+        strokeWidth={1}
+      />
+      <polyline
+        points={points}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx={toX(scores.length - 1)}
+        cy={toY(scores[scores.length - 1])}
+        r={2.5}
+        fill={strokeColor}
+      />
+    </svg>
+  )
 }
