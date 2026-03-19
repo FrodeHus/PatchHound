@@ -1,16 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
 import { Shield, AlertTriangle, Settings2, Gauge } from 'lucide-react'
-import { fetchAssetSecureScore } from '@/api/secure-score.functions'
+import {
+  fetchAssetSecureScore,
+  fetchSecureScoreTarget,
+} from "@/api/secure-score.functions";
 import type { AssetScoreDetail } from '@/api/secure-score.schemas'
+import {
+  scorePosture,
+  postureText,
+  postureBar,
+  postureBadge,
+} from "@/lib/score-posture";
 
 type Props = { assetId: string }
-
-function scoreTone(score: number) {
-  if (score >= 75) return { label: 'Critical', text: 'text-tone-danger-foreground', bar: 'bg-tone-danger-foreground/80', badge: 'border-tone-danger-border bg-tone-danger text-tone-danger-foreground' }
-  if (score >= 50) return { label: 'Elevated', text: 'text-tone-warning-foreground', bar: 'bg-tone-warning-foreground/80', badge: 'border-tone-warning-border bg-tone-warning text-tone-warning-foreground' }
-  if (score >= 25) return { label: 'Guarded', text: 'text-tone-info-foreground', bar: 'bg-tone-info-foreground/80', badge: 'border-tone-info-border bg-tone-info text-tone-info-foreground' }
-  return { label: 'Stable', text: 'text-tone-success-foreground', bar: 'bg-tone-success-foreground/80', badge: 'border-tone-success-border bg-tone-success text-tone-success-foreground' }
-}
 
 export function AssetSecureScorePanel({ assetId }: Props) {
   const { data, isFetching, isError } = useQuery({
@@ -33,7 +35,13 @@ export function AssetSecureScorePanel({ assetId }: Props) {
 }
 
 function ScoreContent({ score }: { score: AssetScoreDetail }) {
-  const tone = scoreTone(score.overallScore)
+  const { data: target } = useQuery({
+    queryKey: ["secure-score", "target"],
+    queryFn: () => fetchSecureScoreTarget(),
+    staleTime: 60_000,
+  });
+  const posture = scorePosture(score.overallScore, target ?? 40);
+  const tone = posture;
 
   return (
     <section className="rounded-[28px] border border-border/70 bg-card p-4">
@@ -47,10 +55,14 @@ function ScoreContent({ score }: { score: AssetScoreDetail }) {
 
       {/* Overall score */}
       <div className="mt-4 flex items-end justify-between gap-3">
-        <p className={`text-4xl font-semibold tabular-nums tracking-[-0.04em] ${tone.text}`}>
+        <p
+          className={`text-4xl font-semibold tabular-nums tracking-[-0.04em] ${postureText(tone.tone)}`}
+        >
           {score.overallScore.toFixed(1)}
         </p>
-        <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${tone.badge}`}>
+        <span
+          className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${postureBadge(tone.tone)}`}
+        >
           {tone.label}
         </span>
       </div>
@@ -58,16 +70,29 @@ function ScoreContent({ score }: { score: AssetScoreDetail }) {
       {/* Score bar */}
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted/80">
         <div
-          className={`h-full rounded-full transition-all ${tone.bar}`}
+          className={`h-full rounded-full transition-all ${postureBar(tone.tone)}`}
           style={{ width: `${Math.min(100, score.overallScore)}%` }}
         />
       </div>
 
       {/* Sub-scores */}
       <div className="mt-4 grid gap-2">
-        <SubScore icon={<AlertTriangle className="size-3.5" />} label="Vulnerability" value={score.vulnerabilityScore} />
-        <SubScore icon={<Settings2 className="size-3.5" />} label="Configuration" value={score.configurationScore} />
-        <SubScore icon={<Gauge className="size-3.5" />} label="Device weight" value={score.deviceValueWeight} suffix="×" />
+        <SubScore
+          icon={<AlertTriangle className="size-3.5" />}
+          label="Vulnerability"
+          value={score.vulnerabilityScore}
+        />
+        <SubScore
+          icon={<Settings2 className="size-3.5" />}
+          label="Configuration"
+          value={score.configurationScore}
+        />
+        <SubScore
+          icon={<Gauge className="size-3.5" />}
+          label="Device weight"
+          value={score.deviceValueWeight}
+          suffix="×"
+        />
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">
@@ -77,16 +102,24 @@ function ScoreContent({ score }: { score: AssetScoreDetail }) {
       {/* Factors */}
       {score.factors.length > 0 ? (
         <div className="mt-4 border-t border-border/60 pt-3">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Score factors</p>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Score factors
+          </p>
           <div className="mt-2 space-y-1.5">
             {score.factors.map((factor) => (
-              <div key={factor.name} className="flex items-start justify-between gap-2 text-xs">
+              <div
+                key={factor.name}
+                className="flex items-start justify-between gap-2 text-xs"
+              >
                 <div className="min-w-0">
                   <p className="font-medium">{factor.name}</p>
                   <p className="text-muted-foreground">{factor.description}</p>
                 </div>
-                <span className={`shrink-0 tabular-nums font-medium ${factor.impact > 0 ? 'text-tone-danger-foreground' : 'text-tone-success-foreground'}`}>
-                  {factor.impact > 0 ? '+' : ''}{factor.impact.toFixed(1)}
+                <span
+                  className={`shrink-0 tabular-nums font-medium ${factor.impact > 0 ? postureText("danger") : postureText("success")}`}
+                >
+                  {factor.impact > 0 ? "+" : ""}
+                  {factor.impact.toFixed(1)}
                 </span>
               </div>
             ))}
@@ -95,10 +128,11 @@ function ScoreContent({ score }: { score: AssetScoreDetail }) {
       ) : null}
 
       <p className="mt-3 text-[10px] text-muted-foreground/60">
-        v{score.calculationVersion} · {new Date(score.calculatedAt).toLocaleString()}
+        v{score.calculationVersion} ·{" "}
+        {new Date(score.calculatedAt).toLocaleString()}
       </p>
     </section>
-  )
+  );
 }
 
 function SubScore({ icon, label, value, suffix }: { icon: React.ReactNode; label: string; value: number; suffix?: string }) {
