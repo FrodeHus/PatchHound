@@ -1,0 +1,248 @@
+using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PatchHound.Api.Auth;
+using PatchHound.Api.Models;
+using PatchHound.Api.Models.AssetRules;
+using PatchHound.Core.Entities;
+using PatchHound.Core.Interfaces;
+using PatchHound.Core.Models;
+using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
+
+namespace PatchHound.Api.Controllers;
+
+[ApiController]
+[Route("api/asset-rules")]
+[Authorize(Policy = Policies.ConfigureTenant)]
+public class AssetRulesController : ControllerBase
+{
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
+    private readonly PatchHoundDbContext _dbContext;
+    private readonly ITenantContext _tenantContext;
+    private readonly IAssetRuleEvaluationService _evaluationService;
+
+    public AssetRulesController(
+        PatchHoundDbContext dbContext,
+        ITenantContext tenantContext,
+        IAssetRuleEvaluationService evaluationService)
+    {
+        _dbContext = dbContext;
+        _tenantContext = tenantContext;
+        _evaluationService = evaluationService;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<PagedResponse<AssetRuleDto>>> List(
+        [FromQuery] PaginationQuery pagination,
+        CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var query = _dbContext.AssetRules
+            .AsNoTracking()
+            .Where(r => r.TenantId == tenantId)
+            .OrderBy(r => r.Priority);
+
+        var totalCount = await query.CountAsync(ct);
+        var items = await query
+            .Skip(pagination.Skip)
+            .Take(pagination.BoundedPageSize)
+            .ToListAsync(ct);
+
+        var dtos = items.Select(ToDto).ToList();
+        return Ok(new PagedResponse<AssetRuleDto>(dtos, totalCount, pagination.Page, pagination.BoundedPageSize));
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<AssetRuleDto>> Get(Guid id, CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var rule = await _dbContext.AssetRules
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId, ct);
+
+        if (rule is null)
+            return NotFound();
+
+        return Ok(ToDto(rule));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<AssetRuleDto>> Create(
+        [FromBody] CreateAssetRuleRequest request,
+        CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var filter = DeserializeFilter(request.FilterDefinition);
+        var operations = DeserializeOperations(request.Operations);
+
+        if (filter is null || operations is null)
+            return BadRequest(new ProblemDetails { Title = "Invalid filter or operations JSON." });
+
+        var maxPriority = await _dbContext.AssetRules
+            .Where(r => r.TenantId == tenantId)
+            .MaxAsync(r => (int?)r.Priority, ct) ?? 0;
+
+        var rule = AssetRule.Create(tenantId, request.Name, request.Description, maxPriority + 1, filter, operations);
+        _dbContext.AssetRules.Add(rule);
+        await _dbContext.SaveChangesAsync(ct);
+
+        return CreatedAtAction(nameof(Get), new { id = rule.Id }, ToDto(rule));
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<AssetRuleDto>> Update(
+        Guid id,
+        [FromBody] UpdateAssetRuleRequest request,
+        CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var rule = await _dbContext.AssetRules
+            .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId, ct);
+
+        if (rule is null)
+            return NotFound();
+
+        var filter = DeserializeFilter(request.FilterDefinition);
+        var operations = DeserializeOperations(request.Operations);
+
+        if (filter is null || operations is null)
+            return BadRequest(new ProblemDetails { Title = "Invalid filter or operations JSON." });
+
+        rule.Update(request.Name, request.Description, request.Enabled, filter, operations);
+        await _dbContext.SaveChangesAsync(ct);
+
+        return Ok(ToDto(rule));
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var rule = await _dbContext.AssetRules
+            .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId, ct);
+
+        if (rule is null)
+            return NotFound();
+
+        _dbContext.AssetRules.Remove(rule);
+        await _dbContext.SaveChangesAsync(ct);
+
+        // Reorder remaining rules to close the gap
+        var remaining = await _dbContext.AssetRules
+            .Where(r => r.TenantId == tenantId)
+            .OrderBy(r => r.Priority)
+            .ToListAsync(ct);
+
+        for (var i = 0; i < remaining.Count; i++)
+            remaining[i].SetPriority(i + 1);
+
+        await _dbContext.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    [HttpPost("preview")]
+    public async Task<ActionResult<AssetRulePreviewDto>> Preview(
+        [FromBody] PreviewFilterRequest request,
+        CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var filter = DeserializeFilter(request.FilterDefinition);
+        if (filter is null)
+            return BadRequest(new ProblemDetails { Title = "Invalid filter JSON." });
+
+        var result = await _evaluationService.PreviewFilterAsync(tenantId, filter, ct);
+        return Ok(new AssetRulePreviewDto(
+            result.Count,
+            result.Samples.Select(s => new AssetPreviewItemDto(s.Id, s.Name, s.AssetType)).ToList()));
+    }
+
+    [HttpPost("run")]
+    public async Task<IActionResult> Run(CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        await _evaluationService.EvaluateRulesAsync(tenantId, ct);
+        return NoContent();
+    }
+
+    [HttpPut("reorder")]
+    public async Task<IActionResult> Reorder(
+        [FromBody] ReorderRulesRequest request,
+        CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var rules = await _dbContext.AssetRules
+            .Where(r => r.TenantId == tenantId)
+            .ToListAsync(ct);
+
+        var ruleMap = rules.ToDictionary(r => r.Id);
+
+        for (var i = 0; i < request.RuleIds.Count; i++)
+        {
+            if (ruleMap.TryGetValue(request.RuleIds[i], out var rule))
+                rule.SetPriority(i + 1);
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    private static AssetRuleDto ToDto(AssetRule rule) => new(
+        rule.Id,
+        rule.Name,
+        rule.Description,
+        rule.Priority,
+        rule.Enabled,
+        JsonDocument.Parse(rule.FilterDefinition).RootElement,
+        JsonDocument.Parse(rule.Operations).RootElement,
+        rule.CreatedAt,
+        rule.UpdatedAt,
+        rule.LastExecutedAt,
+        rule.LastMatchCount
+    );
+
+    private static FilterNode? DeserializeFilter(JsonElement element)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<FilterNode>(element.GetRawText(), JsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static List<AssetRuleOperation>? DeserializeOperations(JsonElement element)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<List<AssetRuleOperation>>(element.GetRawText(), JsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+}

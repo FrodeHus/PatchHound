@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Building2, ChevronRight, DatabaseZap, Settings2, ShieldCheck, ShieldEllipsis, Users } from 'lucide-react'
+import { Building2, ChevronRight, DatabaseZap, GitBranchPlus, Settings2, ShieldCheck, ShieldEllipsis, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({
@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_authed/admin/')({
 type AdminArea = {
   title: string
   description: string
-  to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/sources' | '/admin/security-profiles'
+  to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/sources' | '/admin/security-profiles' | '/admin/asset-rules'
   roles: Array<'GlobalAdmin' | 'SecurityManager'>
   icon: typeof Users
 }
@@ -49,6 +49,13 @@ const adminAreas: AdminArea[] = [
     to: '/admin/security-profiles',
     roles: ['GlobalAdmin', 'SecurityManager'],
     icon: ShieldEllipsis,
+  },
+  {
+    title: 'Asset Rules',
+    description: 'Automate security profile and team assignment based on asset filters. Rules run after each ingestion.',
+    to: '/admin/asset-rules',
+    roles: ['GlobalAdmin', 'SecurityManager'],
+    icon: GitBranchPlus,
   },
 ]
 
