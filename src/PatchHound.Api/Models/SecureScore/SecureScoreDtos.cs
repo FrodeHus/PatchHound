@@ -5,8 +5,11 @@ public record SecureScoreSummaryDto(
     decimal TargetScore,
     int AssetCount,
     int AssetsAboveTarget,
-    List<AssetScoreSummaryDto> TopRiskAssets
+    List<AssetScoreSummaryDto> TopRiskAssets,
+    List<ScoreSnapshotDto> History
 );
+
+public record ScoreSnapshotDto(DateOnly Date, decimal OverallScore, int AssetCount);
 
 public record AssetScoreSummaryDto(
     Guid AssetId,

@@ -82,6 +82,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<AssetSecureScore> AssetSecureScores => Set<AssetSecureScore>();
     public DbSet<TenantSecureScoreTarget> TenantSecureScoreTargets =>
         Set<TenantSecureScoreTarget>();
+    public DbSet<TenantSecureScoreSnapshot> TenantSecureScoreSnapshots =>
+        Set<TenantSecureScoreSnapshot>();
 
     public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken ct = default)
     {
@@ -251,6 +253,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantSecureScoreTarget>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<TenantSecureScoreSnapshot>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
     }
 }

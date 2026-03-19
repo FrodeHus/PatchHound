@@ -16,12 +16,19 @@ export const assetScoreSummarySchema = z.object({
   activeVulnerabilityCount: z.number(),
 })
 
+export const scoreSnapshotSchema = z.object({
+  date: z.string(),
+  overallScore: z.number(),
+  assetCount: z.number(),
+})
+
 export const secureScoreSummarySchema = z.object({
   overallScore: z.number(),
   targetScore: z.number(),
   assetCount: z.number(),
   assetsAboveTarget: z.number(),
   topRiskAssets: z.array(assetScoreSummarySchema),
+  history: z.array(scoreSnapshotSchema),
 })
 
 export const assetScoreDetailSchema = z.object({
@@ -41,3 +48,4 @@ export type SecureScoreSummary = z.infer<typeof secureScoreSummarySchema>
 export type AssetScoreSummary = z.infer<typeof assetScoreSummarySchema>
 export type AssetScoreDetail = z.infer<typeof assetScoreDetailSchema>
 export type ScoreFactor = z.infer<typeof scoreFactorSchema>
+export type ScoreSnapshot = z.infer<typeof scoreSnapshotSchema>
