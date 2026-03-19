@@ -170,12 +170,17 @@ public class DashboardController : ControllerBase
         var taskTuples = tasks.Select(t => (t.Status, t.DueDate)).ToList();
         var (slaPercent, overdueCount) = DashboardService.CalculateSlaCompliance(taskTuples, now);
 
-        // Average remediation days
-        var completedTasks = tasks
-            .Where(t => t.Status == RemediationTaskStatus.Completed)
-            .Select(t => (t.CreatedAt, t.UpdatedAt))
+        // Average remediation days — based on resolved episodes
+        var resolvedEpisodeRows = await _dbContext.VulnerabilityAssetEpisodes.AsNoTracking()
+            .Where(e => e.TenantId == tenantId
+                && e.Status == VulnerabilityStatus.Resolved
+                && e.ResolvedAt != null)
+            .Select(e => new { e.FirstSeenAt, ResolvedAt = e.ResolvedAt!.Value })
+            .ToListAsync(ct);
+        var resolvedEpisodes = resolvedEpisodeRows
+            .Select(e => (e.FirstSeenAt, e.ResolvedAt))
             .ToList();
-        var avgRemediationDays = DashboardService.CalculateAverageRemediationDays(completedTasks);
+        var avgRemediationDays = DashboardService.CalculateAverageRemediationDays(resolvedEpisodes);
 
         // Exposure score: vulnerability severity × asset criticality for open vulnerability-asset pairs
         var baseVaQuery = _dbContext
@@ -452,18 +457,21 @@ public class DashboardController : ControllerBase
 
         // ────────────────────────────────────────────────────
         // MTTR by severity — current 30d vs prior 30d
+        // Based on resolved episodes (ResolvedAt - FirstSeenAt)
         // ────────────────────────────────────────────────────
-        var completedTasksWithSeverity = await _dbContext.RemediationTasks.AsNoTracking()
-            .Where(t => t.TenantId == tenantId && t.Status == RemediationTaskStatus.Completed)
+        var resolvedEpisodesWithSeverity = await _dbContext.VulnerabilityAssetEpisodes.AsNoTracking()
+            .Where(e => e.TenantId == tenantId
+                && e.Status == VulnerabilityStatus.Resolved
+                && e.ResolvedAt != null)
             .Join(
                 _dbContext.TenantVulnerabilities.AsNoTracking(),
-                t => t.TenantVulnerabilityId,
+                e => e.TenantVulnerabilityId,
                 v => v.Id,
-                (t, v) => new
+                (e, v) => new
                 {
                     v.VulnerabilityDefinition.VendorSeverity,
-                    t.CreatedAt,
-                    t.UpdatedAt,
+                    e.FirstSeenAt,
+                    ResolvedAt = e.ResolvedAt!.Value,
                 })
             .ToListAsync(ct);
 
@@ -472,18 +480,18 @@ public class DashboardController : ControllerBase
 
         var mttrBySeverity = Enum.GetValues<Severity>().Select(severity =>
         {
-            var currentPeriod = completedTasksWithSeverity
-                .Where(t => t.VendorSeverity == severity && t.UpdatedAt >= currentPeriodStart)
+            var currentPeriod = resolvedEpisodesWithSeverity
+                .Where(e => e.VendorSeverity == severity && e.ResolvedAt >= currentPeriodStart)
                 .ToList();
-            var priorPeriod = completedTasksWithSeverity
-                .Where(t => t.VendorSeverity == severity && t.UpdatedAt >= priorPeriodStart && t.UpdatedAt < currentPeriodStart)
+            var priorPeriod = resolvedEpisodesWithSeverity
+                .Where(e => e.VendorSeverity == severity && e.ResolvedAt >= priorPeriodStart && e.ResolvedAt < currentPeriodStart)
                 .ToList();
 
             var currentMttr = currentPeriod.Count > 0
-                ? Math.Round((decimal)(currentPeriod.Sum(t => (t.UpdatedAt - t.CreatedAt).TotalDays) / currentPeriod.Count), 1)
+                ? Math.Round((decimal)(currentPeriod.Sum(e => (e.ResolvedAt - e.FirstSeenAt).TotalDays) / currentPeriod.Count), 1)
                 : 0m;
             decimal? priorMttr = priorPeriod.Count > 0
-                ? Math.Round((decimal)(priorPeriod.Sum(t => (t.UpdatedAt - t.CreatedAt).TotalDays) / priorPeriod.Count), 1)
+                ? Math.Round((decimal)(priorPeriod.Sum(e => (e.ResolvedAt - e.FirstSeenAt).TotalDays) / priorPeriod.Count), 1)
                 : null;
 
             return new MttrBySeverityDto(severity.ToString(), currentMttr, priorMttr);
