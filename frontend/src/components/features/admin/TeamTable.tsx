@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { TeamItem } from '@/api/teams.schemas'
 import { Badge } from '@/components/ui/badge'
+import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import { DataTable } from '@/components/ui/data-table'
 import {
   DataTableEmptyState,
@@ -50,7 +51,7 @@ export function TeamTable({
     () => [
       {
         accessorKey: 'name',
-        header: 'Assignment group',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Assignment group" />,
         cell: ({ row }) => (
           <button
             type="button"
@@ -73,17 +74,18 @@ export function TeamTable({
       },
       {
         accessorKey: 'tenantName',
-        header: 'Tenant',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Tenant" />,
         cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.tenantName}</span>,
       },
       {
         accessorKey: 'memberCount',
-        header: 'Members',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Members" />,
         cell: ({ row }) => <span className="text-sm font-medium">{row.original.memberCount}</span>,
       },
       {
         id: 'selection',
         header: () => <div className="text-right">Open</div>,
+        enableSorting: false,
         cell: ({ row }) => (
           <div className="text-right">
             <button

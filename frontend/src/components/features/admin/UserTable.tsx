@@ -3,6 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import type { UserItem } from '@/api/users.schemas'
 import { ManageRolesDialog } from '@/components/features/admin/ManageRolesDialog'
 import { Badge } from '@/components/ui/badge'
+import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import {
   DataTableEmptyState,
   DataTableSummaryStrip,
@@ -53,7 +54,7 @@ export function UserTable({
     () => [
       {
         accessorKey: 'displayName',
-        header: 'User',
+        header: ({ column }) => <SortableColumnHeader column={column} title="User" />,
         cell: ({ row }) => (
           <div className="space-y-1">
             <p className="font-medium tracking-tight">{row.original.displayName}</p>
@@ -63,12 +64,13 @@ export function UserTable({
       },
       {
         accessorKey: 'email',
-        header: 'Email',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Email" />,
         cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.email}</span>,
       },
       {
         id: 'roles',
         header: 'Roles',
+        enableSorting: false,
         cell: ({ row }) => (
           <div className="flex flex-wrap gap-2">
             {row.original.roles.map((role) => (
@@ -86,6 +88,7 @@ export function UserTable({
       {
         id: 'actions',
         header: () => <div className="text-right">Manage</div>,
+        enableSorting: false,
         cell: ({ row }) => (
           <div className="text-right">
             <ManageRolesDialog

@@ -3,6 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import type { RemediationTask } from '@/api/tasks.schemas'
 import { TaskStatusUpdate } from '@/components/features/tasks/TaskStatusUpdate'
 import { Badge } from '@/components/ui/badge'
+import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import { toneBadge } from '@/lib/tone-classes'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
@@ -94,7 +95,7 @@ export function TaskList({
     () => [
       {
         accessorKey: 'vulnerabilityTitle',
-        header: 'Task',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Task" />,
         cell: ({ row }) => (
           <div className="space-y-1">
             <p className="font-medium tracking-tight">{row.original.vulnerabilityTitle}</p>
@@ -104,7 +105,7 @@ export function TaskList({
       },
       {
         accessorKey: 'status',
-        header: 'Status',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Status" />,
         cell: ({ row }) => (
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
@@ -128,7 +129,7 @@ export function TaskList({
       },
       {
         accessorKey: 'dueDate',
-        header: 'Due',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Due" />,
         cell: ({ row }) => (
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground">{new Date(row.original.dueDate).toLocaleString()}</p>
@@ -141,6 +142,7 @@ export function TaskList({
       {
         id: 'justification',
         header: 'Context',
+        enableSorting: false,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
             {row.original.justification?.trim() || 'No justification recorded'}
@@ -150,6 +152,7 @@ export function TaskList({
       {
         id: 'actions',
         header: () => <div className="text-right">Update</div>,
+        enableSorting: false,
         cell: ({ row }) => (
           <div className="flex justify-end">
             <div className="min-w-[220px] rounded-2xl border border-border/60 bg-background/40 p-3">

@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import { Badge } from '@/components/ui/badge'
+import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -132,7 +133,7 @@ export function SoftwareTable({
     () => [
       {
         accessorKey: 'canonicalName',
-        header: 'Software',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Software" />,
         cell: ({ row }) => (
           <div className="space-y-1">
             <Link
@@ -151,7 +152,7 @@ export function SoftwareTable({
       },
       {
         accessorKey: 'confidence',
-        header: 'Identity',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Identity" />,
         cell: ({ row }) => (
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
@@ -165,7 +166,7 @@ export function SoftwareTable({
       },
       {
         accessorKey: 'primaryCpe23Uri',
-        header: 'CPE',
+        header: ({ column }) => <SortableColumnHeader column={column} title="CPE" />,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
             {row.original.primaryCpe23Uri ? 'Bound' : 'Unbound'}
@@ -174,19 +175,19 @@ export function SoftwareTable({
       },
       {
         accessorKey: 'activeInstallCount',
-        header: 'Installs',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Installs" />,
       },
       {
         accessorKey: 'uniqueDeviceCount',
-        header: 'Devices',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Devices" />,
       },
       {
         accessorKey: 'versionCount',
-        header: 'Versions',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Versions" />,
       },
       {
         accessorKey: 'activeVulnerabilityCount',
-        header: 'Open vulns',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Open vulns" />,
         cell: ({ row }) => (
           <span className={row.original.activeVulnerabilityCount > 0 ? `font-medium ${toneText('warning')}` : 'text-muted-foreground'}>
             {row.original.activeVulnerabilityCount}
@@ -195,7 +196,7 @@ export function SoftwareTable({
       },
       {
         accessorKey: 'exposureImpactScore',
-        header: 'Impact',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Impact" />,
         cell: ({ row }) => {
           const score = row.original.exposureImpactScore
           if (score == null) return <span className="text-muted-foreground">—</span>
@@ -205,7 +206,7 @@ export function SoftwareTable({
       },
       {
           accessorKey: 'lastSeenAt',
-          header: 'Last seen',
+          header: ({ column }) => <SortableColumnHeader column={column} title="Last seen" />,
           cell: ({ row }) => (
             <span className="text-sm text-muted-foreground">
               {row.original.lastSeenAt ? formatDate(row.original.lastSeenAt) : 'Unknown'}

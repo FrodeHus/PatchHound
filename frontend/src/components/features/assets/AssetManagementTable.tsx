@@ -10,6 +10,7 @@ import {
   DataTableWorkbench,
 } from "@/components/ui/data-table-workbench";
 import { Input } from '@/components/ui/input'
+import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import { DataTable } from '@/components/ui/data-table'
 import {
@@ -328,7 +329,7 @@ export function AssetManagementTable({
     () => [
       {
         accessorKey: "name",
-        header: "Asset",
+        header: ({ column }) => <SortableColumnHeader column={column} title="Asset" />,
         cell: ({ row }) => (
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
@@ -358,7 +359,7 @@ export function AssetManagementTable({
       },
       {
         accessorKey: "assetType",
-        header: "Type",
+        header: ({ column }) => <SortableColumnHeader column={column} title="Type" />,
         cell: ({ row }) => (
           <Badge
             variant="outline"
@@ -370,7 +371,7 @@ export function AssetManagementTable({
       },
       {
         accessorKey: "deviceGroupName",
-        header: "Device Group",
+        header: ({ column }) => <SortableColumnHeader column={column} title="Device Group" />,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
             {row.original.assetType === "Device"
@@ -381,7 +382,7 @@ export function AssetManagementTable({
       },
       {
         accessorKey: "healthStatus",
-        header: "Health",
+        header: ({ column }) => <SortableColumnHeader column={column} title="Health" />,
         cell: ({ row }) => {
           const value = row.original.healthStatus
           if (!value) return <span className="text-muted-foreground">—</span>
@@ -390,7 +391,7 @@ export function AssetManagementTable({
       },
       {
         accessorKey: "onboardingStatus",
-        header: "Onboarding",
+        header: ({ column }) => <SortableColumnHeader column={column} title="Onboarding" />,
         cell: ({ row }) => {
           const value = row.original.onboardingStatus
           if (!value) return <span className="text-muted-foreground">—</span>
@@ -399,7 +400,7 @@ export function AssetManagementTable({
       },
       {
         accessorKey: "riskScore",
-        header: "Risk",
+        header: ({ column }) => <SortableColumnHeader column={column} title="Risk" />,
         cell: ({ row }) => {
           const value = row.original.riskScore
           if (!value) return <span className="text-muted-foreground">—</span>
@@ -408,7 +409,7 @@ export function AssetManagementTable({
       },
       {
         accessorKey: "exposureLevel",
-        header: "Exposure",
+        header: ({ column }) => <SortableColumnHeader column={column} title="Exposure" />,
         cell: ({ row }) => {
           const value = row.original.exposureLevel
           if (!value) return <span className="text-muted-foreground">—</span>
@@ -418,6 +419,7 @@ export function AssetManagementTable({
       {
         accessorKey: "tags",
         header: "Tags",
+        enableSorting: false,
         cell: ({ row }) => {
           const tags = row.original.tags
           if (!tags?.length) return <span className="text-muted-foreground">—</span>
@@ -432,7 +434,7 @@ export function AssetManagementTable({
       },
       {
         accessorKey: "securityProfileName",
-        header: "Security profile",
+        header: ({ column }) => <SortableColumnHeader column={column} title="Security profile" />,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
             {row.original.securityProfileName ?? "No profile"}
@@ -442,11 +444,12 @@ export function AssetManagementTable({
       {
         id: "ownership",
         header: "Ownership",
+        enableSorting: false,
         cell: ({ row }) => renderOwnership(row.original),
       },
       {
         accessorKey: "recurringVulnerabilityCount",
-        header: "Recurring",
+        header: ({ column }) => <SortableColumnHeader column={column} title="Recurring" />,
         cell: ({ row }) =>
           row.original.recurringVulnerabilityCount > 0 ? (
             <Badge className={`rounded-full border hover:bg-transparent ${toneBadge('warning')}`}>
@@ -458,7 +461,7 @@ export function AssetManagementTable({
       },
       {
         accessorKey: "criticality",
-        header: "Criticality",
+        header: ({ column }) => <SortableColumnHeader column={column} title="Criticality" />,
         cell: ({ row }) => (
           <Select
             value={row.original.criticality}
@@ -490,7 +493,7 @@ export function AssetManagementTable({
       },
       {
         accessorKey: "vulnerabilityCount",
-        header: "Vulnerabilities",
+        header: ({ column }) => <SortableColumnHeader column={column} title="Vulnerabilities" />,
         cell: ({ row }) => (
           <span className="text-sm font-medium">
             {row.original.vulnerabilityCount}
@@ -500,6 +503,7 @@ export function AssetManagementTable({
       {
         id: "actions",
         header: () => <div className="text-right">Actions</div>,
+        enableSorting: false,
         cell: ({ row }) => (
           <div className="text-right">
             <Button

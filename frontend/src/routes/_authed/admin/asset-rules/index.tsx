@@ -11,6 +11,7 @@ import {
 } from "@/api/asset-rules.functions";
 import type { AssetRule } from "@/api/asset-rules.schemas";
 import { Button } from "@/components/ui/button";
+import { SortableColumnHeader } from "@/components/ui/sortable-column-header";
 import { DataTable } from "@/components/ui/data-table";
 import { DataTableWorkbench } from "@/components/ui/data-table-workbench";
 import { PaginationControls } from "@/components/ui/pagination-controls";
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/_authed/admin/asset-rules/")({
 const columns: ColumnDef<AssetRule>[] = [
   {
     accessorKey: "priority",
-    header: "#",
+    header: ({ column }) => <SortableColumnHeader column={column} title="#" />,
     size: 50,
     cell: ({ row }) => (
       <span className="font-mono text-xs text-muted-foreground">
@@ -46,7 +47,7 @@ const columns: ColumnDef<AssetRule>[] = [
   },
   {
     accessorKey: "name",
-    header: "Name",
+    header: ({ column }) => <SortableColumnHeader column={column} title="Name" />,
     cell: ({ row }) => (
       <Link
         to="/admin/asset-rules/$id"
@@ -59,7 +60,7 @@ const columns: ColumnDef<AssetRule>[] = [
   },
   {
     accessorKey: "description",
-    header: "Description",
+    header: ({ column }) => <SortableColumnHeader column={column} title="Description" />,
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground">
         {row.original.description ?? "-"}
@@ -68,7 +69,7 @@ const columns: ColumnDef<AssetRule>[] = [
   },
   {
     accessorKey: "enabled",
-    header: "Status",
+    header: ({ column }) => <SortableColumnHeader column={column} title="Status" />,
     size: 90,
     cell: ({ row }) => (
       <Badge variant={row.original.enabled ? "default" : "secondary"}>
@@ -78,7 +79,7 @@ const columns: ColumnDef<AssetRule>[] = [
   },
   {
     accessorKey: "lastMatchCount",
-    header: "Last Match",
+    header: ({ column }) => <SortableColumnHeader column={column} title="Last Match" />,
     size: 100,
     cell: ({ row }) => (
       <span className="text-sm">
@@ -90,7 +91,7 @@ const columns: ColumnDef<AssetRule>[] = [
   },
   {
     accessorKey: "lastExecutedAt",
-    header: "Last Run",
+    header: ({ column }) => <SortableColumnHeader column={column} title="Last Run" />,
     size: 150,
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground">
@@ -168,6 +169,7 @@ function AssetRulesPage() {
 
   const actionsColumn: ColumnDef<AssetRule> = {
     id: "actions",
+    enableSorting: false,
     size: 120,
     cell: ({ row }) => (
       <div className="flex items-center gap-1">
