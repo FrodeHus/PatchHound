@@ -321,7 +321,7 @@ export function AssetDetailPane({
               ) : (
                 <section className="rounded-xl border border-border/60 bg-background p-3">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <ShieldCheckIcon className="size-4 text-emerald-600" />
+                    <ShieldCheckIcon className="size-4 text-tone-success-foreground" />
                     No vulnerabilities linked to this asset.
                   </div>
                 </section>

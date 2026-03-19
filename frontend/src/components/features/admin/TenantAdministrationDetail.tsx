@@ -171,7 +171,7 @@ export function TenantAdministrationDetail({
                 Open sources administration
               </Link>
             </InsetPanel>
-            {saveState === 'saved' ? <p className="text-sm text-emerald-300">Tenant configuration saved.</p> : null}
+            {saveState === 'saved' ? <p className="text-sm text-tone-success-foreground">Tenant configuration saved.</p> : null}
             {saveState === 'error' ? <p className="text-sm text-destructive">Save failed. Try again.</p> : null}
           </CardContent>
         </Card>

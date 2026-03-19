@@ -131,7 +131,7 @@ export function GlobalEnrichmentSourceManagement({
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                {saveState === 'saved' ? <p className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-emerald-300">Configuration saved</p> : null}
+                {saveState === 'saved' ? <p className="rounded-full border border-tone-success-border bg-tone-success px-3 py-1 text-tone-success-foreground">Configuration saved</p> : null}
                 {saveState === 'error' ? <p className="rounded-full border border-destructive/25 bg-destructive/10 px-3 py-1 text-destructive">Save failed</p> : null}
               </div>
             </div>
@@ -333,7 +333,7 @@ function QueueMetric({
     <div
       className={cn(
         'rounded-2xl border px-4 py-3',
-        tone === 'warning' && 'border-amber-400/25 bg-amber-400/10',
+        tone === 'warning' && 'border-tone-warning-border bg-tone-warning',
         tone === 'error' && 'border-destructive/25 bg-destructive/10',
         tone === 'info' && 'border-primary/20 bg-primary/10',
         tone === 'neutral' && 'border-border/70 bg-background/35',
@@ -428,10 +428,10 @@ function getProviderStatusBadgeClassName(source: EnrichmentSource) {
   }
 
   if (!source.credentials.hasSecret || source.runtime.lastError) {
-    return 'rounded-full border border-amber-400/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/10'
+    return 'rounded-full border border-tone-warning-border bg-tone-warning text-tone-warning-foreground hover:bg-tone-warning'
   }
 
-  return 'rounded-full border border-emerald-400/25 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/10'
+  return 'rounded-full border border-tone-success-border bg-tone-success text-tone-success-foreground hover:bg-tone-success'
 }
 
 function StatusBadge({
@@ -445,8 +445,8 @@ function StatusBadge({
     <span
       className={cn(
         'rounded-full border px-3 py-1 text-xs',
-        tone === 'success' && 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300',
-        tone === 'warning' && 'border-amber-400/25 bg-amber-400/10 text-amber-300',
+        tone === 'success' && 'border-tone-success-border bg-tone-success text-tone-success-foreground',
+        tone === 'warning' && 'border-tone-warning-border bg-tone-warning text-tone-warning-foreground',
         tone === 'error' && 'border-destructive/25 bg-destructive/10 text-destructive',
         tone === 'neutral' && 'border-border/70 bg-background/60 text-muted-foreground',
       )}

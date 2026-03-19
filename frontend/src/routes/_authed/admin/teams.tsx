@@ -158,7 +158,7 @@ function TeamsPage() {
         }}
       />
       {createState === 'success' ? (
-        <p className="text-sm text-emerald-300">Assignment group created.</p>
+        <p className="text-sm text-tone-success-foreground">Assignment group created.</p>
       ) : null}
       {createState === 'error' ? (
         <p className="text-sm text-destructive">Failed to create assignment group.</p>

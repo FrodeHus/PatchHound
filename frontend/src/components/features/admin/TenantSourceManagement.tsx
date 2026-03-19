@@ -727,7 +727,7 @@ function StatusPill({
       className={cn(
         'rounded-full border px-3 py-1',
         tone === 'success'
-          ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300'
+          ? 'border-tone-success-border bg-tone-success text-tone-success-foreground'
           : 'border-destructive/25 bg-destructive/10 text-destructive',
       )}
     >
@@ -747,8 +747,8 @@ function StatusBadge({
     <span
       className={cn(
         'rounded-full border px-3 py-1 text-xs',
-        tone === 'success' && 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300',
-        tone === 'warning' && 'border-amber-400/25 bg-amber-400/10 text-amber-300',
+        tone === 'success' && 'border-tone-success-border bg-tone-success text-tone-success-foreground',
+        tone === 'warning' && 'border-tone-warning-border bg-tone-warning text-tone-warning-foreground',
         tone === 'error' && 'border-destructive/25 bg-destructive/10 text-destructive',
         tone === 'neutral' && 'border-border/70 bg-background/60 text-muted-foreground',
       )}

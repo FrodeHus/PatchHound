@@ -137,8 +137,8 @@ export function TopNav({
             <div
               className={
                 user.systemStatus?.openBaoSealed
-                  ? "hidden items-center gap-1.5 rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-0.5 text-[11px] text-amber-200 sm:flex"
-                  : "hidden items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-0.5 text-[11px] text-emerald-200 sm:flex"
+                  ? "hidden items-center gap-1.5 rounded-full border border-tone-warning-border bg-tone-warning px-2.5 py-0.5 text-[11px] text-tone-warning-foreground sm:flex"
+                  : "hidden items-center gap-1.5 rounded-full border border-tone-success-border bg-tone-success px-2.5 py-0.5 text-[11px] text-tone-success-foreground sm:flex"
               }
             >
               {user.systemStatus?.openBaoSealed ? (
@@ -158,9 +158,9 @@ export function TopNav({
                       type="button"
                       className={[
                         "hidden items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors sm:inline-flex",
-                        "border-amber-400/25 bg-amber-400/10 text-amber-200",
+                        "border-tone-warning-border bg-tone-warning text-tone-warning-foreground",
                         canUnsealOpenBao
-                          ? "cursor-pointer hover:bg-amber-400/15"
+                          ? "cursor-pointer hover:brightness-95"
                           : "cursor-default",
                       ].join(" ")}
                       onClick={() => {

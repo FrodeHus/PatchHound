@@ -98,7 +98,7 @@ function formatTimestamp(value: string) {
 function actionBadgeClassName(action: string) {
   switch (action) {
     case 'Created':
-      return 'rounded-full border border-emerald-400/25 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/10'
+      return 'rounded-full border border-tone-success-border bg-tone-success text-tone-success-foreground hover:bg-tone-success'
     case 'Updated':
       return 'rounded-full border border-primary/20 bg-primary/10 text-primary hover:bg-primary/10'
     case 'Deleted':

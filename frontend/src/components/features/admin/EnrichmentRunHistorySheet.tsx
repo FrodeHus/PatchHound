@@ -125,8 +125,8 @@ function SummaryCard({
     <div
       className={cn(
         'rounded-[22px] border px-4 py-3',
-        tone === 'success' && 'border-emerald-400/25 bg-emerald-400/10',
-        tone === 'warning' && 'border-amber-400/25 bg-amber-400/10',
+        tone === 'success' && 'border-tone-success-border bg-tone-success',
+        tone === 'warning' && 'border-tone-warning-border bg-tone-warning',
         tone === 'error' && 'border-destructive/25 bg-destructive/10',
         tone === 'neutral' && 'border-border/70 bg-background/35',
       )}
@@ -146,8 +146,8 @@ function RunHistoryCard({ run }: { run: EnrichmentRun }) {
             variant="outline"
             className={cn(
               'rounded-full',
-              run.status.toLowerCase() === 'succeeded' && 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300',
-              run.status.toLowerCase() === 'running' && 'border-amber-400/25 bg-amber-400/10 text-amber-300',
+              run.status.toLowerCase() === 'succeeded' && 'border-tone-success-border bg-tone-success text-tone-success-foreground',
+              run.status.toLowerCase() === 'running' && 'border-tone-warning-border bg-tone-warning text-tone-warning-foreground',
               run.status.toLowerCase() === 'failed' && 'border-destructive/25 bg-destructive/10 text-destructive',
               run.status.toLowerCase() === 'nowork' && 'border-border/70 bg-background/70 text-muted-foreground',
             )}
