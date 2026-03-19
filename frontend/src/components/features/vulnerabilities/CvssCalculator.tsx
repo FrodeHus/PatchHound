@@ -88,6 +88,9 @@ export function CvssWorkbenchTrigger({
   const severity = cvssSeverity(vendorScore)
   const tone = severityTone(vendorScore)
   const vendorPresentation = buildMetricPresentation(metrics)
+  const environmental = securityProfile
+    ? calculateCvssEnvironmentalScore(metrics, securityProfile)
+    : null
 
   return (
     <Dialog>
@@ -95,11 +98,28 @@ export function CvssWorkbenchTrigger({
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <ScoreRing score={vendorScore} tone={tone} />
+            {environmental ? (
+              <>
+                <span className="text-muted-foreground">&rarr;</span>
+                <ScoreRing score={environmental.score} tone={severityTone(environmental.score)} />
+              </>
+            ) : null}
             <div>
-              <p className="text-sm font-medium">{severity}</p>
-              <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                {vector ?? buildCvssVector(metrics)}
-              </p>
+              {environmental ? (
+                <>
+                  <p className="text-sm font-medium">{environmental.severity}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {vendorScore.toFixed(1)} vendor &rarr; {environmental.score.toFixed(1)} environmental
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium">{severity}</p>
+                  <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                    {vector ?? buildCvssVector(metrics)}
+                  </p>
+                </>
+              )}
             </div>
           </div>
           <DialogTrigger
