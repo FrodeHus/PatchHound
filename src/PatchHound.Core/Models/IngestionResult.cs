@@ -58,7 +58,8 @@ public record IngestionAsset(
     string? DeviceExposureLevel = null,
     bool? DeviceIsAadJoined = null,
     List<string>? MachineTags = null,
-    string? DeviceOnboardingStatus = null
+    string? DeviceOnboardingStatus = null,
+    string? DeviceValue = null
 );
 
 public record IngestionDeviceSoftwareLink(

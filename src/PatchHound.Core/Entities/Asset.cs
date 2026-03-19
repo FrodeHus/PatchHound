@@ -29,6 +29,7 @@ public class Asset
     public string? DeviceExposureLevel { get; private set; }
     public bool? DeviceIsAadJoined { get; private set; }
     public string? DeviceOnboardingStatus { get; private set; }
+    public string? DeviceValue { get; private set; }
     public string Metadata { get; private set; } = "{}";
 
     private Asset() { }
@@ -103,7 +104,8 @@ public class Asset
         string? groupName = null,
         string? exposureLevel = null,
         bool? isAadJoined = null,
-        string? onboardingStatus = null
+        string? onboardingStatus = null,
+        string? deviceValue = null
     )
     {
         DeviceComputerDnsName = computerDnsName;
@@ -119,5 +121,6 @@ public class Asset
         DeviceExposureLevel = exposureLevel;
         DeviceIsAadJoined = isAadJoined;
         DeviceOnboardingStatus = onboardingStatus;
+        DeviceValue = deviceValue;
     }
 }

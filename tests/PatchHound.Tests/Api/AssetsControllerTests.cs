@@ -43,16 +43,16 @@ public class AssetsControllerTests : IDisposable
             new AssetRepository(_dbContext),
             Substitute.For<IUnitOfWork>()
         );
+        var snapshotResolver = new TenantSnapshotResolver(_dbContext);
         var assessmentService = new VulnerabilityAssessmentService(
             _dbContext,
-            new EnvironmentalSeverityCalculator()
+            new EnvironmentalSeverityCalculator(),
+            snapshotResolver
         );
         var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
             _dbContext,
             new NormalizedSoftwareResolver(_dbContext)
         );
-
-        var snapshotResolver = new TenantSnapshotResolver(_dbContext);
         var aliasResolver = new PatchHound.Api.Services.TenantSoftwareAliasResolver(_dbContext);
         var detailQueryService = new PatchHound.Api.Services.AssetDetailQueryService(
             _dbContext,

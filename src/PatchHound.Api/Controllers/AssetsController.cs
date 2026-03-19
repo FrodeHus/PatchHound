@@ -170,6 +170,7 @@ public class AssetsController : ControllerBase
                 a.DeviceRiskScore,
                 a.DeviceExposureLevel,
                 a.DeviceOnboardingStatus,
+                a.DeviceValue,
             })
             .ToListAsync(ct);
 
@@ -200,7 +201,8 @@ public class AssetsController : ControllerBase
                 a.DeviceRiskScore,
                 a.DeviceExposureLevel,
                 assetTagsByAssetId.TryGetValue(a.Id, out var tags) ? tags : Array.Empty<string>(),
-                a.DeviceOnboardingStatus
+                a.DeviceOnboardingStatus,
+                a.DeviceValue
             ))
             .ToList();
 

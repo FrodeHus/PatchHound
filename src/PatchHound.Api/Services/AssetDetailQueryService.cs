@@ -365,6 +365,7 @@ public class AssetDetailQueryService(
             asset.DeviceExposureLevel,
             asset.DeviceIsAadJoined,
             asset.DeviceOnboardingStatus,
+            asset.DeviceValue,
             tags,
             asset.AssetType == AssetType.Software
                 && normalizedSoftwareIdsByExternalId.TryGetValue(asset.ExternalId, out var assetNormalizedSoftwareId)

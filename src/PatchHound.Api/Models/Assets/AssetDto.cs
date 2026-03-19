@@ -17,7 +17,8 @@ public record AssetDto(
     string? RiskScore,
     string? ExposureLevel,
     string[] Tags,
-    string? OnboardingStatus
+    string? OnboardingStatus,
+    string? DeviceValue
 );
 
 public record AssetDetailDto(
@@ -46,6 +47,7 @@ public record AssetDetailDto(
     string? DeviceExposureLevel,
     bool? DeviceIsAadJoined,
     string? DeviceOnboardingStatus,
+    string? DeviceValue,
     string[] Tags,
     SoftwareCpeBindingDto? SoftwareCpeBinding,
     string Metadata,

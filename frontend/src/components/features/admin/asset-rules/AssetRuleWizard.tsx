@@ -108,10 +108,10 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
             type="button"
             className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
               i === step
-                ? 'border-primary/40 bg-primary/10 text-primary'
+                ? "border-primary/40 bg-primary/10 text-primary"
                 : i < step
-                  ? 'border-border/50 bg-muted/50 text-muted-foreground'
-                  : 'border-border/30 text-muted-foreground/50'
+                  ? "border-border/50 bg-muted/50 text-muted-foreground"
+                  : "border-border/30 text-muted-foreground/50"
             }`}
             onClick={() => i < step && setStep(i)}
             disabled={i > step}
@@ -132,7 +132,9 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Rule name</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                Rule name
+              </label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -141,7 +143,9 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
               />
             </div>
             <div className="grid gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Description (optional)</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                Description (optional)
+              </label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -159,7 +163,8 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
           <CardHeader>
             <CardTitle>Filter Conditions</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Define which assets this rule applies to. Use groups to combine conditions with AND/OR logic.
+              Define which assets this rule applies to. Use groups to combine
+              conditions with AND/OR logic.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -185,13 +190,20 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
                 {preview && (
                   <InsetPanel className="space-y-2 px-4 py-3">
                     <p className="text-sm font-medium">
-                      {preview.count} asset{preview.count !== 1 ? 's' : ''} match
+                      {preview.count} asset{preview.count !== 1 ? "s" : ""}{" "}
+                      match
                     </p>
                     {preview.samples.length > 0 && (
                       <div className="space-y-1">
                         {preview.samples.map((s) => (
-                          <div key={s.id} className="flex items-center gap-2 text-xs">
-                            <Badge variant="outline" className="font-mono text-[10px]">
+                          <div
+                            key={s.id}
+                            className="flex items-center gap-2 text-xs"
+                          >
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-[10px]"
+                            >
                               {s.assetType}
                             </Badge>
                             <span>{s.name}</span>
@@ -225,7 +237,10 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
               type="AssignSecurityProfile"
               label="Assign Security Profile"
               description="Set the security profile on matching assets for environmental CVSS scoring."
-              options={securityProfiles.map((p) => ({ value: p.id, label: p.name }))}
+              options={securityProfiles.map((p) => ({
+                value: p.id,
+                label: p.name,
+              }))}
               paramKey="securityProfileId"
               operations={operations}
               onChange={setOperations}
@@ -247,32 +262,47 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
         <Card className="rounded-2xl border-border/70">
           <CardHeader>
             <CardTitle>Summary</CardTitle>
-            <p className="text-sm text-muted-foreground">Review your rule before saving.</p>
+            <p className="text-sm text-muted-foreground">
+              Review your rule before saving.
+            </p>
           </CardHeader>
           <CardContent className="space-y-4">
             <InsetPanel className="space-y-2 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Name</p>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Name
+              </p>
               <p className="text-sm font-medium">{name}</p>
-              {description && <p className="text-sm text-muted-foreground">{description}</p>}
+              {description && (
+                <p className="text-sm text-muted-foreground">{description}</p>
+              )}
             </InsetPanel>
 
             <InsetPanel className="space-y-2 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Filter</p>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Filter
+              </p>
               <FilterSummary group={filter} />
             </InsetPanel>
 
             <InsetPanel className="space-y-2 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Operations</p>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Operations
+              </p>
               <div className="space-y-1">
                 {operations.map((op, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm">
                     <Badge variant="outline" className="text-[10px]">
-                      {op.type === 'AssignSecurityProfile' ? 'Security Profile' : 'Team'}
+                      {op.type === "AssignSecurityProfile"
+                        ? "Security Profile"
+                        : "Team"}
                     </Badge>
                     <span>
-                      {op.type === 'AssignSecurityProfile'
-                        ? securityProfiles.find((p) => p.id === op.parameters.securityProfileId)?.name ?? op.parameters.securityProfileId
-                        : teams.find((t) => t.id === op.parameters.teamId)?.name ?? op.parameters.teamId}
+                      {op.type === "AssignSecurityProfile"
+                        ? (securityProfiles.find(
+                            (p) => p.id === op.parameters.securityProfileId,
+                          )?.name ?? op.parameters.securityProfileId)
+                        : (teams.find((t) => t.id === op.parameters.teamId)
+                            ?.name ?? op.parameters.teamId)}
                     </span>
                   </div>
                 ))}
@@ -280,7 +310,9 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
             </InsetPanel>
 
             {saveMutation.isError && (
-              <p className="text-sm text-destructive">Failed to save rule. Please try again.</p>
+              <p className="text-sm text-destructive">
+                Failed to save rule. Please try again.
+              </p>
             )}
           </CardContent>
         </Card>
@@ -288,15 +320,30 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
 
       {/* Navigation */}
       <div className="flex items-center justify-between">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={step === 0}
-          onClick={() => setStep((s) => s - 1)}
-        >
-          <ArrowLeft className="size-3.5" />
-          Back
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={step === 0}
+            onClick={() => setStep((s) => s - 1)}
+          >
+            <ArrowLeft className="size-3.5" />
+            Back
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-muted-foreground"
+            onClick={() =>
+              router.navigate({
+                to: "/admin/asset-rules",
+                search: { page: 1, pageSize: 25 },
+              })
+            }
+          >
+            Cancel
+          </Button>
+        </div>
         {step < 3 ? (
           <Button
             type="button"
@@ -312,13 +359,15 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
             onClick={() => saveMutation.mutate()}
             disabled={saveMutation.isPending}
           >
-            {saveMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
-            {mode === 'create' ? 'Create rule' : 'Save changes'}
+            {saveMutation.isPending && (
+              <Loader2 className="size-3.5 animate-spin" />
+            )}
+            {mode === "create" ? "Create rule" : "Save changes"}
           </Button>
         )}
       </div>
     </section>
-  )
+  );
 }
 
 function OperationEditor({
