@@ -171,19 +171,43 @@ export function DeviceSection({
   metadata: MetadataRecord
 }) {
   const normalizedFields = [
-    { label: 'Machine Name', value: asset.deviceComputerDnsName ?? asset.name ?? 'Unknown' },
-    { label: 'Health Status', value: asset.deviceHealthStatus ?? 'Unknown' },
-    { label: 'OS Platform', value: asset.deviceOsPlatform ?? 'Unknown' },
-    { label: 'OS Version', value: asset.deviceOsVersion ?? 'Unknown' },
-    { label: 'Risk Score', value: asset.deviceRiskScore ?? 'Unknown' },
-    { label: 'Last Seen', value: asset.deviceLastSeenAt ? formatDateTime(asset.deviceLastSeenAt) : 'Unknown' },
-    { label: 'Last IP Address', value: asset.deviceLastIpAddress ?? 'Unknown' },
-    { label: 'Device Group', value: asset.deviceGroupName ?? 'Unknown' },
-    { label: 'Exposure Level', value: asset.deviceExposureLevel ?? 'Unknown' },
-    { label: 'AAD Joined', value: asset.deviceIsAadJoined === true ? 'Yes' : asset.deviceIsAadJoined === false ? 'No' : 'Unknown' },
-    { label: 'Onboarding Status', value: asset.deviceOnboardingStatus ?? 'Unknown' },
-    { label: 'Entra Device ID', value: asset.deviceAadDeviceId ?? 'Unknown', mono: true },
-  ]
+    {
+      label: "Machine Name",
+      value: asset.deviceComputerDnsName ?? asset.name ?? "Unknown",
+    },
+    { label: "Health Status", value: asset.deviceHealthStatus ?? "Unknown" },
+    { label: "OS Platform", value: asset.deviceOsPlatform ?? "Unknown" },
+    { label: "OS Version", value: asset.deviceOsVersion ?? "Unknown" },
+    { label: "Risk Score", value: asset.deviceRiskScore ?? "Unknown" },
+    {
+      label: "Last Seen",
+      value: asset.deviceLastSeenAt
+        ? formatDateTime(asset.deviceLastSeenAt)
+        : "Unknown",
+    },
+    { label: "Last IP Address", value: asset.deviceLastIpAddress ?? "Unknown" },
+    { label: "Device Group", value: asset.deviceGroupName ?? "Unknown" },
+    { label: "Exposure Level", value: asset.deviceExposureLevel ?? "Unknown" },
+    {
+      label: "AAD Joined",
+      value:
+        asset.deviceIsAadJoined === true
+          ? "Yes"
+          : asset.deviceIsAadJoined === false
+            ? "No"
+            : "Unknown",
+    },
+    {
+      label: "Onboarding Status",
+      value: asset.deviceOnboardingStatus ?? "Unknown",
+    },
+    { label: "Device Value", value: asset.deviceValue ?? "Unknown" },
+    {
+      label: "Entra Device ID",
+      value: asset.deviceAadDeviceId ?? "Unknown",
+      mono: true,
+    },
+  ];
 
   return (
     <section className="rounded-2xl border border-border/70 bg-card p-4">

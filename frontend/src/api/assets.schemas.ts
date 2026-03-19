@@ -19,7 +19,8 @@ export const assetSchema = z.object({
   exposureLevel: z.string().nullable(),
   tags: z.array(z.string()),
   onboardingStatus: z.string().nullable(),
-})
+  deviceValue: z.string().nullable(),
+});
 
 export const assetVulnerabilitySchema = z.object({
   vulnerabilityId: z.string().uuid(),
@@ -59,15 +60,17 @@ export const assetDetailSchema = z.object({
   ownerUserId: z.string().uuid().nullable(),
   ownerTeamId: z.string().uuid().nullable(),
   fallbackTeamId: z.string().uuid().nullable(),
-  securityProfile: z.object({
-    id: z.string().uuid(),
-    name: z.string(),
-    environmentClass: z.string(),
-    internetReachability: z.string(),
-    confidentialityRequirement: z.string(),
-    integrityRequirement: z.string(),
-    availabilityRequirement: z.string(),
-  }).nullable(),
+  securityProfile: z
+    .object({
+      id: z.string().uuid(),
+      name: z.string(),
+      environmentClass: z.string(),
+      internetReachability: z.string(),
+      confidentialityRequirement: z.string(),
+      integrityRequirement: z.string(),
+      availabilityRequirement: z.string(),
+    })
+    .nullable(),
   deviceComputerDnsName: z.string().nullable(),
   deviceHealthStatus: z.string().nullable(),
   deviceOsPlatform: z.string().nullable(),
@@ -81,26 +84,10 @@ export const assetDetailSchema = z.object({
   deviceExposureLevel: z.string().nullable(),
   deviceIsAadJoined: z.boolean().nullable(),
   deviceOnboardingStatus: z.string().nullable(),
+  deviceValue: z.string().nullable(),
   tags: z.array(z.string()),
-  softwareCpeBinding: z.object({
-    id: z.string().uuid(),
-    cpe23Uri: z.string(),
-    bindingMethod: z.string(),
-    confidence: z.string(),
-    matchedVendor: z.string().nullable(),
-    matchedProduct: z.string().nullable(),
-    matchedVersion: z.string().nullable(),
-    lastValidatedAt: z.string(),
-  }).nullable(),
-  metadata: z.string(),
-  vulnerabilities: z.array(assetVulnerabilitySchema),
-  softwareInventory: z.array(z.object({
-    softwareAssetId: z.string().uuid(),
-    tenantSoftwareId: z.string().uuid().nullable(),
-    name: z.string(),
-    externalId: z.string(),
-    lastSeenAt: z.string(),
-    cpeBinding: z.object({
+  softwareCpeBinding: z
+    .object({
       id: z.string().uuid(),
       cpe23Uri: z.string(),
       bindingMethod: z.string(),
@@ -109,30 +96,57 @@ export const assetDetailSchema = z.object({
       matchedProduct: z.string().nullable(),
       matchedVersion: z.string().nullable(),
       lastValidatedAt: z.string(),
-    }).nullable(),
-    episodeCount: z.number(),
-    episodes: z.array(z.object({
-      episodeNumber: z.number(),
+    })
+    .nullable(),
+  metadata: z.string(),
+  vulnerabilities: z.array(assetVulnerabilitySchema),
+  softwareInventory: z.array(
+    z.object({
+      softwareAssetId: z.string().uuid(),
+      tenantSoftwareId: z.string().uuid().nullable(),
+      name: z.string(),
+      externalId: z.string(),
+      lastSeenAt: z.string(),
+      cpeBinding: z
+        .object({
+          id: z.string().uuid(),
+          cpe23Uri: z.string(),
+          bindingMethod: z.string(),
+          confidence: z.string(),
+          matchedVendor: z.string().nullable(),
+          matchedProduct: z.string().nullable(),
+          matchedVersion: z.string().nullable(),
+          lastValidatedAt: z.string(),
+        })
+        .nullable(),
+      episodeCount: z.number(),
+      episodes: z.array(
+        z.object({
+          episodeNumber: z.number(),
+          firstSeenAt: z.string(),
+          lastSeenAt: z.string(),
+          removedAt: z.string().nullable(),
+        }),
+      ),
+    }),
+  ),
+  knownSoftwareVulnerabilities: z.array(
+    z.object({
+      vulnerabilityId: z.string().uuid(),
+      externalId: z.string(),
+      title: z.string(),
+      vendorSeverity: z.string(),
+      cvssScore: z.number().nullable(),
+      cvssVector: z.string().nullable(),
+      matchMethod: z.string(),
+      confidence: z.string(),
+      evidence: z.string(),
       firstSeenAt: z.string(),
       lastSeenAt: z.string(),
-      removedAt: z.string().nullable(),
-    })),
-  })),
-  knownSoftwareVulnerabilities: z.array(z.object({
-    vulnerabilityId: z.string().uuid(),
-    externalId: z.string(),
-    title: z.string(),
-    vendorSeverity: z.string(),
-    cvssScore: z.number().nullable(),
-    cvssVector: z.string().nullable(),
-    matchMethod: z.string(),
-    confidence: z.string(),
-    evidence: z.string(),
-    firstSeenAt: z.string(),
-    lastSeenAt: z.string(),
-    resolvedAt: z.string().nullable(),
-  })),
-})
+      resolvedAt: z.string().nullable(),
+    }),
+  ),
+});
 
 export const pagedAssetsSchema = pagedResponseMetaSchema.extend({
   items: z.array(assetSchema),

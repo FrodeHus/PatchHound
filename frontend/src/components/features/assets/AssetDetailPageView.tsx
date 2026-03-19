@@ -1,6 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Link, useRouter } from '@tanstack/react-router'
-import { ArrowLeftIcon } from 'lucide-react'
+import { Link } from "@tanstack/react-router";
 import type { AssetDetail } from '@/api/assets.schemas'
 import { formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
@@ -21,39 +20,37 @@ export function AssetDetailPageView({
   isAssigningSecurityProfile,
   onAssignSecurityProfile,
 }: AssetDetailPageViewProps) {
-  const router = useRouter()
-  const [activeTab, setActiveTab] = useState<DetailTab>('overview')
-  const metadata = useMemo(() => parseMetadata(asset.metadata), [asset.metadata])
-  const timelineItems = useMemo(() => buildTimelineItems(asset), [asset])
+  const [activeTab, setActiveTab] = useState<DetailTab>("overview");
+  const metadata = useMemo(
+    () => parseMetadata(asset.metadata),
+    [asset.metadata],
+  );
+  const timelineItems = useMemo(() => buildTimelineItems(asset), [asset]);
 
   return (
     <section className="space-y-5">
       <header className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => router.history.back()}
-              className="flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
-            >
-              <ArrowLeftIcon className="size-3.5" />
-              Back
-            </button>
             <div className="flex flex-wrap gap-2">
               <Pill>{asset.assetType}</Pill>
               <Pill>{asset.criticality} criticality</Pill>
-              {asset.securityProfile ? <Pill>{asset.securityProfile.name}</Pill> : null}
+              {asset.securityProfile ? (
+                <Pill>{asset.securityProfile.name}</Pill>
+              ) : null}
             </div>
             <div>
-              <h1 className="text-3xl font-semibold tracking-[-0.04em]">{asset.name}</h1>
+              <h1 className="text-3xl font-semibold tracking-[-0.04em]">
+                {asset.name}
+              </h1>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 {asset.description ?? getDefaultDescription(asset.assetType)}
               </p>
-              {asset.assetType === 'Software' && asset.tenantSoftwareId ? (
+              {asset.assetType === "Software" && asset.tenantSoftwareId ? (
                 <Link
                   to="/software/$id"
                   params={{ id: asset.tenantSoftwareId }}
-                  search={{ page: 1, pageSize: 25, version: '' }}
+                  search={{ page: 1, pageSize: 25, version: "" }}
                   className="mt-3 inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
                 >
                   Open software workspace
@@ -62,7 +59,9 @@ export function AssetDetailPageView({
             </div>
           </div>
           <div className="rounded-2xl border border-border/70 bg-background/45 p-4 text-right">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">External ID</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              External ID
+            </p>
             <code className="mt-1 block text-xs">{asset.externalId}</code>
           </div>
         </div>
@@ -71,13 +70,29 @@ export function AssetDetailPageView({
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <section className="rounded-[28px] border border-border/70 bg-card p-4">
           <div className="mb-4 flex flex-wrap gap-2">
-            <TabButton label="Overview" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
-            <TabButton label="Vulnerabilities" active={activeTab === 'vulnerabilities'} onClick={() => setActiveTab('vulnerabilities')} />
-            <TabButton label="Software Inventory" active={activeTab === 'software'} onClick={() => setActiveTab('software')} />
-            <TabButton label="Activity Timeline" active={activeTab === 'timeline'} onClick={() => setActiveTab('timeline')} />
+            <TabButton
+              label="Overview"
+              active={activeTab === "overview"}
+              onClick={() => setActiveTab("overview")}
+            />
+            <TabButton
+              label="Vulnerabilities"
+              active={activeTab === "vulnerabilities"}
+              onClick={() => setActiveTab("vulnerabilities")}
+            />
+            <TabButton
+              label="Software Inventory"
+              active={activeTab === "software"}
+              onClick={() => setActiveTab("software")}
+            />
+            <TabButton
+              label="Activity Timeline"
+              active={activeTab === "timeline"}
+              onClick={() => setActiveTab("timeline")}
+            />
           </div>
 
-          {activeTab === 'overview' ? (
+          {activeTab === "overview" ? (
             <div className="space-y-5">
               <SecurityProfilePanel
                 asset={asset}
@@ -86,39 +101,103 @@ export function AssetDetailPageView({
                 onAssignSecurityProfile={onAssignSecurityProfile}
               />
               <section className="grid gap-3 md:grid-cols-2">
-                {asset.ownerType === 'Team' ? (
-                  <MetricCard label="Assignment Group" value={asset.ownerTeamId ?? 'Unassigned'} mono />
+                {asset.ownerType === "Team" ? (
+                  <MetricCard
+                    label="Assignment Group"
+                    value={asset.ownerTeamId ?? "Unassigned"}
+                    mono
+                  />
                 ) : (
-                  <MetricCard label="Owner User" value={asset.ownerUserId ?? 'Unassigned'} mono />
+                  <MetricCard
+                    label="Owner User"
+                    value={asset.ownerUserId ?? "Unassigned"}
+                    mono
+                  />
                 )}
-                <MetricCard label="Fallback Assignment Group" value={asset.fallbackTeamId ?? 'None'} mono />
+                <MetricCard
+                  label="Fallback Assignment Group"
+                  value={asset.fallbackTeamId ?? "None"}
+                  mono
+                />
               </section>
-              {asset.assetType === 'Device' ? (
+              {asset.assetType === "Device" ? (
                 <section className="rounded-2xl border border-border/70 bg-background p-4">
-                  <SectionHeader title="Device context" description="Normalized telemetry and identification fields captured for this endpoint." />
+                  <SectionHeader
+                    title="Device context"
+                    description="Normalized telemetry and identification fields captured for this endpoint."
+                  />
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <MetricCard label="Machine Name" value={asset.deviceComputerDnsName ?? asset.name ?? 'Unknown'} />
-                    <MetricCard label="Health Status" value={asset.deviceHealthStatus ?? 'Unknown'} />
-                    <MetricCard label="OS Platform" value={asset.deviceOsPlatform ?? 'Unknown'} />
-                    <MetricCard label="OS Version" value={asset.deviceOsVersion ?? 'Unknown'} />
-                    <MetricCard label="Risk Score" value={asset.deviceRiskScore ?? 'Unknown'} />
-                    <MetricCard label="Last Seen" value={asset.deviceLastSeenAt ? new Date(asset.deviceLastSeenAt).toLocaleString() : 'Unknown'} />
-                    <MetricCard label="Last IP Address" value={asset.deviceLastIpAddress ?? 'Unknown'} />
-                    <MetricCard label="Device Group" value={asset.deviceGroupName ?? 'Unknown'} />
-                    <MetricCard label="Entra Device ID" value={asset.deviceAadDeviceId ?? 'Unknown'} mono />
+                    <MetricCard
+                      label="Machine Name"
+                      value={
+                        asset.deviceComputerDnsName ?? asset.name ?? "Unknown"
+                      }
+                    />
+                    <MetricCard
+                      label="Health Status"
+                      value={asset.deviceHealthStatus ?? "Unknown"}
+                    />
+                    <MetricCard
+                      label="OS Platform"
+                      value={asset.deviceOsPlatform ?? "Unknown"}
+                    />
+                    <MetricCard
+                      label="OS Version"
+                      value={asset.deviceOsVersion ?? "Unknown"}
+                    />
+                    <MetricCard
+                      label="Risk Score"
+                      value={asset.deviceRiskScore ?? "Unknown"}
+                    />
+                    <MetricCard
+                      label="Last Seen"
+                      value={
+                        asset.deviceLastSeenAt
+                          ? new Date(asset.deviceLastSeenAt).toLocaleString()
+                          : "Unknown"
+                      }
+                    />
+                    <MetricCard
+                      label="Last IP Address"
+                      value={asset.deviceLastIpAddress ?? "Unknown"}
+                    />
+                    <MetricCard
+                      label="Device Group"
+                      value={asset.deviceGroupName ?? "Unknown"}
+                    />
+                    <MetricCard
+                      label="Device Value"
+                      value={asset.deviceValue ?? "Unknown"}
+                    />
+                    <MetricCard
+                      label="Entra Device ID"
+                      value={asset.deviceAadDeviceId ?? "Unknown"}
+                      mono
+                    />
                   </div>
                 </section>
               ) : null}
-              {asset.assetType === 'Software' ? (
+              {asset.assetType === "Software" ? (
                 <section className="rounded-2xl border border-border/70 bg-background p-4">
-                  <SectionHeader title="CPE binding" description="Reusable normalized software identity used for NVD-based software correlation." />
+                  <SectionHeader
+                    title="CPE binding"
+                    description="Reusable normalized software identity used for NVD-based software correlation."
+                  />
                   <div className="mt-4">
-                    <SoftwareCpeBindingPanel binding={asset.softwareCpeBinding} />
+                    <SoftwareCpeBindingPanel
+                      binding={asset.softwareCpeBinding}
+                    />
                   </div>
                   <div className="mt-4">
-                    <SectionHeader title="Known vulnerabilities" description="Derived software-level matches for this software asset." />
+                    <SectionHeader
+                      title="Known vulnerabilities"
+                      description="Derived software-level matches for this software asset."
+                    />
                     {asset.knownSoftwareVulnerabilities.length === 0 ? (
-                      <p className="mt-4 text-sm text-muted-foreground">No known vulnerabilities are currently linked to this software asset.</p>
+                      <p className="mt-4 text-sm text-muted-foreground">
+                        No known vulnerabilities are currently linked to this
+                        software asset.
+                      </p>
                     ) : (
                       <div className="mt-4 space-y-3">
                         {asset.knownSoftwareVulnerabilities.map((item) => (
@@ -133,9 +212,13 @@ export function AssetDetailPageView({
                                 <p className="font-medium">{item.title}</p>
                                 <p className="mt-1 text-xs text-muted-foreground">
                                   {item.externalId} • {item.vendorSeverity}
-                                  {item.cvssScore !== null ? ` • CVSS ${item.cvssScore.toFixed(1)}` : ''}
+                                  {item.cvssScore !== null
+                                    ? ` • CVSS ${item.cvssScore.toFixed(1)}`
+                                    : ""}
                                 </p>
-                                <p className="mt-2 text-xs text-muted-foreground">{item.evidence}</p>
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                  {item.evidence}
+                                </p>
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 <Pill>{item.matchMethod}</Pill>
@@ -150,13 +233,25 @@ export function AssetDetailPageView({
                 </section>
               ) : null}
               <section className="rounded-2xl border border-border/70 bg-background p-4">
-                <SectionHeader title="Stored metadata" description="Residual source-specific metadata that has not been normalized into first-class fields." />
+                <SectionHeader
+                  title="Stored metadata"
+                  description="Residual source-specific metadata that has not been normalized into first-class fields."
+                />
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {Object.keys(metadata).length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No extra metadata is stored for this asset.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No extra metadata is stored for this asset.
+                    </p>
                   ) : (
                     Object.entries(metadata).map(([key, value]) => (
-                      <MetricCard key={key} label={startCase(key)} value={formatUnknownValue(value)} mono={typeof value === 'string' && looksLikeOpaqueId(value)} />
+                      <MetricCard
+                        key={key}
+                        label={startCase(key)}
+                        value={formatUnknownValue(value)}
+                        mono={
+                          typeof value === "string" && looksLikeOpaqueId(value)
+                        }
+                      />
                     ))
                   )}
                 </div>
@@ -164,127 +259,215 @@ export function AssetDetailPageView({
             </div>
           ) : null}
 
-          {activeTab === 'vulnerabilities' ? (
+          {activeTab === "vulnerabilities" ? (
             <section className="space-y-3">
               {asset.vulnerabilities.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No linked vulnerabilities recorded for this asset.</p>
-              ) : asset.vulnerabilities.map((vulnerability) => (
-                <Link
-                  key={vulnerability.vulnerabilityId}
-                  to="/vulnerabilities/$id"
-                  params={{ id: vulnerability.vulnerabilityId }}
-                  className="block rounded-2xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium">{vulnerability.title}</p>
-                        {vulnerability.episodeCount > 1 ? <Pill>Recurred {vulnerability.episodeCount - 1}x</Pill> : null}
+                <p className="text-sm text-muted-foreground">
+                  No linked vulnerabilities recorded for this asset.
+                </p>
+              ) : (
+                asset.vulnerabilities.map((vulnerability) => (
+                  <Link
+                    key={vulnerability.vulnerabilityId}
+                    to="/vulnerabilities/$id"
+                    params={{ id: vulnerability.vulnerabilityId }}
+                    className="block rounded-2xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{vulnerability.title}</p>
+                          {vulnerability.episodeCount > 1 ? (
+                            <Pill>
+                              Recurred {vulnerability.episodeCount - 1}x
+                            </Pill>
+                          ) : null}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {vulnerability.externalId} • {vulnerability.status}
+                        </p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <MetricCard
+                            label="Vendor Severity"
+                            value={
+                              vulnerability.vendorScore
+                                ? `${vulnerability.vendorSeverity} (${vulnerability.vendorScore.toFixed(1)})`
+                                : vulnerability.vendorSeverity
+                            }
+                          />
+                          {asset.securityProfile &&
+                          vulnerability.effectiveSeverity !==
+                            vulnerability.vendorSeverity ? (
+                            <MetricCard
+                              label={`Adjusted Severity (${asset.securityProfile.name})`}
+                              value={
+                                vulnerability.effectiveScore
+                                  ? `${vulnerability.effectiveSeverity} (${vulnerability.effectiveScore.toFixed(1)})`
+                                  : vulnerability.effectiveSeverity
+                              }
+                            />
+                          ) : null}
+                          <MetricCard
+                            label="CVSS Vector"
+                            value={vulnerability.cvssVector ?? "Not available"}
+                            mono
+                          />
+                          <MetricCard
+                            label="Published"
+                            value={
+                              vulnerability.publishedDate
+                                ? new Date(
+                                    vulnerability.publishedDate,
+                                  ).toLocaleDateString()
+                                : "Unknown"
+                            }
+                          />
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {vulnerability.description}
+                        </p>
+                        {vulnerability.assessmentReasonSummary ? (
+                          <p className={`text-xs ${toneText("info")}`}>
+                            {vulnerability.assessmentReasonSummary}
+                          </p>
+                        ) : null}
+                        <div className="flex flex-wrap gap-1">
+                          {vulnerability.episodes.map((episode) => (
+                            <Pill key={episode.episodeNumber}>
+                              #{episode.episodeNumber}{" "}
+                              {episode.status === "Open" ? "open" : "resolved"}
+                            </Pill>
+                          ))}
+                        </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {vulnerability.externalId} • {vulnerability.status}
+                        {new Date(
+                          vulnerability.detectedDate,
+                        ).toLocaleDateString()}
                       </p>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <MetricCard label="Vendor Severity" value={vulnerability.vendorScore ? `${vulnerability.vendorSeverity} (${vulnerability.vendorScore.toFixed(1)})` : vulnerability.vendorSeverity} />
-                        <MetricCard label="CVSS Vector" value={vulnerability.cvssVector ?? 'Not available'} mono />
-                        <MetricCard label="Effective Severity" value={vulnerability.effectiveScore ? `${vulnerability.effectiveSeverity} (${vulnerability.effectiveScore.toFixed(1)})` : vulnerability.effectiveSeverity} />
-                        <MetricCard label="Published" value={vulnerability.publishedDate ? new Date(vulnerability.publishedDate).toLocaleDateString() : 'Unknown'} />
-                      </div>
-                      <p className="text-sm text-muted-foreground">{vulnerability.description}</p>
-                      {vulnerability.assessmentReasonSummary ? (
-                        <p className={`text-xs ${toneText('info')}`}>{vulnerability.assessmentReasonSummary}</p>
-                      ) : null}
-                      <div className="flex flex-wrap gap-1">
-                        {vulnerability.episodes.map((episode) => (
-                          <Pill key={episode.episodeNumber}>
-                            #{episode.episodeNumber} {episode.status === 'Open' ? 'open' : 'resolved'}
-                          </Pill>
-                        ))}
-                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">{new Date(vulnerability.detectedDate).toLocaleDateString()}</p>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                ))
+              )}
             </section>
           ) : null}
 
-          {activeTab === 'software' ? (
+          {activeTab === "software" ? (
             <section className="space-y-3">
               {asset.softwareInventory.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No software inventory is currently linked to this asset.</p>
-              ) : asset.softwareInventory.map((software) => (
-                <div key={software.softwareAssetId} className="rounded-2xl border border-border/70 bg-background p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      {software.tenantSoftwareId ? (
-                        <Link
-                          to="/software/$id"
-                          params={{ id: software.tenantSoftwareId }}
-                          search={{ page: 1, pageSize: 25, version: '' }}
-                          className="font-medium hover:text-primary"
-                        >
-                          {software.name}
-                        </Link>
-                      ) : (
-                        <p className="font-medium">{software.name}</p>
-                      )}
-                      <p className="mt-1 text-xs text-muted-foreground">{software.externalId}</p>
+                <p className="text-sm text-muted-foreground">
+                  No software inventory is currently linked to this asset.
+                </p>
+              ) : (
+                asset.softwareInventory.map((software) => (
+                  <div
+                    key={software.softwareAssetId}
+                    className="rounded-2xl border border-border/70 bg-background p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        {software.tenantSoftwareId ? (
+                          <Link
+                            to="/software/$id"
+                            params={{ id: software.tenantSoftwareId }}
+                            search={{ page: 1, pageSize: 25, version: "" }}
+                            className="font-medium hover:text-primary"
+                          >
+                            {software.name}
+                          </Link>
+                        ) : (
+                          <p className="font-medium">{software.name}</p>
+                        )}
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {software.externalId}
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Last seen{" "}
+                        {new Date(software.lastSeenAt).toLocaleDateString()}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">Last seen {new Date(software.lastSeenAt).toLocaleDateString()}</p>
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {software.episodes.map((episode) => (
+                        <Pill key={episode.episodeNumber}>
+                          #{episode.episodeNumber}{" "}
+                          {episode.removedAt ? "removed" : "installed"}
+                        </Pill>
+                      ))}
+                    </div>
+                    <div className="mt-3">
+                      <SoftwareCpeBindingPanel
+                        binding={software.cpeBinding}
+                        compact
+                      />
+                    </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    {software.episodes.map((episode) => (
-                      <Pill key={episode.episodeNumber}>
-                        #{episode.episodeNumber} {episode.removedAt ? 'removed' : 'installed'}
-                      </Pill>
-                    ))}
-                  </div>
-                  <div className="mt-3">
-                    <SoftwareCpeBindingPanel binding={software.cpeBinding} compact />
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </section>
           ) : null}
 
-          {activeTab === 'timeline' ? (
+          {activeTab === "timeline" ? (
             <section className="space-y-3">
               {timelineItems.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No activity history is available yet.</p>
-              ) : timelineItems.map((item, index) => (
-                <div key={item.id} className="flex gap-3">
-                  <div className="flex w-5 flex-col items-center">
-                    <span className={`mt-1 h-2.5 w-2.5 rounded-full ${toneDot(item.tone)}`} />
-                    {index < timelineItems.length - 1 ? <span className="mt-1 h-full w-px bg-border/80" /> : null}
-                  </div>
-                  <div className="flex-1 rounded-xl border border-border/70 bg-background px-3 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-medium">{item.title}</p>
-                      <span className="text-xs text-muted-foreground">{new Date(item.at).toLocaleString()}</span>
+                <p className="text-sm text-muted-foreground">
+                  No activity history is available yet.
+                </p>
+              ) : (
+                timelineItems.map((item, index) => (
+                  <div key={item.id} className="flex gap-3">
+                    <div className="flex w-5 flex-col items-center">
+                      <span
+                        className={`mt-1 h-2.5 w-2.5 rounded-full ${toneDot(item.tone)}`}
+                      />
+                      {index < timelineItems.length - 1 ? (
+                        <span className="mt-1 h-full w-px bg-border/80" />
+                      ) : null}
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
+                    <div className="flex-1 rounded-xl border border-border/70 bg-background px-3 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-medium">{item.title}</p>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(item.at).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {item.detail}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </section>
           ) : null}
         </section>
 
         <aside className="space-y-4">
           <section className="rounded-[28px] border border-border/70 bg-card p-4">
-            <SectionHeader title="Asset summary" description="Quick operational summary for this asset." />
+            <SectionHeader
+              title="Asset summary"
+              description="Quick operational summary for this asset."
+            />
             <div className="mt-4 grid gap-3">
-              <MetricCard label="Linked Vulnerabilities" value={String(asset.vulnerabilities.length)} />
-              <MetricCard label="Installed Software" value={String(asset.softwareInventory.length)} />
-              <MetricCard label="Security Profile" value={asset.securityProfile?.name ?? 'Not assigned'} />
+              <MetricCard
+                label="Linked Vulnerabilities"
+                value={String(asset.vulnerabilities.length)}
+              />
+              <MetricCard
+                label="Installed Software"
+                value={String(asset.softwareInventory.length)}
+              />
+              <MetricCard
+                label="Security Profile"
+                value={asset.securityProfile?.name ?? "Not assigned"}
+              />
               <MetricCard label="Asset Type" value={asset.assetType} />
             </div>
           </section>
         </aside>
       </div>
     </section>
-  )
+  );
 }
 
 function SecurityProfilePanel({

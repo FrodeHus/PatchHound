@@ -1,20 +1,20 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import type { ColumnDef } from '@tanstack/react-table'
-import { Play, Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Play, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 import {
   deleteAssetRule,
   fetchAssetRules,
   runAssetRules,
   updateAssetRule,
-} from '@/api/asset-rules.functions'
-import type { AssetRule } from '@/api/asset-rules.schemas'
-import { Button } from '@/components/ui/button'
-import { DataTable } from '@/components/ui/data-table'
-import { DataTableWorkbench } from '@/components/ui/data-table-workbench'
-import { PaginationControls } from '@/components/ui/pagination-controls'
-import { Badge } from '@/components/ui/badge'
+} from "@/api/asset-rules.functions";
+import type { AssetRule } from "@/api/asset-rules.schemas";
+import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
+import { DataTableWorkbench } from "@/components/ui/data-table-workbench";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -22,29 +22,31 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { baseListSearchSchema } from '@/routes/-list-search'
+} from "@/components/ui/dialog";
+import { baseListSearchSchema } from "@/routes/-list-search";
 
-export const Route = createFileRoute('/_authed/admin/asset-rules/')({
+export const Route = createFileRoute("/_authed/admin/asset-rules/")({
   validateSearch: baseListSearchSchema,
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) =>
     fetchAssetRules({ data: { page: deps.page, pageSize: deps.pageSize } }),
   component: AssetRulesPage,
-})
+});
 
 const columns: ColumnDef<AssetRule>[] = [
   {
-    accessorKey: 'priority',
-    header: '#',
+    accessorKey: "priority",
+    header: "#",
     size: 50,
     cell: ({ row }) => (
-      <span className="font-mono text-xs text-muted-foreground">{row.original.priority}</span>
+      <span className="font-mono text-xs text-muted-foreground">
+        {row.original.priority}
+      </span>
     ),
   },
   {
-    accessorKey: 'name',
-    header: 'Name',
+    accessorKey: "name",
+    header: "Name",
     cell: ({ row }) => (
       <Link
         to="/admin/asset-rules/$id"
@@ -56,73 +58,81 @@ const columns: ColumnDef<AssetRule>[] = [
     ),
   },
   {
-    accessorKey: 'description',
-    header: 'Description',
+    accessorKey: "description",
+    header: "Description",
     cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground">{row.original.description ?? '-'}</span>
-    ),
-  },
-  {
-    accessorKey: 'enabled',
-    header: 'Status',
-    size: 90,
-    cell: ({ row }) => (
-      <Badge variant={row.original.enabled ? 'default' : 'secondary'}>
-        {row.original.enabled ? 'Enabled' : 'Disabled'}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: 'lastMatchCount',
-    header: 'Last Match',
-    size: 100,
-    cell: ({ row }) => (
-      <span className="text-sm">
-        {row.original.lastMatchCount !== null ? `${row.original.lastMatchCount} assets` : '-'}
+      <span className="text-sm text-muted-foreground">
+        {row.original.description ?? "-"}
       </span>
     ),
   },
   {
-    accessorKey: 'lastExecutedAt',
-    header: 'Last Run',
+    accessorKey: "enabled",
+    header: "Status",
+    size: 90,
+    cell: ({ row }) => (
+      <Badge variant={row.original.enabled ? "default" : "secondary"}>
+        {row.original.enabled ? "Enabled" : "Disabled"}
+      </Badge>
+    ),
+  },
+  {
+    accessorKey: "lastMatchCount",
+    header: "Last Match",
+    size: 100,
+    cell: ({ row }) => (
+      <span className="text-sm">
+        {row.original.lastMatchCount !== null
+          ? `${row.original.lastMatchCount} assets`
+          : "-"}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "lastExecutedAt",
+    header: "Last Run",
     size: 150,
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground">
         {row.original.lastExecutedAt
           ? new Date(row.original.lastExecutedAt).toLocaleDateString()
-          : 'Never'}
+          : "Never"}
       </span>
     ),
   },
-]
+];
 
 function AssetRulesPage() {
-  const loaderData = Route.useLoaderData()
-  const search = Route.useSearch()
-  const navigate = Route.useNavigate()
-  const router = useRouter()
-  const [deleteTarget, setDeleteTarget] = useState<AssetRule | null>(null)
+  const loaderData = Route.useLoaderData();
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [deleteTarget, setDeleteTarget] = useState<AssetRule | null>(null);
 
   const query = useQuery({
-    queryKey: ['asset-rules', search.page, search.pageSize],
-    queryFn: () => fetchAssetRules({ data: { page: search.page, pageSize: search.pageSize } }),
+    queryKey: ["asset-rules", search.page, search.pageSize],
+    queryFn: () =>
+      fetchAssetRules({
+        data: { page: search.page, pageSize: search.pageSize },
+      }),
     initialData: loaderData,
-  })
+  });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => deleteAssetRule({ data: { id } }),
     onSuccess: async () => {
-      setDeleteTarget(null)
-      await router.invalidate()
+      setDeleteTarget(null);
+      await router.invalidate();
     },
-  })
+  });
 
   const runMutation = useMutation({
     mutationFn: async () => runAssetRules(),
     onSuccess: async () => {
-      await router.invalidate()
+      await router.invalidate();
     },
-  })
+  });
 
   const toggleMutation = useMutation({
     mutationFn: async (rule: AssetRule) =>
@@ -136,24 +146,40 @@ function AssetRulesPage() {
           operations: rule.operations,
         },
       }),
-    onSuccess: async () => {
-      await router.invalidate()
+    onMutate: (rule) => {
+      const queryKey = ["asset-rules", search.page, search.pageSize];
+      queryClient.setQueryData(
+        queryKey,
+        (old: typeof query.data | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: old.items.map((item) =>
+              item.id === rule.id ? { ...item, enabled: !item.enabled } : item,
+            ),
+          };
+        },
+      );
     },
-  })
+    onSuccess: async () => {
+      await router.invalidate();
+    },
+  });
 
   const actionsColumn: ColumnDef<AssetRule> = {
-    id: 'actions',
+    id: "actions",
     size: 120,
     cell: ({ row }) => (
       <div className="flex items-center gap-1">
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="sm"
           className="h-7 text-xs"
+          disabled={toggleMutation.isPending}
           onClick={() => toggleMutation.mutate(row.original)}
         >
-          {row.original.enabled ? 'Disable' : 'Enable'}
+          {row.original.enabled ? "Disable" : "Enable"}
         </Button>
         <Button
           type="button"
@@ -166,7 +192,7 @@ function AssetRulesPage() {
         </Button>
       </div>
     ),
-  }
+  };
 
   return (
     <section className="space-y-5">
@@ -193,7 +219,10 @@ function AssetRulesPage() {
             </Button>
           </Link>
         </div>
-        <DataTable columns={[...columns, actionsColumn]} data={query.data.items} />
+        <DataTable
+          columns={[...columns, actionsColumn]}
+          data={query.data.items}
+        />
         <PaginationControls
           page={query.data.page}
           pageSize={query.data.pageSize}
@@ -203,28 +232,39 @@ function AssetRulesPage() {
             void navigate({ search: (prev) => ({ ...prev, page }) })
           }
           onPageSizeChange={(pageSize) =>
-            void navigate({ search: (prev) => ({ ...prev, pageSize, page: 1 }) })
+            void navigate({
+              search: (prev) => ({ ...prev, pageSize, page: 1 }),
+            })
           }
         />
       </DataTableWorkbench>
 
-      <Dialog open={deleteTarget !== null} onOpenChange={() => setDeleteTarget(null)}>
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={() => setDeleteTarget(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete rule</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete &ldquo;{deleteTarget?.name}&rdquo;? This action cannot
-              be undone.
+              Are you sure you want to delete &ldquo;{deleteTarget?.name}
+              &rdquo;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+            >
               Cancel
             </Button>
             <Button
               type="button"
               variant="destructive"
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              onClick={() =>
+                deleteTarget && deleteMutation.mutate(deleteTarget.id)
+              }
               disabled={deleteMutation.isPending}
             >
               Delete
@@ -233,5 +273,5 @@ function AssetRulesPage() {
         </DialogContent>
       </Dialog>
     </section>
-  )
+  );
 }
