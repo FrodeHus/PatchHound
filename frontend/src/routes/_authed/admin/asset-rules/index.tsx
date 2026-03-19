@@ -176,7 +176,6 @@ function AssetRulesPage() {
           variant="outline"
           size="sm"
           className="h-7 text-xs"
-          disabled={toggleMutation.isPending}
           onClick={() => toggleMutation.mutate(row.original)}
         >
           {row.original.enabled ? "Disable" : "Enable"}
