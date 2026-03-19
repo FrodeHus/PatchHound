@@ -4,6 +4,7 @@ import type { AssetDetail } from '@/api/assets.schemas'
 import { formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import { toneDot, toneText, type Tone } from '@/lib/tone-classes'
+import { AssetSecureScorePanel } from "./AssetSecureScorePanel";
 
 type AssetDetailPageViewProps = {
   asset: AssetDetail
@@ -266,88 +267,98 @@ export function AssetDetailPageView({
                   No linked vulnerabilities recorded for this asset.
                 </p>
               ) : (
-                asset.vulnerabilities.map((vulnerability) => (
-                  <Link
-                    key={vulnerability.vulnerabilityId}
-                    to="/vulnerabilities/$id"
-                    params={{ id: vulnerability.vulnerabilityId }}
-                    className="block rounded-2xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{vulnerability.title}</p>
-                          {vulnerability.episodeCount > 1 ? (
-                            <Pill>
-                              Recurred {vulnerability.episodeCount - 1}x
-                            </Pill>
-                          ) : null}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {vulnerability.externalId} • {vulnerability.status}
-                        </p>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <MetricCard
-                            label="Vendor Severity"
-                            value={
-                              vulnerability.vendorScore
-                                ? `${vulnerability.vendorSeverity} (${vulnerability.vendorScore.toFixed(1)})`
-                                : vulnerability.vendorSeverity
-                            }
-                          />
-                          {asset.securityProfile &&
-                          vulnerability.effectiveSeverity !==
-                            vulnerability.vendorSeverity ? (
+                [...asset.vulnerabilities]
+                  .sort(
+                    (a, b) =>
+                      (b.effectiveScore ?? b.vendorScore ?? 0) -
+                      (a.effectiveScore ?? a.vendorScore ?? 0),
+                  )
+                  .map((vulnerability) => (
+                    <Link
+                      key={vulnerability.vulnerabilityId}
+                      to="/vulnerabilities/$id"
+                      params={{ id: vulnerability.vulnerabilityId }}
+                      className="block rounded-2xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">{vulnerability.title}</p>
+                            {vulnerability.episodeCount > 1 ? (
+                              <Pill>
+                                Recurred {vulnerability.episodeCount - 1}x
+                              </Pill>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {vulnerability.externalId} • {vulnerability.status}
+                          </p>
+                          <div className="grid gap-2 sm:grid-cols-2">
                             <MetricCard
-                              label={`Adjusted Severity (${asset.securityProfile.name})`}
+                              label="Vendor Severity"
                               value={
-                                vulnerability.effectiveScore
-                                  ? `${vulnerability.effectiveSeverity} (${vulnerability.effectiveScore.toFixed(1)})`
-                                  : vulnerability.effectiveSeverity
+                                vulnerability.vendorScore
+                                  ? `${vulnerability.vendorSeverity} (${vulnerability.vendorScore.toFixed(1)})`
+                                  : vulnerability.vendorSeverity
                               }
                             />
-                          ) : null}
-                          <MetricCard
-                            label="CVSS Vector"
-                            value={vulnerability.cvssVector ?? "Not available"}
-                            mono
-                          />
-                          <MetricCard
-                            label="Published"
-                            value={
-                              vulnerability.publishedDate
-                                ? new Date(
-                                    vulnerability.publishedDate,
-                                  ).toLocaleDateString()
-                                : "Unknown"
-                            }
-                          />
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {vulnerability.description}
-                        </p>
-                        {vulnerability.assessmentReasonSummary ? (
-                          <p className={`text-xs ${toneText("info")}`}>
-                            {vulnerability.assessmentReasonSummary}
+                            {asset.securityProfile &&
+                            vulnerability.effectiveSeverity !==
+                              vulnerability.vendorSeverity ? (
+                              <MetricCard
+                                label={`Adjusted Severity (${asset.securityProfile.name})`}
+                                value={
+                                  vulnerability.effectiveScore
+                                    ? `${vulnerability.effectiveSeverity} (${vulnerability.effectiveScore.toFixed(1)})`
+                                    : vulnerability.effectiveSeverity
+                                }
+                              />
+                            ) : null}
+                            <MetricCard
+                              label="CVSS Vector"
+                              value={
+                                vulnerability.cvssVector ?? "Not available"
+                              }
+                              mono
+                            />
+                            <MetricCard
+                              label="Published"
+                              value={
+                                vulnerability.publishedDate
+                                  ? new Date(
+                                      vulnerability.publishedDate,
+                                    ).toLocaleDateString()
+                                  : "Unknown"
+                              }
+                            />
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {vulnerability.description}
                           </p>
-                        ) : null}
-                        <div className="flex flex-wrap gap-1">
-                          {vulnerability.episodes.map((episode) => (
-                            <Pill key={episode.episodeNumber}>
-                              #{episode.episodeNumber}{" "}
-                              {episode.status === "Open" ? "open" : "resolved"}
-                            </Pill>
-                          ))}
+                          {vulnerability.assessmentReasonSummary ? (
+                            <p className={`text-xs ${toneText("info")}`}>
+                              {vulnerability.assessmentReasonSummary}
+                            </p>
+                          ) : null}
+                          <div className="flex flex-wrap gap-1">
+                            {vulnerability.episodes.map((episode) => (
+                              <Pill key={episode.episodeNumber}>
+                                #{episode.episodeNumber}{" "}
+                                {episode.status === "Open"
+                                  ? "open"
+                                  : "resolved"}
+                              </Pill>
+                            ))}
+                          </div>
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(
+                            vulnerability.detectedDate,
+                          ).toLocaleDateString()}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(
-                          vulnerability.detectedDate,
-                        ).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </Link>
-                ))
+                    </Link>
+                  ))
               )}
             </section>
           ) : null}
@@ -443,6 +454,7 @@ export function AssetDetailPageView({
         </section>
 
         <aside className="space-y-4">
+          <AssetSecureScorePanel assetId={asset.id} />
           <section className="rounded-[28px] border border-border/70 bg-card p-4">
             <SectionHeader
               title="Asset summary"
