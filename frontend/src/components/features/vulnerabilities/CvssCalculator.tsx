@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Calculator, ShieldCheck } from 'lucide-react'
+import { Calculator, RotateCcw, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { toneBadge, toneText } from '@/lib/tone-classes'
+import { toneBadge, toneText, type Tone } from '@/lib/tone-classes'
 import {
   buildCvssVector,
   buildEnvironmentalPresentation,
@@ -24,8 +24,6 @@ type CvssCalculatorProps = {
   vector?: string | null
   baseScore?: number | null
   securityProfile?: CvssSecurityProfileAdjustment | null
-  title?: string
-  description?: string
   interactive?: boolean
 }
 
@@ -49,59 +47,77 @@ const defaultMetrics: CvssBaseMetrics = {
   availability: 'H',
 }
 
+function severityTone(score: number): Tone {
+  if (score >= 9.0) return 'danger'
+  if (score >= 7.0) return 'warning'
+  if (score >= 4.0) return 'info'
+  return 'success'
+}
+
+/** Maps a CVSS metric key + value to a tone reflecting its impact on the overall score. */
+function metricTone(key: string, value: string): Tone {
+  const highImpact: Record<string, string[]> = {
+    AV: ['N'], AC: ['L'], PR: ['N'], UI: ['N'], S: ['C'],
+    C: ['H'], I: ['H'], A: ['H'],
+    MAV: ['N'], MAC: ['L'], MPR: ['N'], MUI: ['N'], MS: ['C'],
+    MC: ['H'], MI: ['H'], MA: ['H'],
+    CR: ['H'], IR: ['H'], AR: ['H'],
+  }
+  const lowImpact: Record<string, string[]> = {
+    AV: ['P', 'L'], AC: ['H'], PR: ['H'], UI: ['R'], S: ['U'],
+    C: ['N'], I: ['N'], A: ['N'],
+    MAV: ['P', 'L'], MAC: ['H'], MPR: ['H'], MUI: ['R'], MS: ['U'],
+    MC: ['N'], MI: ['N'], MA: ['N'],
+    CR: ['L'], IR: ['L'], AR: ['L'],
+  }
+  if (highImpact[key]?.includes(value)) return 'danger'
+  if (lowImpact[key]?.includes(value)) return 'success'
+  return 'warning'
+}
+
 export function CvssWorkbenchTrigger({
   vector,
   baseScore,
   securityProfile,
-  title = 'CVSS 3.1 scoring',
-  description = 'Inspect the vendor vector and, when a security profile applies, the environmental score used to better reflect organizational exposure.',
-  triggerLabel = 'Inspect calculation',
+  title = 'CVSS 3.1 workbench',
+  description = 'Inspect the vendor vector and explore alternate metric combinations.',
+  triggerLabel = 'Open workbench',
 }: CvssWorkbenchTriggerProps) {
   const metrics = useMemo(() => parseCvssVector(vector ?? null) ?? defaultMetrics, [vector])
   const vendorScore = baseScore ?? calculateCvssBaseScore(metrics)
-  const environmental = securityProfile ? calculateCvssEnvironmentalScore(metrics, securityProfile) : null
-  const delta = environmental ? environmental.score - vendorScore : 0
+  const severity = cvssSeverity(vendorScore)
+  const tone = severityTone(vendorScore)
+  const vendorPresentation = buildMetricPresentation(metrics)
 
   return (
     <Dialog>
-      <InsetPanel className="space-y-4 px-4 py-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">CVSS Preview</p>
-            <p className="text-sm text-muted-foreground">
-              Review the vendor score, environmental score, and open the full workbench only when needed.
-            </p>
+      <InsetPanel className="space-y-3 px-4 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <ScoreRing score={vendorScore} tone={tone} />
+            <div>
+              <p className="text-sm font-medium">{severity}</p>
+              <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                {vector ?? buildCvssVector(metrics)}
+              </p>
+            </div>
           </div>
           <DialogTrigger
-            render={<Button type="button" variant="outline" />}
+            render={<Button type="button" variant="outline" className="h-9 rounded-lg" />}
           >
-            <Calculator className="size-4" />
+            <Calculator className="size-3.5" />
             {triggerLabel}
           </DialogTrigger>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <ScoreCard label="Vendor score" value={vendorScore.toFixed(1)} detail={cvssSeverity(vendorScore)} />
-          <ScoreCard
-            label="Environmental score"
-            value={(environmental ? environmental.score : vendorScore).toFixed(1)}
-            detail={environmental ? environmental.severity : 'Matches vendor score'}
-          />
-          <ScoreCard
-            label="Delta"
-            value={`${delta >= 0 ? '+' : ''}${delta.toFixed(1)}`}
-            detail={delta === 0 ? 'No change' : delta > 0 ? 'Higher than vendor' : 'Lower than vendor'}
-          />
-          <ScoreCard
-            label="Vector"
-            value={environmental?.vector ?? vector ?? buildCvssVector(metrics)}
-            detail={securityProfile?.name ?? 'Vendor base vector'}
-            mono
-          />
+        <div className="flex flex-wrap gap-1.5">
+          {vendorPresentation.map((metric) => (
+            <MetricPill key={metric.key} metric={metric} />
+          ))}
         </div>
       </InsetPanel>
 
-      <DialogContent className="w-[min(96vw,78rem)] max-w-[78rem] overflow-hidden rounded-2xl border-border/80 bg-card p-0 sm:max-w-[78rem]">
+      <DialogContent className="w-[min(96vw,72rem)] max-w-[72rem] overflow-hidden rounded-2xl border-border/80 bg-card p-0 sm:max-w-[72rem]">
         <DialogHeader className="border-b border-border/60 px-5 py-4">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -111,8 +127,6 @@ export function CvssWorkbenchTrigger({
             vector={vector}
             baseScore={baseScore}
             securityProfile={securityProfile}
-            title="CVSS workbench"
-            description="Use the manual calculator to inspect the vendor vector and environmental result without cluttering the main workflow."
           />
         </div>
       </DialogContent>
@@ -124,56 +138,140 @@ export function CvssCalculator({
   vector,
   baseScore,
   securityProfile,
-  title = 'CVSS 3.1 scoring',
-  description = 'Review the vendor vector and, when a security profile applies, the environmental score used to better reflect organizational exposure.',
   interactive = true,
 }: CvssCalculatorProps) {
   const initialMetrics = useMemo(() => parseCvssVector(vector ?? null) ?? defaultMetrics, [vector])
   const [metrics, setMetrics] = useState<CvssBaseMetrics>(initialMetrics)
 
   const effectiveMetrics = vector ? parseCvssVector(vector) ?? metrics : metrics
-  const calculatedBaseScore = calculateCvssBaseScore(effectiveMetrics)
-  const vendorScore = baseScore ?? calculatedBaseScore
+  const vendorScore = baseScore ?? calculateCvssBaseScore(effectiveMetrics)
   const vendorSeverity = cvssSeverity(vendorScore)
+  const vendorTone = severityTone(vendorScore)
   const computedVector = buildCvssVector(effectiveMetrics)
   const vendorMetricPresentation = buildMetricPresentation(effectiveMetrics)
   const environmental = securityProfile
     ? calculateCvssEnvironmentalScore(effectiveMetrics, securityProfile)
     : null
 
+  const calculatedScore = calculateCvssBaseScore(metrics)
+  const calculatedSeverity = cvssSeverity(calculatedScore)
+  const calculatedTone = severityTone(calculatedScore)
+  const isModified = buildCvssVector(metrics) !== (vector ?? computedVector)
+
   return (
-    <section className="rounded-lg border border-border bg-card p-4">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Calculator className="size-4 text-primary" />
-          <h3 className="text-lg font-semibold">{title}</h3>
-        </div>
-        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
-      </div>
-
-      <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
-        <ScoreCard label="Vendor score" value={vendorScore.toFixed(1)} detail={vendorSeverity} />
-        <ScoreCard label="Vendor vector" value={vector ?? computedVector} detail="CVSS 3.1 base vector" mono />
-        <ScoreCard
-          label="Environmental score"
-          value={environmental ? environmental.score.toFixed(1) : vendorScore.toFixed(1)}
-          detail={environmental ? environmental.severity : 'Matches vendor score'}
-        />
-        <ScoreCard
-          label="Environmental vector"
-          value={environmental?.vector ?? 'No profile modifiers'}
-          detail={securityProfile?.name ?? (securityProfile ? 'Profile modifiers applied' : 'No security profile')}
-          mono
-        />
-      </div>
-
-      {interactive ? (
-        <InsetPanel className="mt-4 space-y-4 px-4 py-4">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Calculator className="size-4 text-primary" />
-            Manual calculator
+    <div className="space-y-4">
+      {/* Score header */}
+      <div className="flex flex-wrap items-start gap-6">
+        <div className="flex items-center gap-4">
+          <ScoreRing score={vendorScore} tone={vendorTone} size="lg" />
+          <div>
+            <p className="text-lg font-semibold">{vendorSeverity}</p>
+            <p className="text-sm text-muted-foreground">Vendor base score</p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        </div>
+        {environmental ? (
+          <>
+            <div className="hidden items-center self-center text-muted-foreground sm:flex">
+              <span className="text-lg">&rarr;</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <ScoreRing score={environmental.score} tone={severityTone(environmental.score)} size="lg" />
+              <div>
+                <p className="text-lg font-semibold">{environmental.severity}</p>
+                <p className="text-sm text-muted-foreground">
+                  Environmental score
+                  {securityProfile?.name ? ` (${securityProfile.name})` : ''}
+                </p>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      {/* Vendor vector breakdown */}
+      <InsetPanel className="space-y-3 px-4 py-4">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Vendor vector</p>
+          <code className="rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
+            {vector ?? computedVector}
+          </code>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {vendorMetricPresentation.map((metric) => (
+            <MetricCard key={metric.key} metric={metric} />
+          ))}
+        </div>
+      </InsetPanel>
+
+      {/* Environmental modifiers (only when profile is applied) */}
+      {environmental ? (
+        <InsetPanel className="space-y-3 px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-3.5 text-primary" />
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Environmental modifiers</p>
+            </div>
+            <code className="rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
+              {environmental.vector}
+            </code>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {buildEnvironmentalPresentation(environmental).map((metric) => (
+              <MetricCard key={metric.key} metric={metric} />
+            ))}
+          </div>
+        </InsetPanel>
+      ) : (
+        <InsetPanel className="px-4 py-4">
+          <p className="text-sm text-muted-foreground">
+            No security profile is applied. Environmental scores are calculated per-asset based on each asset's assigned security profile.
+          </p>
+        </InsetPanel>
+      )}
+
+      {/* Security profile details */}
+      {securityProfile ? (
+        <InsetPanel className="space-y-3 px-4 py-4">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="size-3.5 text-primary" />
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              Security profile: {securityProfile.name ?? 'Unnamed'}
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <ProfileField label="Reachability" value={securityProfile.internetReachability} />
+            <ProfileField label="Confidentiality req." value={securityProfile.confidentialityRequirement} />
+            <ProfileField label="Integrity req." value={securityProfile.integrityRequirement} />
+            <ProfileField label="Availability req." value={securityProfile.availabilityRequirement} />
+          </div>
+        </InsetPanel>
+      ) : null}
+
+      {/* Manual calculator */}
+      {interactive ? (
+        <InsetPanel className="space-y-4 px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Calculator className="size-3.5 text-primary" />
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Manual calculator
+              </p>
+            </div>
+            {isModified ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => setMetrics(initialMetrics)}
+              >
+                <RotateCcw className="size-3" />
+                Reset to vendor
+              </Button>
+            ) : null}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <MetricSelect
               label="Attack Vector"
               metricKey="AV"
@@ -223,48 +321,85 @@ export function CvssCalculator({
               onValueChange={(value) => setMetrics((current) => ({ ...current, availability: value as CvssBaseMetrics['availability'] }))}
             />
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <ScoreCard label="Calculated base score" value={calculateCvssBaseScore(metrics).toFixed(1)} detail={cvssSeverity(calculateCvssBaseScore(metrics))} />
-            <ScoreCard label="Generated vector" value={buildCvssVector(metrics)} detail="Manual calculator output" mono />
+
+          <div className="flex items-center gap-6 rounded-lg border border-border/60 bg-background/60 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <ScoreRing score={calculatedScore} tone={calculatedTone} />
+              <div>
+                <p className="text-sm font-medium">{calculatedSeverity}</p>
+                <p className="font-mono text-xs text-muted-foreground">{buildCvssVector(metrics)}</p>
+              </div>
+            </div>
+            {isModified ? (
+              <p className="text-xs text-muted-foreground">
+                {calculatedScore > vendorScore
+                  ? `+${(calculatedScore - vendorScore).toFixed(1)} from vendor`
+                  : calculatedScore < vendorScore
+                    ? `${(calculatedScore - vendorScore).toFixed(1)} from vendor`
+                    : 'Same as vendor'}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">Matches vendor score</p>
+            )}
           </div>
         </InsetPanel>
       ) : null}
+    </div>
+  )
+}
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <MetricStrip title="Vendor vector breakdown" items={vendorMetricPresentation} />
-        <MetricStrip
-          title={securityProfile ? 'Environmental modifiers' : 'Environmental modifiers'}
-          items={environmental ? buildEnvironmentalPresentation(environmental) : []}
-          emptyMessage="No security profile is applied, so the environmental score matches the vendor CVSS score."
-        />
-      </div>
+function ScoreRing({ score, tone, size = 'sm' }: { score: number; tone: Tone; size?: 'sm' | 'lg' }) {
+  const dim = size === 'lg' ? 'size-14' : 'size-10'
+  const textSize = size === 'lg' ? 'text-lg' : 'text-sm'
+  return (
+    <div className={`${dim} flex shrink-0 items-center justify-center rounded-full border-2 border-current ${toneText(tone)}`}>
+      <span className={`${textSize} font-bold`}>{score.toFixed(1)}</span>
+    </div>
+  )
+}
 
-      {securityProfile ? (
-        <InsetPanel className="mt-4 px-4 py-4">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <ShieldCheck className="size-4 text-primary" />
-            Security profile adjustment
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            The security profile provides authoritative CVSS Environmental modified metrics. Requirement levels still adjust the CR, IR, and AR multipliers.
-          </p>
-          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <ProfileAdjustment label="Reachability" value={securityProfile.internetReachability} />
-            <ProfileAdjustment label="Modified AV" value={securityProfile.modifiedAttackVector} />
-            <ProfileAdjustment label="Modified AC" value={securityProfile.modifiedAttackComplexity} />
-            <ProfileAdjustment label="Modified PR" value={securityProfile.modifiedPrivilegesRequired} />
-            <ProfileAdjustment label="Modified UI" value={securityProfile.modifiedUserInteraction} />
-            <ProfileAdjustment label="Modified Scope" value={securityProfile.modifiedScope} />
-            <ProfileAdjustment label="Modified C" value={securityProfile.modifiedConfidentialityImpact} />
-            <ProfileAdjustment label="Modified I" value={securityProfile.modifiedIntegrityImpact} />
-            <ProfileAdjustment label="Modified A" value={securityProfile.modifiedAvailabilityImpact} />
-            <ProfileAdjustment label="Confidentiality requirement" value={securityProfile.confidentialityRequirement} />
-            <ProfileAdjustment label="Integrity requirement" value={securityProfile.integrityRequirement} />
-            <ProfileAdjustment label="Availability requirement" value={securityProfile.availabilityRequirement} />
-          </div>
-        </InsetPanel>
-      ) : null}
-    </section>
+function MetricCard({ metric }: { metric: CvssMetricPresentation }) {
+  const tone = metricTone(metric.key, metric.value)
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <div className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-background/60 px-3 py-2" />
+        }
+      >
+        <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded font-mono text-[10px] font-bold ${toneBadge(tone)}`}>
+          {metric.value}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-xs font-medium">{metric.shortLabel}</p>
+          <p className="truncate text-[11px] text-muted-foreground">{metric.valueLabel}</p>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <p className="font-medium">{metric.shortLabel}: {metric.valueLabel}</p>
+        <p className="mt-1 text-muted-foreground">{metric.description}</p>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function MetricPill({ metric }: { metric: CvssMetricPresentation }) {
+  const tone = metricTone(metric.key, metric.value)
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${toneBadge(tone)}`} />
+        }
+      >
+        <span className="font-mono font-bold opacity-70">{metric.key}</span>
+        <span>{metric.valueLabel}</span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <p className="font-medium">{metric.shortLabel}</p>
+        <p className="mt-1 text-muted-foreground">{metric.description}</p>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -285,10 +420,10 @@ function MetricSelect({
   >
 
   return (
-    <div className="grid gap-2">
-      <label className="text-sm font-medium">{label}</label>
+    <div className="grid gap-1.5">
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)]">
+        <SelectTrigger className="h-9 rounded-lg border-border/80 bg-background/80 text-sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="rounded-xl border-border/80 bg-popover/98 backdrop-blur">
@@ -303,71 +438,11 @@ function MetricSelect({
   )
 }
 
-function ScoreCard({
-  label,
-  value,
-  detail,
-  mono = false,
-}: {
-  label: string
-  value: string
-  detail: string
-  mono?: boolean
-}) {
+function ProfileField({ label, value }: { label: string; value: string }) {
   return (
-    <InsetPanel emphasis="strong" className="px-4 py-3">
-      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-      <p className={mono ? 'mt-2 break-all font-mono text-sm font-medium' : 'mt-2 text-2xl font-semibold'}>{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
-    </InsetPanel>
-  )
-}
-
-function MetricStrip({
-  title,
-  items,
-  emptyMessage = 'No metrics available.',
-}: {
-  title: string
-  items: CvssMetricPresentation[]
-  emptyMessage?: string
-}) {
-  return (
-    <InsetPanel className="space-y-3 px-4 py-4">
-      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{title}</p>
-      {items.length ? (
-        <div className="flex flex-wrap gap-2">
-          {items.map((metric) => (
-            <Tooltip key={`${metric.key}:${metric.value}`}>
-              <TooltipTrigger
-                render={
-                  <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${toneBadge('info')}`} />
-                }
-              >
-                <span className={`text-[11px] uppercase tracking-[0.18em] ${toneText('info')}`}>{metric.key}</span>
-                <span>{metric.valueLabel}</span>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-sm">
-                <div className="space-y-1">
-                  <p className="font-medium">{metric.shortLabel}</p>
-                  <p>{metric.description}</p>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
-      )}
-    </InsetPanel>
-  )
-}
-
-function ProfileAdjustment({ label, value }: { label: string; value: string }) {
-  return (
-    <InsetPanel emphasis="strong" className="px-3 py-3">
-      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-medium">{value}</p>
-    </InsetPanel>
+    <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm font-medium">{value}</p>
+    </div>
   )
 }
