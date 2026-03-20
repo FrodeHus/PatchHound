@@ -25,7 +25,7 @@ export function PaginationControls({
   const hasNext = totalPages > 0 && page < totalPages
 
   return (
-    <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/35 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <span>
           {start}-{end} of {totalCount}

@@ -34,10 +34,10 @@ export function OpenBaoUnsealDialog({
     }}>
       <DialogContent className="w-full max-w-xl rounded-2xl border-border/80 bg-card p-0 sm:max-w-xl">
         <DialogHeader className="border-b border-border/60 px-6 py-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-tone-warning-foreground">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-tone-warning-foreground">
             OpenBao recovery
           </p>
-          <DialogTitle className="text-2xl font-semibold tracking-[-0.03em]">Unseal vault</DialogTitle>
+          <DialogTitle className="text-2xl font-semibold tracking-[-0.04em]">Unseal vault</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
             Provide three unseal keys to reopen OpenBao so workers can resume credential-backed ingestion.
           </DialogDescription>

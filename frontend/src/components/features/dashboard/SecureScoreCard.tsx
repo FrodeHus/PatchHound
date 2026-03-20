@@ -1,3 +1,4 @@
+import { Skeleton } from '@/components/ui/skeleton'
 import { useQuery } from '@tanstack/react-query'
 import { Shield, Target, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
@@ -29,8 +30,8 @@ export function SecureScoreCard({ isLoading: parentLoading }: SecureScoreCardPro
       <Card className="overflow-hidden rounded-[32px] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_11%,transparent),transparent_56%),var(--color-card)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardContent className="p-5">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="h-40 min-w-0 flex-1 animate-pulse rounded-[24px] bg-muted/60" />
-            <div className="h-40 min-w-0 flex-1 animate-pulse rounded-[24px] bg-muted/60" />
+            <Skeleton className="h-40 min-w-0 flex-1 " />
+            <Skeleton className="h-40 min-w-0 flex-1 " />
           </div>
         </CardContent>
       </Card>
@@ -49,10 +50,10 @@ export function SecureScoreCard({ isLoading: parentLoading }: SecureScoreCardPro
         <CardContent className="p-5">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             {/* Score section */}
-            <div className="min-w-0 flex-1 rounded-[24px] border border-border/70 bg-background/35 p-4">
+            <div className="min-w-0 flex-1 rounded-2xl border border-border/70 bg-background/30 p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     Secure Score
                   </p>
                   <p className="mt-3 text-5xl font-semibold tracking-[-0.04em]">
@@ -90,10 +91,10 @@ export function SecureScoreCard({ isLoading: parentLoading }: SecureScoreCardPro
             </div>
 
             {/* Target section */}
-            <div className="min-w-0 flex-1 rounded-[24px] border border-border/70 bg-background/35 p-4">
+            <div className="min-w-0 flex-1 rounded-2xl border border-border/70 bg-background/30 p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     Target
                   </p>
                   <p className="mt-3 text-4xl font-semibold tracking-[-0.04em]">

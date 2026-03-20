@@ -34,7 +34,7 @@ export function SortableColumnHeader<TData, TValue>({
       ) : sorted === 'desc' ? (
         <ArrowDown className="size-3 text-foreground" />
       ) : (
-        <ArrowUpDown className="size-3 text-muted-foreground/50" />
+        <ArrowUpDown className="size-3 text-muted-foreground/70" />
       )}
     </button>
   )

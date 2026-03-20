@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { ArrowLeft, CircleHelp, PenSquare, RotateCw, Square } from 'lucide-react'
 import { abortTenantIngestionRun, triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
 import type { TenantDetail, TenantIngestionSource } from '@/api/settings.schemas'
@@ -80,10 +81,12 @@ export function TenantSourceManagement({
     },
     onSuccess: async () => {
       setSaveState('saved')
+      toast.success('Source configuration saved')
       await router.invalidate()
     },
     onError: () => {
       setSaveState('error')
+      toast.error('Failed to save source configuration')
     },
   })
 
@@ -103,10 +106,12 @@ export function TenantSourceManagement({
     },
     onSuccess: async () => {
       setSyncState('success')
+      toast.success('Sync queued')
       await router.invalidate()
     },
     onError: () => {
       setSyncState('error')
+      toast.error('Failed to start sync')
     },
     onSettled: () => {
       setSyncingSourceKey(null)
@@ -129,10 +134,12 @@ export function TenantSourceManagement({
     },
     onSuccess: async () => {
       setAbortState('success')
+      toast.success('Abort requested')
       await router.invalidate()
     },
     onError: () => {
       setAbortState('error')
+      toast.error('Failed to abort ingestion')
     },
     onSettled: () => {
       setAbortingRunId(null)
@@ -176,7 +183,7 @@ export function TenantSourceManagement({
           <CardHeader className="border-b border-border/60 pb-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-1">
-                <h2 className="text-2xl font-semibold tracking-[-0.03em]">Tenant Sources</h2>
+                <h2 className="text-2xl font-semibold tracking-[-0.04em]">Tenant Sources</h2>
                 <p className="text-sm text-muted-foreground">
                   Review source status, run manual sync, and edit credentials or schedules in a side panel.
                 </p>
@@ -208,7 +215,7 @@ export function TenantSourceManagement({
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-semibold">Tenant Sources</h3>
-                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
                     {sources.length}
                   </Badge>
                 </div>
@@ -750,7 +757,7 @@ function StatusBadge({
         tone === 'success' && 'border-tone-success-border bg-tone-success text-tone-success-foreground',
         tone === 'warning' && 'border-tone-warning-border bg-tone-warning text-tone-warning-foreground',
         tone === 'error' && 'border-destructive/25 bg-destructive/10 text-destructive',
-        tone === 'neutral' && 'border-border/70 bg-background/60 text-muted-foreground',
+        tone === 'neutral' && 'border-border/70 bg-background/50 text-muted-foreground',
       )}
     >
       {children}
@@ -769,7 +776,7 @@ function Metric({
 }) {
   return (
     <InsetPanel emphasis="strong" className={cn('px-3 py-2', compact && 'min-h-0')}>
-      <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
     </InsetPanel>
   )

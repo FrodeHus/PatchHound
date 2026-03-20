@@ -56,7 +56,7 @@ export function EnrichmentRunHistorySheet({
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto border-l border-border/80 bg-background/98 p-0 sm:max-w-3xl">
+      <SheetContent side="right" className="w-full overflow-y-auto border-l border-border/80 bg-background/80 p-0 sm:max-w-3xl">
         <SheetHeader className="border-b border-border/70 bg-muted/20">
           <SheetTitle>{sourceDisplayName ?? 'Enrichment history'}</SheetTitle>
           <SheetDescription>
@@ -102,7 +102,7 @@ export function EnrichmentRunHistorySheet({
           ) : null}
 
           {data && data.items.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border/70 bg-background/20 px-4 py-8 text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-dashed border-border/70 bg-background/30 px-4 py-8 text-sm text-muted-foreground">
               No enrichment runs have been recorded for this source yet.
             </div>
           ) : null}
@@ -124,11 +124,11 @@ function SummaryCard({
   return (
     <div
       className={cn(
-        'rounded-[22px] border px-4 py-3',
+        'rounded-2xl border px-4 py-3',
         tone === 'success' && 'border-tone-success-border bg-tone-success',
         tone === 'warning' && 'border-tone-warning-border bg-tone-warning',
         tone === 'error' && 'border-destructive/25 bg-destructive/10',
-        tone === 'neutral' && 'border-border/70 bg-background/35',
+        tone === 'neutral' && 'border-border/70 bg-background/30',
       )}
     >
       <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
@@ -139,7 +139,7 @@ function SummaryCard({
 
 function RunHistoryCard({ run }: { run: EnrichmentRun }) {
   return (
-    <div className="rounded-[26px] border border-border/70 bg-card/82 p-4 shadow-sm">
+    <div className="rounded-3xl border border-border/70 bg-card/85 p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <Badge
@@ -175,8 +175,8 @@ function RunHistoryCard({ run }: { run: EnrichmentRun }) {
 
 function RunMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-background/35 px-3 py-2">
-      <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+    <div className="rounded-xl border border-border/60 bg-background/30 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
     </div>
   )

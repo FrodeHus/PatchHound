@@ -1,3 +1,4 @@
+import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowDown, ArrowUp, Timer } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { InsetPanel } from '@/components/ui/inset-panel'
@@ -46,7 +47,7 @@ export function MttrCard({ data, isLoading }: MttrCardProps) {
     <Card className="rounded-[32px] border-border/70 bg-card/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 p-5 pb-0">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Remediation speed</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Remediation speed</p>
           <CardTitle className="mt-2 text-xl font-semibold tracking-tight">Mean time to remediate</CardTitle>
         </div>
         <span className="flex size-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-primary">
@@ -57,7 +58,7 @@ export function MttrCard({ data, isLoading }: MttrCardProps) {
         {isLoading ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-28 animate-pulse rounded-[20px] bg-muted/60" />
+              <Skeleton key={i} className="h-28 rounded-xl" />
             ))}
           </div>
         ) : (

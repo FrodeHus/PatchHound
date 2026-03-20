@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Play, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -11,9 +12,13 @@ import {
 } from "@/api/asset-rules.functions";
 import type { AssetRule } from "@/api/asset-rules.schemas";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SortableColumnHeader } from "@/components/ui/sortable-column-header";
 import { DataTable } from "@/components/ui/data-table";
-import { DataTableWorkbench } from "@/components/ui/data-table-workbench";
+import {
+  DataTableWorkbench,
+  DataTableEmptyState,
+} from "@/components/ui/data-table-workbench";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -124,14 +129,22 @@ function AssetRulesPage() {
     mutationFn: async (id: string) => deleteAssetRule({ data: { id } }),
     onSuccess: async () => {
       setDeleteTarget(null);
+      toast.success("Rule deleted");
       await router.invalidate();
+    },
+    onError: () => {
+      toast.error("Failed to delete rule");
     },
   });
 
   const runMutation = useMutation({
     mutationFn: async () => runAssetRules(),
     onSuccess: async () => {
+      toast.success("Rules evaluation started");
       await router.invalidate();
+    },
+    onError: () => {
+      toast.error("Failed to start evaluation");
     },
   });
 
@@ -162,8 +175,12 @@ function AssetRulesPage() {
         },
       );
     },
-    onSuccess: async () => {
+    onSuccess: async (_data, rule) => {
+      toast.success(rule.enabled ? "Rule disabled" : "Rule enabled");
       await router.invalidate();
+    },
+    onError: () => {
+      toast.error("Failed to update rule");
     },
   });
 
@@ -182,15 +199,22 @@ function AssetRulesPage() {
         >
           {row.original.enabled ? "Disable" : "Enable"}
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 text-destructive"
-          onClick={() => setDeleteTarget(row.original)}
-        >
-          <Trash2 className="size-3.5" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-destructive"
+                onClick={() => setDeleteTarget(row.original)}
+              />
+            }
+          >
+            <Trash2 className="size-3.5" />
+          </TooltipTrigger>
+          <TooltipContent>Delete</TooltipContent>
+        </Tooltip>
       </div>
     ),
   };
@@ -223,6 +247,12 @@ function AssetRulesPage() {
         <DataTable
           columns={[...columns, actionsColumn]}
           data={query.data.items}
+          emptyState={
+            <DataTableEmptyState
+              title="No asset rules yet"
+              description="Create your first rule to automatically classify and tag assets after ingestion."
+            />
+          }
         />
         <PaginationControls
           page={query.data.page}

@@ -1,3 +1,4 @@
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Area,
   CartesianGrid,
@@ -36,7 +37,7 @@ export function BurndownChart({ data, isLoading }: BurndownChartProps) {
     <Card className="rounded-[32px] border-border/70 bg-card/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 p-5 pb-0">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Burndown</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Burndown</p>
           <CardTitle className="mt-2 text-xl font-semibold tracking-tight">Discovered vs. resolved over 90 days</CardTitle>
         </div>
         <div className="flex items-center gap-2">
@@ -50,7 +51,7 @@ export function BurndownChart({ data, isLoading }: BurndownChartProps) {
       </CardHeader>
       <CardContent className="pt-4">
         {isLoading ? (
-          <div className="h-[300px] w-full animate-pulse rounded-2xl bg-muted/60" />
+          <Skeleton className="h-[300px] w-full " />
         ) : (
           <>
             <div className="h-[300px] w-full">

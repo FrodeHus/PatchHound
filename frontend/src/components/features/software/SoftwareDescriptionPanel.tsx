@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Bot, CircleAlert, CircleCheckBig, FileText } from 'lucide-react'
 import { fetchTenantAiProfiles } from '@/api/ai-settings.functions'
 import {
@@ -69,9 +70,13 @@ export function SoftwareDescriptionPanel({
         },
       }),
     onSuccess: async () => {
+      toast.success('Description generation queued')
       await queryClient.invalidateQueries({
         queryKey: ['tenant-software-description-job', selectedTenantId, tenantSoftwareId],
       })
+    },
+    onError: () => {
+      toast.error('Failed to generate description')
     },
   })
 

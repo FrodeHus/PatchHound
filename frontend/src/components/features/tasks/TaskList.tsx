@@ -155,7 +155,7 @@ export function TaskList({
         enableSorting: false,
         cell: ({ row }) => (
           <div className="flex justify-end">
-            <div className="min-w-[220px] rounded-2xl border border-border/60 bg-background/40 p-3">
+            <div className="min-w-[220px] rounded-2xl border border-border/60 bg-background/30 p-3">
               <TaskStatusUpdate
                 currentStatus={row.original.status}
                 isSubmitting={isUpdating}
@@ -264,7 +264,7 @@ export function TaskList({
           description="Try widening the task status filter to bring more of the queue into scope."
         />
       ) : (
-        <div className="overflow-hidden rounded-[24px] border border-border/70 bg-background/30">
+        <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/30">
           <DataTable columns={columns} data={tasks} getRowId={(row) => row.id} className="min-w-[1220px]" />
         </div>
       )}

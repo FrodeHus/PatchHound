@@ -89,7 +89,7 @@ function SourcesAdministrationPage() {
       </div>
 
       {canManageEnrichment ? (
-        <div className="inline-flex rounded-[20px] border border-border/70 bg-card/70 p-1">
+        <div className="inline-flex rounded-xl border border-border/70 bg-card/70 p-1">
           <button
             type="button"
             className={viewToggleClassName(activeView === "tenant")}

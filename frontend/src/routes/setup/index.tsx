@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { completeSetup, fetchSetupContext, fetchSetupStatus } from '@/api/setup.functions'
 import { SetupAccessDialog } from '@/components/features/setup/SetupAccessDialog'
 import { SetupWizard } from '@/components/features/setup/SetupWizard'
@@ -34,8 +35,12 @@ function SetupPage() {
   const mutation = useMutation({
     mutationFn: completeSetup,
     onSuccess: async () => {
+      toast.success('Setup completed')
       await router.invalidate()
       await router.navigate({ to: '/' })
+    },
+    onError: () => {
+      toast.error('Failed to complete setup')
     },
   })
 

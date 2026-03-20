@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import {
   ArrowLeft,
   Bot,
@@ -212,6 +213,7 @@ export function TenantAiSettingsPage() {
   const saveMutation = useMutation({
     mutationFn: (payload: SaveTenantAiProfile) => saveTenantAiProfile({ data: payload }),
     onSuccess: async (savedProfile) => {
+      toast.success('AI profile saved')
       await queryClient.invalidateQueries({ queryKey: ['tenant-ai-profiles', selectedTenantId] })
       setSaveBanner('Profile saved successfully.')
       setDraft(toDraft(savedProfile))
@@ -223,19 +225,30 @@ export function TenantAiSettingsPage() {
         },
       })
     },
+    onError: () => {
+      toast.error('Failed to save AI profile')
+    },
   })
 
   const validateMutation = useMutation({
     mutationFn: (id: string) => validateTenantAiProfile({ data: { id } }),
     onSuccess: async () => {
+      toast.success('Validation complete')
       await queryClient.invalidateQueries({ queryKey: ['tenant-ai-profiles', selectedTenantId] })
+    },
+    onError: () => {
+      toast.error('Failed to validate AI profile')
     },
   })
 
   const setDefaultMutation = useMutation({
     mutationFn: (id: string) => setDefaultTenantAiProfile({ data: { id } }),
     onSuccess: async () => {
+      toast.success('Default profile updated')
       await queryClient.invalidateQueries({ queryKey: ['tenant-ai-profiles', selectedTenantId] })
+    },
+    onError: () => {
+      toast.error('Failed to set default profile')
     },
   })
 
@@ -650,7 +663,7 @@ function AiProfileEditorPage({
                   {profile?.lastValidationStatus === 'Invalid' &&
                   draft.providerType === 'Ollama' &&
                   extractMissingOllamaModel(profile.lastValidationError, draft.model) ? (
-                    <div className={`rounded-[16px] border border-tone-warning-border/25 bg-tone-warning/8 px-3 py-2 text-xs ${toneText('warning')}`}>
+                    <div className={`rounded-lg border border-tone-warning-border/25 bg-tone-warning/8 px-3 py-2 text-xs ${toneText('warning')}`}>
                       Ollama could not find <code>{draft.model}</code>. Run <code>ollama pull {draft.model}</code> on the Ollama host, then validate again.
                     </div>
                   ) : null}
@@ -981,7 +994,7 @@ function AiProfileEditorPage({
 
 function InlineError({ message }: { message: string }) {
   return (
-    <div className="flex items-start gap-2 rounded-[18px] border border-destructive/25 bg-destructive/8 px-4 py-3 text-sm text-destructive">
+    <div className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/8 px-4 py-3 text-sm text-destructive">
       <CircleAlert className="mt-0.5 size-4 shrink-0" />
       <p>{message}</p>
     </div>

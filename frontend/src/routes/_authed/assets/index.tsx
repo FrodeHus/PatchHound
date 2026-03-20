@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { assignAssetOwner, assignAssetSecurityProfile, fetchAssetDetail, fetchAssets, setAssetCriticality } from '@/api/assets.functions'
 import { AssetDetailPane } from '@/components/features/assets/AssetDetailPane'
 import { AssetManagementTable } from '@/components/features/assets/AssetManagementTable'
@@ -57,7 +58,11 @@ function AssetsPage() {
       })
     },
     onSuccess: async () => {
+      toast.success('Owner assigned')
       await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+    },
+    onError: () => {
+      toast.error('Failed to assign owner')
     },
   })
   const criticalityMutation = useMutation({
@@ -70,7 +75,11 @@ function AssetsPage() {
       })
     },
     onSuccess: async () => {
+      toast.success('Criticality updated')
       await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+    },
+    onError: () => {
+      toast.error('Failed to update criticality')
     },
   })
   const securityProfileMutation = useMutation({
@@ -78,10 +87,14 @@ function AssetsPage() {
       await assignAssetSecurityProfile({ data: payload })
     },
     onSuccess: async () => {
+      toast.success('Security profile assigned')
       if (selectedAssetId) {
         await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, selectedAssetId) })
       }
       await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+    },
+    onError: () => {
+      toast.error('Failed to assign security profile')
     },
   })
   const assetDetailQuery = useQuery({

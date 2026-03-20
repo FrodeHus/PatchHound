@@ -35,7 +35,7 @@ export function ThemeSelector() {
         applyTheme(nextThemeId)
       }}
     >
-      <SelectTrigger className="h-10 w-full justify-between rounded-xl border-border/70 bg-background/55 px-3" aria-label="Select theme">
+      <SelectTrigger className="h-10 w-full justify-between rounded-xl border-border/70 bg-background/50 px-3" aria-label="Select theme">
         <div className="flex items-center gap-2">
           <Palette className="size-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">Theme</span>

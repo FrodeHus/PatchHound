@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Bot, CircleAlert, CircleCheckBig, Sparkles } from 'lucide-react'
 import { fetchTenantAiProfiles } from '@/api/ai-settings.functions'
 import { generateAiReport } from '@/api/vulnerabilities.functions'
@@ -32,12 +33,18 @@ export function AiReportTab({ vulnerabilityId }: AiReportTabProps) {
           id: vulnerabilityId,
         },
       }),
+    onSuccess: () => {
+      toast.success('Report generated')
+    },
+    onError: () => {
+      toast.error('Failed to generate report')
+    },
   })
 
   const canGenerate = !profilesQuery.isLoading && !!defaultProfile && defaultProfileIsUsable
 
   return (
-    <section className="space-y-4 rounded-[22px] border border-border bg-card p-4">
+    <section className="space-y-4 rounded-2xl border border-border bg-card p-4">
       <header className="space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
@@ -64,7 +71,7 @@ export function AiReportTab({ vulnerabilityId }: AiReportTabProps) {
         {profilesQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading tenant AI configuration...</p>
         ) : defaultProfile ? (
-          <div className="rounded-[18px] border border-border/70 bg-muted/20 p-3">
+          <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <Badge>Default profile</Badge>
               <Badge variant="outline">{defaultProfile.providerType}</Badge>
@@ -80,20 +87,20 @@ export function AiReportTab({ vulnerabilityId }: AiReportTabProps) {
                 : 'Not validated yet.'}
             </p>
             {defaultProfile.lastValidationStatus === 'Invalid' ? (
-              <div className="mt-3 flex items-start gap-2 rounded-[16px] border border-destructive/25 bg-destructive/8 px-3 py-2 text-sm text-destructive">
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/25 bg-destructive/8 px-3 py-2 text-sm text-destructive">
                 <CircleAlert className="mt-0.5 size-4 shrink-0" />
                 <p>{defaultProfile.lastValidationError || 'The last validation attempt failed.'}</p>
               </div>
             ) : null}
             {defaultProfile.lastValidationStatus !== 'Valid' ? (
-              <div className={`mt-3 flex items-start gap-2 rounded-[16px] border border-tone-warning-border/25 bg-tone-warning/8 px-3 py-2 text-sm ${toneText('warning')}`}>
+              <div className={`mt-3 flex items-start gap-2 rounded-lg border border-tone-warning-border/25 bg-tone-warning/8 px-3 py-2 text-sm ${toneText('warning')}`}>
                 <CircleAlert className="mt-0.5 size-4 shrink-0" />
                 <p>AI report generation is disabled until the default profile validates successfully.</p>
               </div>
             ) : null}
           </div>
         ) : (
-          <div className="rounded-[18px] border border-dashed border-border bg-muted/20 p-4">
+          <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4">
             <div className="flex items-start gap-3">
               <CircleAlert className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <div className="space-y-3">
@@ -116,7 +123,7 @@ export function AiReportTab({ vulnerabilityId }: AiReportTabProps) {
       </header>
 
       {mutation.isSuccess ? (
-        <article className="rounded-[18px] border border-border bg-muted/25 p-4">
+        <article className="rounded-xl border border-border bg-muted/20 p-4">
           <div className="flex flex-wrap items-center gap-2">
             <CircleCheckBig className="size-4 text-primary" />
             <p className="text-sm font-medium">Report generated</p>
@@ -128,7 +135,7 @@ export function AiReportTab({ vulnerabilityId }: AiReportTabProps) {
             <Badge variant="outline">{formatDateTime(mutation.data.generatedAt)}</Badge>
           </div>
           <Separator className="my-4" />
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">
             <Sparkles className="size-3.5" />
             Generated markdown
           </div>
@@ -137,7 +144,7 @@ export function AiReportTab({ vulnerabilityId }: AiReportTabProps) {
       ) : null}
 
       {mutation.isError ? (
-        <div className="flex items-start gap-2 rounded-[18px] border border-destructive/25 bg-destructive/8 px-4 py-3 text-sm text-destructive">
+        <div className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/8 px-4 py-3 text-sm text-destructive">
           <CircleAlert className="mt-0.5 size-4 shrink-0" />
           <p>Failed to generate the AI report. Check the tenant AI profile settings and validation state.</p>
         </div>

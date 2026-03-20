@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Bot, CircleAlert, CircleCheckBig, Sparkles } from 'lucide-react'
 import { fetchTenantAiProfiles } from '@/api/ai-settings.functions'
 import { generateTenantSoftwareAiReport } from '@/api/software.functions'
@@ -32,6 +33,12 @@ export function SoftwareAiReportTab({ tenantSoftwareId }: SoftwareAiReportTabPro
           id: tenantSoftwareId,
         },
       }),
+    onSuccess: () => {
+      toast.success('Report generated')
+    },
+    onError: () => {
+      toast.error('Failed to generate report')
+    },
   })
 
   const canGenerate = !profilesQuery.isLoading && !!defaultProfile && defaultProfileIsUsable
@@ -64,7 +71,7 @@ export function SoftwareAiReportTab({ tenantSoftwareId }: SoftwareAiReportTabPro
         {profilesQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading tenant AI configuration...</p>
         ) : defaultProfile ? (
-          <div className="rounded-[18px] border border-border/70 bg-muted/20 p-3">
+          <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <Badge>Default profile</Badge>
               <Badge variant="outline">{defaultProfile.providerType}</Badge>
@@ -78,14 +85,14 @@ export function SoftwareAiReportTab({ tenantSoftwareId }: SoftwareAiReportTabPro
                 : 'Not validated yet.'}
             </p>
             {defaultProfile.lastValidationStatus !== 'Valid' ? (
-              <div className={`mt-3 flex items-start gap-2 rounded-[16px] ${toneSurface('warning')} px-3 py-2 text-sm text-tone-warning-foreground`}>
+              <div className={`mt-3 flex items-start gap-2 rounded-lg ${toneSurface('warning')} px-3 py-2 text-sm text-tone-warning-foreground`}>
                 <CircleAlert className="mt-0.5 size-4 shrink-0" />
                 <p>Software AI report generation is disabled until the default profile validates successfully.</p>
               </div>
             ) : null}
           </div>
         ) : (
-          <div className="rounded-[18px] border border-dashed border-border bg-muted/20 p-4">
+          <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4">
             <div className="flex items-start gap-3">
               <CircleAlert className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <div className="space-y-3">
@@ -108,7 +115,7 @@ export function SoftwareAiReportTab({ tenantSoftwareId }: SoftwareAiReportTabPro
       </header>
 
       {mutation.isSuccess ? (
-        <article className="rounded-[18px] border border-border bg-muted/25 p-4">
+        <article className="rounded-xl border border-border bg-muted/20 p-4">
           <div className="flex flex-wrap items-center gap-2">
             <CircleCheckBig className="size-4 text-primary" />
             <p className="text-sm font-medium">Report generated</p>
@@ -120,7 +127,7 @@ export function SoftwareAiReportTab({ tenantSoftwareId }: SoftwareAiReportTabPro
             <Badge variant="outline">{formatDateTime(mutation.data.generatedAt)}</Badge>
           </div>
           <Separator className="my-4" />
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">
             <Sparkles className="size-3.5" />
             Generated markdown
           </div>
@@ -129,7 +136,7 @@ export function SoftwareAiReportTab({ tenantSoftwareId }: SoftwareAiReportTabPro
       ) : null}
 
       {mutation.isError ? (
-        <div className="flex items-start gap-2 rounded-[18px] border border-destructive/25 bg-destructive/8 px-4 py-3 text-sm text-destructive">
+        <div className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/8 px-4 py-3 text-sm text-destructive">
           <CircleAlert className="mt-0.5 size-4 shrink-0" />
           <p>Failed to generate the software AI report. Check the tenant AI profile settings and validation state.</p>
         </div>

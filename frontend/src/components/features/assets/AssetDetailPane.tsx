@@ -291,7 +291,7 @@ export function AssetDetailPane({
                         key={vuln.vulnerabilityId}
                         to="/vulnerabilities/$id"
                         params={{ id: vuln.vulnerabilityId }}
-                        className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 transition hover:border-foreground/20 hover:bg-muted/40"
+                        className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 transition hover:border-foreground/20 hover:bg-muted/50"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">{vuln.title}</p>

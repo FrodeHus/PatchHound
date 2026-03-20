@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link, useMatches, useRouterState } from '@tanstack/react-router'
 import { ChevronRight, Home } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const segmentLabels: Record<string, string> = {
   vulnerabilities: 'Vulnerabilities',
@@ -90,7 +91,12 @@ export function Breadcrumbs() {
           <span key={crumb.to} className="flex items-center gap-1">
             <ChevronRight className="size-3 text-muted-foreground/50" />
             {isLast ? (
-              <span className="max-w-[200px] truncate font-medium text-foreground">{crumb.label}</span>
+              <Tooltip>
+                <TooltipTrigger>
+                  <span className="max-w-[200px] truncate font-medium text-foreground">{crumb.label}</span>
+                </TooltipTrigger>
+                <TooltipContent>{crumb.label}</TooltipContent>
+              </Tooltip>
             ) : (
               // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
               <Link to={crumb.to as any} search={crumb.search as any} className="text-muted-foreground/70 transition hover:text-foreground">

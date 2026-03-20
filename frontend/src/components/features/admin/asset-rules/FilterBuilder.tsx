@@ -1,5 +1,6 @@
 import { Plus, Trash2, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { FilterCondition, FilterGroup, FilterNode } from '@/api/asset-rules.schemas'
@@ -127,9 +128,16 @@ function FilterGroupEditor({
           {group.operator}
         </Button>
         {!isRoot && onRemove && (
-          <Button type="button" variant="ghost" size="sm" className="h-7 text-destructive" onClick={onRemove}>
-            <Trash2 className="size-3.5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button type="button" variant="ghost" size="sm" className="h-7 text-destructive" onClick={onRemove} />
+              }
+            >
+              <Trash2 className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>Delete group</TooltipContent>
+          </Tooltip>
         )}
       </div>
 
@@ -254,9 +262,16 @@ function FilterConditionEditor({
         />
       )}
 
-      <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0 text-destructive" onClick={onRemove}>
-        <Trash2 className="size-3.5" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0 text-destructive" onClick={onRemove} />
+          }
+        >
+          <Trash2 className="size-3.5" />
+        </TooltipTrigger>
+        <TooltipContent>Delete condition</TooltipContent>
+      </Tooltip>
     </div>
   )
 }

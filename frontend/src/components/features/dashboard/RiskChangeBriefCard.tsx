@@ -1,3 +1,4 @@
+import { Skeleton } from '@/components/ui/skeleton'
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
@@ -36,7 +37,7 @@ export function RiskChangeBriefCard({ brief, isLoading }: RiskChangeBriefCardPro
       <CardHeader className="p-5 pb-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Change brief</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Change brief</p>
             <CardTitle className="mt-2 text-xl font-semibold tracking-tight">Risk change brief</CardTitle>
           </div>
           <div className="flex items-center gap-2">
@@ -69,7 +70,7 @@ export function RiskChangeBriefCard({ brief, isLoading }: RiskChangeBriefCardPro
       </CardHeader>
       <CardContent className="p-5 pt-2">
         {activeLoading ? (
-          <div className="h-32 animate-pulse rounded-2xl bg-muted/60" />
+          <Skeleton className="h-32 " />
         ) : (
         <>
           <div className="grid gap-4 lg:grid-cols-2">

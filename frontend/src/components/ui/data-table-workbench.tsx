@@ -32,13 +32,13 @@ export function DataTableWorkbench({
   className,
 }: DataTableWorkbenchProps) {
   return (
-    <section className={cn('rounded-2xl border border-border/70 bg-card/82 shadow-sm', className)}>
+    <section className={cn('rounded-2xl border border-border/70 bg-card/85 shadow-sm', className)}>
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/60 px-5 py-5">
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
             {typeof totalCount === 'number' ? (
-              <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+              <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
                 {totalCount} total
               </Badge>
             ) : null}
@@ -165,7 +165,7 @@ export function DataTableActiveFilters({
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
-      <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Active filters</span>
+      <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Active filters</span>
       {filters.map((filter) => (
         <Badge key={filter.key} variant="outline" className="h-7 gap-2 rounded-full border-border/80 bg-card px-3">
           <span>{filter.label}</span>

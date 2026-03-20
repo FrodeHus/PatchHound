@@ -309,7 +309,7 @@ export function SoftwareTable({
           title="Exposure"
           description="Limit the catalog to software with current exposure or existing CPE coverage."
         >
-          <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-3 text-sm">
+          <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-3 text-sm">
             <Checkbox
               checked={draftFilters.vulnerableOnly}
               onCheckedChange={(checked) => {
@@ -322,7 +322,7 @@ export function SoftwareTable({
             <span>Vulnerable only</span>
           </label>
 
-          <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-3 text-sm">
+          <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-3 text-sm">
             <Checkbox
               checked={draftFilters.boundOnly}
               onCheckedChange={(checked) => {

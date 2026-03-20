@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { fetchUsers } from '@/api/users.functions'
 import { updateUserRoles } from '@/api/users.functions'
 import { fetchTenants } from '@/api/settings.functions'
@@ -42,7 +43,13 @@ function UsersPage() {
         },
       })
     },
-    onSuccess: () => { void router.invalidate() },
+    onSuccess: () => {
+      toast.success('User roles updated')
+      void router.invalidate()
+    },
+    onError: () => {
+      toast.error('Failed to update user roles')
+    },
   })
 
   return (

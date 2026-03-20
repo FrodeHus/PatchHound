@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { ArrowLeft, ArrowRight, Check, Eye, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import {
@@ -80,8 +81,12 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
       })
     },
     onSuccess: async () => {
+      toast.success(mode === 'create' ? 'Rule created' : 'Changes saved')
       await router.navigate({ to: '/admin/asset-rules', search: { page: 1, pageSize: 25 } })
       await router.invalidate()
+    },
+    onError: () => {
+      toast.error(mode === 'create' ? 'Failed to create rule' : 'Failed to save changes')
     },
   })
 

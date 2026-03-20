@@ -588,7 +588,7 @@ export function AssetManagementTable({
             className="flex-1"
           />
 
-          <div className="flex flex-col gap-2 rounded-[20px] border border-border/70 bg-background/55 px-4 py-3 lg:min-w-[340px]">
+          <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-background/50 px-4 py-3 lg:min-w-[340px]">
             <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
               Quick owner assignment
             </p>
@@ -719,7 +719,7 @@ export function AssetManagementTable({
             </Select>
           </DataTableField>
 
-          <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-3 text-sm">
+          <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-3 text-sm">
             <input
               type="checkbox"
               checked={draftFilters.unassignedOnly}
@@ -894,7 +894,7 @@ export function AssetManagementTable({
           description="Try clearing one or more filters, or broaden the search to bring more assets into the working set."
         />
       ) : (
-        <div className="overflow-hidden rounded-[24px] border border-border/70 bg-background/30">
+        <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/30">
           <DataTable
             columns={columns}
             data={assets}

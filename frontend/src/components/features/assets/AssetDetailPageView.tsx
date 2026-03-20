@@ -59,7 +59,7 @@ export function AssetDetailPageView({
               ) : null}
             </div>
           </div>
-          <div className="rounded-2xl border border-border/70 bg-background/45 p-4 text-right">
+          <div className="rounded-2xl border border-border/70 bg-background/50 p-4 text-right">
             <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
               External ID
             </p>
@@ -69,7 +69,7 @@ export function AssetDetailPageView({
       </header>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-        <section className="rounded-[28px] border border-border/70 bg-card p-4">
+        <section className="rounded-3xl border border-border/70 bg-card p-4">
           <div className="mb-4 flex flex-wrap gap-2">
             <TabButton
               label="Overview"
@@ -455,7 +455,7 @@ export function AssetDetailPageView({
 
         <aside className="space-y-4">
           <AssetSecureScorePanel assetId={asset.id} />
-          <section className="rounded-[28px] border border-border/70 bg-card p-4">
+          <section className="rounded-3xl border border-border/70 bg-card p-4">
             <SectionHeader
               title="Asset summary"
               description="Quick operational summary for this asset."
