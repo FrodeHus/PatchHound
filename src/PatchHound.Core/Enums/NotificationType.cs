@@ -8,4 +8,5 @@ public enum NotificationType
     RiskAcceptanceRequired,
     RiskAcceptanceDecision,
     TaskStatusChanged,
+    WorkflowNotification,
 }

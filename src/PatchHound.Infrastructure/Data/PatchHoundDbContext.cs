@@ -84,6 +84,10 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         Set<TenantSecureScoreTarget>();
     public DbSet<TenantSecureScoreSnapshot> TenantSecureScoreSnapshots =>
         Set<TenantSecureScoreSnapshot>();
+    public DbSet<WorkflowDefinition> WorkflowDefinitions => Set<WorkflowDefinition>();
+    public DbSet<WorkflowInstance> WorkflowInstances => Set<WorkflowInstance>();
+    public DbSet<WorkflowNodeExecution> WorkflowNodeExecutions => Set<WorkflowNodeExecution>();
+    public DbSet<WorkflowAction> WorkflowActions => Set<WorkflowAction>();
 
     public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken ct = default)
     {
@@ -256,6 +260,26 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantSecureScoreSnapshot>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+
+        // Workflow entities – TenantId is nullable (system workflows have null).
+        // System-scoped definitions are visible to all; tenant-scoped ones are filtered.
+        modelBuilder
+            .Entity<WorkflowDefinition>()
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || e.TenantId == null
+                || AccessibleTenantIds.Contains(e.TenantId.Value)
+            );
+        modelBuilder
+            .Entity<WorkflowInstance>()
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || e.TenantId == null
+                || AccessibleTenantIds.Contains(e.TenantId.Value)
+            );
+        modelBuilder
+            .Entity<WorkflowAction>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
     }
 }

@@ -16,6 +16,7 @@ builder.Services.AddHostedService<IngestionWorker>();
 builder.Services.AddHostedService<EnrichmentWorker>();
 builder.Services.AddHostedService<SoftwareDescriptionWorker>();
 builder.Services.AddHostedService<SlaCheckWorker>();
+builder.Services.AddHostedService<WorkflowWorker>();
 
 var host = builder.Build();
 

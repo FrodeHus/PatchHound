@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Building2, ChevronRight, DatabaseZap, GitBranchPlus, Settings2, ShieldCheck, ShieldEllipsis, Users } from 'lucide-react'
+import { Building2, ChevronRight, DatabaseZap, GitBranchPlus, Settings2, ShieldCheck, ShieldEllipsis, Users, Workflow } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({
@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_authed/admin/')({
 type AdminArea = {
   title: string
   description: string
-  to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/sources' | '/admin/security-profiles' | '/admin/asset-rules'
+  to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/sources' | '/admin/security-profiles' | '/admin/asset-rules' | '/admin/workflows'
   roles: Array<'GlobalAdmin' | 'SecurityManager'>
   icon: typeof Users
 }
@@ -56,6 +56,13 @@ const adminAreas: AdminArea[] = [
     to: '/admin/asset-rules',
     roles: ['GlobalAdmin', 'SecurityManager'],
     icon: GitBranchPlus,
+  },
+  {
+    title: 'Workflows',
+    description: 'Design and manage workflows for vulnerability triage, assignment routing, and human-in-the-loop approvals.',
+    to: '/admin/workflows',
+    roles: ['GlobalAdmin', 'SecurityManager'],
+    icon: Workflow,
   },
 ]
 

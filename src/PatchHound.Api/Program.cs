@@ -264,6 +264,14 @@ builder.Services.AddAuthorization(options =>
         Policies.ManageVault,
         policy => policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin))
     );
+
+    options.AddPolicy(
+        Policies.ManageWorkflows,
+        policy =>
+            policy.AddRequirements(
+                new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager)
+            )
+    );
 });
 
 builder.Services.AddScoped<IAuthorizationHandler, RoleRequirementHandler>();

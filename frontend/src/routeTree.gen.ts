@@ -35,8 +35,11 @@ import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/use
 import { Route as AuthedAdminTeamsRouteImport } from './routes/_authed/admin/teams'
 import { Route as AuthedAdminSourcesRouteImport } from './routes/_authed/admin/sources'
 import { Route as AuthedAdminSecurityProfilesRouteImport } from './routes/_authed/admin/security-profiles'
+import { Route as AuthedAdminWorkflowsIndexRouteImport } from './routes/_authed/admin/workflows/index'
 import { Route as AuthedAdminTenantsIndexRouteImport } from './routes/_authed/admin/tenants/index'
 import { Route as AuthedAdminAssetRulesIndexRouteImport } from './routes/_authed/admin/asset-rules/index'
+import { Route as AuthedAdminWorkflowsNewRouteImport } from './routes/_authed/admin/workflows/new'
+import { Route as AuthedAdminWorkflowsIdRouteImport } from './routes/_authed/admin/workflows/$id'
 import { Route as AuthedAdminTenantsIdRouteImport } from './routes/_authed/admin/tenants/$id'
 import { Route as AuthedAdminAssetRulesNewRouteImport } from './routes/_authed/admin/asset-rules/new'
 import { Route as AuthedAdminAssetRulesIdRouteImport } from './routes/_authed/admin/asset-rules/$id'
@@ -173,6 +176,12 @@ const AuthedAdminSecurityProfilesRoute =
     path: '/admin/security-profiles',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedAdminWorkflowsIndexRoute =
+  AuthedAdminWorkflowsIndexRouteImport.update({
+    id: '/admin/workflows/',
+    path: '/admin/workflows/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAdminTenantsIndexRoute = AuthedAdminTenantsIndexRouteImport.update({
   id: '/admin/tenants/',
   path: '/admin/tenants/',
@@ -184,6 +193,16 @@ const AuthedAdminAssetRulesIndexRoute =
     path: '/admin/asset-rules/',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedAdminWorkflowsNewRoute = AuthedAdminWorkflowsNewRouteImport.update({
+  id: '/admin/workflows/new',
+  path: '/admin/workflows/new',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAdminWorkflowsIdRoute = AuthedAdminWorkflowsIdRouteImport.update({
+  id: '/admin/workflows/$id',
+  path: '/admin/workflows/$id',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedAdminTenantsIdRoute = AuthedAdminTenantsIdRouteImport.update({
   id: '/admin/tenants/$id',
   path: '/admin/tenants/$id',
@@ -230,8 +249,11 @@ export interface FileRoutesByFullPath {
   '/admin/asset-rules/$id': typeof AuthedAdminAssetRulesIdRoute
   '/admin/asset-rules/new': typeof AuthedAdminAssetRulesNewRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
+  '/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
+  '/admin/workflows/new': typeof AuthedAdminWorkflowsNewRoute
   '/admin/asset-rules/': typeof AuthedAdminAssetRulesIndexRoute
   '/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
+  '/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -262,8 +284,11 @@ export interface FileRoutesByTo {
   '/admin/asset-rules/$id': typeof AuthedAdminAssetRulesIdRoute
   '/admin/asset-rules/new': typeof AuthedAdminAssetRulesNewRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
+  '/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
+  '/admin/workflows/new': typeof AuthedAdminWorkflowsNewRoute
   '/admin/asset-rules': typeof AuthedAdminAssetRulesIndexRoute
   '/admin/tenants': typeof AuthedAdminTenantsIndexRoute
+  '/admin/workflows': typeof AuthedAdminWorkflowsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -296,8 +321,11 @@ export interface FileRoutesById {
   '/_authed/admin/asset-rules/$id': typeof AuthedAdminAssetRulesIdRoute
   '/_authed/admin/asset-rules/new': typeof AuthedAdminAssetRulesNewRoute
   '/_authed/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
+  '/_authed/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
+  '/_authed/admin/workflows/new': typeof AuthedAdminWorkflowsNewRoute
   '/_authed/admin/asset-rules/': typeof AuthedAdminAssetRulesIndexRoute
   '/_authed/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
+  '/_authed/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -330,8 +358,11 @@ export interface FileRouteTypes {
     | '/admin/asset-rules/$id'
     | '/admin/asset-rules/new'
     | '/admin/tenants/$id'
+    | '/admin/workflows/$id'
+    | '/admin/workflows/new'
     | '/admin/asset-rules/'
     | '/admin/tenants/'
+    | '/admin/workflows/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -362,8 +393,11 @@ export interface FileRouteTypes {
     | '/admin/asset-rules/$id'
     | '/admin/asset-rules/new'
     | '/admin/tenants/$id'
+    | '/admin/workflows/$id'
+    | '/admin/workflows/new'
     | '/admin/asset-rules'
     | '/admin/tenants'
+    | '/admin/workflows'
   id:
     | '__root__'
     | '/_authed'
@@ -395,8 +429,11 @@ export interface FileRouteTypes {
     | '/_authed/admin/asset-rules/$id'
     | '/_authed/admin/asset-rules/new'
     | '/_authed/admin/tenants/$id'
+    | '/_authed/admin/workflows/$id'
+    | '/_authed/admin/workflows/new'
     | '/_authed/admin/asset-rules/'
     | '/_authed/admin/tenants/'
+    | '/_authed/admin/workflows/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -595,6 +632,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminSecurityProfilesRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/workflows/': {
+      id: '/_authed/admin/workflows/'
+      path: '/admin/workflows'
+      fullPath: '/admin/workflows/'
+      preLoaderRoute: typeof AuthedAdminWorkflowsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/admin/tenants/': {
       id: '/_authed/admin/tenants/'
       path: '/admin/tenants'
@@ -607,6 +651,20 @@ declare module '@tanstack/react-router' {
       path: '/admin/asset-rules'
       fullPath: '/admin/asset-rules/'
       preLoaderRoute: typeof AuthedAdminAssetRulesIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/admin/workflows/new': {
+      id: '/_authed/admin/workflows/new'
+      path: '/admin/workflows/new'
+      fullPath: '/admin/workflows/new'
+      preLoaderRoute: typeof AuthedAdminWorkflowsNewRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/admin/workflows/$id': {
+      id: '/_authed/admin/workflows/$id'
+      path: '/admin/workflows/$id'
+      fullPath: '/admin/workflows/$id'
+      preLoaderRoute: typeof AuthedAdminWorkflowsIdRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/admin/tenants/$id': {
@@ -654,8 +712,11 @@ interface AuthedRouteChildren {
   AuthedAdminAssetRulesIdRoute: typeof AuthedAdminAssetRulesIdRoute
   AuthedAdminAssetRulesNewRoute: typeof AuthedAdminAssetRulesNewRoute
   AuthedAdminTenantsIdRoute: typeof AuthedAdminTenantsIdRoute
+  AuthedAdminWorkflowsIdRoute: typeof AuthedAdminWorkflowsIdRoute
+  AuthedAdminWorkflowsNewRoute: typeof AuthedAdminWorkflowsNewRoute
   AuthedAdminAssetRulesIndexRoute: typeof AuthedAdminAssetRulesIndexRoute
   AuthedAdminTenantsIndexRoute: typeof AuthedAdminTenantsIndexRoute
+  AuthedAdminWorkflowsIndexRoute: typeof AuthedAdminWorkflowsIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -679,8 +740,11 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminAssetRulesIdRoute: AuthedAdminAssetRulesIdRoute,
   AuthedAdminAssetRulesNewRoute: AuthedAdminAssetRulesNewRoute,
   AuthedAdminTenantsIdRoute: AuthedAdminTenantsIdRoute,
+  AuthedAdminWorkflowsIdRoute: AuthedAdminWorkflowsIdRoute,
+  AuthedAdminWorkflowsNewRoute: AuthedAdminWorkflowsNewRoute,
   AuthedAdminAssetRulesIndexRoute: AuthedAdminAssetRulesIndexRoute,
   AuthedAdminTenantsIndexRoute: AuthedAdminTenantsIndexRoute,
+  AuthedAdminWorkflowsIndexRoute: AuthedAdminWorkflowsIndexRoute,
 }
 
 const AuthedRouteWithChildren =
@@ -700,12 +764,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
