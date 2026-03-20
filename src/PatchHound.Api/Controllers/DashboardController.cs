@@ -540,6 +540,107 @@ public class DashboardController : ControllerBase
             limit: null, highCriticalOnly: false, ct, cutoffHours));
     }
 
+    [HttpGet("heatmap")]
+    public async Task<ActionResult<List<HeatmapRowDto>>> GetHeatmap(
+        [FromQuery] DashboardFilterQuery filter,
+        [FromQuery] string groupBy = "deviceGroup",
+        CancellationToken ct = default
+    )
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var (filteredAssetIds, minPublishedDate) = BuildFilterContext(tenantId, filter);
+
+        var baseQuery = _dbContext
+            .VulnerabilityAssetEpisodes.AsNoTracking()
+            .Where(e =>
+                e.Status == VulnerabilityStatus.Open
+                && e.TenantVulnerability.TenantId == tenantId
+            );
+
+        if (filteredAssetIds != null)
+        {
+            baseQuery = baseQuery.Where(e => filteredAssetIds.Contains(e.AssetId));
+        }
+
+        if (minPublishedDate.HasValue)
+        {
+            baseQuery = baseQuery.Where(e =>
+                e.TenantVulnerability.VulnerabilityDefinition.PublishedDate <= minPublishedDate.Value
+            );
+        }
+
+        List<(string GroupName, Severity VendorSeverity, int Count)> rawRows;
+
+        switch (groupBy.ToLowerInvariant())
+        {
+            case "platform":
+                rawRows = (await baseQuery
+                    .Join(
+                        _dbContext.Assets.AsNoTracking(),
+                        e => e.AssetId,
+                        a => a.Id,
+                        (e, a) => new { e.TenantVulnerabilityId, GroupName = a.DeviceOsPlatform ?? "Unknown", e.TenantVulnerability.VulnerabilityDefinition.VendorSeverity }
+                    )
+                    .GroupBy(x => new { x.GroupName, x.VendorSeverity })
+                    .Select(g => new { g.Key.GroupName, g.Key.VendorSeverity, Count = g.Select(x => x.TenantVulnerabilityId).Distinct().Count() })
+                    .ToListAsync(ct))
+                    .Select(r => (r.GroupName, r.VendorSeverity, r.Count))
+                    .ToList();
+                break;
+
+            case "vendor":
+                rawRows = (await baseQuery
+                    .Select(e => new
+                    {
+                        e.TenantVulnerabilityId,
+                        GroupName = e.TenantVulnerability.VulnerabilityDefinition.ProductVendor ?? "Unknown",
+                        e.TenantVulnerability.VulnerabilityDefinition.VendorSeverity,
+                    })
+                    .GroupBy(x => new { x.GroupName, x.VendorSeverity })
+                    .Select(g => new { g.Key.GroupName, g.Key.VendorSeverity, Count = g.Select(x => x.TenantVulnerabilityId).Distinct().Count() })
+                    .ToListAsync(ct))
+                    .Select(r => (r.GroupName, r.VendorSeverity, r.Count))
+                    .ToList();
+                break;
+
+            default: // deviceGroup
+                rawRows = (await baseQuery
+                    .Join(
+                        _dbContext.Assets.AsNoTracking(),
+                        e => e.AssetId,
+                        a => a.Id,
+                        (e, a) => new { e.TenantVulnerabilityId, GroupName = a.DeviceGroupName ?? "Ungrouped", e.TenantVulnerability.VulnerabilityDefinition.VendorSeverity }
+                    )
+                    .GroupBy(x => new { x.GroupName, x.VendorSeverity })
+                    .Select(g => new { g.Key.GroupName, g.Key.VendorSeverity, Count = g.Select(x => x.TenantVulnerabilityId).Distinct().Count() })
+                    .ToListAsync(ct))
+                    .Select(r => (r.GroupName, r.VendorSeverity, r.Count))
+                    .ToList();
+                break;
+        }
+
+        var result = rawRows
+            .GroupBy(r => r.GroupName)
+            .Select(g => new
+            {
+                Label = g.Key,
+                Critical = g.Where(x => x.VendorSeverity == Severity.Critical).Sum(x => x.Count),
+                High = g.Where(x => x.VendorSeverity == Severity.High).Sum(x => x.Count),
+                Medium = g.Where(x => x.VendorSeverity == Severity.Medium).Sum(x => x.Count),
+                Low = g.Where(x => x.VendorSeverity == Severity.Low).Sum(x => x.Count),
+            })
+            .OrderByDescending(g => g.Critical + g.High + g.Medium + g.Low)
+            .Take(15)
+            .Select(g => new HeatmapRowDto(g.Label, g.Critical, g.High, g.Medium, g.Low))
+            .ToList();
+
+        return Ok(result);
+    }
+
     [HttpGet("trends")]
     public async Task<ActionResult<TrendDataDto>> GetTrends(
         [FromQuery] DashboardFilterQuery filter,

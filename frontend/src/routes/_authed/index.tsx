@@ -234,8 +234,7 @@ function DashboardPage() {
 
         <TabsContent value="risk" className="space-y-6 pt-2">
           <RiskHeatmap
-            data={summary.vulnerabilitiesByDeviceGroup}
-            isLoading={summaryQuery.isFetching}
+            filters={filterParams}
             onCellClick={(_group, severity) => {
               drillToVulnerabilities({ severity, presentOnly: true })
             }}

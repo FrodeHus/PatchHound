@@ -79,6 +79,14 @@ public record DeviceGroupVulnerabilityDto(
     int Low
 );
 
+public record HeatmapRowDto(
+    string Label,
+    int Critical,
+    int High,
+    int Medium,
+    int Low
+);
+
 public record DashboardFilterOptionsDto(
     string[] Platforms,
     string[] DeviceGroups

@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet } from '@/server/api'
-import { burndownTrendSchema, dashboardFilterOptionsSchema, dashboardRiskChangeBriefSchema, dashboardSummarySchema, trendDataSchema } from './dashboard.schemas'
+import { burndownTrendSchema, dashboardFilterOptionsSchema, dashboardRiskChangeBriefSchema, dashboardSummarySchema, heatmapResponseSchema, trendDataSchema } from './dashboard.schemas'
 import { z } from 'zod'
 
 const dashboardFilterSchema = z.object({
@@ -68,4 +68,23 @@ export const fetchDashboardFilterOptions = createServerFn({ method: 'GET' })
   .handler(async ({ context }) => {
     const data = await apiGet('/dashboard/filter-options', context)
     return dashboardFilterOptionsSchema.parse(data)
+  })
+
+export const fetchDashboardHeatmap = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({
+    groupBy: z.string().optional(),
+    minAgeDays: z.number().optional(),
+    platform: z.string().optional(),
+    deviceGroup: z.string().optional(),
+  }))
+  .handler(async ({ context, data: { groupBy, ...filters } }) => {
+    const params = new URLSearchParams()
+    if (groupBy) params.set('groupBy', groupBy)
+    if (filters.minAgeDays !== undefined) params.set('minAgeDays', String(filters.minAgeDays))
+    if (filters.platform) params.set('platform', filters.platform)
+    if (filters.deviceGroup) params.set('deviceGroup', filters.deviceGroup)
+    const qs = params.toString()
+    const data = await apiGet(`/dashboard/heatmap${qs ? `?${qs}` : ''}`, context)
+    return heatmapResponseSchema.parse(data)
   })
