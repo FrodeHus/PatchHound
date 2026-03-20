@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { RemediationTask } from '@/api/tasks.schemas'
 import { TaskStatusUpdate } from '@/components/features/tasks/TaskStatusUpdate'
@@ -71,12 +71,6 @@ export function TaskList({
 }: TaskListProps) {
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
   const [draftFilters, setDraftFilters] = useState({ status: statusFilter })
-
-  useEffect(() => {
-    if (!isFilterDrawerOpen) {
-      setDraftFilters({ status: statusFilter })
-    }
-  }, [isFilterDrawerOpen, statusFilter])
 
   const summaryItems = useMemo(() => {
     const overdue = tasks.filter((task) => task.isOverdue).length
@@ -218,7 +212,10 @@ export function TaskList({
 
       <WorkbenchFilterDrawer
         open={isFilterDrawerOpen}
-        onOpenChange={setIsFilterDrawerOpen}
+        onOpenChange={(open) => {
+          setIsFilterDrawerOpen(open)
+          if (!open) setDraftFilters({ status: statusFilter })
+        }}
         title="Task Filters"
         description="Focus the remediation queue by task state while keeping the update workflow in view."
         activeCount={activeStructuredFilterCount}

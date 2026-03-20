@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -49,6 +49,9 @@ function TeamsPage() {
     initialData: data.teams,
   })
 
+  // Use first team as fallback when nothing is explicitly selected
+  const effectiveTeamId = selectedTeamId ?? teamsQuery.data.items[0]?.id ?? null
+
   const createMutation = useMutation({
     mutationFn: async (payload: { name: string; tenantId: string }) => {
       await createTeam({ data: payload })
@@ -74,6 +77,7 @@ function TeamsPage() {
       toast.error('Failed to load assignment group details')
     },
   })
+  const { mutateAsync: fetchDetailAsync } = detailMutation
 
   const assetsMutation = useMutation({
     mutationFn: async (payload: {
@@ -95,6 +99,7 @@ function TeamsPage() {
         },
       }),
   })
+  const { mutateAsync: fetchAssetsAsync } = assetsMutation
 
   const assignAssetsMutation = useMutation({
     mutationFn: async (payload: { assetIds: string[]; teamId: string }) =>
@@ -108,8 +113,8 @@ function TeamsPage() {
     onSuccess: async () => {
       setSelectedAssetIds([])
       toast.success('Assets assigned')
-      if (selectedTeamId) {
-        await detailMutation.mutateAsync(selectedTeamId)
+      if (effectiveTeamId) {
+        await fetchDetailAsync(effectiveTeamId)
       }
       await router.invalidate()
     },
@@ -118,23 +123,31 @@ function TeamsPage() {
     },
   })
 
+  const selectTeam = useCallback((teamId: string | null) => {
+    setSelectedTeamId(teamId)
+    if (teamId) {
+      setDetailState('idle')
+      setAssetPage(1)
+      setSelectedAssetIds([])
+      void fetchDetailAsync(teamId)
+    }
+  }, [fetchDetailAsync])
+
+  // Fetch detail for the initial/fallback team selection
   useEffect(() => {
-    if (!selectedTeamId) {
+    if (!effectiveTeamId || detailMutation.data || detailMutation.isPending) {
       return
     }
+    void fetchDetailAsync(effectiveTeamId)
+  }, [effectiveTeamId, detailMutation.data, detailMutation.isPending, fetchDetailAsync])
 
-    setDetailState('idle')
-    setAssetPage(1)
-    void detailMutation.mutateAsync(selectedTeamId)
-  }, [selectedTeamId])
-
+  // Fetch assets when the detail's tenant or filter/pagination state changes
   useEffect(() => {
     if (!detailMutation.data?.tenantId) {
       return
     }
 
-    setSelectedAssetIds([])
-    void assetsMutation.mutateAsync({
+    void fetchAssetsAsync({
       tenantId: detailMutation.data.tenantId,
       search: filters.search,
       assetType: filters.assetType,
@@ -142,13 +155,7 @@ function TeamsPage() {
       page: assetPage,
       pageSize: assetPageSize,
     })
-  }, [detailMutation.data?.tenantId, filters.search, filters.assetType, filters.criticality, assetPage, assetPageSize])
-
-  useEffect(() => {
-    if (!selectedTeamId && teamsQuery.data.items[0]?.id) {
-      setSelectedTeamId(teamsQuery.data.items[0].id)
-    }
-  }, [selectedTeamId, teamsQuery.data.items])
+  }, [detailMutation.data?.tenantId, filters.search, filters.assetType, filters.criticality, assetPage, assetPageSize, fetchAssetsAsync])
 
   return (
     <section className="space-y-4">
