@@ -165,6 +165,7 @@ public static class DependencyInjection
 
         // Workflow Engine
         services.AddScoped<IWorkflowEngine, WorkflowEngine>();
+        services.AddScoped<IWorkflowTriggerService, WorkflowTriggerService>();
         services.AddScoped<IWorkflowNodeExecutor, StartNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, EndNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, AssignGroupNodeExecutor>();
@@ -172,6 +173,7 @@ public static class DependencyInjection
         services.AddScoped<IWorkflowNodeExecutor, SendNotificationNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, MergeNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, SystemTaskNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, WaitForActionNodeExecutor>();
 
         return services;
     }

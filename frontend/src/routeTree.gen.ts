@@ -25,6 +25,7 @@ import { Route as AuthedSettingsIndexRouteImport } from './routes/_authed/settin
 import { Route as AuthedAuditLogIndexRouteImport } from './routes/_authed/audit-log/index'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
 import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/index'
+import { Route as AuthedActionsIndexRouteImport } from './routes/_authed/actions/index'
 import { Route as ApiInternalEventsRouteImport } from './routes/api/internal/events'
 import { Route as AuthedVulnerabilitiesChangesRouteImport } from './routes/_authed/vulnerabilities/changes'
 import { Route as AuthedVulnerabilitiesIdRouteImport } from './routes/_authed/vulnerabilities/$id'
@@ -122,6 +123,11 @@ const AuthedAssetsIndexRoute = AuthedAssetsIndexRouteImport.update({
 const AuthedAdminIndexRoute = AuthedAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedActionsIndexRoute = AuthedActionsIndexRouteImport.update({
+  id: '/actions/',
+  path: '/actions/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const ApiInternalEventsRoute = ApiInternalEventsRouteImport.update({
@@ -239,6 +245,7 @@ export interface FileRoutesByFullPath {
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/vulnerabilities/changes': typeof AuthedVulnerabilitiesChangesRoute
   '/api/internal/events': typeof ApiInternalEventsRoute
+  '/actions/': typeof AuthedActionsIndexRoute
   '/admin/': typeof AuthedAdminIndexRoute
   '/assets/': typeof AuthedAssetsIndexRoute
   '/audit-log/': typeof AuthedAuditLogIndexRoute
@@ -274,6 +281,7 @@ export interface FileRoutesByTo {
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/vulnerabilities/changes': typeof AuthedVulnerabilitiesChangesRoute
   '/api/internal/events': typeof ApiInternalEventsRoute
+  '/actions': typeof AuthedActionsIndexRoute
   '/admin': typeof AuthedAdminIndexRoute
   '/assets': typeof AuthedAssetsIndexRoute
   '/audit-log': typeof AuthedAuditLogIndexRoute
@@ -311,6 +319,7 @@ export interface FileRoutesById {
   '/_authed/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/_authed/vulnerabilities/changes': typeof AuthedVulnerabilitiesChangesRoute
   '/api/internal/events': typeof ApiInternalEventsRoute
+  '/_authed/actions/': typeof AuthedActionsIndexRoute
   '/_authed/admin/': typeof AuthedAdminIndexRoute
   '/_authed/assets/': typeof AuthedAssetsIndexRoute
   '/_authed/audit-log/': typeof AuthedAuditLogIndexRoute
@@ -348,6 +357,7 @@ export interface FileRouteTypes {
     | '/vulnerabilities/$id'
     | '/vulnerabilities/changes'
     | '/api/internal/events'
+    | '/actions/'
     | '/admin/'
     | '/assets/'
     | '/audit-log/'
@@ -383,6 +393,7 @@ export interface FileRouteTypes {
     | '/vulnerabilities/$id'
     | '/vulnerabilities/changes'
     | '/api/internal/events'
+    | '/actions'
     | '/admin'
     | '/assets'
     | '/audit-log'
@@ -419,6 +430,7 @@ export interface FileRouteTypes {
     | '/_authed/vulnerabilities/$id'
     | '/_authed/vulnerabilities/changes'
     | '/api/internal/events'
+    | '/_authed/actions/'
     | '/_authed/admin/'
     | '/_authed/assets/'
     | '/_authed/audit-log/'
@@ -562,6 +574,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/actions/': {
+      id: '/_authed/actions/'
+      path: '/actions'
+      fullPath: '/actions/'
+      preLoaderRoute: typeof AuthedActionsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/api/internal/events': {
       id: '/api/internal/events'
       path: '/api/internal/events'
@@ -702,6 +721,7 @@ interface AuthedRouteChildren {
   AuthedSoftwareIdRoute: typeof AuthedSoftwareIdRoute
   AuthedVulnerabilitiesIdRoute: typeof AuthedVulnerabilitiesIdRoute
   AuthedVulnerabilitiesChangesRoute: typeof AuthedVulnerabilitiesChangesRoute
+  AuthedActionsIndexRoute: typeof AuthedActionsIndexRoute
   AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
   AuthedAssetsIndexRoute: typeof AuthedAssetsIndexRoute
   AuthedAuditLogIndexRoute: typeof AuthedAuditLogIndexRoute
@@ -730,6 +750,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSoftwareIdRoute: AuthedSoftwareIdRoute,
   AuthedVulnerabilitiesIdRoute: AuthedVulnerabilitiesIdRoute,
   AuthedVulnerabilitiesChangesRoute: AuthedVulnerabilitiesChangesRoute,
+  AuthedActionsIndexRoute: AuthedActionsIndexRoute,
   AuthedAdminIndexRoute: AuthedAdminIndexRoute,
   AuthedAssetsIndexRoute: AuthedAssetsIndexRoute,
   AuthedAuditLogIndexRoute: AuthedAuditLogIndexRoute,

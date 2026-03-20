@@ -10,22 +10,14 @@ import {
   type Connection,
   type Node,
   type Edge,
-  type NodeTypes,
   Panel,
   MarkerType,
   type OnSelectionChangeParams,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Button } from '@/components/ui/button'
-import { StartNode } from './nodes/StartNode'
-import { EndNode } from './nodes/EndNode'
-import { AssignGroupNode } from './nodes/AssignGroupNode'
-import { ConditionNode } from './nodes/ConditionNode'
-import { SendNotificationNode } from './nodes/SendNotificationNode'
-import { MergeNode } from './nodes/MergeNode'
-import { SystemTaskNode } from './nodes/SystemTaskNode'
-import { WaitForActionNode } from './nodes/WaitForActionNode'
 import { NodeConfigPanel } from './NodeConfigPanel'
+import { nodeTypeMap } from './nodeTypes'
 import type { TeamItem } from '@/api/teams.schemas'
 
 export type WorkflowGraph = {
@@ -46,17 +38,6 @@ const defaultGraph: WorkflowGraph = {
     { id: 'end', type: 'End', position: { x: 250, y: 400 }, data: { label: 'End' } },
   ],
   edges: [],
-}
-
-const nodeTypeMap: NodeTypes = {
-  Start: StartNode,
-  End: EndNode,
-  AssignGroup: AssignGroupNode,
-  Condition: ConditionNode,
-  SendNotification: SendNotificationNode,
-  Merge: MergeNode,
-  SystemTask: SystemTaskNode,
-  WaitForAction: WaitForActionNode,
 }
 
 const paletteItems = [

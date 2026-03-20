@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, Play, Archive, ChevronRight } from 'lucide-react'
-import { fetchWorkflowDefinitions, publishWorkflowDefinition, archiveWorkflowDefinition } from '@/api/workflows.functions'
+import { Plus, Play, Archive, ChevronRight, Trash2 } from 'lucide-react'
+import { fetchWorkflowDefinitions, publishWorkflowDefinition, archiveWorkflowDefinition, deleteWorkflowDefinition } from '@/api/workflows.functions'
 import type { WorkflowDefinitionItem } from '@/api/workflows.schemas'
 import { baseListSearchSchema } from '@/routes/-list-search'
 import { Badge } from '@/components/ui/badge'
@@ -84,6 +84,19 @@ function WorkflowsPage() {
     },
     onError: () => {
       toast.error('Failed to archive workflow')
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await deleteWorkflowDefinition({ data: { id } })
+    },
+    onSuccess: () => {
+      toast.success('Workflow deleted')
+      void router.invalidate()
+    },
+    onError: () => {
+      toast.error('Failed to delete workflow')
     },
   })
 
@@ -176,6 +189,17 @@ function WorkflowsPage() {
                             title="Archive"
                           >
                             <Archive className="size-4" />
+                          </Button>
+                        )}
+                        {def.status === 'Draft' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive"
+                            onClick={() => deleteMutation.mutate(def.id)}
+                            title="Delete"
+                          >
+                            <Trash2 className="size-4" />
                           </Button>
                         )}
                         <Link to="/admin/workflows/$id" params={{ id: def.id }}>

@@ -11,7 +11,6 @@ import {
 import type {
   AssetRule,
   AssetRuleOperation,
-  FilterCondition,
   FilterGroup,
   FilterPreview,
 } from '@/api/asset-rules.schemas'

@@ -1,9 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
-import { apiGet, apiPost, apiPut } from '@/server/api'
+import { apiDelete, apiGet, apiPost, apiPut } from '@/server/api'
 import {
   pagedWorkflowDefinitionsSchema,
   workflowDefinitionDetailSchema,
+  workflowInstanceSchema,
   pagedWorkflowInstancesSchema,
   workflowInstanceDetailSchema,
   pagedWorkflowActionsSchema,
@@ -84,6 +85,21 @@ export const archiveWorkflowDefinition = createServerFn({ method: 'POST' })
     await apiPost(`/workflows/definitions/${id}/archive`, context)
   })
 
+export const deleteWorkflowDefinition = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ id: z.string() }))
+  .handler(async ({ context, data: { id } }) => {
+    await apiDelete(`/workflows/definitions/${id}`, context)
+  })
+
+export const runWorkflowDefinition = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ id: z.string(), contextJson: z.string().optional() }))
+  .handler(async ({ context, data: { id, contextJson } }) => {
+    const data = await apiPost(`/workflows/definitions/${id}/run`, context, { contextJson })
+    return workflowInstanceSchema.parse(data)
+  })
+
 // ─── Instances ───────────────────────────────────────────
 
 export const fetchWorkflowInstances = createServerFn({ method: 'GET' })
@@ -133,6 +149,21 @@ export const fetchWorkflowActions = createServerFn({ method: 'GET' })
   .handler(async ({ context, data: filters }) => {
     const params = buildFilterParams(filters)
     const data = await apiGet(`/workflows/actions?${params.toString()}`, context)
+    return pagedWorkflowActionsSchema.parse(data)
+  })
+
+export const fetchMyWorkflowActions = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      status: z.string().optional(),
+      page: z.number().optional(),
+      pageSize: z.number().optional(),
+    }),
+  )
+  .handler(async ({ context, data: filters }) => {
+    const params = buildFilterParams(filters)
+    const data = await apiGet(`/workflows/actions/mine?${params.toString()}`, context)
     return pagedWorkflowActionsSchema.parse(data)
   })
 
