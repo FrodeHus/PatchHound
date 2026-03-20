@@ -44,7 +44,7 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
   const [description, setDescription] = useState(initialData?.description ?? '')
   const [filter, setFilter] = useState<FilterGroup>(
     initialData?.filterDefinition?.type === 'group'
-      ? (initialData.filterDefinition as FilterGroup)
+      ? initialData.filterDefinition
       : emptyFilter,
   )
   const [operations, setOperations] = useState<AssetRuleOperation[]>(
@@ -463,13 +463,13 @@ function FilterSummary({ group }: { group: FilterGroup }) {
           )}
           {child.type === 'group' ? (
             <div className="rounded border border-border/50 px-2 py-1">
-              <FilterSummary group={child as FilterGroup} />
+              <FilterSummary group={child} />
             </div>
           ) : (
             <span>
-              {(child as FilterCondition).field}{' '}
-              <span className="text-muted-foreground">{(child as FilterCondition).operator.toLowerCase()}</span>{' '}
-              <span className="font-medium">&ldquo;{(child as FilterCondition).value}&rdquo;</span>
+              {child.field}{' '}
+              <span className="text-muted-foreground">{child.operator.toLowerCase()}</span>{' '}
+              <span className="font-medium">&ldquo;{child.value}&rdquo;</span>
             </span>
           )}
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { fetchEnrichmentRuns, type EnrichmentRun } from '@/server/system.functions'
 import { Badge } from '@/components/ui/badge'
@@ -31,21 +31,23 @@ export function EnrichmentRunHistorySheet({
     mutationFn: async (input: { sourceKey: string; page: number; pageSize: number }) =>
       fetchEnrichmentRuns({ data: input }),
   })
+  const { mutateAsync: fetchRuns } = runsMutation
 
   useEffect(() => {
     if (!isOpen || !sourceKey) {
       return
     }
 
-    void runsMutation.mutateAsync({ sourceKey, page, pageSize })
-  }, [isOpen, page, pageSize, sourceKey])
+    void fetchRuns({ sourceKey, page, pageSize })
+  }, [isOpen, page, pageSize, sourceKey, fetchRuns])
 
-  useEffect(() => {
-    if (!isOpen) {
+  const handleOpenChange = useCallback((open: boolean) => {
+    if (!open) {
       setPage(1)
       setPageSize(10)
     }
-  }, [isOpen])
+    onOpenChange(open)
+  }, [onOpenChange])
 
   const data = runsMutation.data
   const runs = data?.items ?? []
@@ -55,7 +57,7 @@ export function EnrichmentRunHistorySheet({
   const successRate = runs.length ? Math.round((succeededRuns / runs.length) * 100) : 0
 
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+    <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="w-full overflow-y-auto border-l border-border/80 bg-background/80 p-0 sm:max-w-3xl">
         <SheetHeader className="border-b border-border/70 bg-muted/20">
           <SheetTitle>{sourceDisplayName ?? 'Enrichment history'}</SheetTitle>

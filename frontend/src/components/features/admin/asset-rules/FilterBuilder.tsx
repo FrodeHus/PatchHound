@@ -35,8 +35,7 @@ const assetTypes = [
 function getConstrainedAssetType(group: FilterGroup): string | null {
   for (const child of group.conditions) {
     if (child.type === 'condition') {
-      const cond = child as FilterCondition
-      if (cond.field === 'AssetType' && cond.operator === 'Equals') return cond.value
+      if (child.field === 'AssetType' && child.operator === 'Equals') return child.value
     }
   }
   return null
@@ -146,7 +145,7 @@ function FilterGroupEditor({
           child.type === 'group' ? (
             <FilterGroupEditor
               key={index}
-              group={child as FilterGroup}
+              group={child}
               onChange={(updated) => updateChild(index, updated)}
               onRemove={() => removeChild(index)}
               ancestors={currentAncestors}
@@ -154,7 +153,7 @@ function FilterGroupEditor({
           ) : (
             <FilterConditionEditor
               key={index}
-              condition={child as FilterCondition}
+              condition={child}
               onChange={(updated) => updateChild(index, updated)}
               onRemove={() => removeChild(index)}
               ancestors={currentAncestors}
