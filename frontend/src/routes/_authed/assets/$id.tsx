@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { assignAssetSecurityProfile, fetchAssetDetail } from '@/api/assets.functions'
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { AssetDetailPageView } from '@/components/features/assets/AssetDetailPageView'
@@ -35,8 +36,12 @@ function AssetDetailPage() {
       await assignAssetSecurityProfile({ data: { assetId: id, securityProfileId } })
     },
     onSuccess: async () => {
+      toast.success('Security profile assigned')
       await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, id) })
       await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+    },
+    onError: () => {
+      toast.error('Failed to assign security profile')
     },
   })
   if (!asset) {

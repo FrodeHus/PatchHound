@@ -509,7 +509,7 @@ function Metric({
 }) {
   return (
     <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
-      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
       <p className={`mt-2 text-sm ${mono ? 'font-mono text-xs break-all' : 'font-medium'} ${toneText(tone)}`}>
         {value}
       </p>

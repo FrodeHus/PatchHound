@@ -149,16 +149,16 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
         <CardContent className="space-y-6 px-6 py-6 sm:px-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {currentStep.label}
               </p>
-              <h2 className="text-xl font-semibold tracking-[-0.03em] text-foreground">
+              <h2 className="text-xl font-semibold tracking-[-0.04em] text-foreground">
                 {currentStep.title}
               </h2>
               <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{currentStep.description}</p>
             </div>
 
-            <div className="rounded-2xl border border-border/70 bg-muted/40 px-4 py-3 text-sm">
+            <div className="rounded-2xl border border-border/70 bg-muted/50 px-4 py-3 text-sm">
               <p className="font-medium text-foreground">{setupContext.adminDisplayName}</p>
               <p className="text-muted-foreground">{setupContext.adminEmail}</p>
             </div>
@@ -183,7 +183,7 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
                 )}
               />
 
-              <div className="rounded-2xl border border-border/70 bg-muted/40 p-4 text-sm text-muted-foreground">
+              <div className="rounded-2xl border border-border/70 bg-muted/50 p-4 text-sm text-muted-foreground">
                 Entra tenant: <span className="font-medium text-foreground">{setupContext.entraTenantId}</span>
               </div>
 
@@ -195,7 +195,7 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
 
           {stepIndex === 1 ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-muted/40 p-4">
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-muted/50 p-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-foreground">Set up Microsoft Defender now</p>
@@ -270,7 +270,7 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
 
           {stepIndex === 2 ? (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-border/70 bg-muted/40 p-4">
+              <div className="rounded-2xl border border-border/70 bg-muted/50 p-4">
                 <dl className="grid gap-4 text-sm sm:grid-cols-2">
                   <div>
                     <dt className="text-muted-foreground">Workspace name</dt>

@@ -88,7 +88,7 @@ export function Sidebar({
           </div>
           {showLabels ? (
             <div className="min-w-0">
-              <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                 PatchHound Console
               </div>
               <div className="text-lg font-semibold tracking-tight">

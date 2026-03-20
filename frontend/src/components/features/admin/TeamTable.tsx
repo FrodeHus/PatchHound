@@ -120,7 +120,7 @@ export function TeamTable({
           description="Create a group first, then open it to start assigning assets."
         />
       ) : (
-        <div className="overflow-hidden rounded-[24px] border border-border/70 bg-background/30">
+        <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/30">
           <DataTable columns={columns} data={teams} getRowId={(row) => row.id} className="min-w-[860px]" />
         </div>
       )}

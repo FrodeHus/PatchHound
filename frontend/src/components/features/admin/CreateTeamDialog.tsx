@@ -21,7 +21,7 @@ export function CreateTeamDialog({ isSubmitting, tenants, onCreate }: CreateTeam
         <Badge variant="outline" className="w-fit rounded-full border-primary/20 bg-primary/10 text-primary">
           New Assignment Group
         </Badge>
-        <CardTitle className="text-2xl font-semibold tracking-[-0.03em]">
+        <CardTitle className="text-2xl font-semibold tracking-[-0.04em]">
           Create an ownership lane for a tenant, then assign assets into it in bulk.
         </CardTitle>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
@@ -76,7 +76,7 @@ export function CreateTeamDialog({ isSubmitting, tenants, onCreate }: CreateTeam
           </div>
         </div>
 
-        <div className="rounded-3xl border border-border/70 bg-background/35 p-4">
+        <div className="rounded-3xl border border-border/70 bg-background/30 p-4">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Recommended Pattern</p>
           <div className="mt-4 space-y-2">
             <GuideRow label="Scope" value="One tenant per group" />
@@ -91,7 +91,7 @@ export function CreateTeamDialog({ isSubmitting, tenants, onCreate }: CreateTeam
 
 function GuideRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-3 py-3">
+    <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-card/75 px-3 py-3">
       <span className="text-sm font-medium text-foreground">{label}</span>
       <span className="max-w-[14rem] text-right text-xs text-muted-foreground">{value}</span>
     </div>

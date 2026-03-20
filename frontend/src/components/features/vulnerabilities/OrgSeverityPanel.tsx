@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { updateOrganizationalSeverity } from '@/api/vulnerabilities.functions'
 import type { VulnerabilityDetail } from '@/api/vulnerabilities.schemas'
 import { Button } from '@/components/ui/button'
@@ -21,6 +22,12 @@ export function OrgSeverityPanel({ vulnerability }: OrgSeverityPanelProps) {
           ...payload,
         },
       }),
+    onSuccess: () => {
+      toast.success('Severity adjustment saved')
+    },
+    onError: () => {
+      toast.error('Failed to save severity adjustment')
+    },
   })
   const [adjustedSeverity, setAdjustedSeverity] = useState(
     vulnerability.organizationalSeverity?.adjustedSeverity ?? vulnerability.vendorSeverity,

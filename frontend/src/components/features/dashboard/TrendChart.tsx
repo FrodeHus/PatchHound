@@ -1,3 +1,4 @@
+import { Skeleton } from '@/components/ui/skeleton'
 import { useMemo } from 'react'
 import {
   Area,
@@ -83,7 +84,7 @@ export function TrendChart({ data, embedded = false, isLoading, onSeverityClick 
   const header = (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Trendline</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Trendline</p>
         <CardTitle className="mt-2 text-xl font-semibold tracking-tight">Open vulnerability trend over 90 days</CardTitle>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -105,7 +106,7 @@ export function TrendChart({ data, embedded = false, isLoading, onSeverityClick 
   )
 
   const chart = isLoading ? (
-    <div className="h-[320px] w-full animate-pulse rounded-2xl bg-muted/60" />
+    <Skeleton className="h-[320px] w-full " />
   ) : (
     <div className={embedded ? 'mt-5 h-[320px] w-full' : 'h-[320px] w-full'}>
       <ResponsiveContainer width="100%" height="100%">

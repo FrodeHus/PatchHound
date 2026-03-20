@@ -20,8 +20,8 @@ export function TenantSelector({
   const isSingleTenant = tenants.length === 1
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-border/70 bg-card/72 px-2 py-2 backdrop-blur-xl">
-      <div className="hidden items-center gap-2 rounded-full bg-background/55 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground lg:flex">
+    <div className="flex items-center gap-2 rounded-full border border-border/70 bg-card/85 px-2 py-2 backdrop-blur-xl">
+      <div className="hidden items-center gap-2 rounded-full bg-background/50 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground lg:flex">
         <Building2 className="size-3.5 text-primary" />
         Operating scope
       </div>

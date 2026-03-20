@@ -36,7 +36,7 @@ export function TimelineTab({ items }: TimelineTabProps) {
                     {item.action}
                   </span>
                   {item.entityLabel ? (
-                    <span className="rounded-full border border-border/80 bg-card px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    <span className="rounded-full border border-border/80 bg-card px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                       {item.entityLabel}
                     </span>
                   ) : null}

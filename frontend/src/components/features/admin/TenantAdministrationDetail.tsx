@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { ArrowLeft, CircleHelp, Landmark } from 'lucide-react'
 import { updateTenant } from '@/api/settings.functions'
 import type { TenantDetail } from '@/api/settings.schemas'
@@ -64,10 +65,12 @@ export function TenantAdministrationDetail({
     },
     onSuccess: () => {
       setSaveState('saved')
+      toast.success('Tenant configuration saved')
       void router.invalidate()
     },
     onError: () => {
       setSaveState('error')
+      toast.error('Failed to save tenant configuration')
     },
   })
 
@@ -130,7 +133,7 @@ export function TenantAdministrationDetail({
                   label="Entra Tenant ID"
                   tooltip="Read-only identity used to link the tenant to Microsoft Entra."
                   control={(
-                    <div className="rounded-lg border border-border/75 bg-muted/55 px-3 py-3 text-sm text-muted-foreground">
+                    <div className="rounded-lg border border-border/70 bg-muted/55 px-3 py-3 text-sm text-muted-foreground">
                       {tenant.entraTenantId}
                     </div>
                   )}

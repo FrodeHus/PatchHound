@@ -37,11 +37,11 @@ export function AuditDetailDialog({ selected, onClose }: AuditDetailDialogProps)
         <div className="grid gap-3 md:grid-cols-2">
           <section>
             <h4 className="mb-1 text-sm font-medium">Old Values</h4>
-            <pre className="max-h-80 overflow-auto rounded-md border border-border/80 bg-muted/65 p-2 text-xs">{selected.oldValues ?? '(none)'}</pre>
+            <pre className="max-h-80 overflow-auto rounded-md border border-border/80 bg-muted/60 p-2 text-xs">{selected.oldValues ?? '(none)'}</pre>
           </section>
           <section>
             <h4 className="mb-1 text-sm font-medium">New Values</h4>
-            <pre className="max-h-80 overflow-auto rounded-md border border-border/80 bg-muted/65 p-2 text-xs">{selected.newValues ?? '(none)'}</pre>
+            <pre className="max-h-80 overflow-auto rounded-md border border-border/80 bg-muted/60 p-2 text-xs">{selected.newValues ?? '(none)'}</pre>
           </section>
         </div>
         </div>

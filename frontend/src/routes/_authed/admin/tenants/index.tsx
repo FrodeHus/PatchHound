@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate, useRouter } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { createTenant, fetchTenants } from '@/api/settings.functions'
 import { TenantAdministrationList } from '@/components/features/admin/TenantAdministrationList'
 import { baseListSearchSchema } from '@/routes/-list-search'
@@ -26,8 +27,12 @@ function TenantAdministrationPage() {
   const createMutation = useMutation({
     mutationFn: createTenant,
     onSuccess: async (tenant) => {
+      toast.success('Tenant created')
       await router.invalidate()
       await navigate({ to: '/admin/tenants/$id', params: { id: tenant.id } })
+    },
+    onError: () => {
+      toast.error('Failed to create tenant')
     },
   })
 

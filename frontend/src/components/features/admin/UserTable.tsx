@@ -122,7 +122,7 @@ export function UserTable({
           description="Once authenticated users are provisioned and assigned roles, they will appear here."
         />
       ) : (
-        <div className="overflow-hidden rounded-[24px] border border-border/70 bg-background/30">
+        <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/30">
           <DataTable columns={columns} data={users} getRowId={(row) => row.id} className="min-w-[980px]" />
         </div>
       )}

@@ -22,7 +22,7 @@ function InsetPanel({
         emphasis === "strong"
           ? "border-border/85 bg-card"
           : emphasis === "subtle"
-            ? "border-border/75 bg-muted/45"
+            ? "border-border/70 bg-muted/50"
             : "border-border/80 bg-muted/60",
         className,
       )}

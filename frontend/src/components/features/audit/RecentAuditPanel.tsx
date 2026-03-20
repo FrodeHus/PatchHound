@@ -20,7 +20,7 @@ export function RecentAuditPanel({
   emptyMessage,
 }: RecentAuditPanelProps) {
   return (
-    <Card className="rounded-[28px]">
+    <Card className="rounded-3xl">
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div className="space-y-1">
           <CardTitle>{title}</CardTitle>

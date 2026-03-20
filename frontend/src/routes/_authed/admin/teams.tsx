@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { bulkAssignAssets, fetchAssets } from '@/api/assets.functions'
 import { fetchTenants } from '@/api/settings.functions'
 import { createTeam, fetchTeamDetail, fetchTeams } from '@/api/teams.functions'
@@ -57,10 +58,12 @@ function TeamsPage() {
     },
     onSuccess: async () => {
       setCreateState('success')
+      toast.success('Assignment group created')
       await router.invalidate()
     },
     onError: () => {
       setCreateState('error')
+      toast.error('Failed to create assignment group')
     },
   })
 
@@ -68,6 +71,7 @@ function TeamsPage() {
     mutationFn: async (teamId: string) => fetchTeamDetail({ data: { teamId } }),
     onError: () => {
       setDetailState('error')
+      toast.error('Failed to load assignment group details')
     },
   })
 
@@ -103,10 +107,14 @@ function TeamsPage() {
       }),
     onSuccess: async () => {
       setSelectedAssetIds([])
+      toast.success('Assets assigned')
       if (selectedTeamId) {
         await detailMutation.mutateAsync(selectedTeamId)
       }
       await router.invalidate()
+    },
+    onError: () => {
+      toast.error('Failed to assign assets')
     },
   })
 

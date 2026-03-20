@@ -272,7 +272,7 @@ export function TenantAdministrationList({
             description="Create the first tenant to start configuring ingestion sources and inventory policy."
           />
         ) : (
-          <div className="overflow-hidden rounded-[24px] border border-border/80 bg-muted/55">
+          <div className="overflow-hidden rounded-2xl border border-border/80 bg-muted/55">
             <DataTable columns={columns} data={tenants} getRowId={(row) => row.id} className="min-w-[980px]" />
           </div>
         )}
@@ -292,7 +292,7 @@ export function TenantAdministrationList({
 
 function SetupRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded-xl border border-border/80 bg-card/88 px-3 py-3">
+    <div className="flex items-start justify-between gap-3 rounded-xl border border-border/80 bg-card/85 px-3 py-3">
       <span className="text-sm font-medium text-foreground">{label}</span>
       <span className="max-w-[16rem] text-right text-xs text-muted-foreground">{value}</span>
     </div>

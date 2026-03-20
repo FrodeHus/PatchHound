@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { z } from 'zod'
 import { ArrowLeft, CircleHelp, PenSquare, Plus, ShieldCheck, Signal, TriangleAlert } from 'lucide-react'
 import { fetchAuditLog } from '@/api/audit-log.functions'
@@ -179,11 +180,15 @@ function SecurityProfilesPage() {
       await createSecurityProfile({ data: payload })
     },
     onSuccess: async () => {
+      toast.success('Security profile saved')
       await queryClient.invalidateQueries({ queryKey: ['security-profiles'] })
       if (canViewAudit) {
         await queryClient.invalidateQueries({ queryKey: ['audit-log', 'AssetSecurityProfile', selectedTenantId] })
       }
       closeEditor()
+    },
+    onError: () => {
+      toast.error('Failed to save security profile')
     },
   })
 
@@ -274,7 +279,7 @@ function SecurityProfilesPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border/70 bg-card/82">
+        <Card className="rounded-2xl border-border/70 bg-card/85">
           <CardHeader>
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
@@ -510,7 +515,7 @@ function SecurityProfileEditorPage({
                 <FieldBlock
                   label="Active Tenant"
                   description="This form follows the tenant scope in the top navigation."
-                  control={<div className="rounded-lg border border-border/75 bg-muted/55 px-3 py-3 text-sm font-medium">{selectedTenantName}</div>}
+                  control={<div className="rounded-lg border border-border/70 bg-muted/55 px-3 py-3 text-sm font-medium">{selectedTenantName}</div>}
                 />
                 <FieldBlock
                   label="Profile Name"
@@ -1069,7 +1074,7 @@ function ProfileMetric({
     <InsetPanel emphasis="strong" className="p-3">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-        <Badge variant="outline" className="rounded-full border-border/80 bg-muted/75 text-foreground">
+        <Badge variant="outline" className="rounded-full border-border/80 bg-muted/80 text-foreground">
           {value}
         </Badge>
       </div>

@@ -4,8 +4,10 @@ import {
   Outlet,
   Scripts,
 } from '@tanstack/react-router'
+import { RouteError } from '@/components/ui/error-boundary'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '@/styles/app.css'
+import { Toaster } from 'sonner'
 import { getCurrentUser, type CurrentUser } from '@/server/auth.functions'
 import { defaultThemeId, themeStorageKey, themeOptions } from '@/lib/themes'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -30,6 +32,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     return { user }
   },
   component: RootDocument,
+  errorComponent: RouteError,
 })
 
 function RootDocument() {
@@ -58,6 +61,7 @@ function RootDocument() {
           <TooltipProvider>
             <Outlet />
           </TooltipProvider>
+          <Toaster richColors position="bottom-right" />
         </QueryClientProvider>
         <Scripts />
       </body>

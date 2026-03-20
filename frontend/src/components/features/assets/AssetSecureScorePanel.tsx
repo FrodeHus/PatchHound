@@ -24,7 +24,7 @@ export function AssetSecureScorePanel({ assetId }: Props) {
   if (isError) return null
   if (isFetching && !data) {
     return (
-      <section className="rounded-[28px] border border-border/70 bg-card p-4">
+      <section className="rounded-3xl border border-border/70 bg-card p-4">
         <div className="h-32 animate-pulse rounded-xl bg-muted/60" />
       </section>
     )
@@ -44,7 +44,7 @@ function ScoreContent({ score }: { score: AssetScoreDetail }) {
   const tone = posture;
 
   return (
-    <section className="rounded-[28px] border border-border/70 bg-card p-4">
+    <section className="rounded-3xl border border-border/70 bg-card p-4">
       <div className="flex items-center gap-2">
         <Shield className="size-4 text-primary" />
         <h2 className="text-lg font-semibold">Secure Score</h2>

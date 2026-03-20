@@ -11,10 +11,10 @@ export function SetupAccessDialog({ message }: SetupAccessDialogProps) {
       <DialogContent showCloseButton={false} className="w-full max-w-lg rounded-2xl border-border/80 bg-card p-6 sm:max-w-lg">
         <div className="space-y-3">
           <DialogHeader className="p-0">
-            <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${toneText('warning')}`}>
+            <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${toneText('warning')}`}>
               Setup blocked
             </p>
-            <DialogTitle className="mt-2 text-2xl font-semibold tracking-[-0.03em]">
+            <DialogTitle className="mt-2 text-2xl font-semibold tracking-[-0.04em]">
               Tenant.Admin is required
             </DialogTitle>
           </DialogHeader>

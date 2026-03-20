@@ -59,9 +59,7 @@ export function Badge({
   )
 }
 
-export function SkeletonBlock({ className }: { className: string }) {
-  return <div className={`animate-pulse rounded-2xl bg-muted/50 ${className}`} />
-}
+export { Skeleton as SkeletonBlock } from '@/components/ui/skeleton'
 
 export function KeyValueGrid({ metadata }: { metadata: MetadataRecord }) {
   return (

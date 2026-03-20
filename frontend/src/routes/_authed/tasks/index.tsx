@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { fetchTasks } from '@/api/tasks.functions'
 import { updateTaskStatus } from '@/api/tasks.functions'
 import { TaskList } from '@/components/features/tasks/TaskList'
@@ -40,7 +41,11 @@ function TasksPage() {
       })
     },
     onSuccess: async () => {
+      toast.success('Task status updated')
       await queryClient.invalidateQueries({ queryKey: taskQueryKeys.all })
+    },
+    onError: () => {
+      toast.error('Failed to update task status')
     },
   })
 

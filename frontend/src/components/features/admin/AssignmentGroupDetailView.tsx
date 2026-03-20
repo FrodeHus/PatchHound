@@ -57,7 +57,7 @@ export function AssignmentGroupDetailView({
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <CardTitle className="text-2xl font-semibold tracking-[-0.03em]">{team.name}</CardTitle>
+                <CardTitle className="text-2xl font-semibold tracking-[-0.04em]">{team.name}</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {team.tenantName} ownership lane with {team.assignedAssetCount} assets currently assigned.
                 </p>
@@ -73,10 +73,10 @@ export function AssignmentGroupDetailView({
               <SummaryMetric label="Assigned Assets" value={String(team.assignedAssetCount)} />
             </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+            <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
               {team.members.length} members
             </Badge>
-            <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+            <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
               {team.tenantName}
             </Badge>
           </div>
@@ -186,12 +186,12 @@ export function AssignmentGroupDetailView({
                         </div>
                       </td>
                       <td className="px-4 py-3 pr-2">
-                        <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+                        <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
                           {asset.assetType}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 pr-2">
-                        <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+                        <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
                           {asset.criticality}
                         </Badge>
                       </td>

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   Bot,
@@ -49,7 +50,7 @@ function SettingsPage() {
           search={{ page: 1, pageSize: 25 }}
           className="group"
         >
-          <Card className="rounded-2xl border-border/70 bg-card/82 transition-colors group-hover:border-primary/35">
+          <Card className="rounded-2xl border-border/70 bg-card/85 transition-colors group-hover:border-primary/35">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Tenant Administration</CardTitle>
@@ -64,7 +65,7 @@ function SettingsPage() {
         </Link>
 
         <Link to="/settings/ai" className="group">
-          <Card className="rounded-2xl border-border/70 bg-card/82 transition-colors group-hover:border-primary/35">
+          <Card className="rounded-2xl border-border/70 bg-card/85 transition-colors group-hover:border-primary/35">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
@@ -125,11 +126,15 @@ function SecureScoreTargetCard() {
     mutationFn: (targetScore: number) =>
       updateSecureScoreTarget({ data: { targetScore } }),
     onSuccess: async () => {
+      toast.success("Target score saved");
       await queryClient.invalidateQueries({ queryKey: ["secure-score"] });
       setDraft(null);
       setSaved(true);
       const id = window.setTimeout(() => setSaved(false), 2000);
       return () => window.clearTimeout(id);
+    },
+    onError: () => {
+      toast.error("Failed to save target score");
     },
   });
 
@@ -143,7 +148,7 @@ function SecureScoreTargetCard() {
     isValid && currentTarget != null && parsed !== currentTarget;
 
   return (
-    <Card className="rounded-2xl border-border/70 bg-card/82">
+    <Card className="rounded-2xl border-border/70 bg-card/85">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Security Posture Settings</CardTitle>

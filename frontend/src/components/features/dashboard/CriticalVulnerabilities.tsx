@@ -1,3 +1,4 @@
+import { Skeleton } from '@/components/ui/skeleton'
 import { useNavigate } from '@tanstack/react-router'
 import type { DashboardSummary, TopVulnerability } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
@@ -26,7 +27,7 @@ export function CriticalVulnerabilities({ items, summary, isLoading }: CriticalV
       <CardHeader className="p-5 pb-2">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Priority queue</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Priority queue</p>
             <CardTitle className="mt-2 text-xl font-semibold tracking-tight">Top critical vulnerabilities</CardTitle>
           </div>
           <Badge className="rounded-full border border-destructive/20 bg-destructive/10 text-destructive hover:bg-destructive/10">
@@ -36,16 +37,16 @@ export function CriticalVulnerabilities({ items, summary, isLoading }: CriticalV
       </CardHeader>
       <CardContent className="overflow-x-auto p-5 pt-1">
         {isLoading ? (
-          <div className="h-64 animate-pulse rounded-2xl bg-muted/60" />
+          <Skeleton className="h-64 " />
         ) : (
         <>
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-border/70 bg-background/35 p-4">
+          <div className="rounded-2xl border border-border/70 bg-background/30 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Recurring vulnerabilities</p>
             <p className="mt-2 text-2xl font-semibold">{summary.recurringVulnerabilityCount}</p>
             <p className="mt-1 text-xs text-muted-foreground">{summary.recurrenceRatePercent}% of tracked vulnerability-asset histories have recurred.</p>
           </div>
-          <div className="rounded-2xl border border-border/70 bg-background/35 p-4">
+          <div className="rounded-2xl border border-border/70 bg-background/30 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Top recurring asset</p>
             <p className="mt-2 text-sm font-semibold">{summary.topRecurringAssets[0]?.name ?? 'No recurring assets yet'}</p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -107,14 +108,14 @@ export function CriticalVulnerabilities({ items, summary, isLoading }: CriticalV
           </TableBody>
         </Table>
         {summary.topRecurringVulnerabilities.length > 0 ? (
-          <div className="mt-5 rounded-2xl border border-border/70 bg-background/35 p-4">
+          <div className="mt-5 rounded-2xl border border-border/70 bg-background/30 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Top recurring CVEs</p>
             <div className="mt-3 space-y-2">
               {summary.topRecurringVulnerabilities.map((item) => (
                 <button
                   key={item.id}
                   type="button"
-                  className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-left hover:bg-accent/20"
+                  className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/75 px-3 py-2 text-left hover:bg-accent/20"
                   onClick={() => {
                     void navigate({ to: '/vulnerabilities/$id', params: { id: item.id } })
                   }}

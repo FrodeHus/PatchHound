@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   Menu,
@@ -68,8 +69,12 @@ export function TopNav({
     mutationFn: (keys: [string, string, string]) =>
       unsealOpenBao({ data: { keys } }),
     onSuccess: async () => {
+      toast.success("OpenBao unsealed");
       setIsUnsealDialogOpen(false);
       await router.invalidate();
+    },
+    onError: () => {
+      toast.error("Failed to unseal OpenBao");
     },
   });
 
