@@ -1,7 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Flame } from 'lucide-react'
-import type { DashboardSummary } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -9,11 +9,24 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { fetchDashboardHeatmap } from '@/api/dashboard.functions'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+
+type HeatmapGroupBy = 'deviceGroup' | 'platform' | 'vendor'
+
+const groupByOptions: { value: HeatmapGroupBy; label: string; columnHeader: string }[] = [
+  { value: 'deviceGroup', label: 'Device Group', columnHeader: 'Device Group' },
+  { value: 'platform', label: 'Platform', columnHeader: 'Platform' },
+  { value: 'vendor', label: 'Vendor', columnHeader: 'Vendor' },
+]
 
 type RiskHeatmapProps = {
-  data: DashboardSummary['vulnerabilitiesByDeviceGroup']
-  isLoading?: boolean
-  onCellClick?: (deviceGroup: string, severity: string) => void
+  filters?: {
+    minAgeDays?: number
+    platform?: string
+    deviceGroup?: string
+  }
+  onCellClick?: (group: string, severity: string) => void
 }
 
 const severityColumns = ['Critical', 'High', 'Medium', 'Low'] as const
@@ -35,20 +48,52 @@ function intensityClass(value: number, max: number): string {
   return 'bg-chart-2/30 text-foreground'
 }
 
-export function RiskHeatmap({ data, isLoading, onCellClick }: RiskHeatmapProps) {
+export function RiskHeatmap({ filters, onCellClick }: RiskHeatmapProps) {
+  const [groupBy, setGroupBy] = useState<HeatmapGroupBy>('deviceGroup')
+
+  const heatmapQuery = useQuery({
+    queryKey: ['dashboard', 'heatmap', groupBy, filters?.minAgeDays, filters?.platform, filters?.deviceGroup],
+    queryFn: () => fetchDashboardHeatmap({
+      data: {
+        groupBy,
+        ...filters,
+      },
+    }),
+    staleTime: 30_000,
+  })
+
+  const data = heatmapQuery.data
+  const isLoading = heatmapQuery.isLoading
+
   const globalMax = useMemo(
-    () => Math.max(1, ...data.flatMap((g) => [g.critical, g.high, g.medium, g.low])),
+    () => data ? Math.max(1, ...data.flatMap((g) => [g.critical, g.high, g.medium, g.low])) : 1,
     [data],
   )
 
-  if (!data.length && !isLoading) return null
+  const activeOption = groupByOptions.find((o) => o.value === groupBy)!
+
+  if ((!data || !data.length) && !isLoading) return null
 
   return (
     <Card className="rounded-[32px] border-border/70 bg-card/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 p-5 pb-0">
-        <div>
+        <div className="space-y-2">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Risk density</p>
-          <CardTitle className="mt-2 text-xl font-semibold tracking-tight">Device group risk heatmap</CardTitle>
+          <CardTitle className="text-xl font-semibold tracking-tight">Vulnerability heatmap</CardTitle>
+          <ToggleGroup
+            value={[groupBy]}
+            onValueChange={(values) => {
+              if (values.length > 0) setGroupBy(values[0] as HeatmapGroupBy)
+            }}
+            variant="outline"
+            size="sm"
+          >
+            {groupByOptions.map((opt) => (
+              <ToggleGroupItem key={opt.value} value={opt.value} className="text-xs">
+                {opt.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">
@@ -71,7 +116,7 @@ export function RiskHeatmap({ data, isLoading, onCellClick }: RiskHeatmapProps) 
               <thead>
                 <tr>
                   <th className="px-3 py-2 text-left text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    Device Group
+                    {activeOption.columnHeader}
                   </th>
                   {severityColumns.map((sev) => (
                     <th key={sev} className="px-3 py-2 text-center text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -84,15 +129,15 @@ export function RiskHeatmap({ data, isLoading, onCellClick }: RiskHeatmapProps) 
                 </tr>
               </thead>
               <tbody>
-                {data.map((group) => {
-                  const total = group.critical + group.high + group.medium + group.low
+                {data?.map((row) => {
+                  const total = row.critical + row.high + row.medium + row.low
                   return (
-                    <tr key={group.deviceGroupName}>
+                    <tr key={row.label}>
                       <td className="max-w-[180px] truncate rounded-lg bg-muted/20 px-3 py-2.5 text-sm font-medium">
-                        {group.deviceGroupName}
+                        {row.label}
                       </td>
                       {severityColumns.map((sev) => {
-                        const value = group[severityDataKey[sev]]
+                        const value = row[severityDataKey[sev]]
                         return (
                           <td key={sev} className="text-center">
                             <Tooltip>
@@ -101,14 +146,14 @@ export function RiskHeatmap({ data, isLoading, onCellClick }: RiskHeatmapProps) 
                                   <button
                                     type="button"
                                     className={`inline-flex min-w-[3.5rem] items-center justify-center rounded-lg px-3 py-2.5 text-sm font-semibold tabular-nums transition-transform ${intensityClass(value, globalMax)} ${onCellClick ? 'cursor-pointer hover:scale-105' : ''}`}
-                                    onClick={() => onCellClick?.(group.deviceGroupName, sev)}
+                                    onClick={() => onCellClick?.(row.label, sev)}
                                   />
                                 }
                               >
                                 {value}
                               </TooltipTrigger>
                               <TooltipContent>
-                                {group.deviceGroupName}: {value} {sev.toLowerCase()} vulnerabilities
+                                {row.label}: {value} {sev.toLowerCase()} vulnerabilities
                               </TooltipContent>
                             </Tooltip>
                           </td>

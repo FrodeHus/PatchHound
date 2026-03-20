@@ -125,3 +125,15 @@ export const dashboardFilterOptionsSchema = z.object({
 
 export type DashboardFilterOptions = z.infer<typeof dashboardFilterOptionsSchema>
 export type DeviceGroupVulnerability = z.infer<typeof dashboardSummarySchema>['vulnerabilitiesByDeviceGroup'][number]
+
+export const heatmapRowSchema = z.object({
+  label: z.string(),
+  critical: z.number(),
+  high: z.number(),
+  medium: z.number(),
+  low: z.number(),
+})
+
+export const heatmapResponseSchema = z.array(heatmapRowSchema)
+
+export type HeatmapRow = z.infer<typeof heatmapRowSchema>
