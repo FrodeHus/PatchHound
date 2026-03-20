@@ -79,6 +79,7 @@ public class IngestionServiceTests : IDisposable
             dbContextFactory,
             assessmentService,
             taskProjectionService,
+            Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
@@ -966,6 +967,7 @@ public class IngestionServiceTests : IDisposable
             dbContextFactory,
             assessmentService,
             taskProjectionService,
+            Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
@@ -1111,6 +1113,7 @@ public class IngestionServiceTests : IDisposable
             dbContextFactory,
             assessmentService,
             taskProjectionService,
+            Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
@@ -1281,6 +1284,7 @@ public class IngestionServiceTests : IDisposable
             dbContextFactory,
             assessmentService,
             taskProjectionService,
+            Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
@@ -1421,6 +1425,7 @@ public class IngestionServiceTests : IDisposable
             dbContextFactory,
             assessmentService,
             taskProjectionService,
+            Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
@@ -1593,6 +1598,7 @@ public class IngestionServiceTests : IDisposable
             dbContextFactory,
             assessmentService,
             taskProjectionService,
+            Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
@@ -1756,6 +1762,7 @@ public class IngestionServiceTests : IDisposable
             dbContextFactory,
             assessmentService,
             taskProjectionService,
+            Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
@@ -1878,6 +1885,7 @@ public class IngestionServiceTests : IDisposable
             dbContextFactory,
             assessmentService,
             taskProjectionService,
+            Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
         var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
@@ -2888,6 +2896,7 @@ public class IngestionServiceTests : IDisposable
                     new TenantSnapshotResolver(_dbContext)
                 ),
                 new RemediationTaskProjectionService(_dbContext, new SlaService()),
+                Substitute.For<IWorkflowTriggerService>(),
                 new IngestionStateCache()
             ),
             new StagedAssetMergeService(_dbContext),

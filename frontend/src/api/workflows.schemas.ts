@@ -73,6 +73,8 @@ export const workflowActionSchema = z.object({
   createdAt: z.string(),
   completedAt: z.string().nullable(),
   completedByUserId: z.string().uuid().nullable(),
+  workflowName: z.string().nullable(),
+  contextJson: z.string().nullable(),
 })
 
 export const pagedWorkflowActionsSchema = pagedResponseMetaSchema.extend({
@@ -81,6 +83,7 @@ export const pagedWorkflowActionsSchema = pagedResponseMetaSchema.extend({
 
 export type WorkflowDefinitionItem = z.infer<typeof workflowDefinitionSchema>
 export type WorkflowDefinitionDetail = z.infer<typeof workflowDefinitionDetailSchema>
+export type WorkflowNodeExecution = z.infer<typeof workflowNodeExecutionSchema>
 export type WorkflowInstanceItem = z.infer<typeof workflowInstanceSchema>
 export type WorkflowInstanceDetail = z.infer<typeof workflowInstanceDetailSchema>
 export type WorkflowActionItem = z.infer<typeof workflowActionSchema>

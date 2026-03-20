@@ -113,13 +113,12 @@ export function AffectedAssetsTab({ assets }: AffectedAssetsTabProps) {
   const [page, setPage] = useState(1)
 
   useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedSearch(search), 250)
+    const id = window.setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 250)
     return () => window.clearTimeout(id)
   }, [search])
-
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch, statusFilter])
 
   const filtered = useMemo(() => {
     let result = assets
@@ -173,7 +172,7 @@ export function AffectedAssetsTab({ assets }: AffectedAssetsTabProps) {
               className="h-9 pl-9 text-sm"
             />
           </div>
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v ?? 'all'); setPage(1) }}>
             <SelectTrigger className="h-9 w-[130px] rounded-xl border-border/70 bg-background/80 text-sm">
               <SelectValue />
             </SelectTrigger>

@@ -98,9 +98,13 @@ public record WorkflowActionDto(
     DateTimeOffset? DueAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt,
-    Guid? CompletedByUserId
+    Guid? CompletedByUserId,
+    string? WorkflowName,
+    string? ContextJson
 );
 
 public record CompleteWorkflowActionRequest(string? ResponseJson);
 
 public record RejectWorkflowActionRequest(string? ResponseJson);
+
+public record RunWorkflowRequest(string? ContextJson);

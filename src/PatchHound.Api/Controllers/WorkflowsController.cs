@@ -173,6 +173,51 @@ public class WorkflowsController(
         return NoContent();
     }
 
+    [HttpDelete("definitions/{id:guid}")]
+    [Authorize(Policy = Policies.ManageWorkflows)]
+    public async Task<IActionResult> DeleteDefinition(Guid id, CancellationToken ct)
+    {
+        var def = await dbContext.WorkflowDefinitions.FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (def is null) return NotFound();
+
+        if (def.Status != WorkflowDefinitionStatus.Draft)
+            return BadRequest(new ProblemDetails { Title = "Only draft workflows can be deleted." });
+
+        dbContext.WorkflowDefinitions.Remove(def);
+        await dbContext.SaveChangesAsync(ct);
+
+        return NoContent();
+    }
+
+    [HttpPost("definitions/{id:guid}/run")]
+    [Authorize(Policy = Policies.ManageWorkflows)]
+    public async Task<ActionResult<WorkflowInstanceDto>> RunDefinition(
+        Guid id,
+        [FromBody] RunWorkflowRequest? request,
+        CancellationToken ct
+    )
+    {
+        var def = await dbContext.WorkflowDefinitions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == id, ct);
+
+        if (def is null) return NotFound();
+
+        if (def.Status != WorkflowDefinitionStatus.Published)
+            return BadRequest(new ProblemDetails { Title = "Only published workflows can be run manually." });
+
+        var contextJson = request?.ContextJson ?? "{}";
+        var instance = await workflowEngine.StartWorkflowAsync(
+            def.Id, contextJson, tenantContext.CurrentUserId, ct);
+
+        return Ok(new WorkflowInstanceDto(
+            instance.Id, instance.WorkflowDefinitionId, def.Name,
+            instance.DefinitionVersion, instance.TenantId,
+            instance.TriggerType.ToString(), instance.Status.ToString(),
+            instance.StartedAt, instance.CompletedAt, instance.Error
+        ));
+    }
+
     // ─── Instances (Runs) ────────────────────────────────────
 
     [HttpGet("instances")]
@@ -268,7 +313,10 @@ public class WorkflowsController(
         CancellationToken ct
     )
     {
-        var query = dbContext.WorkflowActions.AsNoTracking().AsQueryable();
+        var query = dbContext.WorkflowActions.AsNoTracking()
+            .Include(a => a.WorkflowInstance)
+                .ThenInclude(i => i.WorkflowDefinition)
+            .AsQueryable();
 
         if (teamId.HasValue)
             query = query.Where(a => a.TeamId == teamId.Value);
@@ -288,7 +336,58 @@ public class WorkflowsController(
                 a.ActionType.ToString(), a.Instructions,
                 a.Status.ToString(), a.ResponseJson,
                 a.DueAt, a.CreatedAt, a.CompletedAt,
-                a.CompletedByUserId
+                a.CompletedByUserId,
+                a.WorkflowInstance.WorkflowDefinition.Name,
+                a.WorkflowInstance.ContextJson
+            ))
+            .ToListAsync(ct);
+
+        return Ok(new PagedResponse<WorkflowActionDto>(
+            items, totalCount, pagination.Page, pagination.BoundedPageSize
+        ));
+    }
+
+    [HttpGet("actions/mine")]
+    [Authorize]
+    public async Task<ActionResult<PagedResponse<WorkflowActionDto>>> ListMyActions(
+        [FromQuery] string? status,
+        [FromQuery] PaginationQuery pagination,
+        CancellationToken ct
+    )
+    {
+        var userId = tenantContext.CurrentUserId;
+        var myTeamIds = await dbContext.TeamMembers
+            .AsNoTracking()
+            .Where(tm => tm.UserId == userId)
+            .Select(tm => tm.TeamId)
+            .ToListAsync(ct);
+
+        if (myTeamIds.Count == 0)
+            return Ok(new PagedResponse<WorkflowActionDto>([], 0, pagination.Page, pagination.BoundedPageSize));
+
+        var query = dbContext.WorkflowActions.AsNoTracking()
+            .Include(a => a.WorkflowInstance)
+                .ThenInclude(i => i.WorkflowDefinition)
+            .Where(a => myTeamIds.Contains(a.TeamId));
+
+        if (Enum.TryParse<WorkflowActionStatus>(status, true, out var parsedStatus))
+            query = query.Where(a => a.Status == parsedStatus);
+
+        var totalCount = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderByDescending(a => a.CreatedAt)
+            .Skip(pagination.Skip)
+            .Take(pagination.BoundedPageSize)
+            .Select(a => new WorkflowActionDto(
+                a.Id, a.WorkflowInstanceId, a.NodeExecutionId,
+                a.TenantId, a.TeamId,
+                a.ActionType.ToString(), a.Instructions,
+                a.Status.ToString(), a.ResponseJson,
+                a.DueAt, a.CreatedAt, a.CompletedAt,
+                a.CompletedByUserId,
+                a.WorkflowInstance.WorkflowDefinition.Name,
+                a.WorkflowInstance.ContextJson
             ))
             .ToListAsync(ct);
 

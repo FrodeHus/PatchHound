@@ -3,6 +3,7 @@ import type { ComponentType } from 'react'
 import {
   Bug,
   CheckSquare,
+  Inbox,
   LayoutDashboard,
   ScrollText,
   Server,
@@ -45,6 +46,7 @@ const navItems: NavItem[] = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
   { to: '/vulnerabilities', label: 'Vulnerabilities', icon: Bug },
   { to: '/tasks', label: 'Remediation', icon: CheckSquare },
+  { to: '/actions', label: 'Actions', icon: Inbox },
   { to: '/assets', label: 'Assets', icon: Server },
   { to: '/software', label: 'Software', icon: Boxes },
   { to: '/audit-log', label: 'Audit Trail', icon: ScrollText, roles: ['Auditor', 'GlobalAdmin'] },

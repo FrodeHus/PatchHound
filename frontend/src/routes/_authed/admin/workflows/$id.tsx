@@ -2,17 +2,22 @@ import { useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Play, Archive } from 'lucide-react'
+import { ArrowLeft, Play, Archive, Trash2, X, Ban } from 'lucide-react'
 import {
   fetchWorkflowDefinition,
   updateWorkflowDefinition,
   publishWorkflowDefinition,
   archiveWorkflowDefinition,
+  deleteWorkflowDefinition,
+  runWorkflowDefinition,
   fetchWorkflowInstances,
+  fetchWorkflowInstance,
+  cancelWorkflowInstance,
 } from '@/api/workflows.functions'
 import { fetchTeams } from '@/api/teams.functions'
 import type { WorkflowInstanceItem } from '@/api/workflows.schemas'
 import { WorkflowDesigner, type WorkflowGraph } from '@/components/features/workflows/WorkflowDesigner'
+import { WorkflowRunViewer } from '@/components/features/workflows/WorkflowRunViewer'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -63,6 +68,7 @@ function WorkflowDetailPage() {
 
   const [name, setName] = useState(definition.name)
   const [description, setDescription] = useState(definition.description ?? '')
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null)
 
   const initialGraph: WorkflowGraph = (() => {
     try {
@@ -73,11 +79,19 @@ function WorkflowDetailPage() {
   })()
 
   const isArchived = definition.status === 'Archived'
+  const isPublished = definition.status === 'Published'
+  const isDraft = definition.status === 'Draft'
 
   const instancesQuery = useQuery({
     queryKey: ['workflow-instances', definition.id],
     queryFn: () => fetchWorkflowInstances({ data: { definitionId: definition.id, page: 1, pageSize: 20 } }),
     initialData: instances,
+  })
+
+  const instanceDetailQuery = useQuery({
+    queryKey: ['workflow-instance-detail', selectedInstanceId],
+    queryFn: () => fetchWorkflowInstance({ data: { id: selectedInstanceId! } }),
+    enabled: !!selectedInstanceId,
   })
 
   const updateMutation = useMutation({
@@ -126,6 +140,46 @@ function WorkflowDetailPage() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await deleteWorkflowDefinition({ data: { id: definition.id } })
+    },
+    onSuccess: async () => {
+      toast.success('Workflow deleted')
+      await router.navigate({ to: '/admin/workflows', search: { page: 1, pageSize: 25 } })
+    },
+    onError: () => {
+      toast.error('Failed to delete workflow')
+    },
+  })
+
+  const runMutation = useMutation({
+    mutationFn: async () => {
+      return runWorkflowDefinition({ data: { id: definition.id } })
+    },
+    onSuccess: () => {
+      toast.success('Workflow run started')
+      void router.invalidate()
+    },
+    onError: () => {
+      toast.error('Failed to start workflow run')
+    },
+  })
+
+  const cancelMutation = useMutation({
+    mutationFn: async (instanceId: string) => {
+      await cancelWorkflowInstance({ data: { id: instanceId } })
+    },
+    onSuccess: () => {
+      toast.success('Run cancelled')
+      setSelectedInstanceId(null)
+      void router.invalidate()
+    },
+    onError: () => {
+      toast.error('Failed to cancel run')
+    },
+  })
+
   return (
     <section className="space-y-5">
       <div className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
@@ -136,7 +190,7 @@ function WorkflowDetailPage() {
             </Link>
             <h1 className="text-3xl font-semibold tracking-[-0.04em]">{definition.name}</h1>
             <div className="flex items-center gap-2">
-              <Badge variant={definition.status === 'Published' ? 'default' : 'secondary'}>
+              <Badge variant={isPublished ? 'default' : 'secondary'}>
                 {definition.status}
               </Badge>
               <span className="text-sm text-muted-foreground">
@@ -145,14 +199,24 @@ function WorkflowDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {definition.status === 'Draft' && (
+            {isDraft && (
               <Button variant="outline" size="sm" onClick={() => publishMutation.mutate()}>
                 <Play className="mr-1 size-3" /> Publish
+              </Button>
+            )}
+            {isPublished && definition.triggerType === 'ManualRun' && (
+              <Button variant="outline" size="sm" onClick={() => runMutation.mutate()} disabled={runMutation.isPending}>
+                <Play className="mr-1 size-3" /> Run
               </Button>
             )}
             {!isArchived && (
               <Button variant="outline" size="sm" onClick={() => archiveMutation.mutate()}>
                 <Archive className="mr-1 size-3" /> Archive
+              </Button>
+            )}
+            {isDraft && (
+              <Button variant="outline" size="sm" className="text-destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+                <Trash2 className="mr-1 size-3" /> Delete
               </Button>
             )}
           </div>
@@ -202,7 +266,7 @@ function WorkflowDetailPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="runs" className="mt-4">
+        <TabsContent value="runs" className="mt-4 space-y-4">
           <Card className="rounded-2xl border-border/70">
             <CardHeader>
               <CardTitle>Workflow Runs</CardTitle>
@@ -226,7 +290,11 @@ function WorkflowDetailPage() {
                   </TableHeader>
                   <TableBody>
                     {instancesQuery.data?.items.map((inst: WorkflowInstanceItem) => (
-                      <TableRow key={inst.id}>
+                      <TableRow
+                        key={inst.id}
+                        className={`cursor-pointer ${selectedInstanceId === inst.id ? 'bg-primary/5' : ''}`}
+                        onClick={() => setSelectedInstanceId(selectedInstanceId === inst.id ? null : inst.id)}
+                      >
                         <TableCell className="font-mono text-xs">
                           {inst.id.slice(0, 8)}...
                         </TableCell>
@@ -252,6 +320,48 @@ function WorkflowDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {selectedInstanceId && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold">
+                    Run {selectedInstanceId.slice(0, 8)}...
+                  </h3>
+                  {instanceDetailQuery.data && (
+                    <Badge variant={instanceStatusVariant(instanceDetailQuery.data.status)}>
+                      {instanceDetailQuery.data.status}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {instanceDetailQuery.data && ['Running', 'WaitingForAction'].includes(instanceDetailQuery.data.status) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={(e) => { e.stopPropagation(); cancelMutation.mutate(selectedInstanceId) }}
+                      disabled={cancelMutation.isPending}
+                    >
+                      <Ban className="mr-1 size-3" /> Cancel
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" className="size-7" onClick={() => setSelectedInstanceId(null)}>
+                    <X className="size-4" />
+                  </Button>
+                </div>
+              </div>
+              {instanceDetailQuery.isLoading && (
+                <p className="text-sm text-muted-foreground">Loading run details...</p>
+              )}
+              {instanceDetailQuery.data && (
+                <WorkflowRunViewer
+                  graph={initialGraph}
+                  nodeExecutions={instanceDetailQuery.data.nodeExecutions}
+                />
+              )}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </section>

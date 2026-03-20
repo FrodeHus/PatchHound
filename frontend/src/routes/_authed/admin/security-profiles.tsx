@@ -224,9 +224,9 @@ function SecurityProfilesPage() {
 
   function closeEditor() {
     void navigate({
-      to: '/admin/security-profiles',
-      search: ({ mode, profileId, ...prev }) => prev,
-    })
+      to: "/admin/security-profiles",
+      search: ({ mode: _, profileId: _p, ...prev }) => prev,
+    });
   }
 
   return (

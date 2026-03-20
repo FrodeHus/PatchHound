@@ -196,7 +196,7 @@ function TeamsPage() {
           })
           setSelectedTeamId(null)
         }}
-        onSelectTeam={setSelectedTeamId}
+        onSelectTeam={selectTeam}
       />
       {detailState === 'error' ? (
         <p className="text-sm text-destructive">Failed to load assignment group details.</p>
