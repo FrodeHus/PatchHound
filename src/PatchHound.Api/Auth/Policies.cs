@@ -16,4 +16,5 @@ public static class Policies
     public const string AddComments = nameof(AddComments);
     public const string ManageTeams = nameof(ManageTeams);
     public const string ManageVault = nameof(ManageVault);
+    public const string ManageWorkflows = nameof(ManageWorkflows);
 }

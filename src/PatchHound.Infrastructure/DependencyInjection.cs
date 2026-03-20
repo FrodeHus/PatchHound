@@ -11,6 +11,7 @@ using PatchHound.Infrastructure.Options;
 using PatchHound.Infrastructure.Repositories;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Services.Workflows;
 using PatchHound.Infrastructure.Tenants;
 using PatchHound.Infrastructure.VulnerabilitySources;
 
@@ -161,6 +162,16 @@ public static class DependencyInjection
 
         // Event Pusher (pushes events to TanStack Start SSE endpoint)
         services.AddHttpClient<IEventPusher, HttpEventPusher>();
+
+        // Workflow Engine
+        services.AddScoped<IWorkflowEngine, WorkflowEngine>();
+        services.AddScoped<IWorkflowNodeExecutor, StartNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, EndNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, AssignGroupNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, ConditionNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, SendNotificationNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, MergeNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, SystemTaskNodeExecutor>();
 
         return services;
     }
