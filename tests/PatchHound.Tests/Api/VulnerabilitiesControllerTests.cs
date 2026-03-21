@@ -141,6 +141,22 @@ public class VulnerabilitiesControllerTests : IDisposable
             closeInstall,
             oldInstall
         );
+        await _dbContext.VulnerabilityEpisodeRiskAssessments.AddAsync(
+            VulnerabilityEpisodeRiskAssessment.Create(
+                _tenantId,
+                Guid.NewGuid(),
+                projection.TenantVulnerability.Id,
+                device.Id,
+                null,
+                82m,
+                70m,
+                55m,
+                741m,
+                "Medium",
+                "[]",
+                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+            )
+        );
 
         var firstEpisode = VulnerabilityAssetEpisode.Create(
             _tenantId,
@@ -198,6 +214,8 @@ public class VulnerabilitiesControllerTests : IDisposable
         asset
             .PossibleCorrelatedSoftware.Should()
             .Equal("Contoso Agent", "Nearby Utility", "Legacy Runtime");
+        asset.EpisodeRiskScore.Should().Be(741m);
+        asset.EpisodeRiskBand.Should().Be("Medium");
     }
 
     public void Dispose() => _dbContext.Dispose();

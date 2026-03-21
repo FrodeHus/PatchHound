@@ -29,6 +29,7 @@ public class AssetsController : ControllerBase
     private readonly ITenantContext _tenantContext;
     private readonly TenantSnapshotResolver _snapshotResolver;
     private readonly AssetDetailQueryService _detailQueryService;
+    private readonly RiskRefreshService _riskRefreshService;
 
     public AssetsController(
         PatchHoundDbContext dbContext,
@@ -37,7 +38,8 @@ public class AssetsController : ControllerBase
         NormalizedSoftwareProjectionService normalizedSoftwareProjectionService,
         ITenantContext tenantContext,
         TenantSnapshotResolver snapshotResolver,
-        AssetDetailQueryService detailQueryService
+        AssetDetailQueryService detailQueryService,
+        RiskRefreshService riskRefreshService
     )
     {
         _dbContext = dbContext;
@@ -47,6 +49,7 @@ public class AssetsController : ControllerBase
         _tenantContext = tenantContext;
         _snapshotResolver = snapshotResolver;
         _detailQueryService = detailQueryService;
+        _riskRefreshService = riskRefreshService;
     }
 
     [HttpGet]
@@ -121,12 +124,25 @@ public class AssetsController : ControllerBase
             query = query.Where(a => a.DeviceOnboardingStatus == filter.OnboardingStatus);
 
         var totalCount = await query.CountAsync(ct);
+        var rankedQuery = query
+            .Select(a => new
+            {
+                Asset = a,
+                CurrentRiskScore = _dbContext.AssetRiskScores
+                    .Where(score => score.AssetId == a.Id)
+                    .Select(score => (decimal?)score.OverallScore)
+                    .FirstOrDefault(),
+            });
 
-        var assetIds = await query
-            .OrderBy(a => a.Name)
+        var assetIds = await rankedQuery
+            .OrderByDescending(item => item.CurrentRiskScore ?? 0m)
+            .ThenByDescending(item => _dbContext.VulnerabilityAssets.Count(va =>
+                va.AssetId == item.Asset.Id && va.SnapshotId == activeSnapshotId
+            ))
+            .ThenBy(item => item.Asset.Name)
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
-            .Select(a => a.Id)
+            .Select(item => item.Asset.Id)
             .ToListAsync(ct);
 
         var recurringCounts = await _dbContext
@@ -144,33 +160,40 @@ public class AssetsController : ControllerBase
             item => item.Count
         );
 
-        var itemRows = await query
-            .OrderBy(a => a.Name)
+        var itemRows = await rankedQuery
+            .OrderByDescending(item => item.CurrentRiskScore ?? 0m)
+            .ThenByDescending(item => _dbContext.VulnerabilityAssets.Count(va =>
+                va.AssetId == item.Asset.Id && va.SnapshotId == activeSnapshotId
+            ))
+            .ThenBy(item => item.Asset.Name)
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
-            .Select(a => new
+            .Select(item => new
             {
-                a.Id,
-                a.ExternalId,
-                Name = a.AssetType == AssetType.Device ? a.DeviceComputerDnsName ?? a.Name : a.Name,
-                AssetType = a.AssetType.ToString(),
-                a.DeviceGroupName,
-                Criticality = a.Criticality.ToString(),
-                OwnerType = a.OwnerType.ToString(),
-                a.OwnerUserId,
-                a.OwnerTeamId,
+                item.Asset.Id,
+                item.Asset.ExternalId,
+                Name = item.Asset.AssetType == AssetType.Device
+                    ? item.Asset.DeviceComputerDnsName ?? item.Asset.Name
+                    : item.Asset.Name,
+                AssetType = item.Asset.AssetType.ToString(),
+                CurrentRiskScore = item.CurrentRiskScore,
+                item.Asset.DeviceGroupName,
+                Criticality = item.Asset.Criticality.ToString(),
+                OwnerType = item.Asset.OwnerType.ToString(),
+                item.Asset.OwnerUserId,
+                item.Asset.OwnerTeamId,
                 SecurityProfileName = _dbContext
-                    .AssetSecurityProfiles.Where(profile => profile.Id == a.SecurityProfileId)
+                    .AssetSecurityProfiles.Where(profile => profile.Id == item.Asset.SecurityProfileId)
                     .Select(profile => profile.Name)
                     .FirstOrDefault(),
                 VulnerabilityCount = _dbContext.VulnerabilityAssets.Count(va =>
-                    va.AssetId == a.Id && va.SnapshotId == activeSnapshotId
+                    va.AssetId == item.Asset.Id && va.SnapshotId == activeSnapshotId
                 ),
-                a.DeviceHealthStatus,
-                a.DeviceRiskScore,
-                a.DeviceExposureLevel,
-                a.DeviceOnboardingStatus,
-                a.DeviceValue,
+                item.Asset.DeviceHealthStatus,
+                item.Asset.DeviceRiskScore,
+                item.Asset.DeviceExposureLevel,
+                item.Asset.DeviceOnboardingStatus,
+                item.Asset.DeviceValue,
             })
             .ToListAsync(ct);
 
@@ -187,6 +210,7 @@ public class AssetsController : ControllerBase
                 a.ExternalId,
                 a.Name,
                 a.AssetType,
+                a.CurrentRiskScore,
                 a.DeviceGroupName,
                 a.Criticality,
                 a.OwnerType,
@@ -257,6 +281,13 @@ public class AssetsController : ControllerBase
         if (!result.IsSuccess)
             return NotFound(new ProblemDetails { Title = result.Error });
 
+        await _riskRefreshService.RefreshForAssetAsync(
+            asset.TenantId,
+            id,
+            recalculateAssessments: false,
+            ct
+        );
+
         return NoContent();
     }
 
@@ -293,8 +324,12 @@ public class AssetsController : ControllerBase
         if (!result.IsSuccess)
             return NotFound(new ProblemDetails { Title = result.Error });
 
-        await _assessmentService.RecalculateForAssetAsync(id, ct);
-        await _dbContext.SaveChangesAsync(ct);
+        await _riskRefreshService.RefreshForAssetAsync(
+            asset.TenantId,
+            id,
+            recalculateAssessments: true,
+            ct
+        );
 
         return NoContent();
     }
@@ -319,6 +354,13 @@ public class AssetsController : ControllerBase
         var result = await _assetService.SetCriticalityAsync(id, criticality, ct);
         if (!result.IsSuccess)
             return NotFound(new ProblemDetails { Title = result.Error });
+
+        await _riskRefreshService.RefreshForAssetAsync(
+            asset.TenantId,
+            id,
+            recalculateAssessments: false,
+            ct
+        );
 
         return NoContent();
     }
@@ -488,6 +530,20 @@ public class AssetsController : ControllerBase
         );
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
+
+        var assetTenantMap = await _dbContext.Assets.AsNoTracking()
+            .Where(a => request.AssetIds.Contains(a.Id))
+            .Select(a => new { a.Id, a.TenantId })
+            .ToListAsync(ct);
+        foreach (var tenantAssets in assetTenantMap.GroupBy(item => item.TenantId))
+        {
+            await _riskRefreshService.RefreshForAssetsAsync(
+                tenantAssets.Key,
+                tenantAssets.Select(item => item.Id).ToList(),
+                recalculateAssessments: false,
+                ct
+            );
+        }
 
         return Ok(new BulkAssignResponse(result.Value));
     }

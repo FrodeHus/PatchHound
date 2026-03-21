@@ -78,6 +78,8 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             dbContextFactory,
             assessmentService,
+            new VulnerabilityThreatAssessmentService(_dbContext),
+            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
             taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
@@ -94,6 +96,7 @@ public class IngestionServiceTests : IDisposable
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
+            new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
@@ -966,6 +969,8 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             dbContextFactory,
             assessmentService,
+            new VulnerabilityThreatAssessmentService(_dbContext),
+            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
             taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
@@ -982,6 +987,7 @@ public class IngestionServiceTests : IDisposable
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
+            new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
@@ -1112,6 +1118,8 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             dbContextFactory,
             assessmentService,
+            new VulnerabilityThreatAssessmentService(_dbContext),
+            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
             taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
@@ -1128,6 +1136,7 @@ public class IngestionServiceTests : IDisposable
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
+            new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
@@ -1283,6 +1292,8 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             dbContextFactory,
             assessmentService,
+            new VulnerabilityThreatAssessmentService(_dbContext),
+            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
             taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
@@ -1299,6 +1310,7 @@ public class IngestionServiceTests : IDisposable
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
+            new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
@@ -1424,6 +1436,8 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             dbContextFactory,
             assessmentService,
+            new VulnerabilityThreatAssessmentService(_dbContext),
+            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
             taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
@@ -1440,6 +1454,7 @@ public class IngestionServiceTests : IDisposable
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
+            new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
@@ -1597,6 +1612,8 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             dbContextFactory,
             assessmentService,
+            new VulnerabilityThreatAssessmentService(_dbContext),
+            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
             taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
@@ -1613,6 +1630,7 @@ public class IngestionServiceTests : IDisposable
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
+            new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
@@ -1761,6 +1779,8 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             dbContextFactory,
             assessmentService,
+            new VulnerabilityThreatAssessmentService(_dbContext),
+            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
             taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
@@ -1777,6 +1797,7 @@ public class IngestionServiceTests : IDisposable
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
+            new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
@@ -1884,6 +1905,8 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             dbContextFactory,
             assessmentService,
+            new VulnerabilityThreatAssessmentService(_dbContext),
+            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
             taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
@@ -1900,6 +1923,7 @@ public class IngestionServiceTests : IDisposable
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
+            new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
@@ -2895,12 +2919,15 @@ public class IngestionServiceTests : IDisposable
                     new EnvironmentalSeverityCalculator(),
                     new TenantSnapshotResolver(_dbContext)
                 ),
+                new VulnerabilityThreatAssessmentService(_dbContext),
+                new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
                 new RemediationTaskProjectionService(_dbContext, new SlaService()),
                 Substitute.For<IWorkflowTriggerService>(),
                 new IngestionStateCache()
             ),
             new StagedAssetMergeService(_dbContext),
             Substitute.For<IAssetRuleEvaluationService>(),
+            new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             Substitute.For<ILogger<IngestionService>>()
         );

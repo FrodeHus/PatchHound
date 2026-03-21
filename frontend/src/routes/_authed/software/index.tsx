@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchTenantSoftware } from '@/api/software.functions'
+import { SoftwareRiskDetailDialog } from '@/components/features/software/SoftwareRiskDetailDialog'
 import { SoftwareTable } from '@/components/features/software/SoftwareTable'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { buildSoftwareListRequest, softwareQueryKeys } from '@/features/software/list-state'
@@ -28,6 +29,7 @@ function SoftwareIndexPage() {
   const navigate = Route.useNavigate()
   const { selectedTenantId } = useTenantScope()
   const [initialTenantId] = useState(selectedTenantId)
+  const [selectedRiskSoftwareId, setSelectedRiskSoftwareId] = useState<string | null>(null)
   const canUseInitialData = initialTenantId === selectedTenantId
   const searchActions = createListSearchUpdater<typeof search>(navigate)
   const query = useQuery({
@@ -73,6 +75,7 @@ function SoftwareIndexPage() {
             boundOnly: filters.boundOnly,
           })
         }}
+        onShowRiskDetail={setSelectedRiskSoftwareId}
         onPageChange={(page) => {
           searchActions.updatePage(page)
         }}
@@ -86,6 +89,15 @@ function SoftwareIndexPage() {
             vulnerableOnly: false,
             boundOnly: false,
           })
+        }}
+      />
+      <SoftwareRiskDetailDialog
+        tenantSoftwareId={selectedRiskSoftwareId}
+        open={selectedRiskSoftwareId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedRiskSoftwareId(null)
+          }
         }}
       />
     </section>

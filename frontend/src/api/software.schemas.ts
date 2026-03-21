@@ -51,6 +51,7 @@ export const tenantSoftwareListItemSchema = z.object({
   normalizedSoftwareId: z.string().uuid(),
   canonicalName: z.string(),
   canonicalVendor: z.string().nullable(),
+  currentRiskScore: z.number().nullable(),
   confidence: z.string(),
   normalizationMethod: z.string(),
   primaryCpe23Uri: z.string().nullable(),

@@ -271,50 +271,72 @@ public class DashboardController : ControllerBase
 
         var recurrence = await _dashboardQueryService.GetRecurrenceDataAsync(tenantId, ct);
 
-        // Vulnerabilities by device group — top 10 by total count descending
-        var deviceGroupQuery = _dbContext
-            .VulnerabilityAssetEpisodes.AsNoTracking()
-            .Where(e =>
-                e.Status == VulnerabilityStatus.Open
-                && e.TenantVulnerability.TenantId == tenantId
-            );
-        if (filteredAssetIds != null)
+        List<DeviceGroupVulnerabilityDto> vulnsByDeviceGroup;
+        if (filteredAssetIds is null && !minPublishedDate.HasValue)
         {
-            deviceGroupQuery = deviceGroupQuery.Where(e => filteredAssetIds.Contains(e.AssetId));
+            vulnsByDeviceGroup = await _dbContext.DeviceGroupRiskScores.AsNoTracking()
+                .Where(score => score.TenantId == tenantId)
+                .OrderByDescending(score => score.OverallScore)
+                .ThenByDescending(score => score.OpenEpisodeCount)
+                .Take(10)
+                .Select(score => new DeviceGroupVulnerabilityDto(
+                    score.DeviceGroupName,
+                    score.CriticalEpisodeCount,
+                    score.HighEpisodeCount,
+                    score.MediumEpisodeCount,
+                    score.LowEpisodeCount,
+                    score.OverallScore,
+                    score.AssetCount,
+                    score.OpenEpisodeCount
+                ))
+                .ToListAsync(ct);
         }
-
-        if (minPublishedDate.HasValue)
+        else
         {
-            deviceGroupQuery = deviceGroupQuery.Where(e =>
-                e.TenantVulnerability.VulnerabilityDefinition.PublishedDate <= minPublishedDate.Value
-            );
-        }
-
-        var deviceGroupRows = await deviceGroupQuery
-            .Join(
-                _dbContext.Assets.AsNoTracking(),
-                e => e.AssetId,
-                a => a.Id,
-                (e, a) => new { e.TenantVulnerabilityId, a.DeviceGroupName, e.TenantVulnerability.VulnerabilityDefinition.VendorSeverity }
-            )
-            .GroupBy(x => new { GroupName = x.DeviceGroupName ?? "Ungrouped", x.VendorSeverity })
-            .Select(g => new { g.Key.GroupName, g.Key.VendorSeverity, Count = g.Select(x => x.TenantVulnerabilityId).Distinct().Count() })
-            .ToListAsync(ct);
-
-        var vulnsByDeviceGroup = deviceGroupRows
-            .GroupBy(r => r.GroupName)
-            .Select(g => new
+            var deviceGroupQuery = _dbContext
+                .VulnerabilityAssetEpisodes.AsNoTracking()
+                .Where(e =>
+                    e.Status == VulnerabilityStatus.Open
+                    && e.TenantVulnerability.TenantId == tenantId
+                );
+            if (filteredAssetIds != null)
             {
-                GroupName = g.Key,
-                Critical = g.Where(x => x.VendorSeverity == Severity.Critical).Sum(x => x.Count),
-                High = g.Where(x => x.VendorSeverity == Severity.High).Sum(x => x.Count),
-                Medium = g.Where(x => x.VendorSeverity == Severity.Medium).Sum(x => x.Count),
-                Low = g.Where(x => x.VendorSeverity == Severity.Low).Sum(x => x.Count),
-            })
-            .OrderByDescending(g => g.Critical + g.High + g.Medium + g.Low)
-            .Take(10)
-            .Select(g => new DeviceGroupVulnerabilityDto(g.GroupName, g.Critical, g.High, g.Medium, g.Low))
-            .ToList();
+                deviceGroupQuery = deviceGroupQuery.Where(e => filteredAssetIds.Contains(e.AssetId));
+            }
+
+            if (minPublishedDate.HasValue)
+            {
+                deviceGroupQuery = deviceGroupQuery.Where(e =>
+                    e.TenantVulnerability.VulnerabilityDefinition.PublishedDate <= minPublishedDate.Value
+                );
+            }
+
+            var deviceGroupRows = await deviceGroupQuery
+                .Join(
+                    _dbContext.Assets.AsNoTracking(),
+                    e => e.AssetId,
+                    a => a.Id,
+                    (e, a) => new { e.TenantVulnerabilityId, a.DeviceGroupName, e.TenantVulnerability.VulnerabilityDefinition.VendorSeverity }
+                )
+                .GroupBy(x => new { GroupName = x.DeviceGroupName ?? "Ungrouped", x.VendorSeverity })
+                .Select(g => new { g.Key.GroupName, g.Key.VendorSeverity, Count = g.Select(x => x.TenantVulnerabilityId).Distinct().Count() })
+                .ToListAsync(ct);
+
+            vulnsByDeviceGroup = deviceGroupRows
+                .GroupBy(r => r.GroupName)
+                .Select(g => new
+                {
+                    GroupName = g.Key,
+                    Critical = g.Where(x => x.VendorSeverity == Severity.Critical).Sum(x => x.Count),
+                    High = g.Where(x => x.VendorSeverity == Severity.High).Sum(x => x.Count),
+                    Medium = g.Where(x => x.VendorSeverity == Severity.Medium).Sum(x => x.Count),
+                    Low = g.Where(x => x.VendorSeverity == Severity.Low).Sum(x => x.Count),
+                })
+                .OrderByDescending(g => g.Critical + g.High + g.Medium + g.Low)
+                .Take(10)
+                .Select(g => new DeviceGroupVulnerabilityDto(g.GroupName, g.Critical, g.High, g.Medium, g.Low))
+                .ToList();
+        }
 
         // Device health breakdown — NOT affected by vulnerability filters
         var deviceHealthRows = await _dbContext

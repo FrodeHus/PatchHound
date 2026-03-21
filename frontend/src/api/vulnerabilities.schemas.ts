@@ -28,6 +28,8 @@ export const affectedAssetSchema = z.object({
   assetType: z.string(),
   securityProfileName: z.string().nullable(),
   status: z.string(),
+  episodeRiskScore: z.number().nullable(),
+  episodeRiskBand: z.string().nullable(),
   vendorSeverity: z.string(),
   vendorScore: z.number().nullable(),
   effectiveSeverity: z.string(),

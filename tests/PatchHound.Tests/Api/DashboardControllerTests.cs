@@ -169,7 +169,10 @@ public class DashboardControllerTests : IDisposable
         );
         await _dbContext.SaveChangesAsync();
 
-        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
+        var action = await _controller.GetSummary(
+            new DashboardFilterQuery(DeviceGroup: "Tier 0 Servers"),
+            CancellationToken.None
+        );
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
@@ -560,7 +563,10 @@ public class DashboardControllerTests : IDisposable
             .GenerateAsync(_tenantId, Arg.Any<RiskChangeBriefSummaryInput>(), Arg.Any<CancellationToken>())
             .Returns("1 critical issue appeared in the last 24 hours.");
 
-        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
+        var action = await _controller.GetSummary(
+            new DashboardFilterQuery(DeviceGroup: "Tier 0 Servers"),
+            CancellationToken.None
+        );
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
@@ -713,7 +719,10 @@ public class DashboardControllerTests : IDisposable
         );
         await _dbContext.SaveChangesAsync();
 
-        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
+        var action = await _controller.GetSummary(
+            new DashboardFilterQuery(DeviceGroup: "Tier 0 Servers"),
+            CancellationToken.None
+        );
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
@@ -881,6 +890,56 @@ public class DashboardControllerTests : IDisposable
 
         payload.DeviceOnboardingBreakdown.Should().ContainKey("Onboarded").WhoseValue.Should().Be(1);
         payload.DeviceOnboardingBreakdown.Should().ContainKey("CanBeOnboarded").WhoseValue.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetSummary_UsesPersistedDeviceGroupRiskRollups_WhenUnfiltered()
+    {
+        await _dbContext.AddRangeAsync(
+            DeviceGroupRiskScore.Create(
+                _tenantId,
+                "id:group-1",
+                "group-1",
+                "Servers",
+                780m,
+                760m,
+                2,
+                1,
+                0,
+                0,
+                3,
+                3,
+                "[]",
+                RiskScoreService.CalculationVersion
+            ),
+            DeviceGroupRiskScore.Create(
+                _tenantId,
+                "id:group-2",
+                "group-2",
+                "Workstations",
+                300m,
+                280m,
+                0,
+                1,
+                1,
+                2,
+                10,
+                4,
+                "[]",
+                RiskScoreService.CalculationVersion
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
+
+        payload.VulnerabilitiesByDeviceGroup.Should().HaveCount(2);
+        payload.VulnerabilitiesByDeviceGroup[0].DeviceGroupName.Should().Be("Servers");
+        payload.VulnerabilitiesByDeviceGroup[0].CurrentRiskScore.Should().Be(780m);
+        payload.VulnerabilitiesByDeviceGroup[0].AssetCount.Should().Be(3);
+        payload.VulnerabilitiesByDeviceGroup[0].OpenEpisodeCount.Should().Be(3);
     }
 
     public void Dispose() => _dbContext.Dispose();

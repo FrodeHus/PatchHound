@@ -114,6 +114,10 @@ public static class DependencyInjection
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<EnvironmentalSeverityCalculator>();
         services.AddScoped<VulnerabilityAssessmentService>();
+        services.AddScoped<VulnerabilityThreatAssessmentService>();
+        services.AddScoped<VulnerabilityEpisodeRiskAssessmentService>();
+        services.AddScoped<RiskScoreService>();
+        services.AddScoped<RiskRefreshService>();
         services.AddScoped<SecureScoreService>();
         services.AddScoped<AuditLogWriter>();
 

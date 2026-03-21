@@ -53,6 +53,27 @@ const columns: ColumnDef<AffectedAsset>[] = [
     ),
   },
   {
+    accessorKey: 'episodeRiskScore',
+    header: ({ column }) => <SortableColumnHeader column={column} title="Risk" />,
+    cell: ({ row }) => {
+      const score = row.original.episodeRiskScore
+      const band = row.original.episodeRiskBand
+      if (score == null) {
+        return <span className="text-sm text-muted-foreground">—</span>
+      }
+
+      return (
+        <div className="space-y-0.5">
+          <p className="text-sm font-medium">
+            {score.toFixed(0)}
+            {band ? ` · ${band}` : ''}
+          </p>
+          <p className="text-xs text-muted-foreground">Episode risk</p>
+        </div>
+      )
+    },
+  },
+  {
     accessorKey: 'effectiveSeverity',
     header: ({ column }) => <SortableColumnHeader column={column} title="Eff. severity" />,
     cell: ({ row }) => {
@@ -122,9 +143,12 @@ export function AffectedAssetsTab({ assets }: AffectedAssetsTabProps) {
 
   const filtered = useMemo(() => {
     let result = assets
-    if (debouncedSearch) {
+  if (debouncedSearch) {
       const q = debouncedSearch.toLowerCase()
-      result = result.filter((a) => a.assetName.toLowerCase().includes(q))
+      result = result.filter((a) =>
+        a.assetName.toLowerCase().includes(q)
+        || (a.episodeRiskBand ?? '').toLowerCase().includes(q)
+      )
     }
     if (statusFilter !== 'all') {
       result = result.filter((a) => a.status === statusFilter)

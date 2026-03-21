@@ -76,7 +76,10 @@ public record DeviceGroupVulnerabilityDto(
     int Critical,
     int High,
     int Medium,
-    int Low
+    int Low,
+    decimal? CurrentRiskScore = null,
+    int? AssetCount = null,
+    int? OpenEpisodeCount = null
 );
 
 public record HeatmapRowDto(

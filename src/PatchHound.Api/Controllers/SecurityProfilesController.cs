@@ -19,16 +19,19 @@ public class SecurityProfilesController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly VulnerabilityAssessmentService _assessmentService;
+    private readonly RiskRefreshService _riskRefreshService;
     private readonly ITenantContext _tenantContext;
 
     public SecurityProfilesController(
         PatchHoundDbContext dbContext,
         VulnerabilityAssessmentService assessmentService,
+        RiskRefreshService riskRefreshService,
         ITenantContext tenantContext
     )
     {
         _dbContext = dbContext;
         _assessmentService = assessmentService;
+        _riskRefreshService = riskRefreshService;
         _tenantContext = tenantContext;
     }
 
@@ -186,7 +189,12 @@ public class SecurityProfilesController : ControllerBase
             await _assessmentService.RecalculateForAssetAsync(assetId, ct);
         }
 
-        await _dbContext.SaveChangesAsync(ct);
+        await _riskRefreshService.RefreshForAssetsAsync(
+            profile.TenantId,
+            affectedAssetIds,
+            recalculateAssessments: false,
+            ct
+        );
 
         return NoContent();
     }

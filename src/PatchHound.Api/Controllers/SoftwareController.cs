@@ -323,16 +323,18 @@ public class SoftwareController(
 
         var totalCount = await query.CountAsync(ct);
         var rows = await query
-            .OrderBy(item => item.NormalizedSoftware.CanonicalName)
-            .ThenBy(item => item.Id)
-            .Skip(pagination.Skip)
-            .Take(pagination.BoundedPageSize)
             .Select(item => new
             {
                 item.Id,
                 item.NormalizedSoftwareId,
                 CanonicalName = item.NormalizedSoftware.CanonicalName,
                 CanonicalVendor = item.NormalizedSoftware.CanonicalVendor,
+                CurrentRiskScore = dbContext.TenantSoftwareRiskScores
+                    .Where(score =>
+                        score.TenantSoftwareId == item.Id && score.SnapshotId == activeSnapshotId
+                    )
+                    .Select(score => (decimal?)score.OverallScore)
+                    .FirstOrDefault(),
                 Confidence = item.NormalizedSoftware.Confidence.ToString(),
                 NormalizationMethod = item.NormalizedSoftware.NormalizationMethod.ToString(),
                 PrimaryCpe23Uri = item.NormalizedSoftware.PrimaryCpe23Uri,
@@ -390,6 +392,13 @@ public class SoftwareController(
                     .Select(installation => installation.SoftwareAsset.ExposureImpactScore)
                     .Max(),
             })
+            .OrderByDescending(item => item.CurrentRiskScore ?? 0m)
+            .ThenByDescending(item => item.ActiveVulnerabilityCount)
+            .ThenByDescending(item => item.ActiveInstallCount)
+            .ThenBy(item => item.CanonicalName)
+            .ThenBy(item => item.Id)
+            .Skip(pagination.Skip)
+            .Take(pagination.BoundedPageSize)
             .ToListAsync(ct);
 
         return Ok(
@@ -400,6 +409,7 @@ public class SoftwareController(
                         item.NormalizedSoftwareId,
                         item.CanonicalName,
                         item.CanonicalVendor,
+                        item.CurrentRiskScore,
                         item.Confidence,
                         item.NormalizationMethod,
                         item.PrimaryCpe23Uri,

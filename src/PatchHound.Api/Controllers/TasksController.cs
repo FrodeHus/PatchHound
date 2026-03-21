@@ -9,6 +9,7 @@ using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Api.Controllers;
 
@@ -20,18 +21,21 @@ public class TasksController : ControllerBase
     private readonly PatchHoundDbContext _dbContext;
     private readonly RemediationTaskService _taskService;
     private readonly RiskAcceptanceService _riskAcceptanceService;
+    private readonly RiskRefreshService _riskRefreshService;
     private readonly ITenantContext _tenantContext;
 
     public TasksController(
         PatchHoundDbContext dbContext,
         RemediationTaskService taskService,
         RiskAcceptanceService riskAcceptanceService,
+        RiskRefreshService riskRefreshService,
         ITenantContext tenantContext
     )
     {
         _dbContext = dbContext;
         _taskService = taskService;
         _riskAcceptanceService = riskAcceptanceService;
+        _riskRefreshService = riskRefreshService;
         _tenantContext = tenantContext;
     }
 
@@ -63,15 +67,36 @@ public class TasksController : ControllerBase
         var now = DateTimeOffset.UtcNow;
 
         var items = await query
-            .OrderBy(t => t.DueDate)
+            .Select(t => new
+            {
+                Task = t,
+                EpisodeRiskScore = _dbContext
+                    .VulnerabilityEpisodeRiskAssessments
+                    .Where(assessment =>
+                        assessment.TenantVulnerabilityId == t.TenantVulnerabilityId
+                        && assessment.AssetId == t.AssetId
+                        && assessment.ResolvedAt == null)
+                    .Select(assessment => (decimal?)assessment.EpisodeRiskScore)
+                    .FirstOrDefault(),
+                EpisodeRiskBand = _dbContext
+                    .VulnerabilityEpisodeRiskAssessments
+                    .Where(assessment =>
+                        assessment.TenantVulnerabilityId == t.TenantVulnerabilityId
+                        && assessment.AssetId == t.AssetId
+                        && assessment.ResolvedAt == null)
+                    .Select(assessment => assessment.RiskBand)
+                    .FirstOrDefault(),
+            })
+            .OrderByDescending(t => t.EpisodeRiskScore ?? -1m)
+            .ThenBy(t => t.Task.DueDate)
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
             .Select(t => new RemediationTaskDto(
-                t.Id,
-                t.TenantVulnerabilityId,
-                t.AssetId,
+                t.Task.Id,
+                t.Task.TenantVulnerabilityId,
+                t.Task.AssetId,
                 _dbContext
-                    .TenantVulnerabilities.Where(v => v.Id == t.TenantVulnerabilityId)
+                    .TenantVulnerabilities.Where(v => v.Id == t.Task.TenantVulnerabilityId)
                     .Join(
                         _dbContext.VulnerabilityDefinitions,
                         tenantVulnerability => tenantVulnerability.VulnerabilityDefinitionId,
@@ -79,15 +104,17 @@ public class TasksController : ControllerBase
                         (_, definition) => definition.Title
                     )
                     .FirstOrDefault() ?? "",
-                _dbContext.Assets.Where(a => a.Id == t.AssetId).Select(a => a.Name).FirstOrDefault()
+                _dbContext.Assets.Where(a => a.Id == t.Task.AssetId).Select(a => a.Name).FirstOrDefault()
                     ?? "",
-                t.Status.ToString(),
-                t.Justification,
-                t.DueDate,
-                t.CreatedAt,
-                t.DueDate < now
-                    && t.Status != RemediationTaskStatus.Completed
-                    && t.Status != RemediationTaskStatus.RiskAccepted
+                t.Task.Status.ToString(),
+                t.EpisodeRiskScore,
+                t.EpisodeRiskBand,
+                t.Task.Justification,
+                t.Task.DueDate,
+                t.Task.CreatedAt,
+                t.Task.DueDate < now
+                    && t.Task.Status != RemediationTaskStatus.Completed
+                    && t.Task.Status != RemediationTaskStatus.RiskAccepted
             ))
             .ToListAsync(ct);
 
@@ -139,6 +166,22 @@ public class TasksController : ControllerBase
                 vulnTitle,
                 assetName,
                 task.Status.ToString(),
+                await _dbContext
+                    .VulnerabilityEpisodeRiskAssessments
+                    .Where(assessment =>
+                        assessment.TenantVulnerabilityId == task.TenantVulnerabilityId
+                        && assessment.AssetId == task.AssetId
+                        && assessment.ResolvedAt == null)
+                    .Select(assessment => (decimal?)assessment.EpisodeRiskScore)
+                    .FirstOrDefaultAsync(ct),
+                await _dbContext
+                    .VulnerabilityEpisodeRiskAssessments
+                    .Where(assessment =>
+                        assessment.TenantVulnerabilityId == task.TenantVulnerabilityId
+                        && assessment.AssetId == task.AssetId
+                        && assessment.ResolvedAt == null)
+                    .Select(assessment => assessment.RiskBand)
+                    .FirstOrDefaultAsync(ct),
                 task.Justification,
                 task.DueDate,
                 task.CreatedAt,
@@ -171,6 +214,14 @@ public class TasksController : ControllerBase
         var result = await _taskService.UpdateStatusAsync(id, status, request.Justification, ct);
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
+
+        await _riskRefreshService.RefreshForPairAsync(
+            task.TenantId,
+            task.TenantVulnerabilityId,
+            task.AssetId,
+            recalculateAssessments: false,
+            ct
+        );
 
         return NoContent();
     }
@@ -206,6 +257,14 @@ public class TasksController : ControllerBase
 
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
+
+        await _riskRefreshService.RefreshForPairAsync(
+            task.TenantId,
+            task.TenantVulnerabilityId,
+            task.AssetId,
+            recalculateAssessments: false,
+            ct
+        );
 
         var acceptance = result.Value;
         return CreatedAtAction(

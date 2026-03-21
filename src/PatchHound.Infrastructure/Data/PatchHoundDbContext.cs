@@ -59,6 +59,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<DeviceSoftwareInstallationEpisode> DeviceSoftwareInstallationEpisodes =>
         Set<DeviceSoftwareInstallationEpisode>();
     public DbSet<VulnerabilityDefinition> VulnerabilityDefinitions => Set<VulnerabilityDefinition>();
+    public DbSet<VulnerabilityThreatAssessment> VulnerabilityThreatAssessments =>
+        Set<VulnerabilityThreatAssessment>();
     public DbSet<VulnerabilityDefinitionAffectedSoftware> VulnerabilityDefinitionAffectedSoftware =>
         Set<VulnerabilityDefinitionAffectedSoftware>();
     public DbSet<VulnerabilityDefinitionReference> VulnerabilityDefinitionReferences =>
@@ -69,6 +71,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         Set<VulnerabilityAssetEpisode>();
     public DbSet<VulnerabilityAssetAssessment> VulnerabilityAssetAssessments =>
         Set<VulnerabilityAssetAssessment>();
+    public DbSet<VulnerabilityEpisodeRiskAssessment> VulnerabilityEpisodeRiskAssessments =>
+        Set<VulnerabilityEpisodeRiskAssessment>();
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
     public DbSet<RemediationTask> RemediationTasks => Set<RemediationTask>();
     public DbSet<Comment> Comments => Set<Comment>();
@@ -79,7 +83,12 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<SoftwareDescriptionJob> SoftwareDescriptionJobs => Set<SoftwareDescriptionJob>();
     public DbSet<AssetTag> AssetTags => Set<AssetTag>();
     public DbSet<AssetRule> AssetRules => Set<AssetRule>();
+    public DbSet<AssetRiskScore> AssetRiskScores => Set<AssetRiskScore>();
+    public DbSet<DeviceGroupRiskScore> DeviceGroupRiskScores => Set<DeviceGroupRiskScore>();
+    public DbSet<TenantSoftwareRiskScore> TenantSoftwareRiskScores => Set<TenantSoftwareRiskScore>();
+    public DbSet<TeamRiskScore> TeamRiskScores => Set<TeamRiskScore>();
     public DbSet<AssetSecureScore> AssetSecureScores => Set<AssetSecureScore>();
+    public DbSet<TenantRiskScoreSnapshot> TenantRiskScoreSnapshots => Set<TenantRiskScoreSnapshot>();
     public DbSet<TenantSecureScoreTarget> TenantSecureScoreTargets =>
         Set<TenantSecureScoreTarget>();
     public DbSet<TenantSecureScoreSnapshot> TenantSecureScoreSnapshots =>
@@ -174,6 +183,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<VulnerabilityAssetAssessment>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
+            .Entity<VulnerabilityEpisodeRiskAssessment>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
             .Entity<RemediationTask>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
@@ -247,6 +259,18 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<AssetRule>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
+            .Entity<AssetRiskScore>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<DeviceGroupRiskScore>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<TenantSoftwareRiskScore>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<TeamRiskScore>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
             .Entity<EnrichmentJob>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
@@ -257,6 +281,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantSecureScoreTarget>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<TenantRiskScoreSnapshot>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantSecureScoreSnapshot>()
@@ -277,6 +304,13 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
                 IsSystemContext
                 || e.TenantId == null
                 || AccessibleTenantIds.Contains(e.TenantId.Value)
+            );
+        modelBuilder
+            .Entity<WorkflowNodeExecution>()
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || e.WorkflowInstance.TenantId == null
+                || AccessibleTenantIds.Contains(e.WorkflowInstance.TenantId.Value)
             );
         modelBuilder
             .Entity<WorkflowAction>()
