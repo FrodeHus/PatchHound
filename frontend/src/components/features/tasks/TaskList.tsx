@@ -122,6 +122,20 @@ export function TaskList({
         ),
       },
       {
+        accessorKey: 'episodeRiskScore',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Risk" />,
+        cell: ({ row }) => (
+          <div className="space-y-1">
+            <p className="font-medium tracking-tight">
+              {row.original.episodeRiskScore != null ? row.original.episodeRiskScore.toFixed(0) : '—'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {row.original.episodeRiskBand ?? 'No score'}
+            </p>
+          </div>
+        ),
+      },
+      {
         accessorKey: 'dueDate',
         header: ({ column }) => <SortableColumnHeader column={column} title="Due" />,
         cell: ({ row }) => (

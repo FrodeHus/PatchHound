@@ -29,6 +29,7 @@ public class AssetsControllerTests : IDisposable
         _tenantContext.CurrentTenantId.Returns(_tenantId);
         _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { _tenantId });
         _tenantContext.CurrentUserId.Returns(Guid.NewGuid());
+        _tenantContext.HasAccessToTenant(_tenantId).Returns(true);
 
         var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
@@ -49,6 +50,13 @@ public class AssetsControllerTests : IDisposable
             new EnvironmentalSeverityCalculator(),
             snapshotResolver
         );
+        var riskRefreshService = new RiskRefreshService(
+            _dbContext,
+            snapshotResolver,
+            assessmentService,
+            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
+            new RiskScoreService(_dbContext, Substitute.For<Microsoft.Extensions.Logging.ILogger<RiskScoreService>>())
+        );
         var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
             _dbContext,
             new NormalizedSoftwareResolver(_dbContext)
@@ -66,7 +74,8 @@ public class AssetsControllerTests : IDisposable
             normalizedSoftwareProjectionService,
             _tenantContext,
             snapshotResolver,
-            detailQueryService
+            detailQueryService,
+            riskRefreshService
         );
     }
 
@@ -265,6 +274,70 @@ public class AssetsControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task AssignOwner_RecalculatesEpisodeAndAssetRisk()
+    {
+        var definition = VulnerabilityDefinition.Create(
+            "CVE-2026-8300",
+            "Ownership-sensitive risk",
+            "Desc",
+            Severity.High,
+            "NVD",
+            8.0m
+        );
+        var tenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            definition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow,
+            "MicrosoftDefender"
+        );
+        var asset = Asset.Create(_tenantId, "asset-owner", AssetType.Device, "Asset Owner", Criticality.High);
+        var episode = VulnerabilityAssetEpisode.Create(
+            _tenantId,
+            tenantVulnerability.Id,
+            asset.Id,
+            1,
+            DateTimeOffset.UtcNow.AddDays(-1)
+        );
+
+        await _dbContext.AddRangeAsync(definition, tenantVulnerability, asset, episode);
+        await _dbContext.VulnerabilityEpisodeRiskAssessments.AddAsync(
+            VulnerabilityEpisodeRiskAssessment.Create(
+                _tenantId,
+                episode.Id,
+                tenantVulnerability.Id,
+                asset.Id,
+                null,
+                80m,
+                70m,
+                65m,
+                742.5m,
+                "Medium",
+                "[]",
+                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.AssignOwner(
+            asset.Id,
+            new AssignOwnerRequest(nameof(OwnerType.User), Guid.NewGuid()),
+            CancellationToken.None
+        );
+
+        action.Should().BeOfType<NoContentResult>();
+
+        var refreshedAssessment = await _dbContext.VulnerabilityEpisodeRiskAssessments
+            .SingleAsync(item => item.VulnerabilityAssetEpisodeId == episode.Id);
+        refreshedAssessment.OperationalScore.Should().Be(50m);
+        refreshedAssessment.EpisodeRiskScore.Should().BeLessThan(742.5m);
+
+        var assetRisk = await _dbContext.AssetRiskScores.SingleAsync(item => item.AssetId == asset.Id);
+        assetRisk.OverallScore.Should().BeLessThan(742.5m);
+        assetRisk.OpenEpisodeCount.Should().Be(1);
+    }
+
+    [Fact]
     public async Task List_ReturnsHealthStatusRiskScoreExposureLevelAndTags()
     {
         var asset = Asset.Create(_tenantId, "dev-tag-1", AssetType.Device, "Tagged Host", Criticality.High);
@@ -333,6 +406,54 @@ public class AssetsControllerTests : IDisposable
 
         payload.Items.Should().ContainSingle();
         payload.Items[0].Id.Should().Be(tagged.Id);
+    }
+
+    [Fact]
+    public async Task List_OrdersByCurrentRiskScore_AndReturnsCurrentRiskScore()
+    {
+        var highRisk = Asset.Create(_tenantId, "dev-high-risk", AssetType.Device, "High Risk", Criticality.High);
+        var lowRisk = Asset.Create(_tenantId, "dev-low-risk", AssetType.Device, "Low Risk", Criticality.High);
+
+        await _dbContext.Assets.AddRangeAsync(highRisk, lowRisk);
+        await _dbContext.AssetRiskScores.AddRangeAsync(
+            AssetRiskScore.Create(
+                _tenantId,
+                highRisk.Id,
+                910m,
+                900m,
+                1,
+                1,
+                0,
+                0,
+                2,
+                "[]",
+                RiskScoreService.CalculationVersion
+            ),
+            AssetRiskScore.Create(
+                _tenantId,
+                lowRisk.Id,
+                320m,
+                300m,
+                0,
+                0,
+                1,
+                1,
+                2,
+                "[]",
+                RiskScoreService.CalculationVersion
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(new AssetFilterQuery(), new PaginationQuery(), CancellationToken.None);
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<AssetDto>>().Subject;
+
+        payload.Items.Should().HaveCount(2);
+        payload.Items[0].Id.Should().Be(highRisk.Id);
+        payload.Items[0].CurrentRiskScore.Should().Be(910m);
+        payload.Items[1].Id.Should().Be(lowRisk.Id);
+        payload.Items[1].CurrentRiskScore.Should().Be(320m);
     }
 
     public void Dispose()

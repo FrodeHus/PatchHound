@@ -26,15 +26,18 @@ public class AssetRulesController : ControllerBase
     private readonly PatchHoundDbContext _dbContext;
     private readonly ITenantContext _tenantContext;
     private readonly IAssetRuleEvaluationService _evaluationService;
+    private readonly RiskRefreshService _riskRefreshService;
 
     public AssetRulesController(
         PatchHoundDbContext dbContext,
         ITenantContext tenantContext,
-        IAssetRuleEvaluationService evaluationService)
+        IAssetRuleEvaluationService evaluationService,
+        RiskRefreshService riskRefreshService)
     {
         _dbContext = dbContext;
         _tenantContext = tenantContext;
         _evaluationService = evaluationService;
+        _riskRefreshService = riskRefreshService;
     }
 
     [HttpGet]
@@ -181,6 +184,11 @@ public class AssetRulesController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
         await _evaluationService.EvaluateRulesAsync(tenantId, ct);
+        await _riskRefreshService.RefreshForTenantAsync(
+            tenantId,
+            recalculateAssessments: true,
+            ct
+        );
         return NoContent();
     }
 

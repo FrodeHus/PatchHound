@@ -11,8 +11,10 @@ import { Sparkline } from '@/components/features/dashboard/Sparkline'
 import { CriticalVulnerabilities } from '@/components/features/dashboard/CriticalVulnerabilities'
 import { DashboardFilterBar } from '@/components/features/dashboard/DashboardFilterBar'
 import { DeviceGroupVulnerabilityChart } from '@/components/features/dashboard/DeviceGroupVulnerabilityChart'
+import { DeviceGroupRiskDetailDialog } from '@/components/features/dashboard/DeviceGroupRiskDetailDialog'
 import { DeviceHealthCard } from '@/components/features/dashboard/DeviceHealthCard'
 import { OnboardingStatusCard } from '@/components/features/dashboard/OnboardingStatusCard'
+import { RiskScoreCard } from '@/components/features/dashboard/RiskScoreCard'
 import { SecureScoreCard } from '@/components/features/dashboard/SecureScoreCard'
 import { RemediationVelocity } from '@/components/features/dashboard/RemediationVelocity'
 import { RiskChangeBriefCard } from '@/components/features/dashboard/RiskChangeBriefCard'
@@ -51,6 +53,7 @@ function DashboardPage() {
   const navigate = Route.useNavigate()
   const { selectedTenantId } = useTenantScope()
   const [initialTenantId] = useState(selectedTenantId)
+  const [selectedDeviceGroup, setSelectedDeviceGroup] = useState<string | null>(null)
   const canUseInitialData = initialTenantId === selectedTenantId
 
   const activeTab: DashboardTab = search.tab ?? 'risk'
@@ -233,6 +236,10 @@ function DashboardPage() {
         </TabsList>
 
         <TabsContent value="risk" className="space-y-6 pt-2">
+          <RiskScoreCard
+            isLoading={summaryQuery.isFetching}
+          />
+
           <RiskHeatmap
             filters={filterParams}
             onCellClick={(_group, severity) => {
@@ -304,7 +311,7 @@ function DashboardPage() {
           <DeviceGroupVulnerabilityChart
             data={summary.vulnerabilitiesByDeviceGroup}
             isLoading={summaryQuery.isFetching}
-            onBarClick={drillToAssets}
+            onBarClick={setSelectedDeviceGroup}
           />
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -319,6 +326,16 @@ function DashboardPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <DeviceGroupRiskDetailDialog
+        deviceGroupName={selectedDeviceGroup}
+        open={selectedDeviceGroup !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedDeviceGroup(null)
+          }
+        }}
+      />
     </section>
   );
 }

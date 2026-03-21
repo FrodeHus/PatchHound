@@ -30,6 +30,7 @@ public class IngestionService
     private readonly StagedVulnerabilityMergeService _stagedVulnerabilityMergeService;
     private readonly StagedAssetMergeService _stagedAssetMergeService;
     private readonly IAssetRuleEvaluationService _assetRuleEvaluationService;
+    private readonly RiskScoreService _riskScoreService;
     private readonly SecureScoreService _secureScoreService;
     private readonly ILogger<IngestionService> _logger;
 
@@ -46,6 +47,7 @@ public class IngestionService
         StagedVulnerabilityMergeService stagedVulnerabilityMergeService,
         StagedAssetMergeService stagedAssetMergeService,
         IAssetRuleEvaluationService assetRuleEvaluationService,
+        RiskScoreService riskScoreService,
         SecureScoreService secureScoreService,
         ILogger<IngestionService> logger
     )
@@ -60,6 +62,7 @@ public class IngestionService
         _stagedVulnerabilityMergeService = stagedVulnerabilityMergeService;
         _stagedAssetMergeService = stagedAssetMergeService;
         _assetRuleEvaluationService = assetRuleEvaluationService;
+        _riskScoreService = riskScoreService;
         _secureScoreService = secureScoreService;
         _logger = logger;
     }
@@ -528,6 +531,8 @@ public class IngestionService
                         await EnqueueEnrichmentJobsForRunAsync(run.Id, tenantId, ct);
 
                         await _assetRuleEvaluationService.EvaluateRulesAsync(tenantId, ct);
+
+                        await _riskScoreService.RecalculateForTenantAsync(tenantId, ct);
 
                         await _secureScoreService.RecalculateForTenantAsync(tenantId, ct);
 

@@ -1,5 +1,6 @@
 import type { Asset } from '@/api/assets.schemas'
 import type { TeamDetail } from '@/api/teams.schemas'
+import { Link } from '@tanstack/react-router'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -68,9 +69,10 @@ export function AssignmentGroupDetailView({
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
               <SummaryMetric label="Members" value={String(team.members.length)} />
               <SummaryMetric label="Assigned Assets" value={String(team.assignedAssetCount)} />
+              <SummaryMetric label="Current Risk" value={formatRiskScore(team.currentRiskScore)} />
             </div>
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
@@ -90,6 +92,36 @@ export function AssignmentGroupDetailView({
                   <InsetPanel key={member.userId} emphasis="subtle" className="px-3 py-2">
                     <p className="text-sm font-medium">{member.displayName}</p>
                     <p className="text-xs text-muted-foreground">{member.email}</p>
+                  </InsetPanel>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Top Risk Drivers</p>
+            {team.topRiskAssets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No scored assets are currently driving team risk.</p>
+            ) : (
+              <div className="space-y-2">
+                {team.topRiskAssets.map((asset) => (
+                  <InsetPanel key={asset.assetId} emphasis="subtle" className="px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Link
+                          to="/assets/$id"
+                          params={{ id: asset.assetId }}
+                          className="truncate text-sm font-medium hover:underline"
+                        >
+                          {asset.assetName}
+                        </Link>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {asset.assetType} with peak episode risk {asset.maxEpisodeRiskScore.toFixed(0)} across {asset.openEpisodeCount} open episodes.
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/10 text-primary">
+                        {asset.currentRiskScore.toFixed(0)}
+                      </Badge>
+                    </div>
                   </InsetPanel>
                 ))}
               </div>
@@ -239,4 +271,12 @@ function formatOwnerLabel(ownerType: string) {
   }
 
   return ownerType
+}
+
+function formatRiskScore(score: number | null) {
+  if (typeof score !== 'number') {
+    return '0'
+  }
+
+  return score.toFixed(0)
 }

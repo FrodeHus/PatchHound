@@ -7,6 +7,8 @@ public record RemediationTaskDto(
     string VulnerabilityTitle,
     string AssetName,
     string Status,
+    decimal? EpisodeRiskScore,
+    string? EpisodeRiskBand,
     string? Justification,
     DateTimeOffset DueDate,
     DateTimeOffset CreatedAt,

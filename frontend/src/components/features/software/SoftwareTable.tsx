@@ -48,6 +48,7 @@ type SoftwareTableProps = {
     vulnerableOnly: boolean
     boundOnly: boolean
   }) => void
+  onShowRiskDetail: (tenantSoftwareId: string) => void
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
   onClearFilters: () => void
@@ -70,6 +71,7 @@ export function SoftwareTable({
   onVulnerableOnlyChange,
   onBoundOnlyChange,
   onApplyStructuredFilters,
+  onShowRiskDetail,
   onPageChange,
   onPageSizeChange,
   onClearFilters,
@@ -165,6 +167,24 @@ export function SoftwareTable({
         ),
       },
       {
+        accessorKey: 'currentRiskScore',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Current risk" />,
+        cell: ({ row }) => {
+          const score = row.original.currentRiskScore
+          if (score == null) return <span className="text-muted-foreground">—</span>
+          const tone = score >= 900 ? 'danger' : score >= 750 ? 'warning' : score >= 500 ? 'info' : 'success'
+          return (
+            <button
+              type="button"
+              onClick={() => onShowRiskDetail(row.original.id)}
+              className={`font-medium tabular-nums underline decoration-current/25 underline-offset-4 hover:decoration-current ${toneText(tone)}`}
+            >
+              {score.toFixed(0)}
+            </button>
+          )
+        },
+      },
+      {
         accessorKey: 'primaryCpe23Uri',
         header: ({ column }) => <SortableColumnHeader column={column} title="CPE" />,
         cell: ({ row }) => (
@@ -214,7 +234,7 @@ export function SoftwareTable({
           ),
         },
     ],
-    [],
+    [onShowRiskDetail],
   )
 
   return (

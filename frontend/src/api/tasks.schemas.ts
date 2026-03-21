@@ -8,6 +8,8 @@ export const remediationTaskSchema = z.object({
   vulnerabilityTitle: z.string(),
   assetName: z.string(),
   status: z.string(),
+  episodeRiskScore: z.number().nullable(),
+  episodeRiskBand: z.string().nullable(),
   justification: z.string().nullable(),
   dueDate: z.string().datetime(),
   createdAt: z.string().datetime(),

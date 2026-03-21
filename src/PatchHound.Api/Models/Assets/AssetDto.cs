@@ -5,6 +5,7 @@ public record AssetDto(
     string ExternalId,
     string Name,
     string AssetType,
+    decimal? CurrentRiskScore,
     string? DeviceGroupName,
     string Criticality,
     string OwnerType,

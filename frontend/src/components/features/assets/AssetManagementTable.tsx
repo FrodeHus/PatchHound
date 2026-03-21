@@ -381,6 +381,21 @@ export function AssetManagementTable({
         ),
       },
       {
+        accessorKey: "currentRiskScore",
+        header: ({ column }) => <SortableColumnHeader column={column} title="Current risk" />,
+        cell: ({ row }) => {
+          const score = row.original.currentRiskScore
+          if (score == null) return <span className="text-muted-foreground">—</span>
+          const tone =
+            score >= 900 ? 'danger' : score >= 750 ? 'warning' : score >= 500 ? 'info' : 'success'
+          return (
+            <span className={`font-medium tabular-nums ${toneBadge(tone)}`}>
+              {score.toFixed(0)}
+            </span>
+          )
+        },
+      },
+      {
         accessorKey: "healthStatus",
         header: ({ column }) => <SortableColumnHeader column={column} title="Health" />,
         cell: ({ row }) => {

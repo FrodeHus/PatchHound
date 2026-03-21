@@ -208,6 +208,65 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("Assets");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.AssetRiskScore", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CalculatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CalculationVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("CriticalCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FactorsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("HighCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LowCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MaxEpisodeRiskScore")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)");
+
+                    b.Property<int>("MediumCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OpenEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("OverallScore")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "AssetId")
+                        .IsUnique();
+
+                    b.ToTable("AssetRiskScores");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.AssetRule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -533,6 +592,77 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.HasIndex("EntityType", "EntityId");
 
                     b.ToTable("Comments");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.DeviceGroupRiskScore", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AssetCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CalculatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CalculationVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("CriticalEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DeviceGroupId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("DeviceGroupName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("FactorsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("GroupKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("HighEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LowEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MaxAssetRiskScore")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)");
+
+                    b.Property<int>("MediumEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OpenEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("OverallScore")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "GroupKey")
+                        .IsUnique();
+
+                    b.ToTable("DeviceGroupRiskScores");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.DeviceSoftwareInstallation", b =>
@@ -1844,6 +1974,66 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("TeamMembers");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.TeamRiskScore", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AssetCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CalculatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CalculationVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("CriticalEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FactorsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("HighEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LowEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MaxAssetRiskScore")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)");
+
+                    b.Property<int>("MediumEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OpenEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("OverallScore")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TeamId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("TeamRiskScores");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1988,6 +2178,41 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("TenantAiProfiles");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.TenantRiskScoreSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AssetCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CriticalAssetCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<int>("HighAssetCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("OverallScore")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("TenantRiskScoreSnapshots");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.TenantSecureScoreSnapshot", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2097,6 +2322,71 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("TenantSoftware");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.TenantSoftwareRiskScore", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AffectedDeviceCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CalculatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CalculationVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("CriticalEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FactorsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("HighEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LowEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MaxEpisodeRiskScore")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)");
+
+                    b.Property<int>("MediumEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OpenEpisodeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("OverallScore")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)");
+
+                    b.Property<Guid?>("SnapshotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantSoftwareId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantSoftwareId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "SnapshotId");
+
+                    b.ToTable("TenantSoftwareRiskScores");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.TenantSourceConfiguration", b =>
@@ -2612,6 +2902,141 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("VulnerabilityDefinitionReferences");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.VulnerabilityEpisodeRiskAssessment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CalculatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CalculationVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<decimal>("ContextScore")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal>("EpisodeRiskScore")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)");
+
+                    b.Property<string>("FactorsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("OperationalScore")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RiskBand")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid?>("SnapshotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantVulnerabilityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ThreatScore")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<Guid>("VulnerabilityAssetEpisodeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantVulnerabilityId");
+
+                    b.HasIndex("VulnerabilityAssetEpisodeId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "ResolvedAt");
+
+                    b.HasIndex("TenantId", "TenantVulnerabilityId", "AssetId");
+
+                    b.ToTable("VulnerabilityEpisodeRiskAssessments");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.VulnerabilityThreatAssessment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("ActiveAlert")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("CalculatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CalculationVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<decimal>("ExploitLikelihoodScore")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<string>("FactorsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("HasMalwareAssociation")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("HasRansomwareAssociation")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("KnownExploited")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("PublicExploit")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("TechnicalScore")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal>("ThreatActivityScore")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal>("ThreatScore")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<Guid>("VulnerabilityDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VulnerabilityDefinitionId")
+                        .IsUnique();
+
+                    b.ToTable("VulnerabilityThreatAssessments");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.WorkflowAction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2862,6 +3287,17 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.AssetRiskScore", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.Asset", "Asset")
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Asset");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.AssetSecureScore", b =>
                 {
                     b.HasOne("PatchHound.Core.Entities.Asset", "Asset")
@@ -3037,6 +3473,17 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.TeamRiskScore", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.Team", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Team");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.TenantSoftware", b =>
                 {
                     b.HasOne("PatchHound.Core.Entities.NormalizedSoftware", "NormalizedSoftware")
@@ -3046,6 +3493,17 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("NormalizedSoftware");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.TenantSoftwareRiskScore", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.TenantSoftware", "TenantSoftware")
+                        .WithMany()
+                        .HasForeignKey("TenantSoftwareId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TenantSoftware");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.TenantVulnerability", b =>
@@ -3158,6 +3616,44 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.HasOne("PatchHound.Core.Entities.VulnerabilityDefinition", "VulnerabilityDefinition")
                         .WithMany("References")
                         .HasForeignKey("VulnerabilityDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("VulnerabilityDefinition");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.VulnerabilityEpisodeRiskAssessment", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.Asset", "Asset")
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PatchHound.Core.Entities.TenantVulnerability", "TenantVulnerability")
+                        .WithMany()
+                        .HasForeignKey("TenantVulnerabilityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PatchHound.Core.Entities.VulnerabilityAssetEpisode", "VulnerabilityAssetEpisode")
+                        .WithOne()
+                        .HasForeignKey("PatchHound.Core.Entities.VulnerabilityEpisodeRiskAssessment", "VulnerabilityAssetEpisodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Asset");
+
+                    b.Navigation("TenantVulnerability");
+
+                    b.Navigation("VulnerabilityAssetEpisode");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.VulnerabilityThreatAssessment", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.VulnerabilityDefinition", "VulnerabilityDefinition")
+                        .WithOne()
+                        .HasForeignKey("PatchHound.Core.Entities.VulnerabilityThreatAssessment", "VulnerabilityDefinitionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

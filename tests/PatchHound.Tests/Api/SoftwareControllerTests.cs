@@ -164,6 +164,116 @@ public class SoftwareControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task List_OrdersByPersistedSoftwareRiskScore()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+
+        var lowRiskNormalizedSoftware = NormalizedSoftware.Create(
+            "helper",
+            "contoso",
+            "contoso:helper",
+            null,
+            SoftwareNormalizationMethod.Heuristic,
+            SoftwareNormalizationConfidence.Medium,
+            new DateTimeOffset(2026, 3, 11, 10, 0, 0, TimeSpan.Zero)
+        );
+        var lowRiskTenantSoftware = TenantSoftware.Create(
+            _tenantId,
+            null,
+            lowRiskNormalizedSoftware.Id,
+            new DateTimeOffset(2026, 3, 11, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 3, 11, 0, 0, 0, TimeSpan.Zero)
+        );
+        var helperSoftwareAsset = Asset.Create(
+            _tenantId,
+            "software-3",
+            AssetType.Software,
+            "Contoso Helper",
+            Criticality.Low
+        );
+        var lowRiskDevice = await _dbContext.Assets.SingleAsync(item => item.ExternalId == "device-2");
+
+        await _dbContext.AddRangeAsync(lowRiskNormalizedSoftware, lowRiskTenantSoftware, helperSoftwareAsset);
+        await _dbContext.NormalizedSoftwareAliases.AddAsync(
+            NormalizedSoftwareAlias.Create(
+                lowRiskNormalizedSoftware.Id,
+                SoftwareIdentitySourceSystem.Defender,
+                "software-3",
+                "Contoso Helper",
+                "Contoso",
+                "1.0",
+                SoftwareNormalizationConfidence.Medium,
+                "Resolved via normalized alias.",
+                DateTimeOffset.UtcNow
+            )
+        );
+        await _dbContext.NormalizedSoftwareInstallations.AddAsync(
+            NormalizedSoftwareInstallation.Create(
+                _tenantId,
+                null,
+                lowRiskTenantSoftware.Id,
+                helperSoftwareAsset.Id,
+                lowRiskDevice.Id,
+                SoftwareIdentitySourceSystem.Defender,
+                "1.0",
+                new DateTimeOffset(2026, 3, 11, 0, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 3, 11, 0, 0, 0, TimeSpan.Zero),
+                null,
+                true,
+                1
+            )
+        );
+
+        await _dbContext.TenantSoftwareRiskScores.AddRangeAsync(
+            TenantSoftwareRiskScore.Create(
+                _tenantId,
+                graph.TenantSoftware.Id,
+                null,
+                880m,
+                860m,
+                1,
+                1,
+                0,
+                0,
+                2,
+                2,
+                "[]",
+                RiskScoreService.CalculationVersion
+            ),
+            TenantSoftwareRiskScore.Create(
+                _tenantId,
+                lowRiskTenantSoftware.Id,
+                null,
+                240m,
+                220m,
+                0,
+                0,
+                0,
+                2,
+                2,
+                2,
+                "[]",
+                RiskScoreService.CalculationVersion
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new TenantSoftwareFilterQuery(),
+            new PaginationQuery(1, 10),
+            CancellationToken.None
+        );
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<TenantSoftwareListItemDto>>().Subject;
+
+        payload.Items.Should().HaveCount(2);
+        payload.Items[0].Id.Should().Be(graph.TenantSoftware.Id);
+        payload.Items[0].CurrentRiskScore.Should().Be(880m);
+        payload.Items[1].Id.Should().Be(lowRiskTenantSoftware.Id);
+        payload.Items[1].CurrentRiskScore.Should().Be(240m);
+    }
+
+    [Fact]
     public async Task GenerateAiReport_ReturnsMergedSoftwareReport()
     {
         var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);

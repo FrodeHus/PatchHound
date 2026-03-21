@@ -8,6 +8,7 @@ using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Api.Controllers;
 
@@ -18,16 +19,19 @@ public class RiskAcceptancesController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly RiskAcceptanceService _riskAcceptanceService;
+    private readonly RiskRefreshService _riskRefreshService;
     private readonly ITenantContext _tenantContext;
 
     public RiskAcceptancesController(
         PatchHoundDbContext dbContext,
         RiskAcceptanceService riskAcceptanceService,
+        RiskRefreshService riskRefreshService,
         ITenantContext tenantContext
     )
     {
         _dbContext = dbContext;
         _riskAcceptanceService = riskAcceptanceService;
+        _riskRefreshService = riskRefreshService;
         _tenantContext = tenantContext;
     }
 
@@ -146,6 +150,26 @@ public class RiskAcceptancesController : ControllerBase
             if (!result.IsSuccess)
                 return BadRequest(new ProblemDetails { Title = result.Error });
 
+            if (riskAcceptance.AssetId.HasValue)
+            {
+                await _riskRefreshService.RefreshForPairAsync(
+                    riskAcceptance.TenantId,
+                    riskAcceptance.TenantVulnerabilityId,
+                    riskAcceptance.AssetId.Value,
+                    recalculateAssessments: false,
+                    ct
+                );
+            }
+            else
+            {
+                await _riskRefreshService.RefreshForVulnerabilityAsync(
+                    riskAcceptance.TenantId,
+                    riskAcceptance.TenantVulnerabilityId,
+                    recalculateAssessments: false,
+                    ct
+                );
+            }
+
             return NoContent();
         }
 
@@ -159,6 +183,26 @@ public class RiskAcceptancesController : ControllerBase
 
             if (!result.IsSuccess)
                 return BadRequest(new ProblemDetails { Title = result.Error });
+
+            if (riskAcceptance.AssetId.HasValue)
+            {
+                await _riskRefreshService.RefreshForPairAsync(
+                    riskAcceptance.TenantId,
+                    riskAcceptance.TenantVulnerabilityId,
+                    riskAcceptance.AssetId.Value,
+                    recalculateAssessments: false,
+                    ct
+                );
+            }
+            else
+            {
+                await _riskRefreshService.RefreshForVulnerabilityAsync(
+                    riskAcceptance.TenantId,
+                    riskAcceptance.TenantVulnerabilityId,
+                    recalculateAssessments: false,
+                    ct
+                );
+            }
 
             return NoContent();
         }

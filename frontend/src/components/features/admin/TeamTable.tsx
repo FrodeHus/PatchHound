@@ -83,6 +83,14 @@ export function TeamTable({
         cell: ({ row }) => <span className="text-sm font-medium">{row.original.memberCount}</span>,
       },
       {
+        accessorKey: 'currentRiskScore',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Current Risk" />,
+        cell: ({ row }) => {
+          const score = row.original.currentRiskScore
+          return <span className="text-sm font-medium">{typeof score === 'number' ? score.toFixed(0) : '0'}</span>
+        },
+      },
+      {
         id: 'selection',
         header: () => <div className="text-right">Open</div>,
         enableSorting: false,
@@ -121,7 +129,7 @@ export function TeamTable({
         />
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/30">
-          <DataTable columns={columns} data={teams} getRowId={(row) => row.id} className="min-w-[860px]" />
+          <DataTable columns={columns} data={teams} getRowId={(row) => row.id} className="min-w-[940px]" />
         </div>
       )}
 

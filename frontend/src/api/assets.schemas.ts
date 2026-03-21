@@ -6,6 +6,7 @@ export const assetSchema = z.object({
   externalId: z.string(),
   name: z.string(),
   assetType: z.string(),
+  currentRiskScore: z.number().nullable(),
   deviceGroupName: z.string().nullable(),
   criticality: z.string(),
   ownerType: z.string(),

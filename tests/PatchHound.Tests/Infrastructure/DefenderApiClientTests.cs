@@ -28,7 +28,14 @@ public class DefenderApiClientTests
                   "description": "Catalog description",
                   "severity": "High",
                   "cvssV3": 8.1,
-                  "cvssVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+                  "cvssVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                  "publicExploit": true,
+                  "exploitVerified": true,
+                  "exploitInKit": false,
+                  "activeAlert": true,
+                  "associatedThreats": ["Malware"],
+                  "exploitUris": ["https://example.test/exploit"],
+                  "epss": 0.91
                 }
                 """
             )
@@ -45,6 +52,11 @@ public class DefenderApiClientTests
         response!.Id.Should().Be("CVE-2026-0001");
         response.Name.Should().Be("Contoso vulnerability");
         response.Description.Should().Be("Catalog description");
+        response.PublicExploit.Should().BeTrue();
+        response.ExploitVerified.Should().BeTrue();
+        response.ActiveAlert.Should().BeTrue();
+        response.ExploitUris.Should().ContainSingle("https://example.test/exploit");
+        response.Epss.Should().Be(0.91m);
         handler
             .RequestUris.Should()
             .ContainSingle(
@@ -177,6 +189,61 @@ public class DefenderApiClientTests
             .ContainInOrder(
                 "https://api.securitycenter.microsoft.com/api/machines",
                 "https://api.securitycenter.microsoft.com/api/machines?$skip=1"
+            );
+    }
+
+    [Fact]
+    public async Task GetMachineRecommendationsAsync_FollowsAllPagedResponses()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            CreateJsonResponse(
+                """
+                {
+                  "value": [
+                    {
+                      "id": "rec-1",
+                      "recommendationName": "Update Contoso Agent",
+                      "severityScore": 8.2,
+                      "publicExploit": true,
+                      "activeAlert": false,
+                      "associatedThreats": ["Ransomware"],
+                      "exposureImpact": 0.8,
+                      "configScoreImpact": 0.3
+                    }
+                  ],
+                  "@odata.nextLink": "https://api.securitycenter.microsoft.com/api/machines/machine-1/recommendations?$skip=1"
+                }
+                """
+            ),
+            CreateJsonResponse(
+                """
+                {
+                  "value": [
+                    {
+                      "id": "rec-2",
+                      "recommendationName": "Mitigate another issue"
+                    }
+                  ]
+                }
+                """
+            )
+        );
+        var client = new TestDefenderApiClient(new HttpClient(handler));
+
+        var response = await client.GetMachineRecommendationsAsync(
+            Configuration,
+            "machine-1",
+            CancellationToken.None
+        );
+
+        response.Value.Should().HaveCount(2);
+        response.Value[0].PublicExploit.Should().BeTrue();
+        response.Value[0].AssociatedThreats.Should().Contain("Ransomware");
+        handler
+            .RequestUris.Should()
+            .ContainInOrder(
+                "https://api.securitycenter.microsoft.com/api/machines/machine-1/recommendations",
+                "https://api.securitycenter.microsoft.com/api/machines/machine-1/recommendations?$skip=1"
             );
     }
 

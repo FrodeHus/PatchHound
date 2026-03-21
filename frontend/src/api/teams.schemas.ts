@@ -7,6 +7,7 @@ export const teamSchema = z.object({
   tenantName: z.string(),
   name: z.string(),
   memberCount: z.number(),
+  currentRiskScore: z.number().nullable(),
 })
 
 export const teamDetailSchema = z.object({
@@ -15,6 +16,15 @@ export const teamDetailSchema = z.object({
   tenantName: z.string(),
   name: z.string(),
   assignedAssetCount: z.number(),
+  currentRiskScore: z.number().nullable(),
+  topRiskAssets: z.array(z.object({
+    assetId: z.string().uuid(),
+    assetName: z.string(),
+    assetType: z.string(),
+    currentRiskScore: z.number(),
+    maxEpisodeRiskScore: z.number(),
+    openEpisodeCount: z.number(),
+  })),
   members: z.array(z.object({
     userId: z.string().uuid(),
     displayName: z.string(),

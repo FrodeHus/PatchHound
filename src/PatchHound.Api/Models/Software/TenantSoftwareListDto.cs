@@ -5,6 +5,7 @@ public record TenantSoftwareListItemDto(
     Guid NormalizedSoftwareId,
     string CanonicalName,
     string? CanonicalVendor,
+    decimal? CurrentRiskScore,
     string Confidence,
     string NormalizationMethod,
     string? PrimaryCpe23Uri,
