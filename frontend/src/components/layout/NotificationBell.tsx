@@ -1,11 +1,38 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 import { Bell } from 'lucide-react'
 import { useSSE } from '@/hooks/useSSE'
+import { fetchNotifications, fetchUnreadNotificationCount, markNotificationRead } from '@/api/notifications.functions'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0)
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+
+  const unreadCountQuery = useQuery({
+    queryKey: ['notifications', 'count'],
+    queryFn: () => fetchUnreadNotificationCount(),
+    staleTime: 30_000,
+  })
+
+  const notificationsQuery = useQuery({
+    queryKey: ['notifications', 'recent'],
+    queryFn: () => fetchNotifications({ data: { take: 8 } }),
+    staleTime: 15_000,
+  })
+
+  const markReadMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await markNotificationRead({ data: { id } })
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    },
+  })
 
   const handleCountUpdated = useCallback((count: unknown) => {
     if (typeof count === 'number') {
@@ -13,30 +40,86 @@ export function NotificationBell() {
     }
   }, [])
 
+  useEffect(() => {
+    if (typeof unreadCountQuery.data === 'number') {
+      setUnreadCount(unreadCountQuery.data)
+    }
+  }, [unreadCountQuery.data])
+
   useSSE('NotificationCountUpdated', handleCountUpdated)
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={(
-          <Button
-            aria-label="Notifications"
-            variant="ghost"
-            size="icon"
-            className="relative rounded-full border border-border/70 bg-card/70 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-          />
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger
+          render={(
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  aria-label="Notifications"
+                  variant="ghost"
+                  size="icon"
+                  className="relative rounded-full border border-border/70 bg-card/70 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                />
+              }
+            />
+          )}
+        >
+          <Bell size={18} />
+          {unreadCount > 0 ? (
+            <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-destructive px-1 text-center text-[10px] font-semibold text-white shadow-[0_0_0_2px_var(--background)]">
+              {unreadCount}
+            </span>
+          ) : null}
+        </TooltipTrigger>
+        <TooltipContent>
+          {unreadCount > 0 ? `${unreadCount} unread notifications` : 'No unread notifications'}
+        </TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent align="end" className="w-96 rounded-xl border-border/70 bg-popover/95 p-1.5 backdrop-blur">
+        <DropdownMenuLabel className="px-3 py-2">
+          <div>
+            <p className="text-sm font-medium text-foreground">Notifications</p>
+            <p className="text-xs text-muted-foreground">
+              {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+            </p>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {notificationsQuery.data && notificationsQuery.data.length > 0 ? (
+          notificationsQuery.data.map((item) => (
+            <DropdownMenuItem
+              key={item.id}
+              className="block rounded-lg px-3 py-3"
+              onClick={async () => {
+                if (!item.readAt) {
+                  await markReadMutation.mutateAsync(item.id)
+                  setUnreadCount((count) => Math.max(0, count - 1))
+                }
+                if (item.path) {
+                  void navigate({ to: item.path as never })
+                }
+              }}
+            >
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-foreground">{item.title}</span>
+                  {!item.readAt ? (
+                    <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-destructive">
+                      New
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-xs leading-5 text-muted-foreground">{item.body}</p>
+              </div>
+            </DropdownMenuItem>
+          ))
+        ) : (
+          <div className="px-3 py-8 text-center text-sm text-muted-foreground">
+            No notifications yet.
+          </div>
         )}
-      >
-        <Bell size={18} />
-        {unreadCount > 0 ? (
-          <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-destructive px-1 text-center text-[10px] font-semibold text-white shadow-[0_0_0_2px_var(--background)]">
-            {unreadCount}
-          </span>
-        ) : null}
-      </TooltipTrigger>
-      <TooltipContent>
-        {unreadCount > 0 ? `${unreadCount} unread notifications` : 'No unread notifications'}
-      </TooltipContent>
-    </Tooltip>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

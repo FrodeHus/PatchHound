@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { AlertTriangle, CheckCircle2, ShieldAlert, TimerReset } from 'lucide-react'
-import { fetchDashboardBurndown, fetchDashboardFilterOptions, fetchDashboardSummary, fetchDashboardTrends } from '@/api/dashboard.functions'
+import { fetchDashboardBurndown, fetchDashboardFilterOptions, fetchDashboardSummary, fetchDashboardTrends, fetchOwnerDashboardSummary } from '@/api/dashboard.functions'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { InsetPanel } from '@/components/ui/inset-panel'
@@ -24,12 +24,13 @@ import { MttrCard } from '@/components/features/dashboard/MttrCard'
 import { BurndownChart } from '@/components/features/dashboard/BurndownChart'
 import { CisoExecutiveOverview } from '@/components/features/dashboard/CisoExecutiveOverview'
 import { AnalystTriageWorkbench } from '@/components/features/dashboard/AnalystTriageWorkbench'
+import { AssetOwnerOverview } from '@/components/features/dashboard/AssetOwnerOverview'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { readDashboardViewPreference } from '@/lib/dashboard-view'
 
 const TAB_VALUES = ['risk', 'remediation', 'infrastructure'] as const
 type DashboardTab = (typeof TAB_VALUES)[number]
-const DASHBOARD_MODE_VALUES = ['executive', 'operations'] as const
+const DASHBOARD_MODE_VALUES = ['executive', 'operations', 'owner'] as const
 type DashboardMode = (typeof DASHBOARD_MODE_VALUES)[number]
 
 const dashboardSearchSchema = z.object({
@@ -62,8 +63,15 @@ function DashboardPage() {
   const [selectedDeviceGroup, setSelectedDeviceGroup] = useState<string | null>(null)
   const canUseInitialData = initialTenantId === selectedTenantId
   const isExecutiveViewer = user.roles.includes('Stakeholder') || user.roles.includes('GlobalAdmin')
+  const isAssetOwnerViewer = user.roles.includes('AssetOwner')
   const canSwitchModes = user.roles.includes('GlobalAdmin')
-  const defaultMode: DashboardMode = isExecutiveViewer ? 'executive' : 'operations'
+  const defaultMode: DashboardMode = isExecutiveViewer
+    ? 'executive'
+    : user.roles.includes('SecurityAnalyst')
+      ? 'operations'
+      : isAssetOwnerViewer
+        ? 'owner'
+        : 'operations'
   const requestedMode = search.mode
   const dashboardMode: DashboardMode = canSwitchModes
     ? requestedMode ?? defaultMode
@@ -117,6 +125,12 @@ function DashboardPage() {
     queryFn: () => fetchDashboardFilterOptions(),
     staleTime: 60_000,
   })
+  const ownerSummaryQuery = useQuery({
+    queryKey: ['dashboard', 'owner-summary', selectedTenantId],
+    queryFn: () => fetchOwnerDashboardSummary(),
+    enabled: dashboardMode === 'owner' && Boolean(selectedTenantId),
+    staleTime: 30_000,
+  })
 
   const globalNavigate = useNavigate()
 
@@ -164,6 +178,21 @@ function DashboardPage() {
               }
             : undefined
         }
+      />
+    )
+  }
+  if (dashboardMode === 'owner') {
+    return (
+      <AssetOwnerOverview
+        summary={ownerSummaryQuery.data ?? {
+          ownedAssetCount: 0,
+          assetsNeedingAttention: 0,
+          openActionCount: 0,
+          overdueActionCount: 0,
+          topOwnedAssets: [],
+          actions: [],
+        }}
+        isLoading={ownerSummaryQuery.isPending || ownerSummaryQuery.isFetching}
       />
     )
   }

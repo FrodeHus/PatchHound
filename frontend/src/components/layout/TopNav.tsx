@@ -297,7 +297,13 @@ export function TopNav({
                         value="operations"
                         className="rounded-lg px-3 py-2"
                       >
-                        Operations workbench
+                        Analyst workbench
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem
+                        value="owner"
+                        className="rounded-lg px-3 py-2"
+                      >
+                        Asset owner view
                       </DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                   </DropdownMenuGroup>

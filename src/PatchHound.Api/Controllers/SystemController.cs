@@ -6,6 +6,7 @@ using PatchHound.Api.Models;
 using PatchHound.Api.Models.System;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
@@ -21,16 +22,25 @@ public class SystemController : ControllerBase
     private readonly ISecretStore _secretStore;
     private readonly PatchHoundDbContext _dbContext;
     private readonly AuditLogWriter _auditLogWriter;
+    private readonly NotificationEmailConfigurationResolver _notificationConfigurationResolver;
+    private readonly MailgunEmailSender _mailgunEmailSender;
+    private readonly ITenantContext _tenantContext;
 
     public SystemController(
         ISecretStore secretStore,
         PatchHoundDbContext dbContext,
-        AuditLogWriter auditLogWriter
+        AuditLogWriter auditLogWriter,
+        NotificationEmailConfigurationResolver notificationConfigurationResolver,
+        MailgunEmailSender mailgunEmailSender,
+        ITenantContext tenantContext
     )
     {
         _secretStore = secretStore;
         _dbContext = dbContext;
         _auditLogWriter = auditLogWriter;
+        _notificationConfigurationResolver = notificationConfigurationResolver;
+        _mailgunEmailSender = mailgunEmailSender;
+        _tenantContext = tenantContext;
     }
 
     [HttpGet("/api/health")]
@@ -45,6 +55,221 @@ public class SystemController : ControllerBase
     {
         var status = await _secretStore.GetStatusAsync(ct);
         return Ok(new SystemStatusDto(status.IsAvailable, status.IsInitialized, status.IsSealed));
+    }
+
+    [HttpGet("notification-providers")]
+    [Authorize(Policy = Policies.ManageUsers)]
+    public async Task<ActionResult<NotificationProviderSettingsDto>> GetNotificationProviders(
+        CancellationToken ct
+    )
+    {
+        var configuration = await _notificationConfigurationResolver.GetAsync(ct);
+        return Ok(
+            new NotificationProviderSettingsDto(
+                configuration.ActiveProvider,
+                new SmtpNotificationProviderDto(
+                    configuration.Smtp.Host,
+                    configuration.Smtp.Port,
+                    configuration.Smtp.Username,
+                    configuration.Smtp.FromAddress,
+                    configuration.Smtp.EnableSsl
+                ),
+                new MailgunNotificationProviderDto(
+                    configuration.Mailgun.Enabled,
+                    configuration.Mailgun.Region,
+                    configuration.Mailgun.Domain,
+                    configuration.Mailgun.FromAddress,
+                    configuration.Mailgun.FromName,
+                    configuration.Mailgun.ReplyToAddress,
+                    !string.IsNullOrWhiteSpace(configuration.Mailgun.ApiKey)
+                )
+            )
+        );
+    }
+
+    [HttpPut("notification-providers")]
+    [Authorize(Policy = Policies.ManageUsers)]
+    public async Task<IActionResult> UpdateNotificationProviders(
+        [FromBody] UpdateNotificationProviderSettingsRequest request,
+        CancellationToken ct
+    )
+    {
+        var current = await _notificationConfigurationResolver.GetAsync(ct);
+        var normalizedProvider = NotificationEmailConfigurationResolver.NormalizeProvider(
+            request.ActiveProvider
+        );
+        var normalizedRegion = NotificationEmailConfigurationResolver.NormalizeRegion(
+            request.Mailgun.Region
+        );
+
+        if (normalizedProvider == "mailgun")
+        {
+            if (string.IsNullOrWhiteSpace(request.Mailgun.Domain))
+            {
+                return BadRequest(new ProblemDetails { Title = "Mailgun domain is required." });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Mailgun.FromAddress))
+            {
+                return BadRequest(
+                    new ProblemDetails { Title = "Mailgun from address is required." }
+                );
+            }
+
+            if (
+                string.IsNullOrWhiteSpace(request.Mailgun.ApiKey)
+                && string.IsNullOrWhiteSpace(current.Mailgun.ApiKey)
+            )
+            {
+                return BadRequest(new ProblemDetails { Title = "Mailgun API key is required." });
+            }
+        }
+
+        var values = new Dictionary<string, string>
+        {
+            ["activeProvider"] = normalizedProvider,
+            ["enabled"] = request.Mailgun.Enabled ? "true" : "false",
+            ["region"] = normalizedRegion,
+            ["domain"] = request.Mailgun.Domain.Trim(),
+            ["fromAddress"] = request.Mailgun.FromAddress.Trim(),
+            ["fromName"] = request.Mailgun.FromName?.Trim() ?? string.Empty,
+            ["replyToAddress"] = request.Mailgun.ReplyToAddress?.Trim() ?? string.Empty,
+        };
+        if (!string.IsNullOrWhiteSpace(request.Mailgun.ApiKey))
+        {
+            values["apiKey"] = request.Mailgun.ApiKey.Trim();
+        }
+
+        await _secretStore.PutSecretAsync(
+            NotificationEmailConfigurationResolver.MailgunSecretPath,
+            values,
+            ct
+        );
+
+        await _auditLogWriter.WriteAsync(
+            Guid.Empty,
+            "NotificationProviderSettings",
+            Guid.Empty,
+            AuditAction.Updated,
+            new
+            {
+                current.ActiveProvider,
+                Mailgun = new
+                {
+                    current.Mailgun.Enabled,
+                    current.Mailgun.Region,
+                    current.Mailgun.Domain,
+                    current.Mailgun.FromAddress,
+                    current.Mailgun.FromName,
+                    current.Mailgun.ReplyToAddress,
+                    HasApiKey = !string.IsNullOrWhiteSpace(current.Mailgun.ApiKey),
+                },
+            },
+            new
+            {
+                ActiveProvider = normalizedProvider,
+                Mailgun = new
+                {
+                    request.Mailgun.Enabled,
+                    Region = normalizedRegion,
+                    Domain = request.Mailgun.Domain.Trim(),
+                    FromAddress = request.Mailgun.FromAddress.Trim(),
+                    FromName = request.Mailgun.FromName?.Trim(),
+                    ReplyToAddress = request.Mailgun.ReplyToAddress?.Trim(),
+                    HasApiKey =
+                        !string.IsNullOrWhiteSpace(request.Mailgun.ApiKey)
+                        || !string.IsNullOrWhiteSpace(current.Mailgun.ApiKey),
+                },
+            },
+            ct
+        );
+        await _dbContext.SaveChangesAsync(ct);
+
+        return NoContent();
+    }
+
+    [HttpPost("notification-providers/mailgun/validate")]
+    [Authorize(Policy = Policies.ManageUsers)]
+    public async Task<ActionResult<NotificationProviderValidationResponseDto>> ValidateMailgun(
+        CancellationToken ct
+    )
+    {
+        var configuration = await _notificationConfigurationResolver.GetAsync(ct);
+        if (!configuration.Mailgun.IsConfigured)
+        {
+            return BadRequest(
+                new ProblemDetails
+                {
+                    Title = "Mailgun is not fully configured. Domain, from address, and API key are required.",
+                }
+            );
+        }
+
+        var result = await _mailgunEmailSender.ValidateAsync(configuration.Mailgun, ct);
+        if (!result.IsValid)
+        {
+            return BadRequest(
+                new NotificationProviderValidationResponseDto(
+                    false,
+                    result.Message,
+                    result.DomainState
+                )
+            );
+        }
+
+        return Ok(
+            new NotificationProviderValidationResponseDto(
+                true,
+                result.Message,
+                result.DomainState
+            )
+        );
+    }
+
+    [HttpPost("notification-providers/mailgun/test")]
+    [Authorize(Policy = Policies.ManageUsers)]
+    public async Task<ActionResult<NotificationProviderValidationResponseDto>> SendMailgunTestEmail(
+        CancellationToken ct
+    )
+    {
+        var configuration = await _notificationConfigurationResolver.GetAsync(ct);
+        if (!configuration.Mailgun.IsConfigured)
+        {
+            return BadRequest(
+                new ProblemDetails
+                {
+                    Title = "Mailgun is not fully configured. Domain, from address, and API key are required.",
+                }
+            );
+        }
+
+        if (_tenantContext.CurrentUserId == Guid.Empty)
+        {
+            return Unauthorized();
+        }
+
+        var user = await _dbContext.Users.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == _tenantContext.CurrentUserId, ct);
+        if (user is null)
+        {
+            return NotFound(new ProblemDetails { Title = "Current user was not found." });
+        }
+
+        await _mailgunEmailSender.SendEmailAsync(
+            configuration.Mailgun,
+            user.Email,
+            "PatchHound Mailgun test notification",
+            "<p>This is a test notification from PatchHound using the configured Mailgun delivery settings.</p>",
+            ct
+        );
+
+        return Ok(
+            new NotificationProviderValidationResponseDto(
+                true,
+                $"Sent a test email to {user.Email}.",
+                null
+            )
+        );
     }
 
     [HttpPost("openbao/unseal")]

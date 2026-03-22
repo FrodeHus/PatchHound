@@ -58,6 +58,7 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
         );
 
         await dbContext.RemediationTasks.AddAsync(task, ct);
+        await QueueOwnerNotificationsAsync(tenantId, definition, asset, ct);
     }
 
     public async Task EnsureOpenTasksAsync(
@@ -110,6 +111,7 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
                 )
             );
             openTaskPairKeys.Add(pairKey);
+            await QueueOwnerNotificationsAsync(tenantId, definition, asset, ct);
         }
 
         if (tasksToCreate.Count > 0)
@@ -167,6 +169,11 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
             return asset.OwnerUserId.Value;
         }
 
+        if (asset.OwnerTeamId.HasValue)
+        {
+            return asset.OwnerTeamId.Value;
+        }
+
         if (asset.FallbackTeamId.HasValue)
         {
             return asset.FallbackTeamId.Value;
@@ -178,5 +185,94 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
     private static string BuildPairKey(Guid tenantVulnerabilityId, Guid assetId)
     {
         return $"{tenantVulnerabilityId:N}:{assetId:N}";
+    }
+
+    private async Task QueueOwnerNotificationsAsync(
+        Guid tenantId,
+        VulnerabilityDefinition definition,
+        Asset asset,
+        CancellationToken ct
+    )
+    {
+        var title = $"Software on {asset.Name} needs review";
+        var body =
+            $"{OwnerFacingIssueSummaryFormatter.BuildIssueSummary(null, definition.Title, definition.Description, definition.VendorSeverity)} Open the asset view to see business impact, affected software, and the next step. Technical reference: {definition.ExternalId}.";
+
+        if (asset.OwnerUserId.HasValue)
+        {
+            await QueueNotificationIfMissingAsync(
+                asset.OwnerUserId.Value,
+                tenantId,
+                title,
+                body,
+                asset.Id,
+                ct
+            );
+            return;
+        }
+
+        var ownerTeamId = asset.OwnerTeamId ?? asset.FallbackTeamId;
+        if (!ownerTeamId.HasValue)
+        {
+            return;
+        }
+
+        var memberIds = await dbContext.TeamMembers.IgnoreQueryFilters()
+            .Where(item => item.TeamId == ownerTeamId.Value)
+            .Select(item => item.UserId)
+            .ToListAsync(ct);
+
+        foreach (var memberId in memberIds)
+        {
+            await QueueNotificationIfMissingAsync(
+                memberId,
+                tenantId,
+                title,
+                body,
+                asset.Id,
+                ct
+            );
+        }
+    }
+
+    private async Task QueueNotificationIfMissingAsync(
+        Guid userId,
+        Guid tenantId,
+        string title,
+        string body,
+        Guid assetId,
+        CancellationToken ct
+    )
+    {
+        var threshold = DateTimeOffset.UtcNow.AddHours(-12);
+        var exists = await dbContext.Notifications.IgnoreQueryFilters()
+            .AnyAsync(item =>
+                item.UserId == userId
+                && item.TenantId == tenantId
+                && item.Type == NotificationType.TaskAssigned
+                && item.RelatedEntityType == "Asset"
+                && item.RelatedEntityId == assetId
+                && item.Title == title
+                && item.SentAt >= threshold,
+                ct
+            );
+
+        if (exists)
+        {
+            return;
+        }
+
+        await dbContext.Notifications.AddAsync(
+            Notification.Create(
+                userId,
+                tenantId,
+                NotificationType.TaskAssigned,
+                title,
+                body,
+                "Asset",
+                assetId
+            ),
+            ct
+        );
     }
 }

@@ -10,6 +10,32 @@ const systemStatusSchema = z.object({
   openBaoSealed: z.boolean(),
 })
 
+const notificationProviderSettingsSchema = z.object({
+  activeProvider: z.enum(['smtp', 'mailgun']),
+  smtp: z.object({
+    host: z.string(),
+    port: z.number(),
+    username: z.string().nullable(),
+    fromAddress: z.string(),
+    enableSsl: z.boolean(),
+  }),
+  mailgun: z.object({
+    enabled: z.boolean(),
+    region: z.enum(['us', 'eu']),
+    domain: z.string(),
+    fromAddress: z.string(),
+    fromName: z.string().nullable(),
+    replyToAddress: z.string().nullable(),
+    hasApiKey: z.boolean(),
+  }),
+})
+
+const notificationProviderValidationSchema = z.object({
+  isValid: z.boolean(),
+  message: z.string(),
+  domainState: z.string().nullable(),
+})
+
 const enrichmentSourceSchema = z.object({
   key: z.string(),
   displayName: z.string(),
@@ -80,6 +106,45 @@ export const fetchEnrichmentSources = createServerFn({ method: 'GET' })
     return z.array(enrichmentSourceSchema).parse(response)
   })
 
+export const fetchNotificationProviders = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const response = await apiGet('/system/notification-providers', context)
+    return notificationProviderSettingsSchema.parse(response)
+  })
+
+export const updateNotificationProviders = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({
+    activeProvider: z.enum(['smtp', 'mailgun']),
+    mailgun: z.object({
+      enabled: z.boolean(),
+      region: z.enum(['us', 'eu']),
+      domain: z.string(),
+      fromAddress: z.string(),
+      fromName: z.string(),
+      replyToAddress: z.string(),
+      apiKey: z.string(),
+    }),
+  }))
+  .handler(async ({ context, data }) => {
+    await apiPut('/system/notification-providers', context, data)
+  })
+
+export const validateMailgunConfiguration = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const response = await apiPost('/system/notification-providers/mailgun/validate', context, {})
+    return notificationProviderValidationSchema.parse(response)
+  })
+
+export const sendMailgunTestEmail = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const response = await apiPost('/system/notification-providers/mailgun/test', context, {})
+    return notificationProviderValidationSchema.parse(response)
+  })
+
 export const updateEnrichmentSources = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(z.array(z.object({
@@ -114,3 +179,4 @@ export const fetchEnrichmentRuns = createServerFn({ method: 'GET' })
 
 export type EnrichmentSource = z.infer<typeof enrichmentSourceSchema>
 export type EnrichmentRun = z.infer<typeof pagedEnrichmentRunSchema>['items'][number]
+export type NotificationProviderSettings = z.infer<typeof notificationProviderSettingsSchema>

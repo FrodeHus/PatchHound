@@ -36,6 +36,31 @@ function formatDays(value: number) {
   return `${Math.round(value)}d`
 }
 
+function describePressureArea(group: DashboardSummary['vulnerabilitiesByDeviceGroup'][number] | undefined) {
+  if (!group) {
+    return 'No active concentration by device group.'
+  }
+
+  const highPriorityCount = group.critical + group.high
+  const mediumCount = group.medium
+  const assetCount = group.assetCount ?? 0
+  const openEpisodeCount = group.openEpisodeCount ?? 0
+
+  if (highPriorityCount > 0) {
+    return `${highPriorityCount} high-priority exposures across ${assetCount} assets.`
+  }
+
+  if (mediumCount > 0) {
+    return `${mediumCount} medium-pressure exposures across ${assetCount} assets, with a current risk score of ${Math.round(group.currentRiskScore ?? 0)}.`
+  }
+
+  if (openEpisodeCount > 0) {
+    return `${openEpisodeCount} active exposure items across ${assetCount} assets, even though none are currently in the top severity bands.`
+  }
+
+  return `Current risk score ${Math.round(group.currentRiskScore ?? 0)} across ${assetCount} assets.`
+}
+
 function deriveTone(summary: DashboardSummary): {
   tone: ExecutiveTone
   headline: string
@@ -232,9 +257,7 @@ export function CisoExecutiveOverview({
                     {topDeviceGroup?.deviceGroupName ?? 'No device-group pressure detected'}
                   </div>
                   <div className="mt-1 text-sm text-muted-foreground">
-                    {topDeviceGroup
-                      ? `${topDeviceGroup.critical + topDeviceGroup.high} high-priority exposures across ${topDeviceGroup.assetCount ?? 0} assets.`
-                      : 'No active concentration by device group.'}
+                    {describePressureArea(topDeviceGroup)}
                   </div>
                 </div>
                 <div>
