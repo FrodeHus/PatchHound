@@ -152,6 +152,7 @@ public class SettingsAuditControllerTests : IDisposable
                     "nvd",
                     "National Vulnerability Database",
                     true,
+                    null,
                     new UpdateEnrichmentSourceCredentialsRequest(
                         "replacement-secret",
                         "https://services.nvd.nist.gov/rest/json/cves/2.0"

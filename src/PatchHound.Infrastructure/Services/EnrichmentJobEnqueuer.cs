@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Infrastructure.Services;
 
@@ -11,6 +12,10 @@ public class EnrichmentJobEnqueuer(
     ILogger<EnrichmentJobEnqueuer> logger
 )
 {
+    internal static readonly TimeSpan DefaultDefenderRefreshTtl = TimeSpan.FromHours(
+        EnrichmentSourceCatalog.DefaultDefenderRefreshTtlHours
+    );
+
     public async Task EnqueueVulnerabilityJobsAsync(
         Guid tenantId,
         IReadOnlyList<Guid> vulnerabilityDefinitionIds,
@@ -22,12 +27,40 @@ public class EnrichmentJobEnqueuer(
             return;
         }
 
-        var enabledSourceKeys = await dbContext
+        var enabledSources = await dbContext
             .EnrichmentSourceConfigurations.IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(source => source.Enabled && !string.IsNullOrWhiteSpace(source.SecretRef))
-            .Select(source => source.SourceKey)
+            .Where(source => source.Enabled)
+            .Select(source => new { source.SourceKey, source.SecretRef, source.RefreshTtlHours })
             .ToListAsync(ct);
+
+        if (enabledSources.Count == 0)
+        {
+            return;
+        }
+
+        var defenderConfiguredForTenant = await dbContext
+            .TenantSourceConfigurations.IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(
+                source =>
+                    source.TenantId == tenantId
+                    && source.SourceKey == TenantSourceCatalog.DefenderSourceKey
+                    && source.Enabled
+                    && !string.IsNullOrWhiteSpace(source.CredentialTenantId)
+                    && !string.IsNullOrWhiteSpace(source.ClientId)
+                    && !string.IsNullOrWhiteSpace(source.SecretRef),
+                ct
+            );
+
+        var enabledSourceKeys = enabledSources
+            .Where(source =>
+                string.Equals(source.SourceKey, EnrichmentSourceCatalog.DefenderSourceKey, StringComparison.OrdinalIgnoreCase)
+                    ? defenderConfiguredForTenant
+                    : !string.IsNullOrWhiteSpace(source.SecretRef))
+            .Select(source => source.SourceKey)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         if (enabledSourceKeys.Count == 0)
         {
@@ -49,6 +82,12 @@ public class EnrichmentJobEnqueuer(
                 definition.PublishedDate,
                 ReferenceCount = definition.References.Count,
                 AffectedSoftwareCount = definition.AffectedSoftware.Count,
+                HasDefenderReference = definition.References.Any(reference =>
+                    reference.Source == "MicrosoftDefender"),
+                DefenderLastRefreshedAt = dbContext.VulnerabilityThreatAssessments
+                    .Where(assessment => assessment.VulnerabilityDefinitionId == definition.Id)
+                    .Select(assessment => assessment.DefenderLastRefreshedAt)
+                    .FirstOrDefault(),
             })
             .ToListAsync(ct);
 
@@ -71,25 +110,41 @@ public class EnrichmentJobEnqueuer(
 
         foreach (var definition in definitions)
         {
-            if (
-                !ShouldEnqueueVulnerability(
-                    definition.ExternalId,
-                    definition.Source,
-                    definition.Description,
-                    definition.CvssScore,
-                    definition.CvssVector,
-                    definition.PublishedDate,
-                    definition.ReferenceCount,
-                    definition.AffectedSoftwareCount
-                )
-            )
-            {
-                continue;
-            }
-
             foreach (var sourceKey in enabledSourceKeys)
             {
                 var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+                var sourceConfig = enabledSources.First(source =>
+                    string.Equals(source.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase)
+                );
+                var refreshTtl =
+                    string.Equals(
+                        normalizedSourceKey,
+                        EnrichmentSourceCatalog.DefenderSourceKey,
+                        StringComparison.OrdinalIgnoreCase
+                    ) && sourceConfig.RefreshTtlHours.GetValueOrDefault() > 0
+                        ? TimeSpan.FromHours(sourceConfig.RefreshTtlHours!.Value)
+                        : DefaultDefenderRefreshTtl;
+                if (
+                    !ShouldEnqueueVulnerability(
+                        normalizedSourceKey,
+                        definition.ExternalId,
+                        definition.Source,
+                        definition.Description,
+                        definition.CvssScore,
+                        definition.CvssVector,
+                        definition.PublishedDate,
+                        definition.ReferenceCount,
+                        definition.AffectedSoftwareCount,
+                        definition.HasDefenderReference,
+                        definition.DefenderLastRefreshedAt,
+                        now,
+                        refreshTtl
+                    )
+                )
+                {
+                    continue;
+                }
+
                 var key = (normalizedSourceKey, definition.Id);
 
                 if (existingJobs.TryGetValue(key, out var existingJob))
@@ -135,6 +190,7 @@ public class EnrichmentJobEnqueuer(
     }
 
     private static bool ShouldEnqueueVulnerability(
+        string sourceKey,
         string externalId,
         string source,
         string description,
@@ -142,12 +198,29 @@ public class EnrichmentJobEnqueuer(
         string? cvssVector,
         DateTimeOffset? publishedDate,
         int referenceCount,
-        int affectedSoftwareCount
+        int affectedSoftwareCount,
+        bool hasDefenderReference,
+        DateTimeOffset? defenderLastRefreshedAt,
+        DateTimeOffset now,
+        TimeSpan defenderRefreshTtl
     )
     {
         if (!externalId.StartsWith("CVE-", StringComparison.OrdinalIgnoreCase))
         {
             return false;
+        }
+
+        if (
+            string.Equals(
+                sourceKey,
+                EnrichmentSourceCatalog.DefenderSourceKey,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            return !hasDefenderReference
+                || !defenderLastRefreshedAt.HasValue
+                || now - defenderLastRefreshedAt.Value >= defenderRefreshTtl;
         }
 
         var hasNvd = source

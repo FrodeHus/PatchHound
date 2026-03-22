@@ -5,6 +5,7 @@ public record EnrichmentSourceDto(
     string DisplayName,
     bool Enabled,
     EnrichmentSourceCredentialsDto Credentials,
+    int? RefreshTtlHours,
     EnrichmentSourceRuntimeDto Runtime,
     EnrichmentSourceQueueDto Queue,
     IReadOnlyList<EnrichmentRunDto> RecentRuns
@@ -45,6 +46,7 @@ public record UpdateEnrichmentSourceRequest(
     string Key,
     string DisplayName,
     bool Enabled,
+    int? RefreshTtlHours,
     UpdateEnrichmentSourceCredentialsRequest Credentials
 );
 

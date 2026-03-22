@@ -529,8 +529,6 @@ public class IngestionService
 
                         await _assetRuleEvaluationService.EvaluateRulesAsync(tenantId, ct);
 
-                        await _riskScoreService.RecalculateForTenantAsync(tenantId, ct);
-
                         if (SupportsSoftwareSnapshots(source.SourceKey))
                         {
                             softwareSnapshot ??= await GetOrCreateBuildingSoftwareSnapshotAsync(
@@ -596,6 +594,8 @@ public class IngestionService
                                 (DateTimeOffset.UtcNow - softwareMatchStartedAt).TotalMilliseconds
                             );
                         }
+
+                        await _riskScoreService.RecalculateForTenantAsync(tenantId, ct);
                         _logger.LogInformation(
                             "Vulnerability merge for {Source} tenant {TenantId}: stagedVulnerabilities={StagedVulnerabilityCount} persistedVulnerabilities={PersistedVulnerabilityCount}",
                             source.SourceName,
@@ -1177,74 +1177,95 @@ public class IngestionService
     {
         var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
         var completedAt = DateTimeOffset.UtcNow;
+        if (IsInMemoryProvider())
+        {
+            var run = await _dbContext
+                .IngestionRuns.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(item => item.Id == runId, ct);
+            if (run is null)
+            {
+                return;
+            }
+
+            if (succeeded)
+            {
+                run.CompleteSucceeded(
+                    completedAt,
+                    assetMergeSummary.StagedMachineCount,
+                    assetMergeSummary.StagedSoftwareCount,
+                    vulnerabilityMergeSummary.StagedVulnerabilityCount,
+                    assetMergeSummary.PersistedMachineCount,
+                    assetMergeSummary.PersistedSoftwareCount,
+                    vulnerabilityMergeSummary.PersistedVulnerabilityCount
+                );
+            }
+            else
+            {
+                run.CompleteFailed(
+                    completedAt,
+                    error ?? "Unknown ingestion failure",
+                    failureStatus ?? IngestionRunStatuses.FailedRecoverable,
+                    assetMergeSummary.StagedMachineCount,
+                    assetMergeSummary.StagedSoftwareCount,
+                    vulnerabilityMergeSummary.StagedVulnerabilityCount,
+                    assetMergeSummary.PersistedMachineCount,
+                    assetMergeSummary.PersistedSoftwareCount,
+                    vulnerabilityMergeSummary.PersistedVulnerabilityCount
+                );
+            }
+
+            var source = await _dbContext
+                .TenantSourceConfigurations.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(
+                    item =>
+                        item.TenantId == tenantId
+                        && item.SourceKey == normalizedSourceKey
+                        && item.ActiveIngestionRunId == runId,
+                    ct
+                );
+            if (source is not null)
+            {
+                source.ReleaseLease(runId);
+                source.UpdateRuntime(
+                    source.ManualRequestedAt,
+                    source.LastStartedAt,
+                    completedAt,
+                    succeeded ? completedAt : source.LastSucceededAt,
+                    succeeded
+                        ? IngestionRunStatuses.Succeeded
+                        : failureStatus ?? IngestionRunStatuses.FailedRecoverable,
+                    succeeded ? string.Empty : error ?? "Unknown ingestion failure"
+                );
+            }
+            await _dbContext.SaveChangesAsync(ct);
+
+            if (succeeded)
+            {
+                await ClearStagedDataForRunAsync(runId, ct);
+            }
+
+            var inMemoryCleanupSummary = await CleanupExpiredIngestionArtifactsAsync(
+                completedAt,
+                ct
+            );
+            if (inMemoryCleanupSummary.PrunedRunCount > 0)
+            {
+                _logger.LogInformation(
+                    "Pruned ingestion artifacts: runs={PrunedRunCount} stagedVulnerabilities={PrunedVulnerabilityCount} stagedExposures={PrunedExposureCount} stagedAssets={PrunedAssetCount} stagedSoftwareLinks={PrunedSoftwareLinkCount}",
+                    inMemoryCleanupSummary.PrunedRunCount,
+                    inMemoryCleanupSummary.PrunedVulnerabilityCount,
+                    inMemoryCleanupSummary.PrunedExposureCount,
+                    inMemoryCleanupSummary.PrunedAssetCount,
+                    inMemoryCleanupSummary.PrunedSoftwareLinkCount
+                );
+            }
+            return;
+        }
+
         var strategy = _dbContext.Database.CreateExecutionStrategy();
 
         await strategy.ExecuteAsync(async () =>
         {
-            if (IsInMemoryProvider())
-            {
-                var run = await _dbContext
-                    .IngestionRuns.IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(item => item.Id == runId, ct);
-                if (run is null)
-                {
-                    return;
-                }
-
-                if (succeeded)
-                {
-                    run.CompleteSucceeded(
-                        completedAt,
-                        assetMergeSummary.StagedMachineCount,
-                        assetMergeSummary.StagedSoftwareCount,
-                        vulnerabilityMergeSummary.StagedVulnerabilityCount,
-                        assetMergeSummary.PersistedMachineCount,
-                        assetMergeSummary.PersistedSoftwareCount,
-                        vulnerabilityMergeSummary.PersistedVulnerabilityCount
-                    );
-                }
-                else
-                {
-                    run.CompleteFailed(
-                        completedAt,
-                        error ?? "Unknown ingestion failure",
-                        failureStatus ?? IngestionRunStatuses.FailedRecoverable,
-                        assetMergeSummary.StagedMachineCount,
-                        assetMergeSummary.StagedSoftwareCount,
-                        vulnerabilityMergeSummary.StagedVulnerabilityCount,
-                        assetMergeSummary.PersistedMachineCount,
-                        assetMergeSummary.PersistedSoftwareCount,
-                        vulnerabilityMergeSummary.PersistedVulnerabilityCount
-                    );
-                }
-
-                var source = await _dbContext
-                    .TenantSourceConfigurations.IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(
-                        item =>
-                            item.TenantId == tenantId
-                            && item.SourceKey == normalizedSourceKey
-                            && item.ActiveIngestionRunId == runId,
-                        ct
-                    );
-                if (source is not null)
-                {
-                    source.ReleaseLease(runId);
-                    source.UpdateRuntime(
-                        source.ManualRequestedAt,
-                        source.LastStartedAt,
-                        completedAt,
-                        succeeded ? completedAt : source.LastSucceededAt,
-                        succeeded
-                            ? IngestionRunStatuses.Succeeded
-                            : failureStatus ?? IngestionRunStatuses.FailedRecoverable,
-                        succeeded ? string.Empty : error ?? "Unknown ingestion failure"
-                    );
-                }
-                await _dbContext.SaveChangesAsync(ct);
-                return;
-            }
-
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
 
             var updatedRunRows = succeeded
@@ -1338,6 +1359,12 @@ public class IngestionService
 
             await transaction.CommitAsync(ct);
         });
+
+        if (succeeded)
+        {
+            await ClearStagedDataForRunAsync(runId, ct);
+        }
+
         var cleanupSummary = await CleanupExpiredIngestionArtifactsAsync(completedAt, ct);
         if (cleanupSummary.PrunedRunCount > 0)
         {

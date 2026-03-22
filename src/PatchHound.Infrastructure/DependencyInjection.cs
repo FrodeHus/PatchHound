@@ -102,6 +102,7 @@ public static class DependencyInjection
         services.AddScoped<IngestionStateCache>();
         services.AddScoped<TenantSnapshotResolver>();
         services.AddScoped<IEnrichmentSourceRunner, NvdVulnerabilityEnrichmentRunner>();
+        services.AddScoped<IEnrichmentSourceRunner, DefenderVulnerabilityEnrichmentRunner>();
         services.AddScoped<AiReportService>();
         services.AddScoped<TenantAiTextGenerationService>();
         services.AddScoped<SoftwareDescriptionGenerationService>();

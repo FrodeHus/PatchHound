@@ -194,6 +194,13 @@ internal static class EnrichmentSourceDefaults
         return
         [
             EnrichmentSourceConfiguration.Create(
+                "microsoft-defender",
+                "Microsoft Defender",
+                false,
+                apiBaseUrl: "https://api.securitycenter.microsoft.com",
+                refreshTtlHours: 24
+            ),
+            EnrichmentSourceConfiguration.Create(
                 "nvd",
                 "NVD API",
                 false,
