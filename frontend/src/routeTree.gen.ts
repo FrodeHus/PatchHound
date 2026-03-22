@@ -30,6 +30,7 @@ import { Route as ApiInternalEventsRouteImport } from './routes/api/internal/eve
 import { Route as AuthedVulnerabilitiesChangesRouteImport } from './routes/_authed/vulnerabilities/changes'
 import { Route as AuthedVulnerabilitiesIdRouteImport } from './routes/_authed/vulnerabilities/$id'
 import { Route as AuthedSoftwareIdRouteImport } from './routes/_authed/software/$id'
+import { Route as AuthedSettingsNotificationsRouteImport } from './routes/_authed/settings/notifications'
 import { Route as AuthedSettingsAiRouteImport } from './routes/_authed/settings/ai'
 import { Route as AuthedAssetsIdRouteImport } from './routes/_authed/assets/$id'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
@@ -151,6 +152,12 @@ const AuthedSoftwareIdRoute = AuthedSoftwareIdRouteImport.update({
   path: '/software/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedSettingsNotificationsRoute =
+  AuthedSettingsNotificationsRouteImport.update({
+    id: '/settings/notifications',
+    path: '/settings/notifications',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedSettingsAiRoute = AuthedSettingsAiRouteImport.update({
   id: '/settings/ai',
   path: '/settings/ai',
@@ -241,6 +248,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AuthedAdminUsersRoute
   '/assets/$id': typeof AuthedAssetsIdRoute
   '/settings/ai': typeof AuthedSettingsAiRoute
+  '/settings/notifications': typeof AuthedSettingsNotificationsRoute
   '/software/$id': typeof AuthedSoftwareIdRoute
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/vulnerabilities/changes': typeof AuthedVulnerabilitiesChangesRoute
@@ -277,6 +285,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AuthedAdminUsersRoute
   '/assets/$id': typeof AuthedAssetsIdRoute
   '/settings/ai': typeof AuthedSettingsAiRoute
+  '/settings/notifications': typeof AuthedSettingsNotificationsRoute
   '/software/$id': typeof AuthedSoftwareIdRoute
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/vulnerabilities/changes': typeof AuthedVulnerabilitiesChangesRoute
@@ -315,6 +324,7 @@ export interface FileRoutesById {
   '/_authed/admin/users': typeof AuthedAdminUsersRoute
   '/_authed/assets/$id': typeof AuthedAssetsIdRoute
   '/_authed/settings/ai': typeof AuthedSettingsAiRoute
+  '/_authed/settings/notifications': typeof AuthedSettingsNotificationsRoute
   '/_authed/software/$id': typeof AuthedSoftwareIdRoute
   '/_authed/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/_authed/vulnerabilities/changes': typeof AuthedVulnerabilitiesChangesRoute
@@ -353,6 +363,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/assets/$id'
     | '/settings/ai'
+    | '/settings/notifications'
     | '/software/$id'
     | '/vulnerabilities/$id'
     | '/vulnerabilities/changes'
@@ -389,6 +400,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/assets/$id'
     | '/settings/ai'
+    | '/settings/notifications'
     | '/software/$id'
     | '/vulnerabilities/$id'
     | '/vulnerabilities/changes'
@@ -426,6 +438,7 @@ export interface FileRouteTypes {
     | '/_authed/admin/users'
     | '/_authed/assets/$id'
     | '/_authed/settings/ai'
+    | '/_authed/settings/notifications'
     | '/_authed/software/$id'
     | '/_authed/vulnerabilities/$id'
     | '/_authed/vulnerabilities/changes'
@@ -609,6 +622,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSoftwareIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/settings/notifications': {
+      id: '/_authed/settings/notifications'
+      path: '/settings/notifications'
+      fullPath: '/settings/notifications'
+      preLoaderRoute: typeof AuthedSettingsNotificationsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/settings/ai': {
       id: '/_authed/settings/ai'
       path: '/settings/ai'
@@ -718,6 +738,7 @@ interface AuthedRouteChildren {
   AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
   AuthedAssetsIdRoute: typeof AuthedAssetsIdRoute
   AuthedSettingsAiRoute: typeof AuthedSettingsAiRoute
+  AuthedSettingsNotificationsRoute: typeof AuthedSettingsNotificationsRoute
   AuthedSoftwareIdRoute: typeof AuthedSoftwareIdRoute
   AuthedVulnerabilitiesIdRoute: typeof AuthedVulnerabilitiesIdRoute
   AuthedVulnerabilitiesChangesRoute: typeof AuthedVulnerabilitiesChangesRoute
@@ -747,6 +768,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminUsersRoute: AuthedAdminUsersRoute,
   AuthedAssetsIdRoute: AuthedAssetsIdRoute,
   AuthedSettingsAiRoute: AuthedSettingsAiRoute,
+  AuthedSettingsNotificationsRoute: AuthedSettingsNotificationsRoute,
   AuthedSoftwareIdRoute: AuthedSoftwareIdRoute,
   AuthedVulnerabilitiesIdRoute: AuthedVulnerabilitiesIdRoute,
   AuthedVulnerabilitiesChangesRoute: AuthedVulnerabilitiesChangesRoute,

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using PatchHound.Infrastructure.Options;
 using PatchHound.Infrastructure.Secrets;
 
@@ -5,7 +6,7 @@ namespace PatchHound.Infrastructure.Services;
 
 public class NotificationEmailConfigurationResolver(
     ISecretStore secretStore,
-    SmtpOptions smtpOptions
+    IOptions<SmtpOptions> smtpOptions
 )
 {
     public const string MailgunSecretPath = "system/notification-services/mailgun";
@@ -39,11 +40,11 @@ public class NotificationEmailConfigurationResolver(
             NormalizeProvider(activeProviderValue),
             mailgun,
             new SmtpNotificationConfiguration(
-                smtpOptions.Host,
-                smtpOptions.Port,
-                smtpOptions.Username,
-                smtpOptions.FromAddress,
-                smtpOptions.EnableSsl
+                smtpOptions.Value.Host,
+                smtpOptions.Value.Port,
+                smtpOptions.Value.Username,
+                smtpOptions.Value.FromAddress,
+                smtpOptions.Value.EnableSsl
             )
         );
     }

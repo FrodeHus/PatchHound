@@ -18,6 +18,7 @@ const segmentLabels: Record<string, string> = {
   tenants: 'Tenants',
   'asset-rules': 'Asset Rules',
   ai: 'AI Settings',
+  notifications: 'Notification Delivery',
   changes: 'Changes',
   new: 'New',
 }

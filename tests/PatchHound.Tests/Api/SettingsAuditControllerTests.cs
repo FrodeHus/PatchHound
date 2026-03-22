@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models.Admin;
@@ -136,7 +137,13 @@ public class SettingsAuditControllerTests : IDisposable
         var controller = new SystemController(
             _secretStore,
             _dbContext,
-            new AuditLogWriter(_dbContext, _tenantContext)
+            new AuditLogWriter(_dbContext, _tenantContext),
+            new NotificationEmailConfigurationResolver(
+                _secretStore,
+                Options.Create(new PatchHound.Infrastructure.Options.SmtpOptions())
+            ),
+            new MailgunEmailSender(new HttpClient()),
+            _tenantContext
         );
 
         var action = await controller.UpdateEnrichmentSources(
@@ -233,7 +240,13 @@ public class SettingsAuditControllerTests : IDisposable
         var controller = new SystemController(
             _secretStore,
             _dbContext,
-            new AuditLogWriter(_dbContext, _tenantContext)
+            new AuditLogWriter(_dbContext, _tenantContext),
+            new NotificationEmailConfigurationResolver(
+                _secretStore,
+                Options.Create(new PatchHound.Infrastructure.Options.SmtpOptions())
+            ),
+            new MailgunEmailSender(new HttpClient()),
+            _tenantContext
         );
 
         var action = await controller.GetEnrichmentSources(CancellationToken.None);

@@ -5,6 +5,7 @@ import {
   Bot,
   Building2,
   CircleCheckBig,
+  Mail,
 } from "lucide-react";
 import { fetchTenantAiProfiles } from "@/api/ai-settings.functions";
 import { useTenantScope } from "@/components/layout/tenant-scope";
@@ -16,6 +17,7 @@ export const Route = createFileRoute("/_authed/settings/")({
 });
 
 function SettingsPage() {
+  const { user } = Route.useRouteContext();
   const { selectedTenantId } = useTenantScope();
   const profilesQuery = useQuery({
     queryKey: ["tenant-ai-profiles", selectedTenantId],
@@ -91,6 +93,22 @@ function SettingsPage() {
             </CardContent>
           </Card>
         </Link>
+
+        {user.roles.includes("GlobalAdmin") ? (
+          <Link to="/settings/notifications" className="group">
+            <Card className="rounded-2xl border-border/70 bg-card/85 transition-colors group-hover:border-primary/35">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Notification Delivery</CardTitle>
+                  <Mail className="size-5 text-primary" />
+                </div>
+              </CardHeader>
+              <CardContent className="text-sm leading-6 text-muted-foreground">
+                Configure outbound notification providers in one place, including SMTP and Mailgun, and validate delivery before relying on it.
+              </CardContent>
+            </Card>
+          </Link>
+        ) : null}
 
       </div>
     </section>
