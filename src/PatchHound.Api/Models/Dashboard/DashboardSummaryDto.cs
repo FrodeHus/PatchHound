@@ -9,6 +9,7 @@ public record DashboardSummaryDto(
     int TotalTaskCount,
     decimal AverageRemediationDays,
     List<TopVulnerabilityDto> TopCriticalVulnerabilities,
+    List<UnhandledVulnerabilityDto> LatestUnhandledVulnerabilities,
     DashboardRiskChangeBriefDto RiskChangeBrief,
     int RecurringVulnerabilityCount,
     decimal RecurrenceRatePercent,
@@ -31,6 +32,17 @@ public record TopVulnerabilityDto(
     decimal? CvssScore,
     int AffectedAssetCount,
     int DaysSincePublished
+);
+
+public record UnhandledVulnerabilityDto(
+    Guid Id,
+    string ExternalId,
+    string Title,
+    string Severity,
+    decimal? CvssScore,
+    int AffectedAssetCount,
+    int DaysSincePublished,
+    DateTimeOffset LatestSeenAt
 );
 
 public record RecurringVulnerabilityDto(

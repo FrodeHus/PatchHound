@@ -97,7 +97,6 @@ public class IngestionServiceTests : IDisposable
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
-            new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
     }
@@ -988,7 +987,6 @@ public class IngestionServiceTests : IDisposable
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
-            new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
 
@@ -1137,7 +1135,6 @@ public class IngestionServiceTests : IDisposable
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
-            new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
 
@@ -1311,7 +1308,6 @@ public class IngestionServiceTests : IDisposable
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
-            new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
 
@@ -1455,7 +1451,6 @@ public class IngestionServiceTests : IDisposable
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
-            new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
 
@@ -1631,7 +1626,6 @@ public class IngestionServiceTests : IDisposable
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
-            new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
 
@@ -1798,7 +1792,6 @@ public class IngestionServiceTests : IDisposable
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
-            new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
 
@@ -1924,7 +1917,6 @@ public class IngestionServiceTests : IDisposable
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
-            new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             logger
         );
 
@@ -2928,7 +2920,6 @@ public class IngestionServiceTests : IDisposable
             new StagedAssetMergeService(_dbContext),
             Substitute.For<IAssetRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
-            new SecureScoreService(_dbContext, Substitute.For<ILogger<SecureScoreService>>()),
             Substitute.For<ILogger<IngestionService>>()
         );
 

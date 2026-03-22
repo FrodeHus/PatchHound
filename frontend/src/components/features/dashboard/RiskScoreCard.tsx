@@ -187,7 +187,7 @@ export function RiskScoreCard({ isLoading: parentLoading, filters }: RiskScoreCa
                   {hasFilters ? 'Filtered episode-backed exposure' : 'Episode-backed tenant exposure'} across {summary.assetCount} assets.
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {summary.calculatedAt ? `Updated ${new Date(summary.calculatedAt).toLocaleString()}` : 'Not calculated yet'}
+                  {summary.calculatedAt ? `Updated ${formatUtcTimestamp(summary.calculatedAt)}` : 'Not calculated yet'}
                 </span>
               </div>
 
@@ -345,6 +345,15 @@ function MetricTile({ label, value, tone }: { label: string; value: number; tone
       <p className={`mt-2 text-2xl font-semibold tracking-[-0.04em] ${tone}`}>{value}</p>
     </div>
   )
+}
+
+function formatUtcTimestamp(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return `${date.toISOString().slice(0, 16).replace('T', ' ')} UTC`
 }
 
 function riskPosture(score: number) {

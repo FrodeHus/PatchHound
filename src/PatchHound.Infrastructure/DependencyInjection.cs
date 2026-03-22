@@ -118,7 +118,6 @@ public static class DependencyInjection
         services.AddScoped<VulnerabilityEpisodeRiskAssessmentService>();
         services.AddScoped<RiskScoreService>();
         services.AddScoped<RiskRefreshService>();
-        services.AddScoped<SecureScoreService>();
         services.AddScoped<AuditLogWriter>();
 
         // Notifications & Email
