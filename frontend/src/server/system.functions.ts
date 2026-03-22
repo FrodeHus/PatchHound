@@ -40,6 +40,7 @@ const enrichmentSourceSchema = z.object({
   key: z.string(),
   displayName: z.string(),
   enabled: z.boolean(),
+  credentialMode: z.enum(['global-secret', 'tenant-source']),
   refreshTtlHours: z.number().int().nullable(),
   credentials: z.object({
     hasSecret: z.boolean(),

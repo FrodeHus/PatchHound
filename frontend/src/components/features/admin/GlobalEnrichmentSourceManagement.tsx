@@ -314,20 +314,29 @@ export function GlobalEnrichmentSourceManagement({
                           ) : null}
                         </div>
 
-                        <label className="space-y-2">
-                          <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">API Key</span>
-                          <Input
-                            type="password"
-                            placeholder={source.credentials.hasSecret ? 'API key stored. Enter a new key to replace it.' : 'Enter API key'}
-                            value={source.credentials.secret}
-                            onChange={(event) =>
-                              updateSource(source.key, (current) => ({
-                                ...current,
-                                credentials: { ...current.credentials, secret: event.target.value },
-                              }))
-                            }
-                          />
-                        </label>
+                        {source.credentialMode === 'global-secret' ? (
+                          <label className="space-y-2">
+                            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">API Key</span>
+                            <Input
+                              type="password"
+                              placeholder={source.credentials.hasSecret ? 'API key stored. Enter a new key to replace it.' : 'Enter API key'}
+                              value={source.credentials.secret}
+                              onChange={(event) =>
+                                updateSource(source.key, (current) => ({
+                                  ...current,
+                                  credentials: { ...current.credentials, secret: event.target.value },
+                                }))
+                              }
+                            />
+                          </label>
+                        ) : (
+                          <div className="rounded-2xl border border-border/70 bg-background/30 px-4 py-3">
+                            <p className="text-sm font-medium">Credential source</p>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              This provider reuses each tenant&apos;s Microsoft Defender credentials from the tenant source configuration in OpenBao. No global API key is required here.
+                            </p>
+                          </div>
+                        )}
 
                         {source.runtime.lastError ? (
                           <div className="rounded-2xl border border-destructive/25 bg-destructive/8 px-4 py-3 text-xs text-destructive">
@@ -408,7 +417,7 @@ function getProviderStatusLabel(source: EnrichmentSource) {
     return 'Inactive'
   }
 
-  if (!source.credentials.hasSecret) {
+  if (source.credentialMode === 'global-secret' && !source.credentials.hasSecret) {
     return 'Needs credentials'
   }
 
@@ -462,7 +471,7 @@ function getProviderStatusBadgeClassName(source: EnrichmentSource) {
     return 'rounded-full border border-border/70 bg-background/70 text-muted-foreground hover:bg-background/70'
   }
 
-  if (!source.credentials.hasSecret || source.runtime.lastError) {
+  if ((source.credentialMode === 'global-secret' && !source.credentials.hasSecret) || source.runtime.lastError) {
     return 'rounded-full border border-tone-warning-border bg-tone-warning text-tone-warning-foreground hover:bg-tone-warning'
   }
 
