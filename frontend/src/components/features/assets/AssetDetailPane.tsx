@@ -244,6 +244,38 @@ export function AssetDetailPane({
               </section>
 
               {/* Vulnerability metrics */}
+              {asset.risk ? (
+                <section className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    <ShieldCheckIcon className="size-3.5" />
+                    Current risk
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <MetricCard
+                      label="Asset risk"
+                      value={asset.risk.overallScore.toFixed(0)}
+                      tone={asset.risk.riskBand === 'Critical' ? 'danger' : asset.risk.riskBand === 'High' ? 'warning' : 'default'}
+                    />
+                    <MetricCard
+                      label="Max episode"
+                      value={asset.risk.maxEpisodeRiskScore.toFixed(0)}
+                      tone={asset.risk.maxEpisodeRiskScore >= 900 ? 'danger' : asset.risk.maxEpisodeRiskScore >= 750 ? 'warning' : 'default'}
+                    />
+                    <MetricCard
+                      label="Open episodes"
+                      value={asset.risk.openEpisodeCount}
+                      tone={asset.risk.openEpisodeCount > 0 ? 'danger' : 'success'}
+                    />
+                    <MetricCard
+                      label="Top bands"
+                      value={`${asset.risk.criticalCount}/${asset.risk.highCount}`}
+                      tone={asset.risk.criticalCount > 0 ? 'danger' : asset.risk.highCount > 0 ? 'warning' : 'default'}
+                    />
+                  </div>
+                </section>
+              ) : null}
+
+              {/* Vulnerability metrics */}
               <section className="space-y-2">
                 <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                   <ShieldAlertIcon className="size-3.5" />

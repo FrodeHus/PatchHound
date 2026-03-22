@@ -336,6 +336,56 @@ public class AssetDetailQueryService(
             .Select(t => t.Tag)
             .ToArrayAsync(ct);
 
+        var assetRiskScore = await dbContext.AssetRiskScores
+            .AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.AssetId == assetId)
+            .Select(item => new
+            {
+                item.OverallScore,
+                item.MaxEpisodeRiskScore,
+                item.CriticalCount,
+                item.HighCount,
+                item.MediumCount,
+                item.LowCount,
+                item.OpenEpisodeCount,
+                item.CalculatedAt,
+            })
+            .FirstOrDefaultAsync(ct);
+
+        AssetRiskDetailDto? risk = null;
+        if (assetRiskScore is not null)
+        {
+            var topDrivers = await dbContext.VulnerabilityEpisodeRiskAssessments
+                .AsNoTracking()
+                .Where(item => item.AssetId == assetId && item.TenantId == tenantId && item.ResolvedAt == null)
+                .OrderByDescending(item => item.EpisodeRiskScore)
+                .Take(5)
+                .Select(item => new AssetRiskDriverDto(
+                    item.TenantVulnerabilityId,
+                    item.TenantVulnerability.VulnerabilityDefinition.ExternalId,
+                    item.TenantVulnerability.VulnerabilityDefinition.Title,
+                    item.RiskBand,
+                    item.EpisodeRiskScore,
+                    item.ThreatScore,
+                    item.ContextScore,
+                    item.OperationalScore
+                ))
+                .ToListAsync(ct);
+
+            risk = new AssetRiskDetailDto(
+                assetRiskScore.OverallScore,
+                assetRiskScore.MaxEpisodeRiskScore,
+                ResolveRiskBand(assetRiskScore.OverallScore),
+                assetRiskScore.OpenEpisodeCount,
+                assetRiskScore.CriticalCount,
+                assetRiskScore.HighCount,
+                assetRiskScore.MediumCount,
+                assetRiskScore.LowCount,
+                assetRiskScore.CalculatedAt,
+                topDrivers
+            );
+        }
+
         return new AssetDetailDto(
             asset.Id,
             asset.AssetType == AssetType.Software
@@ -366,6 +416,7 @@ public class AssetDetailQueryService(
             asset.DeviceIsAadJoined,
             asset.DeviceOnboardingStatus,
             asset.DeviceValue,
+            risk,
             tags,
             asset.AssetType == AssetType.Software
                 && normalizedSoftwareIdsByExternalId.TryGetValue(asset.ExternalId, out var assetNormalizedSoftwareId)
@@ -376,6 +427,26 @@ public class AssetDetailQueryService(
             softwareInventory,
             softwareVulnerabilityRows
         );
+    }
+
+    private static string ResolveRiskBand(decimal score)
+    {
+        if (score >= 900m)
+        {
+            return "Critical";
+        }
+
+        if (score >= 750m)
+        {
+            return "High";
+        }
+
+        if (score >= 500m)
+        {
+            return "Medium";
+        }
+
+        return "Low";
     }
 
     private static IReadOnlyList<string> RankPossibleCorrelatedSoftware(

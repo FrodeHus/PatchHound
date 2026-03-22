@@ -12,6 +12,9 @@ describe('buildVulnerabilitiesListRequest', () => {
         presentOnly: false,
         recurrenceOnly: true,
         minAgeDays: '',
+        publicExploitOnly: true,
+        knownExploitedOnly: false,
+        activeAlertOnly: true,
         page: 2,
         pageSize: 50,
       }),
@@ -19,6 +22,8 @@ describe('buildVulnerabilitiesListRequest', () => {
       status: 'Open',
       presentOnly: false,
       recurrenceOnly: true,
+      publicExploitOnly: true,
+      activeAlertOnly: true,
       page: 2,
       pageSize: 50,
     })
@@ -36,6 +41,9 @@ describe('vulnerabilityQueryKeys', () => {
       presentOnly: true,
       recurrenceOnly: false,
       minAgeDays: '',
+      publicExploitOnly: false,
+      knownExploitedOnly: false,
+      activeAlertOnly: false,
       page: 1,
       pageSize: 25,
     })
@@ -52,6 +60,9 @@ describe('vulnerabilityQueryKeys', () => {
       true,
       false,
       '',
+      false,
+      false,
+      false,
       1,
       25,
     ])

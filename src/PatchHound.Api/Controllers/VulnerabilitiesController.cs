@@ -87,6 +87,33 @@ public class VulnerabilitiesController : ControllerBase
             var cutoff = DateTimeOffset.UtcNow.AddDays(-filter.MinAgeDays.Value);
             query = query.Where(v => v.VulnerabilityDefinition.PublishedDate <= cutoff);
         }
+        if (filter.PublicExploitOnly == true)
+        {
+            query = query.Where(v =>
+                _dbContext.VulnerabilityThreatAssessments.Any(assessment =>
+                    assessment.VulnerabilityDefinitionId == v.VulnerabilityDefinitionId
+                    && assessment.PublicExploit
+                )
+            );
+        }
+        if (filter.KnownExploitedOnly == true)
+        {
+            query = query.Where(v =>
+                _dbContext.VulnerabilityThreatAssessments.Any(assessment =>
+                    assessment.VulnerabilityDefinitionId == v.VulnerabilityDefinitionId
+                    && assessment.KnownExploited
+                )
+            );
+        }
+        if (filter.ActiveAlertOnly == true)
+        {
+            query = query.Where(v =>
+                _dbContext.VulnerabilityThreatAssessments.Any(assessment =>
+                    assessment.VulnerabilityDefinitionId == v.VulnerabilityDefinitionId
+                    && assessment.ActiveAlert
+                )
+            );
+        }
         if (filter.PresentOnly != false)
         {
             query = query.Where(v =>
@@ -186,6 +213,36 @@ public class VulnerabilitiesController : ControllerBase
                     .OrderByDescending(os => os.AdjustedAt)
                     .Select(os => os.AdjustedSeverity.ToString())
                     .FirstOrDefault(),
+                ThreatScore = _dbContext
+                    .VulnerabilityThreatAssessments.Where(assessment =>
+                        assessment.VulnerabilityDefinitionId == v.VulnerabilityDefinitionId
+                    )
+                    .Select(assessment => (decimal?)assessment.ThreatScore)
+                    .FirstOrDefault(),
+                EpssScore = _dbContext
+                    .VulnerabilityThreatAssessments.Where(assessment =>
+                        assessment.VulnerabilityDefinitionId == v.VulnerabilityDefinitionId
+                    )
+                    .Select(assessment => assessment.EpssScore)
+                    .FirstOrDefault(),
+                PublicExploit = _dbContext
+                    .VulnerabilityThreatAssessments.Where(assessment =>
+                        assessment.VulnerabilityDefinitionId == v.VulnerabilityDefinitionId
+                    )
+                    .Select(assessment => (bool?)assessment.PublicExploit)
+                    .FirstOrDefault(),
+                KnownExploited = _dbContext
+                    .VulnerabilityThreatAssessments.Where(assessment =>
+                        assessment.VulnerabilityDefinitionId == v.VulnerabilityDefinitionId
+                    )
+                    .Select(assessment => (bool?)assessment.KnownExploited)
+                    .FirstOrDefault(),
+                ActiveAlert = _dbContext
+                    .VulnerabilityThreatAssessments.Where(assessment =>
+                        assessment.VulnerabilityDefinitionId == v.VulnerabilityDefinitionId
+                    )
+                    .Select(assessment => (bool?)assessment.ActiveAlert)
+                    .FirstOrDefault(),
             })
             .ToListAsync(ct);
 
@@ -208,7 +265,12 @@ public class VulnerabilitiesController : ControllerBase
                     ? episodeInfo.ReappearanceCount
                     : 0,
                 episodeCountsByVulnerabilityId.TryGetValue(v.Id, out episodeInfo)
-                    && episodeInfo.HasRecentReappearance
+                    && episodeInfo.HasRecentReappearance,
+                v.ThreatScore,
+                v.EpssScore,
+                v.PublicExploit ?? false,
+                v.KnownExploited ?? false,
+                v.ActiveAlert ?? false
             ))
             .ToList();
 

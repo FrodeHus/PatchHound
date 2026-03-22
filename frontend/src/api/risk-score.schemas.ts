@@ -37,13 +37,13 @@ export const riskScoreSummarySchema = z.object({
   highAssetCount: z.number(),
   topRiskAssets: z.array(riskAssetScoreSummarySchema),
   history: z.array(riskScoreSnapshotSchema),
-  calculatedAt: z.string().datetime().nullable(),
+  calculatedAt: z.string().datetime({ offset: true }).nullable(),
 })
 
 export const deviceGroupRiskDetailSchema = z.object({
   deviceGroupName: z.string(),
   overallScore: z.number(),
-  calculatedAt: z.string().datetime(),
+  calculatedAt: z.string().datetime({ offset: true }),
   assetCount: z.number(),
   openEpisodeCount: z.number(),
   criticalEpisodeCount: z.number(),
@@ -58,7 +58,7 @@ export const softwareRiskDetailSchema = z.object({
   softwareName: z.string(),
   vendor: z.string().nullable(),
   overallScore: z.number(),
-  calculatedAt: z.string().datetime(),
+  calculatedAt: z.string().datetime({ offset: true }),
   affectedDeviceCount: z.number(),
   openEpisodeCount: z.number(),
   criticalEpisodeCount: z.number(),

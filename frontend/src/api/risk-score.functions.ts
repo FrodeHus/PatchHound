@@ -4,11 +4,29 @@ import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost } from '@/server/api'
 import { deviceGroupRiskDetailSchema, riskScoreSummarySchema, softwareRiskDetailSchema } from './risk-score.schemas'
 
+const riskScoreSummaryFiltersSchema = z.object({
+  minAgeDays: z.number().optional(),
+  platform: z.string().optional(),
+  deviceGroup: z.string().optional(),
+})
+
 export const fetchRiskScoreSummary = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const data = await apiGet('/risk-score/summary', context)
-    return riskScoreSummarySchema.parse(data)
+  .inputValidator(riskScoreSummaryFiltersSchema.optional())
+  .handler(async ({ context, data: filters }) => {
+    const params = new URLSearchParams()
+    if (filters?.minAgeDays !== undefined) {
+      params.set('minAgeDays', String(filters.minAgeDays))
+    }
+    if (filters?.platform) {
+      params.set('platform', filters.platform)
+    }
+    if (filters?.deviceGroup) {
+      params.set('deviceGroup', filters.deviceGroup)
+    }
+    const query = params.size > 0 ? `?${params.toString()}` : ''
+    const response = await apiGet(`/risk-score/summary${query}`, context)
+    return riskScoreSummarySchema.parse(response)
   })
 
 export const fetchDeviceGroupRiskDetail = createServerFn({ method: 'GET' })

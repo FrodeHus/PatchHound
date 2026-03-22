@@ -455,6 +455,62 @@ export function AssetDetailPageView({
 
         <aside className="space-y-4">
           <AssetSecureScorePanel assetId={asset.id} />
+          {asset.risk ? (
+            <section className="rounded-3xl border border-border/70 bg-card p-4">
+              <SectionHeader
+                title="Current risk"
+                description="Episode-backed asset risk with the top open drivers."
+              />
+              <div className="mt-4 space-y-3">
+                <div className="flex items-start justify-between gap-3 rounded-2xl border border-border/70 bg-background/40 px-3 py-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Asset risk score
+                    </p>
+                    <p className="mt-2 text-3xl font-semibold tracking-[-0.04em]">
+                      {asset.risk.overallScore.toFixed(0)}
+                    </p>
+                  </div>
+                  <Pill>{asset.risk.riskBand}</Pill>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MetricCard label="Open episodes" value={String(asset.risk.openEpisodeCount)} />
+                  <MetricCard label="Max episode risk" value={asset.risk.maxEpisodeRiskScore.toFixed(0)} />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MetricCard label="Critical drivers" value={String(asset.risk.criticalCount)} />
+                  <MetricCard label="High drivers" value={String(asset.risk.highCount)} />
+                </div>
+                {asset.risk.topDrivers.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Top episode drivers
+                    </p>
+                    {asset.risk.topDrivers.slice(0, 3).map((driver) => (
+                      <Link
+                        key={driver.tenantVulnerabilityId}
+                        to="/vulnerabilities/$id"
+                        params={{ id: driver.tenantVulnerabilityId }}
+                        className="block rounded-xl border border-border/70 bg-background px-3 py-3 transition hover:border-foreground/20 hover:bg-muted/20"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{driver.title}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {driver.externalId} • {driver.riskBand}
+                            </p>
+                          </div>
+                          <span className="text-sm font-semibold tabular-nums">
+                            {driver.episodeRiskScore.toFixed(0)}
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
           <section className="rounded-3xl border border-border/70 bg-card p-4">
             <SectionHeader
               title="Asset summary"

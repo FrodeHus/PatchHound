@@ -8,6 +8,13 @@ import { nitro } from 'nitro/vite'
 
 export default defineConfig(({ mode }) => {
   const isTest = mode === 'test' || process.env.VITEST === 'true'
+  const ignoreThirdPartyModuleDirectiveWarnings = (warning: { code?: string; id?: string | null }, warn: (warning: unknown) => void) => {
+    if (warning.code === 'MODULE_LEVEL_DIRECTIVE' && warning.id?.includes('/node_modules/')) {
+      return
+    }
+
+    warn(warning)
+  }
 
   return {
     server: { port: 3000 },
@@ -18,6 +25,11 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       ...(!isTest ? [nitro()] : []),
     ],
+    build: {
+      rollupOptions: {
+        onwarn: ignoreThirdPartyModuleDirectiveWarnings,
+      },
+    },
     test: {
       globals: true,
       environment: 'jsdom',

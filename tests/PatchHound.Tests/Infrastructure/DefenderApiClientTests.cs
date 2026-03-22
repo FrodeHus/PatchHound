@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using PatchHound.Infrastructure.ExternalHttp;
 using PatchHound.Infrastructure.VulnerabilitySources;
 
 namespace PatchHound.Tests.Infrastructure;
@@ -85,6 +88,54 @@ public class DefenderApiClientTests
             .ContainSingle(
                 "https://api.securitycenter.microsoft.com/api/vulnerabilities/CVE-2026-4040"
             );
+    }
+
+    [Fact]
+    public async Task GetVulnerabilityAsync_RetriesTooManyRequestsUsingRetryAfter()
+    {
+        var throttledResponse = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        throttledResponse.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.Zero);
+
+        var handler = new SequenceHttpMessageHandler(
+            throttledResponse,
+            CreateJsonResponse(
+                """
+                {
+                  "id": "CVE-2026-0009",
+                  "name": "Retried vulnerability",
+                  "description": "Catalog description",
+                  "severity": "High"
+                }
+                """
+            )
+        );
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services
+            .AddHttpClient<DefenderApiClient>()
+            .ConfigurePrimaryHttpMessageHandler(() => handler)
+            .AddPolicyHandler((_, _) =>
+                ExternalHttpResiliencePolicies.CreateDefenderRetryPolicy(NullLogger.Instance)
+            );
+
+        await using var provider = services.BuildServiceProvider();
+        var client = new TestDefenderApiClient(
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(DefenderApiClient))
+        );
+
+        var response = await client.GetVulnerabilityAsync(
+            Configuration,
+            "CVE-2026-0009",
+            CancellationToken.None
+        );
+
+        response.Should().NotBeNull();
+        response!.Id.Should().Be("CVE-2026-0009");
+        handler.RequestUris.Should().HaveCount(2);
+        handler.RequestUris.Should().OnlyContain(uri =>
+            uri == "https://api.securitycenter.microsoft.com/api/vulnerabilities/CVE-2026-0009"
+        );
     }
 
     [Fact]

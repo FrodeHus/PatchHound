@@ -89,6 +89,61 @@ public class VulnerabilitiesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task List_ThreatFilters_ReturnsThreatSignalsFromPersistedAssessment()
+    {
+        var projection = TenantVulnerabilityGraphFactory.CreateProjection(
+            _tenantId,
+            "CVE-2026-0300",
+            "Threat-filtered vulnerability",
+            Severity.Critical
+        );
+
+        await _dbContext.AddRangeAsync(
+            projection.Definition,
+            projection.TenantVulnerability,
+            VulnerabilityThreatAssessment.Create(
+                projection.Definition.Id,
+                88m,
+                92m,
+                81m,
+                73m,
+                0.870m,
+                true,
+                true,
+                true,
+                false,
+                false,
+                "[]",
+                VulnerabilityThreatAssessmentService.CalculationVersion
+            ),
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                projection.TenantVulnerability.Id,
+                Guid.NewGuid(),
+                1,
+                DateTimeOffset.UtcNow.AddDays(-2)
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new VulnerabilityFilterQuery(PublicExploitOnly: true, KnownExploitedOnly: true),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<VulnerabilityDto>>().Subject;
+        var item = payload.Items.Should().ContainSingle().Subject;
+
+        item.PublicExploit.Should().BeTrue();
+        item.KnownExploited.Should().BeTrue();
+        item.ActiveAlert.Should().BeTrue();
+        item.ThreatScore.Should().Be(88m);
+        item.EpssScore.Should().Be(0.870m);
+    }
+
+    [Fact]
     public async Task Get_RanksPossibleCorrelatedSoftware_ByReinstallAndTiming()
     {
         var device = Asset.Create(
@@ -216,6 +271,51 @@ public class VulnerabilitiesControllerTests : IDisposable
             .Equal("Contoso Agent", "Nearby Utility", "Legacy Runtime");
         asset.EpisodeRiskScore.Should().Be(741m);
         asset.EpisodeRiskBand.Should().Be("Medium");
+    }
+
+    [Fact]
+    public async Task Get_ReturnsThreatSignalsIncludingPublicExploitAndEpss()
+    {
+        var projection = TenantVulnerabilityGraphFactory.CreateProjection(
+            _tenantId,
+            "CVE-2026-0200",
+            "Exploited vulnerability",
+            Severity.Critical
+        );
+
+        await _dbContext.AddRangeAsync(
+            projection.Definition,
+            projection.TenantVulnerability,
+            VulnerabilityThreatAssessment.Create(
+                projection.Definition.Id,
+                91m,
+                95m,
+                78m,
+                64m,
+                0.910m,
+                true,
+                true,
+                true,
+                true,
+                false,
+                "[]",
+                VulnerabilityThreatAssessmentService.CalculationVersion
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Get(projection.TenantVulnerability.Id, CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<VulnerabilityDetailDto>().Subject;
+
+        payload.ThreatAssessment.Should().NotBeNull();
+        payload.ThreatAssessment!.PublicExploit.Should().BeTrue();
+        payload.ThreatAssessment.KnownExploited.Should().BeTrue();
+        payload.ThreatAssessment.ActiveAlert.Should().BeTrue();
+        payload.ThreatAssessment.HasRansomwareAssociation.Should().BeTrue();
+        payload.ThreatAssessment.HasMalwareAssociation.Should().BeFalse();
+        payload.ThreatAssessment.EpssScore.Should().Be(0.910m);
     }
 
     public void Dispose() => _dbContext.Dispose();

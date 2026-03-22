@@ -214,6 +214,80 @@ public class AssetsControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task Get_ReturnsEpisodeBackedRiskBreakdown()
+    {
+        var asset = Asset.Create(
+            _tenantId,
+            "device-risk-1",
+            AssetType.Device,
+            "Gateway",
+            Criticality.High
+        );
+        var definition = VulnerabilityDefinition.Create(
+            "CVE-2026-9010",
+            "Gateway issue",
+            "Desc",
+            Severity.Critical,
+            "NVD"
+        );
+        var tenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            definition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow,
+            "MicrosoftDefender"
+        );
+
+        await _dbContext.AddRangeAsync(
+            asset,
+            definition,
+            tenantVulnerability,
+            AssetRiskScore.Create(
+                _tenantId,
+                asset.Id,
+                812m,
+                790m,
+                1,
+                1,
+                0,
+                0,
+                2,
+                "[]",
+                RiskScoreService.CalculationVersion
+            ),
+            VulnerabilityEpisodeRiskAssessment.Create(
+                _tenantId,
+                Guid.NewGuid(),
+                tenantVulnerability.Id,
+                asset.Id,
+                null,
+                88m,
+                73m,
+                44m,
+                790m,
+                "High",
+                "[]",
+                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Get(asset.Id, CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<AssetDetailDto>().Subject;
+
+        payload.Risk.Should().NotBeNull();
+        payload.Risk!.OverallScore.Should().Be(812m);
+        payload.Risk.MaxEpisodeRiskScore.Should().Be(790m);
+        payload.Risk.RiskBand.Should().Be("High");
+        payload.Risk.OpenEpisodeCount.Should().Be(2);
+        payload.Risk.TopDrivers.Should().ContainSingle();
+        payload.Risk.TopDrivers[0].ExternalId.Should().Be("CVE-2026-9010");
+        payload.Risk.TopDrivers[0].EpisodeRiskScore.Should().Be(790m);
+    }
+
+    [Fact]
     public async Task List_FiltersByDeviceGroup_AndReturnsDeviceGroupName()
     {
         var matchingAsset = Asset.Create(

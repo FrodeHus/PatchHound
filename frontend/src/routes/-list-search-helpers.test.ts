@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createListSearchUpdater } from '@/routes/list-search-helpers'
+import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 
 type TestSearch = {
   search: string
