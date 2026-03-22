@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet } from '@/server/api'
-import { burndownTrendSchema, dashboardFilterOptionsSchema, dashboardRiskChangeBriefSchema, dashboardSummarySchema, heatmapResponseSchema, trendDataSchema } from './dashboard.schemas'
+import { burndownTrendSchema, dashboardFilterOptionsSchema, dashboardRiskChangeBriefSchema, dashboardSummarySchema, heatmapResponseSchema, ownerDashboardSummarySchema, trendDataSchema } from './dashboard.schemas'
 import { z } from 'zod'
 
 const dashboardFilterSchema = z.object({
@@ -68,6 +68,13 @@ export const fetchDashboardFilterOptions = createServerFn({ method: 'GET' })
   .handler(async ({ context }) => {
     const data = await apiGet('/dashboard/filter-options', context)
     return dashboardFilterOptionsSchema.parse(data)
+  })
+
+export const fetchOwnerDashboardSummary = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const data = await apiGet('/dashboard/owner-summary', context)
+    return ownerDashboardSummarySchema.parse(data)
   })
 
 export const fetchDashboardHeatmap = createServerFn({ method: 'GET' })

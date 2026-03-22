@@ -139,8 +139,45 @@ export const dashboardFilterOptionsSchema = z.object({
   deviceGroups: z.array(z.string()),
 })
 
+export const ownerAssetSummarySchema = z.object({
+  assetId: z.string().uuid(),
+  assetName: z.string(),
+  criticality: z.string(),
+  currentRiskScore: z.number().nullable(),
+  riskBand: z.string().nullable(),
+  openEpisodeCount: z.number(),
+  topDriverTitle: z.string().nullable(),
+  topDriverSummary: z.string().nullable(),
+})
+
+export const ownerActionSchema = z.object({
+  assetId: z.string().uuid(),
+  tenantVulnerabilityId: z.string().uuid(),
+  taskId: z.string().uuid().nullable(),
+  assetName: z.string(),
+  externalId: z.string(),
+  title: z.string(),
+  softwareNames: z.array(z.string()),
+  ownerSummary: z.string(),
+  severity: z.string(),
+  episodeRiskScore: z.number().nullable(),
+  episodeRiskBand: z.string().nullable(),
+  dueDate: z.string().datetime({ offset: true }).nullable(),
+  actionState: z.string(),
+})
+
+export const ownerDashboardSummarySchema = z.object({
+  ownedAssetCount: z.number(),
+  assetsNeedingAttention: z.number(),
+  openActionCount: z.number(),
+  overdueActionCount: z.number(),
+  topOwnedAssets: z.array(ownerAssetSummarySchema),
+  actions: z.array(ownerActionSchema),
+})
+
 export type DashboardFilterOptions = z.infer<typeof dashboardFilterOptionsSchema>
 export type DeviceGroupVulnerability = z.infer<typeof dashboardSummarySchema>['vulnerabilitiesByDeviceGroup'][number]
+export type OwnerDashboardSummary = z.infer<typeof ownerDashboardSummarySchema>
 
 export const heatmapRowSchema = z.object({
   label: z.string(),

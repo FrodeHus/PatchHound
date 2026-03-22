@@ -616,6 +616,239 @@ public class DashboardController : ControllerBase
         );
     }
 
+    [HttpGet("owner-summary")]
+    public async Task<ActionResult<OwnerDashboardSummaryDto>> GetOwnerSummary(CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var currentUserId = _tenantContext.CurrentUserId;
+        if (currentUserId == Guid.Empty)
+        {
+            return Unauthorized();
+        }
+
+        var ownerTeamIds = await _dbContext.TeamMembers.AsNoTracking()
+            .Where(item => item.UserId == currentUserId)
+            .Select(item => item.TeamId)
+            .ToListAsync(ct);
+
+        var ownedAssetsQuery = _dbContext.Assets.AsNoTracking()
+            .Where(asset =>
+                asset.TenantId == tenantId
+                && (
+                    asset.OwnerUserId == currentUserId
+                    || (asset.OwnerTeamId != null && ownerTeamIds.Contains(asset.OwnerTeamId.Value))
+                    || (asset.FallbackTeamId != null && ownerTeamIds.Contains(asset.FallbackTeamId.Value))
+                )
+            );
+
+        var ownedAssetIds = await ownedAssetsQuery
+            .Select(asset => asset.Id)
+            .ToListAsync(ct);
+
+        if (ownedAssetIds.Count == 0)
+        {
+            return Ok(new OwnerDashboardSummaryDto(0, 0, 0, 0, [], []));
+        }
+
+        var topOwnedAssets = await (
+            from asset in ownedAssetsQuery
+            join score in _dbContext.AssetRiskScores.AsNoTracking()
+                on asset.Id equals score.AssetId into scoreJoin
+            from score in scoreJoin.DefaultIfEmpty()
+            select new
+            {
+                asset.Id,
+                asset.Name,
+                Criticality = asset.Criticality.ToString(),
+                CurrentRiskScore = score != null ? (decimal?)score.OverallScore : null,
+                OpenEpisodeCount = score != null ? score.OpenEpisodeCount : 0,
+                CriticalCount = score != null ? score.CriticalCount : 0,
+                HighCount = score != null ? score.HighCount : 0
+            }
+        )
+            .OrderByDescending(item => item.CurrentRiskScore ?? 0m)
+            .ThenByDescending(item => item.CriticalCount)
+            .ThenByDescending(item => item.HighCount)
+            .Take(6)
+            .ToListAsync(ct);
+
+        var topAssetIds = topOwnedAssets.Select(item => item.Id).ToList();
+        var topDriverRows = await _dbContext.VulnerabilityEpisodeRiskAssessments.AsNoTracking()
+            .Where(item => topAssetIds.Contains(item.AssetId) && item.ResolvedAt == null)
+            .OrderByDescending(item => item.EpisodeRiskScore)
+            .Select(item => new
+            {
+                item.AssetId,
+                item.EpisodeRiskScore,
+                item.RiskBand,
+                ExternalId = item.TenantVulnerability.VulnerabilityDefinition.ExternalId,
+                Title = item.TenantVulnerability.VulnerabilityDefinition.Title,
+                Description = item.TenantVulnerability.VulnerabilityDefinition.Description,
+                Severity = item.TenantVulnerability.VulnerabilityDefinition.VendorSeverity
+            })
+            .ToListAsync(ct);
+
+        var ownerAssets = topOwnedAssets
+            .Select(item =>
+            {
+                var topDriver = topDriverRows
+                    .Where(driver => driver.AssetId == item.Id)
+                    .OrderByDescending(driver => driver.EpisodeRiskScore)
+                    .FirstOrDefault();
+
+                return new OwnerAssetSummaryDto(
+                    item.Id,
+                    item.Name,
+                    item.Criticality,
+                    item.CurrentRiskScore,
+                    topDriver?.RiskBand,
+                    item.OpenEpisodeCount,
+                    topDriver?.Title,
+                    topDriver is null
+                        ? null
+                        : OwnerFacingIssueSummaryFormatter.BuildIssueSummary(
+                            null,
+                            topDriver.Title,
+                            topDriver.Description,
+                            topDriver.Severity
+                        )
+                );
+            })
+            .ToList();
+
+        var ownerActionRows = await (
+            from task in _dbContext.RemediationTasks.AsNoTracking()
+            join asset in _dbContext.Assets.AsNoTracking() on task.AssetId equals asset.Id
+            join tenantVulnerability in _dbContext.TenantVulnerabilities.AsNoTracking()
+                on task.TenantVulnerabilityId equals tenantVulnerability.Id
+            join definition in _dbContext.VulnerabilityDefinitions.AsNoTracking()
+                on tenantVulnerability.VulnerabilityDefinitionId equals definition.Id
+            where task.TenantId == tenantId
+                  && ownedAssetIds.Contains(task.AssetId)
+                  && task.Status != RemediationTaskStatus.Completed
+                  && task.Status != RemediationTaskStatus.RiskAccepted
+            select new
+            {
+                task.AssetId,
+                task.TenantVulnerabilityId,
+                TaskId = (Guid?)task.Id,
+                AssetName = asset.Name,
+                definition.ExternalId,
+                definition.Title,
+                definition.Description,
+                Severity = definition.VendorSeverity,
+                EpisodeRiskScore = _dbContext.VulnerabilityEpisodeRiskAssessments
+                    .Where(assessment =>
+                        assessment.TenantVulnerabilityId == task.TenantVulnerabilityId
+                        && assessment.AssetId == task.AssetId
+                        && assessment.ResolvedAt == null)
+                    .Select(assessment => (decimal?)assessment.EpisodeRiskScore)
+                    .FirstOrDefault(),
+                EpisodeRiskBand = _dbContext.VulnerabilityEpisodeRiskAssessments
+                    .Where(assessment =>
+                        assessment.TenantVulnerabilityId == task.TenantVulnerabilityId
+                        && assessment.AssetId == task.AssetId
+                        && assessment.ResolvedAt == null)
+                    .Select(assessment => assessment.RiskBand)
+                    .FirstOrDefault(),
+                task.DueDate,
+                ActionState = task.Status.ToString()
+            }
+        )
+            .OrderByDescending(item => item.EpisodeRiskScore ?? 0m)
+            .ThenBy(item => item.DueDate)
+            .Take(10)
+            .ToListAsync(ct);
+
+        var ownerActionAssetIds = ownerActionRows
+            .Select(item => item.AssetId)
+            .Distinct()
+            .ToList();
+        var ownerActionDefinitionIds = ownerActionRows
+            .Select(item => item.TenantVulnerabilityId)
+            .Distinct()
+            .ToList();
+
+        var actionSoftwareRows = await (
+            from match in _dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
+            join installation in _dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+                on match.SoftwareAssetId equals installation.SoftwareAssetId
+            join tenantVulnerability in _dbContext.TenantVulnerabilities.AsNoTracking()
+                on match.VulnerabilityDefinitionId equals tenantVulnerability.VulnerabilityDefinitionId
+            where installation.TenantId == tenantId
+                  && match.TenantId == tenantId
+                  && tenantVulnerability.TenantId == tenantId
+                  && ownerActionAssetIds.Contains(installation.DeviceAssetId)
+                  && ownerActionDefinitionIds.Contains(tenantVulnerability.Id)
+                  && installation.IsActive
+                  && installation.RemovedAt == null
+                  && match.ResolvedAt == null
+            select new
+            {
+                installation.DeviceAssetId,
+                tenantVulnerability.Id,
+                SoftwareName = installation.TenantSoftware.NormalizedSoftware.CanonicalName
+            }
+        )
+            .Distinct()
+            .ToListAsync(ct);
+
+        var softwareNamesByAction = actionSoftwareRows
+            .GroupBy(
+                item => new { item.DeviceAssetId, TenantVulnerabilityId = item.Id },
+                item => item.SoftwareName
+            )
+            .ToDictionary(
+                group => (group.Key.DeviceAssetId, group.Key.TenantVulnerabilityId),
+                group => group
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(name => name)
+                    .Take(3)
+                    .ToList()
+            );
+
+        var ownerActions = ownerActionRows
+            .Select(item => new OwnerActionDto(
+                item.AssetId,
+                item.TenantVulnerabilityId,
+                item.TaskId,
+                item.AssetName,
+                item.ExternalId,
+                item.Title,
+                softwareNamesByAction.TryGetValue((item.AssetId, item.TenantVulnerabilityId), out var softwareNames)
+                    ? softwareNames
+                    : [],
+                OwnerFacingIssueSummaryFormatter.BuildIssueSummary(
+                    softwareNamesByAction.TryGetValue((item.AssetId, item.TenantVulnerabilityId), out var softwareList)
+                        ? string.Join(", ", softwareList)
+                        : null,
+                    item.Title,
+                    item.Description,
+                    item.Severity
+                ),
+                item.Severity.ToString(),
+                item.EpisodeRiskScore,
+                item.EpisodeRiskBand,
+                item.DueDate,
+                item.ActionState
+            ))
+            .ToList();
+
+        return Ok(new OwnerDashboardSummaryDto(
+            ownedAssetIds.Count,
+            ownerAssets.Count(item => (item.CurrentRiskScore ?? 0m) >= 500m),
+            ownerActions.Count,
+            ownerActions.Count(item => item.DueDate.HasValue && item.DueDate.Value < DateTimeOffset.UtcNow),
+            ownerAssets,
+            ownerActions
+        ));
+    }
+
     [HttpGet("risk-changes")]
     public async Task<ActionResult<DashboardRiskChangeBriefDto>> GetRiskChanges(
         [FromQuery] int days = 1,

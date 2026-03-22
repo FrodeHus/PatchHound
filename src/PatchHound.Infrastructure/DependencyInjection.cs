@@ -119,10 +119,12 @@ public static class DependencyInjection
         services.AddScoped<RiskScoreService>();
         services.AddScoped<RiskRefreshService>();
         services.AddScoped<AuditLogWriter>();
+        services.AddScoped<NotificationEmailConfigurationResolver>();
 
         // Notifications & Email
         services.AddScoped<INotificationService, EmailNotificationService>();
-        services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<SmtpEmailSender>();
+        services.AddScoped<IEmailSender, ConfigurableEmailSender>();
         services.Configure<SmtpOptions>(configuration.GetSection("Smtp"));
 
         // AI Report Providers
@@ -144,6 +146,9 @@ public static class DependencyInjection
         services
             .AddHttpClient<DefenderApiClient>()
             .AddDefenderHttpPolicies();
+        services
+            .AddHttpClient<MailgunEmailSender>()
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services.AddHttpClient<NvdApiClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 1);
         services
             .AddHttpClient<ISecretStore, OpenBaoSecretStore>()

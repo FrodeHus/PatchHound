@@ -1,6 +1,6 @@
 export const dashboardViewPreferenceKey = 'patchhound:dashboard-view'
 
-export type DashboardViewMode = 'executive' | 'operations'
+export type DashboardViewMode = 'executive' | 'operations' | 'owner'
 
 export function readDashboardViewPreference(): DashboardViewMode | null {
   if (typeof window === 'undefined') {
@@ -8,7 +8,7 @@ export function readDashboardViewPreference(): DashboardViewMode | null {
   }
 
   const value = window.localStorage.getItem(dashboardViewPreferenceKey)
-  return value === 'executive' || value === 'operations' ? value : null
+  return value === 'executive' || value === 'operations' || value === 'owner' ? value : null
 }
 
 export function writeDashboardViewPreference(mode: DashboardViewMode) {

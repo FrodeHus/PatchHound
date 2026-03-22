@@ -138,3 +138,39 @@ public record BurndownTrendDto(List<BurndownPointDto> Items);
 public record TrendDataDto(List<TrendItem> Items);
 
 public record TrendItem(DateOnly Date, string Severity, int Count);
+
+public record OwnerDashboardSummaryDto(
+    int OwnedAssetCount,
+    int AssetsNeedingAttention,
+    int OpenActionCount,
+    int OverdueActionCount,
+    List<OwnerAssetSummaryDto> TopOwnedAssets,
+    List<OwnerActionDto> Actions
+);
+
+public record OwnerAssetSummaryDto(
+    Guid AssetId,
+    string AssetName,
+    string Criticality,
+    decimal? CurrentRiskScore,
+    string? RiskBand,
+    int OpenEpisodeCount,
+    string? TopDriverTitle,
+    string? TopDriverSummary
+);
+
+public record OwnerActionDto(
+    Guid AssetId,
+    Guid TenantVulnerabilityId,
+    Guid? TaskId,
+    string AssetName,
+    string ExternalId,
+    string Title,
+    List<string> SoftwareNames,
+    string OwnerSummary,
+    string Severity,
+    decimal? EpisodeRiskScore,
+    string? EpisodeRiskBand,
+    DateTimeOffset? DueDate,
+    string ActionState
+);
