@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { AlertTriangle, CheckCircle2, ShieldAlert, TimerReset } from 'lucide-react'
 import { fetchDashboardBurndown, fetchDashboardFilterOptions, fetchDashboardSummary, fetchDashboardTrends } from '@/api/dashboard.functions'
@@ -15,7 +15,6 @@ import { DeviceGroupRiskDetailDialog } from '@/components/features/dashboard/Dev
 import { DeviceHealthCard } from '@/components/features/dashboard/DeviceHealthCard'
 import { OnboardingStatusCard } from '@/components/features/dashboard/OnboardingStatusCard'
 import { RiskScoreCard } from '@/components/features/dashboard/RiskScoreCard'
-import { SecureScoreCard } from '@/components/features/dashboard/SecureScoreCard'
 import { RemediationVelocity } from '@/components/features/dashboard/RemediationVelocity'
 import { RiskChangeBriefCard } from '@/components/features/dashboard/RiskChangeBriefCard'
 import { TrendChart } from '@/components/features/dashboard/TrendChart'
@@ -23,13 +22,19 @@ import { RiskHeatmap } from '@/components/features/dashboard/RiskHeatmap'
 import { VulnerabilityAgeChart } from '@/components/features/dashboard/VulnerabilityAgeChart'
 import { MttrCard } from '@/components/features/dashboard/MttrCard'
 import { BurndownChart } from '@/components/features/dashboard/BurndownChart'
+import { CisoExecutiveOverview } from '@/components/features/dashboard/CisoExecutiveOverview'
+import { AnalystTriageWorkbench } from '@/components/features/dashboard/AnalystTriageWorkbench'
 import { useTenantScope } from '@/components/layout/tenant-scope'
+import { readDashboardViewPreference } from '@/lib/dashboard-view'
 
 const TAB_VALUES = ['risk', 'remediation', 'infrastructure'] as const
 type DashboardTab = (typeof TAB_VALUES)[number]
+const DASHBOARD_MODE_VALUES = ['executive', 'operations'] as const
+type DashboardMode = (typeof DASHBOARD_MODE_VALUES)[number]
 
 const dashboardSearchSchema = z.object({
   tab: z.enum(TAB_VALUES).optional().catch(undefined),
+  mode: z.enum(DASHBOARD_MODE_VALUES).optional().catch(undefined),
   minAgeDays: z.string().optional().catch(undefined),
   platform: z.string().optional().catch(undefined),
   deviceGroup: z.string().optional().catch(undefined),
@@ -49,12 +54,20 @@ export const Route = createFileRoute('/_authed/')({
 
 function DashboardPage() {
   const initialData = Route.useLoaderData()
+  const { user } = Route.useRouteContext()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const { selectedTenantId } = useTenantScope()
   const [initialTenantId] = useState(selectedTenantId)
   const [selectedDeviceGroup, setSelectedDeviceGroup] = useState<string | null>(null)
   const canUseInitialData = initialTenantId === selectedTenantId
+  const isExecutiveViewer = user.roles.includes('Stakeholder') || user.roles.includes('GlobalAdmin')
+  const canSwitchModes = user.roles.includes('GlobalAdmin')
+  const defaultMode: DashboardMode = isExecutiveViewer ? 'executive' : 'operations'
+  const requestedMode = search.mode
+  const dashboardMode: DashboardMode = canSwitchModes
+    ? requestedMode ?? defaultMode
+    : defaultMode
 
   const activeTab: DashboardTab = search.tab ?? 'risk'
   const minAgeDays = search.minAgeDays ?? ''
@@ -68,6 +81,19 @@ function DashboardPage() {
   }
 
   const hasActiveFilters = Boolean(minAgeDays || platform || deviceGroup)
+
+  useEffect(() => {
+    if (!canSwitchModes || requestedMode) {
+      return
+    }
+
+    const preferredMode = readDashboardViewPreference()
+    if (preferredMode && preferredMode !== dashboardMode) {
+      void navigate({
+        search: (prev) => ({ ...prev, mode: preferredMode }),
+      })
+    }
+  }, [canSwitchModes, dashboardMode, navigate, requestedMode])
 
   const summaryQuery = useQuery({
     queryKey: ['dashboard', 'summary', selectedTenantId, minAgeDays, platform, deviceGroup],
@@ -120,6 +146,27 @@ function DashboardPage() {
   if (!summary || !trends) {
     return null
   }
+
+  if (dashboardMode === 'executive') {
+    return (
+      <CisoExecutiveOverview
+        summary={summary}
+        trends={trends}
+        isLoading={summaryQuery.isFetching || trendsQuery.isFetching}
+        filters={filterParams}
+        canSwitchToOperations={canSwitchModes}
+        onShowOperations={
+          canSwitchModes
+            ? () => {
+                void navigate({
+                  search: (prev) => ({ ...prev, mode: 'operations' }),
+                })
+              }
+            : undefined
+        }
+      />
+    )
+  }
   const sparklines = summary.metricSparklines
   const statCards = [
     {
@@ -158,6 +205,14 @@ function DashboardPage() {
 
   return (
     <section className="space-y-6 pb-4">
+      {user.roles.includes('SecurityAnalyst') ? (
+        <AnalystTriageWorkbench
+          items={summary.latestUnhandledVulnerabilities}
+          summary={summary}
+          isLoading={summaryQuery.isFetching}
+        />
+      ) : null}
+
       <DashboardFilterBar
         minAgeDays={minAgeDays}
         platform={platform}
@@ -287,10 +342,6 @@ function DashboardPage() {
         </TabsContent>
 
         <TabsContent value="remediation" className="space-y-6 pt-2">
-          <SecureScoreCard
-            isLoading={summaryQuery.isFetching}
-          />
-
           <BurndownChart
             data={burndownQuery.data}
             isLoading={burndownQuery.isFetching}

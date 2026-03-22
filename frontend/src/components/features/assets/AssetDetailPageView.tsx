@@ -4,7 +4,6 @@ import type { AssetDetail } from '@/api/assets.schemas'
 import { formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import { toneDot, toneText, type Tone } from '@/lib/tone-classes'
-import { AssetSecureScorePanel } from "./AssetSecureScorePanel";
 
 type AssetDetailPageViewProps = {
   asset: AssetDetail
@@ -454,7 +453,6 @@ export function AssetDetailPageView({
         </section>
 
         <aside className="space-y-4">
-          <AssetSecureScorePanel assetId={asset.id} />
           {asset.risk ? (
             <section className="rounded-3xl border border-border/70 bg-card p-4">
               <SectionHeader

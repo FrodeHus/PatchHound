@@ -18,6 +18,8 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -29,6 +31,7 @@ import { useTenantScope } from "@/components/layout/tenant-scope";
 import type { CurrentUser } from "@/server/auth.functions";
 import { unsealOpenBao } from "@/server/system.functions";
 import { ThemeSelector } from "@/components/layout/ThemeSelector";
+import { readDashboardViewPreference, writeDashboardViewPreference, type DashboardViewMode } from "@/lib/dashboard-view";
 import {
   Tooltip,
   TooltipContent,
@@ -63,8 +66,10 @@ export function TopNav({
   const queryClient = useQueryClient();
   const [isUnsealDialogOpen, setIsUnsealDialogOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [dashboardViewMode, setDashboardViewMode] = useState<DashboardViewMode>("executive");
   const { selectedTenantId, setSelectedTenantId, tenants } = useTenantScope();
   const canUnsealOpenBao = user.roles.includes("GlobalAdmin");
+  const canSwitchPortalView = user.roles.includes("GlobalAdmin");
   const unsealMutation = useMutation({
     mutationFn: (keys: [string, string, string]) =>
       unsealOpenBao({ data: { keys } }),
@@ -85,6 +90,27 @@ export function TopNav({
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (!canSwitchPortalView) {
+      return;
+    }
+
+    setDashboardViewMode(readDashboardViewPreference() ?? "executive");
+  }, [canSwitchPortalView]);
+
+  const handlePortalViewChange = (nextMode: DashboardViewMode) => {
+    setDashboardViewMode(nextMode);
+    writeDashboardViewPreference(nextMode);
+
+    const pathname = router.state.location.pathname;
+    if (pathname === "/") {
+      void router.navigate({
+        to: "/",
+        search: (prev: Record<string, unknown>) => ({ ...prev, mode: nextMode }),
+      });
+    }
+  };
 
   return (
     <header
@@ -249,6 +275,35 @@ export function TopNav({
                 <ThemeSelector />
               </div>
               <DropdownMenuSeparator />
+              {canSwitchPortalView ? (
+                <>
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel className="px-3 pb-1 pt-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Portal view
+                    </DropdownMenuLabel>
+                    <DropdownMenuRadioGroup
+                      value={dashboardViewMode}
+                      onValueChange={(value) =>
+                        handlePortalViewChange(value as DashboardViewMode)
+                      }
+                    >
+                      <DropdownMenuRadioItem
+                        value="executive"
+                        className="rounded-lg px-3 py-2"
+                      >
+                        Executive overview
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem
+                        value="operations"
+                        className="rounded-lg px-3 py-2"
+                      >
+                        Operations workbench
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                </>
+              ) : null}
               <DropdownMenuItem className="rounded-lg px-3 py-2">
                 {user.tenantIds.length} tenant scope
                 {user.tenantIds.length === 1 ? "" : "s"}

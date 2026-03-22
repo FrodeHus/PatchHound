@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
-using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Tenants;
 
@@ -15,6 +14,7 @@ public class RiskScoreService(
 )
 {
     public const string CalculationVersion = "1";
+    private readonly record struct RiskFactor(string Name, string Description, decimal Impact);
 
     public record AssetRiskResult(
         Guid AssetId,
@@ -461,7 +461,7 @@ public class RiskScoreService(
                     0m,
                     1000m);
 
-                var factorsJson = JsonSerializer.Serialize(new List<SecureScoreCalculator.ScoreFactor>
+                var factorsJson = JsonSerializer.Serialize(new List<RiskFactor>
                 {
                     new("MaxEpisodeRisk", "Highest unresolved episode risk on the asset.", maxEpisodeRisk),
                     new("TopThreeAverage", "Average of the top three unresolved episode risks.", Math.Round(topThreeAverage, 2)),
@@ -560,7 +560,7 @@ public class RiskScoreService(
                     0m,
                     1000m);
 
-                var factorsJson = JsonSerializer.Serialize(new List<SecureScoreCalculator.ScoreFactor>
+                var factorsJson = JsonSerializer.Serialize(new List<RiskFactor>
                 {
                     new("MaxEpisodeRisk", "Highest unresolved episode risk linked to the software.", maxEpisodeRisk),
                     new("TopThreeAverage", "Average of the top three unresolved episode risks linked to the software.", Math.Round(topThreeAverage, 2)),
@@ -643,7 +643,7 @@ public class RiskScoreService(
                 lowCount,
                 grouped.Count(),
                 openEpisodeCount,
-                JsonSerializer.Serialize(new List<SecureScoreCalculator.ScoreFactor>
+                JsonSerializer.Serialize(new List<RiskFactor>
                 {
                     new("MaxAssetRisk", "Highest current asset risk inside the device group.", maxAssetRisk),
                     new("TopThreeAverage", "Average of the top three asset risk scores in the device group.", Math.Round(topThreeAverage, 2)),
@@ -707,7 +707,7 @@ public class RiskScoreService(
                 lowCount,
                 grouped.Count(),
                 openEpisodeCount,
-                JsonSerializer.Serialize(new List<SecureScoreCalculator.ScoreFactor>
+                JsonSerializer.Serialize(new List<RiskFactor>
                 {
                     new("MaxAssetRisk", "Highest current asset risk owned by the team.", maxAssetRisk),
                     new("TopThreeAverage", "Average of the top three asset risk scores owned by the team.", Math.Round(topThreeAverage, 2)),

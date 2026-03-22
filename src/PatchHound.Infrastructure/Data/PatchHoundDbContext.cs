@@ -87,12 +87,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<DeviceGroupRiskScore> DeviceGroupRiskScores => Set<DeviceGroupRiskScore>();
     public DbSet<TenantSoftwareRiskScore> TenantSoftwareRiskScores => Set<TenantSoftwareRiskScore>();
     public DbSet<TeamRiskScore> TeamRiskScores => Set<TeamRiskScore>();
-    public DbSet<AssetSecureScore> AssetSecureScores => Set<AssetSecureScore>();
     public DbSet<TenantRiskScoreSnapshot> TenantRiskScoreSnapshots => Set<TenantRiskScoreSnapshot>();
-    public DbSet<TenantSecureScoreTarget> TenantSecureScoreTargets =>
-        Set<TenantSecureScoreTarget>();
-    public DbSet<TenantSecureScoreSnapshot> TenantSecureScoreSnapshots =>
-        Set<TenantSecureScoreSnapshot>();
     public DbSet<WorkflowDefinition> WorkflowDefinitions => Set<WorkflowDefinition>();
     public DbSet<WorkflowInstance> WorkflowInstances => Set<WorkflowInstance>();
     public DbSet<WorkflowNodeExecution> WorkflowNodeExecutions => Set<WorkflowNodeExecution>();
@@ -277,16 +272,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<TenantSlaConfiguration>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
-            .Entity<AssetSecureScore>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<TenantSecureScoreTarget>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
             .Entity<TenantRiskScoreSnapshot>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<TenantSecureScoreSnapshot>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
 
         // Workflow entities – TenantId is nullable (system workflows have null).

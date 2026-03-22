@@ -269,6 +269,76 @@ public class DashboardController : ControllerBase
             ))
             .ToListAsync(ct);
 
+        var latestUnhandledQuery = _dbContext
+            .TenantVulnerabilities.AsNoTracking()
+            .Where(v =>
+                v.TenantId == tenantId
+                && _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open
+                )
+                && !_dbContext.RemediationTasks.Any(t =>
+                    t.TenantVulnerabilityId == v.Id
+                    && t.Status != RemediationTaskStatus.Completed
+                    && t.Status != RemediationTaskStatus.RiskAccepted
+                )
+                && !_dbContext.RiskAcceptances.Any(ra =>
+                    ra.TenantVulnerabilityId == v.Id
+                    && ra.Status == RiskAcceptanceStatus.Approved
+                )
+            );
+
+        if (filteredAssetIds != null)
+        {
+            latestUnhandledQuery = latestUnhandledQuery.Where(v =>
+                _dbContext.VulnerabilityAssetEpisodes.Any(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open
+                    && filteredAssetIds.Contains(e.AssetId)));
+        }
+
+        if (minPublishedDate.HasValue)
+        {
+            latestUnhandledQuery = latestUnhandledQuery.Where(v =>
+                v.VulnerabilityDefinition.PublishedDate <= minPublishedDate.Value
+            );
+        }
+
+        var latestUnhandled = await latestUnhandledQuery
+            .OrderByDescending(v => v.VulnerabilityDefinition.VendorSeverity)
+            .ThenByDescending(v => v.VulnerabilityDefinition.CvssScore)
+            .ThenByDescending(v => _dbContext.VulnerabilityAssetEpisodes
+                .Where(e =>
+                    e.TenantVulnerabilityId == v.Id
+                    && e.Status == VulnerabilityStatus.Open
+                )
+                .Max(e => (DateTimeOffset?)e.LastSeenAt))
+            .Select(v => new UnhandledVulnerabilityDto(
+                v.Id,
+                v.VulnerabilityDefinition.ExternalId,
+                v.VulnerabilityDefinition.Title,
+                v.VulnerabilityDefinition.VendorSeverity.ToString(),
+                v.VulnerabilityDefinition.CvssScore,
+                _dbContext.VulnerabilityAssets.Count(va =>
+                    va.TenantVulnerabilityId == v.Id
+                    && va.TenantVulnerability.TenantId == tenantId
+                    && va.SnapshotId == activeSnapshotId
+                ),
+                v.VulnerabilityDefinition.PublishedDate.HasValue
+                    ? (int)(now - v.VulnerabilityDefinition.PublishedDate.Value).TotalDays
+                    : 0,
+                _dbContext.VulnerabilityAssetEpisodes
+                    .Where(e =>
+                        e.TenantVulnerabilityId == v.Id
+                        && e.Status == VulnerabilityStatus.Open
+                    )
+                    .OrderByDescending(e => e.LastSeenAt)
+                    .Select(e => e.LastSeenAt)
+                    .FirstOrDefault()
+            ))
+            .Take(12)
+            .ToListAsync(ct);
+
         var recurrence = await _dashboardQueryService.GetRecurrenceDataAsync(tenantId, ct);
 
         List<DeviceGroupVulnerabilityDto> vulnsByDeviceGroup;
@@ -524,12 +594,13 @@ public class DashboardController : ControllerBase
                 exposureScore,
                 vulnsBySeverity,
                 vulnsByStatus,
-                slaPercent,
-                overdueCount,
-                tasks.Count,
-                avgRemediationDays,
-                topVulns,
-                riskChangeBrief,
+            slaPercent,
+            overdueCount,
+            tasks.Count,
+            avgRemediationDays,
+            topVulns,
+            latestUnhandled,
+            riskChangeBrief,
                 recurrence.RecurringVulnerabilityCount,
                 recurrence.RecurrenceRatePercent,
                 recurrence.TopRecurringVulnerabilities,

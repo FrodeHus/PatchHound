@@ -46,7 +46,7 @@ public static class ExposureImpactCalculator
         if (input.Vulnerabilities.Count == 0 || input.DeviceCount == 0)
             return new SoftwareImpactResult(input.TenantSoftwareId, 0m);
 
-        // Vulnerability severity sum (same weights as SecureScoreCalculator)
+        // Vulnerability severity sum uses the shared severity weighting for impact scoring.
         var rawVulnSum = 0m;
         foreach (var vuln in input.Vulnerabilities)
         {
