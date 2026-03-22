@@ -10,4 +10,10 @@ public interface IWorkflowTriggerService
         string contextJson,
         CancellationToken ct
     );
+
+    Task FireManyAsync(
+        Guid tenantId,
+        IReadOnlyList<(WorkflowTrigger Trigger, string ContextJson)> triggers,
+        CancellationToken ct
+    );
 }

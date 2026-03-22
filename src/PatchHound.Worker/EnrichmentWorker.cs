@@ -5,6 +5,7 @@ using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Worker;
 
@@ -98,17 +99,20 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
             return [];
         }
 
-        return await dbContext
+        var enabledSources = await dbContext
             .EnrichmentSourceConfigurations.AsNoTracking()
             .Where(source => source.Enabled)
+            .ToListAsync(ct);
+
+        return enabledSources
             .OrderBy(source => source.DisplayName)
             .Select(source => new EnrichmentSourceSnapshot(
                 source.Id,
                 source.SourceKey,
                 source.DisplayName,
-                !string.IsNullOrWhiteSpace(source.SecretRef)
+                EnrichmentSourceCatalog.HasConfiguredCredentials(source)
             ))
-            .ToListAsync(ct);
+            .ToList();
     }
 
     private async Task<bool> RunSourceCycleAsync(

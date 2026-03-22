@@ -299,10 +299,16 @@ public class SystemController : ControllerBase
         CancellationToken ct
     )
     {
-        var sources = await _dbContext
+        var persistedSources = await _dbContext
             .EnrichmentSourceConfigurations.AsNoTracking()
-            .OrderBy(source => source.DisplayName)
             .ToListAsync(ct);
+        var sources = EnrichmentSourceCatalog
+            .CreateDefaults()
+            .Concat(persistedSources)
+            .GroupBy(source => source.SourceKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
+            .OrderBy(source => source.DisplayName)
+            .ToList();
 
         var sourceKeys = sources.Select(source => source.SourceKey).ToList();
         var queueRows = await _dbContext
@@ -454,7 +460,8 @@ public class SystemController : ControllerBase
                     source.DisplayName,
                     source.Enabled,
                     secretRef,
-                    source.Credentials.ApiBaseUrl
+                    source.Credentials.ApiBaseUrl,
+                    source.RefreshTtlHours
                 );
                 await _dbContext.EnrichmentSourceConfigurations.AddAsync(existingSource, ct);
                 existingSources[source.Key] = existingSource;
@@ -465,7 +472,8 @@ public class SystemController : ControllerBase
                 source.DisplayName,
                 source.Enabled,
                 secretRef,
-                source.Credentials.ApiBaseUrl
+                source.Credentials.ApiBaseUrl,
+                source.RefreshTtlHours
             );
         }
 
@@ -526,6 +534,7 @@ public class SystemController : ControllerBase
                 !string.IsNullOrWhiteSpace(source.SecretRef),
                 source.ApiBaseUrl
             ),
+            source.RefreshTtlHours,
             new EnrichmentSourceRuntimeDto(
                 source.LastStartedAt,
                 source.LastCompletedAt,

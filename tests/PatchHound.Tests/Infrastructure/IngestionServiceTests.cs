@@ -21,6 +21,8 @@ namespace PatchHound.Tests.Infrastructure;
 public class IngestionServiceTests : IDisposable
 {
     private readonly PatchHoundDbContext _dbContext;
+    private readonly DbContextOptions<PatchHoundDbContext> _dbContextOptions;
+    private readonly IServiceProvider _serviceProvider;
     private readonly IngestionService _service;
     private readonly IVulnerabilitySource _source;
     private readonly IAssetInventorySource _assetInventorySource;
@@ -32,14 +34,15 @@ public class IngestionServiceTests : IDisposable
         var tenantIds = new List<Guid> { _tenantId };
         tenantContext.AccessibleTenantIds.Returns(tenantIds);
 
-        var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
+        _dbContextOptions = new DbContextOptionsBuilder<PatchHoundDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .ConfigureWarnings(warnings =>
                 warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning)
             )
             .Options;
 
-        _dbContext = new PatchHoundDbContext(options, BuildServiceProvider(tenantContext));
+        _serviceProvider = BuildServiceProvider(tenantContext);
+        _dbContext = new PatchHoundDbContext(_dbContextOptions, _serviceProvider);
 
         _source = Substitute.For<IVulnerabilitySource, IAssetInventorySource>();
         _assetInventorySource = (IAssetInventorySource)_source;
@@ -72,11 +75,9 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
-        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
-            dbContextFactory,
+            CreateDbContextFactory(),
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
@@ -729,7 +730,7 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RunIngestionAsync_CreatesStagedSnapshotRowsBeforeMerge()
+    public async Task RunIngestionAsync_SuccessfulRun_PurgesStagedSnapshotRows()
     {
         await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
         await _dbContext.TenantSourceConfigurations.AddAsync(
@@ -797,19 +798,10 @@ public class IngestionServiceTests : IDisposable
             .Where(item => item.IngestionRunId == run.Id)
             .ToListAsync();
 
-        stagedVulnerabilities.Should().ContainSingle();
-        stagedVulnerabilities[0].ExternalId.Should().Be("CVE-2026-STAGED-1");
-        System
-            .Text.Json.JsonSerializer.Deserialize<IngestionResult>(
-                stagedVulnerabilities[0].PayloadJson
-            )!
-            .AffectedAssets.Should()
-            .BeNullOrEmpty();
-        stagedExposures.Should().ContainSingle();
-        stagedExposures[0].AssetExternalId.Should().Be("DEVICE-1");
-        stagedAssets.Should().HaveCount(2);
-        stagedLinks.Should().ContainSingle();
-        stagedLinks[0].DeviceExternalId.Should().Be("DEVICE-1");
+        stagedVulnerabilities.Should().BeEmpty();
+        stagedExposures.Should().BeEmpty();
+        stagedAssets.Should().BeEmpty();
+        stagedLinks.Should().BeEmpty();
     }
 
     [Fact]
@@ -962,11 +954,9 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
-        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
-            dbContextFactory,
+            CreateDbContextFactory(),
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
@@ -1110,11 +1100,9 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
-        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
-            dbContextFactory,
+            CreateDbContextFactory(),
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
@@ -1283,11 +1271,9 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
-        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
-            dbContextFactory,
+            CreateDbContextFactory(),
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
@@ -1426,11 +1412,9 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
-        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
-            dbContextFactory,
+            CreateDbContextFactory(),
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
@@ -1601,11 +1585,9 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
-        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
-            dbContextFactory,
+            CreateDbContextFactory(),
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
@@ -1767,11 +1749,9 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
-        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
-            dbContextFactory,
+            CreateDbContextFactory(),
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
@@ -1892,11 +1872,9 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var dbContextFactory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
-        dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
         var stagedMergeService = new StagedVulnerabilityMergeService(
             _dbContext,
-            dbContextFactory,
+            CreateDbContextFactory(),
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
@@ -3085,7 +3063,9 @@ public class IngestionServiceTests : IDisposable
     private IDbContextFactory<PatchHoundDbContext> CreateDbContextFactory()
     {
         var factory = Substitute.For<IDbContextFactory<PatchHoundDbContext>>();
-        factory.CreateDbContextAsync(Arg.Any<CancellationToken>()).Returns(_dbContext);
+        factory
+            .CreateDbContextAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => new PatchHoundDbContext(_dbContextOptions, _serviceProvider));
         return factory;
     }
 }

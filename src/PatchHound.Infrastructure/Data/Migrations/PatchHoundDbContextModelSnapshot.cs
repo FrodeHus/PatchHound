@@ -843,6 +843,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
+                    b.Property<int?>("RefreshTtlHours")
+                        .HasColumnType("integer");
+
                     b.Property<DateTimeOffset?>("LastStartedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2891,6 +2894,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset?>("DefenderLastRefreshedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("ExploitLikelihoodScore")
                         .HasPrecision(5, 2)

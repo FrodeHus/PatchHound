@@ -31,6 +31,7 @@ export function GlobalEnrichmentSourceManagement({
           key: source.key,
           displayName: source.displayName,
           enabled: source.enabled,
+          refreshTtlHours: source.refreshTtlHours,
           credentials: {
             secret: source.credentials.secret,
             apiBaseUrl: source.credentials.apiBaseUrl,
@@ -288,6 +289,29 @@ export function GlobalEnrichmentSourceManagement({
                               }
                             />
                           </label>
+                          {source.key === 'microsoft-defender' ? (
+                            <label className="space-y-2">
+                              <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Refresh TTL (hours)</span>
+                              <Input
+                                type="number"
+                                min={1}
+                                step={1}
+                                value={source.refreshTtlHours ?? ''}
+                                onChange={(event) =>
+                                  updateSource(source.key, (current) => ({
+                                    ...current,
+                                    refreshTtlHours:
+                                      event.target.value.trim() === ''
+                                        ? null
+                                        : Math.max(1, Number.parseInt(event.target.value, 10) || 1),
+                                  }))
+                                }
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Defender CVE detail is refreshed asynchronously when stored detail is older than this threshold.
+                              </p>
+                            </label>
+                          ) : null}
                         </div>
 
                         <label className="space-y-2">
@@ -418,6 +442,14 @@ function getProviderStatusDescription(source: EnrichmentSource) {
     }
 
     return 'NVD is the global backfill source for missing vulnerability metadata when tenant ingestion does not provide it.'
+  }
+
+  if (source.key === 'microsoft-defender') {
+    if (!source.enabled) {
+      return 'Defender enrichment is configured globally but currently inactive for worker processing.'
+    }
+
+    return `Defender CVE detail is refreshed asynchronously after ${source.refreshTtlHours ?? 24} hour(s), instead of being refetched during every ingestion run.`
   }
 
   return source.enabled

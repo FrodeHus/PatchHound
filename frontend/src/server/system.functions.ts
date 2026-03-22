@@ -40,6 +40,7 @@ const enrichmentSourceSchema = z.object({
   key: z.string(),
   displayName: z.string(),
   enabled: z.boolean(),
+  refreshTtlHours: z.number().int().nullable(),
   credentials: z.object({
     hasSecret: z.boolean(),
     apiBaseUrl: z.string(),
@@ -151,6 +152,7 @@ export const updateEnrichmentSources = createServerFn({ method: 'POST' })
     key: z.string(),
     displayName: z.string().min(1),
     enabled: z.boolean(),
+    refreshTtlHours: z.number().int().nullable(),
     credentials: z.object({
       secret: z.string(),
       apiBaseUrl: z.string().min(1),

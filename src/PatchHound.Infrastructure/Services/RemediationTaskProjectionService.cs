@@ -9,6 +9,7 @@ namespace PatchHound.Infrastructure.Services;
 public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, SlaService slaService)
 {
     private static readonly Guid SystemUserId = Guid.Empty;
+    private static readonly string AssetNotificationEntityType = "Asset";
 
     public async Task EnsureOpenTaskAsync(
         Guid tenantId,
@@ -58,7 +59,12 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
         );
 
         await dbContext.RemediationTasks.AddAsync(task, ct);
-        await QueueOwnerNotificationsAsync(tenantId, definition, asset, ct);
+        await QueueOwnerNotificationsAsync(
+            tenantId,
+            [(definition, asset)],
+            DateTimeOffset.UtcNow.AddHours(-12),
+            ct
+        );
     }
 
     public async Task EnsureOpenTasksAsync(
@@ -81,6 +87,8 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
             .TenantSlaConfigurations.IgnoreQueryFilters()
             .FirstOrDefaultAsync(config => config.TenantId == tenantId, ct);
         var tasksToCreate = new List<RemediationTask>();
+        var notificationInputs = new List<(VulnerabilityDefinition Definition, Asset Asset)>();
+        var dueDateCalculationTime = DateTimeOffset.UtcNow;
 
         foreach (var (tenantVulnerability, definition, asset) in openedProjectionPairs)
         {
@@ -105,18 +113,28 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
                     SystemUserId,
                     slaService.CalculateDueDate(
                         definition.VendorSeverity,
-                        DateTimeOffset.UtcNow,
+                        dueDateCalculationTime,
                         tenantSla
                     )
                 )
             );
             openTaskPairKeys.Add(pairKey);
-            await QueueOwnerNotificationsAsync(tenantId, definition, asset, ct);
+            notificationInputs.Add((definition, asset));
         }
 
         if (tasksToCreate.Count > 0)
         {
             await dbContext.RemediationTasks.AddRangeAsync(tasksToCreate, ct);
+        }
+
+        if (notificationInputs.Count > 0)
+        {
+            await QueueOwnerNotificationsAsync(
+                tenantId,
+                notificationInputs,
+                dueDateCalculationTime.AddHours(-12),
+                ct
+            );
         }
     }
 
@@ -189,90 +207,158 @@ public class RemediationTaskProjectionService(PatchHoundDbContext dbContext, Sla
 
     private async Task QueueOwnerNotificationsAsync(
         Guid tenantId,
-        VulnerabilityDefinition definition,
-        Asset asset,
+        IReadOnlyList<(VulnerabilityDefinition Definition, Asset Asset)> items,
+        DateTimeOffset threshold,
         CancellationToken ct
     )
     {
-        var title = $"Software on {asset.Name} needs review";
-        var body =
-            $"{OwnerFacingIssueSummaryFormatter.BuildIssueSummary(null, definition.Title, definition.Description, definition.VendorSeverity)} Open the asset view to see business impact, affected software, and the next step. Technical reference: {definition.ExternalId}.";
-
-        if (asset.OwnerUserId.HasValue)
+        if (items.Count == 0)
         {
-            await QueueNotificationIfMissingAsync(
-                asset.OwnerUserId.Value,
-                tenantId,
-                title,
-                body,
-                asset.Id,
-                ct
+            return;
+        }
+
+        var ownerTeamIds = items
+            .Where(item => !item.Asset.OwnerUserId.HasValue)
+            .Select(item => item.Asset.OwnerTeamId ?? item.Asset.FallbackTeamId)
+            .Where(teamId => teamId.HasValue)
+            .Select(teamId => teamId!.Value)
+            .Distinct()
+            .ToList();
+
+        var teamMembers = ownerTeamIds.Count == 0
+            ? new List<TeamMember>()
+            : await dbContext.TeamMembers.IgnoreQueryFilters()
+                .Where(item => ownerTeamIds.Contains(item.TeamId))
+                .ToListAsync(ct);
+
+        var teamMemberIdsByTeam = teamMembers
+            .GroupBy(item => item.TeamId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(item => item.UserId).Distinct().ToArray()
             );
-            return;
+
+        var candidates = new List<NotificationCandidate>();
+
+        foreach (var (definition, asset) in items)
+        {
+            var title = $"Software on {asset.Name} needs review";
+            var body =
+                $"{OwnerFacingIssueSummaryFormatter.BuildIssueSummary(null, definition.Title, definition.Description, definition.VendorSeverity)} Open the asset view to see business impact, affected software, and the next step. Technical reference: {definition.ExternalId}.";
+
+            if (asset.OwnerUserId.HasValue)
+            {
+                candidates.Add(
+                    new NotificationCandidate(asset.OwnerUserId.Value, asset.Id, title, body)
+                );
+                continue;
+            }
+
+            var ownerTeamId = asset.OwnerTeamId ?? asset.FallbackTeamId;
+            if (!ownerTeamId.HasValue)
+            {
+                continue;
+            }
+
+            if (!teamMemberIdsByTeam.TryGetValue(ownerTeamId.Value, out var memberIds))
+            {
+                continue;
+            }
+
+            foreach (var memberId in memberIds)
+            {
+                candidates.Add(new NotificationCandidate(memberId, asset.Id, title, body));
+            }
         }
 
-        var ownerTeamId = asset.OwnerTeamId ?? asset.FallbackTeamId;
-        if (!ownerTeamId.HasValue)
+        if (candidates.Count == 0)
         {
             return;
         }
 
-        var memberIds = await dbContext.TeamMembers.IgnoreQueryFilters()
-            .Where(item => item.TeamId == ownerTeamId.Value)
-            .Select(item => item.UserId)
+        var uniqueCandidates = candidates
+            .GroupBy(candidate => candidate.DedupeKey, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToList();
+
+        var candidateUserIds = uniqueCandidates
+            .Select(candidate => candidate.UserId)
+            .Distinct()
+            .ToList();
+        var candidateAssetIds = uniqueCandidates
+            .Select(candidate => candidate.AssetId)
+            .Distinct()
+            .ToList();
+
+        var existingNotificationKeys = await dbContext.Notifications.IgnoreQueryFilters()
+            .Where(item =>
+                item.TenantId == tenantId
+                && item.Type == NotificationType.TaskAssigned
+                && item.RelatedEntityType == AssetNotificationEntityType
+                && item.SentAt >= threshold
+                && item.RelatedEntityId.HasValue
+                && candidateUserIds.Contains(item.UserId)
+                && candidateAssetIds.Contains(item.RelatedEntityId.Value)
+            )
+            .Select(item => new { item.UserId, AssetId = item.RelatedEntityId!.Value, item.Title })
             .ToListAsync(ct);
 
-        foreach (var memberId in memberIds)
+        var knownKeys = existingNotificationKeys
+            .Select(item => BuildNotificationDedupeKey(item.UserId, item.AssetId, item.Title))
+            .Concat(
+                dbContext.Notifications.Local
+                    .Where(item =>
+                        item.TenantId == tenantId
+                        && item.Type == NotificationType.TaskAssigned
+                        && item.RelatedEntityType == AssetNotificationEntityType
+                        && item.SentAt >= threshold
+                        && item.RelatedEntityId.HasValue
+                    )
+                    .Select(item =>
+                        BuildNotificationDedupeKey(
+                            item.UserId,
+                            item.RelatedEntityId!.Value,
+                            item.Title
+                        )
+                    )
+            )
+            .ToHashSet(StringComparer.Ordinal);
+
+        var notificationsToAdd = new List<Notification>();
+
+        foreach (var candidate in uniqueCandidates)
         {
-            await QueueNotificationIfMissingAsync(
-                memberId,
-                tenantId,
-                title,
-                body,
-                asset.Id,
-                ct
+            if (!knownKeys.Add(candidate.DedupeKey))
+            {
+                continue;
+            }
+
+            notificationsToAdd.Add(
+                Notification.Create(
+                    candidate.UserId,
+                    tenantId,
+                    NotificationType.TaskAssigned,
+                    candidate.Title,
+                    candidate.Body,
+                    AssetNotificationEntityType,
+                    candidate.AssetId
+                )
             );
+        }
+
+        if (notificationsToAdd.Count > 0)
+        {
+            await dbContext.Notifications.AddRangeAsync(notificationsToAdd, ct);
         }
     }
 
-    private async Task QueueNotificationIfMissingAsync(
-        Guid userId,
-        Guid tenantId,
-        string title,
-        string body,
-        Guid assetId,
-        CancellationToken ct
-    )
+    private static string BuildNotificationDedupeKey(Guid userId, Guid assetId, string title)
     {
-        var threshold = DateTimeOffset.UtcNow.AddHours(-12);
-        var exists = await dbContext.Notifications.IgnoreQueryFilters()
-            .AnyAsync(item =>
-                item.UserId == userId
-                && item.TenantId == tenantId
-                && item.Type == NotificationType.TaskAssigned
-                && item.RelatedEntityType == "Asset"
-                && item.RelatedEntityId == assetId
-                && item.Title == title
-                && item.SentAt >= threshold,
-                ct
-            );
+        return $"{userId:N}:{assetId:N}:{title}";
+    }
 
-        if (exists)
-        {
-            return;
-        }
-
-        await dbContext.Notifications.AddAsync(
-            Notification.Create(
-                userId,
-                tenantId,
-                NotificationType.TaskAssigned,
-                title,
-                body,
-                "Asset",
-                assetId
-            ),
-            ct
-        );
+    private sealed record NotificationCandidate(Guid UserId, Guid AssetId, string Title, string Body)
+    {
+        public string DedupeKey => BuildNotificationDedupeKey(UserId, AssetId, Title);
     }
 }

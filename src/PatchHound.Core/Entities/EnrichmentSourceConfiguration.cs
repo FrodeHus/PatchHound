@@ -8,6 +8,7 @@ public class EnrichmentSourceConfiguration
     public bool Enabled { get; private set; }
     public string SecretRef { get; private set; } = string.Empty;
     public string ApiBaseUrl { get; private set; } = string.Empty;
+    public int? RefreshTtlHours { get; private set; }
     public Guid? ActiveEnrichmentRunId { get; private set; }
     public DateTimeOffset? LeaseAcquiredAt { get; private set; }
     public DateTimeOffset? LeaseExpiresAt { get; private set; }
@@ -24,7 +25,8 @@ public class EnrichmentSourceConfiguration
         string displayName,
         bool enabled,
         string secretRef = "",
-        string apiBaseUrl = ""
+        string apiBaseUrl = "",
+        int? refreshTtlHours = null
     )
     {
         return new EnrichmentSourceConfiguration
@@ -35,6 +37,7 @@ public class EnrichmentSourceConfiguration
             Enabled = enabled,
             SecretRef = secretRef,
             ApiBaseUrl = apiBaseUrl,
+            RefreshTtlHours = refreshTtlHours,
         };
     }
 
@@ -42,13 +45,15 @@ public class EnrichmentSourceConfiguration
         string displayName,
         bool enabled,
         string secretRef,
-        string apiBaseUrl
+        string apiBaseUrl,
+        int? refreshTtlHours
     )
     {
         DisplayName = displayName;
         Enabled = enabled;
         SecretRef = secretRef;
         ApiBaseUrl = apiBaseUrl;
+        RefreshTtlHours = refreshTtlHours;
     }
 
     public void UpdateRuntime(
