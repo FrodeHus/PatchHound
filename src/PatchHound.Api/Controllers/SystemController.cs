@@ -534,6 +534,13 @@ public class SystemController : ControllerBase
                 !string.IsNullOrWhiteSpace(source.SecretRef),
                 source.ApiBaseUrl
             ),
+            string.Equals(
+                source.SourceKey,
+                EnrichmentSourceCatalog.DefenderSourceKey,
+                StringComparison.OrdinalIgnoreCase
+            )
+                ? "tenant-source"
+                : "global-secret",
             source.RefreshTtlHours,
             new EnrichmentSourceRuntimeDto(
                 source.LastStartedAt,

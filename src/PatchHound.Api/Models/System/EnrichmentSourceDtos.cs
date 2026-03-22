@@ -5,6 +5,7 @@ public record EnrichmentSourceDto(
     string DisplayName,
     bool Enabled,
     EnrichmentSourceCredentialsDto Credentials,
+    string CredentialMode,
     int? RefreshTtlHours,
     EnrichmentSourceRuntimeDto Runtime,
     EnrichmentSourceQueueDto Queue,
