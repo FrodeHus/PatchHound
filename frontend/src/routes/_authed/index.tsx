@@ -238,6 +238,7 @@ function DashboardPage() {
         <TabsContent value="risk" className="space-y-6 pt-2">
           <RiskScoreCard
             isLoading={summaryQuery.isFetching}
+            filters={filterParams}
           />
 
           <RiskHeatmap

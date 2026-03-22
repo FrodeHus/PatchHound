@@ -112,7 +112,7 @@ public class RiskScoreControllerTests : IDisposable
         );
         await _dbContext.SaveChangesAsync();
 
-        var action = await _controller.GetSummary(CancellationToken.None);
+        var action = await _controller.GetSummary(null, null, null, CancellationToken.None);
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<RiskScoreSummaryDto>().Subject;
@@ -222,6 +222,153 @@ public class RiskScoreControllerTests : IDisposable
         payload.TopRiskAssets[0].AssetId.Should().Be(asset.Id);
         payload.TopRiskAssets[0].EpisodeDrivers.Should().ContainSingle();
         payload.TopRiskAssets[0].EpisodeDrivers[0].ExternalId.Should().Be("CVE-2026-8800");
+    }
+
+    [Fact]
+    public async Task GetSummary_WithFilters_RecomputesLiveRiskFromMatchingEpisodes()
+    {
+        var oldPublishedDate = DateTime.UtcNow.Date.AddDays(-45);
+        var newPublishedDate = DateTime.UtcNow.Date.AddDays(-5);
+
+        var matchingAsset = Asset.Create(_tenantId, "asset-filter-match", AssetType.Device, "Gateway", Criticality.High);
+        matchingAsset.UpdateDeviceDetails(
+            "gateway.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "High",
+            DateTimeOffset.UtcNow,
+            "10.0.0.10",
+            "aad-match",
+            "group-match",
+            "Tier 0 Servers"
+        );
+
+        var filteredOutAsset = Asset.Create(_tenantId, "asset-filter-out", AssetType.Device, "Laptop", Criticality.Medium);
+        filteredOutAsset.UpdateDeviceDetails(
+            "laptop.contoso.local",
+            "Active",
+            "macOS",
+            "14",
+            "Medium",
+            DateTimeOffset.UtcNow,
+            "10.0.0.20",
+            "aad-out",
+            "group-out",
+            "User Devices"
+        );
+
+        var oldDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-9001",
+            "Old issue",
+            "Desc",
+            Severity.Critical,
+            "NVD",
+            publishedDate: new DateTimeOffset(oldPublishedDate, TimeSpan.Zero)
+        );
+        var newDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-9002",
+            "New issue",
+            "Desc",
+            Severity.Critical,
+            "NVD",
+            publishedDate: new DateTimeOffset(newPublishedDate, TimeSpan.Zero)
+        );
+
+        var matchingTenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            oldDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow,
+            "MicrosoftDefender"
+        );
+        var filteredOutTenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            newDefinition.Id,
+            VulnerabilityStatus.Open,
+            DateTimeOffset.UtcNow,
+            "MicrosoftDefender"
+        );
+
+        await _dbContext.AddRangeAsync(
+            matchingAsset,
+            filteredOutAsset,
+            oldDefinition,
+            newDefinition,
+            matchingTenantVulnerability,
+            filteredOutTenantVulnerability,
+            AssetRiskScore.Create(
+                _tenantId,
+                matchingAsset.Id,
+                930m,
+                910m,
+                1,
+                0,
+                0,
+                0,
+                1,
+                "[]",
+                RiskScoreService.CalculationVersion
+            ),
+            AssetRiskScore.Create(
+                _tenantId,
+                filteredOutAsset.Id,
+                910m,
+                900m,
+                1,
+                0,
+                0,
+                0,
+                1,
+                "[]",
+                RiskScoreService.CalculationVersion
+            ),
+            VulnerabilityEpisodeRiskAssessment.Create(
+                _tenantId,
+                Guid.NewGuid(),
+                matchingTenantVulnerability.Id,
+                matchingAsset.Id,
+                null,
+                91m,
+                85m,
+                50m,
+                910m,
+                "Critical",
+                "[]",
+                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+            ),
+            VulnerabilityEpisodeRiskAssessment.Create(
+                _tenantId,
+                Guid.NewGuid(),
+                filteredOutTenantVulnerability.Id,
+                filteredOutAsset.Id,
+                null,
+                90m,
+                84m,
+                48m,
+                900m,
+                "Critical",
+                "[]",
+                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+            ),
+            TenantRiskScoreSnapshot.Create(_tenantId, DateOnly.FromDateTime(DateTime.UtcNow.Date), 920m, 2, 2, 0)
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetSummary(30, "Windows", "Tier 0 Servers", CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<RiskScoreSummaryDto>().Subject;
+
+        payload.AssetCount.Should().Be(1);
+        payload.CriticalAssetCount.Should().Be(0);
+        payload.OverallScore.Should().BeGreaterThan(700m);
+        payload.TopRiskAssets.Should().ContainSingle();
+        payload.TopRiskAssets[0].AssetId.Should().Be(matchingAsset.Id);
+        payload.TopRiskAssets[0].EpisodeDrivers.Should().ContainSingle();
+        payload.TopRiskAssets[0].EpisodeDrivers[0].ExternalId.Should().Be("CVE-2026-9001");
+        payload.History.Should().BeEmpty();
+        payload.CalculatedAt.Should().NotBeNull();
     }
 
     [Fact]

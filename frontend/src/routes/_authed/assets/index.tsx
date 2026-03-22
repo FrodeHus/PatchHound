@@ -8,7 +8,7 @@ import { AssetManagementTable } from '@/components/features/assets/AssetManageme
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { assetQueryKeys, buildAssetsListRequest } from '@/features/assets/list-state'
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
-import { createListSearchUpdater } from '@/routes/list-search-helpers'
+import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 
 const assetsSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,

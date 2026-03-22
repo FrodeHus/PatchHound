@@ -49,12 +49,37 @@ public record AssetDetailDto(
     bool? DeviceIsAadJoined,
     string? DeviceOnboardingStatus,
     string? DeviceValue,
+    AssetRiskDetailDto? Risk,
     string[] Tags,
     SoftwareCpeBindingDto? SoftwareCpeBinding,
     string Metadata,
     IReadOnlyList<AssetVulnerabilityDto> Vulnerabilities,
     IReadOnlyList<AssetSoftwareInstallationDto> SoftwareInventory,
     IReadOnlyList<AssetKnownSoftwareVulnerabilityDto> KnownSoftwareVulnerabilities
+);
+
+public record AssetRiskDetailDto(
+    decimal OverallScore,
+    decimal MaxEpisodeRiskScore,
+    string RiskBand,
+    int OpenEpisodeCount,
+    int CriticalCount,
+    int HighCount,
+    int MediumCount,
+    int LowCount,
+    DateTimeOffset CalculatedAt,
+    IReadOnlyList<AssetRiskDriverDto> TopDrivers
+);
+
+public record AssetRiskDriverDto(
+    Guid TenantVulnerabilityId,
+    string ExternalId,
+    string Title,
+    string RiskBand,
+    decimal EpisodeRiskScore,
+    decimal ThreatScore,
+    decimal ContextScore,
+    decimal OperationalScore
 );
 
 public record AssetVulnerabilityDto(

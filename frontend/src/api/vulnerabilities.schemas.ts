@@ -16,6 +16,11 @@ export const vulnerabilitySchema = z.object({
   episodeCount: z.number(),
   reappearanceCount: z.number(),
   hasRecentReappearance: z.boolean(),
+  threatScore: z.number().nullable(),
+  epssScore: z.number().nullable(),
+  publicExploit: z.boolean(),
+  knownExploited: z.boolean(),
+  activeAlert: z.boolean(),
 })
 
 export const pagedVulnerabilitySchema = pagedResponseMetaSchema.extend({
@@ -105,6 +110,19 @@ export const vulnerabilityDetailSchema = z.object({
     reappearanceCount: z.number(),
   }),
   affectedAssets: z.array(affectedAssetSchema),
+  threatAssessment: z.object({
+    threatScore: z.number(),
+    technicalScore: z.number(),
+    exploitLikelihoodScore: z.number(),
+    threatActivityScore: z.number(),
+    epssScore: z.number().nullable(),
+    knownExploited: z.boolean(),
+    publicExploit: z.boolean(),
+    activeAlert: z.boolean(),
+    hasRansomwareAssociation: z.boolean(),
+    hasMalwareAssociation: z.boolean(),
+    calculatedAt: isoDateTimeSchema,
+  }).nullable(),
   organizationalSeverity: orgSeveritySchema.nullable(),
 })
 

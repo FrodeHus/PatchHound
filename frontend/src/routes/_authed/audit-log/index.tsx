@@ -4,7 +4,7 @@ import { fetchAuditLog } from '@/api/audit-log.functions'
 import { AuditLogTable } from '@/components/features/audit/AuditLogTable'
 import { auditQueryKeys, buildAuditLogListRequest } from '@/features/audit/list-state'
 import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
-import { createListSearchUpdater } from '@/routes/list-search-helpers'
+import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 
 const auditLogSearchSchema = baseListSearchSchema.extend({
   action: searchStringSchema,

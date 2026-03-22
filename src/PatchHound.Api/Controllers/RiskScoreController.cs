@@ -30,14 +30,25 @@ public class RiskScoreController : ControllerBase
     }
 
     [HttpGet("summary")]
-    public async Task<ActionResult<RiskScoreSummaryDto>> GetSummary(CancellationToken ct)
+    public async Task<ActionResult<RiskScoreSummaryDto>> GetSummary(
+        [FromQuery] int? minAgeDays,
+        [FromQuery] string? platform,
+        [FromQuery] string? deviceGroup,
+        CancellationToken ct
+    )
     {
         if (_tenantContext.CurrentTenantId is not Guid tenantId)
         {
             return BadRequest("No tenant selected.");
         }
 
-        var tenantRisk = await _riskScoreService.GetTenantRiskAsync(tenantId, ct);
+        var hasFilters =
+            minAgeDays.HasValue
+            || !string.IsNullOrWhiteSpace(platform)
+            || !string.IsNullOrWhiteSpace(deviceGroup);
+        var tenantRisk = hasFilters
+            ? await _riskScoreService.GetFilteredTenantRiskAsync(tenantId, minAgeDays, platform, deviceGroup, ct)
+            : await _riskScoreService.GetTenantRiskAsync(tenantId, ct);
         var topRiskAssets = tenantRisk.AssetScores
             .OrderByDescending(item => item.OverallScore)
             .Take(10)
@@ -65,7 +76,15 @@ public class RiskScoreController : ControllerBase
             })
             .ToListAsync(ct);
 
-        var history = await _riskScoreService.GetRiskHistoryAsync(tenantId, ct);
+        var history = hasFilters
+            ? []
+            : await _riskScoreService.GetRiskHistoryAsync(tenantId, ct);
+        var calculatedAt = hasFilters
+            ? DateTimeOffset.UtcNow
+            : await _dbContext.AssetRiskScores.AsNoTracking()
+                .Where(item => item.TenantId == tenantId)
+                .Select(item => (DateTimeOffset?)item.CalculatedAt)
+                .MaxAsync(ct);
 
         return Ok(new RiskScoreSummaryDto(
             tenantRisk.OverallScore,
@@ -105,10 +124,7 @@ public class RiskScoreController : ControllerBase
                 item.CriticalAssetCount,
                 item.HighAssetCount
             )).ToList(),
-            await _dbContext.AssetRiskScores.AsNoTracking()
-                .Where(item => item.TenantId == tenantId)
-                .Select(item => (DateTimeOffset?)item.CalculatedAt)
-                .MaxAsync(ct)
+            calculatedAt
         ));
     }
 

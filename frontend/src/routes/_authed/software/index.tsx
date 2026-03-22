@@ -7,7 +7,7 @@ import { SoftwareTable } from '@/components/features/software/SoftwareTable'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { buildSoftwareListRequest, softwareQueryKeys } from '@/features/software/list-state'
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
-import { createListSearchUpdater } from '@/routes/list-search-helpers'
+import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 
 const softwareSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,

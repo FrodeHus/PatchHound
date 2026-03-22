@@ -6,7 +6,7 @@ import { VulnerabilityTable } from '@/components/features/vulnerabilities/Vulner
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { buildVulnerabilitiesListRequest, vulnerabilityQueryKeys } from '@/features/vulnerabilities/list-state'
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
-import { createListSearchUpdater } from '@/routes/list-search-helpers'
+import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 
 const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
@@ -16,6 +16,9 @@ const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
   recurrenceOnly: searchBooleanSchema,
   presentOnly: searchBooleanSchema.catch(true),
   minAgeDays: searchStringSchema,
+  publicExploitOnly: searchBooleanSchema,
+  knownExploitedOnly: searchBooleanSchema,
+  activeAlertOnly: searchBooleanSchema,
 })
 
 export const Route = createFileRoute('/_authed/vulnerabilities/')({
@@ -60,6 +63,9 @@ function VulnerabilitiesPage() {
         presentOnly={search.presentOnly}
         recurrenceOnly={search.recurrenceOnly}
         minAgeDays={search.minAgeDays}
+        publicExploitOnly={search.publicExploitOnly}
+        knownExploitedOnly={search.knownExploitedOnly}
+        activeAlertOnly={search.activeAlertOnly}
         onSearchChange={(value) => {
           searchActions.updateField('search', value)
         }}
@@ -87,6 +93,15 @@ function VulnerabilitiesPage() {
         onMinAgeDaysChange={(value) => {
           searchActions.updateField('minAgeDays', value)
         }}
+        onPublicExploitOnlyChange={(value) => {
+          searchActions.updateField('publicExploitOnly', value)
+        }}
+        onKnownExploitedOnlyChange={(value) => {
+          searchActions.updateField('knownExploitedOnly', value)
+        }}
+        onActiveAlertOnlyChange={(value) => {
+          searchActions.updateField('activeAlertOnly', value)
+        }}
         onApplyStructuredFilters={(filters) => {
           searchActions.updateFields({
             severity: filters.severity,
@@ -95,6 +110,9 @@ function VulnerabilitiesPage() {
             recurrenceOnly: filters.recurrenceOnly,
             presentOnly: filters.presentOnly,
             minAgeDays: filters.minAgeDays,
+            publicExploitOnly: filters.publicExploitOnly,
+            knownExploitedOnly: filters.knownExploitedOnly,
+            activeAlertOnly: filters.activeAlertOnly,
           })
         }}
         onClearFilters={() => {
@@ -106,6 +124,9 @@ function VulnerabilitiesPage() {
             recurrenceOnly: false,
             presentOnly: true,
             minAgeDays: '',
+            publicExploitOnly: false,
+            knownExploitedOnly: false,
+            activeAlertOnly: false,
           })
         }}
       />

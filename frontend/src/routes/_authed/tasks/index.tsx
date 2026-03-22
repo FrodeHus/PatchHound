@@ -6,7 +6,7 @@ import { updateTaskStatus } from '@/api/tasks.functions'
 import { TaskList } from '@/components/features/tasks/TaskList'
 import { buildTasksListRequest, taskQueryKeys } from '@/features/tasks/list-state'
 import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
-import { createListSearchUpdater } from '@/routes/list-search-helpers'
+import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 
 const tasksSearchSchema = baseListSearchSchema.extend({
   status: searchStringSchema,

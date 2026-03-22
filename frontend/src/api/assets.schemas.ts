@@ -86,6 +86,27 @@ export const assetDetailSchema = z.object({
   deviceIsAadJoined: z.boolean().nullable(),
   deviceOnboardingStatus: z.string().nullable(),
   deviceValue: z.string().nullable(),
+  risk: z.object({
+    overallScore: z.number(),
+    maxEpisodeRiskScore: z.number(),
+    riskBand: z.string(),
+    openEpisodeCount: z.number(),
+    criticalCount: z.number(),
+    highCount: z.number(),
+    mediumCount: z.number(),
+    lowCount: z.number(),
+    calculatedAt: z.string(),
+    topDrivers: z.array(z.object({
+      tenantVulnerabilityId: z.string().uuid(),
+      externalId: z.string(),
+      title: z.string(),
+      riskBand: z.string(),
+      episodeRiskScore: z.number(),
+      threatScore: z.number(),
+      contextScore: z.number(),
+      operationalScore: z.number(),
+    })),
+  }).nullable(),
   tags: z.array(z.string()),
   softwareCpeBinding: z
     .object({

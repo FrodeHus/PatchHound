@@ -2998,6 +2998,10 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)");
 
+                    b.Property<decimal?>("EpssScore")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)");
+
                     b.Property<string>("FactorsJson")
                         .IsRequired()
                         .HasColumnType("text");

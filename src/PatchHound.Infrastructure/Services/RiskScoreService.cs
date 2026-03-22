@@ -322,6 +322,48 @@ public class RiskScoreService(
         )).ToList());
     }
 
+    public async Task<TenantRiskResult> GetFilteredTenantRiskAsync(
+        Guid tenantId,
+        int? minAgeDays,
+        string? platform,
+        string? deviceGroup,
+        CancellationToken ct
+    )
+    {
+        var publishedBefore = minAgeDays.HasValue
+            ? DateTime.UtcNow.Date.AddDays(-minAgeDays.Value)
+            : (DateTime?)null;
+
+        var episodeScores = await (
+            from episodeRisk in dbContext.VulnerabilityEpisodeRiskAssessments.AsNoTracking()
+            join asset in dbContext.Assets.AsNoTracking()
+                on episodeRisk.AssetId equals asset.Id
+            join tenantVulnerability in dbContext.TenantVulnerabilities.AsNoTracking()
+                on episodeRisk.TenantVulnerabilityId equals tenantVulnerability.Id
+            join definition in dbContext.VulnerabilityDefinitions.AsNoTracking()
+                on tenantVulnerability.VulnerabilityDefinitionId equals definition.Id
+            where episodeRisk.TenantId == tenantId
+                  && episodeRisk.ResolvedAt == null
+                  && asset.TenantId == tenantId
+                  && (string.IsNullOrWhiteSpace(platform) || asset.DeviceOsPlatform == platform)
+                  && (string.IsNullOrWhiteSpace(deviceGroup) || asset.DeviceGroupName == deviceGroup)
+                  && (!publishedBefore.HasValue
+                      || (definition.PublishedDate.HasValue && definition.PublishedDate.Value <= publishedBefore.Value))
+            select new
+            {
+                episodeRisk.AssetId,
+                episodeRisk.EpisodeRiskScore,
+                episodeRisk.RiskBand,
+            }
+        ).ToListAsync(ct);
+
+        return CalculateTenantRisk(BuildAssetRiskResults(episodeScores.Select(item => (
+            item.AssetId,
+            item.EpisodeRiskScore,
+            item.RiskBand
+        ))));
+    }
+
     public async Task<List<TenantRiskScoreSnapshot>> GetRiskHistoryAsync(Guid tenantId, CancellationToken ct)
     {
         var cutoff = DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(-29));
@@ -381,6 +423,17 @@ public class RiskScoreService(
             })
             .ToListAsync(ct);
 
+        return BuildAssetRiskResults(episodeScores.Select(item => (
+            item.AssetId,
+            item.EpisodeRiskScore,
+            item.RiskBand
+        )));
+    }
+
+    private static List<AssetRiskResult> BuildAssetRiskResults(
+        IEnumerable<(Guid AssetId, decimal EpisodeRiskScore, string RiskBand)> episodeScores
+    )
+    {
         return episodeScores
             .GroupBy(item => item.AssetId)
             .Select(group =>
