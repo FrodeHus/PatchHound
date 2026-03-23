@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
@@ -46,7 +47,7 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
         var cooldownThreshold = now - NotificationCooldown;
         var notificationsSent = 0;
 
-        // Get all open/in-progress tasks across all tenants
+        // --- Legacy remediation tasks ---
         var activeTasks = await dbContext
             .RemediationTasks.IgnoreQueryFilters()
             .Where(t =>
@@ -60,11 +61,6 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
         {
             if (task.AssigneeId == Guid.Empty)
             {
-                logger.LogWarning(
-                    "Task {TaskId} for tenant {TenantId} has no assignee, skipping SLA notification",
-                    task.Id,
-                    task.TenantId
-                );
                 continue;
             }
 
@@ -73,13 +69,6 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
             switch (status)
             {
                 case SlaStatus.Overdue:
-                    logger.LogWarning(
-                        "Task {TaskId} for tenant {TenantId} is overdue (due: {DueDate})",
-                        task.Id,
-                        task.TenantId,
-                        task.DueDate
-                    );
-
                     await notificationService.SendAsync(
                         task.AssigneeId,
                         task.TenantId,
@@ -96,13 +85,6 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
                     break;
 
                 case SlaStatus.NearDue:
-                    logger.LogInformation(
-                        "Task {TaskId} for tenant {TenantId} is near SLA due date ({DueDate})",
-                        task.Id,
-                        task.TenantId,
-                        task.DueDate
-                    );
-
                     await notificationService.SendAsync(
                         task.AssigneeId,
                         task.TenantId,
@@ -120,10 +102,116 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
             }
         }
 
+        // --- Remediation decisions: PatchingDeferred approaching re-evaluation ---
+        var reEvalThreshold = now.AddDays(3);
+        var deferredDecisions = await dbContext
+            .RemediationDecisions.IgnoreQueryFilters()
+            .Where(d =>
+                d.Outcome == RemediationOutcome.PatchingDeferred
+                && d.ApprovalStatus == DecisionApprovalStatus.Approved
+                && d.ReEvaluationDate.HasValue
+                && d.ReEvaluationDate.Value <= reEvalThreshold
+                && (d.LastSlaNotifiedAt == null || d.LastSlaNotifiedAt < cooldownThreshold)
+            )
+            .ToListAsync(ct);
+
+        foreach (var decision in deferredDecisions)
+        {
+            await notificationService.SendAsync(
+                decision.DecidedBy,
+                decision.TenantId,
+                NotificationType.SLAWarning,
+                "Deferred patching decision approaching re-evaluation",
+                $"Remediation decision {decision.Id} for software asset {decision.SoftwareAssetId} has a re-evaluation date of {decision.ReEvaluationDate!.Value:yyyy-MM-dd}.",
+                "RemediationDecision",
+                decision.Id,
+                ct
+            );
+            decision.MarkSlaNotified();
+            await dbContext.SaveChangesAsync(ct);
+            notificationsSent++;
+        }
+
+        // --- Remediation decisions: approaching expiry ---
+        var expiryThreshold = now.AddDays(7);
+        var expiringDecisions = await dbContext
+            .RemediationDecisions.IgnoreQueryFilters()
+            .Where(d =>
+                d.ApprovalStatus == DecisionApprovalStatus.Approved
+                && d.ExpiryDate.HasValue
+                && d.ExpiryDate.Value <= expiryThreshold
+                && (d.LastSlaNotifiedAt == null || d.LastSlaNotifiedAt < cooldownThreshold)
+            )
+            .ToListAsync(ct);
+
+        foreach (var decision in expiringDecisions)
+        {
+            await notificationService.SendAsync(
+                decision.DecidedBy,
+                decision.TenantId,
+                NotificationType.SLAWarning,
+                "Remediation decision approaching expiry",
+                $"Remediation decision {decision.Id} for software asset {decision.SoftwareAssetId} expires on {decision.ExpiryDate!.Value:yyyy-MM-dd}.",
+                "RemediationDecision",
+                decision.Id,
+                ct
+            );
+            decision.MarkSlaNotified();
+            await dbContext.SaveChangesAsync(ct);
+            notificationsSent++;
+        }
+
+        // --- Patching tasks approaching SLA ---
+        var activePatchingTasks = await dbContext
+            .PatchingTasks.IgnoreQueryFilters()
+            .Where(pt =>
+                pt.Status != PatchingTaskStatus.Completed
+            )
+            .ToListAsync(ct);
+
+        foreach (var patchingTask in activePatchingTasks)
+        {
+            var status = slaService.GetSlaStatus(patchingTask.CreatedAt, patchingTask.DueDate, now);
+
+            if (status is SlaStatus.Overdue or SlaStatus.NearDue)
+            {
+                var title = status == SlaStatus.Overdue
+                    ? "Patching task overdue"
+                    : "Patching task nearing SLA deadline";
+                var body = status == SlaStatus.Overdue
+                    ? $"Patching task {patchingTask.Id} for software asset {patchingTask.SoftwareAssetId} is past its SLA due date of {patchingTask.DueDate:yyyy-MM-dd}."
+                    : $"Patching task {patchingTask.Id} for software asset {patchingTask.SoftwareAssetId} is approaching its SLA due date of {patchingTask.DueDate:yyyy-MM-dd}.";
+
+                // Notify team members
+                var teamMembers = await dbContext.TeamMembers.IgnoreQueryFilters()
+                    .Where(tm => tm.TeamId == patchingTask.OwnerTeamId)
+                    .Select(tm => tm.UserId)
+                    .Distinct()
+                    .ToListAsync(ct);
+
+                foreach (var userId in teamMembers)
+                {
+                    await notificationService.SendAsync(
+                        userId,
+                        patchingTask.TenantId,
+                        NotificationType.SLAWarning,
+                        title,
+                        body,
+                        "PatchingTask",
+                        patchingTask.Id,
+                        ct
+                    );
+                    notificationsSent++;
+                }
+            }
+        }
+
         logger.LogInformation(
-            "Completed SLA check cycle at {CycleCompletedAt}. Active tasks evaluated: {ActiveTaskCount}. Notifications sent: {NotificationsSent}.",
+            "Completed SLA check cycle at {CycleCompletedAt}. Legacy tasks: {ActiveTaskCount}. Decisions checked: {DecisionsCount}. Patching tasks: {PatchingTaskCount}. Notifications sent: {NotificationsSent}.",
             DateTimeOffset.UtcNow,
             activeTasks.Count,
+            deferredDecisions.Count + expiringDecisions.Count,
+            activePatchingTasks.Count,
             notificationsSent
         );
     }

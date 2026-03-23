@@ -29,7 +29,6 @@ public class AssetsController : ControllerBase
     private readonly ITenantContext _tenantContext;
     private readonly TenantSnapshotResolver _snapshotResolver;
     private readonly AssetDetailQueryService _detailQueryService;
-    private readonly SoftwareRemediationQueryService _remediationQueryService;
     private readonly RiskRefreshService _riskRefreshService;
     private readonly IAssetRuleEvaluationService _assetRuleEvaluationService;
 
@@ -41,7 +40,6 @@ public class AssetsController : ControllerBase
         ITenantContext tenantContext,
         TenantSnapshotResolver snapshotResolver,
         AssetDetailQueryService detailQueryService,
-        SoftwareRemediationQueryService remediationQueryService,
         RiskRefreshService riskRefreshService,
         IAssetRuleEvaluationService assetRuleEvaluationService
     )
@@ -53,7 +51,6 @@ public class AssetsController : ControllerBase
         _tenantContext = tenantContext;
         _snapshotResolver = snapshotResolver;
         _detailQueryService = detailQueryService;
-        _remediationQueryService = remediationQueryService;
         _riskRefreshService = riskRefreshService;
         _assetRuleEvaluationService = assetRuleEvaluationService;
     }
@@ -266,23 +263,6 @@ public class AssetsController : ControllerBase
             return NotFound();
 
         return Ok(detail);
-    }
-
-    [HttpGet("{id:guid}/remediation-context")]
-    [Authorize(Policy = Policies.ViewVulnerabilities)]
-    public async Task<ActionResult<SoftwareRemediationContextDto>> GetRemediationContext(
-        Guid id,
-        CancellationToken ct
-    )
-    {
-        if (_tenantContext.CurrentTenantId is not Guid tenantId)
-            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
-
-        var result = await _remediationQueryService.BuildAsync(tenantId, id, ct);
-        if (result is null)
-            return NotFound();
-
-        return Ok(result);
     }
 
     [HttpPut("{id:guid}/owner")]

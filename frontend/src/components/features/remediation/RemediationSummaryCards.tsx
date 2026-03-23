@@ -1,8 +1,8 @@
-import type { SoftwareRemediationSummary } from '@/api/remediation.schemas'
+import type { DecisionSummary } from '@/api/remediation.schemas'
 import { toneText, type Tone } from '@/lib/tone-classes'
 
 type RemediationSummaryCardsProps = {
-  summary: SoftwareRemediationSummary
+  summary: DecisionSummary
 }
 
 type StatCard = {
@@ -20,12 +20,10 @@ export function RemediationSummaryCards({ summary }: RemediationSummaryCardsProp
     { label: 'Low', value: summary.lowCount, tone: 'neutral' },
     { label: 'Known Exploits', value: summary.withKnownExploit, tone: 'danger' },
     { label: 'Active Alerts', value: summary.withActiveAlert, tone: 'warning' },
-    { label: 'Pending Tasks', value: summary.pendingRemediationTasks, tone: 'info' },
-    { label: 'Risk Accepted', value: summary.riskAcceptedCount, tone: 'success' },
   ]
 
   return (
-    <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-9">
+    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-7">
       {cards.map((card) => (
         <div
           key={card.label}

@@ -72,7 +72,7 @@ export function Breadcrumbs() {
         ?? (loaderResult?.externalId as string)
         ?? segment.slice(0, 8)
     } else {
-      label = segmentLabels[segment] ?? segment.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+      label = segmentLabels[segment] ?? segment.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
     }
 
     crumbs.push({ label, to, search: searchParamsCache.get(to) ?? {} })

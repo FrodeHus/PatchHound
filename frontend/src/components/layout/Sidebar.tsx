@@ -2,7 +2,6 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { useEffect, useState, type ComponentType } from 'react'
 import {
   Bug,
-  CheckSquare,
   Inbox,
   LayoutDashboard,
   ScrollText,
@@ -55,7 +54,6 @@ type NavGroup = {
 const navItems: NavItem[] = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
   { to: '/vulnerabilities', label: 'Vulnerabilities', icon: Bug },
-  { to: '/tasks', label: 'Remediation', icon: CheckSquare },
   { to: '/actions', label: 'Actions', icon: Inbox },
   { to: '/audit-log', label: 'Audit Trail', icon: ScrollText, roles: ['Auditor', 'GlobalAdmin'] },
   { to: '/settings', label: 'Settings', icon: Settings2, roles: ['GlobalAdmin', 'SecurityManager'] },
