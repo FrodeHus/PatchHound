@@ -1,5 +1,5 @@
-import { Link } from '@tanstack/react-router'
-import type { ComponentType } from 'react'
+import { Link, useRouterState } from '@tanstack/react-router'
+import { useEffect, useState, type ComponentType } from 'react'
 import {
   Bug,
   CheckSquare,
@@ -11,6 +11,9 @@ import {
   Shield,
   ShieldCheck,
   Boxes,
+  ChevronDown,
+  ChevronRight,
+  Laptop,
 } from 'lucide-react'
 import { cn } from "@/lib/utils";
 import { Separator } from '@/components/ui/separator'
@@ -42,16 +45,32 @@ type NavItem = {
   roles?: RoleName[]
 }
 
+type NavGroup = {
+  label: string
+  icon: ComponentType<{ className?: string }>
+  items: NavItem[]
+  roles?: RoleName[]
+}
+
 const navItems: NavItem[] = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
   { to: '/vulnerabilities', label: 'Vulnerabilities', icon: Bug },
   { to: '/tasks', label: 'Remediation', icon: CheckSquare },
   { to: '/actions', label: 'Actions', icon: Inbox },
-  { to: '/assets', label: 'Assets', icon: Server },
-  { to: '/software', label: 'Software', icon: Boxes },
   { to: '/audit-log', label: 'Audit Trail', icon: ScrollText, roles: ['Auditor', 'GlobalAdmin'] },
   { to: '/settings', label: 'Settings', icon: Settings2, roles: ['GlobalAdmin', 'SecurityManager'] },
   { to: '/admin', label: 'Admin Console', icon: ShieldCheck, roles: ['GlobalAdmin', 'SecurityManager'] },
+]
+
+const navGroups: NavGroup[] = [
+  {
+    label: 'Assets',
+    icon: Server,
+    items: [
+      { to: '/devices', label: 'Devices', icon: Laptop },
+      { to: '/software', label: 'Software', icon: Boxes },
+    ],
+  },
 ]
 
 function canAccess(item: NavItem, user: CurrentUser): boolean {
@@ -68,8 +87,24 @@ export function Sidebar({
   compact = false,
   collapsed = false,
 }: SidebarProps) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
   const accessibleItems = navItems.filter((item) => canAccess(item, user));
+  const accessibleGroups = navGroups
+    .filter((group) => canAccess({ to: '', label: group.label, icon: group.icon, roles: group.roles }, user))
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => canAccess(item, user)),
+    }))
+    .filter((group) => group.items.length > 0)
   const showLabels = compact || !collapsed;
+  const assetsGroupActive = pathname.startsWith('/devices') || pathname.startsWith('/software')
+  const [isAssetsGroupOpen, setIsAssetsGroupOpen] = useState(assetsGroupActive || !collapsed)
+
+  useEffect(() => {
+    if (assetsGroupActive) {
+      setIsAssetsGroupOpen(true)
+    }
+  }, [assetsGroupActive])
 
   return (
     <aside
@@ -111,6 +146,72 @@ export function Sidebar({
           collapsed && !compact ? "px-2" : "px-4",
         )}
       >
+        {accessibleGroups.map((group) => {
+          const GroupIcon = group.icon
+          const isOpen = collapsed && !compact ? false : isAssetsGroupOpen
+          const toggleGroup = () => {
+            if (!collapsed || compact) {
+              setIsAssetsGroupOpen((current) => !current)
+            }
+          }
+
+          return (
+            <div key={group.label} className="space-y-1.5">
+              <button
+                type="button"
+                onClick={toggleGroup}
+                className={cn(
+                  "group flex w-full items-center rounded-2xl border border-transparent text-sm text-sidebar-foreground/84 transition-colors hover:border-sidebar-border/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground",
+                  collapsed && !compact
+                    ? "justify-center px-2 py-3"
+                    : "gap-3 px-3.5 py-3",
+                )}
+                aria-expanded={isOpen}
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/30 text-muted-foreground transition-colors group-hover:text-primary">
+                  <GroupIcon className="size-4" />
+                </span>
+                {showLabels ? (
+                  <>
+                    <span className="flex-1 text-left tracking-tight">{group.label}</span>
+                    {isOpen ? (
+                      <ChevronDown className="size-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    )}
+                  </>
+                ) : null}
+              </button>
+
+              {isOpen ? (
+                <div className="space-y-1 pl-4">
+                  {group.items.map((item) => {
+                    const Icon = item.icon
+                    return (
+                      <Link
+                        key={item.to}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        {...({ to: item.to, search: {}, params: {} } as any)}
+                        onClick={onNavigate}
+                        className="group flex items-center gap-3 rounded-2xl border border-transparent px-3.5 py-2.5 text-sm text-sidebar-foreground/84 transition-colors hover:border-sidebar-border/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground"
+                        activeProps={{
+                          className:
+                            "group flex items-center gap-3 rounded-2xl border border-primary/16 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_72%),var(--color-card)] px-3.5 py-2.5 text-sm font-medium text-sidebar-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] [&>span:first-child]:text-primary",
+                        }}
+                      >
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/30 text-muted-foreground transition-colors group-hover:text-primary">
+                          <Icon className="size-4" />
+                        </span>
+                        <span className="tracking-tight">{item.label}</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
+
         {accessibleItems.map((item) => {
           const Icon = item.icon;
           const linkContent = (

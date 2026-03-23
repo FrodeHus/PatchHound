@@ -50,10 +50,9 @@ export function OnboardingStatusCard({ onboardingBreakdown, isLoading }: Onboard
                   .map(([status, count]) => (
                     <Link
                       key={status}
-                      to="/assets"
+                      to="/devices"
                       search={{
                         search: '',
-                        assetType: 'Device',
                         criticality: '',
                         ownerType: '',
                         deviceGroup: '',

@@ -35,6 +35,11 @@ type AssetManagementTableProps = {
   totalPages: number
   isUpdating: boolean
   selectedAssetId: string | null
+  title?: string
+  description?: string
+  searchPlaceholder?: string
+  showAssetTypeFilter?: boolean
+  showAssetTypeColumn?: boolean
   searchValue: string
   assetTypeFilter: string
   criticalityFilter: string
@@ -97,6 +102,11 @@ export function AssetManagementTable({
   totalPages,
   isUpdating,
   searchValue,
+  title = 'Assets',
+  description = 'Scan device and software inventory, narrow the working set, and open the inspector from the asset name.',
+  searchPlaceholder = 'Search assets',
+  showAssetTypeFilter = true,
+  showAssetTypeColumn = true,
   assetTypeFilter,
   criticalityFilter,
   ownerTypeFilter,
@@ -188,7 +198,7 @@ export function AssetManagementTable({
               },
             }
           : null,
-        assetTypeFilter
+        showAssetTypeFilter && assetTypeFilter
           ? {
               key: "type",
               label: `Type: ${assetTypeFilter}`,
@@ -303,6 +313,7 @@ export function AssetManagementTable({
       ownerTypeFilter,
       riskScoreFilter,
       searchValue,
+      showAssetTypeFilter,
       tagFilter,
       unassignedOnly,
     ],
@@ -311,7 +322,7 @@ export function AssetManagementTable({
   const activeStructuredFilterCount = useMemo(
     () =>
       [
-        assetTypeFilter,
+        showAssetTypeFilter ? assetTypeFilter : '',
         criticalityFilter,
         ownerTypeFilter,
         deviceGroupFilter,
@@ -322,12 +333,13 @@ export function AssetManagementTable({
         tagFilter,
         unassignedOnly ? 'unassigned' : '',
       ].filter(Boolean).length,
-    [assetTypeFilter, criticalityFilter, deviceGroupFilter, exposureLevelFilter, healthStatusFilter, onboardingStatusFilter, ownerTypeFilter, riskScoreFilter, tagFilter, unassignedOnly],
+    [assetTypeFilter, criticalityFilter, deviceGroupFilter, exposureLevelFilter, healthStatusFilter, onboardingStatusFilter, ownerTypeFilter, riskScoreFilter, showAssetTypeFilter, tagFilter, unassignedOnly],
   )
 
   const columns = useMemo<ColumnDef<Asset>[]>(
-    () => [
-      {
+    () => {
+      const columns: ColumnDef<Asset>[] = [
+        {
         accessorKey: "name",
         header: ({ column }) => <SortableColumnHeader column={column} title="Asset" />,
         cell: ({ row }) => (
@@ -357,18 +369,24 @@ export function AssetManagementTable({
           </div>
         ),
       },
-      {
-        accessorKey: "assetType",
-        header: ({ column }) => <SortableColumnHeader column={column} title="Type" />,
-        cell: ({ row }) => (
-          <Badge
-            variant="outline"
-            className="rounded-full border-border/70 bg-background/70"
-          >
-            {row.original.assetType}
-          </Badge>
-        ),
-      },
+      ]
+
+      if (showAssetTypeColumn) {
+        columns.push({
+          accessorKey: "assetType",
+          header: ({ column }) => <SortableColumnHeader column={column} title="Type" />,
+          cell: ({ row }) => (
+            <Badge
+              variant="outline"
+              className="rounded-full border-border/70 bg-background/70"
+            >
+              {row.original.assetType}
+            </Badge>
+          ),
+        })
+      }
+
+      columns.push(
       {
         accessorKey: "deviceGroupName",
         header: ({ column }) => <SortableColumnHeader column={column} title="Device Group" />,
@@ -536,7 +554,10 @@ export function AssetManagementTable({
           </div>
         ),
       },
-    ],
+      )
+
+      return columns
+    },
     [
       isUpdating,
       onAssignOwner,
@@ -544,13 +565,14 @@ export function AssetManagementTable({
       onSetCriticality,
       ownerId,
       ownerType,
+      showAssetTypeColumn,
     ],
   );
 
   return (
     <DataTableWorkbench
-      title="Assets"
-      description="Scan device and software inventory, narrow the working set, and open the inspector from the asset name."
+      title={title}
+      description={description}
       totalCount={totalCount}
     >
       <DataTableToolbar>
@@ -567,7 +589,7 @@ export function AssetManagementTable({
                 onChange={(event) => {
                   setSearchInput(event.target.value);
                 }}
-                placeholder="Search assets"
+                placeholder={searchPlaceholder}
                 className="h-10 rounded-xl border-border/70 bg-background/80 pl-10"
               />
             </div>
@@ -664,29 +686,31 @@ export function AssetManagementTable({
           title="Inventory"
           description="Narrow the device and software estate to the inventory slice you want to inspect."
         >
-          <DataTableField label="Type">
-            <Select
-              value={draftFilters.assetType || "all"}
-              onValueChange={(value) => {
-                const nextValue = value ?? "all";
-                setDraftFilters((current) => ({
-                  ...current,
-                  assetType: nextValue === "all" ? "" : nextValue,
-                }))
-              }}
-            >
-              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
-                <SelectValue placeholder="Any asset type" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                {assetTypeOptions.map((option) => (
-                  <SelectItem key={option} value={option === "All" ? "all" : option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </DataTableField>
+          {showAssetTypeFilter ? (
+            <DataTableField label="Type">
+              <Select
+                value={draftFilters.assetType || "all"}
+                onValueChange={(value) => {
+                  const nextValue = value ?? "all";
+                  setDraftFilters((current) => ({
+                    ...current,
+                    assetType: nextValue === "all" ? "" : nextValue,
+                  }))
+                }}
+              >
+                <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                  <SelectValue placeholder="Any asset type" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                  {assetTypeOptions.map((option) => (
+                    <SelectItem key={option} value={option === "All" ? "all" : option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </DataTableField>
+          ) : null}
 
           <DataTableField
             label="Device Group"
