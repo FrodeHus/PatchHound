@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { z } from 'zod'
 import {
   fetchTenantSoftwareDetail,
   fetchTenantSoftwareInstallations,
@@ -15,6 +16,7 @@ import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
 
 const softwareDetailSearchSchema = baseListSearchSchema.extend({
   version: searchStringSchema,
+  tab: z.enum(['overview', 'remediation', 'ai']).catch('overview'),
 })
 
 export const Route = createFileRoute('/_authed/software/$id')({
@@ -114,6 +116,15 @@ function SoftwareDetailRoute() {
       selectedVersion={selectedVersion}
       installations={installations}
       vulnerabilities={vulnerabilities}
+      activeTab={search.tab}
+      onTabChange={(tab) => {
+        void navigate({
+          search: (prev) => ({
+            ...prev,
+            tab,
+          }),
+        })
+      }}
       onSelectVersion={(version) => {
         void navigate({
           search: (prev) => ({

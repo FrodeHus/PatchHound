@@ -66,7 +66,7 @@ export function AssetDetailPageView({
                 <Link
                   to="/software/$id"
                   params={{ id: asset.tenantSoftwareId }}
-                  search={{ page: 1, pageSize: 25, version: "" }}
+                  search={{ page: 1, pageSize: 25, version: "", tab: "overview" }}
                   className="mt-3 inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
                 >
                   Open software workspace
@@ -486,7 +486,7 @@ export function AssetDetailPageView({
                           <Link
                             to="/software/$id"
                             params={{ id: software.tenantSoftwareId }}
-                            search={{ page: 1, pageSize: 25, version: "" }}
+                            search={{ page: 1, pageSize: 25, version: "", tab: "overview" }}
                             className="font-medium hover:text-primary"
                           >
                             {software.name}

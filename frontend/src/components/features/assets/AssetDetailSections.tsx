@@ -259,7 +259,7 @@ export function DeviceSection({
                       <Link
                         to="/software/$id"
                         params={{ id: software.tenantSoftwareId }}
-                        search={{ page: 1, pageSize: 25, version: '' }}
+                        search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
                         className="font-medium hover:text-primary"
                       >
                         {software.name}

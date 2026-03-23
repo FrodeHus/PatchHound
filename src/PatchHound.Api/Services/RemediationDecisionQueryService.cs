@@ -71,12 +71,30 @@ public class RemediationDecisionQueryService(
             }
         }
 
-        // Risk scores
-        var riskScores = await dbContext.AssetRiskScores.AsNoTracking()
-            .Where(r => r.TenantId == tenantId)
-            .ToDictionaryAsync(r => r.AssetId, ct);
+        // Vulnerability counts per software asset (direct from matches)
+        var vulnCounts = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
+            .Where(m => m.TenantId == tenantId && m.ResolvedAt == null && m.SnapshotId == activeSnapshotId)
+            .Join(
+                dbContext.VulnerabilityDefinitions.AsNoTracking(),
+                m => m.VulnerabilityDefinitionId,
+                v => v.Id,
+                (m, v) => new { m.SoftwareAssetId, v.VendorSeverity }
+            )
+            .GroupBy(x => x.SoftwareAssetId)
+            .Select(g => new
+            {
+                AssetId = g.Key,
+                Total = g.Count(),
+                Critical = g.Count(x => x.VendorSeverity == Severity.Critical),
+                High = g.Count(x => x.VendorSeverity == Severity.High),
+            })
+            .ToDictionaryAsync(x => x.AssetId, ct);
 
-        // Vuln counts per software asset from risk scores (already aggregated)
+        // Risk scores (for composite score / risk band) — keyed by TenantSoftwareId
+        var riskScoresByTsId = await dbContext.TenantSoftwareRiskScores.AsNoTracking()
+            .Where(r => r.TenantId == tenantId)
+            .ToDictionaryAsync(r => r.TenantSoftwareId, ct);
+
         // Device counts per software asset
         var deviceCounts = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
             .Where(i => i.TenantId == tenantId && i.IsActive)
@@ -137,13 +155,14 @@ public class RemediationDecisionQueryService(
                 continue;
 
             decisionsLookup.TryGetValue(asset.Id, out var decision);
-            riskScores.TryGetValue(asset.Id, out var risk);
+            vulnCounts.TryGetValue(asset.Id, out var vc);
             deviceCounts.TryGetValue(asset.Id, out var devCount);
             tenantSoftwareByAsset.TryGetValue(asset.Id, out var tsId);
 
+            // Risk score via TenantSoftwareId
             string? riskBand = null;
             double? riskScore = null;
-            if (risk is not null)
+            if (tsId != Guid.Empty && riskScoresByTsId.TryGetValue(tsId, out var risk))
             {
                 riskScore = (double)risk.OverallScore;
                 riskBand = risk.OverallScore switch
@@ -173,9 +192,9 @@ public class RemediationDecisionQueryService(
                 decision?.ApprovalStatus.ToString(),
                 decision?.DecidedAt,
                 decision?.ExpiryDate,
-                risk?.CriticalCount + risk?.HighCount + risk?.MediumCount + risk?.LowCount ?? 0,
-                risk?.CriticalCount ?? 0,
-                risk?.HighCount ?? 0,
+                vc?.Total ?? 0,
+                vc?.Critical ?? 0,
+                vc?.High ?? 0,
                 riskScore,
                 riskBand,
                 slaStatus,

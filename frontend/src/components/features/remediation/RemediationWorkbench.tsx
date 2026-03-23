@@ -154,7 +154,7 @@ export function RemediationWorkbench({
                             <Link
                               to="/software/$id"
                               params={{ id: item.tenantSoftwareId }}
-                              search={{ page: 1, pageSize: 25, version: '' }}
+                              search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
                               className="text-[10px] text-muted-foreground hover:text-primary"
                             >
                               Software detail

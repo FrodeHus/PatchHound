@@ -23,64 +23,69 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Link } from '@tanstack/react-router'
-import { ExternalLinkIcon, SearchIcon } from 'lucide-react'
+import { ExternalLinkIcon, SearchIcon, ShieldAlertIcon } from "lucide-react";
 import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
 import { toneBadge } from '@/lib/tone-classes'
 
 type AssetManagementTableProps = {
-  assets: Asset[]
-  totalCount: number
-  page: number
-  pageSize: number
-  totalPages: number
-  isUpdating: boolean
-  selectedAssetId: string | null
-  title?: string
-  description?: string
-  searchPlaceholder?: string
-  showAssetTypeFilter?: boolean
-  showAssetTypeColumn?: boolean
-  searchValue: string
-  assetTypeFilter: string
-  criticalityFilter: string
-  ownerTypeFilter: string
-  deviceGroupFilter: string
-  healthStatusFilter: string
-  onboardingStatusFilter: string
-  riskScoreFilter: string
-  exposureLevelFilter: string
-  tagFilter: string
-  unassignedOnly: boolean
-  onSearchChange: (search: string) => void
-  onAssetTypeFilterChange: (assetType: string) => void
-  onCriticalityFilterChange: (criticality: string) => void
-  onOwnerTypeFilterChange: (ownerType: string) => void
-  onDeviceGroupFilterChange: (deviceGroup: string) => void
-  onHealthStatusFilterChange: (healthStatus: string) => void
-  onOnboardingStatusFilterChange: (onboardingStatus: string) => void
-  onRiskScoreFilterChange: (riskScore: string) => void
-  onExposureLevelFilterChange: (exposureLevel: string) => void
-  onTagFilterChange: (tag: string) => void
-  onUnassignedOnlyChange: (value: boolean) => void
+  assets: Asset[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  isUpdating: boolean;
+  selectedAssetId: string | null;
+  title?: string;
+  description?: string;
+  searchPlaceholder?: string;
+  showAssetTypeFilter?: boolean;
+  showAssetTypeColumn?: boolean;
+  showRemediationLink?: boolean;
+  searchValue: string;
+  assetTypeFilter: string;
+  criticalityFilter: string;
+  ownerTypeFilter: string;
+  deviceGroupFilter: string;
+  healthStatusFilter: string;
+  onboardingStatusFilter: string;
+  riskScoreFilter: string;
+  exposureLevelFilter: string;
+  tagFilter: string;
+  unassignedOnly: boolean;
+  onSearchChange: (search: string) => void;
+  onAssetTypeFilterChange: (assetType: string) => void;
+  onCriticalityFilterChange: (criticality: string) => void;
+  onOwnerTypeFilterChange: (ownerType: string) => void;
+  onDeviceGroupFilterChange: (deviceGroup: string) => void;
+  onHealthStatusFilterChange: (healthStatus: string) => void;
+  onOnboardingStatusFilterChange: (onboardingStatus: string) => void;
+  onRiskScoreFilterChange: (riskScore: string) => void;
+  onExposureLevelFilterChange: (exposureLevel: string) => void;
+  onTagFilterChange: (tag: string) => void;
+  onUnassignedOnlyChange: (value: boolean) => void;
   onApplyStructuredFilters: (filters: {
-    assetType: string
-    criticality: string
-    ownerType: string
-    deviceGroup: string
-    healthStatus: string
-    onboardingStatus: string
-    riskScore: string
-    exposureLevel: string
-    tag: string
-    unassignedOnly: boolean
-  }) => void
-  onPageChange: (page: number) => void
-  onPageSizeChange: (pageSize: number) => void
-  onClearFilters: () => void
-  onSelectAsset: (assetId: string) => void
-  onAssignOwner: (assetId: string, ownerType: 'User' | 'Team', ownerId: string) => void
-  onSetCriticality: (assetId: string, criticality: string) => void
-}
+    assetType: string;
+    criticality: string;
+    ownerType: string;
+    deviceGroup: string;
+    healthStatus: string;
+    onboardingStatus: string;
+    riskScore: string;
+    exposureLevel: string;
+    tag: string;
+    unassignedOnly: boolean;
+  }) => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+  onClearFilters: () => void;
+  onSelectAsset: (assetId: string) => void;
+  onAssignOwner: (
+    assetId: string,
+    ownerType: "User" | "Team",
+    ownerId: string,
+  ) => void;
+  onSetCriticality: (assetId: string, criticality: string) => void;
+};
 
 const criticalityOptions = ['Low', 'Medium', 'High', 'Critical']
 const healthStatusOptions = ['Active', 'Inactive', 'ImpairedCommunication', 'NoSensorData', 'NoSensorDataImpairedCommunication']
@@ -102,11 +107,12 @@ export function AssetManagementTable({
   totalPages,
   isUpdating,
   searchValue,
-  title = 'Assets',
-  description = 'Scan device and software inventory, narrow the working set, and open the inspector from the asset name.',
-  searchPlaceholder = 'Search assets',
+  title = "Assets",
+  description = "Scan device and software inventory, narrow the working set, and open the inspector from the asset name.",
+  searchPlaceholder = "Search assets",
   showAssetTypeFilter = true,
   showAssetTypeColumn = true,
+  showRemediationLink = false,
   assetTypeFilter,
   criticalityFilter,
   ownerTypeFilter,
@@ -139,7 +145,7 @@ export function AssetManagementTable({
   const [ownerType, setOwnerType] = useState<"User" | "Team">("User");
   const [ownerId, setOwnerId] = useState("");
   const [searchInput, setSearchInput] = useState(searchValue);
-  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState({
     assetType: assetTypeFilter,
     criticality: criticalityFilter,
@@ -151,7 +157,7 @@ export function AssetManagementTable({
     exposureLevel: exposureLevelFilter,
     tag: tagFilter,
     unassignedOnly,
-  })
+  });
 
   useEffect(() => {
     setSearchInput(searchValue);
@@ -182,9 +188,21 @@ export function AssetManagementTable({
         exposureLevel: exposureLevelFilter,
         tag: tagFilter,
         unassignedOnly,
-      })
+      });
     }
-  }, [assetTypeFilter, criticalityFilter, deviceGroupFilter, exposureLevelFilter, healthStatusFilter, isFilterDrawerOpen, onboardingStatusFilter, ownerTypeFilter, riskScoreFilter, tagFilter, unassignedOnly])
+  }, [
+    assetTypeFilter,
+    criticalityFilter,
+    deviceGroupFilter,
+    exposureLevelFilter,
+    healthStatusFilter,
+    isFilterDrawerOpen,
+    onboardingStatusFilter,
+    ownerTypeFilter,
+    riskScoreFilter,
+    tagFilter,
+    unassignedOnly,
+  ]);
 
   const activeFilters = useMemo(
     () =>
@@ -322,7 +340,7 @@ export function AssetManagementTable({
   const activeStructuredFilterCount = useMemo(
     () =>
       [
-        showAssetTypeFilter ? assetTypeFilter : '',
+        showAssetTypeFilter ? assetTypeFilter : "",
         criticalityFilter,
         ownerTypeFilter,
         deviceGroupFilter,
@@ -331,17 +349,30 @@ export function AssetManagementTable({
         riskScoreFilter,
         exposureLevelFilter,
         tagFilter,
-        unassignedOnly ? 'unassigned' : '',
+        unassignedOnly ? "unassigned" : "",
       ].filter(Boolean).length,
-    [assetTypeFilter, criticalityFilter, deviceGroupFilter, exposureLevelFilter, healthStatusFilter, onboardingStatusFilter, ownerTypeFilter, riskScoreFilter, showAssetTypeFilter, tagFilter, unassignedOnly],
-  )
+    [
+      assetTypeFilter,
+      criticalityFilter,
+      deviceGroupFilter,
+      exposureLevelFilter,
+      healthStatusFilter,
+      onboardingStatusFilter,
+      ownerTypeFilter,
+      riskScoreFilter,
+      showAssetTypeFilter,
+      tagFilter,
+      unassignedOnly,
+    ],
+  );
 
-  const columns = useMemo<ColumnDef<Asset>[]>(
-    () => {
-      const columns: ColumnDef<Asset>[] = [
-        {
+  const columns = useMemo<ColumnDef<Asset>[]>(() => {
+    const columns: ColumnDef<Asset>[] = [
+      {
         accessorKey: "name",
-        header: ({ column }) => <SortableColumnHeader column={column} title="Asset" />,
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Asset" />
+        ),
         cell: ({ row }) => (
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
@@ -362,6 +393,16 @@ export function AssetManagementTable({
               >
                 <ExternalLinkIcon className="size-3.5" />
               </Link>
+              {showRemediationLink ? (
+                <Link
+                  to="/assets/$id/remediation"
+                  params={{ id: row.original.id }}
+                  className="shrink-0 text-muted-foreground transition hover:text-primary"
+                  title="Open remediation view"
+                >
+                  <ShieldAlertIcon className="size-3.5" />
+                </Link>
+              ) : null}
             </div>
             <p className="font-mono text-[11px] text-muted-foreground">
               {row.original.externalId}
@@ -369,84 +410,133 @@ export function AssetManagementTable({
           </div>
         ),
       },
-      ]
+    ];
 
-      if (showAssetTypeColumn) {
-        columns.push({
-          accessorKey: "assetType",
-          header: ({ column }) => <SortableColumnHeader column={column} title="Type" />,
-          cell: ({ row }) => (
-            <Badge
-              variant="outline"
-              className="rounded-full border-border/70 bg-background/70"
-            >
-              {row.original.assetType}
-            </Badge>
-          ),
-        })
-      }
+    if (showAssetTypeColumn) {
+      columns.push({
+        accessorKey: "assetType",
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Type" />
+        ),
+        cell: ({ row }) => (
+          <Badge
+            variant="outline"
+            className="rounded-full border-border/70 bg-background/70"
+          >
+            {row.original.assetType}
+          </Badge>
+        ),
+      });
+    }
 
-      columns.push(
+    columns.push(
       {
         accessorKey: "deviceGroupName",
-        header: ({ column }) => <SortableColumnHeader column={column} title="Device Group" />,
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Device Group" />
+        ),
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
             {row.original.assetType === "Device"
-              ? row.original.deviceGroupName ?? "Unknown"
+              ? (row.original.deviceGroupName ?? "Unknown")
               : "Not applicable"}
           </span>
         ),
       },
       {
         accessorKey: "currentRiskScore",
-        header: ({ column }) => <SortableColumnHeader column={column} title="Current risk" />,
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Current risk" />
+        ),
         cell: ({ row }) => {
-          const score = row.original.currentRiskScore
-          if (score == null) return <span className="text-muted-foreground">—</span>
+          const score = row.original.currentRiskScore;
+          if (score == null)
+            return <span className="text-muted-foreground">—</span>;
           const tone =
-            score >= 900 ? 'danger' : score >= 750 ? 'warning' : score >= 500 ? 'info' : 'success'
+            score >= 900
+              ? "danger"
+              : score >= 750
+                ? "warning"
+                : score >= 500
+                  ? "info"
+                  : "success";
           return (
             <span className={`font-medium tabular-nums ${toneBadge(tone)}`}>
               {score.toFixed(0)}
             </span>
-          )
+          );
         },
       },
       {
         accessorKey: "healthStatus",
-        header: ({ column }) => <SortableColumnHeader column={column} title="Health" />,
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Health" />
+        ),
         cell: ({ row }) => {
-          const value = row.original.healthStatus
-          if (!value) return <span className="text-muted-foreground">—</span>
-          return <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">{value}</Badge>
+          const value = row.original.healthStatus;
+          if (!value) return <span className="text-muted-foreground">—</span>;
+          return (
+            <Badge
+              variant="outline"
+              className="rounded-full border-border/70 bg-background/70"
+            >
+              {value}
+            </Badge>
+          );
         },
       },
       {
         accessorKey: "onboardingStatus",
-        header: ({ column }) => <SortableColumnHeader column={column} title="Onboarding" />,
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Onboarding" />
+        ),
         cell: ({ row }) => {
-          const value = row.original.onboardingStatus
-          if (!value) return <span className="text-muted-foreground">—</span>
-          return <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">{value}</Badge>
+          const value = row.original.onboardingStatus;
+          if (!value) return <span className="text-muted-foreground">—</span>;
+          return (
+            <Badge
+              variant="outline"
+              className="rounded-full border-border/70 bg-background/70"
+            >
+              {value}
+            </Badge>
+          );
         },
       },
       {
         accessorKey: "riskScore",
-        header: ({ column }) => <SortableColumnHeader column={column} title="Risk" />,
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Risk" />
+        ),
         cell: ({ row }) => {
-          const value = row.original.riskScore
-          if (!value) return <span className="text-muted-foreground">—</span>
-          return <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">{value}</Badge>
+          const value = row.original.riskScore;
+          if (!value) return <span className="text-muted-foreground">—</span>;
+          return (
+            <Badge
+              variant="outline"
+              className="rounded-full border-border/70 bg-background/70"
+            >
+              {value}
+            </Badge>
+          );
         },
       },
       {
         accessorKey: "exposureLevel",
-        header: ({ column }) => <SortableColumnHeader column={column} title="Exposure" />,
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Exposure" />
+        ),
         cell: ({ row }) => {
-          const value = row.original.exposureLevel
-          if (!value) return <span className="text-muted-foreground">—</span>
-          return <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">{value}</Badge>
+          const value = row.original.exposureLevel;
+          if (!value) return <span className="text-muted-foreground">—</span>;
+          return (
+            <Badge
+              variant="outline"
+              className="rounded-full border-border/70 bg-background/70"
+            >
+              {value}
+            </Badge>
+          );
         },
       },
       {
@@ -454,20 +544,25 @@ export function AssetManagementTable({
         header: "Tags",
         enableSorting: false,
         cell: ({ row }) => {
-          const tags = row.original.tags
-          if (!tags?.length) return <span className="text-muted-foreground">—</span>
+          const tags = row.original.tags;
+          if (!tags?.length)
+            return <span className="text-muted-foreground">—</span>;
           return (
             <div className="flex flex-wrap gap-1">
               {tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+                <Badge key={tag} variant="secondary" className="text-xs">
+                  {tag}
+                </Badge>
               ))}
             </div>
-          )
+          );
         },
       },
       {
         accessorKey: "securityProfileName",
-        header: ({ column }) => <SortableColumnHeader column={column} title="Security profile" />,
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Security profile" />
+        ),
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
             {row.original.securityProfileName ?? "No profile"}
@@ -482,10 +577,14 @@ export function AssetManagementTable({
       },
       {
         accessorKey: "recurringVulnerabilityCount",
-        header: ({ column }) => <SortableColumnHeader column={column} title="Recurring" />,
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Recurring" />
+        ),
         cell: ({ row }) =>
           row.original.recurringVulnerabilityCount > 0 ? (
-            <Badge className={`rounded-full border hover:bg-transparent ${toneBadge('warning')}`}>
+            <Badge
+              className={`rounded-full border hover:bg-transparent ${toneBadge("warning")}`}
+            >
               {row.original.recurringVulnerabilityCount} recurring
             </Badge>
           ) : (
@@ -494,7 +593,9 @@ export function AssetManagementTable({
       },
       {
         accessorKey: "criticality",
-        header: ({ column }) => <SortableColumnHeader column={column} title="Criticality" />,
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Criticality" />
+        ),
         cell: ({ row }) => (
           <Select
             value={row.original.criticality}
@@ -526,7 +627,9 @@ export function AssetManagementTable({
       },
       {
         accessorKey: "vulnerabilityCount",
-        header: ({ column }) => <SortableColumnHeader column={column} title="Vulnerabilities" />,
+        header: ({ column }) => (
+          <SortableColumnHeader column={column} title="Vulnerabilities" />
+        ),
         cell: ({ row }) => (
           <span className="text-sm font-medium">
             {row.original.vulnerabilityCount}
@@ -554,20 +657,19 @@ export function AssetManagementTable({
           </div>
         ),
       },
-      )
+    );
 
-      return columns
-    },
-    [
-      isUpdating,
-      onAssignOwner,
-      onSelectAsset,
-      onSetCriticality,
-      ownerId,
-      ownerType,
-      showAssetTypeColumn,
-    ],
-  );
+    return columns;
+  }, [
+    isUpdating,
+    onAssignOwner,
+    onSelectAsset,
+    onSetCriticality,
+    ownerId,
+    ownerType,
+    showAssetTypeColumn,
+    showRemediationLink,
+  ]);
 
   return (
     <DataTableWorkbench
@@ -610,11 +712,13 @@ export function AssetManagementTable({
                 exposureLevel: exposureLevelFilter,
                 tag: tagFilter,
                 unassignedOnly,
-              })
-              setIsFilterDrawerOpen(true)
+              });
+              setIsFilterDrawerOpen(true);
             }}
           >
-            {activeStructuredFilterCount > 0 ? `Filters (${activeStructuredFilterCount})` : 'Filters...'}
+            {activeStructuredFilterCount > 0
+              ? `Filters (${activeStructuredFilterCount})`
+              : "Filters..."}
           </Button>
         </DataTableToolbarRow>
 
@@ -665,21 +769,21 @@ export function AssetManagementTable({
         activeCount={activeStructuredFilterCount}
         onResetDraft={() => {
           setDraftFilters({
-            assetType: '',
-            criticality: '',
-            ownerType: '',
-            deviceGroup: '',
-            healthStatus: '',
-            onboardingStatus: '',
-            riskScore: '',
-            exposureLevel: '',
-            tag: '',
+            assetType: "",
+            criticality: "",
+            ownerType: "",
+            deviceGroup: "",
+            healthStatus: "",
+            onboardingStatus: "",
+            riskScore: "",
+            exposureLevel: "",
+            tag: "",
             unassignedOnly: false,
-          })
+          });
         }}
         onApply={() => {
-          onApplyStructuredFilters(draftFilters)
-          setIsFilterDrawerOpen(false)
+          onApplyStructuredFilters(draftFilters);
+          setIsFilterDrawerOpen(false);
         }}
       >
         <WorkbenchFilterSection
@@ -695,7 +799,7 @@ export function AssetManagementTable({
                   setDraftFilters((current) => ({
                     ...current,
                     assetType: nextValue === "all" ? "" : nextValue,
-                  }))
+                  }));
                 }}
               >
                 <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
@@ -703,7 +807,10 @@ export function AssetManagementTable({
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
                   {assetTypeOptions.map((option) => (
-                    <SelectItem key={option} value={option === "All" ? "all" : option}>
+                    <SelectItem
+                      key={option}
+                      value={option === "All" ? "all" : option}
+                    >
                       {option}
                     </SelectItem>
                   ))}
@@ -722,7 +829,7 @@ export function AssetManagementTable({
                 setDraftFilters((current) => ({
                   ...current,
                   deviceGroup: event.target.value,
-                }))
+                }));
               }}
               placeholder="Filter device group"
               className="h-10 rounded-xl border-border/70 bg-background/80"
@@ -742,7 +849,7 @@ export function AssetManagementTable({
                 setDraftFilters((current) => ({
                   ...current,
                   ownerType: nextValue === "all" ? "" : nextValue,
-                }))
+                }));
               }}
             >
               <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
@@ -766,7 +873,7 @@ export function AssetManagementTable({
                 setDraftFilters((current) => ({
                   ...current,
                   unassignedOnly: event.target.checked,
-                }))
+                }));
               }}
               className="size-4 rounded border-border/70"
             />
@@ -786,7 +893,7 @@ export function AssetManagementTable({
                 setDraftFilters((current) => ({
                   ...current,
                   criticality: nextValue === "all" ? "" : nextValue,
-                }))
+                }));
               }}
             >
               <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
@@ -816,7 +923,7 @@ export function AssetManagementTable({
                 setDraftFilters((current) => ({
                   ...current,
                   healthStatus: nextValue === "all" ? "" : nextValue,
-                }))
+                }));
               }}
             >
               <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
@@ -841,7 +948,7 @@ export function AssetManagementTable({
                 setDraftFilters((current) => ({
                   ...current,
                   onboardingStatus: nextValue === "all" ? "" : nextValue,
-                }))
+                }));
               }}
             >
               <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
@@ -866,7 +973,7 @@ export function AssetManagementTable({
                 setDraftFilters((current) => ({
                   ...current,
                   riskScore: nextValue === "all" ? "" : nextValue,
-                }))
+                }));
               }}
             >
               <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
@@ -891,7 +998,7 @@ export function AssetManagementTable({
                 setDraftFilters((current) => ({
                   ...current,
                   exposureLevel: nextValue === "all" ? "" : nextValue,
-                }))
+                }));
               }}
             >
               <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
@@ -918,7 +1025,7 @@ export function AssetManagementTable({
                 setDraftFilters((current) => ({
                   ...current,
                   tag: event.target.value,
-                }))
+                }));
               }}
               placeholder="Filter by tag"
               className="h-10 rounded-xl border-border/70 bg-background/80"
