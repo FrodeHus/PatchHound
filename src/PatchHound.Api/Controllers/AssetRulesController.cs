@@ -6,6 +6,7 @@ using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.AssetRules;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
@@ -93,6 +94,10 @@ public class AssetRulesController : ControllerBase
         if (filter is null || operations is null)
             return BadRequest(new ProblemDetails { Title = "Invalid filter or operations JSON." });
 
+        var validationError = ValidateOperations(operations);
+        if (validationError is not null)
+            return BadRequest(new ProblemDetails { Title = validationError });
+
         var maxPriority = await _dbContext.AssetRules
             .Where(r => r.TenantId == tenantId)
             .MaxAsync(r => (int?)r.Priority, ct) ?? 0;
@@ -124,6 +129,10 @@ public class AssetRulesController : ControllerBase
 
         if (filter is null || operations is null)
             return BadRequest(new ProblemDetails { Title = "Invalid filter or operations JSON." });
+
+        var validationError = ValidateOperations(operations);
+        if (validationError is not null)
+            return BadRequest(new ProblemDetails { Title = validationError });
 
         rule.Update(request.Name, request.Description, request.Enabled, filter, operations);
         await _dbContext.SaveChangesAsync(ct);
@@ -252,5 +261,43 @@ public class AssetRulesController : ControllerBase
         {
             return null;
         }
+    }
+
+    private static string? ValidateOperations(IReadOnlyList<AssetRuleOperation> operations)
+    {
+        foreach (var operation in operations)
+        {
+            switch (operation.Type)
+            {
+                case "AssignSecurityProfile":
+                    if (!operation.Parameters.TryGetValue("securityProfileId", out var securityProfileId)
+                        || !Guid.TryParse(securityProfileId, out _))
+                    {
+                        return "AssignSecurityProfile requires a valid securityProfileId.";
+                    }
+                    break;
+
+                case "AssignTeam":
+                    if (!operation.Parameters.TryGetValue("teamId", out var teamId)
+                        || !Guid.TryParse(teamId, out _))
+                    {
+                        return "AssignTeam requires a valid teamId.";
+                    }
+                    break;
+
+                case "SetCriticality":
+                    if (!operation.Parameters.TryGetValue("criticality", out var criticality)
+                        || !Enum.TryParse<Criticality>(criticality, true, out _))
+                    {
+                        return "SetCriticality requires a valid criticality value.";
+                    }
+                    break;
+
+                default:
+                    return $"Unknown asset rule operation type: {operation.Type}.";
+            }
+        }
+
+        return null;
     }
 }

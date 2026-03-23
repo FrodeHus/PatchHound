@@ -1,4 +1,5 @@
 using FluentAssertions;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -117,6 +118,68 @@ public class AssetRulesControllerTests : IDisposable
         refreshedAssessment.EpisodeRiskScore.Should().BeLessThan(742.5m);
     }
 
+    [Fact]
+    public async Task Create_InvalidSetCriticalityOperation_ReturnsBadRequest()
+    {
+        var request = new PatchHound.Api.Models.AssetRules.CreateAssetRuleRequest(
+            "Criticality rule",
+            null,
+            JsonDocument.Parse(
+                """
+                {"type":"condition","field":"Name","operator":"Contains","value":"Server"}
+                """
+            ).RootElement,
+            JsonDocument.Parse(
+                """
+                [{"type":"SetCriticality","parameters":{"criticality":"Urgent"}}]
+                """
+            ).RootElement
+        );
+
+        var action = await _controller.Create(request, CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        var problem = result.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Title.Should().Be("SetCriticality requires a valid criticality value.");
+    }
+
+    [Fact]
+    public async Task Update_InvalidAssignTeamOperation_ReturnsBadRequest()
+    {
+        var rule = AssetRule.Create(
+            _tenantId,
+            "Team rule",
+            null,
+            1,
+            new FilterCondition("Name", "Contains", "Server"),
+            [new AssetRuleOperation("AssignTeam", new Dictionary<string, string> { ["teamId"] = Guid.NewGuid().ToString() })]
+        );
+        await _dbContext.AssetRules.AddAsync(rule);
+        await _dbContext.SaveChangesAsync();
+
+        var request = new PatchHound.Api.Models.AssetRules.UpdateAssetRuleRequest(
+            "Team rule",
+            null,
+            true,
+            JsonDocument.Parse(
+                """
+                {"type":"condition","field":"Name","operator":"Contains","value":"Server"}
+                """
+            ).RootElement,
+            JsonDocument.Parse(
+                """
+                [{"type":"AssignTeam","parameters":{"teamId":"not-a-guid"}}]
+                """
+            ).RootElement
+        );
+
+        var action = await _controller.Update(rule.Id, request, CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        var problem = result.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Title.Should().Be("AssignTeam requires a valid teamId.");
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();
@@ -152,6 +215,11 @@ public class AssetRulesControllerTests : IDisposable
         )
         {
             return Task.FromResult(new AssetRulePreviewResult(0, []));
+        }
+
+        public Task EvaluateCriticalityForAssetAsync(Guid tenantId, Guid assetId, CancellationToken ct)
+        {
+            return Task.CompletedTask;
         }
     }
 }

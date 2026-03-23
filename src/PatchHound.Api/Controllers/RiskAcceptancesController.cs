@@ -43,7 +43,12 @@ public class RiskAcceptancesController : ControllerBase
         CancellationToken ct
     )
     {
-        var query = _dbContext.RiskAcceptances.AsNoTracking().AsQueryable();
+        if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var query = _dbContext.RiskAcceptances.AsNoTracking()
+            .Where(r => r.TenantId == currentTenantId)
+            .AsQueryable();
 
         if (
             !string.IsNullOrEmpty(filter.Status)

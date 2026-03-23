@@ -57,6 +57,12 @@ export const assetDetailSchema = z.object({
   description: z.string().nullable(),
   assetType: z.string(),
   criticality: z.string(),
+  criticalityDetail: z.object({
+    source: z.string(),
+    reason: z.string().nullable(),
+    ruleId: z.string().uuid().nullable(),
+    updatedAt: z.string().datetime({ offset: true }).nullable(),
+  }).nullable(),
   ownerType: z.string(),
   ownerUserId: z.string().uuid().nullable(),
   ownerTeamId: z.string().uuid().nullable(),

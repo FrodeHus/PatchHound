@@ -9,24 +9,26 @@ namespace PatchHound.Infrastructure.Secrets;
 public class OpenBaoSecretStore : ISecretStore
 {
     private readonly HttpClient _httpClient;
-    private readonly OpenBaoOptions _options;
+    private readonly IOptionsMonitor<OpenBaoOptions> _optionsMonitor;
     private readonly ILogger<OpenBaoSecretStore> _logger;
 
     public OpenBaoSecretStore(
         HttpClient httpClient,
-        IOptions<OpenBaoOptions> options,
+        IOptionsMonitor<OpenBaoOptions> optionsMonitor,
         ILogger<OpenBaoSecretStore> logger
     )
     {
         _httpClient = httpClient;
-        _options = options.Value;
+        _optionsMonitor = optionsMonitor;
         _logger = logger;
-        _httpClient.BaseAddress = new Uri(_options.Address);
+        _httpClient.BaseAddress = new Uri(optionsMonitor.CurrentValue.Address);
     }
+
+    private OpenBaoOptions Options => _optionsMonitor.CurrentValue;
 
     public async Task<string?> GetSecretAsync(string path, string key, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(_options.Token))
+        if (string.IsNullOrWhiteSpace(Options.Token))
         {
             _logger.LogWarning("OpenBao token is not configured. Secret reads are disabled.");
             return null;
@@ -34,9 +36,9 @@ public class OpenBaoSecretStore : ISecretStore
 
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
-            $"/v1/{_options.KvMount}/data/{path}"
+            $"/v1/{Options.KvMount}/data/{path}"
         );
-        request.Headers.Add("X-Vault-Token", _options.Token);
+        request.Headers.Add("X-Vault-Token", Options.Token);
 
         using var response = await SendAsync(request, ct);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -54,7 +56,7 @@ public class OpenBaoSecretStore : ISecretStore
         CancellationToken ct
     )
     {
-        if (string.IsNullOrWhiteSpace(_options.Token))
+        if (string.IsNullOrWhiteSpace(Options.Token))
         {
             throw new InvalidOperationException(
                 "OpenBao token is not configured. Secret writes are disabled."
@@ -63,9 +65,9 @@ public class OpenBaoSecretStore : ISecretStore
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            $"/v1/{_options.KvMount}/data/{path}"
+            $"/v1/{Options.KvMount}/data/{path}"
         );
-        request.Headers.Add("X-Vault-Token", _options.Token);
+        request.Headers.Add("X-Vault-Token", Options.Token);
         request.Content = JsonContent.Create(new { data = values });
 
         using var response = await SendAsync(request, ct);
@@ -157,6 +159,22 @@ public class OpenBaoSecretStore : ISecretStore
             )
             {
                 return response;
+            }
+
+            // Surface a clear error when the token is expired or revoked
+            if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized
+                or System.Net.HttpStatusCode.Forbidden)
+            {
+                _logger.LogError(
+                    "OpenBao returned {StatusCode} for {Path}. The Vault token may be expired or revoked. "
+                    + "Restart the application or update the OpenBao:Token configuration to restore secret access.",
+                    (int)response.StatusCode,
+                    request.RequestUri?.PathAndQuery
+                );
+                throw new SecretStoreUnavailableException(
+                    $"OpenBao authentication failed ({(int)response.StatusCode}). The Vault token may be expired or revoked.",
+                    response.StatusCode
+                );
             }
 
             var responseBody = await response.Content.ReadAsStringAsync(ct);

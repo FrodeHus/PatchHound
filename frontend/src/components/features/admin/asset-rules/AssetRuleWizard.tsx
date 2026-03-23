@@ -33,6 +33,12 @@ type AssetRuleWizardProps = {
 }
 
 const steps = ['Basic Info', 'Filters', 'Operations', 'Summary'] as const
+const criticalityOptions = [
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' },
+]
 
 const emptyFilter: FilterGroup = { type: 'group', operator: 'AND', conditions: [] }
 
@@ -194,9 +200,17 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
                 {preview && (
                   <InsetPanel className="space-y-2 px-4 py-3">
                     <p className="text-sm font-medium">
-                      {preview.count} asset{preview.count !== 1 ? "s" : ""}{" "}
-                      match
+                      {buildPreviewHeadline(preview.count, operations, securityProfiles, teams)}
                     </p>
+                    {operations.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {buildOperationImpactLines(operations, securityProfiles, teams).map((line) => (
+                          <Badge key={line} variant="outline" className="rounded-full bg-background/80">
+                            {line}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : null}
                     {preview.samples.length > 0 && (
                       <div className="space-y-1">
                         {preview.samples.map((s) => (
@@ -258,6 +272,15 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
               operations={operations}
               onChange={setOperations}
             />
+            <OperationEditor
+              type="SetCriticality"
+              label="Set Criticality"
+              description="Set the canonical asset criticality used by risk scoring and executive reporting."
+              options={criticalityOptions}
+              paramKey="criticality"
+              operations={operations}
+              onChange={setOperations}
+            />
           </CardContent>
         </Card>
       )}
@@ -298,19 +321,19 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
                     <Badge variant="outline" className="text-[10px]">
                       {op.type === "AssignSecurityProfile"
                         ? "Security Profile"
-                        : "Team"}
+                        : op.type === "AssignTeam"
+                          ? "Team"
+                          : "Criticality"}
                     </Badge>
                     <span>
-                      {op.type === "AssignSecurityProfile"
-                        ? (securityProfiles.find(
-                            (p) => p.id === op.parameters.securityProfileId,
-                          )?.name ?? op.parameters.securityProfileId)
-                        : (teams.find((t) => t.id === op.parameters.teamId)
-                            ?.name ?? op.parameters.teamId)}
+                      {describeOperationTarget(op, securityProfiles, teams)}
                     </span>
                   </div>
                 ))}
               </div>
+              <p className="text-xs text-muted-foreground">
+                {buildPreviewHeadline(preview?.count ?? 0, operations, securityProfiles, teams)}
+              </p>
             </InsetPanel>
 
             {saveMutation.isError && (
@@ -372,6 +395,65 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
       </div>
     </section>
   );
+}
+
+function buildPreviewHeadline(
+  count: number,
+  operations: AssetRuleOperation[],
+  securityProfiles: SecurityProfile[],
+  teams: TeamItem[],
+) {
+  if (operations.length === 0) {
+    return `${count} asset${count !== 1 ? 's' : ''} match`
+  }
+
+  const operationDescriptions = buildOperationImpactLines(operations, securityProfiles, teams)
+  if (operationDescriptions.length === 1) {
+    return `This rule will ${operationDescriptions[0]} for ${count} asset${count !== 1 ? 's' : ''}.`
+  }
+
+  return `This rule will affect ${count} asset${count !== 1 ? 's' : ''} with ${operationDescriptions.length} operations.`
+}
+
+function buildOperationImpactLines(
+  operations: AssetRuleOperation[],
+  securityProfiles: SecurityProfile[],
+  teams: TeamItem[],
+) {
+  return operations.map((operation) => {
+    switch (operation.type) {
+      case 'AssignSecurityProfile':
+        return `set security profile to ${describeOperationTarget(operation, securityProfiles, teams)}`
+      case 'AssignTeam':
+        return `assign fallback team ${describeOperationTarget(operation, securityProfiles, teams)}`
+      case 'SetCriticality':
+        return `set criticality to ${describeOperationTarget(operation, securityProfiles, teams)}`
+      default:
+        return `apply ${operation.type}`
+    }
+  })
+}
+
+function describeOperationTarget(
+  operation: AssetRuleOperation,
+  securityProfiles: SecurityProfile[],
+  teams: TeamItem[],
+) {
+  if (operation.type === 'AssignSecurityProfile') {
+    return securityProfiles.find((profile) => profile.id === operation.parameters.securityProfileId)?.name
+      ?? operation.parameters.securityProfileId
+  }
+
+  if (operation.type === 'AssignTeam') {
+    return teams.find((team) => team.id === operation.parameters.teamId)?.name
+      ?? operation.parameters.teamId
+  }
+
+  if (operation.type === 'SetCriticality') {
+    return operation.parameters.criticality
+  }
+
+  return operation.type
 }
 
 function OperationEditor({
@@ -476,4 +558,3 @@ function FilterSummary({ group }: { group: FilterGroup }) {
     </div>
   )
 }
-

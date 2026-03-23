@@ -64,6 +64,24 @@ public class AssetService
         return Result<Asset>.Success(asset);
     }
 
+    public async Task<Result<Asset>> ClearManualCriticalityOverrideAsync(
+        Guid assetId,
+        CancellationToken ct
+    )
+    {
+        var asset = await _assetRepository.GetByIdAsync(assetId, ct);
+        if (asset is null)
+            return Result<Asset>.Failure("Asset not found");
+
+        if (!string.Equals(asset.CriticalitySource, "ManualOverride", StringComparison.Ordinal))
+            return Result<Asset>.Failure("Asset does not have a manual criticality override");
+
+        asset.ClearManualCriticalityOverride();
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        return Result<Asset>.Success(asset);
+    }
+
     public async Task<Result<Asset>> AssignSecurityProfileAsync(
         Guid assetId,
         Guid? securityProfileId,

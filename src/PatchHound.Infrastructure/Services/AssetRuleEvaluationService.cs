@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
@@ -30,8 +31,11 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
             .OrderBy(r => r.Priority)
             .ToListAsync(ct);
 
+        var criticalityRuleMatchedAssetIds = new HashSet<Guid>();
+
         if (rules.Count == 0)
         {
+            await ReconcileCriticalityAsync(tenantId, criticalityRuleMatchedAssetIds, ct);
             _logger.LogDebug("No enabled asset rules for tenant {TenantId}", tenantId);
             return;
         }
@@ -61,7 +65,14 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
                     var operations = rule.ParseOperations();
                     foreach (var op in operations)
                     {
-                        await ApplyOperationAsync(tenantId, unclaimedIds, op, ct);
+                        await ApplyOperationAsync(
+                            rule,
+                            tenantId,
+                            unclaimedIds,
+                            op,
+                            criticalityRuleMatchedAssetIds,
+                            ct
+                        );
                     }
 
                     foreach (var id in unclaimedIds)
@@ -82,6 +93,68 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
                     rule.Name, rule.Id, tenantId);
             }
         }
+
+        await ReconcileCriticalityAsync(tenantId, criticalityRuleMatchedAssetIds, ct);
+    }
+
+    public async Task EvaluateCriticalityForAssetAsync(Guid tenantId, Guid assetId, CancellationToken ct)
+    {
+        var asset = await _dbContext.Assets
+            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == assetId, ct);
+        if (asset is null)
+        {
+            return;
+        }
+
+        if (string.Equals(asset.CriticalitySource, "ManualOverride", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var rules = await _dbContext.AssetRules
+            .Where(r => r.TenantId == tenantId && r.Enabled)
+            .OrderBy(r => r.Priority)
+            .ToListAsync(ct);
+
+        foreach (var rule in rules)
+        {
+            var criticalityOperation = rule
+                .ParseOperations()
+                .FirstOrDefault(operation => string.Equals(operation.Type, "SetCriticality", StringComparison.Ordinal));
+            if (criticalityOperation is null)
+            {
+                continue;
+            }
+
+            if (!criticalityOperation.Parameters.TryGetValue("criticality", out var criticalityValue)
+                || !Enum.TryParse<Criticality>(criticalityValue, true, out var criticality))
+            {
+                continue;
+            }
+
+            var predicate = _filterBuilder.Build(rule.ParseFilter());
+            var matches = await _dbContext.Assets
+                .AsNoTracking()
+                .Where(current => current.TenantId == tenantId && current.Id == assetId)
+                .Where(predicate)
+                .AnyAsync(ct);
+            if (!matches)
+            {
+                continue;
+            }
+
+            asset.SetCriticalityFromRule(
+                criticality,
+                rule.Id,
+                criticalityOperation.Parameters.GetValueOrDefault("reason")
+                    ?? $"Matched asset rule '{rule.Name}'."
+            );
+            await _dbContext.SaveChangesAsync(ct);
+            return;
+        }
+
+        asset.ResetCriticalityToBaseline();
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     public async Task<AssetRulePreviewResult> PreviewFilterAsync(
@@ -105,7 +178,12 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
     }
 
     private async Task ApplyOperationAsync(
-        Guid tenantId, List<Guid> assetIds, AssetRuleOperation op, CancellationToken ct)
+        AssetRule rule,
+        Guid tenantId,
+        List<Guid> assetIds,
+        AssetRuleOperation op,
+        ISet<Guid> criticalityRuleMatchedAssetIds,
+        CancellationToken ct)
     {
         switch (op.Type)
         {
@@ -129,9 +207,59 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
                 }
                 break;
 
+            case "SetCriticality":
+                if (op.Parameters.TryGetValue("criticality", out var criticalityStr)
+                    && Enum.TryParse<Criticality>(criticalityStr, true, out var criticality))
+                {
+                    var assets = await _dbContext.Assets
+                        .Where(a => a.TenantId == tenantId && assetIds.Contains(a.Id))
+                        .ToListAsync(ct);
+
+                    foreach (var asset in assets)
+                    {
+                        if (string.Equals(asset.CriticalitySource, "ManualOverride", StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+
+                        asset.SetCriticalityFromRule(
+                            criticality,
+                            rule.Id,
+                            op.Parameters.GetValueOrDefault("reason")
+                                ?? $"Matched asset rule '{rule.Name}'."
+                        );
+                        criticalityRuleMatchedAssetIds.Add(asset.Id);
+                    }
+                }
+                break;
+
             default:
                 _logger.LogWarning("Unknown asset rule operation type: {OperationType}", op.Type);
                 break;
+        }
+    }
+
+    private async Task ReconcileCriticalityAsync(
+        Guid tenantId,
+        ISet<Guid> criticalityRuleMatchedAssetIds,
+        CancellationToken ct)
+    {
+        var ruleDerivedAssets = await _dbContext.Assets
+            .Where(a =>
+                a.TenantId == tenantId
+                && a.CriticalitySource == "Rule"
+                && !criticalityRuleMatchedAssetIds.Contains(a.Id)
+            )
+            .ToListAsync(ct);
+
+        foreach (var asset in ruleDerivedAssets)
+        {
+            asset.ResetCriticalityToBaseline();
+        }
+
+        if (ruleDerivedAssets.Count > 0)
+        {
+            await _dbContext.SaveChangesAsync(ct);
         }
     }
 }

@@ -71,6 +71,13 @@ export const setAssetCriticality = createServerFn({ method: 'POST' })
     await apiPut(`/assets/${assetId}/criticality`, context, { criticality })
   })
 
+export const resetAssetCriticalityOverride = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ assetId: z.string() }))
+  .handler(async ({ context, data: { assetId } }) => {
+    await apiPost(`/assets/${assetId}/criticality/reset`, context, {})
+  })
+
 export const assignSoftwareCpeBinding = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(

@@ -72,6 +72,10 @@ public class AssetServiceTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Criticality.Should().Be(Criticality.Critical);
+        result.Value.CriticalitySource.Should().Be("ManualOverride");
+        result.Value.CriticalityReason.Should().Be("Set manually.");
+        result.Value.CriticalityRuleId.Should().BeNull();
+        result.Value.CriticalityUpdatedAt.Should().NotBeNull();
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -124,6 +128,25 @@ public class AssetServiceTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("not found");
+    }
+
+    [Fact]
+    public async Task ClearManualCriticalityOverride_RevertsToBaseline()
+    {
+        var asset = CreateAsset(Criticality.Low);
+        asset.SetCriticality(Criticality.Critical);
+        _assetRepo.GetByIdAsync(asset.Id, Arg.Any<CancellationToken>()).Returns(asset);
+
+        var result = await _service.ClearManualCriticalityOverrideAsync(
+            asset.Id,
+            CancellationToken.None
+        );
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Criticality.Should().Be(Criticality.Low);
+        result.Value.CriticalitySource.Should().Be("Default");
+        result.Value.CriticalityRuleId.Should().BeNull();
+        await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

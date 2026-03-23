@@ -1,6 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from "@tanstack/react-router";
+import { Loader2, RotateCcw } from 'lucide-react'
 import type { AssetDetail } from '@/api/assets.schemas'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import { toneDot, toneText, type Tone } from '@/lib/tone-classes'
@@ -9,7 +12,9 @@ type AssetDetailPageViewProps = {
   asset: AssetDetail
   securityProfiles: SecurityProfile[]
   isAssigningSecurityProfile: boolean
+  isResettingCriticality: boolean
   onAssignSecurityProfile: (assetId: string, securityProfileId: string | null) => void
+  onResetCriticality: () => void
 }
 
 type DetailTab = 'overview' | 'vulnerabilities' | 'software' | 'timeline'
@@ -18,7 +23,9 @@ export function AssetDetailPageView({
   asset,
   securityProfiles,
   isAssigningSecurityProfile,
+  isResettingCriticality,
   onAssignSecurityProfile,
+  onResetCriticality,
 }: AssetDetailPageViewProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
   const metadata = useMemo(
@@ -100,6 +107,65 @@ export function AssetDetailPageView({
                 isAssigningSecurityProfile={isAssigningSecurityProfile}
                 onAssignSecurityProfile={onAssignSecurityProfile}
               />
+              <section className="rounded-2xl border border-border/70 bg-background p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <SectionHeader
+                    title="Criticality"
+                    description="This value is used directly in PatchHound risk scoring and prioritization."
+                  />
+                  {asset.criticalityDetail?.source === "ManualOverride" ? (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={(
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 rounded-full border border-border/70 text-muted-foreground hover:text-foreground"
+                            disabled={isResettingCriticality}
+                            onClick={onResetCriticality}
+                            aria-label="Remove manual criticality override"
+                          />
+                        )}
+                      >
+                        {isResettingCriticality ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="size-4" />
+                        )}
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Remove manual override and let rules or baseline criticality take over
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : null}
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <MetricCard
+                    label="Effective criticality"
+                    value={asset.criticality}
+                  />
+                  <MetricCard
+                    label="Source"
+                    value={asset.criticalityDetail?.source ?? "Unknown"}
+                  />
+                  <MetricCard
+                    label="Reason"
+                    value={
+                      asset.criticalityDetail?.reason
+                      ?? "No rule or manual rationale has been recorded."
+                    }
+                  />
+                  <MetricCard
+                    label="Updated"
+                    value={
+                      asset.criticalityDetail?.updatedAt
+                        ? formatUtcTimestamp(asset.criticalityDetail.updatedAt)
+                        : "Unknown"
+                    }
+                  />
+                </div>
+              </section>
               <section className="grid gap-3 md:grid-cols-2">
                 {asset.ownerType === "Team" ? (
                   <MetricCard
@@ -713,4 +779,8 @@ function getDefaultDescription(assetType: string): string {
     default:
       return 'Managed asset record tracked inside PatchHound.'
   }
+}
+
+function formatUtcTimestamp(value: string): string {
+  return new Date(value).toUTCString()
 }
