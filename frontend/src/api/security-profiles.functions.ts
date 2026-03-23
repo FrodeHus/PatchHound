@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { authMiddleware } from '@/server/middleware'
-import { apiGet, apiPost, apiPut } from '@/server/api'
+import { apiDelete, apiGet, apiPost, apiPut } from '@/server/api'
 import { buildFilterParams } from './utils'
 import { pagedSecurityProfilesSchema } from './security-profiles.schemas'
 
@@ -100,4 +100,11 @@ export const updateSecurityProfile = createServerFn({ method: 'POST' })
       modifiedIntegrityImpact,
       modifiedAvailabilityImpact,
     })
+  })
+
+export const deleteSecurityProfile = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ context, data: { id } }) => {
+    await apiDelete(`/security-profiles/${id}`, context)
   })

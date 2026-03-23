@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { ArrowLeft, CircleHelp, PenSquare, Plus, ShieldCheck, Signal, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, CircleHelp, PenSquare, Plus, Trash2 } from 'lucide-react'
 import { fetchAuditLog } from '@/api/audit-log.functions'
-import { createSecurityProfile, fetchSecurityProfiles, updateSecurityProfile } from '@/api/security-profiles.functions'
+import { createSecurityProfile, deleteSecurityProfile, fetchSecurityProfiles, updateSecurityProfile } from '@/api/security-profiles.functions'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import { RecentAuditPanel } from '@/components/features/audit/RecentAuditPanel'
 import { useTenantScope } from '@/components/layout/tenant-scope'
@@ -123,6 +123,7 @@ function SecurityProfilesPage() {
   const queryClient = useQueryClient()
   const { selectedTenantId, tenants } = useTenantScope()
   const [draft, setDraft] = useState<SecurityProfileDraft>(defaultDraft)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const tenantNames = new Map(tenants.map((tenant) => [tenant.id, tenant.name]))
   const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
 
@@ -192,6 +193,24 @@ function SecurityProfilesPage() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await deleteSecurityProfile({ data: { id } })
+    },
+    onSuccess: async () => {
+      toast.success('Security profile deleted')
+      setPendingDeleteId(null)
+      await queryClient.invalidateQueries({ queryKey: ['security-profiles'] })
+      if (canViewAudit) {
+        await queryClient.invalidateQueries({ queryKey: ['audit-log', 'AssetSecurityProfile', selectedTenantId] })
+      }
+    },
+    onError: () => {
+      toast.error('Failed to delete security profile. It may be assigned to assets.')
+      setPendingDeleteId(null)
+    },
+  })
+
   const profilePage = profilesQuery.data
   const recentAuditItems = recentAuditQuery.data?.items ?? []
   const canSave = !!selectedTenantId?.trim() && draft.name.trim().length > 0
@@ -229,6 +248,16 @@ function SecurityProfilesPage() {
     });
   }
 
+  const confirmDelete = useCallback((id: string) => {
+    setPendingDeleteId(id)
+  }, [])
+
+  const executeDelete = useCallback(() => {
+    if (pendingDeleteId) {
+      deleteMutation.mutate(pendingDeleteId)
+    }
+  }, [pendingDeleteId, deleteMutation])
+
   return (
     <TooltipProvider>
       <section className="space-y-4 pb-4">
@@ -247,46 +276,14 @@ function SecurityProfilesPage() {
           />
         ) : (
           <>
-        <Card className="rounded-2xl border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_52%),var(--color-card)]">
-          <CardHeader className="space-y-3">
-            <Badge variant="outline" className="w-fit rounded-full border-primary/20 bg-primary/10 text-primary">
-              Environmental Severity
-            </Badge>
-            <CardTitle className="text-3xl font-semibold tracking-[-0.04em]">
-              Security profiles explain why a device should score differently than vendor baseline severity.
-            </CardTitle>
-            <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
-              These profiles do not change the CVE itself. They describe the device environment so PatchHound can
-              recalculate effective severity using reachability and business impact requirements.
-            </p>
-          </CardHeader>
-          <CardContent className="grid gap-4 lg:grid-cols-3">
-            <GuideCard
-              icon={Signal}
-              title="Reachability changes exploitability"
-              text="A device reachable from the internet should keep more severe network exposure than a device that is only local or tightly segmented."
-            />
-            <GuideCard
-              icon={ShieldCheck}
-              title="Requirements change impact"
-              text="Confidentiality, integrity, and availability tell PatchHound which impact dimensions should weigh more heavily for this environment."
-            />
-            <GuideCard
-              icon={TriangleAlert}
-              title="Use profiles deliberately"
-              text="Choose a small set of reusable profiles. If every device gets a one-off profile, the scoring model becomes hard to trust."
-            />
-          </CardContent>
-        </Card>
-
         <Card className="rounded-2xl border-border/70 bg-card/85">
           <CardHeader>
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <CardTitle>Profiles</CardTitle>
+                <CardTitle>Security Profiles</CardTitle>
                 <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                  Review the current severity logic for the tenant selected in the top bar, then create or edit
-                  profiles in the side panel.
+                  Environment profiles adjust CVSS environmental severity based on reachability, business impact, and
+                  operational context.
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -304,14 +301,10 @@ function SecurityProfilesPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent>
             {!selectedTenantId ? (
               <InsetPanel className="flex items-center justify-between gap-4 px-4 py-6 text-sm text-muted-foreground">
                 <span>Choose a tenant from the top bar to review and edit security profiles.</span>
-                <Button type="button" disabled variant="outline">
-                  <Plus className="size-4" />
-                  New profile
-                </Button>
               </InsetPanel>
             ) : profilesQuery.isPending && !profilePage ? (
               <InsetPanel className="px-4 py-6 text-sm text-muted-foreground">
@@ -325,113 +318,61 @@ function SecurityProfilesPage() {
                     Create the first reusable severity profile for {selectedTenantName}.
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  onClick={openNewProfile}
-                >
+                <Button type="button" onClick={openNewProfile}>
                   <Plus className="size-4" />
                   Create profile
                 </Button>
               </InsetPanel>
             ) : (
-              profilePage?.items.map((profile) => (
-                <InsetPanel key={profile.id} className="rounded-xl p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-lg font-semibold">{profile.name}</p>
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {profile.description ?? 'No description provided.'}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="rounded-full border-border/80 bg-card text-foreground">
-                        {tenantNames.get(profile.tenantId) ?? 'Unknown tenant'}
-                      </Badge>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => openProfile(profile)}
-                      >
-                        <PenSquare className="size-4" />
-                        Edit
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 xl:grid-cols-4">
-                    <ProfileMetric
-                      label="Reachability"
-                      value={profile.internetReachability}
-                      explanation={
-                        securityProfileInternetReachabilityHelp[
-                          profile.internetReachability as (typeof securityProfileInternetReachabilityOptions)[number]
-                        ]
-                      }
-                    />
-                    <ProfileMetric
-                      label="Confidentiality"
-                      value={profile.confidentialityRequirement}
-                      explanation={
-                        securityProfileRequirementHelp[
-                          profile.confidentialityRequirement as (typeof securityProfileRequirementOptions)[number]
-                        ]
-                      }
-                    />
-                    <ProfileMetric
-                      label="Integrity"
-                      value={profile.integrityRequirement}
-                      explanation={
-                        securityProfileRequirementHelp[
-                          profile.integrityRequirement as (typeof securityProfileRequirementOptions)[number]
-                        ]
-                      }
-                    />
-                    <ProfileMetric
-                      label="Availability"
-                      value={profile.availabilityRequirement}
-                      explanation={
-                        securityProfileRequirementHelp[
-                          profile.availabilityRequirement as (typeof securityProfileRequirementOptions)[number]
-                        ]
-                      }
-                    />
-                    <ProfileMetric
-                      label="Modified AV"
-                      value={profile.modifiedAttackVector}
-                      explanation={
-                        securityProfileModifiedAttackVectorHelp[
-                          profile.modifiedAttackVector as (typeof securityProfileModifiedAttackVectorOptions)[number]
-                        ]
-                      }
-                    />
-                  </div>
-
-                  <p className="mt-4 text-xs text-muted-foreground">
-                    Updated {new Date(profile.updatedAt).toLocaleString()}
-                  </p>
-                </InsetPanel>
-              ))
+              <div className="rounded-xl border border-border/60 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border/60 bg-muted/40">
+                      <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Name</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground hidden md:table-cell">Reachability</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground hidden lg:table-cell">C / I / A</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground hidden xl:table-cell">Overrides</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Updated</th>
+                      <th className="w-24 px-4 py-2.5" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {profilePage?.items.map((profile) => (
+                      <ProfileRow
+                        key={profile.id}
+                        profile={profile}
+                        isPendingDelete={pendingDeleteId === profile.id}
+                        isDeleting={deleteMutation.isPending && pendingDeleteId === profile.id}
+                        onEdit={() => openProfile(profile)}
+                        onDelete={() => confirmDelete(profile.id)}
+                        onConfirmDelete={executeDelete}
+                        onCancelDelete={() => setPendingDeleteId(null)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
 
             {profilePage ? (
-              <PaginationControls
-                page={profilePage.page}
-                pageSize={profilePage.pageSize}
-                totalCount={profilePage.totalCount}
-                totalPages={profilePage.totalPages}
-                onPageChange={(page) => {
-                  void navigate({
-                    search: (prev) => ({ ...prev, page }),
-                  })
-                }}
-                onPageSizeChange={(nextPageSize) => {
-                  void navigate({
-                    search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
-                  })
-                }}
-              />
+              <div className="mt-3">
+                <PaginationControls
+                  page={profilePage.page}
+                  pageSize={profilePage.pageSize}
+                  totalCount={profilePage.totalCount}
+                  totalPages={profilePage.totalPages}
+                  onPageChange={(page) => {
+                    void navigate({
+                      search: (prev) => ({ ...prev, page }),
+                    })
+                  }}
+                  onPageSizeChange={(nextPageSize) => {
+                    void navigate({
+                      search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
+                    })
+                  }}
+                />
+              </div>
             ) : null}
           </CardContent>
         </Card>
@@ -449,6 +390,112 @@ function SecurityProfilesPage() {
       </section>
     </TooltipProvider>
   )
+}
+
+function ProfileRow({
+  profile,
+  isPendingDelete,
+  isDeleting,
+  onEdit,
+  onDelete,
+  onConfirmDelete,
+  onCancelDelete,
+}: {
+  profile: SecurityProfile
+  isPendingDelete: boolean
+  isDeleting: boolean
+  onEdit: () => void
+  onDelete: () => void
+  onConfirmDelete: () => void
+  onCancelDelete: () => void
+}) {
+  const overrideCount = countOverrides(profile)
+
+  return (
+    <tr className="group transition-colors hover:bg-muted/30">
+      <td className="px-4 py-3">
+        <div>
+          <p className="font-medium text-foreground">{profile.name}</p>
+          {profile.description ? (
+            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{profile.description}</p>
+          ) : null}
+        </div>
+      </td>
+      <td className="px-4 py-3 hidden md:table-cell">
+        <Badge variant="outline" className="rounded-full border-border/80 text-xs">
+          {profile.internetReachability}
+        </Badge>
+      </td>
+      <td className="px-4 py-3 hidden lg:table-cell">
+        <div className="flex gap-1.5">
+          <RequirementPill label="C" value={profile.confidentialityRequirement} />
+          <RequirementPill label="I" value={profile.integrityRequirement} />
+          <RequirementPill label="A" value={profile.availabilityRequirement} />
+        </div>
+      </td>
+      <td className="px-4 py-3 hidden xl:table-cell">
+        {overrideCount > 0 ? (
+          <span className="text-xs text-muted-foreground">{overrideCount} override{overrideCount !== 1 ? 's' : ''}</span>
+        ) : (
+          <span className="text-xs text-muted-foreground/50">None</span>
+        )}
+      </td>
+      <td className="px-4 py-3 hidden sm:table-cell">
+        <span className="text-xs text-muted-foreground">
+          {new Date(profile.updatedAt).toLocaleDateString()}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        {isPendingDelete ? (
+          <div className="flex items-center gap-1.5">
+            <Button variant="destructive" size="sm" onClick={onConfirmDelete} disabled={isDeleting}>
+              {isDeleting ? 'Deleting...' : 'Confirm'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onCancelDelete} disabled={isDeleting}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <Button variant="ghost" size="icon" className="size-8" onClick={onEdit} title="Edit">
+              <PenSquare className="size-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="size-8 text-destructive" onClick={onDelete} title="Delete">
+              <Trash2 className="size-3.5" />
+            </Button>
+          </div>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+function RequirementPill({ label, value }: { label: string; value: string }) {
+  const colorClass =
+    value === 'High'
+      ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+      : value === 'Low'
+        ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+        : 'bg-muted/60 text-muted-foreground border-border/60'
+
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium ${colorClass}`}>
+      {label}:{value}
+    </span>
+  )
+}
+
+function countOverrides(profile: SecurityProfile): number {
+  let count = 0
+  if (profile.modifiedAttackVector !== 'NotDefined') count++
+  if (profile.modifiedAttackComplexity !== 'NotDefined') count++
+  if (profile.modifiedPrivilegesRequired !== 'NotDefined') count++
+  if (profile.modifiedUserInteraction !== 'NotDefined') count++
+  if (profile.modifiedScope !== 'NotDefined') count++
+  if (profile.modifiedConfidentialityImpact !== 'NotDefined') count++
+  if (profile.modifiedIntegrityImpact !== 'NotDefined') count++
+  if (profile.modifiedAvailabilityImpact !== 'NotDefined') count++
+  return count
 }
 
 function SecurityProfileEditorPage({
@@ -519,7 +566,7 @@ function SecurityProfileEditorPage({
                 />
                 <FieldBlock
                   label="Profile Name"
-                  description="Use a clear operational name such as “Internet-facing server” or “Internal workstation”."
+                  description="Use a clear operational name such as &quot;Internet-facing server&quot; or &quot;Internal workstation&quot;."
                   control={(
                     <Input
                       placeholder="Internet-facing server"
@@ -1036,49 +1083,5 @@ function FormSection({
       {children}
       <Separator className="opacity-60" />
     </div>
-  )
-}
-
-function GuideCard({
-  icon: Icon,
-  title,
-  text,
-}: {
-  icon: typeof Signal
-  title: string
-  text: string
-}) {
-  return (
-    <InsetPanel emphasis="subtle" className="rounded-xl p-4">
-      <div className="flex items-center gap-3">
-        <span className="flex size-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
-          <Icon className="size-4" />
-        </span>
-        <p className="font-medium">{title}</p>
-      </div>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">{text}</p>
-    </InsetPanel>
-  )
-}
-
-function ProfileMetric({
-  label,
-  value,
-  explanation,
-}: {
-  label: string
-  value: string
-  explanation: string
-}) {
-  return (
-    <InsetPanel emphasis="strong" className="p-3">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-        <Badge variant="outline" className="rounded-full border-border/80 bg-muted/80 text-foreground">
-          {value}
-        </Badge>
-      </div>
-      <p className="mt-3 text-xs leading-5 text-muted-foreground">{explanation}</p>
-    </InsetPanel>
   )
 }

@@ -199,6 +199,40 @@ public class SecurityProfilesController : ControllerBase
         return NoContent();
     }
 
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Policies.ConfigureTenant)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var profile = await _dbContext.AssetSecurityProfiles.FirstOrDefaultAsync(
+            item => item.Id == id,
+            ct
+        );
+        if (profile is null)
+            return NotFound();
+
+        if (!_tenantContext.HasAccessToTenant(profile.TenantId))
+            return Forbid();
+
+        var assignedAssetCount = await _dbContext
+            .Assets.CountAsync(asset => asset.SecurityProfileId == id, ct);
+
+        if (assignedAssetCount > 0)
+        {
+            return BadRequest(
+                new ProblemDetails
+                {
+                    Title =
+                        $"Cannot delete this profile because it is assigned to {assignedAssetCount} asset(s). Unassign them first.",
+                }
+            );
+        }
+
+        _dbContext.AssetSecurityProfiles.Remove(profile);
+        await _dbContext.SaveChangesAsync(ct);
+
+        return NoContent();
+    }
+
     private static SecurityProfileDto ToDto(AssetSecurityProfile profile) =>
         new(
             profile.Id,
