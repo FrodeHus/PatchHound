@@ -7,7 +7,9 @@ import {
   remediationDecisionSchema,
   analystRecommendationSchema,
   vulnerabilityOverrideSchema,
+  pagedDecisionListSchema,
 } from './remediation.schemas'
+import { buildFilterParams } from './utils'
 
 export const fetchDecisionContext = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
@@ -80,4 +82,22 @@ export const addRecommendation = createServerFn({ method: 'POST' })
   .handler(async ({ context, data: { assetId, ...body } }) => {
     const data = await apiPost(`/assets/${assetId}/recommendations`, context, body)
     return analystRecommendationSchema.parse(data)
+  })
+
+export const fetchDecisionList = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      search: z.string().optional(),
+      criticality: z.string().optional(),
+      outcome: z.string().optional(),
+      approvalStatus: z.string().optional(),
+      page: z.number().optional(),
+      pageSize: z.number().optional(),
+    })
+  )
+  .handler(async ({ context, data: filters }) => {
+    const params = buildFilterParams(filters, { pageSize: 25 })
+    const data = await apiGet(`/decisions?${params.toString()}`, context)
+    return pagedDecisionListSchema.parse(data)
   })

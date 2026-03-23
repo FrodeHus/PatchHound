@@ -201,11 +201,9 @@ export function AssetDetailPageView({
                     page: 1,
                     pageSize: 25,
                     search: '',
-                    vendor: '',
                     criticality: '',
-                    assetOwner: '',
-                    deviceAssetId: asset.id,
-                    tenantSoftwareId: '',
+                    outcome: '',
+                    approvalStatus: '',
                   }}
                   className="flex w-full items-start justify-between gap-4 rounded-2xl border border-border/70 bg-background p-4 text-left transition hover:border-foreground/20 hover:bg-muted/20"
                 >

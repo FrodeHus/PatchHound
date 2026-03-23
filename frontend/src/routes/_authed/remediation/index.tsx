@@ -1,25 +1,23 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchRemediationTasks } from '@/api/remediation-tasks.functions'
-import { RemediationTaskWorkbench } from '@/components/features/remediation/RemediationTaskWorkbench'
+import { fetchDecisionList } from '@/api/remediation.functions'
+import { RemediationWorkbench } from '@/components/features/remediation/RemediationWorkbench'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
 
 const remediationSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
-  vendor: searchStringSchema,
   criticality: searchStringSchema,
-  assetOwner: searchStringSchema,
-  deviceAssetId: searchStringSchema,
-  tenantSoftwareId: searchStringSchema,
+  outcome: searchStringSchema,
+  approvalStatus: searchStringSchema,
 })
 
 export const Route = createFileRoute('/_authed/remediation/')({
   validateSearch: remediationSearchSchema,
   loaderDeps: ({ search }) => search,
   loader: ({ deps }) =>
-    fetchRemediationTasks({
+    fetchDecisionList({
       data: {
         ...normalizeFilters(deps),
         page: deps.page,
@@ -37,10 +35,10 @@ function RemediationRoute() {
   const [initialTenantId] = useState(selectedTenantId)
   const canUseInitialData = initialTenantId === selectedTenantId
 
-  const tasksQuery = useQuery({
-    queryKey: ['remediation-tasks', selectedTenantId, search],
+  const query = useQuery({
+    queryKey: ['decisions', selectedTenantId, search],
     queryFn: () =>
-      fetchRemediationTasks({
+      fetchDecisionList({
         data: {
           ...normalizeFilters(search),
           page: search.page,
@@ -50,22 +48,20 @@ function RemediationRoute() {
     initialData: canUseInitialData ? initialData : undefined,
   })
 
-  const tasks = tasksQuery.data ?? (canUseInitialData ? initialData : undefined)
-  if (!tasks) {
+  const data = query.data ?? (canUseInitialData ? initialData : undefined)
+  if (!data) {
     return null
   }
 
   return (
-    <RemediationTaskWorkbench
-      tasks={tasks}
+    <RemediationWorkbench
+      data={data}
       filters={{
         search: search.search,
-        vendor: search.vendor,
         criticality: search.criticality,
-        assetOwner: search.assetOwner,
+        outcome: search.outcome,
+        approvalStatus: search.approvalStatus,
       }}
-      scopedToSoftware={Boolean(search.tenantSoftwareId)}
-      scopedToDevice={Boolean(search.deviceAssetId)}
       onFiltersChange={(filters) => {
         void navigate({
           search: (prev) => ({
@@ -89,18 +85,14 @@ function RemediationRoute() {
 
 function normalizeFilters(search: {
   search: string
-  vendor: string
   criticality: string
-  assetOwner: string
-  deviceAssetId: string
-  tenantSoftwareId: string
+  outcome: string
+  approvalStatus: string
 }) {
   return {
     search: search.search || undefined,
-    vendor: search.vendor || undefined,
     criticality: search.criticality || undefined,
-    assetOwner: search.assetOwner || undefined,
-    deviceAssetId: search.deviceAssetId || undefined,
-    tenantSoftwareId: search.tenantSoftwareId || undefined,
+    outcome: search.outcome || undefined,
+    approvalStatus: search.approvalStatus || undefined,
   }
 }

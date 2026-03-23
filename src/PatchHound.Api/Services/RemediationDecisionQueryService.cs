@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PatchHound.Api.Models;
 using PatchHound.Api.Models.Decisions;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
@@ -17,6 +18,181 @@ public class RemediationDecisionQueryService(
     TenantAiTextGenerationService aiTextGenerationService
 )
 {
+    public async Task<PagedResponse<RemediationDecisionListItemDto>> ListAsync(
+        Guid tenantId,
+        RemediationDecisionFilterQuery filter,
+        PaginationQuery pagination,
+        CancellationToken ct
+    )
+    {
+        var activeSnapshotId = await snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
+
+        // All software assets for the tenant
+        var assetsQuery = dbContext.Assets.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && a.AssetType == AssetType.Software);
+
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var term = filter.Search.Trim().ToLower();
+            assetsQuery = assetsQuery.Where(a => a.Name.ToLower().Contains(term));
+        }
+
+        // Apply criticality filter
+        if (!string.IsNullOrWhiteSpace(filter.Criticality)
+            && Enum.TryParse<Criticality>(filter.Criticality, true, out var crit))
+        {
+            assetsQuery = assetsQuery.Where(a => a.Criticality == crit);
+        }
+
+        // Latest active decision per asset
+        var decisionsLookup = await dbContext.RemediationDecisions.AsNoTracking()
+            .Where(d => d.TenantId == tenantId
+                && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+            .GroupBy(d => d.SoftwareAssetId)
+            .Select(g => g.OrderByDescending(d => d.CreatedAt).First())
+            .ToDictionaryAsync(d => d.SoftwareAssetId, ct);
+
+        // Apply outcome/status filters (post-query since we need the decision lookup)
+        HashSet<Guid>? filteredAssetIds = null;
+        if (!string.IsNullOrWhiteSpace(filter.Outcome) || !string.IsNullOrWhiteSpace(filter.ApprovalStatus))
+        {
+            filteredAssetIds = [];
+            foreach (var (assetId, decision) in decisionsLookup)
+            {
+                var matchesOutcome = string.IsNullOrWhiteSpace(filter.Outcome)
+                    || string.Equals(decision.Outcome.ToString(), filter.Outcome, StringComparison.OrdinalIgnoreCase);
+                var matchesStatus = string.IsNullOrWhiteSpace(filter.ApprovalStatus)
+                    || string.Equals(decision.ApprovalStatus.ToString(), filter.ApprovalStatus, StringComparison.OrdinalIgnoreCase);
+
+                if (matchesOutcome && matchesStatus)
+                    filteredAssetIds.Add(assetId);
+            }
+        }
+
+        // Risk scores
+        var riskScores = await dbContext.AssetRiskScores.AsNoTracking()
+            .Where(r => r.TenantId == tenantId)
+            .ToDictionaryAsync(r => r.AssetId, ct);
+
+        // Vuln counts per software asset from risk scores (already aggregated)
+        // Device counts per software asset
+        var deviceCounts = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(i => i.TenantId == tenantId && i.IsActive)
+            .GroupBy(i => i.SoftwareAssetId)
+            .Select(g => new { SoftwareAssetId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.SoftwareAssetId, x => x.Count, ct);
+
+        // TenantSoftwareId lookup via installations
+        var tenantSoftwareByAsset = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(i => i.TenantId == tenantId && i.IsActive)
+            .GroupBy(i => i.SoftwareAssetId)
+            .Select(g => new { SoftwareAssetId = g.Key, TenantSoftwareId = g.First().TenantSoftwareId })
+            .ToDictionaryAsync(x => x.SoftwareAssetId, x => x.TenantSoftwareId, ct);
+
+        // SLA configuration
+        var tenantSla = await dbContext.TenantSlaConfigurations.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
+
+        // SLA due dates per asset — need earliest first-seen per asset
+        Dictionary<Guid, (DateTimeOffset DueDate, string Status)>? slaByAsset = null;
+        if (tenantSla is not null)
+        {
+            var vulnFirstSeen = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
+                .Where(m => m.TenantId == tenantId && m.ResolvedAt == null && m.SnapshotId == activeSnapshotId)
+                .Join(
+                    dbContext.VulnerabilityDefinitions.AsNoTracking(),
+                    m => m.VulnerabilityDefinitionId,
+                    v => v.Id,
+                    (m, v) => new { m.SoftwareAssetId, m.FirstSeenAt, v.VendorSeverity }
+                )
+                .GroupBy(x => x.SoftwareAssetId)
+                .Select(g => new
+                {
+                    AssetId = g.Key,
+                    EarliestFirstSeen = g.Min(x => x.FirstSeenAt),
+                    HighestSeverity = g.Max(x => x.VendorSeverity),
+                })
+                .ToListAsync(ct);
+
+            slaByAsset = [];
+            foreach (var item in vulnFirstSeen)
+            {
+                if (item.HighestSeverity == default) continue;
+                var dueDate = slaService.CalculateDueDate(item.HighestSeverity, item.EarliestFirstSeen, tenantSla);
+                var status = slaService.GetSlaStatus(item.EarliestFirstSeen, dueDate, DateTimeOffset.UtcNow);
+                slaByAsset[item.AssetId] = (dueDate, status.ToString());
+            }
+        }
+
+        // Materialize assets
+        var assets = await assetsQuery.OrderBy(a => a.Name).ToListAsync(ct);
+
+        // Build list items
+        var items = new List<RemediationDecisionListItemDto>();
+        foreach (var asset in assets)
+        {
+            if (filteredAssetIds is not null && !filteredAssetIds.Contains(asset.Id))
+                continue;
+
+            decisionsLookup.TryGetValue(asset.Id, out var decision);
+            riskScores.TryGetValue(asset.Id, out var risk);
+            deviceCounts.TryGetValue(asset.Id, out var devCount);
+            tenantSoftwareByAsset.TryGetValue(asset.Id, out var tsId);
+
+            string? riskBand = null;
+            double? riskScore = null;
+            if (risk is not null)
+            {
+                riskScore = (double)risk.OverallScore;
+                riskBand = risk.OverallScore switch
+                {
+                    >= 900m => "Critical",
+                    >= 750m => "High",
+                    >= 500m => "Medium",
+                    > 0m => "Low",
+                    _ => "None",
+                };
+            }
+
+            string? slaStatus = null;
+            DateTimeOffset? slaDueDate = null;
+            if (slaByAsset is not null && slaByAsset.TryGetValue(asset.Id, out var sla))
+            {
+                slaStatus = sla.Status;
+                slaDueDate = sla.DueDate;
+            }
+
+            items.Add(new RemediationDecisionListItemDto(
+                asset.Id,
+                asset.Name,
+                asset.Criticality.ToString(),
+                tsId != Guid.Empty ? tsId : null,
+                decision?.Outcome.ToString(),
+                decision?.ApprovalStatus.ToString(),
+                decision?.DecidedAt,
+                decision?.ExpiryDate,
+                risk?.CriticalCount + risk?.HighCount + risk?.MediumCount + risk?.LowCount ?? 0,
+                risk?.CriticalCount ?? 0,
+                risk?.HighCount ?? 0,
+                riskScore,
+                riskBand,
+                slaStatus,
+                slaDueDate,
+                devCount
+            ));
+        }
+
+        var totalCount = items.Count;
+        var paged = items
+            .Skip(pagination.Skip)
+            .Take(pagination.BoundedPageSize)
+            .ToList();
+
+        return new PagedResponse<RemediationDecisionListItemDto>(paged, totalCount, pagination.Page, pagination.BoundedPageSize);
+    }
+
     public async Task<DecisionContextDto?> BuildAsync(
         Guid tenantId,
         Guid assetId,

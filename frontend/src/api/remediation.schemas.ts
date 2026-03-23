@@ -88,6 +88,33 @@ export const decisionContextSchema = z.object({
   aiNarrative: z.string().nullable(),
 })
 
+export const decisionListItemSchema = z.object({
+  assetId: z.string().uuid(),
+  assetName: z.string(),
+  criticality: z.string(),
+  tenantSoftwareId: z.string().uuid().nullable(),
+  outcome: z.string().nullable(),
+  approvalStatus: z.string().nullable(),
+  decidedAt: z.string().nullable(),
+  expiryDate: z.string().nullable(),
+  totalVulnerabilities: z.number(),
+  criticalCount: z.number(),
+  highCount: z.number(),
+  riskScore: z.number().nullable(),
+  riskBand: z.string().nullable(),
+  slaStatus: z.string().nullable(),
+  slaDueDate: z.string().nullable(),
+  affectedDeviceCount: z.number(),
+})
+
+export const pagedDecisionListSchema = z.object({
+  items: z.array(decisionListItemSchema),
+  totalCount: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+  totalPages: z.number(),
+})
+
 export type DecisionContext = z.infer<typeof decisionContextSchema>
 export type RemediationDecision = z.infer<typeof remediationDecisionSchema>
 export type AnalystRecommendation = z.infer<typeof analystRecommendationSchema>
@@ -96,3 +123,5 @@ export type DecisionSummary = z.infer<typeof decisionSummarySchema>
 export type DecisionRisk = z.infer<typeof decisionRiskSchema>
 export type DecisionSla = z.infer<typeof decisionSlaSchema>
 export type VulnerabilityOverride = z.infer<typeof vulnerabilityOverrideSchema>
+export type DecisionListItem = z.infer<typeof decisionListItemSchema>
+export type PagedDecisionList = z.infer<typeof pagedDecisionListSchema>
