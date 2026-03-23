@@ -51,7 +51,7 @@ public class EmailNotificationServiceTests : IDisposable
             NotificationType.TaskAssigned,
             "Task Assigned",
             "<p>You have a new task.</p>",
-            "RemediationTask",
+            "PatchingTask",
             Guid.NewGuid()
         );
 
@@ -65,7 +65,7 @@ public class EmailNotificationServiceTests : IDisposable
         notification.Type.Should().Be(NotificationType.TaskAssigned);
         notification.Title.Should().Be("Task Assigned");
         notification.Body.Should().Be("<p>You have a new task.</p>");
-        notification.RelatedEntityType.Should().Be("RemediationTask");
+        notification.RelatedEntityType.Should().Be("PatchingTask");
 
         await _emailSender
             .Received(1)

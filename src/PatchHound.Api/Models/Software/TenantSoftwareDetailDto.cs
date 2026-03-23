@@ -1,3 +1,5 @@
+using PatchHound.Api.Models.Remediation;
+
 namespace PatchHound.Api.Models.Software;
 
 public record TenantSoftwareDetailDto(
@@ -21,6 +23,7 @@ public record TenantSoftwareDetailDto(
     int ActiveVulnerabilityCount,
     int VersionCount,
     decimal? ExposureImpactScore,
+    RemediationTaskSummaryDto Remediation,
     IReadOnlyList<TenantSoftwareVersionCohortDto> VersionCohorts,
     IReadOnlyList<TenantSoftwareSourceAliasDto> SourceAliases
 );

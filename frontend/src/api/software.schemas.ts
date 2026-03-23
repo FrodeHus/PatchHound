@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { isoDateTimeSchema } from './common.schemas'
 import { pagedResponseMetaSchema } from './pagination.schemas'
+import { remediationTaskSummarySchema } from './remediation-tasks.schemas'
 
 export const tenantSoftwareVersionCohortSchema = z.object({
   version: z.string().nullable(),
@@ -42,6 +43,7 @@ export const tenantSoftwareDetailSchema = z.object({
   activeVulnerabilityCount: z.number(),
   versionCount: z.number(),
   exposureImpactScore: z.number().nullable(),
+  remediation: remediationTaskSummarySchema,
   versionCohorts: z.array(tenantSoftwareVersionCohortSchema),
   sourceAliases: z.array(tenantSoftwareSourceAliasSchema),
 })

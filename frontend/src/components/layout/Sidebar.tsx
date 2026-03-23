@@ -8,6 +8,7 @@ import {
   Server,
   Settings2,
   Shield,
+  ShieldAlert,
   ShieldCheck,
   Boxes,
   ChevronDown,
@@ -67,6 +68,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/devices', label: 'Devices', icon: Laptop },
       { to: '/software', label: 'Software', icon: Boxes },
+      { to: '/remediation', label: 'Remediation', icon: ShieldAlert },
     ],
   },
 ]
@@ -95,7 +97,8 @@ export function Sidebar({
     }))
     .filter((group) => group.items.length > 0)
   const showLabels = compact || !collapsed;
-  const assetsGroupActive = pathname.startsWith('/devices') || pathname.startsWith('/software')
+  const assetsGroupActive =
+    pathname.startsWith('/devices') || pathname.startsWith('/software') || pathname.startsWith('/remediation')
   const [isAssetsGroupOpen, setIsAssetsGroupOpen] = useState(assetsGroupActive || !collapsed)
 
   useEffect(() => {

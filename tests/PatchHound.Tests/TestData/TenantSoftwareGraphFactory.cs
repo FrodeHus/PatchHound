@@ -131,6 +131,20 @@ internal static class TenantSoftwareGraphFactory
                 1
             )
         );
+        await dbContext.DeviceSoftwareInstallations.AddRangeAsync(
+            DeviceSoftwareInstallation.Create(
+                tenantId,
+                deviceOne.Id,
+                softwareOne.Id,
+                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
+            ),
+            DeviceSoftwareInstallation.Create(
+                tenantId,
+                deviceTwo.Id,
+                softwareTwo.Id,
+                new DateTimeOffset(2026, 3, 9, 0, 0, 0, TimeSpan.Zero)
+            )
+        );
         await dbContext.SoftwareVulnerabilityMatches.AddRangeAsync(
             SoftwareVulnerabilityMatch.Create(
                 tenantId,

@@ -19,9 +19,9 @@ import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as ApiIngestionRunEventsRouteImport } from './routes/api/ingestion-run-events'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as AuthedVulnerabilitiesIndexRouteImport } from './routes/_authed/vulnerabilities/index'
-import { Route as AuthedTasksIndexRouteImport } from './routes/_authed/tasks/index'
 import { Route as AuthedSoftwareIndexRouteImport } from './routes/_authed/software/index'
 import { Route as AuthedSettingsIndexRouteImport } from './routes/_authed/settings/index'
+import { Route as AuthedRemediationIndexRouteImport } from './routes/_authed/remediation/index'
 import { Route as AuthedDevicesIndexRouteImport } from './routes/_authed/devices/index'
 import { Route as AuthedAuditLogIndexRouteImport } from './routes/_authed/audit-log/index'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
@@ -98,11 +98,6 @@ const AuthedVulnerabilitiesIndexRoute =
     path: '/vulnerabilities/',
     getParentRoute: () => AuthedRoute,
   } as any)
-const AuthedTasksIndexRoute = AuthedTasksIndexRouteImport.update({
-  id: '/tasks/',
-  path: '/tasks/',
-  getParentRoute: () => AuthedRoute,
-} as any)
 const AuthedSoftwareIndexRoute = AuthedSoftwareIndexRouteImport.update({
   id: '/software/',
   path: '/software/',
@@ -111,6 +106,11 @@ const AuthedSoftwareIndexRoute = AuthedSoftwareIndexRouteImport.update({
 const AuthedSettingsIndexRoute = AuthedSettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedRemediationIndexRoute = AuthedRemediationIndexRouteImport.update({
+  id: '/remediation/',
+  path: '/remediation/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedDevicesIndexRoute = AuthedDevicesIndexRouteImport.update({
@@ -271,9 +271,9 @@ export interface FileRoutesByFullPath {
   '/assets/': typeof AuthedAssetsIndexRoute
   '/audit-log/': typeof AuthedAuditLogIndexRoute
   '/devices/': typeof AuthedDevicesIndexRoute
+  '/remediation/': typeof AuthedRemediationIndexRoute
   '/settings/': typeof AuthedSettingsIndexRoute
   '/software/': typeof AuthedSoftwareIndexRoute
-  '/tasks/': typeof AuthedTasksIndexRoute
   '/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/admin/asset-rules/$id': typeof AuthedAdminAssetRulesIdRoute
   '/admin/asset-rules/new': typeof AuthedAdminAssetRulesNewRoute
@@ -310,9 +310,9 @@ export interface FileRoutesByTo {
   '/assets': typeof AuthedAssetsIndexRoute
   '/audit-log': typeof AuthedAuditLogIndexRoute
   '/devices': typeof AuthedDevicesIndexRoute
+  '/remediation': typeof AuthedRemediationIndexRoute
   '/settings': typeof AuthedSettingsIndexRoute
   '/software': typeof AuthedSoftwareIndexRoute
-  '/tasks': typeof AuthedTasksIndexRoute
   '/vulnerabilities': typeof AuthedVulnerabilitiesIndexRoute
   '/admin/asset-rules/$id': typeof AuthedAdminAssetRulesIdRoute
   '/admin/asset-rules/new': typeof AuthedAdminAssetRulesNewRoute
@@ -351,9 +351,9 @@ export interface FileRoutesById {
   '/_authed/assets/': typeof AuthedAssetsIndexRoute
   '/_authed/audit-log/': typeof AuthedAuditLogIndexRoute
   '/_authed/devices/': typeof AuthedDevicesIndexRoute
+  '/_authed/remediation/': typeof AuthedRemediationIndexRoute
   '/_authed/settings/': typeof AuthedSettingsIndexRoute
   '/_authed/software/': typeof AuthedSoftwareIndexRoute
-  '/_authed/tasks/': typeof AuthedTasksIndexRoute
   '/_authed/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/_authed/admin/asset-rules/$id': typeof AuthedAdminAssetRulesIdRoute
   '/_authed/admin/asset-rules/new': typeof AuthedAdminAssetRulesNewRoute
@@ -392,9 +392,9 @@ export interface FileRouteTypes {
     | '/assets/'
     | '/audit-log/'
     | '/devices/'
+    | '/remediation/'
     | '/settings/'
     | '/software/'
-    | '/tasks/'
     | '/vulnerabilities/'
     | '/admin/asset-rules/$id'
     | '/admin/asset-rules/new'
@@ -431,9 +431,9 @@ export interface FileRouteTypes {
     | '/assets'
     | '/audit-log'
     | '/devices'
+    | '/remediation'
     | '/settings'
     | '/software'
-    | '/tasks'
     | '/vulnerabilities'
     | '/admin/asset-rules/$id'
     | '/admin/asset-rules/new'
@@ -471,9 +471,9 @@ export interface FileRouteTypes {
     | '/_authed/assets/'
     | '/_authed/audit-log/'
     | '/_authed/devices/'
+    | '/_authed/remediation/'
     | '/_authed/settings/'
     | '/_authed/software/'
-    | '/_authed/tasks/'
     | '/_authed/vulnerabilities/'
     | '/_authed/admin/asset-rules/$id'
     | '/_authed/admin/asset-rules/new'
@@ -570,13 +570,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedVulnerabilitiesIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/tasks/': {
-      id: '/_authed/tasks/'
-      path: '/tasks'
-      fullPath: '/tasks/'
-      preLoaderRoute: typeof AuthedTasksIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/software/': {
       id: '/_authed/software/'
       path: '/software'
@@ -589,6 +582,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings/'
       preLoaderRoute: typeof AuthedSettingsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/remediation/': {
+      id: '/_authed/remediation/'
+      path: '/remediation'
+      fullPath: '/remediation/'
+      preLoaderRoute: typeof AuthedRemediationIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/devices/': {
@@ -786,9 +786,9 @@ interface AuthedRouteChildren {
   AuthedAssetsIndexRoute: typeof AuthedAssetsIndexRoute
   AuthedAuditLogIndexRoute: typeof AuthedAuditLogIndexRoute
   AuthedDevicesIndexRoute: typeof AuthedDevicesIndexRoute
+  AuthedRemediationIndexRoute: typeof AuthedRemediationIndexRoute
   AuthedSettingsIndexRoute: typeof AuthedSettingsIndexRoute
   AuthedSoftwareIndexRoute: typeof AuthedSoftwareIndexRoute
-  AuthedTasksIndexRoute: typeof AuthedTasksIndexRoute
   AuthedVulnerabilitiesIndexRoute: typeof AuthedVulnerabilitiesIndexRoute
   AuthedAdminAssetRulesIdRoute: typeof AuthedAdminAssetRulesIdRoute
   AuthedAdminAssetRulesNewRoute: typeof AuthedAdminAssetRulesNewRoute
@@ -818,9 +818,9 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAssetsIndexRoute: AuthedAssetsIndexRoute,
   AuthedAuditLogIndexRoute: AuthedAuditLogIndexRoute,
   AuthedDevicesIndexRoute: AuthedDevicesIndexRoute,
+  AuthedRemediationIndexRoute: AuthedRemediationIndexRoute,
   AuthedSettingsIndexRoute: AuthedSettingsIndexRoute,
   AuthedSoftwareIndexRoute: AuthedSoftwareIndexRoute,
-  AuthedTasksIndexRoute: AuthedTasksIndexRoute,
   AuthedVulnerabilitiesIndexRoute: AuthedVulnerabilitiesIndexRoute,
   AuthedAdminAssetRulesIdRoute: AuthedAdminAssetRulesIdRoute,
   AuthedAdminAssetRulesNewRoute: AuthedAdminAssetRulesNewRoute,

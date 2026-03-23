@@ -45,8 +45,10 @@ public class NotificationsController(
                     ? $"/assets/{item.RelatedEntityId}"
                     : item.RelatedEntityType == "TenantVulnerability" && item.RelatedEntityId != null
                         ? $"/vulnerabilities/{item.RelatedEntityId}"
-                        : item.RelatedEntityType == "RemediationTask"
-                            ? "/tasks"
+                        : item.RelatedEntityType == "PatchingTask"
+                            ? "/remediation"
+                            : item.RelatedEntityType == "RemediationTask"
+                                ? "/remediation"
                             : null
             ))
             .ToListAsync(ct);

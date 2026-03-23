@@ -194,6 +194,40 @@ export function AssetDetailPageView({
                   mono
                 />
               </section>
+              {asset.assetType === "Device" && asset.remediation ? (
+                <Link
+                  to="/remediation"
+                  search={{
+                    page: 1,
+                    pageSize: 25,
+                    search: '',
+                    vendor: '',
+                    criticality: '',
+                    assetOwner: '',
+                    deviceAssetId: asset.id,
+                    tenantSoftwareId: '',
+                  }}
+                  className="flex w-full items-start justify-between gap-4 rounded-2xl border border-border/70 bg-background p-4 text-left transition hover:border-foreground/20 hover:bg-muted/20"
+                >
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                      Remediation tasks
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Pill>{asset.remediation.openTaskCount} open</Pill>
+                      <span className="text-sm text-muted-foreground">
+                        {asset.remediation.overdueTaskCount} overdue
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Review every open software remediation task linked to this device and see which patching work needs follow-through next.
+                    </p>
+                  </div>
+                  <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                    Open
+                  </span>
+                </Link>
+              ) : null}
               {asset.assetType === "Device" ? (
                 <section className="rounded-2xl border border-border/70 bg-background p-4">
                   <SectionHeader

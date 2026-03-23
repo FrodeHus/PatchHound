@@ -42,6 +42,7 @@ const assetFixture: AssetDetail = {
   deviceOnboardingStatus: null,
   deviceValue: null,
   risk: null,
+  remediation: null,
   tags: [],
   softwareCpeBinding: {
     id: "44444444-4444-4444-4444-444444444444",
