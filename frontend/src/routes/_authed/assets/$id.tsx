@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { assignAssetSecurityProfile, fetchAssetDetail, resetAssetCriticalityOverride } from '@/api/assets.functions'
+import { assignAssetSecurityProfile, fetchAssetDetail, resetAssetCriticalityOverride, setAssetCriticality } from '@/api/assets.functions'
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { AssetDetailPageView } from '@/components/features/assets/AssetDetailPageView'
 import { useTenantScope } from '@/components/layout/tenant-scope'
@@ -44,6 +44,19 @@ function AssetDetailPage() {
       toast.error('Failed to assign security profile')
     },
   })
+  const setCriticalityMutation = useMutation({
+    mutationFn: async (criticality: string) => {
+      await setAssetCriticality({ data: { assetId: id, criticality } })
+    },
+    onSuccess: async () => {
+      toast.success('Criticality updated')
+      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, id) })
+      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+    },
+    onError: () => {
+      toast.error('Failed to update criticality')
+    },
+  })
   const resetCriticalityMutation = useMutation({
     mutationFn: async () => {
       await resetAssetCriticalityOverride({ data: { assetId: id } })
@@ -66,9 +79,13 @@ function AssetDetailPage() {
       asset={asset}
       securityProfiles={securityProfilesQuery.data?.items ?? []}
       isAssigningSecurityProfile={securityProfileMutation.isPending}
+      isSettingCriticality={setCriticalityMutation.isPending}
       isResettingCriticality={resetCriticalityMutation.isPending}
       onAssignSecurityProfile={(_, securityProfileId) => {
         securityProfileMutation.mutate(securityProfileId)
+      }}
+      onSetCriticality={(criticality) => {
+        setCriticalityMutation.mutate(criticality)
       }}
       onResetCriticality={() => {
         resetCriticalityMutation.mutate()

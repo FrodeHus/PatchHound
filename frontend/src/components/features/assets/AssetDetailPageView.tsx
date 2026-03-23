@@ -3,6 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { Loader2, RotateCcw } from 'lucide-react'
 import type { AssetDetail } from '@/api/assets.schemas'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
@@ -12,8 +14,10 @@ type AssetDetailPageViewProps = {
   asset: AssetDetail
   securityProfiles: SecurityProfile[]
   isAssigningSecurityProfile: boolean
+  isSettingCriticality: boolean
   isResettingCriticality: boolean
   onAssignSecurityProfile: (assetId: string, securityProfileId: string | null) => void
+  onSetCriticality: (criticality: string) => void
   onResetCriticality: () => void
 }
 
@@ -23,11 +27,15 @@ export function AssetDetailPageView({
   asset,
   securityProfiles,
   isAssigningSecurityProfile,
+  isSettingCriticality,
   isResettingCriticality,
   onAssignSecurityProfile,
+  onSetCriticality,
   onResetCriticality,
 }: AssetDetailPageViewProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
+  const [securityProfileSheetOpen, setSecurityProfileSheetOpen] = useState(false)
+  const [criticalitySheetOpen, setCriticalitySheetOpen] = useState(false)
   const metadata = useMemo(
     () => parseMetadata(asset.metadata),
     [asset.metadata],
@@ -35,7 +43,8 @@ export function AssetDetailPageView({
   const timelineItems = useMemo(() => buildTimelineItems(asset), [asset]);
 
   return (
-    <section className="space-y-5">
+    <>
+      <section className="space-y-5">
       <header className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-3">
@@ -101,71 +110,61 @@ export function AssetDetailPageView({
 
           {activeTab === "overview" ? (
             <div className="space-y-5">
-              <SecurityProfilePanel
-                asset={asset}
-                securityProfiles={securityProfiles}
-                isAssigningSecurityProfile={isAssigningSecurityProfile}
-                onAssignSecurityProfile={onAssignSecurityProfile}
-              />
-              <section className="rounded-2xl border border-border/70 bg-background p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <SectionHeader
-                    title="Criticality"
-                    description="This value is used directly in PatchHound risk scoring and prioritization."
-                  />
-                  {asset.criticalityDetail?.source === "ManualOverride" ? (
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={(
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 rounded-full border border-border/70 text-muted-foreground hover:text-foreground"
-                            disabled={isResettingCriticality}
-                            onClick={onResetCriticality}
-                            aria-label="Remove manual criticality override"
-                          />
-                        )}
-                      >
-                        {isResettingCriticality ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <RotateCcw className="size-4" />
-                        )}
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        Remove manual override and let rules or baseline criticality take over
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : null}
+              <button
+                type="button"
+                className="w-full rounded-2xl border border-border/70 bg-background p-4 text-left transition hover:border-foreground/20 hover:bg-muted/20"
+                onClick={() => setSecurityProfileSheetOpen(true)}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                      Environmental severity profile
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Pill>{asset.securityProfile?.name ?? "Vendor severity only"}</Pill>
+                      {asset.securityProfile ? (
+                        <span className="text-sm text-muted-foreground">
+                          {asset.securityProfile.internetReachability}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {asset.securityProfile
+                        ? `${asset.securityProfile.environmentClass} profile applied for adjusted vulnerability severity.`
+                        : "No profile is applied. Vendor severity is used directly."}
+                    </p>
+                  </div>
+                  <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                    Manage
+                  </span>
                 </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <MetricCard
-                    label="Effective criticality"
-                    value={asset.criticality}
-                  />
-                  <MetricCard
-                    label="Source"
-                    value={asset.criticalityDetail?.source ?? "Unknown"}
-                  />
-                  <MetricCard
-                    label="Reason"
-                    value={
-                      asset.criticalityDetail?.reason
-                      ?? "No rule or manual rationale has been recorded."
-                    }
-                  />
-                  <MetricCard
-                    label="Updated"
-                    value={
-                      asset.criticalityDetail?.updatedAt
-                        ? formatUtcTimestamp(asset.criticalityDetail.updatedAt)
-                        : "Unknown"
-                    }
-                  />
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-2xl border border-border/70 bg-background p-4 text-left transition hover:border-foreground/20 hover:bg-muted/20"
+                onClick={() => setCriticalitySheetOpen(true)}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                      Criticality
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Pill>{asset.criticality}</Pill>
+                      <span className="text-sm text-muted-foreground">
+                        {asset.criticalityDetail?.source ?? "Unknown"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {asset.criticalityDetail?.reason
+                        ?? "Used directly by PatchHound risk scoring and prioritization."}
+                    </p>
+                  </div>
+                  <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                    Manage
+                  </span>
                 </div>
-              </section>
+              </button>
               <section className="grid gap-3 md:grid-cols-2">
                 {asset.ownerType === "Team" ? (
                   <MetricCard
@@ -598,53 +597,161 @@ export function AssetDetailPageView({
           </section>
         </aside>
       </div>
-    </section>
-  );
-}
+      </section>
+      <Sheet open={securityProfileSheetOpen} onOpenChange={setSecurityProfileSheetOpen}>
+        <SheetContent side="right" className="w-full border-l border-border/80 bg-card p-0 sm:max-w-md">
+          <SheetHeader className="border-b border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_96%,black),var(--card))]">
+            <SheetTitle>Environmental severity profile</SheetTitle>
+            <SheetDescription>
+              Reusable environment settings used to recalculate effective vulnerability severity for this asset.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 p-4">
+            <section className="rounded-2xl border border-border/70 bg-background p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                Assigned profile
+              </p>
+              <div className="mt-3 grid gap-3">
+                <select
+                  className="rounded-xl border border-input bg-card px-3 py-2.5 text-sm"
+                  value={asset.securityProfile?.id ?? ''}
+                  onChange={(event) => onAssignSecurityProfile(asset.id, event.target.value || null)}
+                  disabled={isAssigningSecurityProfile}
+                >
+                  <option value="">No security profile</option>
+                  {securityProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name} • {profile.internetReachability}
+                    </option>
+                  ))}
+                </select>
+                <div className="rounded-xl border border-border/70 bg-card px-3 py-3 text-sm text-muted-foreground">
+                  {isAssigningSecurityProfile
+                    ? 'Applying profile...'
+                    : asset.securityProfile?.name ?? 'Using vendor severity only'}
+                </div>
+              </div>
+            </section>
+            {asset.securityProfile ? (
+              <section className="grid gap-3">
+                <MetricCard label="Environment Class" value={asset.securityProfile.environmentClass} />
+                <MetricCard label="Reachability" value={asset.securityProfile.internetReachability} />
+                <MetricCard label="Confidentiality Requirement" value={asset.securityProfile.confidentialityRequirement} />
+                <MetricCard label="Integrity Requirement" value={asset.securityProfile.integrityRequirement} />
+                <MetricCard label="Availability Requirement" value={asset.securityProfile.availabilityRequirement} />
+              </section>
+            ) : (
+              <section className="rounded-2xl border border-dashed border-border/70 bg-background px-4 py-5 text-sm text-muted-foreground">
+                This asset currently uses vendor severity directly because no environmental profile is assigned.
+              </section>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+      <Sheet open={criticalitySheetOpen} onOpenChange={setCriticalitySheetOpen}>
+        <SheetContent side="right" className="w-full border-l border-border/80 bg-card p-0 sm:max-w-md">
+          <SheetHeader className="border-b border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_96%,black),var(--card))]">
+            <SheetTitle>Criticality</SheetTitle>
+            <SheetDescription>
+              This classification feeds asset risk scoring, prioritization, and executive reporting.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 p-4">
+            <section className="rounded-2xl border border-border/70 bg-background p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    Effective criticality
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Pill>{asset.criticality}</Pill>
+                    <span className="text-sm text-muted-foreground">
+                      {asset.criticalityDetail?.source ?? "Unknown"}
+                    </span>
+                  </div>
+                </div>
+                {asset.criticalityDetail?.source === "ManualOverride" ? (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={(
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 rounded-full border border-border/70 text-muted-foreground hover:text-foreground"
+                          disabled={isResettingCriticality || isSettingCriticality}
+                          onClick={onResetCriticality}
+                          aria-label="Remove manual criticality override"
+                        />
+                      )}
+                    >
+                      {isResettingCriticality ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <RotateCcw className="size-4" />
+                      )}
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Remove manual override and let rules or baseline criticality take over
+                    </TooltipContent>
+                  </Tooltip>
+                ) : null}
+              </div>
+              <div className="mt-4">
+                <Select
+                  value={asset.criticality}
+                  onValueChange={(value) => {
+                    if (value && value !== asset.criticality) {
+                      onSetCriticality(value)
+                    }
+                  }}
+                >
+                  <SelectTrigger
+                    className="h-9 w-full rounded-xl border-border/70 bg-background/80 px-3"
+                    disabled={isSettingCriticality || isResettingCriticality}
+                  >
+                    {isSettingCriticality ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="size-4 animate-spin" />
+                        Saving...
+                      </div>
+                    ) : (
+                      <SelectValue />
+                    )}
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                    {criticalityOptions.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </section>
 
-function SecurityProfilePanel({
-  asset,
-  securityProfiles,
-  isAssigningSecurityProfile,
-  onAssignSecurityProfile,
-}: {
-  asset: AssetDetail
-  securityProfiles: SecurityProfile[]
-  isAssigningSecurityProfile: boolean
-  onAssignSecurityProfile: (assetId: string, securityProfileId: string | null) => void
-}) {
-  return (
-    <section className="rounded-2xl border border-border/70 bg-background p-4">
-      <SectionHeader title="Environmental severity profile" description="Reusable environment settings used to recalculate effective vulnerability severity for this asset." />
-      <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-        <select
-          className="rounded-md border border-input bg-card px-3 py-2 text-sm"
-          value={asset.securityProfile?.id ?? ''}
-          onChange={(event) => onAssignSecurityProfile(asset.id, event.target.value || null)}
-          disabled={isAssigningSecurityProfile}
-        >
-          <option value="">No security profile</option>
-          {securityProfiles.map((profile) => (
-            <option key={profile.id} value={profile.id}>
-              {profile.name} • {profile.internetReachability}
-            </option>
-          ))}
-        </select>
-        <div className="rounded-xl border border-border/70 bg-card px-3 py-3 text-sm text-muted-foreground">
-          {isAssigningSecurityProfile ? 'Applying profile...' : asset.securityProfile?.name ?? 'Using vendor severity only'}
-        </div>
-      </div>
-      {asset.securityProfile ? (
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <MetricCard label="Environment Class" value={asset.securityProfile.environmentClass} />
-          <MetricCard label="Reachability" value={asset.securityProfile.internetReachability} />
-          <MetricCard label="Confidentiality Requirement" value={asset.securityProfile.confidentialityRequirement} />
-          <MetricCard label="Integrity Requirement" value={asset.securityProfile.integrityRequirement} />
-          <MetricCard label="Availability Requirement" value={asset.securityProfile.availabilityRequirement} />
-        </div>
-      ) : null}
-    </section>
-  )
+            <section className="grid gap-3">
+              <MetricCard
+                label="Reason"
+                value={
+                  asset.criticalityDetail?.reason
+                    ?? "No rule or manual rationale has been recorded."
+                }
+              />
+              <MetricCard
+                label="Updated"
+                value={
+                  asset.criticalityDetail?.updatedAt
+                    ? formatUtcTimestamp(asset.criticalityDetail.updatedAt)
+                    : "Unknown"
+                }
+              />
+            </section>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
 }
 
 function TabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
@@ -784,3 +891,5 @@ function getDefaultDescription(assetType: string): string {
 function formatUtcTimestamp(value: string): string {
   return new Date(value).toUTCString()
 }
+
+const criticalityOptions = ['Critical', 'High', 'Medium', 'Low'] as const
