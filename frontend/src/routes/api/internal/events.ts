@@ -5,8 +5,9 @@ export const Route = createFileRoute('/api/internal/events')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const expectedSecret = process.env.INTERNAL_EVENT_SECRET
         const internalToken = request.headers.get('X-Internal-Token')
-        if (!internalToken || internalToken !== process.env.INTERNAL_EVENT_SECRET) {
+        if (!expectedSecret || !internalToken || internalToken !== expectedSecret) {
           return new Response('Forbidden', { status: 403 })
         }
 

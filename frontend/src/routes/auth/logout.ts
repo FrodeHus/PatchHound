@@ -10,7 +10,20 @@ export const Route = createFileRoute('/auth/logout')({
         await session.destroy()
 
         const tenantId = process.env.ENTRA_TENANT_ID
-        const postLogoutUri = encodeURIComponent(process.env.FRONTEND_ORIGIN ?? 'http://localhost:3000')
+        const frontendOrigin = process.env.FRONTEND_ORIGIN ?? 'http://localhost:3000'
+
+        let validatedOrigin: string
+        try {
+          const parsed = new URL(frontendOrigin)
+          if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+            throw new Error('FRONTEND_ORIGIN must use HTTPS in production')
+          }
+          validatedOrigin = parsed.origin
+        } catch {
+          validatedOrigin = 'http://localhost:3000'
+        }
+
+        const postLogoutUri = encodeURIComponent(validatedOrigin)
         const logoutUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/logout?post_logout_redirect_uri=${postLogoutUri}`
 
         return redirectResponse(logoutUrl)

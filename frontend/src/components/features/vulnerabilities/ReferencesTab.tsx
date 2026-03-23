@@ -24,17 +24,22 @@ const columns: ColumnDef<Reference>[] = [
   {
     accessorKey: 'url',
     header: ({ column }) => <SortableColumnHeader column={column} title="URL" />,
-    cell: ({ row }) => (
-      <a
-        href={row.original.url}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
-      >
-        <span className="break-all text-sm">{row.original.url}</span>
-        <ExternalLinkIcon className="size-3.5 shrink-0" />
-      </a>
-    ),
+    cell: ({ row }) => {
+      const safeUrl = /^https?:\/\//i.test(row.original.url) ? row.original.url : undefined
+      return safeUrl ? (
+        <a
+          href={safeUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
+        >
+          <span className="break-all text-sm">{row.original.url}</span>
+          <ExternalLinkIcon className="size-3.5 shrink-0" />
+        </a>
+      ) : (
+        <span className="break-all text-sm text-muted-foreground">{row.original.url}</span>
+      )
+    },
   },
   {
     accessorKey: 'tags',
