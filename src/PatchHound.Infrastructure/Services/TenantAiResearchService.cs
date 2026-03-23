@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using PatchHound.Core.Common;
@@ -147,9 +148,18 @@ public partial class TenantAiResearchService : ITenantAiResearchService
 
         foreach (var source in sources)
         {
+            if (!IsAllowedUrl(source.Url))
+            {
+                continue;
+            }
+
             try
             {
-                using var response = await _httpClient.GetAsync($"https://r.jina.ai/http://{source.Url.Replace("https://", string.Empty, StringComparison.OrdinalIgnoreCase).Replace("http://", string.Empty, StringComparison.OrdinalIgnoreCase)}", ct);
+                var normalizedUrl = source.Url
+                    .Replace("https://", string.Empty, StringComparison.OrdinalIgnoreCase)
+                    .Replace("http://", string.Empty, StringComparison.OrdinalIgnoreCase);
+                using var response = await _httpClient.GetAsync(
+                    $"https://r.jina.ai/http://{normalizedUrl}", ct);
                 if (!response.IsSuccessStatusCode)
                 {
                     continue;
@@ -174,6 +184,51 @@ public partial class TenantAiResearchService : ITenantAiResearchService
         }
 
         return contexts;
+    }
+
+    private static bool IsAllowedUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        if (uri.Scheme is not ("http" or "https"))
+        {
+            return false;
+        }
+
+        var host = uri.Host;
+
+        // Block private/internal/link-local addresses
+        if (IPAddress.TryParse(host, out var ip))
+        {
+            if (ip.AddressFamily == AddressFamily.InterNetworkV6 && ip.IsIPv6LinkLocal)
+                return false;
+            var bytes = ip.GetAddressBytes();
+            if (bytes.Length == 4)
+            {
+                // 10.x.x.x, 172.16-31.x.x, 192.168.x.x, 127.x.x.x, 169.254.x.x
+                if (bytes[0] == 10) return false;
+                if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) return false;
+                if (bytes[0] == 192 && bytes[1] == 168) return false;
+                if (bytes[0] == 127) return false;
+                if (bytes[0] == 169 && bytes[1] == 254) return false;
+                if (bytes[0] == 0) return false;
+            }
+        }
+        else
+        {
+            // Block common internal hostnames
+            if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (host.EndsWith(".local", StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (host.EndsWith(".internal", StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return true;
     }
 
     private static string? ExtractSourceSnippet(string body)

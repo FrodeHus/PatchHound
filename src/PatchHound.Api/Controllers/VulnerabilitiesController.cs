@@ -183,11 +183,9 @@ public class VulnerabilitiesController : ControllerBase
                 }
             );
 
-        var itemRows = await query
-            .OrderByDescending(v => v.VulnerabilityDefinition.CvssScore)
-            .ThenByDescending(v => v.VulnerabilityDefinition.PublishedDate)
-            .Skip(pagination.Skip)
-            .Take(pagination.BoundedPageSize)
+        var itemRows = await _dbContext
+            .TenantVulnerabilities.AsNoTracking()
+            .Where(v => tenantVulnerabilityIds.Contains(v.Id))
             .Select(v => new
             {
                 v.Id,
@@ -246,7 +244,11 @@ public class VulnerabilitiesController : ControllerBase
             })
             .ToListAsync(ct);
 
-        var items = itemRows
+        // Preserve the sort order from the paginated ID query
+        var itemRowsById = itemRows.ToDictionary(v => v.Id);
+        var items = tenantVulnerabilityIds
+            .Where(id => itemRowsById.ContainsKey(id))
+            .Select(id => itemRowsById[id])
             .Select(v => new VulnerabilityDto(
                 v.Id,
                 v.ExternalId,

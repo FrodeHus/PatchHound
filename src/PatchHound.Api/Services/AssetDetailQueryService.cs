@@ -397,6 +397,14 @@ public class AssetDetailQueryService(
             asset.Description,
             asset.AssetType.ToString(),
             asset.Criticality.ToString(),
+            asset.CriticalitySource is { Length: > 0 }
+                ? new AssetCriticalityDetailDto(
+                    asset.CriticalitySource,
+                    asset.CriticalityReason,
+                    asset.CriticalityRuleId,
+                    asset.CriticalityUpdatedAt
+                )
+                : null,
             asset.OwnerType.ToString(),
             asset.OwnerUserId,
             asset.OwnerTeamId,

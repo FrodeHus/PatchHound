@@ -16,6 +16,12 @@ const assetFixture: AssetDetail = {
   description: "Endpoint agent",
   assetType: "Software",
   criticality: "High",
+  criticalityDetail: {
+    source: "Rule",
+    reason: "Matched the Tier 0 software rule.",
+    ruleId: "88888888-8888-8888-8888-888888888888",
+    updatedAt: "2026-03-10T10:00:00Z",
+  },
   ownerType: "Team",
   ownerUserId: null,
   ownerTeamId: "33333333-3333-3333-3333-333333333333",

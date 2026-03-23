@@ -67,6 +67,11 @@ public class AssetsControllerTests : IDisposable
             snapshotResolver,
             aliasResolver
         );
+        var assetRuleEvaluationService = new AssetRuleEvaluationService(
+            _dbContext,
+            new AssetRuleFilterBuilder(_dbContext),
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<AssetRuleEvaluationService>>()
+        );
         _controller = new AssetsController(
             _dbContext,
             assetService,
@@ -75,7 +80,8 @@ public class AssetsControllerTests : IDisposable
             _tenantContext,
             snapshotResolver,
             detailQueryService,
-            riskRefreshService
+            riskRefreshService,
+            assetRuleEvaluationService
         );
     }
 
@@ -285,6 +291,8 @@ public class AssetsControllerTests : IDisposable
         payload.Risk.TopDrivers.Should().ContainSingle();
         payload.Risk.TopDrivers[0].ExternalId.Should().Be("CVE-2026-9010");
         payload.Risk.TopDrivers[0].EpisodeRiskScore.Should().Be(790m);
+        payload.CriticalityDetail.Should().NotBeNull();
+        payload.CriticalityDetail!.Source.Should().Be("Default");
     }
 
     [Fact]
@@ -409,6 +417,38 @@ public class AssetsControllerTests : IDisposable
         var assetRisk = await _dbContext.AssetRiskScores.SingleAsync(item => item.AssetId == asset.Id);
         assetRisk.OverallScore.Should().BeLessThan(742.5m);
         assetRisk.OpenEpisodeCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ResetCriticalityOverride_RemovesManualOverrideAndReappliesRule()
+    {
+        var asset = Asset.Create(_tenantId, "asset-reset", AssetType.Device, "Tier0-App-01", Criticality.Low);
+        asset.SetCriticality(Criticality.High);
+        var rule = AssetRule.Create(
+            _tenantId,
+            "Tier 0 critical",
+            null,
+            1,
+            new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Tier0-"),
+            [
+                new PatchHound.Core.Models.AssetRuleOperation(
+                    "SetCriticality",
+                    new Dictionary<string, string> { ["criticality"] = "Critical" }
+                )
+            ]
+        );
+
+        await _dbContext.AddRangeAsync(asset, rule);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.ResetCriticalityOverride(asset.Id, CancellationToken.None);
+
+        action.Should().BeOfType<NoContentResult>();
+
+        var refreshed = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        refreshed.Criticality.Should().Be(Criticality.Critical);
+        refreshed.CriticalitySource.Should().Be("Rule");
+        refreshed.CriticalityRuleId.Should().Be(rule.Id);
     }
 
     [Fact]

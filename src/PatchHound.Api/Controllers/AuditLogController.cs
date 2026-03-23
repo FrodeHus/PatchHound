@@ -32,7 +32,12 @@ public class AuditLogController : ControllerBase
         CancellationToken ct
     )
     {
-        var query = _dbContext.AuditLogEntries.AsNoTracking().AsQueryable();
+        if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var query = _dbContext.AuditLogEntries.AsNoTracking()
+            .Where(e => e.TenantId == currentTenantId)
+            .AsQueryable();
 
         if (!string.IsNullOrEmpty(filter.EntityType))
             query = query.Where(e => e.EntityType == filter.EntityType);

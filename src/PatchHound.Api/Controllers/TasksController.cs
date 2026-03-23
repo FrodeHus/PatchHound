@@ -47,7 +47,12 @@ public class TasksController : ControllerBase
         CancellationToken ct
     )
     {
-        var query = _dbContext.RemediationTasks.AsNoTracking().AsQueryable();
+        if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var query = _dbContext.RemediationTasks.AsNoTracking()
+            .Where(t => t.TenantId == currentTenantId)
+            .AsQueryable();
 
         if (
             !string.IsNullOrEmpty(filter.Status)

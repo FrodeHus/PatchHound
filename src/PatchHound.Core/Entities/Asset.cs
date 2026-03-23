@@ -10,7 +10,12 @@ public class Asset
     public AssetType AssetType { get; private set; }
     public string Name { get; private set; } = null!;
     public string? Description { get; private set; }
+    public Criticality BaselineCriticality { get; private set; }
     public Criticality Criticality { get; private set; }
+    public string? CriticalitySource { get; private set; }
+    public string? CriticalityReason { get; private set; }
+    public Guid? CriticalityRuleId { get; private set; }
+    public DateTimeOffset? CriticalityUpdatedAt { get; private set; }
     public OwnerType OwnerType { get; private set; }
     public Guid? OwnerUserId { get; private set; }
     public Guid? OwnerTeamId { get; private set; }
@@ -51,7 +56,10 @@ public class Asset
             ExternalId = externalId,
             AssetType = assetType,
             Name = name,
+            BaselineCriticality = criticality,
             Criticality = criticality,
+            CriticalitySource = "Default",
+            CriticalityUpdatedAt = DateTimeOffset.UtcNow,
             Description = description,
             OwnerType = OwnerType.User,
         };
@@ -74,6 +82,41 @@ public class Asset
     public void SetCriticality(Criticality criticality)
     {
         Criticality = criticality;
+        CriticalitySource = "ManualOverride";
+        CriticalityReason = "Set manually.";
+        CriticalityRuleId = null;
+        CriticalityUpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void SetCriticalityFromRule(
+        Criticality criticality,
+        Guid ruleId,
+        string? reason
+    )
+    {
+        Criticality = criticality;
+        CriticalitySource = "Rule";
+        CriticalityReason = reason;
+        CriticalityRuleId = ruleId;
+        CriticalityUpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void ResetCriticalityToBaseline()
+    {
+        Criticality = BaselineCriticality;
+        CriticalitySource = "Default";
+        CriticalityReason = "No criticality rule currently matches this asset.";
+        CriticalityRuleId = null;
+        CriticalityUpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void ClearManualCriticalityOverride()
+    {
+        Criticality = BaselineCriticality;
+        CriticalitySource = "Default";
+        CriticalityReason = "Manual override removed.";
+        CriticalityRuleId = null;
+        CriticalityUpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void AssignSecurityProfile(Guid? securityProfileId)

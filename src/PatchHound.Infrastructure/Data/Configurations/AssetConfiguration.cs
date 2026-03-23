@@ -30,7 +30,10 @@ public class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.Property(a => a.DeviceOnboardingStatus).HasMaxLength(64);
         builder.Property(a => a.DeviceValue).HasMaxLength(64);
         builder.Property(a => a.AssetType).HasConversion<string>().HasMaxLength(32);
+        builder.Property(a => a.BaselineCriticality).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.Criticality).HasConversion<string>().HasMaxLength(32);
+        builder.Property(a => a.CriticalitySource).HasMaxLength(32);
+        builder.Property(a => a.CriticalityReason).HasMaxLength(512);
         builder.Property(a => a.OwnerType).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.Metadata).HasColumnType("text");
 

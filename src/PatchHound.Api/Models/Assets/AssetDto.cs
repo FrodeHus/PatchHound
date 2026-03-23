@@ -30,6 +30,7 @@ public record AssetDetailDto(
     string? Description,
     string AssetType,
     string Criticality,
+    AssetCriticalityDetailDto? CriticalityDetail,
     string OwnerType,
     Guid? OwnerUserId,
     Guid? OwnerTeamId,
@@ -56,6 +57,13 @@ public record AssetDetailDto(
     IReadOnlyList<AssetVulnerabilityDto> Vulnerabilities,
     IReadOnlyList<AssetSoftwareInstallationDto> SoftwareInventory,
     IReadOnlyList<AssetKnownSoftwareVulnerabilityDto> KnownSoftwareVulnerabilities
+);
+
+public record AssetCriticalityDetailDto(
+    string Source,
+    string? Reason,
+    Guid? RuleId,
+    DateTimeOffset? UpdatedAt
 );
 
 public record AssetRiskDetailDto(
