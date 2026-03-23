@@ -147,8 +147,8 @@ function DashboardPage() {
   const drillToAssets = useCallback(
     (deviceGroup: string) => {
       void globalNavigate({
-        to: '/assets',
-        search: { page: 1, pageSize: 25, search: '', assetType: '', criticality: '', ownerType: '', deviceGroup, healthStatus: '', onboardingStatus: '', riskScore: '', exposureLevel: '', tag: '', unassignedOnly: false },
+        to: '/devices',
+        search: { page: 1, pageSize: 25, search: '', criticality: '', ownerType: '', deviceGroup, healthStatus: '', onboardingStatus: '', riskScore: '', exposureLevel: '', tag: '', unassignedOnly: false },
       } as never)
     },
     [globalNavigate],

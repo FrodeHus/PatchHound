@@ -1,4 +1,4 @@
-type AssetsListSearch = {
+export type AssetsListSearch = {
   search: string
   assetType: string
   criticality: string

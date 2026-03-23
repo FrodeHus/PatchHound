@@ -6,7 +6,7 @@ import { SoftwareRemediationView } from '@/components/features/remediation/Softw
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { assetQueryKeys } from '@/features/assets/list-state'
 
-export const Route = createFileRoute('/_authed/assets/$id/remediation')({
+export const Route = createFileRoute('/_authed/assets/$id_/remediation')({
   loader: ({ params }) => fetchRemediationContext({ data: { assetId: params.id } }),
   component: RemediationPage,
 })

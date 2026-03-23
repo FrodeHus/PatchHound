@@ -50,10 +50,9 @@ export function DeviceHealthCard({ healthBreakdown, isLoading }: DeviceHealthCar
                   .map(([status, count]) => (
                     <Link
                       key={status}
-                      to="/assets"
+                      to="/devices"
                       search={{
                         search: '',
-                        assetType: 'Device',
                         criticality: '',
                         ownerType: '',
                         deviceGroup: '',
