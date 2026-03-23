@@ -72,6 +72,15 @@ export function AssetDetailPageView({
                   Open software workspace
                 </Link>
               ) : null}
+              {asset.assetType === "Software" ? (
+                <Link
+                  to="/assets/$id/remediation"
+                  params={{ id: asset.id }}
+                  className="mt-3 ml-2 inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
+                >
+                  Open remediation view
+                </Link>
+              ) : null}
             </div>
           </div>
           <div className="rounded-2xl border border-border/70 bg-background/50 p-4 text-right">

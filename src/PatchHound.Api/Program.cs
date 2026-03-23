@@ -285,6 +285,7 @@ builder.Services.AddScoped<PatchHound.Api.Services.TenantSoftwareAliasResolver>(
 builder.Services.AddScoped<PatchHound.Api.Services.DashboardQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.VulnerabilityDetailQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.AssetDetailQueryService>();
+builder.Services.AddScoped<PatchHound.Api.Services.SoftwareRemediationQueryService>();
 builder.Services.AddHttpContextAccessor();
 
 // SignalR

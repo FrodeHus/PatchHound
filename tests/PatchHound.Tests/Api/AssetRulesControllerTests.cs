@@ -180,6 +180,98 @@ public class AssetRulesControllerTests : IDisposable
         problem.Title.Should().Be("AssignTeam requires a valid teamId.");
     }
 
+    [Fact]
+    public async Task Delete_ClearsDeletedRuleEffectsAndFallsBackToDefaults()
+    {
+        var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var dbContext = new PatchHoundDbContext(options, TestServiceProviderFactory.Create(_tenantContext));
+        var snapshotResolver = new TenantSnapshotResolver(dbContext);
+        var assessmentService = new VulnerabilityAssessmentService(
+            dbContext,
+            new EnvironmentalSeverityCalculator(),
+            snapshotResolver
+        );
+        var evaluationService = new AssetRuleEvaluationService(
+            dbContext,
+            new AssetRuleFilterBuilder(dbContext),
+            Substitute.For<ILogger<AssetRuleEvaluationService>>()
+        );
+        var riskRefreshService = new RiskRefreshService(
+            dbContext,
+            snapshotResolver,
+            assessmentService,
+            new VulnerabilityEpisodeRiskAssessmentService(dbContext),
+            new RiskScoreService(dbContext, Substitute.For<ILogger<RiskScoreService>>())
+        );
+        var controller = new AssetRulesController(
+            dbContext,
+            _tenantContext,
+            evaluationService,
+            riskRefreshService
+        );
+
+        var team = Team.Create(_tenantId, "Fallback team");
+        var profile = AssetSecurityProfile.Create(
+            _tenantId,
+            "Production",
+            null,
+            EnvironmentClass.Server,
+            InternetReachability.Internet,
+            SecurityRequirementLevel.High,
+            SecurityRequirementLevel.High,
+            SecurityRequirementLevel.High
+        );
+        var asset = Asset.Create(_tenantId, "asset-1", AssetType.Device, "Prod Server 01", Criticality.High);
+        var rule = AssetRule.Create(
+            _tenantId,
+            "Prod server defaults",
+            null,
+            1,
+            new FilterCondition("Name", "Contains", "Prod"),
+            [
+                new AssetRuleOperation("AssignSecurityProfile", new Dictionary<string, string>
+                {
+                    ["securityProfileId"] = profile.Id.ToString()
+                }),
+                new AssetRuleOperation("AssignTeam", new Dictionary<string, string>
+                {
+                    ["teamId"] = team.Id.ToString()
+                }),
+                new AssetRuleOperation("SetCriticality", new Dictionary<string, string>
+                {
+                    ["criticality"] = Criticality.Critical.ToString()
+                })
+            ]
+        );
+
+        await dbContext.AddRangeAsync(team, profile, asset, rule);
+        await dbContext.SaveChangesAsync();
+
+        asset.AssignSecurityProfile(profile.Id);
+        dbContext.Entry(asset).Property(nameof(Asset.FallbackTeamId)).CurrentValue = team.Id;
+        asset.SetCriticalityFromRule(Criticality.Critical, rule.Id, "Matched asset rule.");
+        await dbContext.SaveChangesAsync();
+
+        var beforeDelete = await dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        beforeDelete.SecurityProfileId.Should().Be(profile.Id);
+        beforeDelete.FallbackTeamId.Should().Be(team.Id);
+        beforeDelete.Criticality.Should().Be(Criticality.Critical);
+        beforeDelete.CriticalitySource.Should().Be("Rule");
+
+        var action = await controller.Delete(rule.Id, CancellationToken.None);
+
+        action.Should().BeOfType<NoContentResult>();
+
+        var refreshed = await dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        refreshed.SecurityProfileId.Should().BeNull();
+        refreshed.FallbackTeamId.Should().BeNull();
+        refreshed.Criticality.Should().Be(Criticality.High);
+        refreshed.CriticalitySource.Should().Be("Default");
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

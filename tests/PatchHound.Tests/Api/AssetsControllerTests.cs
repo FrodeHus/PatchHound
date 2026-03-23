@@ -72,6 +72,10 @@ public class AssetsControllerTests : IDisposable
             new AssetRuleFilterBuilder(_dbContext),
             Substitute.For<Microsoft.Extensions.Logging.ILogger<AssetRuleEvaluationService>>()
         );
+        var remediationQueryService = new PatchHound.Api.Services.SoftwareRemediationQueryService(
+            _dbContext,
+            snapshotResolver
+        );
         _controller = new AssetsController(
             _dbContext,
             assetService,
@@ -80,6 +84,7 @@ public class AssetsControllerTests : IDisposable
             _tenantContext,
             snapshotResolver,
             detailQueryService,
+            remediationQueryService,
             riskRefreshService,
             assetRuleEvaluationService
         );

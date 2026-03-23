@@ -53,4 +53,5 @@ export const assetQueryKeys = {
     search.pageSize,
   ] as const,
   detail: (tenantId: string | null, assetId: string | null) => [...assetQueryKeys.all, 'detail', tenantId, assetId] as const,
+  remediation: (tenantId: string | null, assetId: string) => [...assetQueryKeys.all, 'remediation', tenantId, assetId] as const,
 }
