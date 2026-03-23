@@ -141,7 +141,7 @@ export function SoftwareTable({
             <Link
               to="/software/$id"
               params={{ id: row.original.id }}
-              search={{ page: 1, pageSize: 25, version: '' }}
+              search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
               className="font-medium underline decoration-border/70 underline-offset-4 hover:decoration-foreground"
             >
               {startCase(row.original.canonicalName)}

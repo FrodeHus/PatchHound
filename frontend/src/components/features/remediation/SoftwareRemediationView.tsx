@@ -26,9 +26,10 @@ import {
 type SoftwareRemediationViewProps = {
   data: DecisionContext
   assetId: string
+  embedded?: boolean
 }
 
-export function SoftwareRemediationView({ data, assetId }: SoftwareRemediationViewProps) {
+export function SoftwareRemediationView({ data, assetId, embedded = false }: SoftwareRemediationViewProps) {
   const [selectedVuln, setSelectedVuln] = useState<DecisionVuln | null>(null)
   const { selectedTenantId } = useTenantScope()
   const queryClient = useQueryClient()
@@ -55,28 +56,30 @@ export function SoftwareRemediationView({ data, assetId }: SoftwareRemediationVi
 
   return (
     <section className="space-y-5">
-      {/* Header */}
-      <header className="flex flex-wrap items-center gap-3">
-        <Link
-          to="/assets/$id"
-          params={{ id: assetId }}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Back to asset
-        </Link>
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">{data.assetName}</h1>
-          <span className="rounded-full border border-border/70 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-            {data.criticality} criticality
-          </span>
-          {data.riskScore ? (
-            <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${toneBadge(riskBandTone(data.riskScore.riskBand))}`}>
-              {data.riskScore.riskBand} ({data.riskScore.compositeScore.toFixed(0)})
+      {/* Header — hidden when embedded in the software detail page */}
+      {!embedded ? (
+        <header className="flex flex-wrap items-center gap-3">
+          <Link
+            to="/assets/$id"
+            params={{ id: assetId }}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" />
+            Back to asset
+          </Link>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">{data.assetName}</h1>
+            <span className="rounded-full border border-border/70 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+              {data.criticality} criticality
             </span>
-          ) : null}
-        </div>
-      </header>
+            {data.riskScore ? (
+              <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${toneBadge(riskBandTone(data.riskScore.riskBand))}`}>
+                {data.riskScore.riskBand} ({data.riskScore.compositeScore.toFixed(0)})
+              </span>
+            ) : null}
+          </div>
+        </header>
+      ) : null}
 
       {/* SLA Indicator */}
       {data.sla ? <SlaIndicator sla={data.sla} /> : null}

@@ -373,7 +373,7 @@ export function AssetDetailPane({
                   <Link
                     to="/software/$id"
                     params={{ id: asset.tenantSoftwareId }}
-                    search={{ page: 1, pageSize: 25, version: '' }}
+                    search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
                     className="flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary transition hover:bg-primary/15"
                   >
                     Software workspace

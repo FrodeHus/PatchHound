@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { Link } from "@tanstack/react-router";
+import { ShieldAlert, LayoutList, Sparkles } from 'lucide-react'
 import type {
   TenantSoftwareDetail,
   TenantSoftwareVulnerability,
@@ -10,14 +11,22 @@ import { SoftwareAiReportTab } from '@/components/features/software/SoftwareAiRe
 import { SoftwareDescriptionPanel } from '@/components/features/software/SoftwareDescriptionPanel'
 import { SoftwareRemediationView } from '@/components/features/remediation/SoftwareRemediationView'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
-import { toneDot, toneText } from '@/lib/tone-classes'
-import { Button } from '@/components/ui/button'
+import { toneBadge, toneDot, toneText } from '@/lib/tone-classes'
+import {
+  approvalStatusTone,
+  outcomeTone,
+  outcomeLabel,
+} from '@/components/features/remediation/remediation-utils'
+
+type TabId = 'overview' | 'remediation' | 'ai'
 
 type SoftwareDetailPageProps = {
   detail: TenantSoftwareDetail
   selectedVersion: string
   installations: PagedTenantSoftwareInstallations
   vulnerabilities: TenantSoftwareVulnerability[]
+  activeTab: TabId
+  onTabChange: (tab: TabId) => void
   onSelectVersion: (version: string) => void
   onPageChange: (page: number) => void
   canViewRemediation: boolean
@@ -30,15 +39,14 @@ export function SoftwareDetailPage({
   selectedVersion,
   installations,
   vulnerabilities,
+  activeTab,
+  onTabChange,
   onSelectVersion,
   onPageChange,
   canViewRemediation,
   remediationData,
   primarySoftwareAssetId,
 }: SoftwareDetailPageProps) {
-  const [activeInsightTab, setActiveInsightTab] = useState<
-    "vulnerabilities" | "ai" | "remediation"
-  >("vulnerabilities");
   const activeVersion =
     detail.versionCohorts.find(
       (cohort) => normalizeVersion(cohort.version) === selectedVersion,
@@ -46,8 +54,11 @@ export function SoftwareDetailPage({
     detail.versionCohorts[0] ??
     null;
 
+  const pendingApproval = remediationData?.currentDecision?.approvalStatus === 'PendingApproval'
+
   return (
     <section className="space-y-5">
+      {/* Compact hero header */}
       <header className="overflow-hidden rounded-2xl border border-border/70 bg-[linear-gradient(140deg,color-mix(in_oklab,var(--primary)_12%,transparent),transparent_45%),linear-gradient(180deg,color-mix(in_oklab,var(--foreground)_4%,transparent),transparent_60%),var(--color-card)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-3">
@@ -111,49 +122,87 @@ export function SoftwareDetailPage({
         </div>
       </header>
 
-      <section className="rounded-2xl border border-border/70 bg-card p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <h2 className="text-lg font-semibold">Remediation tasks</h2>
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              Follow the current software patching backlog linked to this software footprint, or create missing patching tasks for the currently exposed owner teams.
-            </p>
-            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-              <span>
-                {detail.remediation.openTaskCount} open task
-                {detail.remediation.openTaskCount === 1 ? '' : 's'}
+      {/* Top-level tab bar */}
+      <nav className="flex items-center gap-1 rounded-full border border-border/70 bg-card p-1">
+        <TopTab
+          isActive={activeTab === 'overview'}
+          onClick={() => onTabChange('overview')}
+          icon={<LayoutList className="size-3.5" />}
+          label="Overview"
+        />
+        {canViewRemediation ? (
+          <TopTab
+            isActive={activeTab === 'remediation'}
+            onClick={() => onTabChange('remediation')}
+            icon={<ShieldAlert className="size-3.5" />}
+            label="Remediation"
+            badge={remediationData?.currentDecision ? (
+              <span className={`ml-1.5 inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none ${
+                pendingApproval
+                  ? toneBadge(approvalStatusTone('PendingApproval'))
+                  : toneBadge(outcomeTone(remediationData.currentDecision.outcome))
+              }`}>
+                {pendingApproval
+                  ? 'Pending'
+                  : outcomeLabel(remediationData.currentDecision.outcome)}
               </span>
-              <span>
-                {detail.remediation.overdueTaskCount} overdue
+            ) : remediationData ? (
+              <span className="ml-1.5 inline-flex rounded-full border border-border/70 bg-muted px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground">
+                No decision
               </span>
-              <span>
-                Nearest due {detail.remediation.nearestDueDate ? formatDate(detail.remediation.nearestDueDate) : 'not set'}
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              render={
-                <Link
-                  to="/remediation"
-                  search={{
-                    page: 1,
-                    pageSize: 25,
-                    search: '',
-                    criticality: '',
-                    outcome: '',
-                    approvalStatus: '',
-                  }}
-                />
-              }
-            >
-              Remediation overview
-            </Button>
-          </div>
-        </div>
-      </section>
+            ) : null}
+          />
+        ) : null}
+        <TopTab
+          isActive={activeTab === 'ai'}
+          onClick={() => onTabChange('ai')}
+          icon={<Sparkles className="size-3.5" />}
+          label="AI Insights"
+        />
+      </nav>
 
+      {/* Tab content */}
+      {activeTab === 'overview' ? (
+        <OverviewTab
+          detail={detail}
+          selectedVersion={selectedVersion}
+          activeVersion={activeVersion}
+          installations={installations}
+          vulnerabilities={vulnerabilities}
+          onSelectVersion={onSelectVersion}
+          onPageChange={onPageChange}
+        />
+      ) : activeTab === 'remediation' && canViewRemediation && remediationData && primarySoftwareAssetId ? (
+        <SoftwareRemediationView data={remediationData} assetId={primarySoftwareAssetId} embedded />
+      ) : activeTab === 'ai' ? (
+        <AiInsightsTab detail={detail} />
+      ) : null}
+    </section>
+  );
+}
+
+/* ── Overview Tab ────────────────────────────────────────────── */
+
+function OverviewTab({
+  detail,
+  selectedVersion,
+  activeVersion,
+  installations,
+  vulnerabilities,
+  onSelectVersion,
+  onPageChange,
+}: {
+  detail: TenantSoftwareDetail
+  selectedVersion: string
+  activeVersion: TenantSoftwareDetail['versionCohorts'][number] | null
+  installations: PagedTenantSoftwareInstallations
+  vulnerabilities: TenantSoftwareVulnerability[]
+  onSelectVersion: (version: string) => void
+  onPageChange: (page: number) => void
+}) {
+  return (
+    <>
+      {/* Version Pressure Rail */}
       <section className="rounded-2xl border border-border/70 bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -223,8 +272,10 @@ export function SoftwareDetailPage({
         </div>
       </section>
 
+      {/* Two-column layout */}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
         <div className="space-y-4">
+          {/* Cohort Installations */}
           <section className="rounded-2xl border border-border/70 bg-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -348,124 +399,82 @@ export function SoftwareDetailPage({
             </div>
           </section>
 
+          {/* Known Vulnerabilities */}
           <section className="rounded-2xl border border-border/70 bg-card p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold">Analysis workspace</h2>
-                <p className="text-sm text-muted-foreground">
-                  Review linked vulnerabilities or generate an AI summary from
-                  the merged software exposure payload.
-                </p>
-              </div>
-              <div className="flex gap-2 rounded-full border border-border/70 bg-background p-1">
-                <InsightTabButton
-                  isActive={activeInsightTab === "vulnerabilities"}
-                  label="Known vulnerabilities"
-                  onClick={() => setActiveInsightTab("vulnerabilities")}
-                />
-                <InsightTabButton
-                  isActive={activeInsightTab === "ai"}
-                  label="AI report"
-                  onClick={() => setActiveInsightTab("ai")}
-                />
-                {canViewRemediation ? (
-                  <InsightTabButton
-                    isActive={activeInsightTab === "remediation"}
-                    label="Remediation"
-                    onClick={() => setActiveInsightTab("remediation")}
-                  />
-                ) : null}
-              </div>
-            </div>
-
-            {activeInsightTab === "vulnerabilities" ? (
-              vulnerabilities.length === 0 ? (
-                <p className="mt-5 text-sm text-muted-foreground">
-                  No vulnerability matches are currently projected for this
-                  software.
-                </p>
-              ) : (
-                <div className="mt-5 space-y-3">
-                  {vulnerabilities.map((item) => (
-                    <Link
-                      key={item.tenantVulnerabilityId}
-                      to="/vulnerabilities/$id"
-                      params={{ id: item.tenantVulnerabilityId }}
-                      className="block rounded-xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-medium">{item.title}</p>
-                            <Pill>{item.vendorSeverity}</Pill>
-                            {item.bestConfidence ? (
-                              <Pill>{item.bestConfidence}</Pill>
-                            ) : null}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {item.externalId} • {item.source}
-                            {item.cvssScore !== null
-                              ? ` • CVSS ${item.cvssScore.toFixed(1)}`
-                              : ""}
-                          </p>
-                          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                            <span>{item.affectedInstallCount} installs</span>
-                            <span>{item.affectedDeviceCount} devices</span>
-                            <span>{item.affectedVersionCount} versions</span>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {item.affectedVersions.map((version) => (
-                              <span
-                                key={version}
-                                className={
-                                  normalizeVersion(version) === selectedVersion
-                                    ? "rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs text-primary"
-                                    : "rounded-full border border-border/70 bg-card px-2 py-1 text-xs text-muted-foreground"
-                                }
-                              >
-                                {version}
-                              </span>
-                            ))}
-                          </div>
-                          {item.evidence[0] ? (
-                            <p className="text-xs text-muted-foreground">
-                              {item.evidence[0].evidence}
-                            </p>
+            <h2 className="text-lg font-semibold">Known vulnerabilities</h2>
+            <p className="text-sm text-muted-foreground">
+              Vulnerability matches projected for this software identity.
+            </p>
+            {vulnerabilities.length === 0 ? (
+              <p className="mt-5 text-sm text-muted-foreground">
+                No vulnerability matches are currently projected for this
+                software.
+              </p>
+            ) : (
+              <div className="mt-5 space-y-3">
+                {vulnerabilities.map((item) => (
+                  <Link
+                    key={item.tenantVulnerabilityId}
+                    to="/vulnerabilities/$id"
+                    params={{ id: item.tenantVulnerabilityId }}
+                    className="block rounded-xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{item.title}</p>
+                          <Pill>{item.vendorSeverity}</Pill>
+                          {item.bestConfidence ? (
+                            <Pill>{item.bestConfidence}</Pill>
                           ) : null}
                         </div>
-                        <div className="text-right text-xs text-muted-foreground">
-                          <p>{item.bestMatchMethod}</p>
-                          <p className="mt-1">
-                            Seen {formatDate(item.lastSeenAt)}
-                          </p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.externalId} • {item.source}
+                          {item.cvssScore !== null
+                            ? ` • CVSS ${item.cvssScore.toFixed(1)}`
+                            : ""}
+                        </p>
+                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          <span>{item.affectedInstallCount} installs</span>
+                          <span>{item.affectedDeviceCount} devices</span>
+                          <span>{item.affectedVersionCount} versions</span>
                         </div>
+                        <div className="flex flex-wrap gap-1">
+                          {item.affectedVersions.map((version) => (
+                            <span
+                              key={version}
+                              className={
+                                normalizeVersion(version) === selectedVersion
+                                  ? "rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs text-primary"
+                                  : "rounded-full border border-border/70 bg-card px-2 py-1 text-xs text-muted-foreground"
+                              }
+                            >
+                              {version}
+                            </span>
+                          ))}
+                        </div>
+                        {item.evidence[0] ? (
+                          <p className="text-xs text-muted-foreground">
+                            {item.evidence[0].evidence}
+                          </p>
+                        ) : null}
                       </div>
-                    </Link>
-                  ))}
-                </div>
-              )
-            ) : activeInsightTab === "remediation" && remediationData && primarySoftwareAssetId ? (
-              <div className="mt-5">
-                <SoftwareRemediationView data={remediationData} assetId={primarySoftwareAssetId} />
+                      <div className="text-right text-xs text-muted-foreground">
+                        <p>{item.bestMatchMethod}</p>
+                        <p className="mt-1">
+                          Seen {formatDate(item.lastSeenAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
               </div>
-            ) : activeInsightTab === "ai" ? (
-              <div className="mt-5">
-                <SoftwareAiReportTab tenantSoftwareId={detail.id} />
-              </div>
-            ) : null}
+            )}
           </section>
         </div>
 
+        {/* Right aside */}
         <aside className="space-y-4">
-          <SoftwareDescriptionPanel
-            tenantSoftwareId={detail.id}
-            initialDescription={detail.description}
-            initialGeneratedAt={detail.descriptionGeneratedAt}
-            initialProviderType={detail.descriptionProviderType}
-            initialProfileName={detail.descriptionProfileName}
-            initialModel={detail.descriptionModel}
-          />
-
           <section className="rounded-2xl border border-border/70 bg-card p-5">
             <h2 className="text-lg font-semibold">Identity rail</h2>
             <div className="mt-4 grid gap-3">
@@ -531,17 +540,41 @@ export function SoftwareDetailPage({
           </section>
         </aside>
       </div>
-    </section>
-  );
+    </>
+  )
 }
 
-function InsightTabButton({
+/* ── AI Insights Tab ─────────────────────────────────────────── */
+
+function AiInsightsTab({ detail }: { detail: TenantSoftwareDetail }) {
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+      <SoftwareAiReportTab tenantSoftwareId={detail.id} />
+      <SoftwareDescriptionPanel
+        tenantSoftwareId={detail.id}
+        initialDescription={detail.description}
+        initialGeneratedAt={detail.descriptionGeneratedAt}
+        initialProviderType={detail.descriptionProviderType}
+        initialProfileName={detail.descriptionProfileName}
+        initialModel={detail.descriptionModel}
+      />
+    </div>
+  )
+}
+
+/* ── Shared sub-components ───────────────────────────────────── */
+
+function TopTab({
   isActive,
   label,
+  icon,
+  badge,
   onClick,
 }: {
   isActive: boolean
   label: string
+  icon: ReactNode
+  badge?: ReactNode
   onClick: () => void
 }) {
   return (
@@ -550,11 +583,13 @@ function InsightTabButton({
       onClick={onClick}
       className={
         isActive
-          ? 'rounded-full bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground'
-          : 'rounded-full px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted'
+          ? 'inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground'
+          : 'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm text-muted-foreground hover:bg-muted'
       }
     >
+      {icon}
       {label}
+      {badge}
     </button>
   )
 }
