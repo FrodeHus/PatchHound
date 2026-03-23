@@ -95,11 +95,12 @@ public class RemediationDecisionsController(
         {
             "approve" => await decisionService.ApproveAsync(decisionId, userId, ct),
             "reject" => await decisionService.RejectAsync(decisionId, userId, ct),
+            "cancel" => await decisionService.ExpireAsync(decisionId, ct),
             _ => null,
         };
 
         if (result is null)
-            return BadRequest(new ProblemDetails { Title = "Action must be 'approve' or 'reject'." });
+            return BadRequest(new ProblemDetails { Title = "Action must be 'approve', 'reject', or 'cancel'." });
 
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });

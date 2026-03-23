@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react'
+import { ArrowLeft, Ban, CheckCircle, XCircle } from 'lucide-react'
 import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
 import { approveOrRejectDecision } from '@/api/remediation.functions'
 import { Button } from '@/components/ui/button'
@@ -36,7 +36,7 @@ export function SoftwareRemediationView({ data, assetId }: SoftwareRemediationVi
 
   const [approving, setApproving] = useState(false)
 
-  async function handleApproveReject(action: 'approve' | 'reject') {
+  async function handleApproveReject(action: 'approve' | 'reject' | 'cancel') {
     if (!data.currentDecision) return
     setApproving(true)
     try {
@@ -161,28 +161,39 @@ export function SoftwareRemediationView({ data, assetId }: SoftwareRemediationVi
                 ) : null}
               </div>
 
-              {/* Approve/Reject buttons for PendingApproval */}
-              {data.currentDecision.approvalStatus === 'PendingApproval' ? (
-                <div className="flex gap-2 pt-1">
-                  <Button
-                    size="sm"
-                    onClick={() => handleApproveReject('approve')}
-                    disabled={approving}
-                  >
-                    <CheckCircle className="mr-1.5 size-3.5" />
-                    Approve
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleApproveReject('reject')}
-                    disabled={approving}
-                  >
-                    <XCircle className="mr-1.5 size-3.5" />
-                    Reject
-                  </Button>
-                </div>
-              ) : null}
+              {/* Action buttons */}
+              <div className="flex gap-2 pt-1">
+                {data.currentDecision.approvalStatus === 'PendingApproval' ? (
+                  <>
+                    <Button
+                      size="sm"
+                      onClick={() => handleApproveReject('approve')}
+                      disabled={approving}
+                    >
+                      <CheckCircle className="mr-1.5 size-3.5" />
+                      Approve
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleApproveReject('reject')}
+                      disabled={approving}
+                    >
+                      <XCircle className="mr-1.5 size-3.5" />
+                      Reject
+                    </Button>
+                  </>
+                ) : null}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleApproveReject('cancel')}
+                  disabled={approving}
+                >
+                  <Ban className="mr-1.5 size-3.5" />
+                  Cancel Decision
+                </Button>
+              </div>
 
               {/* Overrides */}
               {data.currentDecision.overrides.length > 0 ? (
@@ -214,15 +225,17 @@ export function SoftwareRemediationView({ data, assetId }: SoftwareRemediationVi
         </CardContent>
       </Card>
 
-      {/* Decision Form */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">New Decision</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DecisionForm assetId={assetId} queryKey={queryKey} />
-        </CardContent>
-      </Card>
+      {/* Decision Form — only when no active decision exists */}
+      {!data.currentDecision ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">New Decision</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DecisionForm assetId={assetId} queryKey={queryKey} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Vulnerabilities */}
       <div>
