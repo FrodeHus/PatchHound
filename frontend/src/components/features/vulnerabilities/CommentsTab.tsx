@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { CommentItem } from '@/api/vulnerabilities.schemas'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -6,11 +6,12 @@ import { Textarea } from '@/components/ui/textarea'
 type CommentsTabProps = {
   comments: CommentItem[]
   isSubmitting: boolean
-  onSubmit: (content: string) => void
+  onSubmit: (content: string, onSuccess: () => void) => void
 }
 
 export function CommentsTab({ comments, isSubmitting, onSubmit }: CommentsTabProps) {
   const [content, setContent] = useState('')
+  const clearRef = useRef(() => setContent(''))
 
   return (
     <section className="space-y-3 rounded-lg border border-border bg-card p-4">
@@ -42,8 +43,7 @@ export function CommentsTab({ comments, isSubmitting, onSubmit }: CommentsTabPro
         disabled={isSubmitting || content.trim().length === 0}
         onClick={() => {
           const trimmed = content.trim()
-          onSubmit(trimmed)
-          setContent('')
+          onSubmit(trimmed, clearRef.current)
         }}
       >
         {isSubmitting ? 'Saving...' : 'Post comment'}

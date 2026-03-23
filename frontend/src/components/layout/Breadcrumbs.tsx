@@ -45,7 +45,7 @@ export function Breadcrumbs() {
         searchParamsCache.set(match.pathname.replace(/\/$/, ''), { ...search })
       }
     }
-  })
+  }, [matches])
 
   const crumbs: { label: string; to: string; search: Record<string, unknown> }[] = []
 

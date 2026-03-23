@@ -1,5 +1,4 @@
-import { useEffect } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchAuditLog } from '@/api/audit-log.functions'
 import { fetchTenantDetail } from '@/api/settings.functions'
@@ -14,8 +13,10 @@ function TenantDetailPage() {
   const { user } = Route.useRouteContext()
   const tenant = Route.useLoaderData()
   const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
-  const recentAuditQuery = useMutation({
-    mutationFn: async () =>
+
+  const recentAuditQuery = useQuery({
+    queryKey: ['audit-log', 'tenant-detail', tenant.id],
+    queryFn: () =>
       fetchAuditLog({
         data: {
           tenantId: tenant.id,
@@ -23,15 +24,9 @@ function TenantDetailPage() {
           pageSize: 5,
         },
       }),
+    enabled: canViewAudit,
+    staleTime: 30_000,
   })
-
-  useEffect(() => {
-    if (!canViewAudit || recentAuditQuery.data || recentAuditQuery.isPending) {
-      return
-    }
-
-    void recentAuditQuery.mutateAsync()
-  }, [canViewAudit, recentAuditQuery.data, recentAuditQuery.isPending, recentAuditQuery.mutateAsync])
 
   return (
     <TenantAdministrationDetail

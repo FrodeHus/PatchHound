@@ -74,49 +74,32 @@ export async function getAuthorizationUrl(state: string): Promise<string> {
 }
 
 export async function exchangeCodeForTokens(code: string): Promise<TokenExchangeResult> {
-  const body = new URLSearchParams({
-    client_id: ENTRA_CLIENT_ID,
-    client_secret: ENTRA_CLIENT_SECRET,
+  const result = await msalClient.acquireTokenByCode({
     code,
-    grant_type: 'authorization_code',
-    redirect_uri: ENTRA_REDIRECT_URI,
-    scope: SCOPES.join(' '),
+    scopes: SCOPES,
+    redirectUri: ENTRA_REDIRECT_URI,
   })
 
-  const response = await fetch(TOKEN_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body,
-  })
-
-  if (!response.ok) {
-    throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`)
-  }
-
-  const result = await response.json() as {
-    access_token?: string
-    expires_in?: number
-    id_token?: string
-    refresh_token?: string
-  }
-
-  if (!result.access_token) {
+  if (!result.accessToken) {
     throw new Error('Token exchange failed: access token missing')
   }
 
-  const expiresIn = typeof result.expires_in === 'number' && result.expires_in > 0
-    ? Math.max(60, result.expires_in)
+  const expiresIn = result.expiresOn
+    ? Math.max(60, Math.floor((result.expiresOn.getTime() - Date.now()) / 1000))
     : 3600
-  const claims = decodeJwtClaims(result.id_token)
+
+  // MSAL validates the ID token signature, issuer, audience, and nonce.
+  // Extract claims from the validated result rather than decoding the raw JWT.
+  const claims: IdTokenClaims | undefined = result.idTokenClaims
+    ? result.idTokenClaims as IdTokenClaims
+    : undefined
 
   return {
-    access_token: result.access_token,
+    access_token: result.accessToken,
     expires_in: expiresIn,
-    id_token: result.id_token,
+    id_token: result.idToken,
     claims,
-    refresh_token: result.refresh_token,
+    refresh_token: undefined,
   }
 }
 
@@ -159,27 +142,6 @@ export async function refreshAccessTokenByRefreshToken(refreshToken: string): Pr
     access_token: result.access_token,
     expires_in: expiresIn,
     refresh_token: result.refresh_token,
-  }
-}
-
-function decodeJwtClaims(idToken?: string): IdTokenClaims | undefined {
-  if (!idToken) {
-    return undefined
-  }
-
-  const [, payload] = idToken.split('.')
-  if (!payload) {
-    return undefined
-  }
-
-  const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
-  const padded = normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '=')
-
-  try {
-    const decoded = Buffer.from(padded, 'base64').toString('utf8')
-    return JSON.parse(decoded) as IdTokenClaims
-  } catch {
-    return undefined
   }
 }
 

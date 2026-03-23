@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   createRootRouteWithContext,
   HeadContent,
@@ -15,8 +16,6 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 interface RouterContext {
   user: CurrentUser | null
 }
-
-const queryClient = new QueryClient()
 const darkThemeIds = themeOptions.filter(t => t.mode === 'dark').map(t => t.id)
 
 export const Route = createRootRouteWithContext<RouterContext>()({
@@ -36,6 +35,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 })
 
 function RootDocument() {
+  const [queryClient] = useState(() => new QueryClient())
+
   return (
     <html lang="en">
       <head>

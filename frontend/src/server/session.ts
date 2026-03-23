@@ -2,6 +2,52 @@ import crypto from 'node:crypto'
 import { Pool } from 'pg'
 import { getCookie, setCookie } from '@tanstack/react-start/server'
 
+const ENCRYPTION_ALGORITHM = 'aes-256-gcm'
+const IV_LENGTH = 12
+const AUTH_TAG_LENGTH = 16
+
+function getEncryptionKey(): Buffer | null {
+  const hex = process.env.SESSION_ENCRYPTION_KEY
+  if (!hex) return null
+  const buf = Buffer.from(hex, 'hex')
+  if (buf.length !== 32) {
+    throw new Error('SESSION_ENCRYPTION_KEY must be exactly 32 bytes (64 hex characters)')
+  }
+  return buf
+}
+
+function encryptPayload(plaintext: string): string {
+  const key = getEncryptionKey()
+  if (!key) return plaintext
+
+  const iv = crypto.randomBytes(IV_LENGTH)
+  const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH })
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+  const authTag = cipher.getAuthTag()
+
+  // Format: base64(iv + authTag + ciphertext) prefixed with "enc:" marker
+  return 'enc:' + Buffer.concat([iv, authTag, encrypted]).toString('base64')
+}
+
+function decryptPayload(stored: string): string {
+  if (!stored.startsWith('enc:')) return stored
+
+  const key = getEncryptionKey()
+  if (!key) {
+    throw new Error('SESSION_ENCRYPTION_KEY is required to decrypt session data')
+  }
+
+  const raw = Buffer.from(stored.slice(4), 'base64')
+  const iv = raw.subarray(0, IV_LENGTH)
+  const authTag = raw.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH)
+  const ciphertext = raw.subarray(IV_LENGTH + AUTH_TAG_LENGTH)
+
+  const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH })
+  decipher.setAuthTag(authTag)
+  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()])
+  return decrypted.toString('utf8')
+}
+
 export interface SessionData {
   accessToken?: string
   tokenExpiry?: number
@@ -137,6 +183,7 @@ class AppSession implements SessionData {
 
     const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000)
     const pool = getPool()
+    const serialized = encryptPayload(JSON.stringify(payload))
     await pool.query(
       `
       INSERT INTO frontend_sessions (id, data, expires_at, updated_at)
@@ -144,7 +191,7 @@ class AppSession implements SessionData {
       ON CONFLICT (id)
       DO UPDATE SET data = EXCLUDED.data, expires_at = EXCLUDED.expires_at, updated_at = NOW()
       `,
-      [this.sid, JSON.stringify(payload), expiresAt],
+      [this.sid, JSON.stringify(serialized), expiresAt],
     )
 
     setCookie(COOKIE_NAME, this.sid, cookieOptions)
@@ -171,7 +218,8 @@ class AppSession implements SessionData {
       await getPool().query('DELETE FROM frontend_sessions WHERE id = $1', [previousSid])
     }
 
-    setCookie(COOKIE_NAME, this.sid, cookieOptions)
+    // Cookie is written by the subsequent save() call, not here.
+    // Setting it before the row exists creates a dangling cookie if save() throws.
   }
 }
 
@@ -184,7 +232,7 @@ export async function getSession() {
   }
 
   const result = await getPool().query<{
-    data: SessionData
+    data: string | SessionData
     expires_at: Date
   }>(
     `
@@ -208,7 +256,16 @@ export async function getSession() {
     return new AppSession()
   }
 
-  return new AppSession(record.data, sid)
+  let sessionData: SessionData
+  if (typeof record.data === 'string') {
+    // Encrypted or legacy string payload
+    sessionData = JSON.parse(decryptPayload(record.data)) as SessionData
+  } else {
+    // Legacy unencrypted JSONB payload (before encryption was enabled)
+    sessionData = record.data
+  }
+
+  return new AppSession(sessionData, sid)
 }
 
 export function isTokenExpired(session: SessionData): boolean {
