@@ -152,6 +152,9 @@ public class AssetRulesController : ControllerBase
         if (rule is null)
             return NotFound();
 
+        var affectedAssetIds = await GetMatchingAssetIdsAsync(rule, tenantId, ct);
+        var operations = rule.ParseOperations();
+
         _dbContext.AssetRules.Remove(rule);
         await _dbContext.SaveChangesAsync(ct);
 
@@ -165,6 +168,13 @@ public class AssetRulesController : ControllerBase
             remaining[i].SetPriority(i + 1);
 
         await _dbContext.SaveChangesAsync(ct);
+        await ResetDeletedRuleEffectsAsync(tenantId, rule.Id, affectedAssetIds, operations, ct);
+        await _evaluationService.EvaluateRulesAsync(tenantId, ct);
+        await _riskRefreshService.RefreshForTenantAsync(
+            tenantId,
+            recalculateAssessments: true,
+            ct
+        );
         return NoContent();
     }
 
@@ -299,5 +309,100 @@ public class AssetRulesController : ControllerBase
         }
 
         return null;
+    }
+
+    private async Task<List<Guid>> GetMatchingAssetIdsAsync(
+        AssetRule rule,
+        Guid tenantId,
+        CancellationToken ct)
+    {
+        try
+        {
+            var predicate = new AssetRuleFilterBuilder(_dbContext).Build(rule.ParseFilter());
+            return await _dbContext.Assets
+                .AsNoTracking()
+                .Where(asset => asset.TenantId == tenantId)
+                .Where(predicate)
+                .Select(asset => asset.Id)
+                .ToListAsync(ct);
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private async Task ResetDeletedRuleEffectsAsync(
+        Guid tenantId,
+        Guid deletedRuleId,
+        IReadOnlyCollection<Guid> assetIds,
+        IReadOnlyCollection<AssetRuleOperation> operations,
+        CancellationToken ct)
+    {
+        if (assetIds.Count == 0 || operations.Count == 0)
+            return;
+
+        foreach (var operation in operations)
+        {
+            switch (operation.Type)
+            {
+                case "AssignSecurityProfile":
+                    if (operation.Parameters.TryGetValue("securityProfileId", out var securityProfileIdValue)
+                        && Guid.TryParse(securityProfileIdValue, out var securityProfileId))
+                    {
+                        var assets = await _dbContext.Assets
+                            .Where(asset =>
+                                asset.TenantId == tenantId
+                                && assetIds.Contains(asset.Id)
+                                && asset.SecurityProfileId == securityProfileId)
+                            .ToListAsync(ct);
+
+                        foreach (var asset in assets)
+                            asset.AssignSecurityProfile(null);
+
+                        if (assets.Count > 0)
+                            await _dbContext.SaveChangesAsync(ct);
+                    }
+                    break;
+
+                case "AssignTeam":
+                    if (operation.Parameters.TryGetValue("teamId", out var teamIdValue)
+                        && Guid.TryParse(teamIdValue, out var teamId))
+                    {
+                        var assets = await _dbContext.Assets
+                            .Where(asset =>
+                                asset.TenantId == tenantId
+                                && assetIds.Contains(asset.Id)
+                                && asset.FallbackTeamId == teamId)
+                            .ToListAsync(ct);
+
+                        foreach (var asset in assets)
+                            _dbContext.Entry(asset).Property(nameof(Asset.FallbackTeamId)).CurrentValue = null;
+
+                        if (assets.Count > 0)
+                            await _dbContext.SaveChangesAsync(ct);
+                    }
+                    break;
+
+                case "SetCriticality":
+                {
+                    var assets = await _dbContext.Assets
+                        .Where(asset =>
+                            asset.TenantId == tenantId
+                            && assetIds.Contains(asset.Id)
+                            && asset.CriticalitySource == "Rule"
+                            && asset.CriticalityRuleId == deletedRuleId)
+                        .ToListAsync(ct);
+
+                    foreach (var asset in assets)
+                        asset.ResetCriticalityToBaseline();
+
+                    if (assets.Count > 0)
+                        await _dbContext.SaveChangesAsync(ct);
+
+                    break;
+                }
+            }
+        }
     }
 }
