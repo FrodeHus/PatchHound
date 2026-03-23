@@ -141,6 +141,7 @@ public class SoftwareController(
             new TenantSoftwareDetailDto(
                 tenantSoftware.Id,
                 tenantSoftware.NormalizedSoftwareId,
+                softwareAssetIds.FirstOrDefault() is var primaryAssetId && primaryAssetId != Guid.Empty ? primaryAssetId : null,
                 tenantSoftware.CanonicalName,
                 tenantSoftware.CanonicalVendor,
                 tenantSoftware.PrimaryCpe23Uri,

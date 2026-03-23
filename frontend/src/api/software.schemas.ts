@@ -25,6 +25,7 @@ export const tenantSoftwareSourceAliasSchema = z.object({
 export const tenantSoftwareDetailSchema = z.object({
   id: z.string().uuid(),
   normalizedSoftwareId: z.string().uuid(),
+  primarySoftwareAssetId: z.string().uuid().nullable(),
   canonicalName: z.string(),
   canonicalVendor: z.string().nullable(),
   primaryCpe23Uri: z.string().nullable(),

@@ -5,8 +5,10 @@ import type {
   TenantSoftwareVulnerability,
   PagedTenantSoftwareInstallations,
 } from '@/api/software.schemas'
+import type { DecisionContext } from '@/api/remediation.schemas'
 import { SoftwareAiReportTab } from '@/components/features/software/SoftwareAiReportTab'
 import { SoftwareDescriptionPanel } from '@/components/features/software/SoftwareDescriptionPanel'
+import { SoftwareRemediationView } from '@/components/features/remediation/SoftwareRemediationView'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 import { toneDot, toneText } from '@/lib/tone-classes'
 import { Button } from '@/components/ui/button'
@@ -21,6 +23,9 @@ type SoftwareDetailPageProps = {
   onCreateRemediationTasks: () => void
   onSelectVersion: (version: string) => void
   onPageChange: (page: number) => void
+  canViewRemediation: boolean
+  remediationData: DecisionContext | null
+  primarySoftwareAssetId: string | null
 }
 
 export function SoftwareDetailPage({
@@ -33,9 +38,12 @@ export function SoftwareDetailPage({
   onCreateRemediationTasks,
   onSelectVersion,
   onPageChange,
+  canViewRemediation,
+  remediationData,
+  primarySoftwareAssetId,
 }: SoftwareDetailPageProps) {
   const [activeInsightTab, setActiveInsightTab] = useState<
-    "vulnerabilities" | "ai"
+    "vulnerabilities" | "ai" | "remediation"
   >("vulnerabilities");
   const activeVersion =
     detail.versionCohorts.find(
@@ -373,6 +381,13 @@ export function SoftwareDetailPage({
                   label="AI report"
                   onClick={() => setActiveInsightTab("ai")}
                 />
+                {canViewRemediation ? (
+                  <InsightTabButton
+                    isActive={activeInsightTab === "remediation"}
+                    label="Remediation"
+                    onClick={() => setActiveInsightTab("remediation")}
+                  />
+                ) : null}
               </div>
             </div>
 
@@ -442,11 +457,15 @@ export function SoftwareDetailPage({
                   ))}
                 </div>
               )
-            ) : (
+            ) : activeInsightTab === "remediation" && remediationData && primarySoftwareAssetId ? (
+              <div className="mt-5">
+                <SoftwareRemediationView data={remediationData} assetId={primarySoftwareAssetId} />
+              </div>
+            ) : activeInsightTab === "ai" ? (
               <div className="mt-5">
                 <SoftwareAiReportTab tenantSoftwareId={detail.id} />
               </div>
-            )}
+            ) : null}
           </section>
         </div>
 

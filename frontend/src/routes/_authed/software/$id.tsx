@@ -7,10 +7,12 @@ import {
   fetchTenantSoftwareInstallations,
   fetchTenantSoftwareVulnerabilities,
 } from '@/api/software.functions'
+import { fetchDecisionContext } from '@/api/remediation.functions'
 import { createRemediationTasksForSoftware } from '@/api/remediation-tasks.functions'
 import { SoftwareDetailPage } from '@/components/features/software/SoftwareDetailPage'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { softwareQueryKeys } from '@/features/software/list-state'
+import { assetQueryKeys } from '@/features/assets/list-state'
 import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
 
 const softwareDetailSearchSchema = baseListSearchSchema.extend({
@@ -93,6 +95,18 @@ function SoftwareDetailRoute() {
 
   const installations = installationsQuery.data ?? (canUseInitialData ? initialData.installations : undefined)
   const vulnerabilities = vulnerabilitiesQuery.data ?? (canUseInitialData ? initialData.vulnerabilities : undefined)
+  const primarySoftwareAssetId = detail?.primarySoftwareAssetId ?? null
+  const canViewRemediation = primarySoftwareAssetId !== null && (
+    user.roles.includes('GlobalAdmin')
+    || user.roles.includes('AssetOwner')
+  )
+
+  const remediationQuery = useQuery({
+    queryKey: assetQueryKeys.remediation(selectedTenantId, primarySoftwareAssetId ?? ''),
+    queryFn: () => fetchDecisionContext({ data: { assetId: primarySoftwareAssetId! } }),
+    enabled: canViewRemediation && primarySoftwareAssetId !== null,
+  })
+
   const createTasksMutation = useMutation({
     mutationFn: async () => createRemediationTasksForSoftware({ data: { tenantSoftwareId: id } }),
     onSuccess: async (result) => {
@@ -145,6 +159,9 @@ function SoftwareDetailRoute() {
           }),
         })
       }}
+      canViewRemediation={canViewRemediation}
+      remediationData={remediationQuery.data ?? null}
+      primarySoftwareAssetId={primarySoftwareAssetId}
     />
   )
 }
