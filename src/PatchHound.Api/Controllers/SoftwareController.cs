@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Software;
+using PatchHound.Api.Services;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
@@ -24,6 +25,7 @@ public class SoftwareController(
     SoftwareDescriptionJobService softwareDescriptionJobService,
     ITenantAiConfigurationResolver tenantAiConfigurationResolver,
     ITenantAiResearchService tenantAiResearchService,
+    RemediationTaskQueryService remediationTaskQueryService,
     ITenantContext tenantContext
 ) : ControllerBase
 {
@@ -129,6 +131,12 @@ public class SoftwareController(
             .ThenBy(item => item.Version ?? string.Empty, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        var remediationSummary = await remediationTaskQueryService.BuildSoftwareSummaryAsync(
+            currentTenantId,
+            id,
+            ct
+        );
+
         return Ok(
             new TenantSoftwareDetailDto(
                 tenantSoftware.Id,
@@ -164,6 +172,7 @@ public class SoftwareController(
                     .Where(a => softwareAssetIds.Contains(a.Id))
                     .Select(a => a.ExposureImpactScore)
                     .MaxAsync(ct),
+                remediationSummary,
                 versionCohorts,
                 aliases
                     .Select(item => new TenantSoftwareSourceAliasDto(

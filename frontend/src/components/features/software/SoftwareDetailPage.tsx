@@ -9,12 +9,16 @@ import { SoftwareAiReportTab } from '@/components/features/software/SoftwareAiRe
 import { SoftwareDescriptionPanel } from '@/components/features/software/SoftwareDescriptionPanel'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 import { toneDot, toneText } from '@/lib/tone-classes'
+import { Button } from '@/components/ui/button'
 
 type SoftwareDetailPageProps = {
   detail: TenantSoftwareDetail
   selectedVersion: string
   installations: PagedTenantSoftwareInstallations
   vulnerabilities: TenantSoftwareVulnerability[]
+  canCreateRemediationTasks: boolean
+  isCreatingRemediationTasks: boolean
+  onCreateRemediationTasks: () => void
   onSelectVersion: (version: string) => void
   onPageChange: (page: number) => void
 }
@@ -24,6 +28,9 @@ export function SoftwareDetailPage({
   selectedVersion,
   installations,
   vulnerabilities,
+  canCreateRemediationTasks,
+  isCreatingRemediationTasks,
+  onCreateRemediationTasks,
   onSelectVersion,
   onPageChange,
 }: SoftwareDetailPageProps) {
@@ -101,6 +108,56 @@ export function SoftwareDetailPage({
           </div>
         </div>
       </header>
+
+      <section className="rounded-2xl border border-border/70 bg-card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold">Remediation tasks</h2>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Follow the current software patching backlog linked to this software footprint, or create missing patching tasks for the currently exposed owner teams.
+            </p>
+            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+              <span>
+                {detail.remediation.openTaskCount} open task
+                {detail.remediation.openTaskCount === 1 ? '' : 's'}
+              </span>
+              <span>
+                {detail.remediation.overdueTaskCount} overdue
+              </span>
+              <span>
+                Nearest due {detail.remediation.nearestDueDate ? formatDate(detail.remediation.nearestDueDate) : 'not set'}
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              render={
+                <Link
+                  to="/remediation"
+                  search={{
+                    page: 1,
+                    pageSize: 25,
+                    search: '',
+                    vendor: '',
+                    criticality: '',
+                    assetOwner: '',
+                    deviceAssetId: '',
+                    tenantSoftwareId: detail.id,
+                  }}
+                />
+              }
+            >
+              Open task list
+            </Button>
+            {canCreateRemediationTasks ? (
+              <Button onClick={onCreateRemediationTasks} disabled={isCreatingRemediationTasks}>
+                {isCreatingRemediationTasks ? 'Creating tasks...' : 'Create remediation task'}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </section>
 
       <section className="rounded-2xl border border-border/70 bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

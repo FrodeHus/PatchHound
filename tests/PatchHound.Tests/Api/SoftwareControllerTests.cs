@@ -21,6 +21,7 @@ public class SoftwareControllerTests : IDisposable
 {
     private readonly Guid _tenantId = Guid.NewGuid();
     private readonly PatchHoundDbContext _dbContext;
+    private readonly ITenantContext _tenantContext;
     private readonly IAiReportProvider _aiProvider;
     private readonly ITenantAiConfigurationResolver _tenantAiConfigurationResolver;
     private readonly TenantAiTextGenerationService _tenantAiTextGenerationService;
@@ -30,10 +31,11 @@ public class SoftwareControllerTests : IDisposable
 
     public SoftwareControllerTests()
     {
-        var tenantContext = Substitute.For<ITenantContext>();
-        tenantContext.CurrentTenantId.Returns(_tenantId);
-        tenantContext.AccessibleTenantIds.Returns([_tenantId]);
-        tenantContext.HasAccessToTenant(_tenantId).Returns(true);
+        _tenantContext = Substitute.For<ITenantContext>();
+        _tenantContext.CurrentTenantId.Returns(_tenantId);
+        _tenantContext.AccessibleTenantIds.Returns([_tenantId]);
+        _tenantContext.CurrentUserId.Returns(Guid.NewGuid());
+        _tenantContext.HasAccessToTenant(_tenantId).Returns(true);
 
         var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
@@ -41,7 +43,7 @@ public class SoftwareControllerTests : IDisposable
 
         _dbContext = new PatchHoundDbContext(
             options,
-            TestServiceProviderFactory.Create(tenantContext)
+            TestServiceProviderFactory.Create(_tenantContext)
         );
         _aiProvider = Substitute.For<IAiReportProvider>();
         _tenantAiConfigurationResolver = Substitute.For<ITenantAiConfigurationResolver>();
@@ -50,6 +52,11 @@ public class SoftwareControllerTests : IDisposable
             [_aiProvider],
             _tenantAiConfigurationResolver
         );
+        var remediationDecisionService = new RemediationDecisionService(_dbContext, new SlaService());
+        var remediationTaskQueryService = new PatchHound.Api.Services.RemediationTaskQueryService(
+            _dbContext,
+            remediationDecisionService
+        );
         _softwareDescriptionJobService = new SoftwareDescriptionJobService(_dbContext);
         _controller = new SoftwareController(
             _dbContext,
@@ -57,7 +64,8 @@ public class SoftwareControllerTests : IDisposable
             _softwareDescriptionJobService,
             _tenantAiConfigurationResolver,
             _tenantAiResearchService,
-            tenantContext
+            remediationTaskQueryService,
+            _tenantContext
         );
     }
 

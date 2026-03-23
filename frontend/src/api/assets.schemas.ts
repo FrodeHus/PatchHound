@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { pagedResponseMetaSchema } from './pagination.schemas'
+import { remediationTaskSummarySchema } from './remediation-tasks.schemas'
 
 export const assetSchema = z.object({
   id: z.string().uuid(),
@@ -113,6 +114,7 @@ export const assetDetailSchema = z.object({
       operationalScore: z.number(),
     })),
   }).nullable(),
+  remediation: remediationTaskSummarySchema.nullable(),
   tags: z.array(z.string()),
   softwareCpeBinding: z
     .object({

@@ -19,7 +19,7 @@ public class CommentsController : ControllerBase
     )
     {
         ["vulnerabilities"] = "TenantVulnerability",
-        ["tasks"] = "RemediationTask",
+        ["tasks"] = "PatchingTask",
     };
 
     private readonly PatchHoundDbContext _dbContext;
@@ -82,8 +82,8 @@ public class CommentsController : ControllerBase
                 .TenantVulnerabilities.Where(v => v.Id == entityId)
                 .Select(v => (Guid?)v.TenantId)
                 .FirstOrDefaultAsync(ct),
-            "RemediationTask" => await _dbContext
-                .RemediationTasks.Where(t => t.Id == entityId)
+            "PatchingTask" => await _dbContext
+                .PatchingTasks.Where(t => t.Id == entityId)
                 .Select(t => (Guid?)t.TenantId)
                 .FirstOrDefaultAsync(ct),
             _ => null,

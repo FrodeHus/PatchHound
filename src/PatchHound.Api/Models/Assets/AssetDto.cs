@@ -1,3 +1,5 @@
+using PatchHound.Api.Models.Remediation;
+
 namespace PatchHound.Api.Models.Assets;
 
 public record AssetDto(
@@ -51,6 +53,7 @@ public record AssetDetailDto(
     string? DeviceOnboardingStatus,
     string? DeviceValue,
     AssetRiskDetailDto? Risk,
+    RemediationTaskSummaryDto? Remediation,
     string[] Tags,
     SoftwareCpeBindingDto? SoftwareCpeBinding,
     string Metadata,

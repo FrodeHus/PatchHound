@@ -9,7 +9,8 @@ namespace PatchHound.Api.Services;
 public class AssetDetailQueryService(
     PatchHoundDbContext dbContext,
     TenantSnapshotResolver snapshotResolver,
-    TenantSoftwareAliasResolver aliasResolver
+    TenantSoftwareAliasResolver aliasResolver,
+    RemediationTaskQueryService remediationTaskQueryService
 )
 {
     private sealed record SoftwareCorrelationRow(
@@ -386,6 +387,10 @@ public class AssetDetailQueryService(
             );
         }
 
+        var remediation = asset.AssetType == AssetType.Device
+            ? await remediationTaskQueryService.BuildDeviceSummaryAsync(tenantId, assetId, ct)
+            : null;
+
         return new AssetDetailDto(
             asset.Id,
             asset.AssetType == AssetType.Software
@@ -425,6 +430,7 @@ public class AssetDetailQueryService(
             asset.DeviceOnboardingStatus,
             asset.DeviceValue,
             risk,
+            remediation,
             tags,
             asset.AssetType == AssetType.Software
                 && normalizedSoftwareIdsByExternalId.TryGetValue(asset.ExternalId, out var assetNormalizedSoftwareId)

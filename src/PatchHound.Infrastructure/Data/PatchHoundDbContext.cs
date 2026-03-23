@@ -74,7 +74,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<VulnerabilityEpisodeRiskAssessment> VulnerabilityEpisodeRiskAssessments =>
         Set<VulnerabilityEpisodeRiskAssessment>();
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
-    public DbSet<RemediationTask> RemediationTasks => Set<RemediationTask>();
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<RiskAcceptance> RiskAcceptances => Set<RiskAcceptance>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
@@ -184,9 +183,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<VulnerabilityEpisodeRiskAssessment>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<RemediationTask>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Comment>()

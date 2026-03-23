@@ -205,11 +205,7 @@ public class IngestionServiceTests : IDisposable
             .TenantVulnerabilities.IgnoreQueryFilters()
             .FirstAsync(tv => tv.TenantId == _tenantId && tv.VulnerabilityDefinitionId == vuln!.Id);
 
-        var tasks = await _dbContext
-            .RemediationTasks.IgnoreQueryFilters()
-            .Where(t => t.TenantVulnerabilityId == tenantVulnerability!.Id)
-            .ToListAsync();
-        tasks.Should().BeEmpty();
+        _dbContext.PatchingTasks.Should().BeEmpty();
     }
 
     [Fact]
@@ -2181,15 +2177,6 @@ public class IngestionServiceTests : IDisposable
         await _dbContext.VulnerabilityAssets.AddAsync(va);
         await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
 
-        var task = RemediationTask.Create(
-            tenantVulnerability.Id,
-            asset.Id,
-            _tenantId,
-            Guid.NewGuid(),
-            Guid.Empty,
-            DateTimeOffset.UtcNow.AddDays(30)
-        );
-        await _dbContext.RemediationTasks.AddAsync(task);
         await _dbContext.SaveChangesAsync();
 
         // Act: ingestion returns empty results (vulnerability no longer present)

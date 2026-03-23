@@ -47,61 +47,6 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
         var cooldownThreshold = now - NotificationCooldown;
         var notificationsSent = 0;
 
-        // --- Legacy remediation tasks ---
-        var activeTasks = await dbContext
-            .RemediationTasks.IgnoreQueryFilters()
-            .Where(t =>
-                t.Status != RemediationTaskStatus.Completed
-                && t.Status != RemediationTaskStatus.RiskAccepted
-                && (t.LastSlaNotifiedAt == null || t.LastSlaNotifiedAt < cooldownThreshold)
-            )
-            .ToListAsync(ct);
-
-        foreach (var task in activeTasks)
-        {
-            if (task.AssigneeId == Guid.Empty)
-            {
-                continue;
-            }
-
-            var status = slaService.GetSlaStatus(task.CreatedAt, task.DueDate, now);
-
-            switch (status)
-            {
-                case SlaStatus.Overdue:
-                    await notificationService.SendAsync(
-                        task.AssigneeId,
-                        task.TenantId,
-                        NotificationType.SLAWarning,
-                        "Remediation task overdue",
-                        $"Task {task.Id} is past its SLA due date of {task.DueDate:yyyy-MM-dd}.",
-                        "RemediationTask",
-                        task.Id,
-                        ct
-                    );
-                    task.MarkSlaNotified();
-                    await dbContext.SaveChangesAsync(ct);
-                    notificationsSent++;
-                    break;
-
-                case SlaStatus.NearDue:
-                    await notificationService.SendAsync(
-                        task.AssigneeId,
-                        task.TenantId,
-                        NotificationType.SLAWarning,
-                        "Remediation task nearing SLA deadline",
-                        $"Task {task.Id} is approaching its SLA due date of {task.DueDate:yyyy-MM-dd}.",
-                        "RemediationTask",
-                        task.Id,
-                        ct
-                    );
-                    task.MarkSlaNotified();
-                    await dbContext.SaveChangesAsync(ct);
-                    notificationsSent++;
-                    break;
-            }
-        }
-
         // --- Remediation decisions: PatchingDeferred approaching re-evaluation ---
         var reEvalThreshold = now.AddDays(3);
         var deferredDecisions = await dbContext
@@ -207,9 +152,8 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
         }
 
         logger.LogInformation(
-            "Completed SLA check cycle at {CycleCompletedAt}. Legacy tasks: {ActiveTaskCount}. Decisions checked: {DecisionsCount}. Patching tasks: {PatchingTaskCount}. Notifications sent: {NotificationsSent}.",
+            "Completed SLA check cycle at {CycleCompletedAt}. Decisions checked: {DecisionsCount}. Patching tasks: {PatchingTaskCount}. Notifications sent: {NotificationsSent}.",
             DateTimeOffset.UtcNow,
-            activeTasks.Count,
             deferredDecisions.Count + expiringDecisions.Count,
             activePatchingTasks.Count,
             notificationsSent

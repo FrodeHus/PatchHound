@@ -31,6 +31,13 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
         );
 
         await dbContext.RemediationDecisions.AddAsync(decision, ct);
+
+        if (decision.Outcome == RemediationOutcome.ApprovedForPatching
+            && decision.ApprovalStatus == DecisionApprovalStatus.Approved)
+        {
+            await EnsurePatchingTasksAsync(decision, ct);
+        }
+
         await dbContext.SaveChangesAsync(ct);
 
         return Result<RemediationDecision>.Success(decision);
@@ -52,7 +59,7 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
 
         if (decision.Outcome == RemediationOutcome.ApprovedForPatching)
         {
-            await GeneratePatchingTasksAsync(decision, ct);
+            await EnsurePatchingTasksAsync(decision, ct);
         }
 
         await dbContext.SaveChangesAsync(ct);
@@ -132,7 +139,21 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
         return Result<RemediationDecisionVulnerabilityOverride>.Success(overrideEntity);
     }
 
-    private async Task GeneratePatchingTasksAsync(
+    public async Task<int> EnsurePatchingTasksAsync(
+        Guid decisionId,
+        CancellationToken ct
+    )
+    {
+        var decision = await dbContext.RemediationDecisions
+            .FirstOrDefaultAsync(d => d.Id == decisionId, ct);
+
+        if (decision is null)
+            return 0;
+
+        return await EnsurePatchingTasksAsync(decision, ct);
+    }
+
+    private async Task<int> EnsurePatchingTasksAsync(
         RemediationDecision decision,
         CancellationToken ct
     )
@@ -145,7 +166,7 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
             .ToListAsync(ct);
 
         if (deviceInstallations.Count == 0)
-            return;
+            return 0;
 
         var deviceAssetIds = deviceInstallations.Select(d => d.DeviceAssetId).Distinct().ToList();
 
@@ -159,6 +180,9 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
             .Where(d => d.OwnerTeamId.HasValue)
             .GroupBy(d => d.OwnerTeamId!.Value)
             .ToList();
+
+        if (teamGroups.Count == 0)
+            return 0;
 
         // Determine due date from highest severity vulnerability
         var tenantSla = await dbContext.TenantSlaConfigurations
@@ -183,14 +207,31 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
             tenantSla
         );
 
-        var tasks = teamGroups.Select(group => PatchingTask.Create(
-            decision.TenantId,
-            decision.Id,
-            decision.SoftwareAssetId,
-            group.Key,
-            dueDate
-        ));
+        var existingOpenTeamIds = await dbContext.PatchingTasks
+            .IgnoreQueryFilters()
+            .Where(task =>
+                task.TenantId == decision.TenantId
+                && task.SoftwareAssetId == decision.SoftwareAssetId
+                && task.Status != PatchingTaskStatus.Completed)
+            .Select(task => task.OwnerTeamId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var tasks = teamGroups
+            .Where(group => !existingOpenTeamIds.Contains(group.Key))
+            .Select(group => PatchingTask.Create(
+                decision.TenantId,
+                decision.Id,
+                decision.SoftwareAssetId,
+                group.Key,
+                dueDate
+            ))
+            .ToList();
+
+        if (tasks.Count == 0)
+            return 0;
 
         await dbContext.PatchingTasks.AddRangeAsync(tasks, ct);
+        return tasks.Count;
     }
 }

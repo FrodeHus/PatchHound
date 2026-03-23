@@ -42,35 +42,6 @@ public class DashboardService
     }
 
     /// <summary>
-    /// Calculates SLA compliance as the percentage of tasks that are not overdue.
-    /// A task is overdue if its status is not Completed/RiskAccepted and its DueDate has passed.
-    /// </summary>
-    public static (decimal CompliancePercent, int OverdueCount) CalculateSlaCompliance(
-        IReadOnlyList<(RemediationTaskStatus Status, DateTimeOffset DueDate)> tasks,
-        DateTimeOffset now
-    )
-    {
-        if (tasks.Count == 0)
-            return (100m, 0);
-
-        var terminalStatuses = new HashSet<RemediationTaskStatus>
-        {
-            RemediationTaskStatus.Completed,
-            RemediationTaskStatus.RiskAccepted,
-        };
-
-        var overdueCount = tasks.Count(t =>
-            !terminalStatuses.Contains(t.Status) && t.DueDate < now
-        );
-
-        var compliancePercent = Math.Round(
-            (tasks.Count - overdueCount) / (decimal)tasks.Count * 100m,
-            1
-        );
-        return (compliancePercent, overdueCount);
-    }
-
-    /// <summary>
     /// Calculates the average number of days from first seen to resolution
     /// for resolved vulnerability episodes.
     /// </summary>

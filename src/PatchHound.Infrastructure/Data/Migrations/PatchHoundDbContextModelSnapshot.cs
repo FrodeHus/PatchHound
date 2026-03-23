@@ -1590,63 +1590,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("RemediationDecisionVulnerabilityOverrides");
                 });
 
-            modelBuilder.Entity("PatchHound.Core.Entities.RemediationTask", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AssetId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AssignedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AssigneeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset>("DueDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Justification")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
-
-                    b.Property<DateTimeOffset?>("LastSlaNotifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TenantVulnerabilityId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AssigneeId");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("TenantVulnerabilityId");
-
-                    b.HasIndex("TenantId", "TenantVulnerabilityId", "AssetId", "Status");
-
-                    b.ToTable("RemediationTasks");
-                });
-
             modelBuilder.Entity("PatchHound.Core.Entities.RiskAcceptance", b =>
                 {
                     b.Property<Guid>("Id")
