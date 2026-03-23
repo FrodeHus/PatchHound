@@ -1,14 +1,12 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { toast } from 'sonner'
 import {
   fetchTenantSoftwareDetail,
   fetchTenantSoftwareInstallations,
   fetchTenantSoftwareVulnerabilities,
 } from '@/api/software.functions'
 import { fetchDecisionContext } from '@/api/remediation.functions'
-import { createRemediationTasksForSoftware } from '@/api/remediation-tasks.functions'
 import { SoftwareDetailPage } from '@/components/features/software/SoftwareDetailPage'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { softwareQueryKeys } from '@/features/software/list-state'
@@ -52,7 +50,6 @@ function SoftwareDetailRoute() {
   const { selectedTenantId } = useTenantScope()
   const [initialTenantId] = useState(selectedTenantId)
   const canUseInitialData = initialTenantId === selectedTenantId
-  const queryClient = useQueryClient()
 
   const detailQuery = useQuery({
     queryKey: softwareQueryKeys.detail(selectedTenantId, id),
@@ -107,22 +104,6 @@ function SoftwareDetailRoute() {
     enabled: canViewRemediation && primarySoftwareAssetId !== null,
   })
 
-  const createTasksMutation = useMutation({
-    mutationFn: async () => createRemediationTasksForSoftware({ data: { tenantSoftwareId: id } }),
-    onSuccess: async (result) => {
-      toast.success(
-        result.createdCount > 0
-          ? `Created ${result.createdCount} software remediation task${result.createdCount === 1 ? '' : 's'}`
-          : 'No missing software remediation tasks were created',
-      )
-      await queryClient.invalidateQueries({ queryKey: softwareQueryKeys.detail(selectedTenantId, id) })
-      await queryClient.invalidateQueries({ queryKey: ['remediation-tasks'] })
-    },
-    onError: () => {
-      toast.error('Failed to create software remediation tasks')
-    },
-  })
-
   if (!detail || !installations || !vulnerabilities) {
     return null
   }
@@ -133,15 +114,6 @@ function SoftwareDetailRoute() {
       selectedVersion={selectedVersion}
       installations={installations}
       vulnerabilities={vulnerabilities}
-      canCreateRemediationTasks={
-        user.roles.includes('GlobalAdmin')
-        || user.roles.includes('SecurityManager')
-        || user.roles.includes('SecurityAnalyst')
-      }
-      isCreatingRemediationTasks={createTasksMutation.isPending}
-      onCreateRemediationTasks={() => {
-        createTasksMutation.mutate()
-      }}
       onSelectVersion={(version) => {
         void navigate({
           search: (prev) => ({

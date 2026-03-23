@@ -18,9 +18,6 @@ type SoftwareDetailPageProps = {
   selectedVersion: string
   installations: PagedTenantSoftwareInstallations
   vulnerabilities: TenantSoftwareVulnerability[]
-  canCreateRemediationTasks: boolean
-  isCreatingRemediationTasks: boolean
-  onCreateRemediationTasks: () => void
   onSelectVersion: (version: string) => void
   onPageChange: (page: number) => void
   canViewRemediation: boolean
@@ -33,9 +30,6 @@ export function SoftwareDetailPage({
   selectedVersion,
   installations,
   vulnerabilities,
-  canCreateRemediationTasks,
-  isCreatingRemediationTasks,
-  onCreateRemediationTasks,
   onSelectVersion,
   onPageChange,
   canViewRemediation,
@@ -147,22 +141,15 @@ export function SoftwareDetailPage({
                     page: 1,
                     pageSize: 25,
                     search: '',
-                    vendor: '',
                     criticality: '',
-                    assetOwner: '',
-                    deviceAssetId: '',
-                    tenantSoftwareId: detail.id,
+                    outcome: '',
+                    approvalStatus: '',
                   }}
                 />
               }
             >
-              Open task list
+              Remediation overview
             </Button>
-            {canCreateRemediationTasks ? (
-              <Button onClick={onCreateRemediationTasks} disabled={isCreatingRemediationTasks}>
-                {isCreatingRemediationTasks ? 'Creating tasks...' : 'Create remediation task'}
-              </Button>
-            ) : null}
           </div>
         </div>
       </section>
