@@ -2,7 +2,6 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { useEffect, useState, type ComponentType } from 'react'
 import {
   Bug,
-  Inbox,
   LayoutDashboard,
   ScrollText,
   Server,
@@ -14,7 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
   Laptop,
-} from 'lucide-react'
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from '@/components/ui/separator'
 import {
@@ -53,25 +52,44 @@ type NavGroup = {
 }
 
 const navItems: NavItem[] = [
-  { to: '/', label: 'Overview', icon: LayoutDashboard },
-  { to: '/vulnerabilities', label: 'Vulnerabilities', icon: Bug },
-  { to: '/actions', label: 'Actions', icon: Inbox },
-  { to: '/audit-log', label: 'Audit Trail', icon: ScrollText, roles: ['Auditor', 'GlobalAdmin'] },
-  { to: '/settings', label: 'Settings', icon: Settings2, roles: ['GlobalAdmin', 'SecurityManager'] },
-  { to: '/admin', label: 'Admin Console', icon: ShieldCheck, roles: ['GlobalAdmin', 'SecurityManager'] },
-]
+  { to: "/", label: "Overview", icon: LayoutDashboard },
+  { to: "/vulnerabilities", label: "Vulnerabilities", icon: Bug },
+  {
+    to: "/remediation",
+    label: "Remediation",
+    icon: ShieldAlert,
+    roles: ["SecurityManager", "SecurityAnalyst", "GlobalAdmin"],
+  },
+  {
+    to: "/audit-log",
+    label: "Audit Trail",
+    icon: ScrollText,
+    roles: ["Auditor", "GlobalAdmin"],
+  },
+  {
+    to: "/settings",
+    label: "Settings",
+    icon: Settings2,
+    roles: ["GlobalAdmin", "SecurityManager"],
+  },
+  {
+    to: "/admin",
+    label: "Admin Console",
+    icon: ShieldCheck,
+    roles: ["GlobalAdmin", "SecurityManager"],
+  },
+];
 
 const navGroups: NavGroup[] = [
   {
-    label: 'Assets',
+    label: "Assets",
     icon: Server,
     items: [
-      { to: '/devices', label: 'Devices', icon: Laptop },
-      { to: '/software', label: 'Software', icon: Boxes },
-      { to: '/remediation', label: 'Remediation', icon: ShieldAlert },
+      { to: "/devices", label: "Devices", icon: Laptop },
+      { to: "/software", label: "Software", icon: Boxes },
     ],
   },
-]
+];
 
 function canAccess(item: NavItem, user: CurrentUser): boolean {
   if (!item.roles?.length) {
