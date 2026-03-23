@@ -58,8 +58,6 @@ public static class DependencyInjection
 
         // Repositories
         services.AddScoped<IAssetRepository, AssetRepository>();
-        services.AddScoped<IRemediationTaskRepository, RemediationTaskRepository>();
-        services.AddScoped<IRiskAcceptanceRepository, RiskAcceptanceRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITeamRepository, TeamRepository>();
@@ -85,14 +83,13 @@ public static class DependencyInjection
 
         // Application services
         services.AddScoped<VulnerabilityService>();
-        services.AddScoped<RemediationTaskService>();
         services.AddScoped<AssetService>();
-        services.AddScoped<RiskAcceptanceService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<UserService>();
         services.AddScoped<TeamService>();
         services.AddScoped<SlaService>();
-        services.AddScoped<RemediationTaskProjectionService>();
+        services.AddScoped<RemediationDecisionService>();
+        services.AddScoped<AnalystRecommendationService>();
         services.AddScoped<SoftwareVulnerabilityMatchService>();
         services.AddScoped<NormalizedSoftwareResolver>();
         services.AddScoped<NormalizedSoftwareProjectionService>();

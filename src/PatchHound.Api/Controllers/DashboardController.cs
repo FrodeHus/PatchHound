@@ -154,8 +154,8 @@ public class DashboardController : ControllerBase
         };
 
         // SLA compliance and remediation metrics — tenant-wide, NOT affected by dashboard filters
-        var tasks = await _dbContext
-            .RemediationTasks.AsNoTracking()
+        var patchingTasks = await _dbContext
+            .PatchingTasks.AsNoTracking()
             .Where(t => t.TenantId == tenantId)
             .Select(t => new
             {
@@ -167,8 +167,12 @@ public class DashboardController : ControllerBase
             .ToListAsync(ct);
 
         var now = DateTimeOffset.UtcNow;
-        var taskTuples = tasks.Select(t => (t.Status, t.DueDate)).ToList();
-        var (slaPercent, overdueCount) = DashboardService.CalculateSlaCompliance(taskTuples, now);
+        var overdueCount = patchingTasks.Count(t =>
+            t.Status != PatchingTaskStatus.Completed && t.DueDate < now);
+        var slaPercent = patchingTasks.Count == 0
+            ? 100m
+            : Math.Round(
+                (patchingTasks.Count - overdueCount) / (decimal)patchingTasks.Count * 100m, 1);
 
         // Average remediation days — based on resolved episodes
         var resolvedEpisodeRows = await _dbContext.VulnerabilityAssetEpisodes.AsNoTracking()
@@ -277,14 +281,16 @@ public class DashboardController : ControllerBase
                     e.TenantVulnerabilityId == v.Id
                     && e.Status == VulnerabilityStatus.Open
                 )
-                && !_dbContext.RemediationTasks.Any(t =>
-                    t.TenantVulnerabilityId == v.Id
-                    && t.Status != RemediationTaskStatus.Completed
-                    && t.Status != RemediationTaskStatus.RiskAccepted
-                )
-                && !_dbContext.RiskAcceptances.Any(ra =>
-                    ra.TenantVulnerabilityId == v.Id
-                    && ra.Status == RiskAcceptanceStatus.Approved
+                // No active remediation decision covering this vulnerability's software asset
+                && !_dbContext.SoftwareVulnerabilityMatches.Any(svm =>
+                    svm.VulnerabilityDefinitionId == v.VulnerabilityDefinitionId
+                    && svm.TenantId == tenantId
+                    && _dbContext.RemediationDecisions.Any(rd =>
+                        rd.SoftwareAssetId == svm.SoftwareAssetId
+                        && rd.TenantId == tenantId
+                        && rd.ApprovalStatus != DecisionApprovalStatus.Rejected
+                        && rd.ApprovalStatus != DecisionApprovalStatus.Expired
+                    )
                 )
             );
 
@@ -437,15 +443,17 @@ public class DashboardController : ControllerBase
         {
             var snapshotDate = todayDate.AddDays(-dayOffset);
             var snapshotInstant = new DateTimeOffset(snapshotDate.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
-            // Tasks that existed on this date: created on or before snapshotInstant
-            var tasksOnDate = tasks.Where(t => t.CreatedAt <= snapshotInstant).ToList();
+            // Patching tasks that existed on this date
+            var tasksOnDate = patchingTasks.Where(t => t.CreatedAt <= snapshotInstant).ToList();
             if (tasksOnDate.Count == 0)
             {
                 slaComplianceTrend.Add(new SlaComplianceTrendPointDto(snapshotDate, 100m));
                 continue;
             }
-            var taskTuplesOnDate = tasksOnDate.Select(t => (t.Status, t.DueDate)).ToList();
-            var (dailySlaPercent, _) = DashboardService.CalculateSlaCompliance(taskTuplesOnDate, snapshotInstant);
+            var overdueOnDateSla = tasksOnDate.Count(t =>
+                t.Status != PatchingTaskStatus.Completed && t.DueDate < snapshotInstant);
+            var dailySlaPercent = Math.Round(
+                (tasksOnDate.Count - overdueOnDateSla) / (decimal)tasksOnDate.Count * 100m, 1);
             slaComplianceTrend.Add(new SlaComplianceTrendPointDto(snapshotDate, dailySlaPercent));
         }
 
@@ -492,13 +500,12 @@ public class DashboardController : ControllerBase
             sparkOpenStatuses.Add(openOnDate);
 
             // Task-based sparklines
-            var tasksOnDate = tasks.Where(t => t.CreatedAt <= snapshotInstant).ToList();
-            var overdueOnDate = tasksOnDate.Count(t =>
-                t.Status != RemediationTaskStatus.Completed
-                && t.Status != RemediationTaskStatus.RiskAccepted
+            var tasksOnDateSpk = patchingTasks.Where(t => t.CreatedAt <= snapshotInstant).ToList();
+            var overdueOnDate = tasksOnDateSpk.Count(t =>
+                t.Status != PatchingTaskStatus.Completed
                 && t.DueDate < snapshotInstant);
             sparkOverdueActions.Add(overdueOnDate);
-            sparkHealthyTasks.Add(Math.Max(tasksOnDate.Count - overdueOnDate, 0));
+            sparkHealthyTasks.Add(Math.Max(tasksOnDateSpk.Count - overdueOnDate, 0));
         }
 
         var metricSparklines = new MetricSparklinesDto(
@@ -596,7 +603,7 @@ public class DashboardController : ControllerBase
                 vulnsByStatus,
             slaPercent,
             overdueCount,
-            tasks.Count,
+            patchingTasks.Count,
             avgRemediationDays,
             topVulns,
             latestUnhandled,
@@ -720,97 +727,88 @@ public class DashboardController : ControllerBase
             })
             .ToList();
 
-        var ownerActionRows = await (
-            from task in _dbContext.RemediationTasks.AsNoTracking()
-            join asset in _dbContext.Assets.AsNoTracking() on task.AssetId equals asset.Id
-            join tenantVulnerability in _dbContext.TenantVulnerabilities.AsNoTracking()
-                on task.TenantVulnerabilityId equals tenantVulnerability.Id
-            join definition in _dbContext.VulnerabilityDefinitions.AsNoTracking()
-                on tenantVulnerability.VulnerabilityDefinitionId equals definition.Id
-            where task.TenantId == tenantId
-                  && ownedAssetIds.Contains(task.AssetId)
-                  && task.Status != RemediationTaskStatus.Completed
-                  && task.Status != RemediationTaskStatus.RiskAccepted
+        // Patching tasks targeting teams that own the user's devices
+        var ownerPatchingRows = await (
+            from pt in _dbContext.PatchingTasks.AsNoTracking()
+            join decision in _dbContext.RemediationDecisions.AsNoTracking()
+                on pt.RemediationDecisionId equals decision.Id
+            join softwareAsset in _dbContext.Assets.AsNoTracking()
+                on decision.SoftwareAssetId equals softwareAsset.Id
+            where pt.TenantId == tenantId
+                  && ownerTeamIds.Contains(pt.OwnerTeamId)
+                  && pt.Status != PatchingTaskStatus.Completed
             select new
             {
-                task.AssetId,
-                task.TenantVulnerabilityId,
-                TaskId = (Guid?)task.Id,
-                AssetName = asset.Name,
-                definition.ExternalId,
-                definition.Title,
-                definition.Description,
-                Severity = definition.VendorSeverity,
-                EpisodeRiskScore = _dbContext.VulnerabilityEpisodeRiskAssessments
-                    .Where(assessment =>
-                        assessment.TenantVulnerabilityId == task.TenantVulnerabilityId
-                        && assessment.AssetId == task.AssetId
-                        && assessment.ResolvedAt == null)
-                    .Select(assessment => (decimal?)assessment.EpisodeRiskScore)
-                    .FirstOrDefault(),
-                EpisodeRiskBand = _dbContext.VulnerabilityEpisodeRiskAssessments
-                    .Where(assessment =>
-                        assessment.TenantVulnerabilityId == task.TenantVulnerabilityId
-                        && assessment.AssetId == task.AssetId
-                        && assessment.ResolvedAt == null)
-                    .Select(assessment => assessment.RiskBand)
-                    .FirstOrDefault(),
-                task.DueDate,
-                ActionState = task.Status.ToString()
+                SoftwareAssetId = decision.SoftwareAssetId,
+                SoftwareAssetName = softwareAsset.Name,
+                PatchingTaskId = pt.Id,
+                pt.DueDate,
+                ActionState = pt.Status.ToString(),
             }
         )
-            .OrderByDescending(item => item.EpisodeRiskScore ?? 0m)
-            .ThenBy(item => item.DueDate)
+            .OrderBy(item => item.DueDate)
             .Take(10)
             .ToListAsync(ct);
+
+        // Build owner actions from patching tasks — use the top vulnerability per software asset
+        var patchingSoftwareAssetIds = ownerPatchingRows
+            .Select(p => p.SoftwareAssetId)
+            .Distinct()
+            .ToList();
+
+        var topVulnPerSoftwareAsset = await (
+            from svm in _dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
+            join tv in _dbContext.TenantVulnerabilities.AsNoTracking()
+                on new { VulnDefId = svm.VulnerabilityDefinitionId, svm.TenantId }
+                equals new { VulnDefId = tv.VulnerabilityDefinitionId, tv.TenantId }
+            join vd in _dbContext.VulnerabilityDefinitions.AsNoTracking()
+                on svm.VulnerabilityDefinitionId equals vd.Id
+            where svm.TenantId == tenantId
+                  && patchingSoftwareAssetIds.Contains(svm.SoftwareAssetId)
+                  && svm.ResolvedAt == null
+            select new
+            {
+                svm.SoftwareAssetId,
+                tv.Id,
+                vd.ExternalId,
+                vd.Title,
+                vd.Description,
+                Severity = vd.VendorSeverity,
+            }
+        )
+            .ToListAsync(ct);
+
+        var topVulnBySoftware = topVulnPerSoftwareAsset
+            .GroupBy(v => v.SoftwareAssetId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(v => v.Severity).First()
+            );
+
+        var ownerActionRows = ownerPatchingRows.Select(p =>
+        {
+            var topVuln = topVulnBySoftware.GetValueOrDefault(p.SoftwareAssetId);
+            return new
+            {
+                AssetId = p.SoftwareAssetId,
+                TenantVulnerabilityId = topVuln?.Id ?? Guid.Empty,
+                TaskId = (Guid?)p.PatchingTaskId,
+                AssetName = p.SoftwareAssetName,
+                ExternalId = topVuln?.ExternalId ?? "-",
+                Title = topVuln?.Title ?? "Patching required",
+                Description = topVuln?.Description ?? "",
+                Severity = topVuln?.Severity ?? Severity.Medium,
+                EpisodeRiskScore = (decimal?)null,
+                EpisodeRiskBand = (string?)null,
+                DueDate = p.DueDate,
+                ActionState = p.ActionState,
+            };
+        }).ToList();
 
         var ownerActionAssetIds = ownerActionRows
             .Select(item => item.AssetId)
             .Distinct()
             .ToList();
-        var ownerActionDefinitionIds = ownerActionRows
-            .Select(item => item.TenantVulnerabilityId)
-            .Distinct()
-            .ToList();
-
-        var actionSoftwareRows = await (
-            from match in _dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-            join installation in _dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-                on match.SoftwareAssetId equals installation.SoftwareAssetId
-            join tenantVulnerability in _dbContext.TenantVulnerabilities.AsNoTracking()
-                on match.VulnerabilityDefinitionId equals tenantVulnerability.VulnerabilityDefinitionId
-            where installation.TenantId == tenantId
-                  && match.TenantId == tenantId
-                  && tenantVulnerability.TenantId == tenantId
-                  && ownerActionAssetIds.Contains(installation.DeviceAssetId)
-                  && ownerActionDefinitionIds.Contains(tenantVulnerability.Id)
-                  && installation.IsActive
-                  && installation.RemovedAt == null
-                  && match.ResolvedAt == null
-            select new
-            {
-                installation.DeviceAssetId,
-                tenantVulnerability.Id,
-                SoftwareName = installation.TenantSoftware.NormalizedSoftware.CanonicalName
-            }
-        )
-            .Distinct()
-            .ToListAsync(ct);
-
-        var softwareNamesByAction = actionSoftwareRows
-            .GroupBy(
-                item => new { item.DeviceAssetId, TenantVulnerabilityId = item.Id },
-                item => item.SoftwareName
-            )
-            .ToDictionary(
-                group => (group.Key.DeviceAssetId, group.Key.TenantVulnerabilityId),
-                group => group
-                    .Where(name => !string.IsNullOrWhiteSpace(name))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(name => name)
-                    .Take(3)
-                    .ToList()
-            );
 
         var ownerActions = ownerActionRows
             .Select(item => new OwnerActionDto(
@@ -819,16 +817,12 @@ public class DashboardController : ControllerBase
                 item.TaskId,
                 item.AssetName,
                 item.ExternalId,
-                item.Title,
-                softwareNamesByAction.TryGetValue((item.AssetId, item.TenantVulnerabilityId), out var softwareNames)
-                    ? softwareNames
-                    : [],
+                item.Title ?? "",
+                [],
                 OwnerFacingIssueSummaryFormatter.BuildIssueSummary(
-                    softwareNamesByAction.TryGetValue((item.AssetId, item.TenantVulnerabilityId), out var softwareList)
-                        ? string.Join(", ", softwareList)
-                        : null,
-                    item.Title,
-                    item.Description,
+                    null,
+                    item.Title ?? "",
+                    item.Description ?? "",
                     item.Severity
                 ),
                 item.Severity.ToString(),

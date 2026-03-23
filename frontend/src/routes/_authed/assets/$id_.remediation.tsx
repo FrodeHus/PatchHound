@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchRemediationContext } from '@/api/remediation.functions'
+import { fetchDecisionContext } from '@/api/remediation.functions'
 import { SoftwareRemediationView } from '@/components/features/remediation/SoftwareRemediationView'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { assetQueryKeys } from '@/features/assets/list-state'
 
 export const Route = createFileRoute('/_authed/assets/$id_/remediation')({
-  loader: ({ params }) => fetchRemediationContext({ data: { assetId: params.id } }),
+  loader: ({ params }) => fetchDecisionContext({ data: { assetId: params.id } }),
   component: RemediationPage,
 })
 
@@ -20,7 +20,7 @@ function RemediationPage() {
 
   const query = useQuery({
     queryKey: assetQueryKeys.remediation(selectedTenantId, id),
-    queryFn: () => fetchRemediationContext({ data: { assetId: id } }),
+    queryFn: () => fetchDecisionContext({ data: { assetId: id } }),
     initialData: canUseInitialData ? initialData : undefined,
   })
 
@@ -29,10 +29,10 @@ function RemediationPage() {
   if (!data) {
     return (
       <div className="flex items-center justify-center py-24 text-muted-foreground">
-        Loading remediation context...
+        Loading decision context...
       </div>
     )
   }
 
-  return <SoftwareRemediationView data={data} />
+  return <SoftwareRemediationView data={data} assetId={id} />
 }

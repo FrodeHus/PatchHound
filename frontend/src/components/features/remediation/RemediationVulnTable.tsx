@@ -1,45 +1,52 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
-import type { SoftwareRemediationVuln } from '@/api/remediation.schemas'
+import type { DecisionVuln } from '@/api/remediation.schemas'
+import { addVulnerabilityOverride } from '@/api/remediation.functions'
 import { DataTable } from '@/components/ui/data-table'
 import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
-import { toneBadge, type Tone } from '@/lib/tone-classes'
+import { Button } from '@/components/ui/button'
+import { toneBadge } from '@/lib/tone-classes'
+import { severityTone, outcomeLabel, outcomeTone } from './remediation-utils'
 
 type RemediationVulnTableProps = {
-  vulnerabilities: SoftwareRemediationVuln[]
-  onSelectVuln: (vuln: SoftwareRemediationVuln) => void
+  vulnerabilities: DecisionVuln[]
+  decisionId: string | null
+  assetId: string
+  queryKey: readonly unknown[]
+  onSelectVuln: (vuln: DecisionVuln) => void
 }
 
-function severityTone(severity: string): Tone {
-  switch (severity) {
-    case 'Critical': return 'danger'
-    case 'High': return 'warning'
-    case 'Medium': return 'info'
-    default: return 'neutral'
-  }
-}
+export function RemediationVulnTable({
+  vulnerabilities,
+  decisionId,
+  assetId,
+  queryKey,
+  onSelectVuln,
+}: RemediationVulnTableProps) {
+  const queryClient = useQueryClient()
+  const [overridingId, setOverridingId] = useState<string | null>(null)
 
-function taskStatusLabel(vuln: SoftwareRemediationVuln): string {
-  if (vuln.riskAcceptance?.status === 'Approved') return 'Risk Accepted'
-  if (vuln.remediationTask) return vuln.remediationTask.status
-  return 'No task'
-}
+  const handleOverride = useCallback(async (vuln: DecisionVuln, outcome: string) => {
+    if (!decisionId) return
+    setOverridingId(vuln.tenantVulnerabilityId)
+    try {
+      await addVulnerabilityOverride({
+        data: {
+          assetId,
+          decisionId,
+          tenantVulnerabilityId: vuln.tenantVulnerabilityId,
+          outcome,
+          justification: `Per-vulnerability override to ${outcome}`,
+        },
+      })
+      await queryClient.invalidateQueries({ queryKey })
+    } finally {
+      setOverridingId(null)
+    }
+  }, [decisionId, assetId, queryClient, queryKey])
 
-function taskStatusTone(vuln: SoftwareRemediationVuln): Tone {
-  if (vuln.riskAcceptance?.status === 'Approved') return 'success'
-  if (!vuln.remediationTask) return 'neutral'
-  switch (vuln.remediationTask.status) {
-    case 'Completed': return 'success'
-    case 'InProgress':
-    case 'PatchScheduled': return 'info'
-    case 'Pending': return 'warning'
-    case 'CannotPatch': return 'danger'
-    default: return 'neutral'
-  }
-}
-
-export function RemediationVulnTable({ vulnerabilities, onSelectVuln }: RemediationVulnTableProps) {
-  const columns = useMemo<ColumnDef<SoftwareRemediationVuln>[]>(
+  const columns = useMemo<ColumnDef<DecisionVuln>[]>(
     () => [
       {
         accessorKey: 'externalId',
@@ -72,7 +79,7 @@ export function RemediationVulnTable({ vulnerabilities, onSelectVuln }: Remediat
           const tone = severityTone(row.original.effectiveSeverity)
           return (
             <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${toneBadge(tone)}`}>
-              {row.original.effectiveSeverity}
+              {row.original.effectiveSeverity ?? row.original.vendorSeverity}
               {score != null ? ` ${score.toFixed(1)}` : ''}
             </span>
           )
@@ -80,12 +87,22 @@ export function RemediationVulnTable({ vulnerabilities, onSelectVuln }: Remediat
       },
       {
         id: 'epss',
-        accessorFn: (row) => row.threat?.epssScore ?? -1,
+        accessorFn: (row) => row.epssScore ?? -1,
         header: ({ column }) => <SortableColumnHeader column={column} title="EPSS" />,
         cell: ({ row }) => {
-          const epss = row.original.threat?.epssScore
+          const epss = row.original.epssScore
           if (epss == null) return <span className="text-muted-foreground">-</span>
           return <span className="tabular-nums">{(epss * 100).toFixed(1)}%</span>
+        },
+      },
+      {
+        id: 'riskScore',
+        accessorFn: (row) => row.episodeRiskScore ?? -1,
+        header: ({ column }) => <SortableColumnHeader column={column} title="Risk" />,
+        cell: ({ row }) => {
+          const score = row.original.episodeRiskScore
+          if (score == null) return <span className="text-muted-foreground">-</span>
+          return <span className="tabular-nums font-medium">{score.toFixed(0)}</span>
         },
       },
       {
@@ -93,13 +110,11 @@ export function RemediationVulnTable({ vulnerabilities, onSelectVuln }: Remediat
         header: 'Threats',
         enableSorting: false,
         cell: ({ row }) => {
-          const threat = row.original.threat
-          if (!threat) return <span className="text-muted-foreground">-</span>
+          const v = row.original
           const badges: string[] = []
-          if (threat.knownExploited) badges.push('KEV')
-          if (threat.publicExploit) badges.push('Exploit')
-          if (threat.activeAlert) badges.push('Alert')
-          if (threat.hasRansomwareAssociation) badges.push('Ransomware')
+          if (v.knownExploited) badges.push('KEV')
+          if (v.publicExploit) badges.push('Exploit')
+          if (v.activeAlert) badges.push('Alert')
           if (badges.length === 0) return <span className="text-muted-foreground">-</span>
           return (
             <div className="flex flex-wrap gap-1">
@@ -113,36 +128,42 @@ export function RemediationVulnTable({ vulnerabilities, onSelectVuln }: Remediat
         },
       },
       {
-        accessorKey: 'confidence',
-        header: 'Match',
-        enableSorting: false,
-        cell: ({ row }) => (
-          <span className="text-xs text-muted-foreground">{row.original.confidence}</span>
-        ),
-      },
-      {
-        id: 'status',
-        header: 'Status',
+        id: 'override',
+        header: 'Override',
         enableSorting: false,
         cell: ({ row }) => {
-          const label = taskStatusLabel(row.original)
-          const tone = taskStatusTone(row.original)
+          const v = row.original
+          if (v.overrideOutcome) {
+            return (
+              <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(v.overrideOutcome))}`}>
+                {outcomeLabel(v.overrideOutcome)}
+              </span>
+            )
+          }
+          if (!decisionId) return <span className="text-muted-foreground">-</span>
+          const isLoading = overridingId === v.tenantVulnerabilityId
           return (
-            <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${toneBadge(tone)}`}>
-              {label}
-            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              disabled={isLoading}
+              onClick={() => handleOverride(v, 'RiskAcceptance')}
+            >
+              {isLoading ? '...' : 'Override'}
+            </Button>
           )
         },
       },
     ],
-    [onSelectVuln],
+    [onSelectVuln, decisionId, overridingId, handleOverride],
   )
 
   return (
     <DataTable
       columns={columns}
       data={vulnerabilities}
-      getRowId={(row) => row.vulnerabilityDefinitionId}
+      getRowId={(row) => row.tenantVulnerabilityId}
       emptyState={
         <div className="py-12 text-center text-muted-foreground">
           No vulnerabilities found for this software asset.

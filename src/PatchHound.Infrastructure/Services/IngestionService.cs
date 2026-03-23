@@ -26,7 +26,6 @@ public class IngestionService
     private readonly VulnerabilityAssessmentService _assessmentService;
     private readonly SoftwareVulnerabilityMatchService _softwareVulnerabilityMatchService;
     private readonly NormalizedSoftwareProjectionService _normalizedSoftwareProjectionService;
-    private readonly RemediationTaskProjectionService _remediationTaskProjectionService;
     private readonly StagedVulnerabilityMergeService _stagedVulnerabilityMergeService;
     private readonly StagedAssetMergeService _stagedAssetMergeService;
     private readonly IAssetRuleEvaluationService _assetRuleEvaluationService;
@@ -42,7 +41,6 @@ public class IngestionService
         VulnerabilityAssessmentService assessmentService,
         SoftwareVulnerabilityMatchService softwareVulnerabilityMatchService,
         NormalizedSoftwareProjectionService normalizedSoftwareProjectionService,
-        RemediationTaskProjectionService remediationTaskProjectionService,
         StagedVulnerabilityMergeService stagedVulnerabilityMergeService,
         StagedAssetMergeService stagedAssetMergeService,
         IAssetRuleEvaluationService assetRuleEvaluationService,
@@ -56,7 +54,6 @@ public class IngestionService
         _assessmentService = assessmentService;
         _softwareVulnerabilityMatchService = softwareVulnerabilityMatchService;
         _normalizedSoftwareProjectionService = normalizedSoftwareProjectionService;
-        _remediationTaskProjectionService = remediationTaskProjectionService;
         _stagedVulnerabilityMergeService = stagedVulnerabilityMergeService;
         _stagedAssetMergeService = stagedAssetMergeService;
         _assetRuleEvaluationService = assetRuleEvaluationService;

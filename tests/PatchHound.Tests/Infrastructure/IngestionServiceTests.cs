@@ -53,10 +53,6 @@ public class IngestionServiceTests : IDisposable
             .Returns(new IngestionAssetInventorySnapshot([], []));
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var taskProjectionService = new RemediationTaskProjectionService(
-            _dbContext,
-            new SlaService()
-        );
         var assessmentService = new VulnerabilityAssessmentService(
             _dbContext,
             new EnvironmentalSeverityCalculator(),
@@ -81,7 +77,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
@@ -93,7 +88,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             softwareMatchService,
             normalizedSoftwareProjectionService,
-            taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
@@ -103,10 +97,9 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task NewVulnerability_CreatesVulnerabilityAndAssetAndTask()
+    public async Task NewVulnerability_CreatesVulnerabilityAndAsset()
     {
-        // Arrange: create an asset with an owner so a task will be created
-        var ownerId = Guid.NewGuid();
+        // Arrange: create an asset
         var asset = Asset.Create(
             _tenantId,
             "ASSET-1",
@@ -114,7 +107,6 @@ public class IngestionServiceTests : IDisposable
             "Server1",
             Criticality.High
         );
-        asset.AssignOwner(ownerId);
         await _dbContext.Assets.AddAsync(asset);
         await _dbContext.SaveChangesAsync();
 
@@ -166,13 +158,6 @@ public class IngestionServiceTests : IDisposable
             .FirstOrDefaultAsync(va => va.TenantVulnerabilityId == tenantVulnerability.Id);
         va.Should().NotBeNull();
         va!.Status.Should().Be(VulnerabilityStatus.Open);
-
-        var task = await _dbContext
-            .RemediationTasks.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(t => t.TenantVulnerabilityId == tenantVulnerability.Id);
-        task.Should().NotBeNull();
-        task!.AssigneeId.Should().Be(ownerId);
-        task.Status.Should().Be(RemediationTaskStatus.Pending);
     }
 
     [Fact]
@@ -932,10 +917,6 @@ public class IngestionServiceTests : IDisposable
             );
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var taskProjectionService = new RemediationTaskProjectionService(
-            _dbContext,
-            new SlaService()
-        );
         var assessmentService = new VulnerabilityAssessmentService(
             _dbContext,
             new EnvironmentalSeverityCalculator(),
@@ -960,7 +941,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
@@ -972,7 +952,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             softwareMatchService,
             normalizedSoftwareProjectionService,
-            taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
@@ -985,13 +964,13 @@ public class IngestionServiceTests : IDisposable
         started.Should().BeTrue();
         (await _dbContext.IngestionRuns.IgnoreQueryFilters().CountAsync()).Should().Be(1);
 
-        var stagedBatchNumbers = await _dbContext
-            .StagedVulnerabilities.IgnoreQueryFilters()
-            .Where(item => item.IngestionRunId == existingRun.Id)
-            .OrderBy(item => item.BatchNumber)
-            .Select(item => item.BatchNumber)
+        // Staged data is purged after successful run, so verify persisted vulnerabilities instead
+        var persistedVulnerabilities = await _dbContext
+            .VulnerabilityDefinitions.IgnoreQueryFilters()
+            .OrderBy(item => item.ExternalId)
+            .Select(item => item.ExternalId)
             .ToListAsync();
-        stagedBatchNumbers.Should().Equal([1, 2]);
+        persistedVulnerabilities.Should().Equal(["CVE-2026-RESUME-1", "CVE-2026-RESUME-2"]);
 
         var updatedCheckpoint = await _dbContext
             .IngestionCheckpoints.IgnoreQueryFilters()
@@ -1078,10 +1057,6 @@ public class IngestionServiceTests : IDisposable
             });
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var taskProjectionService = new RemediationTaskProjectionService(
-            _dbContext,
-            new SlaService()
-        );
         var assessmentService = new VulnerabilityAssessmentService(
             _dbContext,
             new EnvironmentalSeverityCalculator(),
@@ -1106,7 +1081,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
@@ -1118,7 +1092,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             softwareMatchService,
             normalizedSoftwareProjectionService,
-            taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
@@ -1249,10 +1222,6 @@ public class IngestionServiceTests : IDisposable
             .Returns(new SourceBatchResult<IngestionResult>([], null, true));
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var taskProjectionService = new RemediationTaskProjectionService(
-            _dbContext,
-            new SlaService()
-        );
         var assessmentService = new VulnerabilityAssessmentService(
             _dbContext,
             new EnvironmentalSeverityCalculator(),
@@ -1277,7 +1246,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
@@ -1289,7 +1257,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             softwareMatchService,
             normalizedSoftwareProjectionService,
-            taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
@@ -1302,20 +1269,20 @@ public class IngestionServiceTests : IDisposable
         started.Should().BeTrue();
         (await _dbContext.IngestionRuns.IgnoreQueryFilters().CountAsync()).Should().Be(1);
 
-        var stagedAssets = await _dbContext
-            .StagedAssets.IgnoreQueryFilters()
-            .Where(item => item.IngestionRunId == existingRun.Id)
-            .OrderBy(item => item.BatchNumber)
-            .Select(item => item.BatchNumber)
+        // Staged data is purged after successful run, so verify persisted assets instead
+        var persistedAssets = await _dbContext
+            .Assets.IgnoreQueryFilters()
+            .Where(item => item.TenantId == _tenantId)
+            .OrderBy(item => item.ExternalId)
+            .Select(item => item.ExternalId)
             .ToListAsync();
-        stagedAssets.Should().Equal([1, 2]);
+        persistedAssets.Should().Equal(["DEVICE-1", "SOFTWARE-1"]);
 
-        var stagedLinks = await _dbContext
-            .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
-            .Where(item => item.IngestionRunId == existingRun.Id)
+        var persistedLinks = await _dbContext
+            .DeviceSoftwareInstallations.IgnoreQueryFilters()
+            .Where(item => item.TenantId == _tenantId)
             .ToListAsync();
-        stagedLinks.Should().ContainSingle();
-        stagedLinks[0].BatchNumber.Should().Be(2);
+        persistedLinks.Should().ContainSingle();
     }
 
     [Fact]
@@ -1390,10 +1357,6 @@ public class IngestionServiceTests : IDisposable
             .Returns(new SourceBatchResult<IngestionResult>([], null, true));
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var taskProjectionService = new RemediationTaskProjectionService(
-            _dbContext,
-            new SlaService()
-        );
         var assessmentService = new VulnerabilityAssessmentService(
             _dbContext,
             new EnvironmentalSeverityCalculator(),
@@ -1418,7 +1381,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
@@ -1430,7 +1392,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             softwareMatchService,
             normalizedSoftwareProjectionService,
-            taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
@@ -1563,10 +1524,6 @@ public class IngestionServiceTests : IDisposable
             );
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var taskProjectionService = new RemediationTaskProjectionService(
-            _dbContext,
-            new SlaService()
-        );
         var assessmentService = new VulnerabilityAssessmentService(
             _dbContext,
             new EnvironmentalSeverityCalculator(),
@@ -1591,7 +1548,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
@@ -1603,7 +1559,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             softwareMatchService,
             normalizedSoftwareProjectionService,
-            taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
@@ -1727,10 +1682,6 @@ public class IngestionServiceTests : IDisposable
             });
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var taskProjectionService = new RemediationTaskProjectionService(
-            _dbContext,
-            new SlaService()
-        );
         var assessmentService = new VulnerabilityAssessmentService(
             _dbContext,
             new EnvironmentalSeverityCalculator(),
@@ -1755,7 +1706,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
@@ -1767,7 +1717,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             softwareMatchService,
             normalizedSoftwareProjectionService,
-            taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
@@ -1850,10 +1799,6 @@ public class IngestionServiceTests : IDisposable
             );
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var taskProjectionService = new RemediationTaskProjectionService(
-            _dbContext,
-            new SlaService()
-        );
         var assessmentService = new VulnerabilityAssessmentService(
             _dbContext,
             new EnvironmentalSeverityCalculator(),
@@ -1878,7 +1823,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             new VulnerabilityThreatAssessmentService(_dbContext),
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            taskProjectionService,
             Substitute.For<IWorkflowTriggerService>(),
             new IngestionStateCache()
         );
@@ -1890,7 +1834,6 @@ public class IngestionServiceTests : IDisposable
             assessmentService,
             softwareMatchService,
             normalizedSoftwareProjectionService,
-            taskProjectionService,
             stagedMergeService,
             stagedAssetMergeService,
             Substitute.For<IAssetRuleEvaluationService>(),
@@ -2269,11 +2212,6 @@ public class IngestionServiceTests : IDisposable
             .FirstAsync(v => v.Id == va.Id);
         updatedVa.Status.Should().Be(VulnerabilityStatus.Resolved);
         updatedVa.ResolvedDate.Should().NotBeNull();
-
-        var updatedTask = await _dbContext
-            .RemediationTasks.IgnoreQueryFilters()
-            .FirstAsync(t => t.Id == task.Id);
-        updatedTask.Status.Should().Be(RemediationTaskStatus.Completed);
     }
 
     [Fact]
@@ -2880,7 +2818,6 @@ public class IngestionServiceTests : IDisposable
                 _dbContext,
                 new NormalizedSoftwareResolver(_dbContext)
             ),
-            new RemediationTaskProjectionService(_dbContext, new SlaService()),
             new StagedVulnerabilityMergeService(
                 _dbContext,
                 CreateDbContextFactory(),
@@ -2891,7 +2828,6 @@ public class IngestionServiceTests : IDisposable
                 ),
                 new VulnerabilityThreatAssessmentService(_dbContext),
                 new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-                new RemediationTaskProjectionService(_dbContext, new SlaService()),
                 Substitute.For<IWorkflowTriggerService>(),
                 new IngestionStateCache()
             ),

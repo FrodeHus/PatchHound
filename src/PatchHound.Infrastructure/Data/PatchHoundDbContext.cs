@@ -92,6 +92,11 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<WorkflowInstance> WorkflowInstances => Set<WorkflowInstance>();
     public DbSet<WorkflowNodeExecution> WorkflowNodeExecutions => Set<WorkflowNodeExecution>();
     public DbSet<WorkflowAction> WorkflowActions => Set<WorkflowAction>();
+    public DbSet<RemediationDecision> RemediationDecisions => Set<RemediationDecision>();
+    public DbSet<RemediationDecisionVulnerabilityOverride> RemediationDecisionVulnerabilityOverrides =>
+        Set<RemediationDecisionVulnerabilityOverride>();
+    public DbSet<AnalystRecommendation> AnalystRecommendations => Set<AnalystRecommendation>();
+    public DbSet<PatchingTask> PatchingTasks => Set<PatchingTask>();
 
     public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken ct = default)
     {
@@ -300,6 +305,15 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             );
         modelBuilder
             .Entity<WorkflowAction>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<RemediationDecision>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<AnalystRecommendation>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<PatchingTask>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
     }
 }
