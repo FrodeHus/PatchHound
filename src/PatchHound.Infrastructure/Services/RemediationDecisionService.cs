@@ -20,6 +20,19 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
         CancellationToken ct
     )
     {
+        var hasOpenDecision = await dbContext.RemediationDecisions
+            .AnyAsync(
+                d => d.TenantId == tenantId
+                    && d.SoftwareAssetId == softwareAssetId
+                    && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                    && d.ApprovalStatus != DecisionApprovalStatus.Expired,
+                ct
+            );
+
+        if (hasOpenDecision)
+            return Result<RemediationDecision>.Failure(
+                "An active remediation decision already exists for this software asset. Reject or expire the current decision before creating a new one.");
+
         var decision = RemediationDecision.Create(
             tenantId,
             softwareAssetId,
