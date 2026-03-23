@@ -39,7 +39,7 @@ export const approveOrRejectDecision = createServerFn({ method: 'POST' })
     z.object({
       assetId: z.string().uuid(),
       decisionId: z.string().uuid(),
-      action: z.enum(['approve', 'reject']),
+      action: z.enum(['approve', 'reject', 'cancel']),
     })
   )
   .handler(async ({ context, data: { assetId, decisionId, action } }) => {
