@@ -4,6 +4,7 @@ import type { DashboardSummary, UnhandledVulnerability } from '@/api/dashboard.s
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { MetricInfoTooltip } from '@/components/features/dashboard/MetricInfoTooltip'
 
 type Props = {
   items: UnhandledVulnerability[]
@@ -57,6 +58,7 @@ export function AnalystTriageWorkbench({ items, summary, isLoading }: Props) {
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-destructive">
               <Siren className="size-3.5" />
               Critical unhandled
+              <MetricInfoTooltip content="Unhandled means there is no active remediation coverage and no approved acceptance in place. Critical unhandled items are the analyst queue's highest-urgency problems." />
             </div>
             <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{criticalUnhandled}</div>
           </div>
@@ -64,6 +66,7 @@ export function AnalystTriageWorkbench({ items, summary, isLoading }: Props) {
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-primary">
               <ShieldAlert className="size-3.5" />
               High unhandled
+              <MetricInfoTooltip content="High unhandled vulnerabilities are still severe enough to require analyst triage, but they sit below the critical tier in urgency." />
             </div>
             <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{highUnhandled}</div>
           </div>
@@ -71,6 +74,7 @@ export function AnalystTriageWorkbench({ items, summary, isLoading }: Props) {
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
               <TimerReset className="size-3.5" />
               Overdue pressure
+              <MetricInfoTooltip content="Vulnerability pressure is the operational strain created by unresolved exposure and slipping remediation timelines. Overdue work increases that pressure because risk is aging without closure." />
             </div>
             <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{summary.overdueTaskCount}</div>
           </div>

@@ -4,6 +4,7 @@ import type { DashboardSummary, SecurityManagerDashboardSummary } from '@/api/da
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { MetricInfoTooltip } from '@/components/features/dashboard/MetricInfoTooltip'
 import { RiskScoreCard } from '@/components/features/dashboard/RiskScoreCard'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 
@@ -58,24 +59,28 @@ export function SecurityManagerOverview({ summary, managerSummary, isLoading }: 
               <Metric
                 icon={ShieldAlert}
                 label="Critical backlog"
+                tooltip="Backlog here means unresolved exposure that is still present. Critical backlog is the part of that exposure sitting in the highest severity band and therefore most likely to require executive or governance attention."
                 value={summary.vulnerabilitiesBySeverity.Critical ?? 0}
                 tone="text-destructive"
               />
               <Metric
                 icon={AlertTriangle}
                 label="Overdue actions"
+                tooltip="Overdue actions are remediation items that have moved past their expected completion date. They are a proxy for execution strain and control slippage."
                 value={summary.overdueTaskCount}
                 tone="text-primary"
               />
               <Metric
                 icon={ClipboardCheck}
                 label="Pending approvals"
+                tooltip="Approval tasks are decisions that need formal review before the organization accepts risk or chooses an alternate mitigation path. Pending items near expiry create governance pressure."
                 value={managerSummary.approvalTasksRequiringAttention.length}
                 tone="text-chart-4"
               />
               <Metric
                 icon={CheckCircle2}
                 label="Approved exceptions"
+                tooltip="Exceptions are approved departures from normal patching or remediation, such as risk acceptance or alternate mitigation. This metric reflects the recent flow of such approved exceptions."
                 value={managerSummary.recentApprovedDecisions.length}
                 tone="text-chart-3"
               />
@@ -203,11 +208,13 @@ export function SecurityManagerOverview({ summary, managerSummary, isLoading }: 
 function Metric({
   icon: Icon,
   label,
+  tooltip,
   value,
   tone,
 }: {
   icon: typeof ShieldAlert
   label: string
+  tooltip: string
   value: number
   tone: string
 }) {
@@ -216,6 +223,7 @@ function Metric({
       <div className={`flex items-center gap-2 text-xs uppercase tracking-[0.18em] ${tone}`}>
         <Icon className="size-3.5" />
         {label}
+        <MetricInfoTooltip content={tooltip} />
       </div>
       <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{value}</div>
     </div>

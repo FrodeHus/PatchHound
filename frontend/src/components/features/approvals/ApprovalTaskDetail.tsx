@@ -56,6 +56,36 @@ function riskBandTone(band: string) {
   }
 }
 
+function outcomeTone(outcome: string) {
+  switch (outcome) {
+    case 'ApprovedForPatching':
+      return 'info' as const
+    case 'PatchingDeferred':
+      return 'warning' as const
+    case 'RiskAcceptance':
+      return 'warning' as const
+    case 'AlternateMitigation':
+      return 'success' as const
+    default:
+      return 'neutral' as const
+  }
+}
+
+function outcomeLabel(outcome: string) {
+  switch (outcome) {
+    case 'ApprovedForPatching':
+      return 'Patch this software'
+    case 'PatchingDeferred':
+      return 'Defer patching for now'
+    case 'RiskAcceptance':
+      return 'Accept the current risk'
+    case 'AlternateMitigation':
+      return 'Use an alternate mitigation'
+    default:
+      return startCase(outcome)
+  }
+}
+
 function auditActionIcon(action: string) {
   switch (action) {
     case 'Approved':
@@ -120,6 +150,11 @@ export function ApprovalTaskDetail({
               >
                 {data.criticality}
               </span>
+              <span
+                className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(outcomeTone(data.outcome))}`}
+              >
+                {outcomeLabel(data.outcome)}
+              </span>
               <ApprovalTypeBadge type={data.type} />
               <ApprovalStatusBadge status={data.status} />
             </div>
@@ -160,6 +195,18 @@ export function ApprovalTaskDetail({
                 </p>
               </div>
             ) : null}
+            <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Selected decision
+              </p>
+              <p className="mt-2">
+                <span
+                  className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${toneBadge(outcomeTone(data.outcome))}`}
+                >
+                  {outcomeLabel(data.outcome)}
+                </span>
+              </p>
+            </div>
           </div>
         </div>
       </header>
@@ -226,6 +273,17 @@ export function ApprovalTaskDetail({
           </TabsList>
 
           <TabsContent value="justification" className="space-y-4 pt-1">
+            <section className="rounded-2xl border border-border/70 bg-background/60 p-5">
+              <h2 className="mb-3 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                Selected decision
+              </h2>
+              <p className="text-sm leading-relaxed text-foreground/90">
+                This approval task asks you to review the decision to{' '}
+                <span className="font-medium">{outcomeLabel(data.outcome).toLowerCase()}</span>{' '}
+                for this software scope.
+              </p>
+            </section>
+
             <section className="rounded-2xl border border-border/70 bg-background/60 p-5">
               <h2 className="mb-3 text-xs uppercase tracking-[0.14em] text-muted-foreground">
                 Decision justification
