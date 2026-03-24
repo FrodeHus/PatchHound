@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MetricInfoTooltip } from '@/components/features/dashboard/MetricInfoTooltip'
 import { RiskScoreCard } from '@/components/features/dashboard/RiskScoreCard'
+import { outcomeLabel } from '@/components/features/remediation/remediation-utils'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 
 type Props = {
@@ -25,14 +26,6 @@ function attentionTone(state: string) {
   if (state === 'Overdue') return 'border-destructive/25 bg-destructive/10 text-destructive'
   if (state === 'NearExpiry') return 'border-chart-4/25 bg-chart-4/10 text-chart-4'
   return 'border-border/70 bg-muted/50 text-muted-foreground'
-}
-
-function outcomeLabel(outcome: string) {
-  return outcome === 'RiskAcceptance'
-    ? 'Risk acceptance'
-    : outcome === 'AlternateMitigation'
-      ? 'Alternate mitigation'
-      : outcome
 }
 
 export function SecurityManagerOverview({ summary, managerSummary, isLoading }: Props) {

@@ -92,10 +92,10 @@ export function RemediationWorkbench({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All outcomes</SelectItem>
-              <SelectItem value="ApprovedForPatching">Approved for Patching</SelectItem>
-              <SelectItem value="RiskAcceptance">Risk Acceptance</SelectItem>
-              <SelectItem value="AlternateMitigation">Alternate Mitigation</SelectItem>
-              <SelectItem value="PatchingDeferred">Patching Deferred</SelectItem>
+              <SelectItem value="ApprovedForPatching">{outcomeLabel('ApprovedForPatching')}</SelectItem>
+              <SelectItem value="RiskAcceptance">{outcomeLabel('RiskAcceptance')}</SelectItem>
+              <SelectItem value="AlternateMitigation">{outcomeLabel('AlternateMitigation')}</SelectItem>
+              <SelectItem value="PatchingDeferred">{outcomeLabel('PatchingDeferred')}</SelectItem>
             </SelectContent>
           </Select>
           <Select

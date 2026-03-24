@@ -123,6 +123,11 @@ export function ApprovalTaskDetail({
   )
   const isPending = data.status === 'Pending'
   const justificationRequired = data.requiresJustification
+  const vulnerabilityCount = data.vulnerabilities.totalCount
+  const affectedDeviceCount =
+    data.deviceVersionCohorts.reduce((sum, cohort) => sum + cohort.deviceCount, 0) ||
+    data.devices?.totalCount ||
+    0
 
   function handleResolve(action: 'approve' | 'deny') {
     if (justificationRequired && !justification.trim()) {
@@ -134,40 +139,97 @@ export function ApprovalTaskDetail({
 
   return (
     <section className="space-y-5">
-      {/* Software overview header */}
-      <header className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              Approval task
-            </p>
-            <h1 className="text-3xl font-semibold tracking-[-0.04em]">
-              {startCase(data.softwareName)}
-            </h1>
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(severityTone(data.criticality))}`}
-              >
-                {data.criticality}
-              </span>
-              <span
-                className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(outcomeTone(data.outcome))}`}
-              >
-                {outcomeLabel(data.outcome)}
-              </span>
-              <ApprovalTypeBadge type={data.type} />
-              <ApprovalStatusBadge status={data.status} />
+      <header className="rounded-[28px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%),var(--color-card)] p-5">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                Approval task
+              </p>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-semibold tracking-[-0.04em]">
+                    {startCase(data.softwareName)}
+                  </h1>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(severityTone(data.criticality))}`}
+                    >
+                      {data.criticality}
+                    </span>
+                    <span
+                      className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(outcomeTone(data.outcome))}`}
+                    >
+                      {outcomeLabel(data.outcome)}
+                    </span>
+                    <ApprovalTypeBadge type={data.type} />
+                    <ApprovalStatusBadge status={data.status} />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Decision by {data.decidedByName}
+                  </p>
+                </div>
+                {!isPending && !data.readAt ? (
+                  <Button variant="outline" size="sm" onClick={onMarkRead}>
+                    <Eye className="mr-1.5 size-4" />
+                    Mark as read
+                  </Button>
+                ) : null}
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Decision by {data.decidedByName}
-            </p>
+
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
+              <section className="rounded-2xl border border-primary/15 bg-background/70 p-4">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  Requested action
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${toneBadge(outcomeTone(data.outcome))}`}
+                  >
+                    {outcomeLabel(data.outcome)}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    for this software scope
+                  </span>
+                </div>
+                <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-foreground/90">
+                  {data.justification || 'No justification was provided for this decision.'}
+                </p>
+              </section>
+
+              <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-3">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    Open vulnerabilities
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-[-0.03em]">
+                    {vulnerabilityCount}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-3">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    Affected devices
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-[-0.03em]">
+                    {affectedDeviceCount}
+                  </p>
+                </div>
+              </section>
+            </div>
           </div>
-          <div className="grid min-w-[220px] gap-3 rounded-xl border border-border/70 bg-background/50 p-4">
-            <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
-              <ApprovalExpiryCountdown expiresAt={data.expiresAt} />
+
+          <aside className="grid gap-3 content-start">
+            <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Expiry
+              </p>
+              <div className="mt-2">
+                <ApprovalExpiryCountdown expiresAt={data.expiresAt} />
+              </div>
             </div>
             {data.riskBand ? (
-              <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
+              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   Risk
                 </p>
@@ -181,7 +243,7 @@ export function ApprovalTaskDetail({
               </div>
             ) : null}
             {data.slaStatus ? (
-              <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
+              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   SLA
                 </p>
@@ -195,77 +257,56 @@ export function ApprovalTaskDetail({
                 </p>
               </div>
             ) : null}
-            <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                Selected decision
-              </p>
-              <p className="mt-2">
-                <span
-                  className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${toneBadge(outcomeTone(data.outcome))}`}
-                >
-                  {outcomeLabel(data.outcome)}
-                </span>
-              </p>
-            </div>
-          </div>
+            {isPending ? (
+              <div className="rounded-2xl border border-primary/20 bg-background/80 p-4">
+                <h2 className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                  Your decision
+                </h2>
+                <div className="mt-3 space-y-4">
+                  <Textarea
+                    placeholder={
+                      justificationRequired
+                        ? 'Justification required for both approve and deny'
+                        : 'Optional justification'
+                    }
+                    value={justification}
+                    onChange={(e) => setJustification(e.target.value)}
+                    rows={3}
+                  />
+                  {resolveAction && justificationRequired && !justification.trim() ? (
+                    <p className="flex items-center gap-1.5 text-sm text-tone-danger-foreground">
+                      <AlertTriangle className="size-3.5" />
+                      Justification is required to {resolveAction} this task.
+                    </p>
+                  ) : null}
+                  <div className="flex gap-3">
+                    <Button onClick={() => handleResolve('approve')}>
+                      <CheckCircle className="mr-1.5 size-4" />
+                      Approve
+                    </Button>
+                    <Button variant="destructive" onClick={() => handleResolve('deny')}>
+                      <XCircle className="mr-1.5 size-4" />
+                      Deny
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </aside>
         </div>
       </header>
 
-      {/* Action section */}
-      {isPending ? (
-        <section className="rounded-2xl border border-primary/20 bg-card p-5">
-          <h2 className="mb-4 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-            Your decision
-          </h2>
-          <div className="space-y-4">
-            <Textarea
-              placeholder={
-                justificationRequired
-                  ? 'Justification required for both approve and deny'
-                  : 'Optional justification'
-              }
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
-              rows={3}
-            />
-            {resolveAction && justificationRequired && !justification.trim() ? (
-              <p className="flex items-center gap-1.5 text-sm text-tone-danger-foreground">
-                <AlertTriangle className="size-3.5" />
-                Justification is required to {resolveAction} this task.
-              </p>
-            ) : null}
-            <div className="flex gap-3">
-              <Button onClick={() => handleResolve('approve')}>
-                <CheckCircle className="mr-1.5 size-4" />
-                Approve
-              </Button>
-              <Button variant="destructive" onClick={() => handleResolve('deny')}>
-                <XCircle className="mr-1.5 size-4" />
-                Deny
-              </Button>
-            </div>
-          </div>
-        </section>
-      ) : !data.readAt ? (
-        <section className="rounded-2xl border border-border/70 bg-card p-5">
-          <Button variant="outline" onClick={onMarkRead}>
-            <Eye className="mr-1.5 size-4" />
-            Mark as read
-          </Button>
-        </section>
-      ) : null}
-
-      <section className="rounded-[28px] border border-border/70 bg-card p-5">
+      <section className="rounded-[28px] border border-border/70 bg-card p-4">
         <Tabs defaultValue="justification" className="gap-4">
           <TabsList className="h-10 w-full justify-start rounded-xl bg-muted/50 p-1">
             <TabsTrigger value="justification" className="rounded-lg px-4 text-sm">
               Justification
             </TabsTrigger>
             <TabsTrigger value="vulnerabilities" className="rounded-lg px-4 text-sm">
-              Vulnerabilities
+              Vulnerabilities ({vulnerabilityCount})
             </TabsTrigger>
             <TabsTrigger value="devices" className="rounded-lg px-4 text-sm">
-              Affected Devices
+              Affected Devices ({affectedDeviceCount})
             </TabsTrigger>
             <TabsTrigger value="timeline" className="rounded-lg px-4 text-sm">
               Timeline
@@ -308,7 +349,7 @@ export function ApprovalTaskDetail({
                         <div className="flex items-center gap-2">
                           <MessageSquare className="size-4 text-muted-foreground" />
                           <span className="text-xs font-medium">
-                            {rec.recommendedOutcome}
+                            {outcomeLabel(rec.recommendedOutcome)}
                           </span>
                           {rec.priorityOverride ? (
                             <span className="text-[10px] text-muted-foreground">

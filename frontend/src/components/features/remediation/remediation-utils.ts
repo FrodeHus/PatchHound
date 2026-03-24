@@ -31,10 +31,10 @@ export function approvalStatusTone(status: string): Tone {
 
 export function outcomeLabel(outcome: string): string {
   switch (outcome) {
-    case 'RiskAcceptance': return 'Risk Acceptance'
-    case 'AlternateMitigation': return 'Alternate Mitigation'
-    case 'ApprovedForPatching': return 'Approved for Patching'
-    case 'PatchingDeferred': return 'Patching Deferred'
+    case 'RiskAcceptance': return 'Accept the current risk'
+    case 'AlternateMitigation': return 'Use an alternate mitigation'
+    case 'ApprovedForPatching': return 'Patch this software'
+    case 'PatchingDeferred': return 'Defer patching for now'
     default: return outcome
   }
 }
