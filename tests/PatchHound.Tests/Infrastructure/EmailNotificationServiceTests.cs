@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
@@ -33,7 +34,11 @@ public class EmailNotificationServiceTests : IDisposable
             TestServiceProviderFactory.Create(_tenantContext)
         );
         _emailSender = Substitute.For<IEmailSender>();
-        _sut = new EmailNotificationService(_dbContext, _emailSender);
+        _sut = new EmailNotificationService(
+            _dbContext,
+            _emailSender,
+            NullLogger<EmailNotificationService>.Instance
+        );
     }
 
     [Fact]
@@ -184,6 +189,38 @@ public class EmailNotificationServiceTests : IDisposable
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>()
             );
+    }
+
+    [Fact]
+    public async Task SendAsync_WhenEmailDeliveryFails_PersistsNotification_AndDoesNotThrow()
+    {
+        var user = User.Create("alice@example.com", "Alice", "entra-1");
+        _dbContext.Users.Add(user);
+        await _dbContext.SaveChangesAsync();
+
+        _emailSender
+            .SendEmailAsync(
+                "alice@example.com",
+                "Task Assigned",
+                "<p>You have a new task.</p>",
+                Arg.Any<CancellationToken>()
+            )
+            .Returns<Task>(_ => throw new InvalidOperationException("SMTP unavailable"));
+
+        var act = () => _sut.SendAsync(
+            user.Id,
+            _tenantId,
+            NotificationType.TaskAssigned,
+            "Task Assigned",
+            "<p>You have a new task.</p>",
+            "PatchingTask",
+            Guid.NewGuid()
+        );
+
+        await act.Should().NotThrowAsync();
+
+        var notifications = await _dbContext.Notifications.IgnoreQueryFilters().ToListAsync();
+        notifications.Should().ContainSingle();
     }
 
     public void Dispose()
