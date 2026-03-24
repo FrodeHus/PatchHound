@@ -32,33 +32,25 @@ public partial class MailgunEmailSender(HttpClient httpClient) : IEmailSender
             ? configuration.FromAddress
             : $"{configuration.FromName} <{configuration.FromAddress}>";
 
-        using var request = BuildRequest(
-            configuration,
-            $"/v3/{configuration.Domain}/messages",
-            new Dictionary<string, string>
-            {
-                ["from"] = from,
-                ["to"] = to,
-                ["subject"] = subject,
-                ["html"] = htmlBody,
-                ["text"] = StripHtml(htmlBody),
-            }
-        );
+        var content = new Dictionary<string, string>
+        {
+            ["from"] = from,
+            ["to"] = to,
+            ["subject"] = subject,
+            ["html"] = htmlBody,
+            ["text"] = StripHtml(htmlBody),
+        };
 
         if (!string.IsNullOrWhiteSpace(configuration.ReplyToAddress))
         {
-            request.Content = new FormUrlEncodedContent(
-                new Dictionary<string, string>
-                {
-                    ["from"] = from,
-                    ["to"] = to,
-                    ["subject"] = subject,
-                    ["html"] = htmlBody,
-                    ["text"] = StripHtml(htmlBody),
-                    ["h:Reply-To"] = configuration.ReplyToAddress!,
-                }
-            );
+            content["h:Reply-To"] = configuration.ReplyToAddress!;
         }
+
+        using var request = BuildRequest(
+            configuration,
+            $"/v3/{configuration.Domain}/messages",
+            content
+        );
 
         using var response = await httpClient.SendAsync(request, ct);
         await EnsureSuccessAsync(response, ct);
@@ -69,10 +61,21 @@ public partial class MailgunEmailSender(HttpClient httpClient) : IEmailSender
         CancellationToken ct = default
     )
     {
+        var from = string.IsNullOrWhiteSpace(configuration.FromName)
+            ? configuration.FromAddress
+            : $"{configuration.FromName} <{configuration.FromAddress}>";
+
         using var request = BuildRequest(
             configuration,
-            $"/v4/domains/{configuration.Domain}",
-            content: null
+            $"/v3/{configuration.Domain}/messages",
+            new Dictionary<string, string>
+            {
+                ["from"] = from,
+                ["to"] = configuration.FromAddress,
+                ["subject"] = "PatchHound Mailgun validation",
+                ["text"] = "PatchHound Mailgun validation request.",
+                ["o:testmode"] = "yes",
+            }
         );
 
         using var response = await httpClient.SendAsync(request, ct);
@@ -82,16 +85,26 @@ public partial class MailgunEmailSender(HttpClient httpClient) : IEmailSender
             return new MailgunValidationResult(false, error, null);
         }
 
-        await using var stream = await response.Content.ReadAsStreamAsync(ct);
-        using var payload = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-        var state = payload.RootElement.TryGetProperty("domain", out var domainElement)
-            && domainElement.TryGetProperty("state", out var stateElement)
-            ? stateElement.GetString()
-            : null;
-        var message = string.IsNullOrWhiteSpace(state)
-            ? "Mailgun domain lookup succeeded."
-            : $"Mailgun domain lookup succeeded. Domain state: {state}.";
-        return new MailgunValidationResult(true, message, state);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        var message = "Mailgun accepted a test-mode message request.";
+        if (!string.IsNullOrWhiteSpace(body))
+        {
+            try
+            {
+                using var payload = JsonDocument.Parse(body);
+                if (payload.RootElement.TryGetProperty("message", out var messageElement)
+                    && !string.IsNullOrWhiteSpace(messageElement.GetString()))
+                {
+                    message = messageElement.GetString()!;
+                }
+            }
+            catch (JsonException)
+            {
+                // Keep the generic success message when the response body is not JSON.
+            }
+        }
+
+        return new MailgunValidationResult(true, message, "accepted");
     }
 
     private static HttpRequestMessage BuildRequest(
@@ -110,10 +123,23 @@ public partial class MailgunEmailSender(HttpClient httpClient) : IEmailSender
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic", basicToken);
         if (content is not null)
         {
-            request.Content = new FormUrlEncodedContent(content);
+            request.Content = BuildMultipartContent(content);
         }
 
         return request;
+    }
+
+    private static MultipartFormDataContent BuildMultipartContent(
+        IReadOnlyDictionary<string, string> content
+    )
+    {
+        var multipart = new MultipartFormDataContent();
+        foreach (var (key, value) in content)
+        {
+            multipart.Add(new StringContent(value), key);
+        }
+
+        return multipart;
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
