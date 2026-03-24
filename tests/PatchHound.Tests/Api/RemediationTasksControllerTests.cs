@@ -41,7 +41,7 @@ public class RemediationTasksControllerTests : IDisposable
         );
 
         var approvalTaskService = new ApprovalTaskService(_dbContext, Substitute.For<INotificationService>(), new AuditLogWriter(_dbContext, _tenantContext), Substitute.For<IRealTimeNotifier>());
-        var decisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService);
+        var decisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService, new AuditLogWriter(_dbContext, _tenantContext));
         var queryService = new RemediationTaskQueryService(_dbContext, decisionService);
         _controller = new RemediationTasksController(queryService, _tenantContext);
     }
@@ -71,21 +71,18 @@ public class RemediationTasksControllerTests : IDisposable
             .ToListAsync();
 
         var approvalTaskService = new ApprovalTaskService(_dbContext, Substitute.For<INotificationService>(), new AuditLogWriter(_dbContext, _tenantContext), Substitute.For<IRealTimeNotifier>());
-        var decisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService);
-        foreach (var softwareAssetId in softwareAssetIds)
-        {
-            var createResult = await decisionService.CreateDecisionAsync(
-                _tenantId,
-                softwareAssetId,
-                RemediationOutcome.ApprovedForPatching,
-                "Create software task",
-                _tenantContext.CurrentUserId,
-                null,
-                null,
-                CancellationToken.None
-            );
-            createResult.IsSuccess.Should().BeTrue();
-        }
+        var decisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService, new AuditLogWriter(_dbContext, _tenantContext));
+        var createResult = await decisionService.CreateDecisionAsync(
+            _tenantId,
+            softwareAssetIds[0],
+            RemediationOutcome.ApprovedForPatching,
+            "Create software task",
+            _tenantContext.CurrentUserId,
+            null,
+            null,
+            CancellationToken.None
+        );
+        createResult.IsSuccess.Should().BeTrue();
 
         var action = await _controller.List(
             new RemediationTaskFilterQuery(TenantSoftwareId: graph.TenantSoftware.Id),
@@ -96,8 +93,8 @@ public class RemediationTasksControllerTests : IDisposable
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<PagedResponse<RemediationTaskListItemDto>>().Subject;
 
-        payload.TotalCount.Should().Be(2);
-        payload.Items.Should().HaveCount(2);
+        payload.TotalCount.Should().Be(1);
+        payload.Items.Should().HaveCount(1);
         payload.Items.Should().OnlyContain(item => item.SoftwareName == "agent");
         payload.Items.Should().OnlyContain(item => item.OwnerTeamName == "Platform");
     }
@@ -122,9 +119,9 @@ public class RemediationTasksControllerTests : IDisposable
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<RemediationTaskCreateResultDto>().Subject;
 
-        payload.CreatedCount.Should().Be(2);
+        payload.CreatedCount.Should().Be(1);
         payload.EligibleCount.Should().Be(2);
-        _dbContext.PatchingTasks.Should().HaveCount(2);
+        _dbContext.PatchingTasks.Should().HaveCount(1);
     }
 
     public void Dispose()

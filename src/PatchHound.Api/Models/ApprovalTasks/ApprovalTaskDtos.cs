@@ -37,6 +37,7 @@ public record ApprovalTaskDetailDto(
     double? RiskScore,
     string? RiskBand,
     PagedVulnerabilityList Vulnerabilities,
+    List<ApprovalDeviceVersionCohortDto> DeviceVersionCohorts,
     PagedDeviceList? Devices,
     List<ApprovalRecommendationDto> Recommendations,
     List<ApprovalAuditEntryDto> AuditTrail
@@ -67,10 +68,22 @@ public record PagedDeviceList(
     int PageSize
 );
 
+public record ApprovalDeviceVersionCohortDto(
+    string? Version,
+    int ActiveInstallCount,
+    int DeviceCount,
+    int ActiveVulnerabilityCount,
+    DateTimeOffset FirstSeenAt,
+    DateTimeOffset LastSeenAt
+);
+
 public record ApprovalDeviceDto(
     Guid DeviceAssetId,
     string DeviceName,
-    string Criticality
+    string Criticality,
+    string? Version,
+    DateTimeOffset LastSeenAt,
+    int OpenVulnerabilityCount
 );
 
 public record ApprovalRecommendationDto(

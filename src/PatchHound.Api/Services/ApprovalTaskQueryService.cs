@@ -65,14 +65,14 @@ public class ApprovalTaskQueryService(
             .ToListAsync(ct);
 
         // Resolve highest severity per decision's software asset
-        var softwareAssetIds = tasks.Select(t => t.RemediationDecision.SoftwareAssetId).Distinct().ToList();
-        var highestSeverities = await GetHighestSeveritiesAsync(tenantId, softwareAssetIds, ct);
+        var tenantSoftwareIds = tasks.Select(t => t.RemediationDecision.TenantSoftwareId).Distinct().ToList();
+        var highestSeverities = await GetHighestSeveritiesAsync(tenantId, tenantSoftwareIds, ct);
 
         // Vulnerability counts
-        var vulnCounts = await GetVulnCountsAsync(tenantId, softwareAssetIds, ct);
+        var vulnCounts = await GetVulnCountsAsync(tenantId, tenantSoftwareIds, ct);
 
         // SLA info
-        var slaInfo = await GetSlaInfoAsync(tenantId, softwareAssetIds, ct);
+        var slaInfo = await GetSlaInfoAsync(tenantId, tenantSoftwareIds, ct);
 
         // Decided-by user names
         var decidedByIds = tasks.Select(t => t.RemediationDecision.DecidedBy).Distinct().ToList();
@@ -82,10 +82,10 @@ public class ApprovalTaskQueryService(
 
         var items = tasks.Select(t =>
         {
-            var assetId = t.RemediationDecision.SoftwareAssetId;
-            var hasSeverity = highestSeverities.TryGetValue(assetId, out var severity);
-            vulnCounts.TryGetValue(assetId, out var vc);
-            var hasSla = slaInfo.TryGetValue(assetId, out var sla);
+            var tenantSoftwareId = t.RemediationDecision.TenantSoftwareId;
+            var hasSeverity = highestSeverities.TryGetValue(tenantSoftwareId, out var severity);
+            vulnCounts.TryGetValue(tenantSoftwareId, out var vc);
+            var hasSla = slaInfo.TryGetValue(tenantSoftwareId, out var sla);
             userNames.TryGetValue(t.RemediationDecision.DecidedBy, out var decidedByName);
 
             return new ApprovalTaskListItemDto(
@@ -115,6 +115,7 @@ public class ApprovalTaskQueryService(
         IReadOnlyList<string> userRoles,
         PaginationQuery vulnPagination,
         PaginationQuery? devicePagination,
+        string? deviceVersion,
         CancellationToken ct
     )
     {
@@ -133,21 +134,17 @@ public class ApprovalTaskQueryService(
 
         var decision = task.RemediationDecision;
         var assetId = decision.SoftwareAssetId;
+        var tenantSoftwareId = decision.TenantSoftwareId;
 
         // Highest severity
-        var highestSeverities = await GetHighestSeveritiesAsync(tenantId, [assetId], ct);
-        var hasHighestSeverity = highestSeverities.TryGetValue(assetId, out var highestSeverity);
+        var highestSeverities = await GetHighestSeveritiesAsync(tenantId, [tenantSoftwareId], ct);
+        var hasHighestSeverity = highestSeverities.TryGetValue(tenantSoftwareId, out var highestSeverity);
 
         // SLA
-        var slaInfo = await GetSlaInfoAsync(tenantId, [assetId], ct);
-        var hasSla = slaInfo.TryGetValue(assetId, out var sla);
+        var slaInfo = await GetSlaInfoAsync(tenantId, [tenantSoftwareId], ct);
+        var hasSla = slaInfo.TryGetValue(tenantSoftwareId, out var sla);
 
         // Risk score
-        var tenantSoftwareId = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(i => i.TenantId == tenantId && i.SoftwareAssetId == assetId && i.IsActive)
-            .Select(i => i.TenantSoftwareId)
-            .FirstOrDefaultAsync(ct);
-
         double? riskScore = null;
         string? riskBand = null;
         if (tenantSoftwareId != Guid.Empty)
@@ -173,8 +170,16 @@ public class ApprovalTaskQueryService(
             .FirstOrDefaultAsync(u => u.Id == decision.DecidedBy, ct);
 
         // Vulnerabilities (paginated, sorted by severity)
+        var scopedSoftwareAssetIds = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(i => i.TenantId == tenantId && i.TenantSoftwareId == tenantSoftwareId && i.IsActive)
+            .Select(i => i.SoftwareAssetId)
+            .Distinct()
+            .ToListAsync(ct);
         var vulnQuery = dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(m => m.SoftwareAssetId == assetId && m.TenantId == tenantId && m.ResolvedAt == null)
+            .Where(m =>
+                m.TenantId == tenantId
+                && m.ResolvedAt == null
+                && scopedSoftwareAssetIds.Contains(m.SoftwareAssetId))
             .Join(
                 dbContext.VulnerabilityDefinitions.AsNoTracking(),
                 m => m.VulnerabilityDefinitionId,
@@ -230,29 +235,99 @@ public class ApprovalTaskQueryService(
         var vulnList = new PagedVulnerabilityList(vulnDtos, vulnTotalCount, vulnPagination.Page, vulnPagination.BoundedPageSize);
 
         // Devices (only for patching-type tasks)
+        var deviceVersionCohorts = new List<ApprovalDeviceVersionCohortDto>();
         PagedDeviceList? deviceList = null;
         if (task.Type is ApprovalTaskType.PatchingApproved or ApprovalTaskType.PatchingDeferred && devicePagination is not null)
         {
+            var activeInstallations = dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+                .Where(nsi =>
+                    nsi.TenantId == tenantId
+                    && nsi.TenantSoftwareId == tenantSoftwareId
+                    && nsi.IsActive)
+                .Select(nsi => new
+                {
+                    nsi.DeviceAssetId,
+                    nsi.DetectedVersion,
+                    nsi.FirstSeenAt,
+                    nsi.LastSeenAt,
+                    nsi.SoftwareAssetId,
+                });
+
+            var installationRows = await activeInstallations.ToListAsync(ct);
+            var softwareAssetIdsForInstalls = installationRows
+                .Select(item => item.SoftwareAssetId)
+                .Distinct()
+                .ToList();
+            var openMatchRows = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
+                .Where(match =>
+                    match.TenantId == tenantId
+                    && match.ResolvedAt == null
+                    && softwareAssetIdsForInstalls.Contains(match.SoftwareAssetId))
+                .Select(match => new { match.SoftwareAssetId, match.VulnerabilityDefinitionId })
+                .Distinct()
+                .ToListAsync(ct);
+
+            deviceVersionCohorts = installationRows
+                .GroupBy(item => NormalizeVersionKey(item.DetectedVersion))
+                .Select(group =>
+                {
+                    var cohortSoftwareAssetIds = group.Select(item => item.SoftwareAssetId).ToHashSet();
+                    return new ApprovalDeviceVersionCohortDto(
+                        RestoreVersion(group.Key),
+                        group.Count(),
+                        group.Select(item => item.DeviceAssetId).Distinct().Count(),
+                        openMatchRows.Count(item => cohortSoftwareAssetIds.Contains(item.SoftwareAssetId)),
+                        group.Min(item => item.FirstSeenAt),
+                        group.Max(item => item.LastSeenAt)
+                    );
+                })
+                .OrderByDescending(item => item.ActiveInstallCount)
+                .ThenByDescending(item => item.ActiveVulnerabilityCount)
+                .ThenBy(item => item.Version ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var selectedVersionKey = deviceVersion is null
+                ? NormalizeVersionKey(deviceVersionCohorts.FirstOrDefault()?.Version)
+                : NormalizeVersionKey(deviceVersion);
+
             var deviceQuery = dbContext.NormalizedSoftwareInstallations.AsNoTracking()
                 .Where(nsi =>
                     nsi.TenantId == tenantId
-                    && nsi.SoftwareAssetId == assetId
-                    && nsi.IsActive)
-                .Join(
-                    dbContext.Assets.AsNoTracking().Where(a => a.TenantId == tenantId),
-                    nsi => nsi.DeviceAssetId,
-                    a => a.Id,
-                    (dsi, a) => new { a.Id, a.Name, a.Criticality }
-                )
+                    && nsi.TenantSoftwareId == tenantSoftwareId
+                    && nsi.IsActive
+                    && (selectedVersionKey == string.Empty
+                        ? string.IsNullOrWhiteSpace(nsi.DetectedVersion)
+                        : nsi.DetectedVersion == selectedVersionKey))
+                .Select(nsi => new
+                {
+                    nsi.DeviceAssetId,
+                    DeviceName = nsi.DeviceAsset.AssetType == AssetType.Device
+                        ? nsi.DeviceAsset.DeviceComputerDnsName ?? nsi.DeviceAsset.Name
+                        : nsi.DeviceAsset.Name,
+                    Criticality = nsi.DeviceAsset.Criticality,
+                    nsi.DetectedVersion,
+                    nsi.LastSeenAt,
+                    OpenVulnerabilityCount = dbContext.VulnerabilityAssets
+                        .Where(link =>
+                            link.AssetId == nsi.DeviceAssetId
+                            && link.Status == Core.Enums.VulnerabilityStatus.Open)
+                        .Count(),
+                })
                 .Distinct();
 
             var deviceTotalCount = await deviceQuery.CountAsync(ct);
             var devices = await deviceQuery
                 .OrderByDescending(d => d.Criticality)
-                .ThenBy(d => d.Name)
+                .ThenBy(d => d.DeviceName)
                 .Skip(devicePagination.Skip)
                 .Take(devicePagination.BoundedPageSize)
-                .Select(d => new ApprovalDeviceDto(d.Id, d.Name, d.Criticality.ToString()))
+                .Select(d => new ApprovalDeviceDto(
+                    d.DeviceAssetId,
+                    d.DeviceName,
+                    d.Criticality.ToString(),
+                    d.DetectedVersion,
+                    d.LastSeenAt,
+                    d.OpenVulnerabilityCount))
                 .ToListAsync(ct);
 
             deviceList = new PagedDeviceList(devices, deviceTotalCount, devicePagination.Page, devicePagination.BoundedPageSize);
@@ -319,6 +394,7 @@ public class ApprovalTaskQueryService(
             riskScore,
             riskBand,
             vulnList,
+            deviceVersionCohorts,
             deviceList,
             recommendations,
             auditDtos
@@ -350,33 +426,46 @@ public class ApprovalTaskQueryService(
     }
 
     private async Task<Dictionary<Guid, Severity>> GetHighestSeveritiesAsync(
-        Guid tenantId, List<Guid> softwareAssetIds, CancellationToken ct)
+        Guid tenantId, List<Guid> tenantSoftwareIds, CancellationToken ct)
     {
-        return await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(m => m.TenantId == tenantId && softwareAssetIds.Contains(m.SoftwareAssetId) && m.ResolvedAt == null)
+        return await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(i => i.TenantId == tenantId && i.IsActive && tenantSoftwareIds.Contains(i.TenantSoftwareId))
+            .Join(
+                dbContext.SoftwareVulnerabilityMatches.AsNoTracking().Where(m => m.TenantId == tenantId && m.ResolvedAt == null),
+                i => i.SoftwareAssetId,
+                m => m.SoftwareAssetId,
+                (i, m) => new { i.TenantSoftwareId, m.VulnerabilityDefinitionId }
+            )
             .Join(
                 dbContext.VulnerabilityDefinitions.AsNoTracking(),
-                m => m.VulnerabilityDefinitionId,
+                x => x.VulnerabilityDefinitionId,
                 v => v.Id,
-                (m, v) => new { m.SoftwareAssetId, v.VendorSeverity }
+                (x, v) => new { x.TenantSoftwareId, v.VendorSeverity }
             )
-            .GroupBy(x => x.SoftwareAssetId)
-            .Select(g => new { AssetId = g.Key, HighestSeverity = g.Max(x => x.VendorSeverity) })
-            .ToDictionaryAsync(x => x.AssetId, x => x.HighestSeverity, ct);
+            .GroupBy(x => x.TenantSoftwareId)
+            .Select(g => new { TenantSoftwareId = g.Key, HighestSeverity = g.Max(x => x.VendorSeverity) })
+            .ToDictionaryAsync(x => x.TenantSoftwareId, x => x.HighestSeverity, ct);
     }
 
     private async Task<Dictionary<Guid, int>> GetVulnCountsAsync(
-        Guid tenantId, List<Guid> softwareAssetIds, CancellationToken ct)
+        Guid tenantId, List<Guid> tenantSoftwareIds, CancellationToken ct)
     {
-        return await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(m => m.TenantId == tenantId && softwareAssetIds.Contains(m.SoftwareAssetId) && m.ResolvedAt == null)
-            .GroupBy(m => m.SoftwareAssetId)
-            .Select(g => new { AssetId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.AssetId, x => x.Count, ct);
+        return await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(i => i.TenantId == tenantId && i.IsActive && tenantSoftwareIds.Contains(i.TenantSoftwareId))
+            .Join(
+                dbContext.SoftwareVulnerabilityMatches.AsNoTracking().Where(m => m.TenantId == tenantId && m.ResolvedAt == null),
+                i => i.SoftwareAssetId,
+                m => m.SoftwareAssetId,
+                (i, m) => new { i.TenantSoftwareId, m.VulnerabilityDefinitionId }
+            )
+            .Distinct()
+            .GroupBy(x => x.TenantSoftwareId)
+            .Select(g => new { TenantSoftwareId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.TenantSoftwareId, x => x.Count, ct);
     }
 
     private async Task<Dictionary<Guid, (string Status, DateTimeOffset DueDate)>> GetSlaInfoAsync(
-        Guid tenantId, List<Guid> softwareAssetIds, CancellationToken ct)
+        Guid tenantId, List<Guid> tenantSoftwareIds, CancellationToken ct)
     {
         var tenantSla = await dbContext.TenantSlaConfigurations.AsNoTracking()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
@@ -384,18 +473,24 @@ public class ApprovalTaskQueryService(
         if (tenantSla is null)
             return [];
 
-        var vulnData = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(m => m.TenantId == tenantId && softwareAssetIds.Contains(m.SoftwareAssetId) && m.ResolvedAt == null)
+        var vulnData = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(i => i.TenantId == tenantId && i.IsActive && tenantSoftwareIds.Contains(i.TenantSoftwareId))
+            .Join(
+                dbContext.SoftwareVulnerabilityMatches.AsNoTracking().Where(m => m.TenantId == tenantId && m.ResolvedAt == null),
+                i => i.SoftwareAssetId,
+                m => m.SoftwareAssetId,
+                (i, m) => new { i.TenantSoftwareId, m.FirstSeenAt, m.VulnerabilityDefinitionId }
+            )
             .Join(
                 dbContext.VulnerabilityDefinitions.AsNoTracking(),
-                m => m.VulnerabilityDefinitionId,
+                x => x.VulnerabilityDefinitionId,
                 v => v.Id,
-                (m, v) => new { m.SoftwareAssetId, m.FirstSeenAt, v.VendorSeverity }
+                (x, v) => new { x.TenantSoftwareId, x.FirstSeenAt, v.VendorSeverity }
             )
-            .GroupBy(x => x.SoftwareAssetId)
+            .GroupBy(x => x.TenantSoftwareId)
             .Select(g => new
             {
-                AssetId = g.Key,
+                TenantSoftwareId = g.Key,
                 EarliestFirstSeen = g.Min(x => x.FirstSeenAt),
                 HighestSeverity = g.Max(x => x.VendorSeverity),
             })
@@ -407,9 +502,19 @@ public class ApprovalTaskQueryService(
             if (item.HighestSeverity == default) continue;
             var dueDate = slaService.CalculateDueDate(item.HighestSeverity, item.EarliestFirstSeen, tenantSla);
             var status = slaService.GetSlaStatus(item.EarliestFirstSeen, dueDate, DateTimeOffset.UtcNow);
-            result[item.AssetId] = (status.ToString(), dueDate);
+            result[item.TenantSoftwareId] = (status.ToString(), dueDate);
         }
 
         return result;
+    }
+
+    private static string NormalizeVersionKey(string? version)
+    {
+        return string.IsNullOrWhiteSpace(version) ? string.Empty : version.Trim();
+    }
+
+    private static string? RestoreVersion(string versionKey)
+    {
+        return string.IsNullOrWhiteSpace(versionKey) ? null : versionKey;
     }
 }

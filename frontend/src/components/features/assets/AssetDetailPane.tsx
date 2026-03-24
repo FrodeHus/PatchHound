@@ -381,8 +381,8 @@ export function AssetDetailPane({
                 ) : null}
                 {asset.assetType === 'Software' ? (
                   <Link
-                    to="/assets/$id/remediation"
-                    params={{ id: asset.id }}
+                    to="/software/$id/remediation"
+                    params={{ id: asset.tenantSoftwareId ?? asset.id }}
                     className="flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary transition hover:bg-primary/15"
                   >
                     Remediation

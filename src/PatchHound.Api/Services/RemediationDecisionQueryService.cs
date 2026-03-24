@@ -26,143 +26,135 @@ public class RemediationDecisionQueryService(
     )
     {
         var activeSnapshotId = await snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
+        var tenantSoftwareQuery = dbContext.TenantSoftware.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.SnapshotId == activeSnapshotId);
 
-        // All software assets for the tenant
-        var assetsQuery = dbContext.Assets.AsNoTracking()
-            .Where(a => a.TenantId == tenantId && a.AssetType == AssetType.Software);
-
-        // Apply search filter
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var term = filter.Search.Trim().ToLower();
-            assetsQuery = assetsQuery.Where(a => a.Name.ToLower().Contains(term));
+            tenantSoftwareQuery = tenantSoftwareQuery.Where(item =>
+                item.NormalizedSoftware.CanonicalName.ToLower().Contains(term)
+                || (item.NormalizedSoftware.CanonicalVendor != null
+                    && item.NormalizedSoftware.CanonicalVendor.ToLower().Contains(term)));
         }
 
-        // Apply criticality filter
-        if (!string.IsNullOrWhiteSpace(filter.Criticality)
-            && Enum.TryParse<Criticality>(filter.Criticality, true, out var crit))
-        {
-            assetsQuery = assetsQuery.Where(a => a.Criticality == crit);
-        }
+        var tenantSoftwareRows = await tenantSoftwareQuery
+            .Select(item => new
+            {
+                item.Id,
+                Name = item.NormalizedSoftware.CanonicalName,
+                item.NormalizedSoftware.CanonicalVendor,
+            })
+            .OrderBy(item => item.Name)
+            .ToListAsync(ct);
 
-        // Latest active decision per asset
+        var tenantSoftwareIds = tenantSoftwareRows.Select(item => item.Id).ToList();
+        var activeInstallations = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.IsActive && tenantSoftwareIds.Contains(item.TenantSoftwareId))
+            .Select(item => new { item.TenantSoftwareId, item.SoftwareAssetId, item.DeviceAssetId })
+            .ToListAsync(ct);
+        var softwareAssetIds = activeInstallations.Select(item => item.SoftwareAssetId).Distinct().ToList();
+        var softwareAssets = await dbContext.Assets.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && softwareAssetIds.Contains(item.Id))
+            .Select(item => new { item.Id, item.Name, item.Criticality })
+            .ToListAsync(ct);
+        var softwareAssetsById = softwareAssets.ToDictionary(item => item.Id);
+        var representativeAssetByTenantSoftwareId = activeInstallations
+            .GroupBy(item => item.TenantSoftwareId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(item => item.SoftwareAssetId).Distinct().OrderBy(id => id).FirstOrDefault()
+            );
+        var highestCriticalityByTenantSoftwareId = activeInstallations
+            .GroupBy(item => item.TenantSoftwareId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(item => softwareAssetsById.GetValueOrDefault(item.SoftwareAssetId)?.Criticality ?? Criticality.Low)
+                    .DefaultIfEmpty(Criticality.Low)
+                    .Max()
+            );
+        var deviceCountByTenantSoftwareId = activeInstallations
+            .GroupBy(item => item.TenantSoftwareId)
+            .ToDictionary(group => group.Key, group => group.Select(item => item.DeviceAssetId).Distinct().Count());
+
         var decisionsLookup = await dbContext.RemediationDecisions.AsNoTracking()
             .Where(d => d.TenantId == tenantId
+                && tenantSoftwareIds.Contains(d.TenantSoftwareId)
                 && d.ApprovalStatus != DecisionApprovalStatus.Rejected
                 && d.ApprovalStatus != DecisionApprovalStatus.Expired)
-            .GroupBy(d => d.SoftwareAssetId)
+            .GroupBy(d => d.TenantSoftwareId)
             .Select(g => g.OrderByDescending(d => d.CreatedAt).First())
-            .ToDictionaryAsync(d => d.SoftwareAssetId, ct);
+            .ToDictionaryAsync(d => d.TenantSoftwareId, ct);
 
-        // Apply outcome/status filters (post-query since we need the decision lookup)
-        HashSet<Guid>? filteredAssetIds = null;
-        if (!string.IsNullOrWhiteSpace(filter.Outcome) || !string.IsNullOrWhiteSpace(filter.ApprovalStatus))
-        {
-            filteredAssetIds = [];
-            foreach (var (assetId, decision) in decisionsLookup)
-            {
-                var matchesOutcome = string.IsNullOrWhiteSpace(filter.Outcome)
-                    || string.Equals(decision.Outcome.ToString(), filter.Outcome, StringComparison.OrdinalIgnoreCase);
-                var matchesStatus = string.IsNullOrWhiteSpace(filter.ApprovalStatus)
-                    || string.Equals(decision.ApprovalStatus.ToString(), filter.ApprovalStatus, StringComparison.OrdinalIgnoreCase);
-
-                if (matchesOutcome && matchesStatus)
-                    filteredAssetIds.Add(assetId);
-            }
-        }
-
-        // Vulnerability counts per software asset (direct from matches)
-        var vulnCounts = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(m => m.TenantId == tenantId && m.ResolvedAt == null && m.SnapshotId == activeSnapshotId)
+        var openMatchRows = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
+            .Where(m =>
+                m.TenantId == tenantId
+                && m.ResolvedAt == null
+                && m.SnapshotId == activeSnapshotId
+                && softwareAssetIds.Contains(m.SoftwareAssetId))
             .Join(
                 dbContext.VulnerabilityDefinitions.AsNoTracking(),
                 m => m.VulnerabilityDefinitionId,
                 v => v.Id,
-                (m, v) => new { m.SoftwareAssetId, v.VendorSeverity }
+                (m, v) => new { m.SoftwareAssetId, m.FirstSeenAt, m.VulnerabilityDefinitionId, v.VendorSeverity }
             )
-            .GroupBy(x => x.SoftwareAssetId)
-            .Select(g => new
-            {
-                AssetId = g.Key,
-                Total = g.Count(),
-                Critical = g.Count(x => x.VendorSeverity == Severity.Critical),
-                High = g.Count(x => x.VendorSeverity == Severity.High),
-            })
-            .ToDictionaryAsync(x => x.AssetId, ct);
+            .ToListAsync(ct);
 
-        // Risk scores (for composite score / risk band) — keyed by TenantSoftwareId
+        var tenantSoftwareIdBySoftwareAssetId = activeInstallations
+            .GroupBy(item => item.SoftwareAssetId)
+            .ToDictionary(group => group.Key, group => group.First().TenantSoftwareId);
+
+        var vulnCounts = openMatchRows
+            .Where(item => tenantSoftwareIdBySoftwareAssetId.ContainsKey(item.SoftwareAssetId))
+            .GroupBy(item => tenantSoftwareIdBySoftwareAssetId[item.SoftwareAssetId])
+            .ToDictionary(
+                group => group.Key,
+                group => new
+                {
+                    Total = group.Select(item => item.VulnerabilityDefinitionId).Distinct().Count(),
+                    Critical = group.Where(item => item.VendorSeverity == Severity.Critical).Select(item => item.VulnerabilityDefinitionId).Distinct().Count(),
+                    High = group.Where(item => item.VendorSeverity == Severity.High).Select(item => item.VulnerabilityDefinitionId).Distinct().Count(),
+                    EarliestFirstSeen = group.Min(item => item.FirstSeenAt),
+                    HighestSeverity = group.Max(item => item.VendorSeverity),
+                });
+
         var riskScoresByTsId = await dbContext.TenantSoftwareRiskScores.AsNoTracking()
-            .Where(r => r.TenantId == tenantId)
+            .Where(r => r.TenantId == tenantId && tenantSoftwareIds.Contains(r.TenantSoftwareId))
             .ToDictionaryAsync(r => r.TenantSoftwareId, ct);
 
-        // Device counts per software asset
-        var deviceCounts = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(i => i.TenantId == tenantId && i.IsActive)
-            .GroupBy(i => i.SoftwareAssetId)
-            .Select(g => new { SoftwareAssetId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.SoftwareAssetId, x => x.Count, ct);
-
-        // TenantSoftwareId lookup via installations
-        var tenantSoftwareByAsset = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(i => i.TenantId == tenantId && i.IsActive)
-            .GroupBy(i => i.SoftwareAssetId)
-            .Select(g => new { SoftwareAssetId = g.Key, TenantSoftwareId = g.First().TenantSoftwareId })
-            .ToDictionaryAsync(x => x.SoftwareAssetId, x => x.TenantSoftwareId, ct);
-
-        // SLA configuration
         var tenantSla = await dbContext.TenantSlaConfigurations.AsNoTracking()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
 
-        // SLA due dates per asset — need earliest first-seen per asset
-        Dictionary<Guid, (DateTimeOffset DueDate, string Status)>? slaByAsset = null;
-        if (tenantSla is not null)
-        {
-            var vulnFirstSeen = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-                .Where(m => m.TenantId == tenantId && m.ResolvedAt == null && m.SnapshotId == activeSnapshotId)
-                .Join(
-                    dbContext.VulnerabilityDefinitions.AsNoTracking(),
-                    m => m.VulnerabilityDefinitionId,
-                    v => v.Id,
-                    (m, v) => new { m.SoftwareAssetId, m.FirstSeenAt, v.VendorSeverity }
-                )
-                .GroupBy(x => x.SoftwareAssetId)
-                .Select(g => new
-                {
-                    AssetId = g.Key,
-                    EarliestFirstSeen = g.Min(x => x.FirstSeenAt),
-                    HighestSeverity = g.Max(x => x.VendorSeverity),
-                })
-                .ToListAsync(ct);
-
-            slaByAsset = [];
-            foreach (var item in vulnFirstSeen)
-            {
-                if (item.HighestSeverity == default) continue;
-                var dueDate = slaService.CalculateDueDate(item.HighestSeverity, item.EarliestFirstSeen, tenantSla);
-                var status = slaService.GetSlaStatus(item.EarliestFirstSeen, dueDate, DateTimeOffset.UtcNow);
-                slaByAsset[item.AssetId] = (dueDate, status.ToString());
-            }
-        }
-
-        // Materialize assets
-        var assets = await assetsQuery.OrderBy(a => a.Name).ToListAsync(ct);
-
-        // Build list items
         var items = new List<RemediationDecisionListItemDto>();
-        foreach (var asset in assets)
+        foreach (var software in tenantSoftwareRows)
         {
-            if (filteredAssetIds is not null && !filteredAssetIds.Contains(asset.Id))
+            if (!highestCriticalityByTenantSoftwareId.TryGetValue(software.Id, out var criticality))
+                criticality = Criticality.Low;
+
+            if (!string.IsNullOrWhiteSpace(filter.Criticality)
+                && Enum.TryParse<Criticality>(filter.Criticality, true, out var crit)
+                && criticality != crit)
+            {
                 continue;
+            }
 
-            decisionsLookup.TryGetValue(asset.Id, out var decision);
-            vulnCounts.TryGetValue(asset.Id, out var vc);
-            deviceCounts.TryGetValue(asset.Id, out var devCount);
-            tenantSoftwareByAsset.TryGetValue(asset.Id, out var tsId);
+            decisionsLookup.TryGetValue(software.Id, out var decision);
+            if (!string.IsNullOrWhiteSpace(filter.Outcome)
+                && !string.Equals(decision?.Outcome.ToString(), filter.Outcome, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
 
-            // Risk score via TenantSoftwareId
+            if (!string.IsNullOrWhiteSpace(filter.ApprovalStatus)
+                && !string.Equals(decision?.ApprovalStatus.ToString(), filter.ApprovalStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             string? riskBand = null;
             double? riskScore = null;
-            if (tsId != Guid.Empty && riskScoresByTsId.TryGetValue(tsId, out var risk))
+            if (riskScoresByTsId.TryGetValue(software.Id, out var risk))
             {
                 riskScore = (double)risk.OverallScore;
                 riskBand = risk.OverallScore switch
@@ -177,29 +169,30 @@ public class RemediationDecisionQueryService(
 
             string? slaStatus = null;
             DateTimeOffset? slaDueDate = null;
-            if (slaByAsset is not null && slaByAsset.TryGetValue(asset.Id, out var sla))
+            if (tenantSla is not null && vulnCounts.TryGetValue(software.Id, out var vcForSla) && vcForSla.HighestSeverity != default)
             {
-                slaStatus = sla.Status;
-                slaDueDate = sla.DueDate;
+                slaDueDate = slaService.CalculateDueDate(vcForSla.HighestSeverity, vcForSla.EarliestFirstSeen, tenantSla);
+                slaStatus = slaService.GetSlaStatus(vcForSla.EarliestFirstSeen, slaDueDate.Value, DateTimeOffset.UtcNow).ToString();
             }
 
+            var representativeAssetId = representativeAssetByTenantSoftwareId.GetValueOrDefault(software.Id);
             items.Add(new RemediationDecisionListItemDto(
-                asset.Id,
-                asset.Name,
-                asset.Criticality.ToString(),
-                tsId != Guid.Empty ? tsId : null,
+                representativeAssetId,
+                software.Name,
+                criticality.ToString(),
+                software.Id,
                 decision?.Outcome.ToString(),
                 decision?.ApprovalStatus.ToString(),
                 decision?.DecidedAt,
                 decision?.ExpiryDate,
-                vc?.Total ?? 0,
-                vc?.Critical ?? 0,
-                vc?.High ?? 0,
+                vulnCounts.GetValueOrDefault(software.Id)?.Total ?? 0,
+                vulnCounts.GetValueOrDefault(software.Id)?.Critical ?? 0,
+                vulnCounts.GetValueOrDefault(software.Id)?.High ?? 0,
                 riskScore,
                 riskBand,
                 slaStatus,
                 slaDueDate,
-                devCount
+                deviceCountByTenantSoftwareId.GetValueOrDefault(software.Id)
             ));
         }
 
@@ -218,20 +211,55 @@ public class RemediationDecisionQueryService(
         CancellationToken ct
     )
     {
-        var asset = await dbContext.Assets.AsNoTracking()
-            .FirstOrDefaultAsync(
-                a => a.Id == assetId && a.TenantId == tenantId && a.AssetType == AssetType.Software,
-                ct
-            );
-        if (asset is null)
+        var tenantSoftwareId = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.SoftwareAssetId == assetId && item.IsActive)
+            .Select(item => item.TenantSoftwareId)
+            .FirstOrDefaultAsync(ct);
+        if (tenantSoftwareId == Guid.Empty)
             return null;
+
+        return await BuildByTenantSoftwareAsync(tenantId, tenantSoftwareId, ct);
+    }
+
+    public async Task<DecisionContextDto?> BuildByTenantSoftwareAsync(
+        Guid tenantId,
+        Guid tenantSoftwareId,
+        CancellationToken ct
+    )
+    {
+        var representativeAsset = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId
+                && item.TenantSoftwareId == tenantSoftwareId
+                && item.IsActive)
+            .Join(
+                dbContext.Assets.AsNoTracking(),
+                item => item.SoftwareAssetId,
+                asset => asset.Id,
+                (item, asset) => new { asset.Id, asset.Name, asset.Criticality }
+            )
+            .OrderBy(item => item.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (representativeAsset is null)
+            return null;
+
+        var assetId = representativeAsset.Id;
+        var assetName = representativeAsset.Name;
+        var assetCriticality = representativeAsset.Criticality;
+
+        var scopedSoftwareAssetIds = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
+            .Select(item => item.SoftwareAssetId)
+            .Distinct()
+            .ToListAsync(ct);
 
         var activeSnapshotId = await snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
 
         // Load vulnerability matches
         var matches = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
             .Where(m =>
-                m.SoftwareAssetId == assetId
+                scopedSoftwareAssetIds.Contains(m.SoftwareAssetId)
                 && m.TenantId == tenantId
                 && m.ResolvedAt == null
                 && m.SnapshotId == activeSnapshotId
@@ -284,7 +312,7 @@ public class RemediationDecisionQueryService(
         // Current decision
         var decision = await dbContext.RemediationDecisions.AsNoTracking()
             .Include(d => d.VulnerabilityOverrides)
-            .Where(d => d.TenantId == tenantId && d.SoftwareAssetId == assetId
+            .Where(d => d.TenantId == tenantId && d.TenantSoftwareId == tenantSoftwareId
                 && d.ApprovalStatus != DecisionApprovalStatus.Rejected
                 && d.ApprovalStatus != DecisionApprovalStatus.Expired)
             .OrderByDescending(d => d.CreatedAt)
@@ -295,7 +323,7 @@ public class RemediationDecisionQueryService(
 
         // Analyst recommendations
         var recommendations = await dbContext.AnalystRecommendations.AsNoTracking()
-            .Where(r => r.TenantId == tenantId && r.SoftwareAssetId == assetId)
+            .Where(r => r.TenantId == tenantId && scopedSoftwareAssetIds.Contains(r.SoftwareAssetId))
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync(ct);
 
@@ -401,9 +429,11 @@ public class RemediationDecisionQueryService(
 
         // Risk score
         DecisionRiskDto? riskDto = null;
-        if (assetRiskScore is not null)
+        var tenantSoftwareRisk = await dbContext.TenantSoftwareRiskScores.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.TenantSoftwareId == tenantSoftwareId && r.TenantId == tenantId, ct);
+        if (tenantSoftwareRisk is not null)
         {
-            var riskBand = assetRiskScore.OverallScore switch
+            var riskBand = tenantSoftwareRisk.OverallScore switch
             {
                 >= 900m => "Critical",
                 >= 750m => "High",
@@ -412,9 +442,9 @@ public class RemediationDecisionQueryService(
                 _ => "None",
             };
             riskDto = new DecisionRiskDto(
-                (double)assetRiskScore.OverallScore,
+                (double)tenantSoftwareRisk.OverallScore,
                 riskBand,
-                assetRiskScore.CalculatedAt
+                tenantSoftwareRisk.CalculatedAt
             );
         }
 
@@ -422,7 +452,7 @@ public class RemediationDecisionQueryService(
         string? aiNarrative = null;
         try
         {
-            aiNarrative = await GenerateAiNarrativeAsync(tenantId, asset.Name, summary, topVulns.Take(5).ToList(), ct);
+            aiNarrative = await GenerateAiNarrativeAsync(tenantId, assetName, summary, topVulns.Take(5).ToList(), ct);
         }
         catch
         {
@@ -466,9 +496,9 @@ public class RemediationDecisionQueryService(
         )).ToList();
 
         return new DecisionContextDto(
-            asset.Id,
-            asset.Name,
-            asset.Criticality.ToString(),
+            assetId,
+            assetName,
+            assetCriticality.ToString(),
             summary,
             decisionDto,
             recommendationDtos,
@@ -498,7 +528,7 @@ public class RemediationDecisionQueryService(
         ));
 
         var request = new AiTextGenerationRequest(
-            "You are a PatchHound remediation analyst. Write one concise paragraph (2-3 sentences) summarizing the remediation context for a software asset. Focus on risk level, key vulnerabilities, and recommended action urgency. Do not use bullets, headings, or markdown.",
+            "You are a PatchHound remediation analyst. Write one concise paragraph (2-3 sentences) summarizing the remediation context for a software title across its active versions. Focus on risk level, key vulnerabilities, and recommended action urgency. Do not use bullets, headings, or markdown.",
             $"Asset: {assetName}. Total vulnerabilities: {summary.TotalVulnerabilities} (Critical: {summary.CriticalCount}, High: {summary.HighCount}, Medium: {summary.MediumCount}, Low: {summary.LowCount}). Known exploits: {summary.WithKnownExploit}. Active alerts: {summary.WithActiveAlert}. Top vulnerabilities: {topVulnSummary}.",
             ExternalContext: null,
             UseProviderNativeWebResearch: false

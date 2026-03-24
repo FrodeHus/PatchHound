@@ -1548,6 +1548,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("RemediationDecisionId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("TenantSoftwareId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("SoftwareAssetId")
                         .HasColumnType("uuid");
 
@@ -1572,7 +1575,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.HasIndex("TenantId", "SoftwareAssetId");
+                    b.HasIndex("TenantId", "TenantSoftwareId");
 
                     b.ToTable("PatchingTasks");
                 });
@@ -1621,6 +1624,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("ReEvaluationDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("TenantSoftwareId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("SoftwareAssetId")
                         .HasColumnType("uuid");
 
@@ -1638,7 +1644,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.HasIndex("TenantId", "SoftwareAssetId");
+                    b.HasIndex("TenantId", "TenantSoftwareId");
 
                     b.ToTable("RemediationDecisions");
                 });

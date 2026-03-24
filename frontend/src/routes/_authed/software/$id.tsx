@@ -11,7 +11,6 @@ import { fetchDecisionContext } from '@/api/remediation.functions'
 import { SoftwareDetailPage } from '@/components/features/software/SoftwareDetailPage'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { softwareQueryKeys } from '@/features/software/list-state'
-import { assetQueryKeys } from '@/features/assets/list-state'
 import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
 
 const softwareDetailSearchSchema = baseListSearchSchema.extend({
@@ -94,16 +93,15 @@ function SoftwareDetailRoute() {
 
   const installations = installationsQuery.data ?? (canUseInitialData ? initialData.installations : undefined)
   const vulnerabilities = vulnerabilitiesQuery.data ?? (canUseInitialData ? initialData.vulnerabilities : undefined)
-  const primarySoftwareAssetId = detail?.primarySoftwareAssetId ?? null
-  const canViewRemediation = primarySoftwareAssetId !== null && (
+  const canViewRemediation = (
     user.roles.includes('GlobalAdmin')
     || user.roles.includes('AssetOwner')
   )
 
   const remediationQuery = useQuery({
-    queryKey: assetQueryKeys.remediation(selectedTenantId, primarySoftwareAssetId ?? ''),
-    queryFn: () => fetchDecisionContext({ data: { assetId: primarySoftwareAssetId! } }),
-    enabled: canViewRemediation && primarySoftwareAssetId !== null,
+    queryKey: softwareQueryKeys.remediation(selectedTenantId, id),
+    queryFn: () => fetchDecisionContext({ data: { tenantSoftwareId: id } }),
+    enabled: canViewRemediation,
   })
 
   if (!detail || !installations || !vulnerabilities) {
@@ -144,7 +142,7 @@ function SoftwareDetailRoute() {
       }}
       canViewRemediation={canViewRemediation}
       remediationData={remediationQuery.data ?? null}
-      primarySoftwareAssetId={primarySoftwareAssetId}
+      tenantSoftwareId={id}
     />
   )
 }

@@ -14,7 +14,7 @@ import { createDecision } from '@/api/remediation.functions'
 import { outcomeLabel } from './remediation-utils'
 
 type DecisionFormProps = {
-  assetId: string
+  tenantSoftwareId: string
   queryKey: readonly unknown[]
 }
 
@@ -33,7 +33,7 @@ const REQUIRES_JUSTIFICATION = new Set<string>([
 const REQUIRES_EXPIRY = new Set<string>(['RiskAcceptance', 'AlternateMitigation'])
 const REQUIRES_REEVALUATION = new Set<string>(['PatchingDeferred'])
 
-export function DecisionForm({ assetId, queryKey }: DecisionFormProps) {
+export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) {
   const queryClient = useQueryClient()
   const [outcome, setOutcome] = useState('')
   const [justification, setJustification] = useState('')
@@ -56,7 +56,7 @@ export function DecisionForm({ assetId, queryKey }: DecisionFormProps) {
     try {
       await createDecision({
         data: {
-          assetId,
+          tenantSoftwareId,
           outcome,
           justification: justification || undefined,
           expiryDate: expiryDate || undefined,

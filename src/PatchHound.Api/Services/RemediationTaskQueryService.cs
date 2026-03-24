@@ -247,7 +247,7 @@ public class RemediationTaskQueryService(
             var decision = await dbContext.RemediationDecisions
                 .Where(item =>
                     item.TenantId == tenantId
-                    && item.SoftwareAssetId == softwareAssetId
+                    && item.TenantSoftwareId == tenantSoftwareId
                     && item.Outcome == RemediationOutcome.ApprovedForPatching
                     && item.ApprovalStatus == DecisionApprovalStatus.Approved)
                 .OrderByDescending(item => item.DecidedAt)
@@ -294,9 +294,9 @@ public class RemediationTaskQueryService(
             from task in dbContext.PatchingTasks.AsNoTracking()
             join team in dbContext.Teams.AsNoTracking() on task.OwnerTeamId equals team.Id
             join installation in dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-                on task.SoftwareAssetId equals installation.SoftwareAssetId
+                on task.TenantSoftwareId equals installation.TenantSoftwareId
             join tenantSoftware in dbContext.TenantSoftware.AsNoTracking()
-                on installation.TenantSoftwareId equals tenantSoftware.Id
+                on task.TenantSoftwareId equals tenantSoftware.Id
             join normalized in dbContext.NormalizedSoftware.AsNoTracking()
                 on tenantSoftware.NormalizedSoftwareId equals normalized.Id
             join device in dbContext.Assets.AsNoTracking()
@@ -315,7 +315,7 @@ public class RemediationTaskQueryService(
             select new LinkedTaskDbRow(
                 task.Id,
                 task.SoftwareAssetId,
-                installation.TenantSoftwareId,
+                task.TenantSoftwareId,
                 normalized.CanonicalName,
                 normalized.CanonicalVendor,
                 task.OwnerTeamId,

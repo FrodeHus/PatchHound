@@ -20,10 +20,13 @@ function ApprovalTaskDetailRoute() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [vulnPage, setVulnPage] = useState(1)
+  const [deviceVersion, setDeviceVersion] = useState(
+    normalizeVersion(initialData.deviceVersionCohorts[0]?.version ?? null)
+  )
   const [devicePage, setDevicePage] = useState(1)
 
   const query = useQuery({
-    queryKey: ['approval-task', id, vulnPage, devicePage],
+    queryKey: ['approval-task', id, vulnPage, deviceVersion, devicePage],
     queryFn: () =>
       fetchApprovalTaskDetail({
         data: {
@@ -32,9 +35,13 @@ function ApprovalTaskDetailRoute() {
           pageSize: 25,
           devicePage,
           devicePageSize: 25,
+          deviceVersion,
         },
       }),
-    initialData: vulnPage === 1 && devicePage === 1 ? initialData : undefined,
+    initialData:
+      vulnPage === 1 && devicePage === 1 && deviceVersion === normalizeVersion(initialData.deviceVersionCohorts[0]?.version ?? null)
+        ? initialData
+        : undefined,
   })
 
   const data = query.data ?? initialData
@@ -56,6 +63,14 @@ function ApprovalTaskDetailRoute() {
       }}
       onVulnPageChange={setVulnPage}
       onDevicePageChange={setDevicePage}
+      onDeviceVersionChange={(version) => {
+        setDeviceVersion(version)
+        setDevicePage(1)
+      }}
     />
   )
+}
+
+function normalizeVersion(version: string | null) {
+  return version?.trim() ?? ''
 }

@@ -43,6 +43,7 @@ import { Route as AuthedAdminSecurityProfilesRouteImport } from './routes/_authe
 import { Route as AuthedAdminWorkflowsIndexRouteImport } from './routes/_authed/admin/workflows/index'
 import { Route as AuthedAdminTenantsIndexRouteImport } from './routes/_authed/admin/tenants/index'
 import { Route as AuthedAdminAssetRulesIndexRouteImport } from './routes/_authed/admin/asset-rules/index'
+import { Route as AuthedSoftwareIdRemediationRouteImport } from './routes/_authed/software/$id_.remediation'
 import { Route as AuthedAssetsIdRemediationRouteImport } from './routes/_authed/assets/$id_.remediation'
 import { Route as AuthedAdminWorkflowsNewRouteImport } from './routes/_authed/admin/workflows/new'
 import { Route as AuthedAdminWorkflowsIdRouteImport } from './routes/_authed/admin/workflows/$id'
@@ -225,6 +226,12 @@ const AuthedAdminAssetRulesIndexRoute =
     path: '/admin/asset-rules/',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedSoftwareIdRemediationRoute =
+  AuthedSoftwareIdRemediationRouteImport.update({
+    id: '/software/$id_/remediation',
+    path: '/software/$id/remediation',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAssetsIdRemediationRoute =
   AuthedAssetsIdRemediationRouteImport.update({
     id: '/assets/$id_/remediation',
@@ -295,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
   '/admin/workflows/new': typeof AuthedAdminWorkflowsNewRoute
   '/assets/$id/remediation': typeof AuthedAssetsIdRemediationRoute
+  '/software/$id/remediation': typeof AuthedSoftwareIdRemediationRoute
   '/admin/asset-rules/': typeof AuthedAdminAssetRulesIndexRoute
   '/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
   '/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
@@ -336,6 +344,7 @@ export interface FileRoutesByTo {
   '/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
   '/admin/workflows/new': typeof AuthedAdminWorkflowsNewRoute
   '/assets/$id/remediation': typeof AuthedAssetsIdRemediationRoute
+  '/software/$id/remediation': typeof AuthedSoftwareIdRemediationRoute
   '/admin/asset-rules': typeof AuthedAdminAssetRulesIndexRoute
   '/admin/tenants': typeof AuthedAdminTenantsIndexRoute
   '/admin/workflows': typeof AuthedAdminWorkflowsIndexRoute
@@ -379,6 +388,7 @@ export interface FileRoutesById {
   '/_authed/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
   '/_authed/admin/workflows/new': typeof AuthedAdminWorkflowsNewRoute
   '/_authed/assets/$id_/remediation': typeof AuthedAssetsIdRemediationRoute
+  '/_authed/software/$id_/remediation': typeof AuthedSoftwareIdRemediationRoute
   '/_authed/admin/asset-rules/': typeof AuthedAdminAssetRulesIndexRoute
   '/_authed/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
   '/_authed/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
@@ -422,6 +432,7 @@ export interface FileRouteTypes {
     | '/admin/workflows/$id'
     | '/admin/workflows/new'
     | '/assets/$id/remediation'
+    | '/software/$id/remediation'
     | '/admin/asset-rules/'
     | '/admin/tenants/'
     | '/admin/workflows/'
@@ -463,6 +474,7 @@ export interface FileRouteTypes {
     | '/admin/workflows/$id'
     | '/admin/workflows/new'
     | '/assets/$id/remediation'
+    | '/software/$id/remediation'
     | '/admin/asset-rules'
     | '/admin/tenants'
     | '/admin/workflows'
@@ -505,6 +517,7 @@ export interface FileRouteTypes {
     | '/_authed/admin/workflows/$id'
     | '/_authed/admin/workflows/new'
     | '/_authed/assets/$id_/remediation'
+    | '/_authed/software/$id_/remediation'
     | '/_authed/admin/asset-rules/'
     | '/_authed/admin/tenants/'
     | '/_authed/admin/workflows/'
@@ -762,6 +775,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminAssetRulesIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/software/$id_/remediation': {
+      id: '/_authed/software/$id_/remediation'
+      path: '/software/$id/remediation'
+      fullPath: '/software/$id/remediation'
+      preLoaderRoute: typeof AuthedSoftwareIdRemediationRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/assets/$id_/remediation': {
       id: '/_authed/assets/$id_/remediation'
       path: '/assets/$id/remediation'
@@ -836,6 +856,7 @@ interface AuthedRouteChildren {
   AuthedAdminWorkflowsIdRoute: typeof AuthedAdminWorkflowsIdRoute
   AuthedAdminWorkflowsNewRoute: typeof AuthedAdminWorkflowsNewRoute
   AuthedAssetsIdRemediationRoute: typeof AuthedAssetsIdRemediationRoute
+  AuthedSoftwareIdRemediationRoute: typeof AuthedSoftwareIdRemediationRoute
   AuthedAdminAssetRulesIndexRoute: typeof AuthedAdminAssetRulesIndexRoute
   AuthedAdminTenantsIndexRoute: typeof AuthedAdminTenantsIndexRoute
   AuthedAdminWorkflowsIndexRoute: typeof AuthedAdminWorkflowsIndexRoute
@@ -870,6 +891,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminWorkflowsIdRoute: AuthedAdminWorkflowsIdRoute,
   AuthedAdminWorkflowsNewRoute: AuthedAdminWorkflowsNewRoute,
   AuthedAssetsIdRemediationRoute: AuthedAssetsIdRemediationRoute,
+  AuthedSoftwareIdRemediationRoute: AuthedSoftwareIdRemediationRoute,
   AuthedAdminAssetRulesIndexRoute: AuthedAdminAssetRulesIndexRoute,
   AuthedAdminTenantsIndexRoute: AuthedAdminTenantsIndexRoute,
   AuthedAdminWorkflowsIndexRoute: AuthedAdminWorkflowsIndexRoute,
@@ -892,3 +914,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

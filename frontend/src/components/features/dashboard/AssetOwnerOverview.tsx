@@ -69,7 +69,7 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
             <CardTitle className="text-3xl tracking-[-0.05em]">{summary.openActionCount}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0 text-sm text-muted-foreground">
-            Vulnerabilities on your assets that already have work queued.
+            Software remediation actions already queued for the assets you own.
           </CardContent>
         </Card>
         <Card className="rounded-[1.5rem] border-border/70">
@@ -102,7 +102,7 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
           <CardHeader>
             <CardTitle>Action list</CardTitle>
             <CardDescription>
-              The work items on assets you own, ordered by urgency.
+              The software on assets you own that needs follow-through, ordered by urgency.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -112,7 +112,7 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
               </div>
             ) : summary.actions.length === 0 ? (
               <div className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-10 text-center text-sm text-muted-foreground">
-                No open vulnerability actions are assigned to assets you own right now.
+                No open software remediation actions are assigned to assets you own right now.
               </div>
             ) : (
               summary.actions.map((item) => (
@@ -138,7 +138,7 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
                       </div>
                       {item.softwareNames.length > 0 ? (
                         <div className="mt-2 text-sm text-muted-foreground">
-                          Software in scope: {item.softwareNames.join(', ')}
+                          Software covered by this remediation: {item.softwareNames.join(', ')}
                         </div>
                       ) : null}
                       <div className="mt-2 text-xs text-muted-foreground">

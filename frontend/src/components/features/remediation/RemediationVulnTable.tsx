@@ -12,7 +12,7 @@ import { severityTone, outcomeLabel, outcomeTone } from './remediation-utils'
 type RemediationVulnTableProps = {
   vulnerabilities: DecisionVuln[]
   decisionId: string | null
-  assetId: string
+  tenantSoftwareId: string
   queryKey: readonly unknown[]
   onSelectVuln: (vuln: DecisionVuln) => void
 }
@@ -20,7 +20,7 @@ type RemediationVulnTableProps = {
 export function RemediationVulnTable({
   vulnerabilities,
   decisionId,
-  assetId,
+  tenantSoftwareId,
   queryKey,
   onSelectVuln,
 }: RemediationVulnTableProps) {
@@ -33,7 +33,7 @@ export function RemediationVulnTable({
     try {
       await addVulnerabilityOverride({
         data: {
-          assetId,
+          tenantSoftwareId,
           decisionId,
           tenantVulnerabilityId: vuln.tenantVulnerabilityId,
           outcome,
@@ -44,7 +44,7 @@ export function RemediationVulnTable({
     } finally {
       setOverridingId(null)
     }
-  }, [decisionId, assetId, queryClient, queryKey])
+  }, [decisionId, tenantSoftwareId, queryClient, queryKey])
 
   const columns = useMemo<ColumnDef<DecisionVuln>[]>(
     () => [
@@ -166,7 +166,7 @@ export function RemediationVulnTable({
       getRowId={(row) => row.tenantVulnerabilityId}
       emptyState={
         <div className="py-12 text-center text-muted-foreground">
-          No vulnerabilities found for this software asset.
+          No vulnerabilities are currently linked to this software.
         </div>
       }
     />

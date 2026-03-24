@@ -6,6 +6,7 @@ public class RemediationDecision
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public Guid TenantSoftwareId { get; private set; }
     public Guid SoftwareAssetId { get; private set; }
     public RemediationOutcome Outcome { get; private set; }
     public DecisionApprovalStatus ApprovalStatus { get; private set; }
@@ -40,6 +41,7 @@ public class RemediationDecision
 
     public static RemediationDecision Create(
         Guid tenantId,
+        Guid tenantSoftwareId,
         Guid softwareAssetId,
         RemediationOutcome outcome,
         string? justification,
@@ -61,6 +63,7 @@ public class RemediationDecision
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
+            TenantSoftwareId = tenantSoftwareId,
             SoftwareAssetId = softwareAssetId,
             Outcome = outcome,
             ApprovalStatus = requiresApproval ? DecisionApprovalStatus.PendingApproval : DecisionApprovalStatus.Approved,

@@ -41,7 +41,7 @@ export function AnalystTriageWorkbench({ items, summary, isLoading }: Props) {
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Analyst Workbench</p>
             <CardTitle className="mt-2 text-2xl font-semibold tracking-tight">Latest unhandled vulnerabilities</CardTitle>
             <CardDescription className="mt-2 max-w-3xl leading-6">
-              Open vulnerabilities with no active remediation task and no approved risk acceptance. Ordered for triage: severity first, then newest unresolved appearance.
+              Open vulnerabilities with no active software remediation coverage and no approved risk acceptance. Ordered for triage: severity first, then newest unresolved appearance.
             </CardDescription>
           </div>
           <Button
@@ -87,7 +87,7 @@ export function AnalystTriageWorkbench({ items, summary, isLoading }: Props) {
             <div className="rounded-[1.25rem] border border-border/60 bg-background/25 px-4 py-12 text-center">
               <div className="text-lg font-medium tracking-tight">No unhandled vulnerabilities are waiting</div>
               <p className="mt-2 text-sm text-muted-foreground">
-                Open vulnerabilities are either already in remediation flow or covered by approved acceptance.
+                Open vulnerabilities are either already covered by software remediation or covered by approved acceptance.
               </p>
             </div>
           ) : (

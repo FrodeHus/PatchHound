@@ -45,11 +45,11 @@ export function RemediationWorkbench({
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Remediation workbench</p>
             <h1 className="text-3xl font-semibold tracking-[-0.04em]">Software remediation decisions</h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              Review remediation status across all software assets. Track decisions, approval status, risk scores, and SLA compliance.
+              Review remediation status across tracked software, including every active version cohort. Track decisions, approval status, risk scores, and SLA compliance.
             </p>
           </div>
           <div className="grid min-w-[220px] gap-3 rounded-xl border border-border/70 bg-background/50 p-4">
-            <Metric label="Total assets" value={String(data.totalCount)} />
+            <Metric label="Software in scope" value={String(data.totalCount)} />
             <Metric label="With decision" value={String(withDecision.length)} />
             <Metric label="Pending approval" value={String(pendingCount)} />
             <Metric label="No decision" value={String(noDecisionCount)} />
@@ -131,7 +131,7 @@ export function RemediationWorkbench({
               {data.items.length === 0 ? (
                 <tr>
                   <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>
-                    No software assets match the current filters.
+                    No software matches the current filters.
                   </td>
                 </tr>
               ) : (
@@ -139,13 +139,17 @@ export function RemediationWorkbench({
                   <tr key={item.assetId} className="align-top">
                     <td className="px-4 py-3">
                       <div className="space-y-1">
-                        <Link
-                          to="/assets/$id/remediation"
-                          params={{ id: item.assetId }}
-                          className="font-medium hover:text-primary"
-                        >
-                          {item.assetName}
-                        </Link>
+                        {item.tenantSoftwareId ? (
+                          <Link
+                            to="/software/$id/remediation"
+                            params={{ id: item.tenantSoftwareId }}
+                            className="font-medium hover:text-primary"
+                          >
+                            {item.assetName}
+                          </Link>
+                        ) : (
+                          <span className="font-medium">{item.assetName}</span>
+                        )}
                         <div className="flex gap-1.5">
                           <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(severityTone(item.criticality))}`}>
                             {item.criticality}

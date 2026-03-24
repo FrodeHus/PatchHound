@@ -54,6 +54,7 @@ public class ApprovalTasksController(
         [FromQuery] PaginationQuery vulnPagination,
         [FromQuery(Name = "devicePage")] int devicePage = 1,
         [FromQuery(Name = "devicePageSize")] int devicePageSize = 25,
+        [FromQuery(Name = "deviceVersion")] string? deviceVersion = null,
         CancellationToken ct = default
     )
     {
@@ -62,7 +63,15 @@ public class ApprovalTasksController(
 
         var userRoles = tenantContext.GetRolesForTenant(tenantId);
         var devicePagination = new PaginationQuery(devicePage, devicePageSize);
-        var result = await queryService.GetDetailAsync(tenantId, id, userRoles, vulnPagination, devicePagination, ct);
+        var result = await queryService.GetDetailAsync(
+            tenantId,
+            id,
+            userRoles,
+            vulnPagination,
+            devicePagination,
+            deviceVersion,
+            ct
+        );
 
         if (result is null)
             return NotFound();

@@ -22,6 +22,18 @@ export const approvalDeviceSchema = z.object({
   deviceAssetId: z.string().uuid(),
   deviceName: z.string(),
   criticality: z.string(),
+  version: z.string().nullable(),
+  lastSeenAt: z.string(),
+  openVulnerabilityCount: z.number(),
+})
+
+export const approvalDeviceVersionCohortSchema = z.object({
+  version: z.string().nullable(),
+  activeInstallCount: z.number(),
+  deviceCount: z.number(),
+  activeVulnerabilityCount: z.number(),
+  firstSeenAt: z.string(),
+  lastSeenAt: z.string(),
 })
 
 export const approvalRecommendationSchema = z.object({
@@ -84,6 +96,7 @@ export const approvalTaskDetailSchema = z.object({
   riskScore: z.number().nullable(),
   riskBand: z.string().nullable(),
   vulnerabilities: pagedVulnerabilityListSchema,
+  deviceVersionCohorts: z.array(approvalDeviceVersionCohortSchema),
   devices: pagedDeviceListSchema.nullable(),
   recommendations: z.array(approvalRecommendationSchema),
   auditTrail: z.array(approvalAuditEntrySchema),
@@ -103,4 +116,5 @@ export type PagedApprovalTaskList = z.infer<typeof pagedApprovalTaskListSchema>
 export type ApprovalAuditEntry = z.infer<typeof approvalAuditEntrySchema>
 export type ApprovalVuln = z.infer<typeof approvalVulnSchema>
 export type ApprovalDevice = z.infer<typeof approvalDeviceSchema>
+export type ApprovalDeviceVersionCohort = z.infer<typeof approvalDeviceVersionCohortSchema>
 export type ApprovalRecommendation = z.infer<typeof approvalRecommendationSchema>

@@ -30,6 +30,7 @@ public class IngestionService
     private readonly StagedAssetMergeService _stagedAssetMergeService;
     private readonly IAssetRuleEvaluationService _assetRuleEvaluationService;
     private readonly RiskScoreService _riskScoreService;
+    private readonly RemediationDecisionService? _remediationDecisionService;
     private readonly ILogger<IngestionService> _logger;
 
     private sealed record AcquiredIngestionRun(IngestionRun Run, bool Resumed);
@@ -47,6 +48,35 @@ public class IngestionService
         RiskScoreService riskScoreService,
         ILogger<IngestionService> logger
     )
+        : this(
+            dbContext,
+            sources,
+            enrichmentJobEnqueuer,
+            assessmentService,
+            softwareVulnerabilityMatchService,
+            normalizedSoftwareProjectionService,
+            stagedVulnerabilityMergeService,
+            stagedAssetMergeService,
+            assetRuleEvaluationService,
+            riskScoreService,
+            remediationDecisionService: null,
+            logger
+        ) { }
+
+    public IngestionService(
+        PatchHoundDbContext dbContext,
+        IEnumerable<IVulnerabilitySource> sources,
+        EnrichmentJobEnqueuer enrichmentJobEnqueuer,
+        VulnerabilityAssessmentService assessmentService,
+        SoftwareVulnerabilityMatchService softwareVulnerabilityMatchService,
+        NormalizedSoftwareProjectionService normalizedSoftwareProjectionService,
+        StagedVulnerabilityMergeService stagedVulnerabilityMergeService,
+        StagedAssetMergeService stagedAssetMergeService,
+        IAssetRuleEvaluationService assetRuleEvaluationService,
+        RiskScoreService riskScoreService,
+        RemediationDecisionService? remediationDecisionService,
+        ILogger<IngestionService> logger
+    )
     {
         _dbContext = dbContext;
         _sources = sources;
@@ -58,6 +88,7 @@ public class IngestionService
         _stagedAssetMergeService = stagedAssetMergeService;
         _assetRuleEvaluationService = assetRuleEvaluationService;
         _riskScoreService = riskScoreService;
+        _remediationDecisionService = remediationDecisionService;
         _logger = logger;
     }
 
@@ -562,6 +593,14 @@ public class IngestionService
                                 softwareSnapshot.Id,
                                 ct
                             );
+                            if (_remediationDecisionService is not null)
+                            {
+                                await _remediationDecisionService.ReconcileResolvedSoftwareRemediationsAsync(
+                                    tenantId,
+                                    softwareSnapshot.Id,
+                                    ct
+                                );
+                            }
                             _logger.LogInformation(
                                 "Snapshot publish completed for ingestion run {IngestionRunId}. Snapshot: {SnapshotId}. Duration: {DurationMs} ms.",
                                 run.Id,
@@ -585,6 +624,14 @@ public class IngestionService
                                 tenantId,
                                 ct
                             );
+                            if (_remediationDecisionService is not null)
+                            {
+                                await _remediationDecisionService.ReconcileResolvedSoftwareRemediationsAsync(
+                                    tenantId,
+                                    null,
+                                    ct
+                                );
+                            }
                             _logger.LogInformation(
                                 "Software vulnerability match sync completed for ingestion run {IngestionRunId}. Duration: {DurationMs} ms.",
                                 run.Id,

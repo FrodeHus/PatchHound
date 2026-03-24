@@ -36,14 +36,16 @@ export const fetchApprovalTaskDetail = createServerFn({ method: 'GET' })
       pageSize: z.number().optional(),
       devicePage: z.number().optional(),
       devicePageSize: z.number().optional(),
+      deviceVersion: z.string().optional(),
     })
   )
-  .handler(async ({ context, data: { id, page, pageSize, devicePage, devicePageSize } }) => {
+  .handler(async ({ context, data: { id, page, pageSize, devicePage, devicePageSize, deviceVersion } }) => {
     const params = new URLSearchParams()
     if (page) params.set('page', String(page))
     if (pageSize) params.set('pageSize', String(pageSize))
     if (devicePage) params.set('devicePage', String(devicePage))
     if (devicePageSize) params.set('devicePageSize', String(devicePageSize))
+    if (deviceVersion !== undefined) params.set('deviceVersion', deviceVersion)
     const data = await apiGet(`/approval-tasks/${id}?${params.toString()}`, context)
     return approvalTaskDetailSchema.parse(data)
   })
@@ -79,13 +81,13 @@ export const fetchDecisionAuditTrail = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(
     z.object({
-      assetId: z.string().uuid(),
+      tenantSoftwareId: z.string().uuid(),
       decisionId: z.string().uuid(),
     })
   )
-  .handler(async ({ context, data: { assetId, decisionId } }) => {
+  .handler(async ({ context, data: { tenantSoftwareId, decisionId } }) => {
     const data = await apiGet(
-      `/assets/${assetId}/decisions/${decisionId}/audit-trail`,
+      `/software/${tenantSoftwareId}/remediation/decisions/${decisionId}/audit-trail`,
       context
     )
     return z.array(approvalAuditEntrySchema).parse(data)

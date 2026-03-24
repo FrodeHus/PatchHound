@@ -11,7 +11,7 @@ public class RemediationDecisionConfiguration : IEntityTypeConfiguration<Remedia
         builder.HasKey(rd => rd.Id);
 
         builder.HasIndex(rd => rd.TenantId);
-        builder.HasIndex(rd => new { rd.TenantId, rd.SoftwareAssetId });
+        builder.HasIndex(rd => new { rd.TenantId, rd.TenantSoftwareId });
         builder.HasIndex(rd => rd.ApprovalStatus);
 
         builder.Property(rd => rd.Outcome).HasConversion<string>().HasMaxLength(32);

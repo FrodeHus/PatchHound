@@ -31,7 +31,7 @@ type SoftwareDetailPageProps = {
   onPageChange: (page: number) => void
   canViewRemediation: boolean
   remediationData: DecisionContext | null
-  primarySoftwareAssetId: string | null
+  tenantSoftwareId: string
 }
 
 export function SoftwareDetailPage({
@@ -45,7 +45,7 @@ export function SoftwareDetailPage({
   onPageChange,
   canViewRemediation,
   remediationData,
-  primarySoftwareAssetId,
+  tenantSoftwareId,
 }: SoftwareDetailPageProps) {
   const activeVersion =
     detail.versionCohorts.find(
@@ -172,8 +172,8 @@ export function SoftwareDetailPage({
           onSelectVersion={onSelectVersion}
           onPageChange={onPageChange}
         />
-      ) : activeTab === 'remediation' && canViewRemediation && remediationData && primarySoftwareAssetId ? (
-        <SoftwareRemediationView data={remediationData} assetId={primarySoftwareAssetId} embedded />
+      ) : activeTab === 'remediation' && canViewRemediation && remediationData ? (
+        <SoftwareRemediationView data={remediationData} tenantSoftwareId={tenantSoftwareId} embedded />
       ) : activeTab === 'ai' ? (
         <AiInsightsTab detail={detail} />
       ) : null}
