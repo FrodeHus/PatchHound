@@ -6,6 +6,7 @@ import type { VulnerabilityDetail } from '@/api/vulnerabilities.schemas'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { getApiErrorMessage } from '@/lib/api-errors'
 import { vulnerabilitySeverityOptions } from '@/lib/options/vulnerabilities'
 import { toneBadge, toneText } from '@/lib/tone-classes'
 
@@ -25,8 +26,8 @@ export function OrgSeverityPanel({ vulnerability }: OrgSeverityPanelProps) {
     onSuccess: () => {
       toast.success('Severity adjustment saved')
     },
-    onError: () => {
-      toast.error('Failed to save severity adjustment')
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to save severity adjustment'))
     },
   })
   const [adjustedSeverity, setAdjustedSeverity] = useState(

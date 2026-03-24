@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { getApiErrorMessage } from '@/lib/api-errors'
 
 type DraftState = {
   activeProvider: 'smtp' | 'mailgun'
@@ -81,7 +82,7 @@ export function NotificationDeliverySettingsPage() {
       await query.refetch()
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Failed to save notification delivery settings')
+      toast.error(getApiErrorMessage(error, 'Failed to save notification delivery settings'))
     },
   })
 
@@ -91,7 +92,7 @@ export function NotificationDeliverySettingsPage() {
       toast.success(result.message)
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Mailgun validation failed')
+      toast.error(getApiErrorMessage(error, 'Mailgun validation failed'))
     },
   })
 
@@ -101,7 +102,7 @@ export function NotificationDeliverySettingsPage() {
       toast.success(result.message)
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Failed to send test email')
+      toast.error(getApiErrorMessage(error, 'Failed to send test email'))
     },
   })
 

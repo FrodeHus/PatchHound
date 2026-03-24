@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { getApiErrorMessage } from '@/lib/api-errors'
 import { cn } from '@/lib/utils'
 
 type GlobalEnrichmentSourceManagementProps = {
@@ -44,9 +45,9 @@ export function GlobalEnrichmentSourceManagement({
       toast.success('Enrichment configuration saved')
       await onSaved()
     },
-    onError: () => {
+    onError: (error) => {
       setSaveState('error')
-      toast.error('Failed to save enrichment configuration')
+      toast.error(getApiErrorMessage(error, 'Failed to save enrichment configuration'))
     },
   })
 
