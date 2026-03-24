@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
@@ -6,16 +7,12 @@ using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Infrastructure.Services;
 
-public class EmailNotificationService : INotificationService
+public class EmailNotificationService(
+    PatchHoundDbContext dbContext,
+    IEmailSender emailSender,
+    ILogger<EmailNotificationService> logger
+) : INotificationService
 {
-    private readonly PatchHoundDbContext _dbContext;
-    private readonly IEmailSender _emailSender;
-
-    public EmailNotificationService(PatchHoundDbContext dbContext, IEmailSender emailSender)
-    {
-        _dbContext = dbContext;
-        _emailSender = emailSender;
-    }
 
     public async Task SendAsync(
         Guid userId,
@@ -37,13 +34,25 @@ public class EmailNotificationService : INotificationService
             relatedEntityType,
             relatedEntityId
         );
-        _dbContext.Notifications.Add(notification);
-        await _dbContext.SaveChangesAsync(ct);
+        dbContext.Notifications.Add(notification);
+        await dbContext.SaveChangesAsync(ct);
 
-        var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user is not null)
         {
-            await _emailSender.SendEmailAsync(user.Email, title, body, ct);
+            try
+            {
+                await emailSender.SendEmailAsync(user.Email, title, body, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Failed to send notification email to user {UserId} for tenant {TenantId}.",
+                    userId,
+                    tenantId
+                );
+            }
         }
     }
 
@@ -58,7 +67,7 @@ public class EmailNotificationService : INotificationService
         CancellationToken ct = default
     )
     {
-        var members = await _dbContext
+        var members = await dbContext
             .TeamMembers.IgnoreQueryFilters()
             .Where(tm => tm.TeamId == teamId)
             .ToListAsync(ct);
