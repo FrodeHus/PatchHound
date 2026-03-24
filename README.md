@@ -144,6 +144,9 @@ path "patchhound/data/tenants/*" {
 path "patchhound/data/system/enrichment-sources/*" {
   capabilities = ["create", "update", "read"]
 }
+path "patchhound/data/system/notification-services/*" {
+  capabilities = ["create", "update", "read"]
+}
 EOF
 bao policy write patchhound /tmp/patchhound-policy.hcl
 bao token create -policy=patchhound'

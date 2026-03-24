@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -38,12 +38,20 @@ export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) 
   const [outcome, setOutcome] = useState('')
   const [justification, setJustification] = useState('')
   const [expiryDate, setExpiryDate] = useState('')
+  const [expiryMode, setExpiryMode] = useState<'permanent' | 'expires'>('permanent')
   const [reEvaluationDate, setReEvaluationDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const needsJustification = REQUIRES_JUSTIFICATION.has(outcome)
   const needsExpiry = REQUIRES_EXPIRY.has(outcome)
   const needsReEvaluation = REQUIRES_REEVALUATION.has(outcome)
+
+  useEffect(() => {
+    if (!needsExpiry) {
+      setExpiryMode('permanent')
+      setExpiryDate('')
+    }
+  }, [needsExpiry])
 
   const canSubmit =
     outcome !== '' &&
@@ -59,14 +67,15 @@ export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) 
           tenantSoftwareId,
           outcome,
           justification: justification || undefined,
-          expiryDate: expiryDate || undefined,
-          reEvaluationDate: reEvaluationDate || undefined,
+          expiryDate: needsExpiry && expiryMode === 'expires' ? toIsoDateBoundary(expiryDate) : undefined,
+          reEvaluationDate: toIsoDateBoundary(reEvaluationDate),
         },
       })
       await queryClient.invalidateQueries({ queryKey })
       setOutcome('')
       setJustification('')
       setExpiryDate('')
+      setExpiryMode('permanent')
       setReEvaluationDate('')
     } finally {
       setSubmitting(false)
@@ -108,13 +117,36 @@ export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) 
       {needsExpiry ? (
         <div className="space-y-2">
           <label className="text-sm font-medium">Expiry Date</label>
-          <Input
-            type="date"
-            value={expiryDate}
-            onChange={(e) => setExpiryDate(e.target.value)}
-          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={expiryMode === 'permanent' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                setExpiryMode('permanent')
+                setExpiryDate('')
+              }}
+            >
+              Permanent or until cancelled
+            </Button>
+            <Button
+              type="button"
+              variant={expiryMode === 'expires' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setExpiryMode('expires')}
+            >
+              Expires on date
+            </Button>
+          </div>
+          {expiryMode === 'expires' ? (
+            <Input
+              type="date"
+              value={expiryDate}
+              onChange={(e) => setExpiryDate(e.target.value)}
+            />
+          ) : null}
           <p className="text-xs text-muted-foreground">
-            Optional. When the acceptance or mitigation expires.
+            Risk acceptance and alternate mitigation can be permanent, or set to expire on a specific date.
           </p>
         </div>
       ) : null}
@@ -144,4 +176,12 @@ export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) 
       </Button>
     </div>
   )
+}
+
+function toIsoDateBoundary(value: string) {
+  if (!value) {
+    return undefined
+  }
+
+  return `${value}T00:00:00Z`
 }

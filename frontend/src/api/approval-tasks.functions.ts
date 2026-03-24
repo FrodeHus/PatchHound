@@ -82,12 +82,11 @@ export const fetchDecisionAuditTrail = createServerFn({ method: 'GET' })
   .inputValidator(
     z.object({
       tenantSoftwareId: z.string().uuid(),
-      decisionId: z.string().uuid(),
     })
   )
-  .handler(async ({ context, data: { tenantSoftwareId, decisionId } }) => {
+  .handler(async ({ context, data: { tenantSoftwareId } }) => {
     const data = await apiGet(
-      `/software/${tenantSoftwareId}/remediation/decisions/${decisionId}/audit-trail`,
+      `/software/${tenantSoftwareId}/remediation/audit-trail`,
       context
     )
     return z.array(approvalAuditEntrySchema).parse(data)

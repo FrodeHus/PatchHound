@@ -35,7 +35,15 @@ export class ForbiddenApiError extends ApiRequestError {
 
 export class ValidationApiError extends ApiRequestError {
   constructor(status: number, statusText: string, bodyText: string | null) {
-    super('The request was rejected as invalid.', status, statusText, bodyText)
+    super(
+      buildFriendlyErrorMessage(
+        bodyText,
+        'The request was rejected as invalid.',
+      ),
+      status,
+      statusText,
+      bodyText,
+    )
     this.name = 'ValidationApiError'
   }
 }
@@ -96,11 +104,75 @@ async function ensureOk(response: Response): Promise<void> {
   }
 
   throw new ApiRequestError(
-    `API request failed with ${response.status} ${response.statusText}.`,
+    buildFriendlyErrorMessage(
+      bodyText,
+      `API request failed with ${response.status} ${response.statusText}.`,
+    ),
     response.status,
     response.statusText,
     bodyText,
   )
+}
+
+type ProblemDetailsShape = {
+  title?: string
+  detail?: string
+  errors?: Record<string, string[]>
+}
+
+function buildFriendlyErrorMessage(bodyText: string | null, fallback: string) {
+  if (!bodyText) {
+    return fallback
+  }
+
+  const parsed = tryParseProblemDetails(bodyText)
+  if (!parsed) {
+    return bodyText || fallback
+  }
+
+  const parts: string[] = []
+  if (parsed.title?.trim()) {
+    parts.push(parsed.title.trim())
+  }
+
+  if (parsed.detail?.trim()) {
+    parts.push(parsed.detail.trim())
+  }
+
+  const validationErrors = flattenValidationErrors(parsed.errors)
+  if (validationErrors.length > 0) {
+    parts.push(validationErrors.join(' '))
+  }
+
+  return parts.length > 0 ? parts.join(' ') : fallback
+}
+
+function tryParseProblemDetails(bodyText: string): ProblemDetailsShape | null {
+  try {
+    const parsed = JSON.parse(bodyText) as ProblemDetailsShape
+    if (
+      typeof parsed === 'object'
+      && parsed !== null
+      && ('title' in parsed || 'detail' in parsed || 'errors' in parsed)
+    ) {
+      return parsed
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+function flattenValidationErrors(errors?: Record<string, string[]>) {
+  if (!errors) {
+    return []
+  }
+
+  return Object.entries(errors)
+    .flatMap(([field, messages]) =>
+      messages.map((message) => (field ? `${field}: ${message}` : message)),
+    )
 }
 
 export async function apiGet<T>(path: string, context: ApiRequestContext): Promise<T> {

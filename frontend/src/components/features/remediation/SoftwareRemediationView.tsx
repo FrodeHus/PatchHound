@@ -334,7 +334,6 @@ export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = fal
         <TabsContent value="history" className="pt-1">
           <DecisionHistorySection
             tenantSoftwareId={tenantSoftwareId}
-            decisionId={data.currentDecision?.id ?? null}
             recommendations={data.recommendations}
           />
         </TabsContent>
@@ -351,17 +350,14 @@ export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = fal
 
 function DecisionHistorySection({
   tenantSoftwareId,
-  decisionId,
   recommendations,
 }: {
   tenantSoftwareId: string
-  decisionId: string | null
   recommendations: DecisionContext['recommendations']
 }) {
   const auditQuery = useQuery({
-    queryKey: ['decision-audit-trail', tenantSoftwareId, decisionId],
-    enabled: Boolean(decisionId),
-    queryFn: () => fetchDecisionAuditTrail({ data: { tenantSoftwareId, decisionId: decisionId! } }),
+    queryKey: ['decision-audit-trail', tenantSoftwareId],
+    queryFn: () => fetchDecisionAuditTrail({ data: { tenantSoftwareId } }),
   })
 
   const recommendationEvents: AuditTimelineEvent[] = recommendations.map((recommendation) => ({

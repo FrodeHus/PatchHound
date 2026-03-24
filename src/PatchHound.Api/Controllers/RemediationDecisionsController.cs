@@ -20,7 +20,6 @@ public class RemediationDecisionsController(
     RemediationDecisionQueryService queryService,
     RemediationDecisionService decisionService,
     AnalystRecommendationService recommendationService,
-    IAuditLogRepository auditLogRepository,
     PatchHoundDbContext dbContext,
     ITenantContext tenantContext
 ) : ControllerBase
@@ -204,18 +203,28 @@ public class RemediationDecisionsController(
         ));
     }
 
-    [HttpGet("decisions/{decisionId:guid}/audit-trail")]
+    [HttpGet("audit-trail")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<List<ApprovalAuditEntryDto>>> GetAuditTrail(
         Guid tenantSoftwareId,
-        Guid decisionId,
         CancellationToken ct
     )
     {
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var entries = await auditLogRepository.GetByEntityAsync("RemediationDecision", decisionId, ct);
+        var decisionIds = await dbContext.RemediationDecisions.AsNoTracking()
+            .Where(decision => decision.TenantId == tenantId && decision.TenantSoftwareId == tenantSoftwareId)
+            .Select(decision => decision.Id)
+            .ToListAsync(ct);
+
+        if (decisionIds.Count == 0)
+            return Ok(new List<ApprovalAuditEntryDto>());
+
+        var entries = await dbContext.AuditLogEntries.AsNoTracking()
+            .Where(entry => entry.EntityType == "RemediationDecision" && decisionIds.Contains(entry.EntityId))
+            .OrderByDescending(entry => entry.Timestamp)
+            .ToListAsync(ct);
 
         var userIds = entries.Select(e => e.UserId).Distinct().ToList();
         var userNames = await dbContext.Users.AsNoTracking()
