@@ -16,7 +16,7 @@ import { formatDateTime } from '@/lib/formatting'
 import { outcomeLabel, outcomeTone } from './remediation-utils'
 
 type RecommendationPanelProps = {
-  assetId: string
+  tenantSoftwareId: string
   recommendations: AnalystRecommendation[]
   queryKey: readonly unknown[]
 }
@@ -28,7 +28,7 @@ const OUTCOMES = [
   'PatchingDeferred',
 ] as const
 
-export function RecommendationPanel({ assetId, recommendations, queryKey }: RecommendationPanelProps) {
+export function RecommendationPanel({ tenantSoftwareId, recommendations, queryKey }: RecommendationPanelProps) {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [outcome, setOutcome] = useState('')
@@ -41,7 +41,7 @@ export function RecommendationPanel({ assetId, recommendations, queryKey }: Reco
     try {
       await addRecommendation({
         data: {
-          assetId,
+          tenantSoftwareId,
           recommendedOutcome: outcome,
           rationale: rationale.trim(),
         },

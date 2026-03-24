@@ -7,6 +7,7 @@ public class PatchingTask
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public Guid RemediationDecisionId { get; private set; }
+    public Guid TenantSoftwareId { get; private set; }
     public Guid SoftwareAssetId { get; private set; }
     public Guid OwnerTeamId { get; private set; }
     public PatchingTaskStatus Status { get; private set; }
@@ -22,6 +23,7 @@ public class PatchingTask
     public static PatchingTask Create(
         Guid tenantId,
         Guid remediationDecisionId,
+        Guid tenantSoftwareId,
         Guid softwareAssetId,
         Guid ownerTeamId,
         DateTimeOffset dueDate
@@ -33,6 +35,7 @@ public class PatchingTask
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             RemediationDecisionId = remediationDecisionId,
+            TenantSoftwareId = tenantSoftwareId,
             SoftwareAssetId = softwareAssetId,
             OwnerTeamId = ownerTeamId,
             Status = PatchingTaskStatus.Pending,

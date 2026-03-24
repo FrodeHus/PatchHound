@@ -7,8 +7,16 @@ using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Infrastructure.Services;
 
-public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaService slaService, ApprovalTaskService approvalTaskService)
+public class RemediationDecisionService(
+    PatchHoundDbContext dbContext,
+    SlaService slaService,
+    ApprovalTaskService approvalTaskService,
+    AuditLogWriter auditLogWriter
+)
 {
+    private const string SystemClosureReason =
+        "All vulnerabilities were resolved - remediation closed by system";
+
     public async Task<Result<RemediationDecision>> CreateDecisionAsync(
         Guid tenantId,
         Guid softwareAssetId,
@@ -20,10 +28,14 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
         CancellationToken ct
     )
     {
+        var remediationScope = await ResolveScopeAsync(tenantId, softwareAssetId, ct);
+        if (remediationScope is null)
+            return Result<RemediationDecision>.Failure("No tenant software scope was found for this software.");
+
         var hasOpenDecision = await dbContext.RemediationDecisions
             .AnyAsync(
                 d => d.TenantId == tenantId
-                    && d.SoftwareAssetId == softwareAssetId
+                    && d.TenantSoftwareId == remediationScope.TenantSoftwareId
                     && d.ApprovalStatus != DecisionApprovalStatus.Rejected
                     && d.ApprovalStatus != DecisionApprovalStatus.Expired,
                 ct
@@ -31,11 +43,12 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
 
         if (hasOpenDecision)
             return Result<RemediationDecision>.Failure(
-                "An active remediation decision already exists for this software asset. Reject or expire the current decision before creating a new one.");
+                "An active remediation decision already exists for this software. Reject or expire the current decision before creating a new one.");
 
         var decision = RemediationDecision.Create(
             tenantId,
-            softwareAssetId,
+            remediationScope.TenantSoftwareId,
+            remediationScope.RepresentativeSoftwareAssetId,
             outcome,
             justification,
             decidedBy,
@@ -61,6 +74,33 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
         await approvalTaskService.CreateForDecisionAsync(decision, expiryHours, ct);
 
         return Result<RemediationDecision>.Success(decision);
+    }
+
+    public async Task<Result<RemediationDecision>> CreateDecisionForTenantSoftwareAsync(
+        Guid tenantId,
+        Guid tenantSoftwareId,
+        RemediationOutcome outcome,
+        string? justification,
+        Guid decidedBy,
+        DateTimeOffset? expiryDate,
+        DateTimeOffset? reEvaluationDate,
+        CancellationToken ct
+    )
+    {
+        var remediationScope = await ResolveScopeByTenantSoftwareAsync(tenantId, tenantSoftwareId, ct);
+        if (remediationScope is null)
+            return Result<RemediationDecision>.Failure("No tenant software scope was found for this software.");
+
+        return await CreateDecisionAsync(
+            tenantId,
+            remediationScope.RepresentativeSoftwareAssetId,
+            outcome,
+            justification,
+            decidedBy,
+            expiryDate,
+            reEvaluationDate,
+            ct
+        );
     }
 
     public async Task<Result<RemediationDecision>> ApproveAsync(
@@ -121,6 +161,87 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
         return Result<RemediationDecision>.Success(decision);
     }
 
+    public async Task<int> ReconcileResolvedSoftwareRemediationsAsync(
+        Guid tenantId,
+        Guid? snapshotId,
+        CancellationToken ct
+    )
+    {
+        var openPatchingDecisions = await dbContext.RemediationDecisions
+            .Where(d =>
+                d.TenantId == tenantId
+                && d.Outcome == RemediationOutcome.ApprovedForPatching
+                && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+            .ToListAsync(ct);
+
+        if (openPatchingDecisions.Count == 0)
+            return 0;
+
+        var tenantSoftwareIds = openPatchingDecisions
+            .Select(d => d.TenantSoftwareId)
+            .Distinct()
+            .ToList();
+
+        var unresolvedTenantSoftwareIds = await dbContext.NormalizedSoftwareVulnerabilityProjections
+            .IgnoreQueryFilters()
+            .Where(p =>
+                p.TenantId == tenantId
+                && p.SnapshotId == snapshotId
+                && p.ResolvedAt == null
+                && tenantSoftwareIds.Contains(p.TenantSoftwareId))
+            .Select(p => p.TenantSoftwareId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var decisionsToClose = openPatchingDecisions
+            .Where(d => !unresolvedTenantSoftwareIds.Contains(d.TenantSoftwareId))
+            .ToList();
+
+        if (decisionsToClose.Count == 0)
+            return 0;
+
+        var decisionIds = decisionsToClose.Select(d => d.Id).ToList();
+        var openTasks = await dbContext.PatchingTasks
+            .Where(task =>
+                task.TenantId == tenantId
+                && decisionIds.Contains(task.RemediationDecisionId)
+                && task.Status != PatchingTaskStatus.Completed)
+            .ToListAsync(ct);
+
+        foreach (var task in openTasks)
+        {
+            task.Complete();
+        }
+
+        var closedAt = DateTimeOffset.UtcNow;
+        foreach (var decision in decisionsToClose)
+        {
+            var previousStatus = decision.ApprovalStatus;
+            decision.Expire();
+            await auditLogWriter.WriteAsync(
+                tenantId,
+                "RemediationDecision",
+                decision.Id,
+                AuditAction.Updated,
+                new
+                {
+                    ApprovalStatus = previousStatus.ToString(),
+                },
+                new
+                {
+                    ApprovalStatus = decision.ApprovalStatus.ToString(),
+                    SystemConclusion = SystemClosureReason,
+                    ClosedAt = closedAt,
+                },
+                ct
+            );
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        return decisionsToClose.Count;
+    }
+
     public async Task<Result<RemediationDecisionVulnerabilityOverride>> AddVulnerabilityOverrideAsync(
         Guid decisionId,
         Guid tenantVulnerabilityId,
@@ -178,31 +299,37 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
         CancellationToken ct
     )
     {
-        // Find devices that have the software asset installed, grouped by owning team
-        var deviceInstallations = await dbContext.DeviceSoftwareInstallations
+        var scopedInstallations = await dbContext.NormalizedSoftwareInstallations
             .IgnoreQueryFilters()
-            .Where(dsi => dsi.SoftwareAssetId == decision.SoftwareAssetId && dsi.TenantId == decision.TenantId)
-            .Select(dsi => new { dsi.DeviceAssetId })
+            .Where(item =>
+                item.TenantId == decision.TenantId
+                && item.TenantSoftwareId == decision.TenantSoftwareId
+                && item.IsActive)
+            .Select(item => new { item.DeviceAssetId, item.SoftwareAssetId })
             .ToListAsync(ct);
 
-        if (deviceInstallations.Count == 0)
+        if (scopedInstallations.Count == 0)
             return 0;
 
-        var deviceAssetIds = deviceInstallations.Select(d => d.DeviceAssetId).Distinct().ToList();
+        var deviceAssetIds = scopedInstallations.Select(d => d.DeviceAssetId).Distinct().ToList();
+        var scopedSoftwareAssetIds = scopedInstallations.Select(item => item.SoftwareAssetId).Distinct().ToList();
 
         var deviceTeams = await dbContext.Assets
             .IgnoreQueryFilters()
             .Where(a => deviceAssetIds.Contains(a.Id) && a.TenantId == decision.TenantId)
-            .Select(a => new { a.Id, a.OwnerTeamId })
+            .Select(a => new { a.Id, a.OwnerTeamId, a.FallbackTeamId })
             .ToListAsync(ct);
 
         var teamGroups = deviceTeams
-            .Where(d => d.OwnerTeamId.HasValue)
-            .GroupBy(d => d.OwnerTeamId!.Value)
+            .Select(d => d.OwnerTeamId ?? d.FallbackTeamId)
+            .OfType<Guid>()
+            .Distinct()
             .ToList();
 
         if (teamGroups.Count == 0)
             return 0;
+
+        var representativeSoftwareAssetId = decision.SoftwareAssetId;
 
         // Determine due date from highest severity vulnerability
         var tenantSla = await dbContext.TenantSlaConfigurations
@@ -211,7 +338,10 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
 
         var highestSeverity = await dbContext.SoftwareVulnerabilityMatches
             .IgnoreQueryFilters()
-            .Where(svm => svm.SoftwareAssetId == decision.SoftwareAssetId && svm.TenantId == decision.TenantId)
+            .Where(svm =>
+                svm.TenantId == decision.TenantId
+                && svm.ResolvedAt == null
+                && scopedSoftwareAssetIds.Contains(svm.SoftwareAssetId))
             .Join(
                 dbContext.VulnerabilityDefinitions,
                 svm => svm.VulnerabilityDefinitionId,
@@ -231,19 +361,20 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
             .IgnoreQueryFilters()
             .Where(task =>
                 task.TenantId == decision.TenantId
-                && task.SoftwareAssetId == decision.SoftwareAssetId
+                && task.TenantSoftwareId == decision.TenantSoftwareId
                 && task.Status != PatchingTaskStatus.Completed)
             .Select(task => task.OwnerTeamId)
             .Distinct()
             .ToListAsync(ct);
 
         var tasks = teamGroups
-            .Where(group => !existingOpenTeamIds.Contains(group.Key))
+            .Where(teamId => !existingOpenTeamIds.Contains(teamId))
             .Select(group => PatchingTask.Create(
                 decision.TenantId,
                 decision.Id,
-                decision.SoftwareAssetId,
-                group.Key,
+                decision.TenantSoftwareId,
+                representativeSoftwareAssetId,
+                group,
                 dueDate
             ))
             .ToList();
@@ -254,4 +385,60 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
         await dbContext.PatchingTasks.AddRangeAsync(tasks, ct);
         return tasks.Count;
     }
+
+    private async Task<RemediationScope?> ResolveScopeAsync(
+        Guid tenantId,
+        Guid softwareAssetId,
+        CancellationToken ct
+    )
+    {
+        var scopeRow = await dbContext.NormalizedSoftwareInstallations
+            .IgnoreQueryFilters()
+            .Where(item =>
+                item.TenantId == tenantId
+                && item.SoftwareAssetId == softwareAssetId
+                && item.IsActive)
+            .Select(item => new { item.TenantSoftwareId })
+            .FirstOrDefaultAsync(ct);
+
+        if (scopeRow is null)
+            return null;
+
+        var representativeSoftwareAssetId = await dbContext.NormalizedSoftwareInstallations
+            .IgnoreQueryFilters()
+            .Where(item =>
+                item.TenantId == tenantId
+                && item.TenantSoftwareId == scopeRow.TenantSoftwareId
+                && item.IsActive)
+            .Select(item => item.SoftwareAssetId)
+            .Distinct()
+            .OrderBy(id => id)
+            .FirstAsync(ct);
+
+        return new RemediationScope(scopeRow.TenantSoftwareId, representativeSoftwareAssetId);
+    }
+
+    private async Task<RemediationScope?> ResolveScopeByTenantSoftwareAsync(
+        Guid tenantId,
+        Guid tenantSoftwareId,
+        CancellationToken ct
+    )
+    {
+        var representativeSoftwareAssetId = await dbContext.NormalizedSoftwareInstallations
+            .IgnoreQueryFilters()
+            .Where(item =>
+                item.TenantId == tenantId
+                && item.TenantSoftwareId == tenantSoftwareId
+                && item.IsActive)
+            .Select(item => item.SoftwareAssetId)
+            .Distinct()
+            .OrderBy(id => id)
+            .FirstOrDefaultAsync(ct);
+
+        return representativeSoftwareAssetId == Guid.Empty
+            ? null
+            : new RemediationScope(tenantSoftwareId, representativeSoftwareAssetId);
+    }
+
+    private sealed record RemediationScope(Guid TenantSoftwareId, Guid RepresentativeSoftwareAssetId);
 }

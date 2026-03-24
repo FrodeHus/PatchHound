@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toneBadge } from '@/lib/tone-classes'
 import { formatDateTime, formatNullableDateTime } from '@/lib/formatting'
 import { useTenantScope } from '@/components/layout/tenant-scope'
-import { assetQueryKeys } from '@/features/assets/list-state'
+import { softwareQueryKeys } from '@/features/software/list-state'
 import { RemediationSummaryCards } from './RemediationSummaryCards'
 import { RemediationVulnTable } from './RemediationVulnTable'
 import { RemediationVulnDrawer } from './RemediationVulnDrawer'
@@ -26,15 +26,15 @@ import {
 
 type SoftwareRemediationViewProps = {
   data: DecisionContext
-  assetId: string
+  tenantSoftwareId: string
   embedded?: boolean
 }
 
-export function SoftwareRemediationView({ data, assetId, embedded = false }: SoftwareRemediationViewProps) {
+export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = false }: SoftwareRemediationViewProps) {
   const [selectedVuln, setSelectedVuln] = useState<DecisionVuln | null>(null)
   const { selectedTenantId } = useTenantScope()
   const queryClient = useQueryClient()
-  const queryKey = assetQueryKeys.remediation(selectedTenantId, assetId)
+  const queryKey = softwareQueryKeys.remediation(selectedTenantId, tenantSoftwareId)
 
   const [approving, setApproving] = useState(false)
 
@@ -44,7 +44,7 @@ export function SoftwareRemediationView({ data, assetId, embedded = false }: Sof
     try {
       await approveOrRejectDecision({
         data: {
-          assetId,
+          tenantSoftwareId,
           decisionId: data.currentDecision.id,
           action,
         },
@@ -61,12 +61,13 @@ export function SoftwareRemediationView({ data, assetId, embedded = false }: Sof
       {!embedded ? (
         <header className="flex flex-wrap items-center gap-3">
           <Link
-            to="/assets/$id"
-            params={{ id: assetId }}
+            to="/software/$id"
+            params={{ id: tenantSoftwareId }}
+            search={{ page: 1, pageSize: 25, version: '', tab: 'remediation' }}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
-            Back to asset
+            Back to software
           </Link>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">{data.assetName}</h1>
@@ -109,7 +110,7 @@ export function SoftwareRemediationView({ data, assetId, embedded = false }: Sof
         </CardHeader>
         <CardContent>
           <RecommendationPanel
-            assetId={assetId}
+            tenantSoftwareId={tenantSoftwareId}
             recommendations={data.recommendations}
             queryKey={queryKey}
           />
@@ -223,7 +224,7 @@ export function SoftwareRemediationView({ data, assetId, embedded = false }: Sof
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No decision has been made yet. Use the form below to create one.
+              No software-wide remediation decision has been made yet. Use the form below to create one for every active version cohort.
             </p>
           )}
         </CardContent>
@@ -231,7 +232,7 @@ export function SoftwareRemediationView({ data, assetId, embedded = false }: Sof
 
       {/* Approval History */}
       {data.currentDecision ? (
-        <ApprovalHistorySection assetId={assetId} decisionId={data.currentDecision.id} />
+        <ApprovalHistorySection tenantSoftwareId={tenantSoftwareId} decisionId={data.currentDecision.id} />
       ) : null}
 
       {/* Decision Form — only when no active decision exists */}
@@ -241,18 +242,18 @@ export function SoftwareRemediationView({ data, assetId, embedded = false }: Sof
             <CardTitle className="text-sm">New Decision</CardTitle>
           </CardHeader>
           <CardContent>
-            <DecisionForm assetId={assetId} queryKey={queryKey} />
+            <DecisionForm tenantSoftwareId={tenantSoftwareId} queryKey={queryKey} />
           </CardContent>
         </Card>
       ) : null}
 
       {/* Vulnerabilities */}
       <div>
-        <h2 className="mb-3 text-lg font-semibold">Top Vulnerabilities</h2>
+        <h2 className="mb-3 text-lg font-semibold">Top vulnerabilities across this software</h2>
         <RemediationVulnTable
           vulnerabilities={data.topVulnerabilities}
           decisionId={data.currentDecision?.id ?? null}
-          assetId={assetId}
+          tenantSoftwareId={tenantSoftwareId}
           queryKey={queryKey}
           onSelectVuln={setSelectedVuln}
         />
@@ -282,10 +283,10 @@ function auditActionIcon(action: string) {
   }
 }
 
-function ApprovalHistorySection({ assetId, decisionId }: { assetId: string; decisionId: string }) {
+function ApprovalHistorySection({ tenantSoftwareId, decisionId }: { tenantSoftwareId: string; decisionId: string }) {
   const auditQuery = useQuery({
-    queryKey: ['decision-audit-trail', assetId, decisionId],
-    queryFn: () => fetchDecisionAuditTrail({ data: { assetId, decisionId } }),
+    queryKey: ['decision-audit-trail', tenantSoftwareId, decisionId],
+    queryFn: () => fetchDecisionAuditTrail({ data: { tenantSoftwareId, decisionId } }),
   })
 
   if (!auditQuery.data || auditQuery.data.length === 0) return null

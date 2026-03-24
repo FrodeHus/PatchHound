@@ -11,7 +11,7 @@ public class PatchingTaskConfiguration : IEntityTypeConfiguration<PatchingTask>
         builder.HasKey(pt => pt.Id);
 
         builder.HasIndex(pt => pt.TenantId);
-        builder.HasIndex(pt => new { pt.TenantId, pt.SoftwareAssetId });
+        builder.HasIndex(pt => new { pt.TenantId, pt.TenantSoftwareId });
         builder.HasIndex(pt => pt.OwnerTeamId);
         builder.HasIndex(pt => pt.Status);
 

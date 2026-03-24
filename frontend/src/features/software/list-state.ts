@@ -32,6 +32,7 @@ export const softwareQueryKeys = {
     search.pageSize,
   ] as const,
   detail: (tenantId: string | null, id: string) => [...softwareQueryKeys.all, 'detail', tenantId, id] as const,
+  remediation: (tenantId: string | null, id: string) => [...softwareQueryKeys.all, 'remediation', tenantId, id] as const,
   installations: (tenantId: string | null, id: string, version: string, page: number, pageSize: number) => [
     ...softwareQueryKeys.all,
     'installations',

@@ -14,7 +14,7 @@ using PatchHound.Infrastructure.Services;
 namespace PatchHound.Api.Controllers;
 
 [ApiController]
-[Route("api/assets/{softwareAssetId:guid}")]
+[Route("api/software/{tenantSoftwareId:guid}/remediation")]
 [Authorize]
 public class RemediationDecisionsController(
     RemediationDecisionQueryService queryService,
@@ -28,14 +28,14 @@ public class RemediationDecisionsController(
     [HttpGet("decision-context")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<DecisionContextDto>> GetDecisionContext(
-        Guid softwareAssetId,
+        Guid tenantSoftwareId,
         CancellationToken ct
     )
     {
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var result = await queryService.BuildAsync(tenantId, softwareAssetId, ct);
+        var result = await queryService.BuildByTenantSoftwareAsync(tenantId, tenantSoftwareId, ct);
         if (result is null)
             return NotFound();
 
@@ -45,7 +45,7 @@ public class RemediationDecisionsController(
     [HttpPost("decisions")]
     [Authorize(Policy = Policies.UpdateTaskStatus)]
     public async Task<ActionResult<RemediationDecisionDto>> CreateDecision(
-        Guid softwareAssetId,
+        Guid tenantSoftwareId,
         [FromBody] CreateDecisionRequest request,
         CancellationToken ct
     )
@@ -58,9 +58,9 @@ public class RemediationDecisionsController(
 
         var userId = tenantContext.CurrentUserId;
 
-        var result = await decisionService.CreateDecisionAsync(
+        var result = await decisionService.CreateDecisionForTenantSoftwareAsync(
             tenantId,
-            softwareAssetId,
+            tenantSoftwareId,
             outcome,
             request.Justification,
             userId,
@@ -75,7 +75,7 @@ public class RemediationDecisionsController(
         var d = result.Value;
         return CreatedAtAction(
             nameof(GetDecisionContext),
-            new { softwareAssetId },
+            new { tenantSoftwareId },
             new RemediationDecisionDto(
                 d.Id, d.Outcome.ToString(), d.ApprovalStatus.ToString(),
                 d.Justification, d.DecidedBy, d.DecidedAt,
@@ -88,7 +88,7 @@ public class RemediationDecisionsController(
     [HttpPut("decisions/{decisionId:guid}")]
     [Authorize(Policy = Policies.ApproveRiskAcceptance)]
     public async Task<IActionResult> ApproveOrReject(
-        Guid softwareAssetId,
+        Guid tenantSoftwareId,
         Guid decisionId,
         [FromBody] ApproveRejectDecisionRequest request,
         CancellationToken ct
@@ -116,7 +116,7 @@ public class RemediationDecisionsController(
     [HttpPost("decisions/{decisionId:guid}/overrides")]
     [Authorize(Policy = Policies.UpdateTaskStatus)]
     public async Task<ActionResult<VulnerabilityOverrideDto>> AddOverride(
-        Guid softwareAssetId,
+        Guid tenantSoftwareId,
         Guid decisionId,
         [FromBody] CreateOverrideRequest request,
         CancellationToken ct
@@ -145,14 +145,14 @@ public class RemediationDecisionsController(
     [HttpGet("recommendations")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<List<AnalystRecommendationDto>>> GetRecommendations(
-        Guid softwareAssetId,
+        Guid tenantSoftwareId,
         CancellationToken ct
     )
     {
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var context = await queryService.BuildAsync(tenantId, softwareAssetId, ct);
+        var context = await queryService.BuildByTenantSoftwareAsync(tenantId, tenantSoftwareId, ct);
         if (context is null)
             return NotFound();
 
@@ -162,7 +162,7 @@ public class RemediationDecisionsController(
     [HttpPost("recommendations")]
     [Authorize(Policy = Policies.AddComments)]
     public async Task<ActionResult<AnalystRecommendationDto>> AddRecommendation(
-        Guid softwareAssetId,
+        Guid tenantSoftwareId,
         [FromBody] CreateRecommendationRequest request,
         CancellationToken ct
     )
@@ -175,9 +175,9 @@ public class RemediationDecisionsController(
 
         var userId = tenantContext.CurrentUserId;
 
-        var result = await recommendationService.AddRecommendationAsync(
+        var result = await recommendationService.AddRecommendationForTenantSoftwareAsync(
             tenantId,
-            softwareAssetId,
+            tenantSoftwareId,
             outcome,
             request.Rationale,
             userId,
@@ -199,7 +199,7 @@ public class RemediationDecisionsController(
     [HttpGet("decisions/{decisionId:guid}/audit-trail")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<List<ApprovalAuditEntryDto>>> GetAuditTrail(
-        Guid softwareAssetId,
+        Guid tenantSoftwareId,
         Guid decisionId,
         CancellationToken ct
     )
