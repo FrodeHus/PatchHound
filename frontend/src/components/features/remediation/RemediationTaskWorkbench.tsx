@@ -3,7 +3,7 @@ import type { PagedRemediationTasks } from '@/api/remediation-tasks.schemas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { formatDate } from '@/lib/formatting'
+import { formatDate, startCase } from '@/lib/formatting'
 
 type Filters = {
   search: string
@@ -120,10 +120,10 @@ export function RemediationTaskWorkbench({
                             search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
                             className="font-medium hover:text-primary"
                           >
-                            {task.softwareName}
+                            {startCase(task.softwareName)}
                           </Link>
                         ) : (
-                          <span className="font-medium">{task.softwareName}</span>
+                          <span className="font-medium">{startCase(task.softwareName)}</span>
                         )}
                         <p className="text-xs text-muted-foreground">
                           {task.deviceNames.length > 0

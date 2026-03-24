@@ -4,7 +4,7 @@ import type { TechnicalManagerDashboardSummary } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatDate, formatDateTime } from '@/lib/formatting'
+import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 
 type Props = {
   summary: TechnicalManagerDashboardSummary
@@ -83,7 +83,7 @@ export function TechnicalManagerOverview({ summary, isLoading }: Props) {
                         params={{ id: item.tenantSoftwareId }}
                         className="mt-2 block text-base font-medium tracking-tight hover:text-primary"
                       >
-                        {item.softwareName}
+                        {startCase(item.softwareName)}
                       </Link>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Owned by {item.ownerTeamName}
@@ -183,7 +183,7 @@ export function TechnicalManagerOverview({ summary, isLoading }: Props) {
                           params={{ id: item.approvalTaskId }}
                           className="mt-2 block text-base font-medium tracking-tight hover:text-primary"
                         >
-                          {item.softwareName}
+                          {startCase(item.softwareName)}
                         </Link>
                         <p className="mt-1 text-sm text-muted-foreground">
                           {item.approvalType} for {item.vulnerabilityCount} open vulnerabilities

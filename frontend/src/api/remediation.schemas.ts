@@ -76,8 +76,8 @@ export const decisionSlaSchema = z.object({
 })
 
 export const decisionContextSchema = z.object({
-  assetId: z.string().uuid(),
-  assetName: z.string(),
+  tenantSoftwareId: z.string().uuid(),
+  softwareName: z.string(),
   criticality: z.string(),
   summary: decisionSummarySchema,
   currentDecision: remediationDecisionSchema.nullable(),
@@ -89,10 +89,9 @@ export const decisionContextSchema = z.object({
 })
 
 export const decisionListItemSchema = z.object({
-  assetId: z.string().uuid(),
-  assetName: z.string(),
+  tenantSoftwareId: z.string().uuid(),
+  softwareName: z.string(),
   criticality: z.string(),
-  tenantSoftwareId: z.string().uuid().nullable(),
   outcome: z.string().nullable(),
   approvalStatus: z.string().nullable(),
   decidedAt: z.string().nullable(),
