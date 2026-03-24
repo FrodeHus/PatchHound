@@ -6,7 +6,7 @@ import { useSSE } from '@/hooks/useSSE'
 import { fetchNotifications, fetchUnreadNotificationCount, markNotificationRead } from '@/api/notifications.functions'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0)
@@ -77,14 +77,16 @@ export function NotificationBell() {
         </TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end" className="w-96 rounded-xl border-border/70 bg-popover/95 p-1.5 backdrop-blur">
-        <DropdownMenuLabel className="px-3 py-2">
-          <div>
-            <p className="text-sm font-medium text-foreground">Notifications</p>
-            <p className="text-xs text-muted-foreground">
-              {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
-            </p>
-          </div>
-        </DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="px-3 py-2">
+            <div>
+              <p className="text-sm font-medium text-foreground">Notifications</p>
+              <p className="text-xs text-muted-foreground">
+                {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+              </p>
+            </div>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         {notificationsQuery.data && notificationsQuery.data.length > 0 ? (
           notificationsQuery.data.map((item) => (
