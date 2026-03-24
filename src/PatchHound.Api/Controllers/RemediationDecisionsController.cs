@@ -1,11 +1,14 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
+using PatchHound.Api.Models.ApprovalTasks;
 using PatchHound.Api.Models.Decisions;
 using PatchHound.Api.Services;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
+using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Api.Controllers;
@@ -17,6 +20,8 @@ public class RemediationDecisionsController(
     RemediationDecisionQueryService queryService,
     RemediationDecisionService decisionService,
     AnalystRecommendationService recommendationService,
+    IAuditLogRepository auditLogRepository,
+    PatchHoundDbContext dbContext,
     ITenantContext tenantContext
 ) : ControllerBase
 {
@@ -189,5 +194,59 @@ public class RemediationDecisionsController(
             r.Id, r.TenantVulnerabilityId, r.RecommendedOutcome.ToString(),
             r.Rationale, r.PriorityOverride, r.AnalystId, r.CreatedAt
         ));
+    }
+
+    [HttpGet("decisions/{decisionId:guid}/audit-trail")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
+    public async Task<ActionResult<List<ApprovalAuditEntryDto>>> GetAuditTrail(
+        Guid softwareAssetId,
+        Guid decisionId,
+        CancellationToken ct
+    )
+    {
+        if (tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        // Audit entries for the decision itself
+        var entries = await auditLogRepository.GetByEntityAsync("RemediationDecision", decisionId, ct);
+
+        // Also include entries for linked approval tasks
+        var approvalTaskIds = await dbContext.ApprovalTasks.AsNoTracking()
+            .Where(at => at.RemediationDecisionId == decisionId && at.TenantId == tenantId)
+            .Select(at => at.Id)
+            .ToListAsync(ct);
+
+        foreach (var taskId in approvalTaskIds)
+        {
+            var taskEntries = await auditLogRepository.GetByEntityAsync("ApprovalTask", taskId, ct);
+            entries = entries.Concat(taskEntries).ToList();
+        }
+
+        var userIds = entries.Select(e => e.UserId).Distinct().ToList();
+        var userNames = await dbContext.Users.AsNoTracking()
+            .Where(u => userIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.DisplayName, ct);
+
+        var dtos = entries
+            .OrderByDescending(e => e.Timestamp)
+            .Select(e =>
+            {
+                userNames.TryGetValue(e.UserId, out var name);
+                string? justification = null;
+                if (e.NewValues is not null)
+                {
+                    try
+                    {
+                        var doc = System.Text.Json.JsonDocument.Parse(e.NewValues);
+                        if (doc.RootElement.TryGetProperty("Justification", out var j))
+                            justification = j.GetString();
+                    }
+                    catch { }
+                }
+                return new ApprovalAuditEntryDto(e.Action.ToString(), name, justification, e.Timestamp);
+            })
+            .ToList();
+
+        return Ok(dtos);
     }
 }

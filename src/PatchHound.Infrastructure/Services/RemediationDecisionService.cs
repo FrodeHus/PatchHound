@@ -7,7 +7,7 @@ using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Infrastructure.Services;
 
-public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaService slaService)
+public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaService slaService, ApprovalTaskService approvalTaskService)
 {
     public async Task<Result<RemediationDecision>> CreateDecisionAsync(
         Guid tenantId,
@@ -52,6 +52,13 @@ public class RemediationDecisionService(PatchHoundDbContext dbContext, SlaServic
         }
 
         await dbContext.SaveChangesAsync(ct);
+
+        // Create approval task for the decision
+        var tenantSla = await dbContext.TenantSlaConfigurations
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
+        var expiryHours = tenantSla?.ApprovalExpiryHours ?? 24;
+        await approvalTaskService.CreateForDecisionAsync(decision, expiryHours, ct);
 
         return Result<RemediationDecision>.Success(decision);
     }

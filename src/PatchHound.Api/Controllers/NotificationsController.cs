@@ -45,11 +45,13 @@ public class NotificationsController(
                     ? $"/assets/{item.RelatedEntityId}"
                     : item.RelatedEntityType == "TenantVulnerability" && item.RelatedEntityId != null
                         ? $"/vulnerabilities/{item.RelatedEntityId}"
-                        : item.RelatedEntityType == "PatchingTask"
-                            ? "/remediation"
-                            : item.RelatedEntityType == "RemediationTask"
+                        : item.RelatedEntityType == "ApprovalTask" && item.RelatedEntityId != null
+                            ? $"/approvals/{item.RelatedEntityId}"
+                            : item.RelatedEntityType == "PatchingTask"
                                 ? "/remediation"
-                            : null
+                                : item.RelatedEntityType == "RemediationTask"
+                                    ? "/remediation"
+                                : null
             ))
             .ToListAsync(ct);
 

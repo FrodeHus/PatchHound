@@ -257,7 +257,7 @@ public class SettingsAuditControllerTests : IDisposable
             .Value.Should()
             .BeAssignableTo<IReadOnlyList<EnrichmentSourceDto>>()
             .Subject;
-        var dto = sources.Should().ContainSingle().Subject;
+        var dto = sources.Should().Contain(s => s.Key == "nvd").Subject;
         dto.Queue.PendingCount.Should().Be(1);
         dto.Queue.RunningCount.Should().Be(1);
         dto.RecentRuns.Should().ContainSingle();

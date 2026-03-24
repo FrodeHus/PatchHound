@@ -6,4 +6,5 @@ public interface IRealTimeNotifier
     Task NotifyTaskAssignedAsync(Guid userId, Guid taskId, CancellationToken ct);
     Task NotifyTaskStatusChangedAsync(Guid tenantId, Guid taskId, CancellationToken ct);
     Task NotifySlaWarningAsync(Guid userId, Guid taskId, CancellationToken ct);
+    Task NotifyApprovalTaskCreatedAsync(Guid tenantId, Guid approvalTaskId, CancellationToken ct);
 }

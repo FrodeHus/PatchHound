@@ -2,6 +2,7 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { useEffect, useState, type ComponentType } from 'react'
 import {
   Bug,
+  ClipboardCheck,
   LayoutDashboard,
   ScrollText,
   Server,
@@ -36,6 +37,7 @@ type RoleName =
   | 'GlobalAdmin'
   | 'Auditor'
   | 'AssetOwner'
+  | 'TechnicalManager'
 
 type NavItem = {
   to: string
@@ -59,6 +61,12 @@ const navItems: NavItem[] = [
     label: "Remediation",
     icon: ShieldAlert,
     roles: ["SecurityManager", "SecurityAnalyst", "GlobalAdmin"],
+  },
+  {
+    to: "/approvals",
+    label: "Approvals",
+    icon: ClipboardCheck,
+    roles: ["GlobalAdmin", "SecurityManager", "TechnicalManager"],
   },
   {
     to: "/audit-log",

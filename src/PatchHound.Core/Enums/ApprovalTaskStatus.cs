@@ -1,11 +1,10 @@
 namespace PatchHound.Core.Enums;
 
-public enum AuditAction
+public enum ApprovalTaskStatus
 {
-    Created,
-    Updated,
-    Deleted,
+    Pending,
     Approved,
     Denied,
+    AutoApproved,
     AutoDenied,
 }

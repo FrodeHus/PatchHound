@@ -9,4 +9,7 @@ public enum NotificationType
     RiskAcceptanceDecision,
     TaskStatusChanged,
     WorkflowNotification,
+    ApprovalTaskCreated,
+    ApprovalTaskDenied,
+    ApprovalTaskAutoExpired,
 }

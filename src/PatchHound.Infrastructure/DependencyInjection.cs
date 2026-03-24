@@ -87,6 +87,7 @@ public static class DependencyInjection
         services.AddScoped<UserService>();
         services.AddScoped<TeamService>();
         services.AddScoped<SlaService>();
+        services.AddScoped<ApprovalTaskService>();
         services.AddScoped<RemediationDecisionService>();
         services.AddScoped<AnalystRecommendationService>();
         services.AddScoped<SoftwareVulnerabilityMatchService>();

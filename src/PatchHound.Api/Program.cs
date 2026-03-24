@@ -261,6 +261,22 @@ builder.Services.AddAuthorization(options =>
     );
 
     options.AddPolicy(
+        Policies.ViewApprovalTasks,
+        policy =>
+            policy.AddRequirements(
+                new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager, RoleName.TechnicalManager)
+            )
+    );
+
+    options.AddPolicy(
+        Policies.ResolveApprovalTask,
+        policy =>
+            policy.AddRequirements(
+                new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager, RoleName.TechnicalManager)
+            )
+    );
+
+    options.AddPolicy(
         Policies.ManageVault,
         policy => policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin))
     );
@@ -286,6 +302,7 @@ builder.Services.AddScoped<PatchHound.Api.Services.DashboardQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.VulnerabilityDetailQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.AssetDetailQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.RemediationDecisionQueryService>();
+builder.Services.AddScoped<PatchHound.Api.Services.ApprovalTaskQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.RemediationTaskQueryService>();
 builder.Services.AddHttpContextAccessor();
 
