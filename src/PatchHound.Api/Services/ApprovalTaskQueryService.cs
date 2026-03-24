@@ -51,8 +51,19 @@ public class ApprovalTaskQueryService(
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var term = filter.Search.Trim().ToLower();
+            var matchingTenantSoftwareIds = await dbContext.TenantSoftware.AsNoTracking()
+                .Where(item =>
+                    item.TenantId == tenantId
+                    && (
+                        item.NormalizedSoftware.CanonicalName.ToLower().Contains(term)
+                        || (item.NormalizedSoftware.CanonicalVendor != null
+                            && item.NormalizedSoftware.CanonicalVendor.ToLower().Contains(term))
+                    ))
+                .Select(item => item.Id)
+                .ToListAsync(ct);
+
             query = query.Where(at =>
-                at.RemediationDecision.SoftwareAsset.Name.ToLower().Contains(term));
+                matchingTenantSoftwareIds.Contains(at.RemediationDecision.TenantSoftwareId));
         }
 
         var totalCount = await query.CountAsync(ct);
@@ -66,7 +77,9 @@ public class ApprovalTaskQueryService(
 
         // Resolve highest severity per decision's software asset
         var tenantSoftwareIds = tasks.Select(t => t.RemediationDecision.TenantSoftwareId).Distinct().ToList();
+        var softwareNames = await GetSoftwareNamesAsync(tenantId, tenantSoftwareIds, ct);
         var highestSeverities = await GetHighestSeveritiesAsync(tenantId, tenantSoftwareIds, ct);
+        var highestCriticalities = await GetHighestCriticalitiesAsync(tenantId, tenantSoftwareIds, ct);
 
         // Vulnerability counts
         var vulnCounts = await GetVulnCountsAsync(tenantId, tenantSoftwareIds, ct);
@@ -83,7 +96,9 @@ public class ApprovalTaskQueryService(
         var items = tasks.Select(t =>
         {
             var tenantSoftwareId = t.RemediationDecision.TenantSoftwareId;
+            softwareNames.TryGetValue(tenantSoftwareId, out var softwareName);
             var hasSeverity = highestSeverities.TryGetValue(tenantSoftwareId, out var severity);
+            var hasCriticality = highestCriticalities.TryGetValue(tenantSoftwareId, out var criticality);
             vulnCounts.TryGetValue(tenantSoftwareId, out var vc);
             var hasSla = slaInfo.TryGetValue(tenantSoftwareId, out var sla);
             userNames.TryGetValue(t.RemediationDecision.DecidedBy, out var decidedByName);
@@ -92,8 +107,8 @@ public class ApprovalTaskQueryService(
                 t.Id,
                 t.Type.ToString(),
                 t.Status.ToString(),
-                t.RemediationDecision.SoftwareAsset.Name,
-                t.RemediationDecision.SoftwareAsset.Criticality.ToString(),
+                softwareName ?? t.RemediationDecision.SoftwareAsset.Name,
+                hasCriticality ? criticality.ToString() : t.RemediationDecision.SoftwareAsset.Criticality.ToString(),
                 t.RemediationDecision.Outcome.ToString(),
                 hasSeverity ? severity.ToString() : "Unknown",
                 vc,
@@ -135,10 +150,14 @@ public class ApprovalTaskQueryService(
         var decision = task.RemediationDecision;
         var assetId = decision.SoftwareAssetId;
         var tenantSoftwareId = decision.TenantSoftwareId;
+        var softwareNames = await GetSoftwareNamesAsync(tenantId, [tenantSoftwareId], ct);
+        softwareNames.TryGetValue(tenantSoftwareId, out var softwareName);
 
         // Highest severity
         var highestSeverities = await GetHighestSeveritiesAsync(tenantId, [tenantSoftwareId], ct);
         var hasHighestSeverity = highestSeverities.TryGetValue(tenantSoftwareId, out var highestSeverity);
+        var highestCriticalities = await GetHighestCriticalitiesAsync(tenantId, [tenantSoftwareId], ct);
+        var hasHighestCriticality = highestCriticalities.TryGetValue(tenantSoftwareId, out var highestCriticality);
 
         // SLA
         var slaInfo = await GetSlaInfoAsync(tenantId, [tenantSoftwareId], ct);
@@ -379,8 +398,8 @@ public class ApprovalTaskQueryService(
             task.Type.ToString(),
             task.Status.ToString(),
             task.RemediationDecisionId,
-            decision.SoftwareAsset.Name,
-            decision.SoftwareAsset.Criticality.ToString(),
+            softwareName ?? decision.SoftwareAsset.Name,
+            hasHighestCriticality ? highestCriticality.ToString() : decision.SoftwareAsset.Criticality.ToString(),
             decision.Outcome.ToString(),
             decision.Justification,
             hasHighestSeverity ? highestSeverity.ToString() : "Unknown",
@@ -445,6 +464,45 @@ public class ApprovalTaskQueryService(
             .GroupBy(x => x.TenantSoftwareId)
             .Select(g => new { TenantSoftwareId = g.Key, HighestSeverity = g.Max(x => x.VendorSeverity) })
             .ToDictionaryAsync(x => x.TenantSoftwareId, x => x.HighestSeverity, ct);
+    }
+
+    private async Task<Dictionary<Guid, string>> GetSoftwareNamesAsync(
+        Guid tenantId, List<Guid> tenantSoftwareIds, CancellationToken ct)
+    {
+        if (tenantSoftwareIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.TenantSoftware.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && tenantSoftwareIds.Contains(item.Id))
+            .Select(item => new { item.Id, Name = item.NormalizedSoftware.CanonicalName })
+            .ToDictionaryAsync(item => item.Id, item => item.Name, ct);
+    }
+
+    private async Task<Dictionary<Guid, Criticality>> GetHighestCriticalitiesAsync(
+        Guid tenantId, List<Guid> tenantSoftwareIds, CancellationToken ct)
+    {
+        if (tenantSoftwareIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.IsActive && tenantSoftwareIds.Contains(item.TenantSoftwareId))
+            .Join(
+                dbContext.Assets.AsNoTracking().Where(asset => asset.TenantId == tenantId),
+                item => item.DeviceAssetId,
+                asset => asset.Id,
+                (item, asset) => new { item.TenantSoftwareId, asset.Criticality }
+            )
+            .GroupBy(item => item.TenantSoftwareId)
+            .Select(group => new
+            {
+                TenantSoftwareId = group.Key,
+                HighestCriticality = group.Max(item => item.Criticality),
+            })
+            .ToDictionaryAsync(item => item.TenantSoftwareId, item => item.HighestCriticality, ct);
     }
 
     private async Task<Dictionary<Guid, int>> GetVulnCountsAsync(

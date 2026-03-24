@@ -174,3 +174,61 @@ public record OwnerActionDto(
     DateTimeOffset? DueDate,
     string ActionState
 );
+
+public record ApprovalAttentionTaskDto(
+    Guid ApprovalTaskId,
+    Guid RemediationDecisionId,
+    Guid TenantSoftwareId,
+    string SoftwareName,
+    string ApprovalType,
+    string HighestSeverity,
+    int VulnerabilityCount,
+    DateTimeOffset ExpiresAt,
+    DateTimeOffset CreatedAt,
+    string AttentionState
+);
+
+public record ApprovedPolicyDecisionDto(
+    Guid DecisionId,
+    Guid TenantSoftwareId,
+    string SoftwareName,
+    string Outcome,
+    string? Justification,
+    string HighestSeverity,
+    int VulnerabilityCount,
+    DateTimeOffset ApprovedAt,
+    DateTimeOffset? ExpiryDate
+);
+
+public record SecurityManagerDashboardSummaryDto(
+    List<ApprovedPolicyDecisionDto> RecentApprovedDecisions,
+    List<ApprovalAttentionTaskDto> ApprovalTasksRequiringAttention
+);
+
+public record ApprovedPatchingTaskDto(
+    Guid PatchingTaskId,
+    Guid RemediationDecisionId,
+    Guid TenantSoftwareId,
+    string SoftwareName,
+    string OwnerTeamName,
+    string HighestSeverity,
+    int AffectedDeviceCount,
+    DateTimeOffset ApprovedAt,
+    DateTimeOffset DueDate,
+    string Status
+);
+
+public record DevicePatchDriftDto(
+    Guid DeviceAssetId,
+    string DeviceName,
+    string Criticality,
+    string HighestSeverity,
+    int OldVulnerabilityCount,
+    DateTimeOffset OldestPublishedDate
+);
+
+public record TechnicalManagerDashboardSummaryDto(
+    List<ApprovedPatchingTaskDto> ApprovedPatchingTasks,
+    List<DevicePatchDriftDto> DevicesWithAgedVulnerabilities,
+    List<ApprovalAttentionTaskDto> ApprovalTasksRequiringAttention
+);

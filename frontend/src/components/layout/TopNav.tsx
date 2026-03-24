@@ -305,6 +305,18 @@ export function TopNav({
                       >
                         Asset owner view
                       </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem
+                        value="security-manager"
+                        className="rounded-lg px-3 py-2"
+                      >
+                        Security manager view
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem
+                        value="technical-manager"
+                        className="rounded-lg px-3 py-2"
+                      >
+                        Technical manager view
+                      </DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />

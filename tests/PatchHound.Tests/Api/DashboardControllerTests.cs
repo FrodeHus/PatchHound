@@ -20,13 +20,19 @@ public class DashboardControllerTests : IDisposable
     private readonly PatchHoundDbContext _dbContext;
     private readonly DashboardController _controller;
     private readonly IRiskChangeBriefAiSummaryService _riskChangeBriefAiSummaryService;
+    private readonly ITenantContext _tenantContext;
 
     public DashboardControllerTests()
     {
-        var tenantContext = Substitute.For<ITenantContext>();
-        tenantContext.CurrentTenantId.Returns(_tenantId);
-        tenantContext.AccessibleTenantIds.Returns(new List<Guid> { _tenantId });
-        tenantContext.CurrentUserId.Returns(Guid.NewGuid());
+        _tenantContext = Substitute.For<ITenantContext>();
+        _tenantContext.CurrentTenantId.Returns(_tenantId);
+        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { _tenantId });
+        _tenantContext.CurrentUserId.Returns(Guid.NewGuid());
+        _tenantContext.GetRolesForTenant(_tenantId).Returns([
+            RoleName.GlobalAdmin.ToString(),
+            RoleName.SecurityManager.ToString(),
+            RoleName.TechnicalManager.ToString(),
+        ]);
 
         var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
@@ -34,7 +40,7 @@ public class DashboardControllerTests : IDisposable
 
         _dbContext = new PatchHoundDbContext(
             options,
-            TestServiceProviderFactory.Create(tenantContext)
+            TestServiceProviderFactory.Create(_tenantContext)
         );
         _riskChangeBriefAiSummaryService = Substitute.For<IRiskChangeBriefAiSummaryService>();
         _riskChangeBriefAiSummaryService
@@ -46,7 +52,221 @@ public class DashboardControllerTests : IDisposable
             _riskChangeBriefAiSummaryService,
             snapshotResolver
         );
-        _controller = new DashboardController(_dbContext, dashboardQueryService, tenantContext, snapshotResolver);
+        _controller = new DashboardController(_dbContext, dashboardQueryService, _tenantContext, snapshotResolver);
+    }
+
+    [Fact]
+    public async Task GetSecurityManagerSummary_ReturnsApprovedDecisions_AndPendingAttentionTasks()
+    {
+        var timestamp = DateTimeOffset.UtcNow;
+        var normalizedSoftware = NormalizedSoftware.Create(
+            "Contoso Agent",
+            "Contoso",
+            "contoso:agent",
+            null,
+            SoftwareNormalizationMethod.Manual,
+            SoftwareNormalizationConfidence.High,
+            timestamp
+        );
+        var tenantSoftware = TenantSoftware.Create(_tenantId, null, normalizedSoftware.Id, timestamp.AddDays(-10), timestamp);
+        var softwareAsset = Asset.Create(_tenantId, "soft-sec-1", AssetType.Software, "Contoso Agent 5.2", Criticality.High);
+        var vulnerabilityDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-8000",
+            "Agent policy exception",
+            "Desc",
+            Severity.Critical,
+            "MicrosoftDefender",
+            9.1m
+        );
+        var decision = RemediationDecision.Create(
+            _tenantId,
+            tenantSoftware.Id,
+            softwareAsset.Id,
+            RemediationOutcome.RiskAcceptance,
+            "Operations freeze approved by CAB.",
+            Guid.NewGuid(),
+            expiryDate: timestamp.AddDays(30)
+        );
+        decision.Approve(Guid.NewGuid());
+        var approvalTask = ApprovalTask.Create(
+            _tenantId,
+            decision.Id,
+            RemediationOutcome.RiskAcceptance,
+            timestamp.AddHours(12)
+        );
+
+        await _dbContext.AddRangeAsync(
+            normalizedSoftware,
+            tenantSoftware,
+            softwareAsset,
+            vulnerabilityDefinition,
+            decision,
+            approvalTask,
+            NormalizedSoftwareVulnerabilityProjection.Create(
+                _tenantId,
+                null,
+                tenantSoftware.Id,
+                vulnerabilityDefinition.Id,
+                SoftwareVulnerabilityMatchMethod.DefenderDirect,
+                MatchConfidence.High,
+                4,
+                3,
+                2,
+                timestamp.AddDays(-5),
+                timestamp,
+                null,
+                "{}"
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetSecurityManagerSummary(CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<SecurityManagerDashboardSummaryDto>().Subject;
+
+        payload.RecentApprovedDecisions.Should().ContainSingle();
+        payload.RecentApprovedDecisions[0].SoftwareName.Should().Be("Contoso Agent");
+        payload.RecentApprovedDecisions[0].Outcome.Should().Be(RemediationOutcome.RiskAcceptance.ToString());
+        payload.RecentApprovedDecisions[0].HighestSeverity.Should().Be(Severity.Critical.ToString());
+        payload.RecentApprovedDecisions[0].VulnerabilityCount.Should().Be(1);
+
+        payload.ApprovalTasksRequiringAttention.Should().ContainSingle();
+        payload.ApprovalTasksRequiringAttention[0].SoftwareName.Should().Be("Contoso Agent");
+        payload.ApprovalTasksRequiringAttention[0].AttentionState.Should().Be("NearExpiry");
+    }
+
+    [Fact]
+    public async Task GetTechnicalManagerSummary_ReturnsApprovedPatchingTasks_AndDevicesWithAgedPublishedVulnerabilities()
+    {
+        var timestamp = DateTimeOffset.UtcNow;
+        var normalizedSoftware = NormalizedSoftware.Create(
+            "Legacy Browser",
+            "Fabrikam",
+            "fabrikam:browser",
+            null,
+            SoftwareNormalizationMethod.Manual,
+            SoftwareNormalizationConfidence.High,
+            timestamp
+        );
+        var tenantSoftware = TenantSoftware.Create(_tenantId, null, normalizedSoftware.Id, timestamp.AddDays(-20), timestamp);
+        var softwareAsset = Asset.Create(_tenantId, "soft-tech-1", AssetType.Software, "Legacy Browser 11", Criticality.Medium);
+        var ownerTeam = Team.Create(_tenantId, "Platform Engineering");
+        var approvedDecision = RemediationDecision.Create(
+            _tenantId,
+            tenantSoftware.Id,
+            softwareAsset.Id,
+            RemediationOutcome.ApprovedForPatching,
+            null,
+            Guid.NewGuid()
+        );
+        var pendingDecision = RemediationDecision.Create(
+            _tenantId,
+            tenantSoftware.Id,
+            softwareAsset.Id,
+            RemediationOutcome.RiskAcceptance,
+            "Awaiting approval for exception.",
+            Guid.NewGuid(),
+            expiryDate: timestamp.AddDays(14)
+        );
+        var patchingTask = PatchingTask.Create(
+            _tenantId,
+            approvedDecision.Id,
+            tenantSoftware.Id,
+            softwareAsset.Id,
+            ownerTeam.Id,
+            timestamp.AddDays(7)
+        );
+        var pendingApprovalTask = ApprovalTask.Create(
+            _tenantId,
+            pendingDecision.Id,
+            RemediationOutcome.RiskAcceptance,
+            timestamp.AddHours(8)
+        );
+
+        var agedDevice = Asset.Create(_tenantId, "device-aged-1", AssetType.Device, "Device Aged 1", Criticality.Critical);
+        agedDevice.UpdateDeviceDetails(
+            "aged-1.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "High",
+            timestamp,
+            "10.0.0.55",
+            "aad-aged-1"
+        );
+        var agedVulnerabilityDefinition = VulnerabilityDefinition.Create(
+            "CVE-2025-1234",
+            "Old browser vulnerability",
+            "Desc",
+            Severity.High,
+            "MicrosoftDefender",
+            8.4m,
+            null,
+            timestamp.AddDays(-120)
+        );
+        var agedTenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            agedVulnerabilityDefinition.Id,
+            VulnerabilityStatus.Open,
+            timestamp.AddDays(-30)
+        );
+
+        await _dbContext.AddRangeAsync(
+            normalizedSoftware,
+            tenantSoftware,
+            softwareAsset,
+            ownerTeam,
+            approvedDecision,
+            pendingDecision,
+            patchingTask,
+            pendingApprovalTask,
+            agedDevice,
+            agedVulnerabilityDefinition,
+            agedTenantVulnerability,
+            NormalizedSoftwareVulnerabilityProjection.Create(
+                _tenantId,
+                null,
+                tenantSoftware.Id,
+                agedVulnerabilityDefinition.Id,
+                SoftwareVulnerabilityMatchMethod.DefenderDirect,
+                MatchConfidence.High,
+                6,
+                4,
+                3,
+                timestamp.AddDays(-40),
+                timestamp,
+                null,
+                "{}"
+            )
+        );
+        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(
+            VulnerabilityAssetEpisode.Create(
+                _tenantId,
+                agedTenantVulnerability.Id,
+                agedDevice.Id,
+                1,
+                timestamp.AddDays(-30)
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetTechnicalManagerSummary(CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<TechnicalManagerDashboardSummaryDto>().Subject;
+
+        payload.ApprovedPatchingTasks.Should().ContainSingle();
+        payload.ApprovedPatchingTasks[0].SoftwareName.Should().Be("Legacy Browser");
+        payload.ApprovedPatchingTasks[0].OwnerTeamName.Should().Be("Platform Engineering");
+        payload.ApprovedPatchingTasks[0].AffectedDeviceCount.Should().Be(4);
+
+        payload.DevicesWithAgedVulnerabilities.Should().ContainSingle();
+        payload.DevicesWithAgedVulnerabilities[0].DeviceName.Should().Be("aged-1.contoso.local");
+        payload.DevicesWithAgedVulnerabilities[0].OldVulnerabilityCount.Should().Be(1);
+
+        payload.ApprovalTasksRequiringAttention.Should().ContainSingle();
+        payload.ApprovalTasksRequiringAttention[0].SoftwareName.Should().Be("Legacy Browser");
     }
 
     [Fact]

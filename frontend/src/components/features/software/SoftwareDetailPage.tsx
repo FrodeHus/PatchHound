@@ -31,6 +31,8 @@ type SoftwareDetailPageProps = {
   onPageChange: (page: number) => void
   canViewRemediation: boolean
   remediationData: DecisionContext | null
+  isRemediationLoading?: boolean
+  remediationError?: boolean
   tenantSoftwareId: string
 }
 
@@ -45,6 +47,8 @@ export function SoftwareDetailPage({
   onPageChange,
   canViewRemediation,
   remediationData,
+  isRemediationLoading = false,
+  remediationError = false,
   tenantSoftwareId,
 }: SoftwareDetailPageProps) {
   const activeVersion =
@@ -172,8 +176,23 @@ export function SoftwareDetailPage({
           onSelectVersion={onSelectVersion}
           onPageChange={onPageChange}
         />
-      ) : activeTab === 'remediation' && canViewRemediation && remediationData ? (
-        <SoftwareRemediationView data={remediationData} tenantSoftwareId={tenantSoftwareId} embedded />
+      ) : activeTab === 'remediation' && canViewRemediation ? (
+        remediationData ? (
+          <SoftwareRemediationView data={remediationData} tenantSoftwareId={tenantSoftwareId} embedded />
+        ) : (
+          <section className="rounded-2xl border border-border/70 bg-card p-8">
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-lg font-semibold tracking-tight">Remediation context unavailable</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {isRemediationLoading
+                  ? 'Loading remediation context for this software title.'
+                  : remediationError
+                    ? 'The remediation view could not be loaded for this software title right now.'
+                    : 'No remediation context is currently available for this software title.'}
+              </p>
+            </div>
+          </section>
+        )
       ) : activeTab === 'ai' ? (
         <AiInsightsTab detail={detail} />
       ) : null}

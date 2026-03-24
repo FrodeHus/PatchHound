@@ -54,11 +54,12 @@ public class RemediationDecisionQueryService(
             .Select(item => new { item.TenantSoftwareId, item.SoftwareAssetId, item.DeviceAssetId })
             .ToListAsync(ct);
         var softwareAssetIds = activeInstallations.Select(item => item.SoftwareAssetId).Distinct().ToList();
-        var softwareAssets = await dbContext.Assets.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && softwareAssetIds.Contains(item.Id))
-            .Select(item => new { item.Id, item.Name, item.Criticality })
+        var deviceAssetIds = activeInstallations.Select(item => item.DeviceAssetId).Distinct().ToList();
+        var deviceAssets = await dbContext.Assets.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && deviceAssetIds.Contains(item.Id))
+            .Select(item => new { item.Id, item.Criticality })
             .ToListAsync(ct);
-        var softwareAssetsById = softwareAssets.ToDictionary(item => item.Id);
+        var deviceAssetsById = deviceAssets.ToDictionary(item => item.Id);
         var representativeAssetByTenantSoftwareId = activeInstallations
             .GroupBy(item => item.TenantSoftwareId)
             .ToDictionary(
@@ -70,7 +71,7 @@ public class RemediationDecisionQueryService(
             .ToDictionary(
                 group => group.Key,
                 group => group
-                    .Select(item => softwareAssetsById.GetValueOrDefault(item.SoftwareAssetId)?.Criticality ?? Criticality.Low)
+                    .Select(item => deviceAssetsById.GetValueOrDefault(item.DeviceAssetId)?.Criticality ?? Criticality.Low)
                     .DefaultIfEmpty(Criticality.Low)
                     .Max()
             );
@@ -227,6 +228,15 @@ public class RemediationDecisionQueryService(
         CancellationToken ct
     )
     {
+        var tenantSoftwareMeta = await dbContext.TenantSoftware.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.Id == tenantSoftwareId)
+            .Select(item => new
+            {
+                Name = item.NormalizedSoftware.CanonicalName,
+                Vendor = item.NormalizedSoftware.CanonicalVendor,
+            })
+            .FirstOrDefaultAsync(ct);
+
         var representativeAsset = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
             .Where(item =>
                 item.TenantId == tenantId
@@ -241,18 +251,29 @@ public class RemediationDecisionQueryService(
             .OrderBy(item => item.Id)
             .FirstOrDefaultAsync(ct);
 
-        if (representativeAsset is null)
+        if (representativeAsset is null && tenantSoftwareMeta is null)
             return null;
 
-        var assetId = representativeAsset.Id;
-        var assetName = representativeAsset.Name;
-        var assetCriticality = representativeAsset.Criticality;
+        var assetId = representativeAsset?.Id ?? tenantSoftwareId;
+        var assetName = tenantSoftwareMeta?.Name ?? representativeAsset?.Name ?? "Software";
 
         var scopedSoftwareAssetIds = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
             .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
             .Select(item => item.SoftwareAssetId)
             .Distinct()
             .ToListAsync(ct);
+        var scopedDeviceCriticalityValues = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
+            .Join(
+                dbContext.Assets.AsNoTracking(),
+                item => item.DeviceAssetId,
+                asset => asset.Id,
+                (item, asset) => asset.Criticality
+            )
+            .ToListAsync(ct);
+        var assetCriticality = scopedDeviceCriticalityValues.Count > 0
+            ? scopedDeviceCriticalityValues.Max()
+            : Criticality.Low;
 
         var activeSnapshotId = await snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
 
@@ -301,12 +322,20 @@ public class RemediationDecisionQueryService(
 
         // Episode risk assessments for effective severity/score
         var assessmentsByTenantVulnId = await dbContext.VulnerabilityAssetAssessments.AsNoTracking()
-            .Where(a => a.AssetId == assetId && a.SnapshotId == activeSnapshotId && allTenantVulnIds.Contains(a.TenantVulnerabilityId))
+            .Where(a =>
+                representativeAsset != null
+                && a.AssetId == assetId
+                && a.SnapshotId == activeSnapshotId
+                && allTenantVulnIds.Contains(a.TenantVulnerabilityId))
             .ToDictionaryAsync(a => a.TenantVulnerabilityId, ct);
 
         // Episode risk scores
         var episodeRiskScores = await dbContext.VulnerabilityEpisodeRiskAssessments.AsNoTracking()
-            .Where(r => r.AssetId == assetId && allTenantVulnIds.Contains(r.TenantVulnerabilityId) && r.ResolvedAt == null)
+            .Where(r =>
+                representativeAsset != null
+                && r.AssetId == assetId
+                && allTenantVulnIds.Contains(r.TenantVulnerabilityId)
+                && r.ResolvedAt == null)
             .ToDictionaryAsync(r => r.TenantVulnerabilityId, ct);
 
         // Current decision

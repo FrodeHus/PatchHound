@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { AlertTriangle, CheckCircle2, ShieldAlert, TimerReset } from 'lucide-react'
-import { fetchDashboardBurndown, fetchDashboardFilterOptions, fetchDashboardSummary, fetchDashboardTrends, fetchOwnerDashboardSummary } from '@/api/dashboard.functions'
+import { fetchDashboardBurndown, fetchDashboardFilterOptions, fetchDashboardSummary, fetchDashboardTrends, fetchOwnerDashboardSummary, fetchSecurityManagerDashboardSummary, fetchTechnicalManagerDashboardSummary } from '@/api/dashboard.functions'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { InsetPanel } from '@/components/ui/inset-panel'
@@ -25,12 +25,14 @@ import { BurndownChart } from '@/components/features/dashboard/BurndownChart'
 import { CisoExecutiveOverview } from '@/components/features/dashboard/CisoExecutiveOverview'
 import { AnalystTriageWorkbench } from '@/components/features/dashboard/AnalystTriageWorkbench'
 import { AssetOwnerOverview } from '@/components/features/dashboard/AssetOwnerOverview'
+import { SecurityManagerOverview } from '@/components/features/dashboard/SecurityManagerOverview'
+import { TechnicalManagerOverview } from '@/components/features/dashboard/TechnicalManagerOverview'
 import { useTenantScope } from '@/components/layout/tenant-scope'
-import { readDashboardViewPreference } from '@/lib/dashboard-view'
+import { readDashboardViewPreference, resolveDashboardViewMode } from '@/lib/dashboard-view'
 
 const TAB_VALUES = ['risk', 'remediation', 'infrastructure'] as const
 type DashboardTab = (typeof TAB_VALUES)[number]
-const DASHBOARD_MODE_VALUES = ['executive', 'operations', 'owner'] as const
+const DASHBOARD_MODE_VALUES = ['executive', 'operations', 'owner', 'security-manager', 'technical-manager'] as const
 type DashboardMode = (typeof DASHBOARD_MODE_VALUES)[number]
 
 const dashboardSearchSchema = z.object({
@@ -43,39 +45,25 @@ const dashboardSearchSchema = z.object({
 
 export const Route = createFileRoute('/_authed/')({
   validateSearch: dashboardSearchSchema,
-  loader: async () => {
-    const [summary, trends] = await Promise.all([
-      fetchDashboardSummary({ data: {} }),
-      fetchDashboardTrends({ data: {} }),
-    ])
-    return { summary, trends }
-  },
   component: DashboardPage,
 })
 
 function DashboardPage() {
-  const initialData = Route.useLoaderData()
   const { user } = Route.useRouteContext()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const { selectedTenantId } = useTenantScope()
-  const [initialTenantId] = useState(selectedTenantId)
   const [selectedDeviceGroup, setSelectedDeviceGroup] = useState<string | null>(null)
-  const canUseInitialData = initialTenantId === selectedTenantId
-  const isExecutiveViewer = user.roles.includes('Stakeholder') || user.roles.includes('GlobalAdmin')
+  const isExecutiveViewer = user.roles.includes('Stakeholder')
   const isAssetOwnerViewer = user.roles.includes('AssetOwner')
+  const isSecurityManagerViewer = user.roles.includes('SecurityManager')
+  const isTechnicalManagerViewer = user.roles.includes('TechnicalManager')
   const canSwitchModes = user.roles.includes('GlobalAdmin')
-  const defaultMode: DashboardMode = isExecutiveViewer
-    ? 'executive'
-    : user.roles.includes('SecurityAnalyst')
-      ? 'operations'
-      : isAssetOwnerViewer
-        ? 'owner'
-        : 'operations'
   const requestedMode = search.mode
-  const dashboardMode: DashboardMode = canSwitchModes
-    ? requestedMode ?? defaultMode
-    : defaultMode
+  const dashboardMode = resolveDashboardViewMode({
+    roles: user.roles,
+    requestedMode,
+  }) as DashboardMode
 
   const activeTab: DashboardTab = search.tab ?? 'risk'
   const minAgeDays = search.minAgeDays ?? ''
@@ -88,7 +76,8 @@ function DashboardPage() {
     deviceGroup: deviceGroup || undefined,
   }
 
-  const hasActiveFilters = Boolean(minAgeDays || platform || deviceGroup)
+  const needsSummary = dashboardMode === 'executive' || dashboardMode === 'operations' || dashboardMode === 'security-manager'
+  const needsTrends = dashboardMode === 'executive' || dashboardMode === 'operations'
 
   useEffect(() => {
     if (!canSwitchModes || requestedMode) {
@@ -96,39 +85,58 @@ function DashboardPage() {
     }
 
     const preferredMode = readDashboardViewPreference()
-    if (preferredMode && preferredMode !== dashboardMode) {
+    const resolvedPreferredMode = resolveDashboardViewMode({
+      roles: user.roles,
+      requestedMode,
+      preferredMode,
+    }) as DashboardMode
+    if (resolvedPreferredMode !== dashboardMode) {
       void navigate({
-        search: (prev) => ({ ...prev, mode: preferredMode }),
+        search: (prev) => ({ ...prev, mode: resolvedPreferredMode }),
       })
     }
-  }, [canSwitchModes, dashboardMode, navigate, requestedMode])
+  }, [canSwitchModes, dashboardMode, navigate, requestedMode, user.roles])
 
   const summaryQuery = useQuery({
     queryKey: ['dashboard', 'summary', selectedTenantId, minAgeDays, platform, deviceGroup],
     queryFn: () => fetchDashboardSummary({ data: filterParams }),
-    initialData: canUseInitialData && !hasActiveFilters ? initialData.summary : undefined,
+    enabled: needsSummary && Boolean(selectedTenantId),
     staleTime: 30_000,
   })
   const trendsQuery = useQuery({
     queryKey: ['dashboard', 'trends', selectedTenantId, minAgeDays, platform, deviceGroup],
     queryFn: () => fetchDashboardTrends({ data: filterParams }),
-    initialData: canUseInitialData && !hasActiveFilters ? initialData.trends : undefined,
+    enabled: needsTrends && Boolean(selectedTenantId),
     staleTime: 30_000,
   })
   const burndownQuery = useQuery({
     queryKey: ['dashboard', 'burndown', selectedTenantId, minAgeDays, platform, deviceGroup],
     queryFn: () => fetchDashboardBurndown({ data: filterParams }),
+    enabled: dashboardMode === 'operations' && Boolean(selectedTenantId),
     staleTime: 30_000,
   })
   const filterOptionsQuery = useQuery({
     queryKey: ['dashboard', 'filter-options', selectedTenantId],
     queryFn: () => fetchDashboardFilterOptions(),
+    enabled: dashboardMode === 'operations' && Boolean(selectedTenantId),
     staleTime: 60_000,
   })
   const ownerSummaryQuery = useQuery({
     queryKey: ['dashboard', 'owner-summary', selectedTenantId],
     queryFn: () => fetchOwnerDashboardSummary(),
     enabled: dashboardMode === 'owner' && Boolean(selectedTenantId),
+    staleTime: 30_000,
+  })
+  const securityManagerSummaryQuery = useQuery({
+    queryKey: ['dashboard', 'security-manager-summary', selectedTenantId],
+    queryFn: () => fetchSecurityManagerDashboardSummary(),
+    enabled: dashboardMode === 'security-manager' && Boolean(selectedTenantId),
+    staleTime: 30_000,
+  })
+  const technicalManagerSummaryQuery = useQuery({
+    queryKey: ['dashboard', 'technical-manager-summary', selectedTenantId],
+    queryFn: () => fetchTechnicalManagerDashboardSummary(),
+    enabled: dashboardMode === 'technical-manager' && Boolean(selectedTenantId),
     staleTime: 30_000,
   })
 
@@ -154,14 +162,13 @@ function DashboardPage() {
     [globalNavigate],
   )
 
-  const summary = summaryQuery.data ?? (canUseInitialData && !hasActiveFilters ? initialData.summary : undefined)
-  const trends = trendsQuery.data ?? (canUseInitialData && !hasActiveFilters ? initialData.trends : undefined)
-
-  if (!summary || !trends) {
-    return null
-  }
+  const summary = summaryQuery.data
+  const trends = trendsQuery.data
 
   if (dashboardMode === 'executive') {
+    if (!summary || !trends) {
+      return null
+    }
     return (
       <CisoExecutiveOverview
         summary={summary}
@@ -181,6 +188,29 @@ function DashboardPage() {
       />
     )
   }
+  if (dashboardMode === 'security-manager') {
+    if (!summary || !securityManagerSummaryQuery.data) {
+      return null
+    }
+    return (
+      <SecurityManagerOverview
+        summary={summary}
+        managerSummary={securityManagerSummaryQuery.data}
+        isLoading={summaryQuery.isFetching || securityManagerSummaryQuery.isFetching}
+      />
+    )
+  }
+  if (dashboardMode === 'technical-manager') {
+    if (!technicalManagerSummaryQuery.data) {
+      return null
+    }
+    return (
+      <TechnicalManagerOverview
+        summary={technicalManagerSummaryQuery.data}
+        isLoading={technicalManagerSummaryQuery.isFetching}
+      />
+    )
+  }
   if (dashboardMode === 'owner') {
     return (
       <AssetOwnerOverview
@@ -195,6 +225,9 @@ function DashboardPage() {
         isLoading={ownerSummaryQuery.isPending || ownerSummaryQuery.isFetching}
       />
     )
+  }
+  if (!summary || !trends) {
+    return null
   }
   const sparklines = summary.metricSparklines
   const statCards = [

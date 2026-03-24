@@ -179,6 +179,71 @@ export type DashboardFilterOptions = z.infer<typeof dashboardFilterOptionsSchema
 export type DeviceGroupVulnerability = z.infer<typeof dashboardSummarySchema>['vulnerabilitiesByDeviceGroup'][number]
 export type OwnerDashboardSummary = z.infer<typeof ownerDashboardSummarySchema>
 
+export const approvalAttentionTaskSchema = z.object({
+  approvalTaskId: z.string().uuid(),
+  remediationDecisionId: z.string().uuid(),
+  tenantSoftwareId: z.string().uuid(),
+  softwareName: z.string(),
+  approvalType: z.string(),
+  highestSeverity: z.string(),
+  vulnerabilityCount: z.number(),
+  expiresAt: z.string().datetime({ offset: true }),
+  createdAt: z.string().datetime({ offset: true }),
+  attentionState: z.string(),
+})
+
+export const approvedPolicyDecisionSchema = z.object({
+  decisionId: z.string().uuid(),
+  tenantSoftwareId: z.string().uuid(),
+  softwareName: z.string(),
+  outcome: z.string(),
+  justification: z.string().nullable(),
+  highestSeverity: z.string(),
+  vulnerabilityCount: z.number(),
+  approvedAt: z.string().datetime({ offset: true }),
+  expiryDate: z.string().datetime({ offset: true }).nullable(),
+})
+
+export const securityManagerDashboardSummarySchema = z.object({
+  recentApprovedDecisions: z.array(approvedPolicyDecisionSchema),
+  approvalTasksRequiringAttention: z.array(approvalAttentionTaskSchema),
+})
+
+export const approvedPatchingTaskSchema = z.object({
+  patchingTaskId: z.string().uuid(),
+  remediationDecisionId: z.string().uuid(),
+  tenantSoftwareId: z.string().uuid(),
+  softwareName: z.string(),
+  ownerTeamName: z.string(),
+  highestSeverity: z.string(),
+  affectedDeviceCount: z.number(),
+  approvedAt: z.string().datetime({ offset: true }),
+  dueDate: z.string().datetime({ offset: true }),
+  status: z.string(),
+})
+
+export const devicePatchDriftSchema = z.object({
+  deviceAssetId: z.string().uuid(),
+  deviceName: z.string(),
+  criticality: z.string(),
+  highestSeverity: z.string(),
+  oldVulnerabilityCount: z.number(),
+  oldestPublishedDate: z.string().datetime({ offset: true }),
+})
+
+export const technicalManagerDashboardSummarySchema = z.object({
+  approvedPatchingTasks: z.array(approvedPatchingTaskSchema),
+  devicesWithAgedVulnerabilities: z.array(devicePatchDriftSchema),
+  approvalTasksRequiringAttention: z.array(approvalAttentionTaskSchema),
+})
+
+export type SecurityManagerDashboardSummary = z.infer<typeof securityManagerDashboardSummarySchema>
+export type TechnicalManagerDashboardSummary = z.infer<typeof technicalManagerDashboardSummarySchema>
+export type ApprovalAttentionTask = z.infer<typeof approvalAttentionTaskSchema>
+export type ApprovedPolicyDecision = z.infer<typeof approvedPolicyDecisionSchema>
+export type ApprovedPatchingTask = z.infer<typeof approvedPatchingTaskSchema>
+export type DevicePatchDrift = z.infer<typeof devicePatchDriftSchema>
+
 export const heatmapRowSchema = z.object({
   label: z.string(),
   critical: z.number(),
