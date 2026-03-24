@@ -35,18 +35,15 @@ public class RemediationDecisionServiceTests : IDisposable
             TestServiceProviderFactory.Create(_tenantContext)
         );
 
-        var auditLogWriter = new AuditLogWriter(_dbContext, _tenantContext);
         var approvalTaskService = new ApprovalTaskService(
             _dbContext,
             Substitute.For<INotificationService>(),
-            auditLogWriter,
             Substitute.For<IRealTimeNotifier>()
         );
         _sut = new RemediationDecisionService(
             _dbContext,
             new SlaService(),
-            approvalTaskService,
-            auditLogWriter
+            approvalTaskService
         );
     }
 
@@ -134,10 +131,6 @@ public class RemediationDecisionServiceTests : IDisposable
         var tasks = await _dbContext.PatchingTasks.IgnoreQueryFilters().ToListAsync();
         tasks.Should().OnlyContain(task => task.Status == PatchingTaskStatus.Completed);
 
-        var auditEntry = await _dbContext.AuditLogEntries.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(item => item.EntityType == "RemediationDecision" && item.EntityId == decision.Id);
-        auditEntry.Should().NotBeNull();
-        auditEntry!.NewValues.Should().Contain("All vulnerabilities were resolved - remediation closed by system");
     }
 
     [Fact]

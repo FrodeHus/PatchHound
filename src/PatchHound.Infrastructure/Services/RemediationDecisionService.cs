@@ -10,13 +10,9 @@ namespace PatchHound.Infrastructure.Services;
 public class RemediationDecisionService(
     PatchHoundDbContext dbContext,
     SlaService slaService,
-    ApprovalTaskService approvalTaskService,
-    AuditLogWriter auditLogWriter
+    ApprovalTaskService approvalTaskService
 )
 {
-    private const string SystemClosureReason =
-        "All vulnerabilities were resolved - remediation closed by system";
-
     public async Task<Result<RemediationDecision>> CreateDecisionAsync(
         Guid tenantId,
         Guid softwareAssetId,
@@ -214,28 +210,9 @@ public class RemediationDecisionService(
             task.Complete();
         }
 
-        var closedAt = DateTimeOffset.UtcNow;
         foreach (var decision in decisionsToClose)
         {
-            var previousStatus = decision.ApprovalStatus;
             decision.Expire();
-            await auditLogWriter.WriteAsync(
-                tenantId,
-                "RemediationDecision",
-                decision.Id,
-                AuditAction.Updated,
-                new
-                {
-                    ApprovalStatus = previousStatus.ToString(),
-                },
-                new
-                {
-                    ApprovalStatus = decision.ApprovalStatus.ToString(),
-                    SystemConclusion = SystemClosureReason,
-                    ClosedAt = closedAt,
-                },
-                ct
-            );
         }
 
         await dbContext.SaveChangesAsync(ct);

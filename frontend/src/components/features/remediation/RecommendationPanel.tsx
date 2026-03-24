@@ -76,7 +76,7 @@ export function RecommendationPanel({ tenantSoftwareId, recommendations, queryKe
               </div>
               <p className="text-sm">{rec.rationale}</p>
               <p className="text-xs text-muted-foreground">
-                {formatDateTime(rec.createdAt)}
+                {rec.analystDisplayName ? `${rec.analystDisplayName} · ` : ''}{formatDateTime(rec.createdAt)}
               </p>
             </div>
           ))}

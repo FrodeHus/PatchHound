@@ -29,6 +29,16 @@ export function approvalStatusTone(status: string): Tone {
   }
 }
 
+export function approvalStatusLabel(status: string): string {
+  switch (status) {
+    case 'PendingApproval': return 'Pending approval'
+    case 'Approved': return 'Approved'
+    case 'Rejected': return 'Rejected'
+    case 'Expired': return 'Expired'
+    default: return status
+  }
+}
+
 export function outcomeLabel(outcome: string): string {
   switch (outcome) {
     case 'RiskAcceptance': return 'Accept the current risk'

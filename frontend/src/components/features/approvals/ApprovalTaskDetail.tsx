@@ -3,19 +3,19 @@ import type { ApprovalTaskDetail as ApprovalTaskDetailType } from '@/api/approva
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  AuditTimeline,
+  type AuditTimelineEvent,
+} from '@/components/features/audit/AuditTimeline'
+import {
+  outcomeLabel,
+  outcomeTone,
+} from '@/components/features/remediation/remediation-utils'
 import { toneBadge } from '@/lib/tone-classes'
 import { formatDate, startCase } from '@/lib/formatting'
 import { ApprovalTypeBadge, ApprovalStatusBadge } from './ApprovalBadge'
 import { ApprovalExpiryCountdown } from './ApprovalExpiryCountdown'
-import {
-  CheckCircle,
-  XCircle,
-  Clock,
-  Eye,
-  AlertTriangle,
-  ShieldAlert,
-  MessageSquare,
-} from 'lucide-react'
+import { CheckCircle, XCircle, Eye, AlertTriangle, MessageSquare } from 'lucide-react'
 
 type Props = {
   data: ApprovalTaskDetailType
@@ -56,51 +56,6 @@ function riskBandTone(band: string) {
   }
 }
 
-function outcomeTone(outcome: string) {
-  switch (outcome) {
-    case 'ApprovedForPatching':
-      return 'info' as const
-    case 'PatchingDeferred':
-      return 'warning' as const
-    case 'RiskAcceptance':
-      return 'warning' as const
-    case 'AlternateMitigation':
-      return 'success' as const
-    default:
-      return 'neutral' as const
-  }
-}
-
-function outcomeLabel(outcome: string) {
-  switch (outcome) {
-    case 'ApprovedForPatching':
-      return 'Patch this software'
-    case 'PatchingDeferred':
-      return 'Defer patching for now'
-    case 'RiskAcceptance':
-      return 'Accept the current risk'
-    case 'AlternateMitigation':
-      return 'Use an alternate mitigation'
-    default:
-      return startCase(outcome)
-  }
-}
-
-function auditActionIcon(action: string) {
-  switch (action) {
-    case 'Approved':
-      return <CheckCircle className="size-4 text-tone-success-foreground" />
-    case 'Denied':
-      return <XCircle className="size-4 text-tone-danger-foreground" />
-    case 'AutoDenied':
-      return <Clock className="size-4 text-muted-foreground" />
-    case 'Created':
-      return <ShieldAlert className="size-4 text-primary" />
-    default:
-      return <Clock className="size-4 text-muted-foreground" />
-  }
-}
-
 function normalizeVersion(version: string | null) {
   return version?.trim() ?? ''
 }
@@ -128,6 +83,15 @@ export function ApprovalTaskDetail({
     data.deviceVersionCohorts.reduce((sum, cohort) => sum + cohort.deviceCount, 0) ||
     data.devices?.totalCount ||
     0
+  const auditEvents: AuditTimelineEvent[] = data.auditTrail.map((entry, index) => ({
+    id: `${entry.timestamp}-${entry.action}-${index}`,
+    action: entry.action,
+    title: buildApprovalTimelineTitle(entry.action, entry.userDisplayName),
+    description: entry.justification
+      ? `Justification: ${entry.justification}`
+      : undefined,
+    timestamp: entry.timestamp,
+  }))
 
   function handleResolve(action: 'approve' | 'deny') {
     if (justificationRequired && !justification.trim()) {
@@ -655,48 +619,39 @@ export function ApprovalTaskDetail({
           </TabsContent>
 
           <TabsContent value="timeline" className="pt-1">
-            {data.auditTrail.length > 0 ? (
-              <section className="rounded-2xl border border-border/70 bg-background/40 p-5">
-                <h2 className="mb-4 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                  Approval history
-                </h2>
-                <div className="space-y-0">
-                  {data.auditTrail.map((entry, i) => (
-                    <div
-                      key={`${entry.timestamp}-${i}`}
-                      className="flex gap-3 border-l-2 border-border/60 py-3 pl-4"
-                    >
-                      <div className="mt-0.5">{auditActionIcon(entry.action)}</div>
-                      <div className="min-w-0 flex-1 space-y-0.5">
-                        <p className="text-sm">
-                          <span className="font-medium">
-                            {entry.userDisplayName ?? 'System'}
-                          </span>{' '}
-                          <span className="text-muted-foreground">
-                            {entry.action.toLowerCase()}
-                          </span>
-                        </p>
-                        {entry.justification ? (
-                          <p className="text-sm italic text-muted-foreground">
-                            &ldquo;{entry.justification}&rdquo;
-                          </p>
-                        ) : null}
-                        <p className="text-[10px] text-muted-foreground">
-                          {formatDate(entry.timestamp)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ) : (
-              <section className="rounded-2xl border border-border/70 bg-background/40 p-5 text-sm text-muted-foreground">
-                No timeline events recorded yet.
-              </section>
-            )}
+            <section className="rounded-2xl border border-border/70 bg-background/40 p-5">
+              <h2 className="mb-4 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                Approval history
+              </h2>
+              <AuditTimeline
+                events={auditEvents}
+                emptyMessage="No timeline events recorded yet."
+              />
+            </section>
           </TabsContent>
         </Tabs>
       </section>
     </section>
   )
+}
+
+function buildApprovalTimelineTitle(action: string, userDisplayName: string | null) {
+  const actor = userDisplayName ?? 'System'
+
+  switch (action) {
+    case 'Approved':
+      return `${actor} approved this remediation decision.`
+    case 'Denied':
+      return `${actor} denied this remediation decision.`
+    case 'AutoDenied':
+      return `This approval request expired before anyone responded.`
+    case 'Expired':
+      return `${actor} closed or expired this remediation decision.`
+    case 'Read':
+      return `${actor} marked this approval item as read.`
+    case 'Created':
+      return `${actor} created this remediation decision.`
+    default:
+      return `${actor} updated this remediation decision.`
+  }
 }

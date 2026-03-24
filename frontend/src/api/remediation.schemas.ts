@@ -29,6 +29,7 @@ export const analystRecommendationSchema = z.object({
   rationale: z.string(),
   priorityOverride: z.string().nullable(),
   analystId: z.string().uuid(),
+  analystDisplayName: z.string().nullable(),
   createdAt: z.string(),
 })
 

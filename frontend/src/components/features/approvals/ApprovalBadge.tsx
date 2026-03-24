@@ -16,11 +16,11 @@ function typeTone(type: string) {
 function typeLabel(type: string) {
   switch (type) {
     case 'RiskAcceptanceApproval':
-      return 'Approval Required'
+      return 'Risk exception approval'
     case 'PatchingApproved':
-      return 'Auto-Approved'
+      return 'Patch decision review'
     case 'PatchingDeferred':
-      return 'Informational'
+      return 'Deferred patching notice'
     default:
       return type
   }
@@ -45,8 +45,14 @@ function statusTone(status: string) {
 
 function statusLabel(status: string) {
   switch (status) {
+    case 'Pending':
+      return 'Pending review'
+    case 'Approved':
+      return 'Approved'
+    case 'Denied':
+      return 'Denied'
     case 'AutoApproved':
-      return 'Auto-Approved'
+      return 'Auto-approved'
     case 'AutoDenied':
       return 'Expired'
     default:

@@ -190,9 +190,17 @@ public class RemediationDecisionsController(
             return BadRequest(new ProblemDetails { Title = result.Error });
 
         var r = result.Value;
+        string? analystDisplayName = null;
+        if (userId != Guid.Empty)
+        {
+            analystDisplayName = await dbContext.Users.AsNoTracking()
+                .Where(user => user.Id == userId)
+                .Select(user => user.DisplayName)
+                .FirstOrDefaultAsync(ct);
+        }
         return Created("", new AnalystRecommendationDto(
             r.Id, r.TenantVulnerabilityId, r.RecommendedOutcome.ToString(),
-            r.Rationale, r.PriorityOverride, r.AnalystId, r.CreatedAt
+            r.Rationale, r.PriorityOverride, r.AnalystId, analystDisplayName, r.CreatedAt
         ));
     }
 
@@ -207,20 +215,7 @@ public class RemediationDecisionsController(
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        // Audit entries for the decision itself
         var entries = await auditLogRepository.GetByEntityAsync("RemediationDecision", decisionId, ct);
-
-        // Also include entries for linked approval tasks
-        var approvalTaskIds = await dbContext.ApprovalTasks.AsNoTracking()
-            .Where(at => at.RemediationDecisionId == decisionId && at.TenantId == tenantId)
-            .Select(at => at.Id)
-            .ToListAsync(ct);
-
-        foreach (var taskId in approvalTaskIds)
-        {
-            var taskEntries = await auditLogRepository.GetByEntityAsync("ApprovalTask", taskId, ct);
-            entries = entries.Concat(taskEntries).ToList();
-        }
 
         var userIds = entries.Select(e => e.UserId).Distinct().ToList();
         var userNames = await dbContext.Users.AsNoTracking()
@@ -232,18 +227,7 @@ public class RemediationDecisionsController(
             .Select(e =>
             {
                 userNames.TryGetValue(e.UserId, out var name);
-                string? justification = null;
-                if (e.NewValues is not null)
-                {
-                    try
-                    {
-                        var doc = System.Text.Json.JsonDocument.Parse(e.NewValues);
-                        if (doc.RootElement.TryGetProperty("Justification", out var j))
-                            justification = j.GetString();
-                    }
-                    catch { }
-                }
-                return new ApprovalAuditEntryDto(e.Action.ToString(), name, justification, e.Timestamp);
+                return AuditTimelineMapper.ToDto(e, name);
             })
             .ToList();
 

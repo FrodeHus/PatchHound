@@ -101,10 +101,10 @@ export function ApprovalInbox({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All statuses</SelectItem>
-              <SelectItem value="Pending">Pending</SelectItem>
+              <SelectItem value="Pending">Pending review</SelectItem>
               <SelectItem value="Approved">Approved</SelectItem>
               <SelectItem value="Denied">Denied</SelectItem>
-              <SelectItem value="AutoApproved">Auto-Approved</SelectItem>
+              <SelectItem value="AutoApproved">Auto-approved</SelectItem>
               <SelectItem value="AutoDenied">Expired</SelectItem>
             </SelectContent>
           </Select>
@@ -123,10 +123,10 @@ export function ApprovalInbox({
             <SelectContent>
               <SelectItem value="__all__">All types</SelectItem>
               <SelectItem value="RiskAcceptanceApproval">
-                Approval Required
+                Risk exception approval
               </SelectItem>
-              <SelectItem value="PatchingApproved">Auto-Approved</SelectItem>
-              <SelectItem value="PatchingDeferred">Informational</SelectItem>
+              <SelectItem value="PatchingApproved">Patch decision review</SelectItem>
+              <SelectItem value="PatchingDeferred">Deferred patching notice</SelectItem>
             </SelectContent>
           </Select>
           <label className="flex cursor-pointer items-center gap-2 self-center whitespace-nowrap text-sm text-muted-foreground">
