@@ -8,6 +8,7 @@ import { formatDate, startCase } from '@/lib/formatting'
 import {
   outcomeLabel,
   outcomeTone,
+  approvalStatusLabel,
   approvalStatusTone,
   riskBandTone,
   severityTone,
@@ -174,7 +175,7 @@ export function RemediationWorkbench({
                             {outcomeLabel(item.outcome)}
                           </span>
                           <span className={`ml-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(approvalStatusTone(item.approvalStatus!))}`}>
-                            {item.approvalStatus}
+                            {approvalStatusLabel(item.approvalStatus!)}
                           </span>
                           {item.decidedAt ? (
                             <p className="text-[10px] text-muted-foreground">

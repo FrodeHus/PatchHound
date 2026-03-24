@@ -37,12 +37,9 @@ public class ApprovalTaskServiceTests : IDisposable
 
         _notificationService = Substitute.For<INotificationService>();
         _realTimeNotifier = Substitute.For<IRealTimeNotifier>();
-        var auditLogWriter = new AuditLogWriter(_dbContext, tenantContext);
-
         _sut = new ApprovalTaskService(
             _dbContext,
             _notificationService,
-            auditLogWriter,
             _realTimeNotifier
         );
     }

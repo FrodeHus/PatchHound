@@ -52,6 +52,7 @@ public record AnalystRecommendationDto(
     string Rationale,
     string? PriorityOverride,
     Guid AnalystId,
+    string? AnalystDisplayName,
     DateTimeOffset CreatedAt
 );
 

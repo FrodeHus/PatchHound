@@ -378,19 +378,7 @@ public class ApprovalTaskQueryService(
         var auditDtos = auditEntries.Select(a =>
         {
             auditUserNames.TryGetValue(a.UserId, out var name);
-            // Extract justification from NewValues JSON
-            string? justification = null;
-            if (a.NewValues is not null)
-            {
-                try
-                {
-                    var doc = System.Text.Json.JsonDocument.Parse(a.NewValues);
-                    if (doc.RootElement.TryGetProperty("Justification", out var j))
-                        justification = j.GetString();
-                }
-                catch { }
-            }
-            return new ApprovalAuditEntryDto(a.Action.ToString(), name, justification, a.Timestamp);
+            return AuditTimelineMapper.ToDto(a, name);
         }).ToList();
 
         return new ApprovalTaskDetailDto(

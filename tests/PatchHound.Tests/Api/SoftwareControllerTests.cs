@@ -52,8 +52,8 @@ public class SoftwareControllerTests : IDisposable
             [_aiProvider],
             _tenantAiConfigurationResolver
         );
-        var approvalTaskService = new ApprovalTaskService(_dbContext, Substitute.For<INotificationService>(), new AuditLogWriter(_dbContext, _tenantContext), Substitute.For<IRealTimeNotifier>());
-        var remediationDecisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService, new AuditLogWriter(_dbContext, _tenantContext));
+        var approvalTaskService = new ApprovalTaskService(_dbContext, Substitute.For<INotificationService>(), Substitute.For<IRealTimeNotifier>());
+        var remediationDecisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService);
         var remediationTaskQueryService = new PatchHound.Api.Services.RemediationTaskQueryService(
             _dbContext,
             remediationDecisionService

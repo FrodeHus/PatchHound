@@ -9,7 +9,6 @@ namespace PatchHound.Infrastructure.Services;
 public class ApprovalTaskService(
     PatchHoundDbContext dbContext,
     INotificationService notificationService,
-    AuditLogWriter auditLogWriter,
     IRealTimeNotifier realTimeNotifier
 )
 {
@@ -70,16 +69,6 @@ public class ApprovalTaskService(
         task.Approve(userId, justification);
         task.RemediationDecision.Approve(userId);
 
-        await auditLogWriter.WriteAsync(
-            task.TenantId,
-            "RemediationDecision",
-            task.RemediationDecisionId,
-            AuditAction.Approved,
-            null,
-            new { ApprovalTaskId = task.Id, Justification = justification },
-            ct
-        );
-
         await dbContext.SaveChangesAsync(ct);
         return task;
     }
@@ -98,16 +87,6 @@ public class ApprovalTaskService(
 
         task.Deny(userId, justification);
         task.RemediationDecision.Reject(userId);
-
-        await auditLogWriter.WriteAsync(
-            task.TenantId,
-            "RemediationDecision",
-            task.RemediationDecisionId,
-            AuditAction.Denied,
-            null,
-            new { ApprovalTaskId = task.Id, Justification = justification },
-            ct
-        );
 
         // Notify the analyst who created the decision
         await notificationService.SendAsync(

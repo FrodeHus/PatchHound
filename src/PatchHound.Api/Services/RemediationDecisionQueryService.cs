@@ -364,6 +364,12 @@ public class RemediationDecisionQueryService(
             .Where(r => r.TenantId == tenantId && scopedSoftwareAssetIds.Contains(r.SoftwareAssetId))
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync(ct);
+        var recommendationAnalystIds = recommendations.Select(r => r.AnalystId).Distinct().ToList();
+        var recommendationAnalystNames = recommendationAnalystIds.Count > 0
+            ? await dbContext.Users.AsNoTracking()
+                .Where(user => recommendationAnalystIds.Contains(user.Id))
+                .ToDictionaryAsync(user => user.Id, user => user.DisplayName, ct)
+            : new Dictionary<Guid, string>();
 
         // Asset risk score
         var assetRiskScore = await dbContext.AssetRiskScores.AsNoTracking()
@@ -530,6 +536,7 @@ public class RemediationDecisionQueryService(
             r.Rationale,
             r.PriorityOverride,
             r.AnalystId,
+            recommendationAnalystNames.GetValueOrDefault(r.AnalystId),
             r.CreatedAt
         )).ToList();
 
