@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet } from '@/server/api'
-import { burndownTrendSchema, dashboardFilterOptionsSchema, dashboardRiskChangeBriefSchema, dashboardSummarySchema, heatmapResponseSchema, ownerDashboardSummarySchema, trendDataSchema } from './dashboard.schemas'
+import { burndownTrendSchema, dashboardFilterOptionsSchema, dashboardRiskChangeBriefSchema, dashboardSummarySchema, heatmapResponseSchema, ownerDashboardSummarySchema, securityManagerDashboardSummarySchema, technicalManagerDashboardSummarySchema, trendDataSchema } from './dashboard.schemas'
 import { z } from 'zod'
 
 const dashboardFilterSchema = z.object({
@@ -75,6 +75,20 @@ export const fetchOwnerDashboardSummary = createServerFn({ method: 'GET' })
   .handler(async ({ context }) => {
     const data = await apiGet('/dashboard/owner-summary', context)
     return ownerDashboardSummarySchema.parse(data)
+  })
+
+export const fetchSecurityManagerDashboardSummary = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const data = await apiGet('/dashboard/security-manager-summary', context)
+    return securityManagerDashboardSummarySchema.parse(data)
+  })
+
+export const fetchTechnicalManagerDashboardSummary = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const data = await apiGet('/dashboard/technical-manager-summary', context)
+    return technicalManagerDashboardSummarySchema.parse(data)
   })
 
 export const fetchDashboardHeatmap = createServerFn({ method: 'GET' })

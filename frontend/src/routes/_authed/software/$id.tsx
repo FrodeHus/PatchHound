@@ -142,6 +142,8 @@ function SoftwareDetailRoute() {
       }}
       canViewRemediation={canViewRemediation}
       remediationData={remediationQuery.data ?? null}
+      isRemediationLoading={remediationQuery.isLoading}
+      remediationError={remediationQuery.isError}
       tenantSoftwareId={id}
     />
   )

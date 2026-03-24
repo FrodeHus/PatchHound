@@ -14,7 +14,7 @@ namespace PatchHound.Api.Controllers;
 
 [ApiController]
 [Route("api/dashboard")]
-[Authorize(Policy = Policies.ViewVulnerabilities)]
+[Authorize]
 public class DashboardController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
@@ -36,6 +36,7 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("summary")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<DashboardSummaryDto>> GetSummary(
         [FromQuery] DashboardFilterQuery filter,
         CancellationToken ct
@@ -624,6 +625,7 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("owner-summary")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<OwnerDashboardSummaryDto>> GetOwnerSummary(CancellationToken ct)
     {
         if (_tenantContext.CurrentTenantId is not Guid tenantId)
@@ -843,7 +845,180 @@ public class DashboardController : ControllerBase
         ));
     }
 
+    [HttpGet("security-manager-summary")]
+    [Authorize(Policy = Policies.ConfigureTenant)]
+    public async Task<ActionResult<SecurityManagerDashboardSummaryDto>> GetSecurityManagerSummary(CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var recentApprovedDecisions = await (
+            from decision in _dbContext.RemediationDecisions.AsNoTracking()
+            join tenantSoftware in _dbContext.TenantSoftware.AsNoTracking()
+                on decision.TenantSoftwareId equals tenantSoftware.Id
+            join normalizedSoftware in _dbContext.NormalizedSoftware.AsNoTracking()
+                on tenantSoftware.NormalizedSoftwareId equals normalizedSoftware.Id
+            where decision.TenantId == tenantId
+                  && decision.ApprovalStatus == DecisionApprovalStatus.Approved
+                  && (decision.Outcome == RemediationOutcome.RiskAcceptance
+                      || decision.Outcome == RemediationOutcome.AlternateMitigation)
+            orderby decision.ApprovedAt descending, decision.DecidedAt descending
+            select new
+            {
+                decision.Id,
+                decision.TenantSoftwareId,
+                SoftwareName = normalizedSoftware.CanonicalName,
+                Outcome = decision.Outcome.ToString(),
+                decision.Justification,
+                decision.DecidedAt,
+                decision.ApprovedAt,
+                decision.ExpiryDate,
+            }
+        )
+            .Take(10)
+            .ToListAsync(ct);
+
+        var policySoftwareStats = await BuildSoftwareScopeStatsAsync(
+            tenantId,
+            recentApprovedDecisions.Select(item => item.TenantSoftwareId).Distinct().ToList(),
+            ct);
+
+        var approvalTasks = await BuildApprovalAttentionTasksAsync(
+            tenantId,
+            ParseRoleNames(_tenantContext.GetRolesForTenant(tenantId)),
+            ct);
+
+        return Ok(new SecurityManagerDashboardSummaryDto(
+            recentApprovedDecisions.Select(item =>
+            {
+                var stats = policySoftwareStats.GetValueOrDefault(item.TenantSoftwareId);
+                return new ApprovedPolicyDecisionDto(
+                    item.Id,
+                    item.TenantSoftwareId,
+                    item.SoftwareName,
+                    item.Outcome,
+                    string.IsNullOrWhiteSpace(item.Justification) ? null : item.Justification,
+                    stats?.HighestSeverity ?? "Unknown",
+                    stats?.VulnerabilityCount ?? 0,
+                    item.ApprovedAt ?? item.DecidedAt,
+                    item.ExpiryDate
+                );
+            }).ToList(),
+            approvalTasks
+        ));
+    }
+
+    [HttpGet("technical-manager-summary")]
+    [Authorize(Policy = Policies.ViewApprovalTasks)]
+    public async Task<ActionResult<TechnicalManagerDashboardSummaryDto>> GetTechnicalManagerSummary(CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var approvedPatchingTasks = await (
+            from task in _dbContext.PatchingTasks.AsNoTracking()
+            join decision in _dbContext.RemediationDecisions.AsNoTracking()
+                on task.RemediationDecisionId equals decision.Id
+            join tenantSoftware in _dbContext.TenantSoftware.AsNoTracking()
+                on task.TenantSoftwareId equals tenantSoftware.Id
+            join normalizedSoftware in _dbContext.NormalizedSoftware.AsNoTracking()
+                on tenantSoftware.NormalizedSoftwareId equals normalizedSoftware.Id
+            join ownerTeam in _dbContext.Teams.AsNoTracking()
+                on task.OwnerTeamId equals ownerTeam.Id
+            where task.TenantId == tenantId
+                  && task.Status != PatchingTaskStatus.Completed
+                  && decision.Outcome == RemediationOutcome.ApprovedForPatching
+                  && decision.ApprovalStatus == DecisionApprovalStatus.Approved
+            orderby decision.ApprovedAt descending, task.CreatedAt descending
+            select new
+            {
+                task.Id,
+                task.RemediationDecisionId,
+                task.TenantSoftwareId,
+                SoftwareName = normalizedSoftware.CanonicalName,
+                OwnerTeamName = ownerTeam.Name,
+                task.DueDate,
+                task.Status,
+                task.CreatedAt,
+                decision.ApprovedAt,
+            }
+        )
+            .Take(10)
+            .ToListAsync(ct);
+
+        var patchingSoftwareStats = await BuildSoftwareScopeStatsAsync(
+            tenantId,
+            approvedPatchingTasks.Select(item => item.TenantSoftwareId).Distinct().ToList(),
+            ct);
+
+        var agedCutoff = DateTimeOffset.UtcNow.AddDays(-90);
+        var devicesWithAgedVulnerabilities = await (
+            from episode in _dbContext.VulnerabilityAssetEpisodes.AsNoTracking()
+            join asset in _dbContext.Assets.AsNoTracking()
+                on episode.AssetId equals asset.Id
+            join tenantVulnerability in _dbContext.TenantVulnerabilities.AsNoTracking()
+                on episode.TenantVulnerabilityId equals tenantVulnerability.Id
+            join vulnerabilityDefinition in _dbContext.VulnerabilityDefinitions.AsNoTracking()
+                on tenantVulnerability.VulnerabilityDefinitionId equals vulnerabilityDefinition.Id
+            where episode.TenantId == tenantId
+                  && episode.Status == VulnerabilityStatus.Open
+                  && asset.AssetType == AssetType.Device
+                  && vulnerabilityDefinition.PublishedDate != null
+                  && vulnerabilityDefinition.PublishedDate <= agedCutoff
+            group vulnerabilityDefinition by new
+            {
+                asset.Id,
+                DeviceName = asset.DeviceComputerDnsName ?? asset.Name,
+                asset.Criticality
+            }
+            into grouped
+            orderby grouped.Min(item => item.PublishedDate) ascending,
+                grouped.Count() descending
+            select new DevicePatchDriftDto(
+                grouped.Key.Id,
+                grouped.Key.DeviceName,
+                grouped.Key.Criticality.ToString(),
+                grouped.Max(item => item.VendorSeverity).ToString(),
+                grouped.Count(),
+                grouped.Min(item => item.PublishedDate)!.Value
+            )
+        )
+            .Take(12)
+            .ToListAsync(ct);
+
+        var approvalTasks = await BuildApprovalAttentionTasksAsync(
+            tenantId,
+            ParseRoleNames(_tenantContext.GetRolesForTenant(tenantId)),
+            ct);
+
+        return Ok(new TechnicalManagerDashboardSummaryDto(
+            approvedPatchingTasks.Select(item =>
+            {
+                var stats = patchingSoftwareStats.GetValueOrDefault(item.TenantSoftwareId);
+                return new ApprovedPatchingTaskDto(
+                    item.Id,
+                    item.RemediationDecisionId,
+                    item.TenantSoftwareId,
+                    item.SoftwareName,
+                    item.OwnerTeamName,
+                    stats?.HighestSeverity ?? "Unknown",
+                    stats?.AffectedDeviceCount ?? 0,
+                    item.ApprovedAt ?? item.CreatedAt,
+                    item.DueDate,
+                    item.Status.ToString()
+                );
+            }).ToList(),
+            devicesWithAgedVulnerabilities,
+            approvalTasks
+        ));
+    }
+
     [HttpGet("risk-changes")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<DashboardRiskChangeBriefDto>> GetRiskChanges(
         [FromQuery] int days = 1,
         CancellationToken ct = default
@@ -861,6 +1036,7 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("heatmap")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<List<HeatmapRowDto>>> GetHeatmap(
         [FromQuery] DashboardFilterQuery filter,
         [FromQuery] string groupBy = "deviceGroup",
@@ -962,6 +1138,7 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("trends")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<TrendDataDto>> GetTrends(
         [FromQuery] DashboardFilterQuery filter,
         CancellationToken ct
@@ -1057,6 +1234,7 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("burndown")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<BurndownTrendDto>> GetBurndown(
         [FromQuery] DashboardFilterQuery filter,
         CancellationToken ct
@@ -1119,6 +1297,7 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("filter-options")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<DashboardFilterOptionsDto>> GetFilterOptions(CancellationToken ct)
     {
         if (_tenantContext.CurrentTenantId is not Guid tenantId)
@@ -1141,6 +1320,102 @@ public class DashboardController : ControllerBase
             .ToArrayAsync(ct);
 
         return Ok(new DashboardFilterOptionsDto(platforms, deviceGroups));
+    }
+
+    private async Task<List<ApprovalAttentionTaskDto>> BuildApprovalAttentionTasksAsync(
+        Guid tenantId,
+        HashSet<RoleName> visibleRoles,
+        CancellationToken ct)
+    {
+        var pendingTasks = await (
+            from task in _dbContext.ApprovalTasks.AsNoTracking()
+            join decision in _dbContext.RemediationDecisions.AsNoTracking()
+                on task.RemediationDecisionId equals decision.Id
+            join tenantSoftware in _dbContext.TenantSoftware.AsNoTracking()
+                on decision.TenantSoftwareId equals tenantSoftware.Id
+            join normalizedSoftware in _dbContext.NormalizedSoftware.AsNoTracking()
+                on tenantSoftware.NormalizedSoftwareId equals normalizedSoftware.Id
+            where task.TenantId == tenantId
+                  && task.Status == ApprovalTaskStatus.Pending
+                  && task.VisibleRoles.Any(role => visibleRoles.Contains(role.Role))
+            orderby task.ExpiresAt ascending, task.CreatedAt descending
+            select new
+            {
+                task.Id,
+                task.RemediationDecisionId,
+                decision.TenantSoftwareId,
+                SoftwareName = normalizedSoftware.CanonicalName,
+                ApprovalType = task.Type.ToString(),
+                task.ExpiresAt,
+                task.CreatedAt,
+            }
+        )
+            .Take(8)
+            .ToListAsync(ct);
+
+        var softwareStats = await BuildSoftwareScopeStatsAsync(
+            tenantId,
+            pendingTasks.Select(item => item.TenantSoftwareId).Distinct().ToList(),
+            ct);
+
+        var now = DateTimeOffset.UtcNow;
+        return pendingTasks.Select(item =>
+        {
+            var stats = softwareStats.GetValueOrDefault(item.TenantSoftwareId);
+            var attentionState = item.ExpiresAt <= now
+                ? "Overdue"
+                : item.ExpiresAt <= now.AddHours(24)
+                    ? "NearExpiry"
+                    : "Pending";
+
+            return new ApprovalAttentionTaskDto(
+                item.Id,
+                item.RemediationDecisionId,
+                item.TenantSoftwareId,
+                item.SoftwareName,
+                item.ApprovalType,
+                stats?.HighestSeverity ?? "Unknown",
+                stats?.VulnerabilityCount ?? 0,
+                item.ExpiresAt,
+                item.CreatedAt,
+                attentionState
+            );
+        }).ToList();
+    }
+
+    private async Task<Dictionary<Guid, SoftwareScopeStats>> BuildSoftwareScopeStatsAsync(
+        Guid tenantId,
+        List<Guid> tenantSoftwareIds,
+        CancellationToken ct)
+    {
+        if (tenantSoftwareIds.Count == 0)
+        {
+            return [];
+        }
+
+        var rows = await _dbContext.NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId
+                && item.ResolvedAt == null
+                && tenantSoftwareIds.Contains(item.TenantSoftwareId))
+            .Select(item => new
+            {
+                item.TenantSoftwareId,
+                item.AffectedDeviceCount,
+                item.VulnerabilityDefinition.VendorSeverity
+            })
+            .ToListAsync(ct);
+
+        return rows
+            .GroupBy(item => item.TenantSoftwareId)
+            .ToDictionary(
+                group => group.Key,
+                group => new SoftwareScopeStats(
+                    group.Max(item => item.VendorSeverity).ToString(),
+                    group.Count(),
+                    group.Max(item => item.AffectedDeviceCount)
+                )
+            );
     }
 
     private (IQueryable<Guid>? FilteredAssetIdQuery, DateTimeOffset? MinPublishedDate) BuildFilterContext(
@@ -1172,5 +1447,20 @@ public class DashboardController : ControllerBase
             yield return current;
         }
     }
+
+    private static HashSet<RoleName> ParseRoleNames(IReadOnlyList<string> userRoles)
+    {
+        return userRoles
+            .Select(role => Enum.TryParse<RoleName>(role, true, out var parsedRole) ? parsedRole : (RoleName?)null)
+            .Where(role => role.HasValue)
+            .Select(role => role!.Value)
+            .ToHashSet();
+    }
+
+    private sealed record SoftwareScopeStats(
+        string HighestSeverity,
+        int VulnerabilityCount,
+        int AffectedDeviceCount
+    );
 
 }
