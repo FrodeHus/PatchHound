@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { getApiErrorMessage } from '@/lib/api-errors'
 
 type TenantAdministrationDetailProps = {
   tenant: TenantDetail
@@ -68,9 +69,9 @@ export function TenantAdministrationDetail({
       toast.success('Tenant configuration saved')
       void router.invalidate()
     },
-    onError: () => {
+    onError: (error) => {
       setSaveState('error')
-      toast.error('Failed to save tenant configuration')
+      toast.error(getApiErrorMessage(error, 'Failed to save tenant configuration'))
     },
   })
 

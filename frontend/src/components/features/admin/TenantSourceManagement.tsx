@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { getApiErrorMessage } from '@/lib/api-errors'
 import { cn } from '@/lib/utils'
 
 type TenantSourceManagementProps = {
@@ -84,9 +85,9 @@ export function TenantSourceManagement({
       toast.success('Source configuration saved')
       await router.invalidate()
     },
-    onError: () => {
+    onError: (error) => {
       setSaveState('error')
-      toast.error('Failed to save source configuration')
+      toast.error(getApiErrorMessage(error, 'Failed to save source configuration'))
     },
   })
 
@@ -109,9 +110,9 @@ export function TenantSourceManagement({
       toast.success('Sync queued')
       await router.invalidate()
     },
-    onError: () => {
+    onError: (error) => {
       setSyncState('error')
-      toast.error('Failed to start sync')
+      toast.error(getApiErrorMessage(error, 'Failed to start sync'))
     },
     onSettled: () => {
       setSyncingSourceKey(null)
@@ -137,9 +138,9 @@ export function TenantSourceManagement({
       toast.success('Abort requested')
       await router.invalidate()
     },
-    onError: () => {
+    onError: (error) => {
       setAbortState('error')
-      toast.error('Failed to abort ingestion')
+      toast.error(getApiErrorMessage(error, 'Failed to abort ingestion'))
     },
     onSettled: () => {
       setAbortingRunId(null)

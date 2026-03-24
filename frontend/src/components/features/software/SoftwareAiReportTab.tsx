@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { MarkdownViewer } from '@/components/ui/markdown-viewer'
 import { Separator } from '@/components/ui/separator'
+import { getApiErrorMessage } from '@/lib/api-errors'
 import { formatDateTime } from '@/lib/formatting'
 import { toneSurface } from '@/lib/tone-classes'
 
@@ -36,8 +37,8 @@ export function SoftwareAiReportTab({ tenantSoftwareId }: SoftwareAiReportTabPro
     onSuccess: () => {
       toast.success('Report generated')
     },
-    onError: () => {
-      toast.error('Failed to generate report')
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to generate report'))
     },
   })
 

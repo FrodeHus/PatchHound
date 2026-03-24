@@ -23,6 +23,7 @@ import { InsetPanel } from '@/components/ui/inset-panel'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { getApiErrorMessage } from '@/lib/api-errors'
 import { FilterBuilder } from './FilterBuilder'
 
 type AssetRuleWizardProps = {
@@ -90,8 +91,8 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, teams }: 
       await router.navigate({ to: '/admin/asset-rules', search: { page: 1, pageSize: 25 } })
       await router.invalidate()
     },
-    onError: () => {
-      toast.error(mode === 'create' ? 'Failed to create rule' : 'Failed to save changes')
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, mode === 'create' ? 'Failed to create rule' : 'Failed to save changes'))
     },
   })
 

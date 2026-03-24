@@ -35,6 +35,7 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { getApiErrorMessage } from '@/lib/api-errors'
 import { formatDateTime } from '@/lib/formatting'
 import { toneText } from '@/lib/tone-classes'
 
@@ -166,14 +167,6 @@ function getValidationVariant(status: string): 'default' | 'outline' | 'destruct
   }
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message
-  }
-
-  return fallback
-}
-
 function extractMissingOllamaModel(errorMessage: string, model: string) {
   if (!errorMessage || !model) {
     return null
@@ -225,8 +218,8 @@ export function TenantAiSettingsPage() {
         },
       })
     },
-    onError: () => {
-      toast.error('Failed to save AI profile')
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to save AI profile'))
     },
   })
 
@@ -236,8 +229,8 @@ export function TenantAiSettingsPage() {
       toast.success('Validation complete')
       await queryClient.invalidateQueries({ queryKey: ['tenant-ai-profiles', selectedTenantId] })
     },
-    onError: () => {
-      toast.error('Failed to validate AI profile')
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to validate AI profile'))
     },
   })
 
@@ -247,8 +240,8 @@ export function TenantAiSettingsPage() {
       toast.success('Default profile updated')
       await queryClient.invalidateQueries({ queryKey: ['tenant-ai-profiles', selectedTenantId] })
     },
-    onError: () => {
-      toast.error('Failed to set default profile')
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to set default profile'))
     },
   })
 
@@ -303,12 +296,12 @@ export function TenantAiSettingsPage() {
             draft={draft}
             isSaving={saveMutation.isPending}
             saveBanner={saveBanner}
-            saveError={saveMutation.isError ? getErrorMessage(saveMutation.error, 'Failed to save AI profile.') : null}
-            validateError={validateMutation.isError ? getErrorMessage(validateMutation.error, 'Failed to validate AI profile.') : null}
+            saveError={saveMutation.isError ? getApiErrorMessage(saveMutation.error, 'Failed to save AI profile.') : null}
+            validateError={validateMutation.isError ? getApiErrorMessage(validateMutation.error, 'Failed to validate AI profile.') : null}
             isValidating={validateMutation.isPending}
             onValidate={(id) => validateMutation.mutate(id)}
             modelResult={modelsMutation.data ?? null}
-            modelError={modelsMutation.isError ? getErrorMessage(modelsMutation.error, 'Failed to list available models.') : null}
+            modelError={modelsMutation.isError ? getApiErrorMessage(modelsMutation.error, 'Failed to list available models.') : null}
             isListingModels={modelsMutation.isPending}
             onListModels={(id) => modelsMutation.mutate(id)}
             onDraftChange={setDraft}

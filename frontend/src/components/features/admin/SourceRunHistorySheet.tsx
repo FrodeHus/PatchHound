@@ -24,6 +24,7 @@ import {
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import { DataTableActiveFilters } from '@/components/ui/data-table-workbench'
 import { useSSE } from '@/hooks/useSSE'
+import { getApiErrorMessage } from '@/lib/api-errors'
 import { cn } from '@/lib/utils'
 
 type SourceRunHistoryViewProps = {
@@ -77,8 +78,8 @@ export function SourceRunHistoryView({
       toast.success('Ingestion resumed')
       await router.invalidate()
     },
-    onError: () => {
-      toast.error('Failed to resume ingestion')
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to resume ingestion'))
     },
   })
   const deleteMutation = useMutation({
@@ -96,8 +97,8 @@ export function SourceRunHistoryView({
       toast.success('Ingestion run deleted')
       await router.invalidate()
     },
-    onError: () => {
-      toast.error('Failed to delete ingestion run')
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to delete ingestion run'))
     },
   })
   const abortMutation = useMutation({
@@ -115,8 +116,8 @@ export function SourceRunHistoryView({
       toast.success('Abort requested')
       await router.invalidate()
     },
-    onError: () => {
-      toast.error('Failed to abort ingestion')
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to abort ingestion'))
     },
   })
 
