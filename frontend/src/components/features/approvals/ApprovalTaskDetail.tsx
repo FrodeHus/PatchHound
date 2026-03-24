@@ -148,15 +148,24 @@ export function ApprovalTaskDetail({
               </p>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="space-y-2">
-                  <h1 className="text-3xl font-semibold tracking-[-0.04em]">
-                    {startCase(data.softwareName)}
-                  </h1>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h1 className="text-3xl font-semibold tracking-[-0.04em]">
+                      {startCase(data.softwareName)}
+                    </h1>
+                    {!isPending && !data.readAt ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onMarkRead}
+                        title="Mark as read"
+                        aria-label="Mark as read"
+                        className="size-8 rounded-full border border-border/70"
+                      >
+                        <Eye className="size-4" />
+                      </Button>
+                    ) : null}
+                  </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(severityTone(data.criticality))}`}
-                    >
-                      {data.criticality}
-                    </span>
                     <span
                       className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(outcomeTone(data.outcome))}`}
                     >
@@ -165,16 +174,17 @@ export function ApprovalTaskDetail({
                     <ApprovalTypeBadge type={data.type} />
                     <ApprovalStatusBadge status={data.status} />
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Decision by {data.decidedByName}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] text-muted-foreground">
+                      Decision by: <span className="ml-1 font-medium text-foreground">{data.decidedByName}</span>
+                    </span>
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneBadge(severityTone(data.criticality))}`}
+                    >
+                      Severity: {data.criticality}
+                    </span>
+                  </div>
                 </div>
-                {!isPending && !data.readAt ? (
-                  <Button variant="outline" size="sm" onClick={onMarkRead}>
-                    <Eye className="mr-1.5 size-4" />
-                    Mark as read
-                  </Button>
-                ) : null}
               </div>
             </div>
 
@@ -198,29 +208,34 @@ export function ApprovalTaskDetail({
                 </p>
               </section>
 
-              <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-3">
-                  <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                    Open vulnerabilities
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-[-0.03em]">
-                    {vulnerabilityCount}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-3">
-                  <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                    Affected devices
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-[-0.03em]">
-                    {affectedDeviceCount}
-                  </p>
+              <section className="rounded-2xl border border-border/70 bg-background/60 px-4 py-4">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  Exposure in scope
+                </p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-2xl font-semibold tracking-[-0.03em]">
+                      {vulnerabilityCount}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      open vulnerabilities
+                    </p>
+                  </div>
+                  <div className="border-border/60 sm:border-l sm:pl-4">
+                    <p className="text-2xl font-semibold tracking-[-0.03em]">
+                      {affectedDeviceCount}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      affected devices
+                    </p>
+                  </div>
                 </div>
               </section>
             </div>
           </div>
 
-          <aside className="grid gap-3 content-start">
-            <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+          <aside className="grid auto-rows-fr gap-3 content-start">
+            <div className="flex min-h-[88px] flex-col justify-center rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
               <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                 Expiry
               </p>
@@ -229,7 +244,7 @@ export function ApprovalTaskDetail({
               </div>
             </div>
             {data.riskBand ? (
-              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+              <div className="flex min-h-[88px] flex-col justify-center rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   Risk
                 </p>
@@ -243,7 +258,7 @@ export function ApprovalTaskDetail({
               </div>
             ) : null}
             {data.slaStatus ? (
-              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+              <div className="flex min-h-[88px] flex-col justify-center rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   SLA
                 </p>
