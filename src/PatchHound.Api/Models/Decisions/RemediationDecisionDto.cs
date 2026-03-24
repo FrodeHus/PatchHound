@@ -1,8 +1,8 @@
 namespace PatchHound.Api.Models.Decisions;
 
 public record DecisionContextDto(
-    Guid AssetId,
-    string AssetName,
+    Guid TenantSoftwareId,
+    string SoftwareName,
     string Criticality,
     DecisionSummaryDto Summary,
     RemediationDecisionDto? CurrentDecision,

@@ -176,12 +176,10 @@ public class RemediationDecisionQueryService(
                 slaStatus = slaService.GetSlaStatus(vcForSla.EarliestFirstSeen, slaDueDate.Value, DateTimeOffset.UtcNow).ToString();
             }
 
-            var representativeAssetId = representativeAssetByTenantSoftwareId.GetValueOrDefault(software.Id);
             items.Add(new RemediationDecisionListItemDto(
-                representativeAssetId,
+                software.Id,
                 software.Name,
                 criticality.ToString(),
-                software.Id,
                 decision?.Outcome.ToString(),
                 decision?.ApprovalStatus.ToString(),
                 decision?.DecidedAt,
@@ -255,7 +253,7 @@ public class RemediationDecisionQueryService(
             return null;
 
         var assetId = representativeAsset?.Id ?? tenantSoftwareId;
-        var assetName = tenantSoftwareMeta?.Name ?? representativeAsset?.Name ?? "Software";
+        var softwareName = tenantSoftwareMeta?.Name ?? representativeAsset?.Name ?? "Software";
 
         var scopedSoftwareAssetIds = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
             .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
@@ -481,7 +479,7 @@ public class RemediationDecisionQueryService(
         string? aiNarrative = null;
         try
         {
-            aiNarrative = await GenerateAiNarrativeAsync(tenantId, assetName, summary, topVulns.Take(5).ToList(), ct);
+            aiNarrative = await GenerateAiNarrativeAsync(tenantId, softwareName, summary, topVulns.Take(5).ToList(), ct);
         }
         catch
         {
@@ -525,8 +523,8 @@ public class RemediationDecisionQueryService(
         )).ToList();
 
         return new DecisionContextDto(
-            assetId,
-            assetName,
+            tenantSoftwareId,
+            softwareName,
             assetCriticality.ToString(),
             summary,
             decisionDto,
@@ -540,7 +538,7 @@ public class RemediationDecisionQueryService(
 
     private async Task<string?> GenerateAiNarrativeAsync(
         Guid tenantId,
-        string assetName,
+        string softwareName,
         DecisionSummaryDto summary,
         List<DecisionVulnDto> topVulns,
         CancellationToken ct
@@ -558,7 +556,7 @@ public class RemediationDecisionQueryService(
 
         var request = new AiTextGenerationRequest(
             "You are a PatchHound remediation analyst. Write one concise paragraph (2-3 sentences) summarizing the remediation context for a software title across its active versions. Focus on risk level, key vulnerabilities, and recommended action urgency. Do not use bullets, headings, or markdown.",
-            $"Asset: {assetName}. Total vulnerabilities: {summary.TotalVulnerabilities} (Critical: {summary.CriticalCount}, High: {summary.HighCount}, Medium: {summary.MediumCount}, Low: {summary.LowCount}). Known exploits: {summary.WithKnownExploit}. Active alerts: {summary.WithActiveAlert}. Top vulnerabilities: {topVulnSummary}.",
+            $"Software: {softwareName}. Total vulnerabilities: {summary.TotalVulnerabilities} (Critical: {summary.CriticalCount}, High: {summary.HighCount}, Medium: {summary.MediumCount}, Low: {summary.LowCount}). Known exploits: {summary.WithKnownExploit}. Active alerts: {summary.WithActiveAlert}. Top vulnerabilities: {topVulnSummary}.",
             ExternalContext: null,
             UseProviderNativeWebResearch: false
         );

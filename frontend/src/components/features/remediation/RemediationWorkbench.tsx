@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toneBadge } from '@/lib/tone-classes'
-import { formatDate } from '@/lib/formatting'
+import { formatDate, startCase } from '@/lib/formatting'
 import {
   outcomeLabel,
   outcomeTone,
@@ -136,7 +136,7 @@ export function RemediationWorkbench({
                 </tr>
               ) : (
                 data.items.map((item) => (
-                  <tr key={item.assetId} className="align-top">
+                  <tr key={item.tenantSoftwareId} className="align-top">
                     <td className="px-4 py-3">
                       <div className="space-y-1">
                         {item.tenantSoftwareId ? (
@@ -145,19 +145,19 @@ export function RemediationWorkbench({
                             params={{ id: item.tenantSoftwareId }}
                             className="font-medium hover:text-primary"
                           >
-                            {item.assetName}
+                            {startCase(item.softwareName)}
                           </Link>
                         ) : (
-                          <span className="font-medium">{item.assetName}</span>
+                          <span className="font-medium">{startCase(item.softwareName)}</span>
                         )}
                         <div className="flex gap-1.5">
                           <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(severityTone(item.criticality))}`}>
                             {item.criticality}
                           </span>
-                          {item.tenantSoftwareId ? (
-                            <Link
-                              to="/software/$id"
-                              params={{ id: item.tenantSoftwareId }}
+                        {item.tenantSoftwareId ? (
+                          <Link
+                            to="/software/$id"
+                            params={{ id: item.tenantSoftwareId }}
                               search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
                               className="text-[10px] text-muted-foreground hover:text-primary"
                             >

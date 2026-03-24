@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { RiskScoreCard } from '@/components/features/dashboard/RiskScoreCard'
-import { formatDate, formatDateTime } from '@/lib/formatting'
+import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 
 type Props = {
   summary: DashboardSummary
@@ -122,7 +122,7 @@ export function SecurityManagerOverview({ summary, managerSummary, isLoading }: 
                         params={{ id: item.tenantSoftwareId }}
                         className="mt-2 block text-base font-medium tracking-tight hover:text-primary"
                       >
-                        {item.softwareName}
+                        {startCase(item.softwareName)}
                       </Link>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {outcomeLabel(item.outcome)}
@@ -179,7 +179,7 @@ export function SecurityManagerOverview({ summary, managerSummary, isLoading }: 
                         params={{ id: item.approvalTaskId }}
                         className="mt-2 block text-base font-medium tracking-tight hover:text-primary"
                       >
-                        {item.softwareName}
+                          {startCase(item.softwareName)}
                       </Link>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {item.approvalType} for {item.vulnerabilityCount} open vulnerabilities

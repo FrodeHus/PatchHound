@@ -1,10 +1,9 @@
 namespace PatchHound.Api.Models.Decisions;
 
 public record RemediationDecisionListItemDto(
-    Guid AssetId,
-    string AssetName,
+    Guid TenantSoftwareId,
+    string SoftwareName,
     string Criticality,
-    Guid? TenantSoftwareId,
     string? Outcome,
     string? ApprovalStatus,
     DateTimeOffset? DecidedAt,

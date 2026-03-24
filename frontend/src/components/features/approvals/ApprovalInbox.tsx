@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toneBadge } from '@/lib/tone-classes'
-import { formatDate } from '@/lib/formatting'
+import { formatDate, startCase } from '@/lib/formatting'
 import { ApprovalTypeBadge, ApprovalStatusBadge } from './ApprovalBadge'
 import { ApprovalExpiryCountdown } from './ApprovalExpiryCountdown'
 import { Eye } from 'lucide-react'
@@ -176,7 +176,7 @@ export function ApprovalInbox({
                           params={{ id: item.id }}
                           className="font-medium hover:text-primary"
                         >
-                          {item.assetName}
+                          {startCase(item.softwareName)}
                         </Link>
                         <div className="flex gap-1.5">
                           <span

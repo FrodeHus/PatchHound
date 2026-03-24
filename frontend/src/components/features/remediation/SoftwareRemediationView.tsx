@@ -8,7 +8,7 @@ import { fetchDecisionAuditTrail } from '@/api/approval-tasks.functions'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toneBadge } from '@/lib/tone-classes'
-import { formatDateTime, formatNullableDateTime } from '@/lib/formatting'
+import { formatDateTime, formatNullableDateTime, startCase } from '@/lib/formatting'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { softwareQueryKeys } from '@/features/software/list-state'
 import { RemediationSummaryCards } from './RemediationSummaryCards'
@@ -70,7 +70,7 @@ export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = fal
             Back to software
           </Link>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{data.assetName}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{startCase(data.softwareName)}</h1>
             <span className="rounded-full border border-border/70 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
               {data.criticality} criticality
             </span>

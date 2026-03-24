@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { toneBadge } from '@/lib/tone-classes'
-import { formatDate } from '@/lib/formatting'
+import { formatDate, startCase } from '@/lib/formatting'
 import { ApprovalTypeBadge, ApprovalStatusBadge } from './ApprovalBadge'
 import { ApprovalExpiryCountdown } from './ApprovalExpiryCountdown'
 import {
@@ -112,7 +112,7 @@ export function ApprovalTaskDetail({
               Approval task
             </p>
             <h1 className="text-3xl font-semibold tracking-[-0.04em]">
-              {data.assetName}
+              {startCase(data.softwareName)}
             </h1>
             <div className="flex flex-wrap items-center gap-2">
               <span
