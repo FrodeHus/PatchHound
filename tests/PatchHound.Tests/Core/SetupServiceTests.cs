@@ -145,7 +145,7 @@ public class SetupServiceTests
             .Received(1)
             .AddAsync(Arg.Any<TenantSourceConfiguration>(), Arg.Any<CancellationToken>());
         await _enrichmentSourceRepository
-            .Received(1)
+            .Received(2)
             .AddAsync(Arg.Any<EnrichmentSourceConfiguration>(), Arg.Any<CancellationToken>());
         await _tenantSlaRepository
             .Received(1)

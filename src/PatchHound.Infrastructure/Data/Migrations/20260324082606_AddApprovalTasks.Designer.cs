@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PatchHound.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PatchHound.Infrastructure.Data;
 namespace PatchHound.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(PatchHoundDbContext))]
-    partial class PatchHoundDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260324082606_AddApprovalTasks")]
+    partial class AddApprovalTasks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -174,6 +177,10 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("VisibleToRoles")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ExpiresAt");
@@ -187,30 +194,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.HasIndex("TenantId", "RemediationDecisionId");
 
                     b.ToTable("ApprovalTasks");
-                });
-
-            modelBuilder.Entity("PatchHound.Core.Entities.ApprovalTaskVisibleRole", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ApprovalTaskId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApprovalTaskId", "Role")
-                        .IsUnique();
-
-                    b.HasIndex("Role", "ApprovalTaskId");
-
-                    b.ToTable("ApprovalTaskVisibleRoles");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.Asset", b =>
@@ -3861,17 +3844,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Navigation("WorkflowInstance");
                 });
 
-            modelBuilder.Entity("PatchHound.Core.Entities.ApprovalTaskVisibleRole", b =>
-                {
-                    b.HasOne("PatchHound.Core.Entities.ApprovalTask", "ApprovalTask")
-                        .WithMany("VisibleRoles")
-                        .HasForeignKey("ApprovalTaskId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ApprovalTask");
-                });
-
             modelBuilder.Entity("PatchHound.Core.Entities.WorkflowInstance", b =>
                 {
                     b.HasOne("PatchHound.Core.Entities.WorkflowDefinition", "WorkflowDefinition")
@@ -3897,11 +3869,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
             modelBuilder.Entity("PatchHound.Core.Entities.RemediationDecision", b =>
                 {
                     b.Navigation("VulnerabilityOverrides");
-                });
-
-            modelBuilder.Entity("PatchHound.Core.Entities.ApprovalTask", b =>
-                {
-                    b.Navigation("VisibleRoles");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.Team", b =>

@@ -10,6 +10,7 @@ builder.Services.AddPatchHoundInfrastructure(builder.Configuration);
 // Tenant context for worker (system-level, all tenants accessible)
 builder.Services.AddScoped<ITenantContext, WorkerTenantContext>();
 builder.Services.AddScoped<IEmailSender, NoOpEmailSender>();
+builder.Services.AddScoped<IRealTimeNotifier, NoOpRealTimeNotifier>();
 
 // Hosted services
 builder.Services.AddHostedService<IngestionWorker>();
@@ -17,6 +18,7 @@ builder.Services.AddHostedService<EnrichmentWorker>();
 builder.Services.AddHostedService<SoftwareDescriptionWorker>();
 builder.Services.AddHostedService<SlaCheckWorker>();
 builder.Services.AddHostedService<WorkflowWorker>();
+builder.Services.AddHostedService<ApprovalExpiryWorker>();
 
 var host = builder.Build();
 
@@ -50,4 +52,16 @@ internal class NoOpEmailSender : IEmailSender
         string htmlBody,
         CancellationToken ct = default
     ) => Task.CompletedTask;
+}
+
+/// <summary>
+/// No-op real-time notifier for worker process. SignalR is only available in the API.
+/// </summary>
+internal class NoOpRealTimeNotifier : IRealTimeNotifier
+{
+    public Task NotifyNewVulnerabilityAsync(Guid tenantId, Guid vulnerabilityId, CancellationToken ct) => Task.CompletedTask;
+    public Task NotifyTaskAssignedAsync(Guid userId, Guid taskId, CancellationToken ct) => Task.CompletedTask;
+    public Task NotifyTaskStatusChangedAsync(Guid tenantId, Guid taskId, CancellationToken ct) => Task.CompletedTask;
+    public Task NotifySlaWarningAsync(Guid userId, Guid taskId, CancellationToken ct) => Task.CompletedTask;
+    public Task NotifyApprovalTaskCreatedAsync(Guid tenantId, Guid approvalTaskId, CancellationToken ct) => Task.CompletedTask;
 }

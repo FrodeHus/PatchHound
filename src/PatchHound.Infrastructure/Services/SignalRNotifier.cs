@@ -44,4 +44,11 @@ public class SignalRNotifier<THub> : IRealTimeNotifier
             .Clients.Group($"user-{userId}")
             .SendAsync("SLAWarning", new { userId, taskId }, ct);
     }
+
+    public async Task NotifyApprovalTaskCreatedAsync(Guid tenantId, Guid approvalTaskId, CancellationToken ct)
+    {
+        await _hubContext
+            .Clients.Group($"tenant-{tenantId}")
+            .SendAsync("ApprovalTaskCreated", new { tenantId, approvalTaskId }, ct);
+    }
 }

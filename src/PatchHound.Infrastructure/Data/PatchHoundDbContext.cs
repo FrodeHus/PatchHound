@@ -96,6 +96,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         Set<RemediationDecisionVulnerabilityOverride>();
     public DbSet<AnalystRecommendation> AnalystRecommendations => Set<AnalystRecommendation>();
     public DbSet<PatchingTask> PatchingTasks => Set<PatchingTask>();
+    public DbSet<ApprovalTask> ApprovalTasks => Set<ApprovalTask>();
+    public DbSet<ApprovalTaskVisibleRole> ApprovalTaskVisibleRoles => Set<ApprovalTaskVisibleRole>();
 
     public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken ct = default)
     {
@@ -306,10 +308,23 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<RemediationDecision>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
+            .Entity<RemediationDecisionVulnerabilityOverride>()
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || AccessibleTenantIds.Contains(e.RemediationDecision.TenantId));
+        modelBuilder
             .Entity<AnalystRecommendation>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<PatchingTask>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<ApprovalTask>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<ApprovalTaskVisibleRole>()
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || AccessibleTenantIds.Contains(e.ApprovalTask.TenantId));
     }
 }

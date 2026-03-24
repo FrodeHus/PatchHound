@@ -5,4 +5,5 @@ export const roleOptions = [
   'AssetOwner',
   'Stakeholder',
   'Auditor',
+  'TechnicalManager',
 ] as const

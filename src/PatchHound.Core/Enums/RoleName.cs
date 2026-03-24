@@ -8,4 +8,5 @@ public enum RoleName
     AssetOwner,
     Stakeholder,
     Auditor,
+    TechnicalManager,
 }

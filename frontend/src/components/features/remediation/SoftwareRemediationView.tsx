@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { ArrowLeft, Ban, CheckCircle, XCircle } from 'lucide-react'
+import { ArrowLeft, Ban, CheckCircle, Clock, ShieldAlert, XCircle } from 'lucide-react'
 import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
 import { approveOrRejectDecision } from '@/api/remediation.functions'
+import { fetchDecisionAuditTrail } from '@/api/approval-tasks.functions'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toneBadge } from '@/lib/tone-classes'
@@ -228,6 +229,11 @@ export function SoftwareRemediationView({ data, assetId, embedded = false }: Sof
         </CardContent>
       </Card>
 
+      {/* Approval History */}
+      {data.currentDecision ? (
+        <ApprovalHistorySection assetId={assetId} decisionId={data.currentDecision.id} />
+      ) : null}
+
       {/* Decision Form — only when no active decision exists */}
       {!data.currentDecision ? (
         <Card>
@@ -258,5 +264,67 @@ export function SoftwareRemediationView({ data, assetId, embedded = false }: Sof
         onOpenChange={(open) => { if (!open) setSelectedVuln(null) }}
       />
     </section>
+  )
+}
+
+function auditActionIcon(action: string) {
+  switch (action) {
+    case 'Approved':
+      return <CheckCircle className="size-4 text-tone-success-foreground" />
+    case 'Denied':
+      return <XCircle className="size-4 text-tone-danger-foreground" />
+    case 'AutoDenied':
+      return <Clock className="size-4 text-muted-foreground" />
+    case 'Created':
+      return <ShieldAlert className="size-4 text-primary" />
+    default:
+      return <Clock className="size-4 text-muted-foreground" />
+  }
+}
+
+function ApprovalHistorySection({ assetId, decisionId }: { assetId: string; decisionId: string }) {
+  const auditQuery = useQuery({
+    queryKey: ['decision-audit-trail', assetId, decisionId],
+    queryFn: () => fetchDecisionAuditTrail({ data: { assetId, decisionId } }),
+  })
+
+  if (!auditQuery.data || auditQuery.data.length === 0) return null
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">Approval History</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-0">
+          {auditQuery.data.map((entry, i) => (
+            <div
+              key={`${entry.timestamp}-${i}`}
+              className="flex gap-3 border-l-2 border-border/60 py-3 pl-4"
+            >
+              <div className="mt-0.5">{auditActionIcon(entry.action)}</div>
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <p className="text-sm">
+                  <span className="font-medium">
+                    {entry.userDisplayName ?? 'System'}
+                  </span>{' '}
+                  <span className="text-muted-foreground">
+                    {entry.action.toLowerCase()}
+                  </span>
+                </p>
+                {entry.justification ? (
+                  <p className="text-sm italic text-muted-foreground">
+                    &ldquo;{entry.justification}&rdquo;
+                  </p>
+                ) : null}
+                <p className="text-[10px] text-muted-foreground">
+                  {formatDateTime(entry.timestamp)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

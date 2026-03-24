@@ -62,7 +62,8 @@ public class AssetsControllerTests : IDisposable
             new NormalizedSoftwareResolver(_dbContext)
         );
         var aliasResolver = new PatchHound.Api.Services.TenantSoftwareAliasResolver(_dbContext);
-        var remediationDecisionService = new RemediationDecisionService(_dbContext, new SlaService());
+        var approvalTaskService = new ApprovalTaskService(_dbContext, Substitute.For<INotificationService>(), new AuditLogWriter(_dbContext, _tenantContext), Substitute.For<IRealTimeNotifier>());
+        var remediationDecisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService);
         var remediationTaskQueryService = new PatchHound.Api.Services.RemediationTaskQueryService(
             _dbContext,
             remediationDecisionService
