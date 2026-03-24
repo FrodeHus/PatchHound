@@ -4,6 +4,7 @@ import type { TechnicalManagerDashboardSummary } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { MetricInfoTooltip } from '@/components/features/dashboard/MetricInfoTooltip'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 
 type Props = {
@@ -47,10 +48,10 @@ export function TechnicalManagerOverview({ summary, isLoading }: Props) {
             </div>
 
             <div className="grid gap-3 rounded-[1.5rem] border border-border/70 bg-background/45 p-5 backdrop-blur-sm sm:grid-cols-2">
-              <Metric icon={CheckCircle2} label="Approved patching tasks" value={summary.approvedPatchingTasks.length} tone="text-chart-3" />
-              <Metric icon={Clock3} label="Past due" value={overdueApprovedTasks} tone="text-destructive" />
-              <Metric icon={ShieldAlert} label="Devices with 90+ day vulns" value={summary.devicesWithAgedVulnerabilities.length} tone="text-primary" />
-              <Metric icon={AlertTriangle} label="Pending approvals" value={summary.approvalTasksRequiringAttention.length} tone="text-chart-4" />
+              <Metric icon={CheckCircle2} label="Approved patching tasks" tooltip="A patching task represents approved software remediation work that is ready for execution. It reflects work that should now move through normal technical delivery." value={summary.approvedPatchingTasks.length} tone="text-chart-3" />
+              <Metric icon={Clock3} label="Past due" tooltip="Past due means approved patch work has outlived its expected completion window. This is a leading signal of patching routine breakdown." value={overdueApprovedTasks} tone="text-destructive" />
+              <Metric icon={ShieldAlert} label="Devices with 90+ day vulns" tooltip="This highlights long-lived exposure. The 90-day threshold is meant to catch devices that appear to be falling outside normal patching cadence." value={summary.devicesWithAgedVulnerabilities.length} tone="text-primary" />
+              <Metric icon={AlertTriangle} label="Pending approvals" tooltip="Pending approvals are unresolved governance steps that can block technical remediation from proceeding, even when engineering capacity exists." value={summary.approvalTasksRequiringAttention.length} tone="text-chart-4" />
             </div>
           </div>
         </CardContent>
@@ -207,11 +208,13 @@ export function TechnicalManagerOverview({ summary, isLoading }: Props) {
 function Metric({
   icon: Icon,
   label,
+  tooltip,
   value,
   tone,
 }: {
   icon: typeof ShieldAlert
   label: string
+  tooltip: string
   value: number
   tone: string
 }) {
@@ -220,6 +223,7 @@ function Metric({
       <div className={`flex items-center gap-2 text-xs uppercase tracking-[0.18em] ${tone}`}>
         <Icon className="size-3.5" />
         {label}
+        <MetricInfoTooltip content={tooltip} />
       </div>
       <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{value}</div>
     </div>

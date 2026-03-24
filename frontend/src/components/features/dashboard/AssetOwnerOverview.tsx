@@ -4,6 +4,7 @@ import type { OwnerDashboardSummary } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { MetricInfoTooltip } from '@/components/features/dashboard/MetricInfoTooltip'
 
 type Props = {
   summary: OwnerDashboardSummary
@@ -46,11 +47,17 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
               <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Your scope</div>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[1.2rem] border border-border/60 bg-card/70 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Owned assets</div>
+                  <div className="flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    Owned assets
+                    <MetricInfoTooltip content="Ownership means you are accountable for the asset in PatchHound. The count shows the current asset scope for that responsibility." />
+                  </div>
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{summary.ownedAssetCount}</div>
                 </div>
                 <div className="rounded-[1.2rem] border border-destructive/20 bg-destructive/8 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-destructive">Need attention</div>
+                  <div className="flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-destructive">
+                    Need attention
+                    <MetricInfoTooltip content="Need attention means the owned asset currently carries enough exposure or remediation pressure that it should be reviewed rather than left in routine monitoring." />
+                  </div>
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{summary.assetsNeedingAttention}</div>
                 </div>
               </div>
@@ -65,6 +72,7 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
             <CardDescription className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em]">
               <ShieldAlert className="size-3.5 text-primary" />
               Open actions
+              <MetricInfoTooltip content="An open action is remediation work still awaiting follow-through. It tells the owner that something remains unresolved on software running on their assets." />
             </CardDescription>
             <CardTitle className="text-3xl tracking-[-0.05em]">{summary.openActionCount}</CardTitle>
           </CardHeader>
@@ -77,6 +85,7 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
             <CardDescription className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em]">
               <Clock3 className="size-3.5 text-destructive" />
               Overdue
+              <MetricInfoTooltip content="Overdue means the expected action window has passed. These items usually deserve first review because agreed timelines are already slipping." />
             </CardDescription>
             <CardTitle className="text-3xl tracking-[-0.05em]">{summary.overdueActionCount}</CardTitle>
           </CardHeader>

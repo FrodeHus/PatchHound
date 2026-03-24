@@ -55,6 +55,10 @@ public class RemediationDecisionQueryService(
             .ToListAsync(ct);
         var softwareAssetIds = activeInstallations.Select(item => item.SoftwareAssetId).Distinct().ToList();
         var deviceAssetIds = activeInstallations.Select(item => item.DeviceAssetId).Distinct().ToList();
+        var softwareAssetNamesById = await dbContext.Assets.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && softwareAssetIds.Contains(item.Id))
+            .Select(item => new { item.Id, item.Name })
+            .ToDictionaryAsync(item => item.Id, item => item.Name, ct);
         var deviceAssets = await dbContext.Assets.AsNoTracking()
             .Where(item => item.TenantId == tenantId && deviceAssetIds.Contains(item.Id))
             .Select(item => new { item.Id, item.Criticality })
@@ -178,7 +182,14 @@ public class RemediationDecisionQueryService(
 
             items.Add(new RemediationDecisionListItemDto(
                 software.Id,
-                software.Name,
+                ResolveDisplaySoftwareName(
+                    software.Name,
+                    representativeAssetByTenantSoftwareId.TryGetValue(software.Id, out var representativeSoftwareAssetId)
+                        && representativeSoftwareAssetId != Guid.Empty
+                        && softwareAssetNamesById.TryGetValue(representativeSoftwareAssetId, out var representativeSoftwareName)
+                        ? representativeSoftwareName
+                        : null
+                ),
                 criticality.ToString(),
                 decision?.Outcome.ToString(),
                 decision?.ApprovalStatus.ToString(),
@@ -253,7 +264,7 @@ public class RemediationDecisionQueryService(
             return null;
 
         var assetId = representativeAsset?.Id ?? tenantSoftwareId;
-        var softwareName = tenantSoftwareMeta?.Name ?? representativeAsset?.Name ?? "Software";
+        var softwareName = ResolveDisplaySoftwareName(tenantSoftwareMeta?.Name, representativeAsset?.Name);
 
         var scopedSoftwareAssetIds = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
             .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
@@ -534,6 +545,21 @@ public class RemediationDecisionQueryService(
             slaDto,
             aiNarrative
         );
+    }
+
+    private static string ResolveDisplaySoftwareName(string? canonicalName, string? fallbackName)
+    {
+        if (!string.IsNullOrWhiteSpace(canonicalName))
+        {
+            return canonicalName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(fallbackName))
+        {
+            return fallbackName;
+        }
+
+        return "Unknown software";
     }
 
     private async Task<string?> GenerateAiNarrativeAsync(

@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowUpRight, Building2, Clock3, Flame, RefreshCw, ShieldAlert, Siren, Trophy } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import type { DashboardSummary, TrendData } from '@/api/dashboard.schemas'
+import { MetricInfoTooltip } from '@/components/features/dashboard/MetricInfoTooltip'
 import { RiskScoreCard } from '@/components/features/dashboard/RiskScoreCard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -118,12 +119,14 @@ function getTrendDirection(trends: TrendData) {
 
 function ExecutiveSignalCard({
   label,
+  tooltip,
   value,
   detail,
   tone,
   icon: Icon,
 }: {
   label: string
+  tooltip: string
   value: string
   detail: string
   tone: ExecutiveTone
@@ -137,7 +140,10 @@ function ExecutiveSignalCard({
     )}>
       <CardHeader className="gap-2">
         <div className="flex items-center justify-between">
-          <CardDescription className="text-[11px] uppercase tracking-[0.18em]">{label}</CardDescription>
+          <div className="flex items-center gap-1.5">
+            <CardDescription className="text-[11px] uppercase tracking-[0.18em]">{label}</CardDescription>
+            <MetricInfoTooltip content={tooltip} />
+          </div>
           <span className={cn(
             'flex size-9 items-center justify-center rounded-2xl border',
             tone === 'critical' && 'border-destructive/30 bg-destructive/10 text-destructive',
@@ -220,12 +226,12 @@ export function CisoExecutiveOverview({
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-[1.4rem] border border-border/70 bg-background/50 px-4 py-4 backdrop-blur-sm">
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Critical exposure</div>
+                  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Critical exposure<MetricInfoTooltip content="Exposure is the part of organizational risk that is currently reachable through unresolved vulnerabilities. Critical exposure is the subset sitting in the highest severity band." /></div>
                   <div className="mt-2 text-4xl font-semibold tracking-[-0.06em]">{criticalCount}</div>
                   <div className="mt-2 text-sm text-muted-foreground">currently critical vulnerabilities across the estate</div>
                 </div>
                 <div className="rounded-[1.4rem] border border-border/70 bg-background/50 px-4 py-4 backdrop-blur-sm">
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Remediation momentum</div>
+                  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Remediation momentum<MetricInfoTooltip content="Momentum describes whether remediation is reducing pressure faster than new exposure is appearing. Positive movement means closure is outpacing inflow." /></div>
                   <div className="mt-2 flex items-end gap-2">
                     <span className="text-4xl font-semibold tracking-[-0.06em]">{resolvedVsAppeared > 0 ? '+' : ''}{resolvedVsAppeared}</span>
                     <span className="pb-1 text-sm text-muted-foreground">net weekly movement</span>
@@ -233,7 +239,7 @@ export function CisoExecutiveOverview({
                   <div className="mt-2 text-sm text-muted-foreground">resolved minus newly appeared vulnerabilities in the latest brief</div>
                 </div>
                 <div className="rounded-[1.4rem] border border-border/70 bg-background/50 px-4 py-4 backdrop-blur-sm">
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Trend direction</div>
+                  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Trend direction<MetricInfoTooltip content="Trend direction shows whether open vulnerability pressure is rising, falling, or flat over the recent reporting window." /></div>
                   <div className="mt-2 flex items-center gap-2 text-4xl font-semibold tracking-[-0.06em]">
                     {trend.direction === 'down' ? <ArrowDownRight className="size-8 text-chart-3" /> : null}
                     {trend.direction === 'up' ? <ArrowUpRight className="size-8 text-destructive" /> : null}
@@ -292,6 +298,7 @@ export function CisoExecutiveOverview({
       <div className="grid gap-4 xl:grid-cols-4">
         <ExecutiveSignalCard
           label="Critical backlog"
+          tooltip="Backlog means unresolved exposure still waiting for control action. Critical backlog is the portion of that backlog in the highest severity tier."
           value={String(criticalCount)}
           detail={`${highCount} additional high-severity vulnerabilities are still active.`}
           tone={criticalCount > 0 ? 'critical' : highCount > 0 ? 'watch' : 'contained'}
@@ -299,6 +306,7 @@ export function CisoExecutiveOverview({
         />
         <ExecutiveSignalCard
           label="Repeat risk"
+          tooltip="Repeat risk reflects control drift: vulnerabilities or weakness patterns that reappear after they should have been prevented or permanently reduced."
           value={formatPercent(summary.recurrenceRatePercent)}
           detail={`${summary.recurringVulnerabilityCount} recurring vulnerabilities suggest control drift or repeated patch slippage.`}
           tone={summary.recurrenceRatePercent >= 15 ? 'critical' : summary.recurrenceRatePercent >= 6 ? 'watch' : 'contained'}
@@ -306,6 +314,7 @@ export function CisoExecutiveOverview({
         />
         <ExecutiveSignalCard
           label="Remediation pace"
+          tooltip="Remediation pace is how quickly the organization closes exposure once it is present. Slower pace increases the time risk remains active in the environment."
           value={formatDays(summary.averageRemediationDays)}
           detail={`${summary.overdueTaskCount} actions are overdue, which is the cleanest indicator of execution strain.`}
           tone={summary.overdueTaskCount >= 25 ? 'critical' : summary.overdueTaskCount >= 10 ? 'watch' : 'contained'}
@@ -313,6 +322,7 @@ export function CisoExecutiveOverview({
         />
         <ExecutiveSignalCard
           label="Estate health"
+          tooltip="Estate health is a broad posture signal combining timely remediation and healthy device-state coverage. It is a resilience indicator rather than a raw vulnerability count."
           value={formatPercent(summary.slaCompliancePercent)}
           detail={`${healthyDevices} of ${totalDevices} devices report healthy or active posture signals.`}
           tone={summary.slaCompliancePercent < 70 ? 'critical' : summary.slaCompliancePercent < 85 ? 'watch' : 'contained'}

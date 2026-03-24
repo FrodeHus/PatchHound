@@ -107,7 +107,7 @@ public class ApprovalTaskQueryService(
                 t.Id,
                 t.Type.ToString(),
                 t.Status.ToString(),
-                softwareName ?? t.RemediationDecision.SoftwareAsset.Name,
+                ResolveDisplaySoftwareName(softwareName, t.RemediationDecision.SoftwareAsset.Name),
                 hasCriticality ? criticality.ToString() : t.RemediationDecision.SoftwareAsset.Criticality.ToString(),
                 t.RemediationDecision.Outcome.ToString(),
                 hasSeverity ? severity.ToString() : "Unknown",
@@ -398,7 +398,7 @@ public class ApprovalTaskQueryService(
             task.Type.ToString(),
             task.Status.ToString(),
             task.RemediationDecisionId,
-            softwareName ?? decision.SoftwareAsset.Name,
+            ResolveDisplaySoftwareName(softwareName, decision.SoftwareAsset.Name),
             hasHighestCriticality ? highestCriticality.ToString() : decision.SoftwareAsset.Criticality.ToString(),
             decision.Outcome.ToString(),
             decision.Justification,
@@ -442,6 +442,21 @@ public class ApprovalTaskQueryService(
             .Select(role => Enum.Parse<RoleName>(role, true))
             .Distinct()
             .ToList();
+    }
+
+    private static string ResolveDisplaySoftwareName(string? canonicalName, string? fallbackName)
+    {
+        if (!string.IsNullOrWhiteSpace(canonicalName))
+        {
+            return canonicalName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(fallbackName))
+        {
+            return fallbackName;
+        }
+
+        return "Unknown software";
     }
 
     private async Task<Dictionary<Guid, Severity>> GetHighestSeveritiesAsync(

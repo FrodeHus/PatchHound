@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, CircleQuestionMark, Flame, RefreshCw, ShieldAlert, Siren } from 'lucide-react'
+import { ChevronRight, Flame, RefreshCw, ShieldAlert, Siren } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InsetPanel } from '@/components/ui/inset-panel'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Sparkline } from '@/components/features/dashboard/Sparkline'
 import { fetchRiskScoreSummary, recalculateRiskScores } from '@/api/risk-score.functions'
 import type { RiskScoreSummary } from '@/api/risk-score.schemas'
 import { useTenantScope } from '@/components/layout/tenant-scope'
+import { MetricInfoTooltip } from './MetricInfoTooltip'
 import { RiskScoreDetailDialog } from './RiskScoreDetailDialog'
 
 type RiskScoreCardProps = {
@@ -307,9 +307,9 @@ export function RiskScoreCard({ isLoading: parentLoading, filters }: RiskScoreCa
               </div>
 
               <div className="grid gap-2 sm:grid-cols-3">
-                <MetricTile label="Critical assets" value={summary.criticalAssetCount} tone="text-destructive" />
-                <MetricTile label="High assets" value={summary.highAssetCount} tone="text-tone-warning-foreground" />
-                <MetricTile label="Medium assets" value={mediumAssetCount} tone="text-chart-2" />
+                <MetricTile label="Critical assets" tooltip="A risk band is PatchHound's severity grouping for current exposure on an asset. Critical is the highest band and reflects the strongest concentration of active risk, not business criticality." value={summary.criticalAssetCount} tone="text-destructive" />
+                <MetricTile label="High assets" tooltip="High risk band means the asset carries serious active exposure, but below the platform's top critical threshold." value={summary.highAssetCount} tone="text-tone-warning-foreground" />
+                <MetricTile label="Medium assets" tooltip="Medium risk band represents meaningful active exposure that is notable but not yet in the high or critical tiers." value={mediumAssetCount} tone="text-chart-2" />
               </div>
             </InsetPanel>
           </div>
@@ -325,23 +325,15 @@ export function RiskScoreCard({ isLoading: parentLoading, filters }: RiskScoreCa
   )
 }
 
-function InfoTooltip({ content }: { content: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger className="inline-flex items-center text-muted-foreground/80 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:text-foreground">
-        <CircleQuestionMark className="size-4" />
-      </TooltipTrigger>
-      <TooltipContent className="max-w-sm text-sm">
-        {content}
-      </TooltipContent>
-    </Tooltip>
-  )
-}
+const InfoTooltip = MetricInfoTooltip
 
-function MetricTile({ label, value, tone }: { label: string; value: number; tone: string }) {
+function MetricTile({ label, tooltip, value, tone }: { label: string; tooltip: string; value: number; tone: string }) {
   return (
     <div className="rounded-xl border border-border/70 bg-background/35 px-3 py-3">
-      <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">{label}</p>
+      <div className="flex items-center gap-1.5">
+        <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">{label}</p>
+        <MetricInfoTooltip content={tooltip} />
+      </div>
       <p className={`mt-2 text-2xl font-semibold tracking-[-0.04em] ${tone}`}>{value}</p>
     </div>
   )
