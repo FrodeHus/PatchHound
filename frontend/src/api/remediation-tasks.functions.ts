@@ -5,6 +5,7 @@ import { apiGet, apiPost } from '@/server/api'
 import {
   pagedRemediationTasksSchema,
   remediationTaskCreateResultSchema,
+  remediationTaskTeamStatusSchema,
 } from './remediation-tasks.schemas'
 import { buildFilterParams } from './utils'
 
@@ -34,4 +35,12 @@ export const createRemediationTasksForSoftware = createServerFn({ method: 'POST'
   .handler(async ({ context, data: { tenantSoftwareId } }) => {
     const data = await apiPost(`/remediation/tasks/software/${tenantSoftwareId}`, context, {})
     return remediationTaskCreateResultSchema.parse(data)
+  })
+
+export const fetchRemediationTaskTeamStatuses = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ tenantSoftwareId: z.string().uuid() }))
+  .handler(async ({ context, data: { tenantSoftwareId } }) => {
+    const data = await apiGet(`/remediation/tasks/software/${tenantSoftwareId}/team-statuses`, context)
+    return z.array(remediationTaskTeamStatusSchema).parse(data)
   })

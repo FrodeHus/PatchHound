@@ -178,7 +178,14 @@ export function SoftwareDetailPage({
         />
       ) : activeTab === 'remediation' && canViewRemediation ? (
         remediationData ? (
-          <SoftwareRemediationView data={remediationData} tenantSoftwareId={tenantSoftwareId} embedded />
+          <SoftwareRemediationView
+            data={remediationData}
+            tenantSoftwareId={tenantSoftwareId}
+            embedded
+            initialSoftwareDetail={detail}
+            initialInstallations={installations}
+            initialDeviceVersion={selectedVersion}
+          />
         ) : (
           <section className="rounded-2xl border border-border/70 bg-card p-8">
             <div className="mx-auto max-w-2xl text-center">

@@ -6,6 +6,7 @@ public class RemediationDecision
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public Guid? RemediationWorkflowId { get; private set; }
     public Guid TenantSoftwareId { get; private set; }
     public Guid SoftwareAssetId { get; private set; }
     public RemediationOutcome Outcome { get; private set; }
@@ -22,6 +23,7 @@ public class RemediationDecision
     public DateTimeOffset UpdatedAt { get; private set; }
 
     public Asset SoftwareAsset { get; private set; } = null!;
+    public RemediationWorkflow? RemediationWorkflow { get; private set; }
     public ICollection<RemediationDecisionVulnerabilityOverride> VulnerabilityOverrides { get; private set; } = [];
 
     private static readonly RemediationOutcome[] OutcomesRequiringApproval =
@@ -110,5 +112,11 @@ public class RemediationDecision
     public void MarkSlaNotified()
     {
         LastSlaNotifiedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void AttachToWorkflow(Guid remediationWorkflowId)
+    {
+        RemediationWorkflowId = remediationWorkflowId;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

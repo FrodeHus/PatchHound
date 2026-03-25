@@ -14,6 +14,7 @@ public class ApprovalTaskConfiguration : IEntityTypeConfiguration<ApprovalTask>
         builder.HasIndex(at => new { at.TenantId, at.RemediationDecisionId });
         builder.HasIndex(at => at.Status);
         builder.HasIndex(at => at.ExpiresAt);
+        builder.HasIndex(at => at.RemediationWorkflowId);
 
         builder.Property(at => at.Type).HasConversion<string>().HasMaxLength(32);
         builder.Property(at => at.Status).HasConversion<string>().HasMaxLength(32);
@@ -24,6 +25,12 @@ public class ApprovalTaskConfiguration : IEntityTypeConfiguration<ApprovalTask>
             .WithMany()
             .HasForeignKey(at => at.RemediationDecisionId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder
+            .HasOne(at => at.RemediationWorkflow)
+            .WithMany()
+            .HasForeignKey(at => at.RemediationWorkflowId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.Navigation(at => at.VisibleRoles).UsePropertyAccessMode(PropertyAccessMode.Field);
     }

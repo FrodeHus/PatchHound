@@ -39,6 +39,27 @@ public class RemediationTasksController(
         return Ok(result);
     }
 
+    [HttpGet("software/{tenantSoftwareId:guid}/team-statuses")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
+    public async Task<ActionResult<List<RemediationTaskTeamStatusDto>>> GetTeamStatusesForSoftware(
+        Guid tenantSoftwareId,
+        CancellationToken ct
+    )
+    {
+        if (tenantContext.CurrentTenantId is not Guid tenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var result = await remediationTaskQueryService.ListTeamStatusesForSoftwareAsync(
+            tenantId,
+            tenantSoftwareId,
+            ct
+        );
+
+        return Ok(result);
+    }
+
     [HttpPost("software/{tenantSoftwareId:guid}")]
     [Authorize(Policy = Policies.AssignTasks)]
     public async Task<ActionResult<RemediationTaskCreateResultDto>> CreateForSoftware(

@@ -14,6 +14,7 @@ public class PatchingTaskConfiguration : IEntityTypeConfiguration<PatchingTask>
         builder.HasIndex(pt => new { pt.TenantId, pt.TenantSoftwareId });
         builder.HasIndex(pt => pt.OwnerTeamId);
         builder.HasIndex(pt => pt.Status);
+        builder.HasIndex(pt => pt.RemediationWorkflowId);
 
         builder.Property(pt => pt.Status).HasConversion<string>().HasMaxLength(32);
 
@@ -22,5 +23,11 @@ public class PatchingTaskConfiguration : IEntityTypeConfiguration<PatchingTask>
             .WithMany()
             .HasForeignKey(pt => pt.RemediationDecisionId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder
+            .HasOne(pt => pt.RemediationWorkflow)
+            .WithMany()
+            .HasForeignKey(pt => pt.RemediationWorkflowId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

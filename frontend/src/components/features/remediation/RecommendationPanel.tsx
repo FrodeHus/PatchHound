@@ -17,8 +17,10 @@ import { outcomeLabel, outcomeTone } from './remediation-utils'
 
 type RecommendationPanelProps = {
   tenantSoftwareId: string
+  workflowId?: string | null
   recommendations: AnalystRecommendation[]
   queryKey: readonly unknown[]
+  readOnly?: boolean
 }
 
 const OUTCOMES = [
@@ -28,7 +30,13 @@ const OUTCOMES = [
   'PatchingDeferred',
 ] as const
 
-export function RecommendationPanel({ tenantSoftwareId, recommendations, queryKey }: RecommendationPanelProps) {
+export function RecommendationPanel({
+  tenantSoftwareId,
+  workflowId,
+  recommendations,
+  queryKey,
+  readOnly = false,
+}: RecommendationPanelProps) {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [outcome, setOutcome] = useState('')
@@ -42,6 +50,7 @@ export function RecommendationPanel({ tenantSoftwareId, recommendations, queryKe
       await addRecommendation({
         data: {
           tenantSoftwareId,
+          workflowId,
           recommendedOutcome: outcome,
           rationale: rationale.trim(),
         },
@@ -85,7 +94,11 @@ export function RecommendationPanel({ tenantSoftwareId, recommendations, queryKe
         <p className="text-sm text-muted-foreground">No analyst recommendations yet.</p>
       )}
 
-      {showForm ? (
+      {readOnly ? (
+        <p className="text-xs text-muted-foreground">
+          You can review analyst recommendations here, but only the current stage owner can add or change them.
+        </p>
+      ) : showForm ? (
         <div className="space-y-3 rounded-lg border border-border/70 bg-background p-3">
           <div className="space-y-2">
             <label className="text-sm font-medium">Recommended Outcome</label>

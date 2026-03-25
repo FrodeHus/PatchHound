@@ -8,6 +8,7 @@ public class ApprovalTask
 
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public Guid? RemediationWorkflowId { get; private set; }
     public Guid RemediationDecisionId { get; private set; }
     public ApprovalTaskType Type { get; private set; }
     public ApprovalTaskStatus Status { get; private set; }
@@ -23,6 +24,7 @@ public class ApprovalTask
     public DateTimeOffset? ReadAt { get; private set; }
 
     public RemediationDecision RemediationDecision { get; private set; } = null!;
+    public RemediationWorkflow? RemediationWorkflow { get; private set; }
 
     private ApprovalTask() { }
 
@@ -122,5 +124,11 @@ public class ApprovalTask
     public void MarkAsRead()
     {
         ReadAt = DateTimeOffset.UtcNow;
+    }
+
+    public void AttachToWorkflow(Guid remediationWorkflowId)
+    {
+        RemediationWorkflowId = remediationWorkflowId;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

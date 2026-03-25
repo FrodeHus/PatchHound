@@ -63,7 +63,9 @@ public record TenantSoftwareInstallationDto(
     int CurrentEpisodeNumber,
     string? SecurityProfileName,
     Guid? OwnerUserId,
+    string? OwnerUserName,
     Guid? OwnerTeamId,
+    string? OwnerTeamName,
     int OpenVulnerabilityCount
 );
 

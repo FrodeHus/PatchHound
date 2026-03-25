@@ -98,6 +98,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<PatchingTask> PatchingTasks => Set<PatchingTask>();
     public DbSet<ApprovalTask> ApprovalTasks => Set<ApprovalTask>();
     public DbSet<ApprovalTaskVisibleRole> ApprovalTaskVisibleRoles => Set<ApprovalTaskVisibleRole>();
+    public DbSet<RemediationWorkflow> RemediationWorkflows => Set<RemediationWorkflow>();
+    public DbSet<RemediationWorkflowStageRecord> RemediationWorkflowStageRecords => Set<RemediationWorkflowStageRecord>();
 
     public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken ct = default)
     {
@@ -326,5 +328,11 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e =>
                 IsSystemContext
                 || AccessibleTenantIds.Contains(e.ApprovalTask.TenantId));
+        modelBuilder
+            .Entity<RemediationWorkflow>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<RemediationWorkflowStageRecord>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
     }
 }

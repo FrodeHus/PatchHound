@@ -81,7 +81,9 @@ export const tenantSoftwareInstallationSchema = z.object({
   currentEpisodeNumber: z.number(),
   securityProfileName: z.string().nullable(),
   ownerUserId: z.string().uuid().nullable(),
+  ownerUserName: z.string().nullable(),
   ownerTeamId: z.string().uuid().nullable(),
+  ownerTeamName: z.string().nullable(),
   openVulnerabilityCount: z.number(),
 })
 

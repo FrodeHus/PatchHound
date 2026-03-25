@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Decisions;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
@@ -15,7 +16,8 @@ public class RemediationDecisionQueryService(
     TenantSnapshotResolver snapshotResolver,
     SlaService slaService,
     ITenantAiConfigurationResolver aiConfigResolver,
-    TenantAiTextGenerationService aiTextGenerationService
+    TenantAiTextGenerationService aiTextGenerationService,
+    ITenantContext tenantContext
 )
 {
     public async Task<PagedResponse<RemediationDecisionListItemDto>> ListAsync(
@@ -271,6 +273,11 @@ public class RemediationDecisionQueryService(
             .Select(item => item.SoftwareAssetId)
             .Distinct()
             .ToListAsync(ct);
+        var scopedInstallations = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
+            .Select(item => new { item.DeviceAssetId })
+            .ToListAsync(ct);
+        var scopedDeviceAssetIds = scopedInstallations.Select(item => item.DeviceAssetId).Distinct().ToList();
         var scopedDeviceCriticalityValues = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
             .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
             .Join(
@@ -283,6 +290,23 @@ public class RemediationDecisionQueryService(
         var assetCriticality = scopedDeviceCriticalityValues.Count > 0
             ? scopedDeviceCriticalityValues.Max()
             : Criticality.Low;
+        var affectedOwnerTeamCount = scopedDeviceAssetIds.Count > 0
+            ? await dbContext.Assets.AsNoTracking()
+                .Where(asset => asset.TenantId == tenantId && scopedDeviceAssetIds.Contains(asset.Id))
+                .Select(asset => asset.OwnerTeamId ?? asset.FallbackTeamId)
+                .Where(teamId => teamId != null)
+                .Distinct()
+                .CountAsync(ct)
+            : 0;
+        var patchingTaskCounts = await dbContext.PatchingTasks.AsNoTracking()
+            .Where(task => task.TenantId == tenantId && task.TenantSoftwareId == tenantSoftwareId)
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                Open = group.Count(task => task.Status != PatchingTaskStatus.Completed),
+                Completed = group.Count(task => task.Status == PatchingTaskStatus.Completed),
+            })
+            .FirstOrDefaultAsync(ct);
 
         var activeSnapshotId = await snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
 
@@ -355,6 +379,8 @@ public class RemediationDecisionQueryService(
                 && d.ApprovalStatus != DecisionApprovalStatus.Expired)
             .OrderByDescending(d => d.CreatedAt)
             .FirstOrDefaultAsync(ct);
+
+        RemediationDecision? previousDecision = null;
 
         var overridesByTenantVulnId = decision?.VulnerabilityOverrides
             .ToDictionary(vo => vo.TenantVulnerabilityId);
@@ -528,6 +554,30 @@ public class RemediationDecisionQueryService(
             );
         }
 
+        RemediationDecisionDto? previousDecisionDto = null;
+        if (previousDecision is not null)
+        {
+            previousDecisionDto = new RemediationDecisionDto(
+                previousDecision.Id,
+                previousDecision.Outcome.ToString(),
+                previousDecision.ApprovalStatus.ToString(),
+                previousDecision.Justification,
+                previousDecision.DecidedBy,
+                previousDecision.DecidedAt,
+                previousDecision.ApprovedBy,
+                previousDecision.ApprovedAt,
+                previousDecision.ExpiryDate,
+                previousDecision.ReEvaluationDate,
+                previousDecision.VulnerabilityOverrides.Select(vo => new VulnerabilityOverrideDto(
+                    vo.Id,
+                    vo.TenantVulnerabilityId,
+                    vo.Outcome.ToString(),
+                    vo.Justification,
+                    vo.CreatedAt
+                )).ToList()
+            );
+        }
+
         // Recommendation DTOs
         var recommendationDtos = recommendations.Select(r => new AnalystRecommendationDto(
             r.Id,
@@ -540,12 +590,85 @@ public class RemediationDecisionQueryService(
             r.CreatedAt
         )).ToList();
 
+        var activeWorkflow = await dbContext.RemediationWorkflows.AsNoTracking()
+            .Where(workflow =>
+                workflow.TenantId == tenantId
+                && workflow.TenantSoftwareId == tenantSoftwareId)
+            .OrderByDescending(workflow => workflow.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (activeWorkflow?.RecurrenceSourceWorkflowId is Guid recurrenceSourceWorkflowId)
+        {
+            previousDecision = await dbContext.RemediationDecisions.AsNoTracking()
+                .Include(d => d.VulnerabilityOverrides)
+                .Where(d =>
+                    d.TenantId == tenantId
+                    && d.RemediationWorkflowId == recurrenceSourceWorkflowId
+                    && d.ApprovalStatus == DecisionApprovalStatus.Approved)
+                .OrderByDescending(d => d.DecidedAt)
+                .FirstOrDefaultAsync(ct);
+        }
+
+        var stageRecords = activeWorkflow is not null
+            ? await dbContext.RemediationWorkflowStageRecords.AsNoTracking()
+                .Where(record => record.RemediationWorkflowId == activeWorkflow.Id)
+                .OrderBy(record => record.StartedAt)
+                .ToListAsync(ct)
+            : [];
+
+        var currentUserRoles = tenantContext
+            .GetRolesForTenant(tenantId)
+            .Select(role => Enum.TryParse<RoleName>(role, true, out var parsed) ? parsed : (RoleName?)null)
+            .OfType<RoleName>()
+            .ToHashSet();
+
+        var currentUserTeamIds = await dbContext.TeamMembers.AsNoTracking()
+            .Where(member => member.UserId == tenantContext.CurrentUserId && member.Team.TenantId == tenantId)
+            .Select(member => member.TeamId)
+            .ToListAsync(ct);
+
+        var softwareOwnerTeamId = activeWorkflow?.SoftwareOwnerTeamId;
+        var softwareOwnerTeamName = softwareOwnerTeamId is Guid resolvedSoftwareOwnerTeamId
+            && resolvedSoftwareOwnerTeamId != Guid.Empty
+            ? await dbContext.Teams.AsNoTracking()
+                .Where(team => team.Id == resolvedSoftwareOwnerTeamId)
+                .Select(team => team.Name)
+                .FirstOrDefaultAsync(ct)
+            : null;
+
+        var executionTeamIds = scopedDeviceAssetIds.Count > 0
+            ? await dbContext.Assets.AsNoTracking()
+                .Where(asset => asset.TenantId == tenantId && scopedDeviceAssetIds.Contains(asset.Id))
+                .Select(asset => asset.OwnerTeamId ?? asset.FallbackTeamId)
+                .Where(teamId => teamId != null)
+                .Select(teamId => teamId!.Value)
+                .Distinct()
+                .ToListAsync(ct)
+            : [];
+
+        var workflowState = BuildWorkflowState(
+            activeWorkflow,
+            stageRecords,
+            currentUserRoles,
+            currentUserTeamIds,
+            softwareOwnerTeamName,
+            executionTeamIds
+        );
+
         return new DecisionContextDto(
             tenantSoftwareId,
             softwareName,
             assetCriticality.ToString(),
             summary,
+            new DecisionWorkflowSummaryDto(
+                scopedDeviceAssetIds.Count,
+                affectedOwnerTeamCount,
+                patchingTaskCounts?.Open ?? 0,
+                patchingTaskCounts?.Completed ?? 0
+            ),
+            workflowState,
             decisionDto,
+            previousDecisionDto,
             recommendationDtos,
             topVulns.Take(5).ToList(),
             riskDto,
@@ -553,6 +676,179 @@ public class RemediationDecisionQueryService(
             aiNarrative
         );
     }
+
+    private static DecisionWorkflowStateDto BuildWorkflowState(
+        RemediationWorkflow? workflow,
+        List<RemediationWorkflowStageRecord> stageRecords,
+        HashSet<RoleName> currentUserRoles,
+        List<Guid> currentUserTeamIds,
+        string? softwareOwnerTeamName,
+        List<Guid> executionTeamIds
+    )
+    {
+        var isRecurrence = workflow?.RecurrenceSourceWorkflowId != null;
+        var currentStage = workflow?.Status == RemediationWorkflowStatus.Completed
+            ? RemediationWorkflowStage.Closure
+            : workflow?.CurrentStage ?? RemediationWorkflowStage.SecurityAnalysis;
+
+        var stageOrder = new List<RemediationWorkflowStage>();
+        if (isRecurrence)
+        {
+            stageOrder.Add(RemediationWorkflowStage.Verification);
+        }
+
+        stageOrder.AddRange(
+        [
+            RemediationWorkflowStage.SecurityAnalysis,
+            RemediationWorkflowStage.RemediationDecision,
+            RemediationWorkflowStage.Approval,
+            RemediationWorkflowStage.Execution,
+            RemediationWorkflowStage.Closure,
+        ]);
+
+        var currentIndex = stageOrder.IndexOf(currentStage);
+        var stageDtos = stageOrder.Select((stage, index) =>
+        {
+            var latestRecord = stageRecords
+                .Where(record => record.Stage == stage)
+                .OrderByDescending(record => record.StartedAt)
+                .FirstOrDefault();
+
+            var state = workflow?.Status == RemediationWorkflowStatus.Completed && stage == RemediationWorkflowStage.Closure
+                ? "closed"
+                : latestRecord?.Status switch
+                {
+                    RemediationWorkflowStageStatus.Skipped => "skipped",
+                    RemediationWorkflowStageStatus.Completed or RemediationWorkflowStageStatus.AutoCompleted => "complete",
+                    RemediationWorkflowStageStatus.InProgress when stage == currentStage => "current",
+                    RemediationWorkflowStageStatus.Pending => "pending",
+                    _ => index < currentIndex ? "complete" : index == currentIndex ? "current" : "pending",
+                };
+
+            return new DecisionWorkflowStageDto(
+                StageId(stage),
+                StageLabel(stage),
+                state,
+                StageDescription(stage)
+            );
+        }).ToList();
+
+        return new DecisionWorkflowStateDto(
+            workflow?.Id,
+            StageId(currentStage),
+            StageLabel(currentStage),
+            StageDescription(currentStage),
+            CurrentActorSummary(currentStage, workflow, softwareOwnerTeamName),
+            CanActOnCurrentStage(currentStage, workflow, currentUserRoles, currentUserTeamIds, executionTeamIds),
+            isRecurrence,
+            workflow?.Status == RemediationWorkflowStatus.Active,
+            stageDtos
+        );
+    }
+
+    private static bool CanActOnCurrentStage(
+        RemediationWorkflowStage stage,
+        RemediationWorkflow? workflow,
+        HashSet<RoleName> currentUserRoles,
+        List<Guid> currentUserTeamIds,
+        List<Guid> executionTeamIds
+    )
+    {
+        if (currentUserRoles.Contains(RoleName.GlobalAdmin))
+            return stage != RemediationWorkflowStage.Closure;
+
+        return stage switch
+        {
+            RemediationWorkflowStage.Verification =>
+                workflow?.ProposedOutcome switch
+                {
+                    RemediationOutcome.RiskAcceptance or RemediationOutcome.AlternateMitigation =>
+                        currentUserRoles.Contains(RoleName.SecurityManager),
+                    _ =>
+                        workflow is not null && currentUserTeamIds.Contains(workflow.SoftwareOwnerTeamId),
+                },
+            RemediationWorkflowStage.SecurityAnalysis =>
+                currentUserRoles.Contains(RoleName.SecurityManager)
+                || currentUserRoles.Contains(RoleName.SecurityAnalyst),
+            RemediationWorkflowStage.RemediationDecision =>
+                workflow is not null && currentUserTeamIds.Contains(workflow.SoftwareOwnerTeamId),
+            RemediationWorkflowStage.Approval =>
+                workflow?.ApprovalMode switch
+                {
+                    RemediationWorkflowApprovalMode.SecurityApproval =>
+                        currentUserRoles.Contains(RoleName.SecurityManager),
+                    RemediationWorkflowApprovalMode.TechnicalApproval =>
+                        currentUserRoles.Contains(RoleName.TechnicalManager),
+                    _ => false,
+                },
+            RemediationWorkflowStage.Execution =>
+                currentUserRoles.Contains(RoleName.TechnicalManager)
+                || executionTeamIds.Any(currentUserTeamIds.Contains),
+            _ => false,
+        };
+    }
+
+    private static string CurrentActorSummary(
+        RemediationWorkflowStage stage,
+        RemediationWorkflow? workflow,
+        string? softwareOwnerTeamName
+    ) =>
+        stage switch
+        {
+            RemediationWorkflowStage.Verification when workflow?.ProposedOutcome is RemediationOutcome.RiskAcceptance or RemediationOutcome.AlternateMitigation =>
+                "Waiting for Security Manager or Global Admin to verify whether the previous exception still applies.",
+            RemediationWorkflowStage.Verification =>
+                $"Waiting for the software owner team to verify whether the previous remediation should be kept. Current owner: {softwareOwnerTeamName ?? "Infrastructure"}.",
+            RemediationWorkflowStage.SecurityAnalysis =>
+                "Security analysis can be completed by Global Admin, Security Manager, or Security Analyst.",
+            RemediationWorkflowStage.RemediationDecision =>
+                $"Waiting for the software owner team to decide. Current owner: {softwareOwnerTeamName ?? "Infrastructure"}.",
+            RemediationWorkflowStage.Approval when workflow?.ApprovalMode == RemediationWorkflowApprovalMode.SecurityApproval =>
+                "Waiting for Security Manager or Global Admin approval.",
+            RemediationWorkflowStage.Approval when workflow?.ApprovalMode == RemediationWorkflowApprovalMode.TechnicalApproval =>
+                "Waiting for Technical Manager or Global Admin approval.",
+            RemediationWorkflowStage.Execution =>
+                "Device owner teams execute patching tasks, with Technical Manager or Global Admin oversight.",
+            RemediationWorkflowStage.Closure =>
+                "Closure is completed by the system when execution is finished and exposure is resolved.",
+            _ => "This stage is ready for action.",
+        };
+
+    private static string StageId(RemediationWorkflowStage stage) =>
+        stage switch
+        {
+            RemediationWorkflowStage.Verification => "verification",
+            RemediationWorkflowStage.SecurityAnalysis => "securityAnalysis",
+            RemediationWorkflowStage.RemediationDecision => "remediationDecision",
+            RemediationWorkflowStage.Approval => "approval",
+            RemediationWorkflowStage.Execution => "execution",
+            RemediationWorkflowStage.Closure => "closure",
+            _ => "securityAnalysis",
+        };
+
+    private static string StageLabel(RemediationWorkflowStage stage) =>
+        stage switch
+        {
+            RemediationWorkflowStage.Verification => "Verification",
+            RemediationWorkflowStage.SecurityAnalysis => "Security Analysis",
+            RemediationWorkflowStage.RemediationDecision => "Remediation Decision",
+            RemediationWorkflowStage.Approval => "Approval",
+            RemediationWorkflowStage.Execution => "Execution",
+            RemediationWorkflowStage.Closure => "Closure",
+            _ => "Security Analysis",
+        };
+
+    private static string StageDescription(RemediationWorkflowStage stage) =>
+        stage switch
+        {
+            RemediationWorkflowStage.Verification => "Recurring exposure must be verified before the workflow reuses or replaces the previous remediation posture.",
+            RemediationWorkflowStage.SecurityAnalysis => "Security roles review shared exposure and record a recommendation and priority.",
+            RemediationWorkflowStage.RemediationDecision => "The software owner team chooses how the organization should handle the software exposure.",
+            RemediationWorkflowStage.Approval => "Approvers validate the chosen posture when the decision branch requires approval.",
+            RemediationWorkflowStage.Execution => "Device owner teams execute approved patching work across affected devices.",
+            RemediationWorkflowStage.Closure => "The system closes the workflow when patching is complete and exposure is resolved.",
+            _ => "The workflow is active.",
+        };
 
     private static string ResolveDisplaySoftwareName(string? canonicalName, string? fallbackName)
     {

@@ -511,6 +511,14 @@ public class SoftwareController(
                 item.CurrentEpisodeNumber,
                 item.DeviceAsset.OwnerUserId,
                 item.DeviceAsset.OwnerTeamId,
+                OwnerUserName = dbContext.Users
+                    .Where(user => user.Id == item.DeviceAsset.OwnerUserId)
+                    .Select(user => user.DisplayName)
+                    .FirstOrDefault(),
+                OwnerTeamName = dbContext.Teams
+                    .Where(team => team.Id == item.DeviceAsset.OwnerTeamId)
+                    .Select(team => team.Name)
+                    .FirstOrDefault(),
                 SecurityProfileName = dbContext
                     .AssetSecurityProfiles.Where(profile =>
                         profile.Id == item.DeviceAsset.SecurityProfileId
@@ -544,7 +552,9 @@ public class SoftwareController(
                         item.CurrentEpisodeNumber,
                         item.SecurityProfileName,
                         item.OwnerUserId,
+                        item.OwnerUserName,
                         item.OwnerTeamId,
+                        item.OwnerTeamName,
                         item.OpenVulnerabilityCount
                     ))
                     .ToList(),

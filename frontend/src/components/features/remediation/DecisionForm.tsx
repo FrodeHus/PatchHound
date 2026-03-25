@@ -15,7 +15,9 @@ import { outcomeLabel } from './remediation-utils'
 
 type DecisionFormProps = {
   tenantSoftwareId: string
+  workflowId?: string | null
   queryKey: readonly unknown[]
+  readOnly?: boolean
 }
 
 const OUTCOMES = [
@@ -33,7 +35,12 @@ const REQUIRES_JUSTIFICATION = new Set<string>([
 const REQUIRES_EXPIRY = new Set<string>(['RiskAcceptance', 'AlternateMitigation'])
 const REQUIRES_REEVALUATION = new Set<string>(['PatchingDeferred'])
 
-export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) {
+export function DecisionForm({
+  tenantSoftwareId,
+  workflowId,
+  queryKey,
+  readOnly = false,
+}: DecisionFormProps) {
   const queryClient = useQueryClient()
   const [outcome, setOutcome] = useState('')
   const [justification, setJustification] = useState('')
@@ -65,6 +72,7 @@ export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) 
       await createDecision({
         data: {
           tenantSoftwareId,
+          workflowId,
           outcome,
           justification: justification || undefined,
           expiryDate: needsExpiry && expiryMode === 'expires' ? toIsoDateBoundary(expiryDate) : undefined,
@@ -84,9 +92,14 @@ export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) 
 
   return (
     <div className="space-y-4">
+      {readOnly ? (
+        <div className="rounded-xl border border-dashed border-border/70 bg-background/50 px-4 py-3 text-sm text-muted-foreground">
+          This stage is visible in read-only mode. Only the current remediation decision owner can submit the next decision.
+        </div>
+      ) : null}
       <div className="space-y-2">
         <label className="text-sm font-medium">Outcome</label>
-        <Select value={outcome} onValueChange={(v) => setOutcome(v ?? '')}>
+        <Select value={outcome} onValueChange={(v) => setOutcome(v ?? '')} disabled={readOnly}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Select remediation outcome..." />
           </SelectTrigger>
@@ -110,6 +123,7 @@ export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) 
             onChange={(e) => setJustification(e.target.value)}
             placeholder="Provide justification for this decision..."
             rows={3}
+            disabled={readOnly}
           />
         </div>
       ) : null}
@@ -122,6 +136,7 @@ export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) 
               type="button"
               variant={expiryMode === 'permanent' ? 'default' : 'outline'}
               size="sm"
+              disabled={readOnly}
               onClick={() => {
                 setExpiryMode('permanent')
                 setExpiryDate('')
@@ -133,6 +148,7 @@ export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) 
               type="button"
               variant={expiryMode === 'expires' ? 'default' : 'outline'}
               size="sm"
+              disabled={readOnly}
               onClick={() => setExpiryMode('expires')}
             >
               Expires on date
@@ -143,6 +159,7 @@ export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) 
               type="date"
               value={expiryDate}
               onChange={(e) => setExpiryDate(e.target.value)}
+              disabled={readOnly}
             />
           ) : null}
           <p className="text-xs text-muted-foreground">
@@ -160,6 +177,7 @@ export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) 
             type="date"
             value={reEvaluationDate}
             onChange={(e) => setReEvaluationDate(e.target.value)}
+            disabled={readOnly}
           />
           <p className="text-xs text-muted-foreground">
             When this deferral should be reassessed.
@@ -169,7 +187,7 @@ export function DecisionForm({ tenantSoftwareId, queryKey }: DecisionFormProps) 
 
       <Button
         onClick={handleSubmit}
-        disabled={!canSubmit || submitting}
+        disabled={readOnly || !canSubmit || submitting}
         className="w-full sm:w-auto"
       >
         {submitting ? 'Submitting...' : 'Submit Decision'}
