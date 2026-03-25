@@ -63,7 +63,13 @@ public record RemediationDecisionDto(
     DateTimeOffset? ApprovedAt,
     DateTimeOffset? ExpiryDate,
     DateTimeOffset? ReEvaluationDate,
+    DecisionRejectionDto? LatestRejection,
     List<VulnerabilityOverrideDto> Overrides
+);
+
+public record DecisionRejectionDto(
+    string? Comment,
+    DateTimeOffset? RejectedAt
 );
 
 public record VulnerabilityOverrideDto(

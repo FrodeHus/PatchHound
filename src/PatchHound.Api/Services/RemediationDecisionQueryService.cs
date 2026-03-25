@@ -371,14 +371,29 @@ public class RemediationDecisionQueryService(
                 && r.ResolvedAt == null)
             .ToDictionaryAsync(r => r.TenantVulnerabilityId, ct);
 
-        // Current decision
-        var decision = await dbContext.RemediationDecisions.AsNoTracking()
-            .Include(d => d.VulnerabilityOverrides)
-            .Where(d => d.TenantId == tenantId && d.TenantSoftwareId == tenantSoftwareId
-                && d.ApprovalStatus != DecisionApprovalStatus.Rejected
-                && d.ApprovalStatus != DecisionApprovalStatus.Expired)
-            .OrderByDescending(d => d.CreatedAt)
+        var activeWorkflow = await dbContext.RemediationWorkflows.AsNoTracking()
+            .Where(workflow =>
+                workflow.TenantId == tenantId
+                && workflow.TenantSoftwareId == tenantSoftwareId)
+            .OrderByDescending(workflow => workflow.CreatedAt)
             .FirstOrDefaultAsync(ct);
+
+        // Current decision
+        var decisionQuery = dbContext.RemediationDecisions.AsNoTracking()
+            .Include(d => d.VulnerabilityOverrides)
+            .Where(d => d.TenantId == tenantId && d.TenantSoftwareId == tenantSoftwareId);
+
+        var decision = activeWorkflow is not null
+            ? await decisionQuery
+                .Where(d => d.RemediationWorkflowId == activeWorkflow.Id)
+                .OrderByDescending(d => d.CreatedAt)
+                .FirstOrDefaultAsync(ct)
+            : await decisionQuery
+                .Where(d =>
+                    d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                    && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                .OrderByDescending(d => d.CreatedAt)
+                .FirstOrDefaultAsync(ct);
 
         RemediationDecision? previousDecision = null;
 
@@ -396,6 +411,16 @@ public class RemediationDecisionQueryService(
                 .Where(user => recommendationAnalystIds.Contains(user.Id))
                 .ToDictionaryAsync(user => user.Id, user => user.DisplayName, ct)
             : new Dictionary<Guid, string>();
+
+        var latestRejectedApproval = decision is not null
+            ? await dbContext.ApprovalTasks.AsNoTracking()
+                .Where(task =>
+                    task.TenantId == tenantId
+                    && task.RemediationDecisionId == decision.Id
+                    && (task.Status == ApprovalTaskStatus.Denied || task.Status == ApprovalTaskStatus.AutoDenied))
+                .OrderByDescending(task => task.ResolvedAt ?? task.UpdatedAt)
+                .FirstOrDefaultAsync(ct)
+            : null;
 
         // Asset risk score
         var assetRiskScore = await dbContext.AssetRiskScores.AsNoTracking()
@@ -544,31 +569,13 @@ public class RemediationDecisionQueryService(
                 decision.ApprovedAt,
                 decision.ExpiryDate,
                 decision.ReEvaluationDate,
+                latestRejectedApproval is not null
+                    ? new DecisionRejectionDto(
+                        latestRejectedApproval.ResolutionJustification,
+                        latestRejectedApproval.ResolvedAt
+                    )
+                    : null,
                 decision.VulnerabilityOverrides.Select(vo => new VulnerabilityOverrideDto(
-                    vo.Id,
-                    vo.TenantVulnerabilityId,
-                    vo.Outcome.ToString(),
-                    vo.Justification,
-                    vo.CreatedAt
-                )).ToList()
-            );
-        }
-
-        RemediationDecisionDto? previousDecisionDto = null;
-        if (previousDecision is not null)
-        {
-            previousDecisionDto = new RemediationDecisionDto(
-                previousDecision.Id,
-                previousDecision.Outcome.ToString(),
-                previousDecision.ApprovalStatus.ToString(),
-                previousDecision.Justification,
-                previousDecision.DecidedBy,
-                previousDecision.DecidedAt,
-                previousDecision.ApprovedBy,
-                previousDecision.ApprovedAt,
-                previousDecision.ExpiryDate,
-                previousDecision.ReEvaluationDate,
-                previousDecision.VulnerabilityOverrides.Select(vo => new VulnerabilityOverrideDto(
                     vo.Id,
                     vo.TenantVulnerabilityId,
                     vo.Outcome.ToString(),
@@ -590,13 +597,6 @@ public class RemediationDecisionQueryService(
             r.CreatedAt
         )).ToList();
 
-        var activeWorkflow = await dbContext.RemediationWorkflows.AsNoTracking()
-            .Where(workflow =>
-                workflow.TenantId == tenantId
-                && workflow.TenantSoftwareId == tenantSoftwareId)
-            .OrderByDescending(workflow => workflow.CreatedAt)
-            .FirstOrDefaultAsync(ct);
-
         if (activeWorkflow?.RecurrenceSourceWorkflowId is Guid recurrenceSourceWorkflowId)
         {
             previousDecision = await dbContext.RemediationDecisions.AsNoTracking()
@@ -607,6 +607,31 @@ public class RemediationDecisionQueryService(
                     && d.ApprovalStatus == DecisionApprovalStatus.Approved)
                 .OrderByDescending(d => d.DecidedAt)
                 .FirstOrDefaultAsync(ct);
+        }
+
+        RemediationDecisionDto? previousDecisionDto = null;
+        if (previousDecision is not null)
+        {
+            previousDecisionDto = new RemediationDecisionDto(
+                previousDecision.Id,
+                previousDecision.Outcome.ToString(),
+                previousDecision.ApprovalStatus.ToString(),
+                previousDecision.Justification,
+                previousDecision.DecidedBy,
+                previousDecision.DecidedAt,
+                previousDecision.ApprovedBy,
+                previousDecision.ApprovedAt,
+                previousDecision.ExpiryDate,
+                previousDecision.ReEvaluationDate,
+                null,
+                previousDecision.VulnerabilityOverrides.Select(vo => new VulnerabilityOverrideDto(
+                    vo.Id,
+                    vo.TenantVulnerabilityId,
+                    vo.Outcome.ToString(),
+                    vo.Justification,
+                    vo.CreatedAt
+                )).ToList()
+            );
         }
 
         var stageRecords = activeWorkflow is not null

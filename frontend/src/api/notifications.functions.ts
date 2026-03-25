@@ -25,3 +25,9 @@ export const markNotificationRead = createServerFn({ method: 'POST' })
   .handler(async ({ context, data: { id } }) => {
     await apiPost(`/notifications/${id}/read`, context)
   })
+
+export const markAllNotificationsRead = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    await apiPost('/notifications/read-all', context)
+  })

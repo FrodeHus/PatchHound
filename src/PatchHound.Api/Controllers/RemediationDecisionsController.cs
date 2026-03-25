@@ -270,6 +270,7 @@ public class RemediationDecisionsController(
             d.Id, d.Outcome.ToString(), d.ApprovalStatus.ToString(),
             d.Justification, d.DecidedBy, d.DecidedAt,
             d.ApprovedBy, d.ApprovedAt, d.ExpiryDate, d.ReEvaluationDate,
+            null,
             []
         ));
     }

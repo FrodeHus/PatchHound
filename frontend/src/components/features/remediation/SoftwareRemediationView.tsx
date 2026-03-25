@@ -942,11 +942,43 @@ function DecisionSummaryPanel({
   requireApprovalJustification?: boolean
 }) {
   const [approvalJustification, setApprovalJustification] = useState('')
+  const isRejected = decision.approvalStatus === 'Rejected'
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
       <div className="space-y-4">
-        <div className={`rounded-2xl border p-4 ${emphasizeApproval ? 'border-amber-300/70 bg-amber-500/6' : 'border-border/70 bg-background/60'}`}>
+        {isRejected ? (
+          <div className="rounded-2xl border border-destructive/40 bg-destructive/6 p-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-full border border-destructive/30 bg-destructive/10 p-2 text-destructive">
+                <XCircle className="size-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-destructive">
+                  Approval was rejected
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-foreground/90">
+                  {decision.latestRejection?.comment?.trim()
+                    ? decision.latestRejection.comment
+                    : 'The approver rejected this remediation decision without leaving a written comment.'}
+                </p>
+                {decision.latestRejection?.rejectedAt ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Rejected {formatDateTime(decision.latestRejection.rejectedAt)}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className={`rounded-2xl border p-4 ${
+          isRejected
+            ? 'border-destructive/40 bg-destructive/4'
+            : emphasizeApproval
+              ? 'border-amber-300/70 bg-amber-500/6'
+              : 'border-border/70 bg-background/60'
+        }`}>
           <div className="flex flex-wrap items-center gap-2">
             <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(decision.outcome))}`}>
               {outcomeLabel(decision.outcome)}

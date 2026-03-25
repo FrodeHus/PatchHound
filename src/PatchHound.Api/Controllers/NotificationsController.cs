@@ -94,4 +94,26 @@ public class NotificationsController(
         await dbContext.SaveChangesAsync(ct);
         return NoContent();
     }
+
+    [HttpPost("read-all")]
+    public async Task<IActionResult> MarkAllRead(CancellationToken ct)
+    {
+        var userId = tenantContext.CurrentUserId;
+        if (userId == Guid.Empty)
+        {
+            return Unauthorized();
+        }
+
+        var notifications = await dbContext.Notifications
+            .Where(item => item.UserId == userId && item.ReadAt == null)
+            .ToListAsync(ct);
+
+        foreach (var notification in notifications)
+        {
+            notification.MarkAsRead();
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        return NoContent();
+    }
 }
