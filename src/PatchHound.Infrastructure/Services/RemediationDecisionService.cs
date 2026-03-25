@@ -10,7 +10,8 @@ namespace PatchHound.Infrastructure.Services;
 public class RemediationDecisionService(
     PatchHoundDbContext dbContext,
     SlaService slaService,
-    ApprovalTaskService approvalTaskService
+    ApprovalTaskService approvalTaskService,
+    RemediationWorkflowService remediationWorkflowService
 )
 {
     public async Task<Result<RemediationDecision>> CreateDecisionAsync(
@@ -29,11 +30,16 @@ public class RemediationDecisionService(
             return Result<RemediationDecision>.Failure("No tenant software scope was found for this software.");
 
         var hasOpenDecision = await dbContext.RemediationDecisions
+            .Where(d =>
+                d.TenantId == tenantId
+                && d.TenantSoftwareId == remediationScope.TenantSoftwareId
+                && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                && d.ApprovalStatus != DecisionApprovalStatus.Expired)
             .AnyAsync(
-                d => d.TenantId == tenantId
-                    && d.TenantSoftwareId == remediationScope.TenantSoftwareId
-                    && d.ApprovalStatus != DecisionApprovalStatus.Rejected
-                    && d.ApprovalStatus != DecisionApprovalStatus.Expired,
+                d => !d.RemediationWorkflowId.HasValue
+                    || dbContext.RemediationWorkflows.Any(workflow =>
+                        workflow.Id == d.RemediationWorkflowId.Value
+                        && workflow.Status == RemediationWorkflowStatus.Active),
                 ct
             );
 
@@ -53,6 +59,7 @@ public class RemediationDecisionService(
         );
 
         await dbContext.RemediationDecisions.AddAsync(decision, ct);
+        await remediationWorkflowService.AttachDecisionAsync(decision, ct);
 
         if (decision.Outcome == RemediationOutcome.ApprovedForPatching
             && decision.ApprovalStatus == DecisionApprovalStatus.Approved)
@@ -97,6 +104,53 @@ public class RemediationDecisionService(
             reEvaluationDate,
             ct
         );
+    }
+
+    public async Task<Result<RemediationDecision>> VerifyAndCarryForwardDecisionAsync(
+        Guid tenantId,
+        Guid workflowId,
+        RemediationDecision previousDecision,
+        Guid actedBy,
+        CancellationToken ct
+    )
+    {
+        var verificationResult = await remediationWorkflowService.VerifyRecurringWorkflowAsync(
+            tenantId,
+            workflowId,
+            actedBy,
+            "keepCurrentDecision",
+            ct
+        );
+        if (!verificationResult.IsSuccess)
+            return Result<RemediationDecision>.Failure(verificationResult.Error ?? "Verification failed.");
+
+        return await CreateDecisionForTenantSoftwareAsync(
+            tenantId,
+            previousDecision.TenantSoftwareId,
+            previousDecision.Outcome,
+            previousDecision.Justification,
+            actedBy,
+            previousDecision.ExpiryDate,
+            previousDecision.ReEvaluationDate,
+            ct
+        );
+    }
+
+    public async Task<Result<bool>> VerifyAndRequireNewDecisionAsync(
+        Guid tenantId,
+        Guid workflowId,
+        Guid actedBy,
+        CancellationToken ct
+    )
+    {
+        var verificationResult = await remediationWorkflowService.VerifyRecurringWorkflowAsync(
+            tenantId,
+            workflowId,
+            actedBy,
+            "chooseNewDecision",
+            ct
+        );
+        return verificationResult;
     }
 
     public async Task<Result<RemediationDecision>> ApproveAsync(
@@ -213,6 +267,7 @@ public class RemediationDecisionService(
         foreach (var decision in decisionsToClose)
         {
             decision.Expire();
+            await remediationWorkflowService.MarkPatchedWorkflowClosedAsync(decision, ct);
         }
 
         await dbContext.SaveChangesAsync(ct);
@@ -358,6 +413,11 @@ public class RemediationDecisionService(
 
         if (tasks.Count == 0)
             return 0;
+
+        foreach (var task in tasks)
+        {
+            await remediationWorkflowService.AttachPatchingTaskAsync(task, decision, ct);
+        }
 
         await dbContext.PatchingTasks.AddRangeAsync(tasks, ct);
         return tasks.Count;

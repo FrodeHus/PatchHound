@@ -6,6 +6,7 @@ public class AnalystRecommendation
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public Guid? RemediationWorkflowId { get; private set; }
     public Guid SoftwareAssetId { get; private set; }
     public Guid? TenantVulnerabilityId { get; private set; }
     public RemediationOutcome RecommendedOutcome { get; private set; }
@@ -13,6 +14,8 @@ public class AnalystRecommendation
     public string? PriorityOverride { get; private set; }
     public Guid AnalystId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
+
+    public RemediationWorkflow? RemediationWorkflow { get; private set; }
 
     private AnalystRecommendation() { }
 
@@ -41,5 +44,10 @@ public class AnalystRecommendation
             AnalystId = analystId,
             CreatedAt = DateTimeOffset.UtcNow,
         };
+    }
+
+    public void AttachToWorkflow(Guid remediationWorkflowId)
+    {
+        RemediationWorkflowId = remediationWorkflowId;
     }
 }

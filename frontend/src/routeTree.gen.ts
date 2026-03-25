@@ -34,6 +34,7 @@ import { Route as AuthedVulnerabilitiesIdRouteImport } from './routes/_authed/vu
 import { Route as AuthedSoftwareIdRouteImport } from './routes/_authed/software/$id'
 import { Route as AuthedSettingsNotificationsRouteImport } from './routes/_authed/settings/notifications'
 import { Route as AuthedSettingsAiRouteImport } from './routes/_authed/settings/ai'
+import { Route as AuthedRemediationTasksRouteImport } from './routes/_authed/remediation/tasks'
 import { Route as AuthedAssetsIdRouteImport } from './routes/_authed/assets/$id'
 import { Route as AuthedApprovalsIdRouteImport } from './routes/_authed/approvals/$id'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
@@ -178,6 +179,11 @@ const AuthedSettingsAiRoute = AuthedSettingsAiRouteImport.update({
   path: '/settings/ai',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedRemediationTasksRoute = AuthedRemediationTasksRouteImport.update({
+  id: '/remediation/tasks',
+  path: '/remediation/tasks',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedAssetsIdRoute = AuthedAssetsIdRouteImport.update({
   id: '/assets/$id',
   path: '/assets/$id',
@@ -280,6 +286,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AuthedAdminUsersRoute
   '/approvals/$id': typeof AuthedApprovalsIdRoute
   '/assets/$id': typeof AuthedAssetsIdRoute
+  '/remediation/tasks': typeof AuthedRemediationTasksRoute
   '/settings/ai': typeof AuthedSettingsAiRoute
   '/settings/notifications': typeof AuthedSettingsNotificationsRoute
   '/software/$id': typeof AuthedSoftwareIdRoute
@@ -322,6 +329,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AuthedAdminUsersRoute
   '/approvals/$id': typeof AuthedApprovalsIdRoute
   '/assets/$id': typeof AuthedAssetsIdRoute
+  '/remediation/tasks': typeof AuthedRemediationTasksRoute
   '/settings/ai': typeof AuthedSettingsAiRoute
   '/settings/notifications': typeof AuthedSettingsNotificationsRoute
   '/software/$id': typeof AuthedSoftwareIdRoute
@@ -366,6 +374,7 @@ export interface FileRoutesById {
   '/_authed/admin/users': typeof AuthedAdminUsersRoute
   '/_authed/approvals/$id': typeof AuthedApprovalsIdRoute
   '/_authed/assets/$id': typeof AuthedAssetsIdRoute
+  '/_authed/remediation/tasks': typeof AuthedRemediationTasksRoute
   '/_authed/settings/ai': typeof AuthedSettingsAiRoute
   '/_authed/settings/notifications': typeof AuthedSettingsNotificationsRoute
   '/_authed/software/$id': typeof AuthedSoftwareIdRoute
@@ -410,6 +419,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/approvals/$id'
     | '/assets/$id'
+    | '/remediation/tasks'
     | '/settings/ai'
     | '/settings/notifications'
     | '/software/$id'
@@ -452,6 +462,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/approvals/$id'
     | '/assets/$id'
+    | '/remediation/tasks'
     | '/settings/ai'
     | '/settings/notifications'
     | '/software/$id'
@@ -495,6 +506,7 @@ export interface FileRouteTypes {
     | '/_authed/admin/users'
     | '/_authed/approvals/$id'
     | '/_authed/assets/$id'
+    | '/_authed/remediation/tasks'
     | '/_authed/settings/ai'
     | '/_authed/settings/notifications'
     | '/_authed/software/$id'
@@ -712,6 +724,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSettingsAiRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/remediation/tasks': {
+      id: '/_authed/remediation/tasks'
+      path: '/remediation/tasks'
+      fullPath: '/remediation/tasks'
+      preLoaderRoute: typeof AuthedRemediationTasksRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/assets/$id': {
       id: '/_authed/assets/$id'
       path: '/assets/$id'
@@ -835,6 +854,7 @@ interface AuthedRouteChildren {
   AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
   AuthedApprovalsIdRoute: typeof AuthedApprovalsIdRoute
   AuthedAssetsIdRoute: typeof AuthedAssetsIdRoute
+  AuthedRemediationTasksRoute: typeof AuthedRemediationTasksRoute
   AuthedSettingsAiRoute: typeof AuthedSettingsAiRoute
   AuthedSettingsNotificationsRoute: typeof AuthedSettingsNotificationsRoute
   AuthedSoftwareIdRoute: typeof AuthedSoftwareIdRoute
@@ -870,6 +890,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminUsersRoute: AuthedAdminUsersRoute,
   AuthedApprovalsIdRoute: AuthedApprovalsIdRoute,
   AuthedAssetsIdRoute: AuthedAssetsIdRoute,
+  AuthedRemediationTasksRoute: AuthedRemediationTasksRoute,
   AuthedSettingsAiRoute: AuthedSettingsAiRoute,
   AuthedSettingsNotificationsRoute: AuthedSettingsNotificationsRoute,
   AuthedSoftwareIdRoute: AuthedSoftwareIdRoute,

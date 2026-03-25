@@ -1,9 +1,21 @@
-import { useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { ArrowLeft, Ban, CheckCircle, XCircle } from 'lucide-react'
+import {
+  fetchTenantSoftwareDetail,
+  fetchTenantSoftwareInstallations,
+} from '@/api/software.functions'
+import type {
+  PagedTenantSoftwareInstallations,
+  TenantSoftwareDetail,
+} from '@/api/software.schemas'
+import {
+  fetchRemediationTaskTeamStatuses,
+} from '@/api/remediation-tasks.functions'
+import type { RemediationTaskTeamStatus } from '@/api/remediation-tasks.schemas'
 import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
-import { approveOrRejectDecision } from '@/api/remediation.functions'
+import { approveOrRejectDecision, verifyRecurringRemediation } from '@/api/remediation.functions'
 import { fetchDecisionAuditTrail } from '@/api/approval-tasks.functions'
 import {
   AuditTimeline,
@@ -13,7 +25,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toneBadge } from '@/lib/tone-classes'
-import { formatDateTime, formatNullableDateTime, startCase } from '@/lib/formatting'
+import { formatDate, formatDateTime, formatNullableDateTime, startCase } from '@/lib/formatting'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { softwareQueryKeys } from '@/features/software/list-state'
 import { RemediationSummaryCards } from './RemediationSummaryCards'
@@ -22,6 +34,11 @@ import { RemediationVulnDrawer } from './RemediationVulnDrawer'
 import { DecisionForm } from './DecisionForm'
 import { RecommendationPanel } from './RecommendationPanel'
 import { SlaIndicator } from './SlaIndicator'
+import {
+  RemediationStageRail,
+  type RemediationStage,
+  type RemediationStageId,
+} from './RemediationStageRail'
 import {
   outcomeLabel,
   outcomeTone,
@@ -34,15 +51,79 @@ type SoftwareRemediationViewProps = {
   data: DecisionContext
   tenantSoftwareId: string
   embedded?: boolean
+  initialSoftwareDetail?: TenantSoftwareDetail
+  initialInstallations?: PagedTenantSoftwareInstallations
+  initialDeviceVersion?: string
 }
 
-export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = false }: SoftwareRemediationViewProps) {
+export function SoftwareRemediationView({
+  data,
+  tenantSoftwareId,
+  embedded = false,
+  initialSoftwareDetail,
+  initialInstallations,
+  initialDeviceVersion,
+}: SoftwareRemediationViewProps) {
   const [selectedVuln, setSelectedVuln] = useState<DecisionVuln | null>(null)
   const { selectedTenantId } = useTenantScope()
   const queryClient = useQueryClient()
   const queryKey = softwareQueryKeys.remediation(selectedTenantId, tenantSoftwareId)
+  const [deviceVersion, setDeviceVersion] = useState(initialDeviceVersion ?? '')
 
   const [approving, setApproving] = useState(false)
+  const workflowId = data.workflowState.workflowId
+  const currentStageId = data.workflowState.currentStage as RemediationStageId
+  const stages: RemediationStage[] = data.workflowState.stages.map((stage) => ({
+    id: stage.id as RemediationStageId,
+    label: stage.label,
+    state: stage.state as RemediationStage['state'],
+    description: stage.description,
+  }))
+
+  const softwareDetailQuery = useQuery({
+    queryKey: softwareQueryKeys.detail(selectedTenantId, tenantSoftwareId),
+    queryFn: () => fetchTenantSoftwareDetail({ data: { id: tenantSoftwareId } }),
+    initialData: initialSoftwareDetail,
+  })
+
+  const softwareDetail = softwareDetailQuery.data ?? initialSoftwareDetail
+  const normalizedDeviceVersion = deviceVersion || normalizeVersion(softwareDetail?.versionCohorts[0]?.version ?? null)
+
+  useEffect(() => {
+    if (!softwareDetail) {
+      return
+    }
+
+    const defaultVersion = normalizeVersion(softwareDetail.versionCohorts[0]?.version ?? null)
+    if (!deviceVersion && defaultVersion) {
+      setDeviceVersion(defaultVersion)
+    }
+  }, [softwareDetail, deviceVersion])
+
+  const installationsQuery = useQuery({
+    queryKey: softwareQueryKeys.installations(selectedTenantId, tenantSoftwareId, normalizedDeviceVersion, 1, 25),
+    queryFn: () => fetchTenantSoftwareInstallations({
+      data: {
+        id: tenantSoftwareId,
+        version: normalizedDeviceVersion || undefined,
+        activeOnly: true,
+        page: 1,
+        pageSize: 25,
+      },
+    }),
+    enabled: Boolean(softwareDetail),
+    initialData:
+      initialInstallations && (initialDeviceVersion ?? '') === normalizedDeviceVersion
+        ? initialInstallations
+        : undefined,
+  })
+
+  const remediationInstallations = installationsQuery.data ?? initialInstallations
+  const teamStatusesQuery = useQuery({
+    queryKey: ['remediation-team-statuses', selectedTenantId, tenantSoftwareId],
+    queryFn: () => fetchRemediationTaskTeamStatuses({ data: { tenantSoftwareId } }),
+  })
+  const teamStatuses = teamStatusesQuery.data ?? []
 
   async function handleApproveReject(action: 'approve' | 'reject' | 'cancel') {
     if (!data.currentDecision) return
@@ -51,7 +132,24 @@ export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = fal
       await approveOrRejectDecision({
         data: {
           tenantSoftwareId,
+          workflowId,
           decisionId: data.currentDecision.id,
+          action,
+        },
+      })
+      await queryClient.invalidateQueries({ queryKey })
+    } finally {
+      setApproving(false)
+    }
+  }
+
+  async function handleVerification(action: 'keepCurrentDecision' | 'chooseNewDecision') {
+    if (!workflowId) return
+    setApproving(true)
+    try {
+      await verifyRecurringRemediation({
+        data: {
+          workflowId,
           action,
         },
       })
@@ -106,7 +204,9 @@ export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = fal
                   ? `${data.summary.withKnownExploit.toLocaleString()} known exploits`
                   : 'No known exploits'}
                 {' · '}
-                {data.summary.criticalCount + data.summary.highCount} critical or high vulnerabilities
+                {data.workflow.affectedOwnerTeamCount > 0
+                  ? `${data.workflow.affectedOwnerTeamCount.toLocaleString()} owner teams affected`
+                  : `${data.summary.criticalCount + data.summary.highCount} critical or high vulnerabilities`}
                 {data.sla ? ` · SLA ${startCase(data.sla.slaStatus)}` : ''}
               </p>
             </div>
@@ -119,141 +219,61 @@ export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = fal
         </header>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-        <Card className="rounded-[1.6rem] border-border/70">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">
-              {data.currentDecision ? 'Current remediation decision' : 'Make a remediation decision'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {data.currentDecision ? (
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(data.currentDecision.outcome))}`}>
-                    {outcomeLabel(data.currentDecision.outcome)}
-                  </span>
-                <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(approvalStatusTone(data.currentDecision.approvalStatus))}`}>
-                  {approvalStatusLabel(data.currentDecision.approvalStatus)}
-                </span>
-                </div>
+      <RemediationStageRail
+        stages={stages}
+        currentStageId={currentStageId}
+      />
 
-                <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                    Rationale
-                  </p>
-                  <p className="mt-2 text-sm leading-relaxed text-foreground/90">
-                    {data.currentDecision.justification || 'No justification was provided for this decision.'}
-                  </p>
-                </div>
+      <Card className="rounded-[1.6rem] border-border/70">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">
+            {data.workflowState.currentStageLabel} is the current focus
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          <WorkflowFact
+            label="Exposure in scope"
+            value={`${data.summary.totalVulnerabilities.toLocaleString()} vulnerabilities`}
+            detail={`${data.workflow.affectedDeviceCount.toLocaleString()} devices across ${data.workflow.affectedOwnerTeamCount.toLocaleString()} owner teams`}
+          />
+          <WorkflowFact
+            label="Decision posture"
+            value={data.currentDecision ? outcomeLabel(data.currentDecision.outcome) : 'No decision yet'}
+            detail={
+              data.currentDecision
+                ? approvalStatusLabel(data.currentDecision.approvalStatus)
+                : data.recommendations.length > 0
+                  ? `${data.recommendations.length.toLocaleString()} analyst recommendations ready`
+                  : 'Review exposure and capture guidance'
+            }
+          />
+          <WorkflowFact
+            label="Execution status"
+            value={
+              data.workflow.openPatchingTaskCount > 0
+                ? `${data.workflow.openPatchingTaskCount.toLocaleString()} open patching tasks`
+                : data.workflow.completedPatchingTaskCount > 0
+                  ? `${data.workflow.completedPatchingTaskCount.toLocaleString()} completed patching tasks`
+                  : 'No patching tasks yet'
+            }
+            detail={data.workflowState.currentStageDescription}
+          />
+        </CardContent>
+      </Card>
 
-                <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground sm:grid-cols-4">
-                  <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-3">
-                    <span className="block font-medium text-foreground">Decided</span>
-                    {formatDateTime(data.currentDecision.decidedAt)}
-                  </div>
-                  {data.currentDecision.approvedAt ? (
-                    <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-3">
-                      <span className="block font-medium text-foreground">Approved</span>
-                      {formatDateTime(data.currentDecision.approvedAt)}
-                    </div>
-                  ) : null}
-                  {data.currentDecision.expiryDate ? (
-                    <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-3">
-                      <span className="block font-medium text-foreground">Expires</span>
-                      {formatNullableDateTime(data.currentDecision.expiryDate)}
-                    </div>
-                  ) : null}
-                  {data.currentDecision.reEvaluationDate ? (
-                    <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-3">
-                      <span className="block font-medium text-foreground">Re-evaluate</span>
-                      {formatNullableDateTime(data.currentDecision.reEvaluationDate)}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="flex gap-2 pt-1">
-                  {data.currentDecision.approvalStatus === 'PendingApproval' ? (
-                    <>
-                      <Button
-                        size="sm"
-                        onClick={() => handleApproveReject('approve')}
-                        disabled={approving}
-                      >
-                        <CheckCircle className="mr-1.5 size-3.5" />
-                        Approve
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleApproveReject('reject')}
-                        disabled={approving}
-                      >
-                        <XCircle className="mr-1.5 size-3.5" />
-                        Reject
-                      </Button>
-                    </>
-                  ) : null}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleApproveReject('cancel')}
-                    disabled={approving}
-                  >
-                    <Ban className="mr-1.5 size-3.5" />
-                    Cancel Decision
-                  </Button>
-                </div>
-
-                {data.currentDecision.overrides.length > 0 ? (
-                  <div className="pt-2">
-                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">
-                      Vulnerability overrides ({data.currentDecision.overrides.length})
-                    </p>
-                    <div className="space-y-1">
-                      {data.currentDecision.overrides.map((ov) => (
-                        <div
-                          key={ov.id}
-                          className="flex items-center justify-between rounded border border-border/70 bg-background px-3 py-1.5 text-xs"
-                        >
-                          <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${toneBadge(outcomeTone(ov.outcome))}`}>
-                            {outcomeLabel(ov.outcome)}
-                          </span>
-                          <span className="text-muted-foreground">{ov.justification}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    No remediation decision has been recorded for this software yet. Choose how the organization will handle the current exposure across active version cohorts.
-                  </p>
-                </div>
-                <DecisionForm tenantSoftwareId={tenantSoftwareId} queryKey={queryKey} />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          {data.aiNarrative ? (
-            <Card className="rounded-[1.6rem] border-border/70">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">AI analysis</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                  {data.aiNarrative}
-                </p>
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
-      </div>
+      <StagePanel
+        data={data}
+        tenantSoftwareId={tenantSoftwareId}
+        queryKey={queryKey}
+        currentStageId={currentStageId}
+        currentStageLabel={data.workflowState.currentStageLabel}
+        currentActorSummary={data.workflowState.currentActorSummary}
+        canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
+        workflowId={workflowId}
+        approving={approving}
+        onApproveReject={handleApproveReject}
+        onVerify={handleVerification}
+      />
 
       <RemediationSummaryCards summary={data.summary} />
 
@@ -264,6 +284,9 @@ export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = fal
           </TabsTrigger>
           <TabsTrigger value="vulnerabilities" className="rounded-lg px-4 text-sm">
             Vulnerabilities ({data.topVulnerabilities.length})
+          </TabsTrigger>
+          <TabsTrigger value="devices" className="rounded-lg px-4 text-sm">
+            Devices ({data.workflow.affectedDeviceCount})
           </TabsTrigger>
           <TabsTrigger value="history" className="rounded-lg px-4 text-sm">
             History {data.currentDecision || data.recommendations.length > 0 ? `(${(data.currentDecision ? 1 : 0) + data.recommendations.length})` : ''}
@@ -284,6 +307,7 @@ export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = fal
                   <div className="mt-3">
                     <RecommendationPanel
                       tenantSoftwareId={tenantSoftwareId}
+                      workflowId={workflowId}
                       recommendations={data.recommendations}
                       queryKey={queryKey}
                     />
@@ -292,6 +316,7 @@ export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = fal
               ) : (
                 <RecommendationPanel
                   tenantSoftwareId={tenantSoftwareId}
+                  workflowId={workflowId}
                   recommendations={data.recommendations}
                   queryKey={queryKey}
                 />
@@ -331,6 +356,16 @@ export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = fal
           </div>
         </TabsContent>
 
+        <TabsContent value="devices" className="space-y-4 pt-1">
+          <DevicesTab
+            detail={softwareDetail}
+            installations={remediationInstallations}
+            selectedVersion={normalizedDeviceVersion}
+            onSelectVersion={setDeviceVersion}
+            teamStatuses={teamStatuses}
+          />
+        </TabsContent>
+
         <TabsContent value="history" className="pt-1">
           <DecisionHistorySection
             tenantSoftwareId={tenantSoftwareId}
@@ -347,6 +382,778 @@ export function SoftwareRemediationView({ data, tenantSoftwareId, embedded = fal
     </section>
   )
 }
+
+function WorkflowFact({
+  label,
+  value,
+  detail,
+}: {
+  label: string
+  value: string
+  detail: string
+}) {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-background/55 px-4 py-3">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-2 text-base font-semibold text-foreground">
+        {value}
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        {detail}
+      </p>
+    </div>
+  )
+}
+
+function StagePanel({
+  data,
+  tenantSoftwareId,
+  queryKey,
+  currentStageId,
+  currentStageLabel,
+  currentActorSummary,
+  canActOnCurrentStage,
+  workflowId,
+  approving,
+  onApproveReject,
+  onVerify,
+}: {
+  data: DecisionContext
+  tenantSoftwareId: string
+  queryKey: readonly unknown[]
+  currentStageId: RemediationStageId
+  currentStageLabel: string
+  currentActorSummary: string
+  canActOnCurrentStage: boolean
+  workflowId: string | null
+  approving: boolean
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel') => Promise<void>
+  onVerify: (action: 'keepCurrentDecision' | 'chooseNewDecision') => Promise<void>
+}) {
+  return (
+    <Card className="rounded-[1.8rem] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_58%),var(--color-card)]">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">{currentStageLabel} is the current focus</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className={`rounded-2xl border px-4 py-3 text-sm ${
+          canActOnCurrentStage
+            ? 'border-emerald-300/70 bg-emerald-500/6 text-foreground'
+            : 'border-amber-300/70 bg-amber-500/6 text-foreground'
+        }`}>
+          <p className="font-medium">
+            {canActOnCurrentStage ? 'You can complete this stage.' : 'You can review this stage, but you cannot complete it.'}
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            {currentActorSummary}
+          </p>
+        </div>
+        {currentStageId === 'verification' ? (
+          <StageVerificationPanel
+            data={data}
+            canActOnCurrentStage={canActOnCurrentStage}
+            approving={approving}
+            onVerify={onVerify}
+          />
+        ) : null}
+        {currentStageId === 'securityAnalysis' ? (
+          <StageSecurityAnalysisPanel
+            data={data}
+            tenantSoftwareId={tenantSoftwareId}
+            workflowId={workflowId}
+            queryKey={queryKey}
+            canActOnCurrentStage={canActOnCurrentStage}
+          />
+        ) : null}
+        {currentStageId === 'remediationDecision' ? (
+          <StageRemediationDecisionPanel
+            data={data}
+            tenantSoftwareId={tenantSoftwareId}
+            workflowId={workflowId}
+            queryKey={queryKey}
+            canActOnCurrentStage={canActOnCurrentStage}
+            approving={approving}
+            onApproveReject={onApproveReject}
+          />
+        ) : null}
+        {currentStageId === 'approval' ? (
+          <StageApprovalPanel
+            data={data}
+            canActOnCurrentStage={canActOnCurrentStage}
+            approving={approving}
+            onApproveReject={onApproveReject}
+          />
+        ) : null}
+        {currentStageId === 'execution' ? (
+          <StageExecutionPanel
+            data={data}
+            canActOnCurrentStage={canActOnCurrentStage}
+            approving={approving}
+            onApproveReject={onApproveReject}
+          />
+        ) : null}
+        {currentStageId === 'closure' ? (
+          <StageClosurePanel data={data} />
+        ) : null}
+      </CardContent>
+    </Card>
+  )
+}
+
+function StageVerificationPanel({
+  data,
+  canActOnCurrentStage,
+  approving,
+  onVerify,
+}: {
+  data: DecisionContext
+  canActOnCurrentStage: boolean
+  approving: boolean
+  onVerify: (action: 'keepCurrentDecision' | 'chooseNewDecision') => Promise<void>
+}) {
+  const previousDecision = data.previousDecision
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            This software has re-entered exposure after a previous remediation was closed. Verify whether the last decision should stay in place, or route the software back for a new decision.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            Previous decision
+          </p>
+          {previousDecision ? (
+            <>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(previousDecision.outcome))}`}>
+                  {outcomeLabel(previousDecision.outcome)}
+                </span>
+                <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(approvalStatusTone(previousDecision.approvalStatus))}`}>
+                  {approvalStatusLabel(previousDecision.approvalStatus)}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-foreground/90">
+                {previousDecision.justification || 'No justification was recorded for the previous decision.'}
+              </p>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Decided {formatDateTime(previousDecision.decidedAt)}
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              No previous approved decision is available to carry forward.
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="space-y-3">
+        <StageMetricCard
+          label="Recurrence scope"
+          value={data.summary.totalVulnerabilities.toLocaleString()}
+          detail={`${data.workflow.affectedDeviceCount.toLocaleString()} affected devices in the recurring software scope`}
+        />
+        <StageMetricCard
+          label="Default path"
+          value={previousDecision ? outcomeLabel(previousDecision.outcome) : 'No prior posture'}
+          detail="Keeping the current decision carries the same posture forward into the new workflow episode"
+        />
+        <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
+          <div className="space-y-2">
+            <Button
+              onClick={() => onVerify('keepCurrentDecision')}
+              disabled={!canActOnCurrentStage || approving || !previousDecision}
+              className="w-full"
+            >
+              {approving ? 'Processing...' : 'Keep current decision'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => onVerify('chooseNewDecision')}
+              disabled={!canActOnCurrentStage || approving}
+              className="w-full"
+            >
+              Choose a new decision
+            </Button>
+          </div>
+          {!canActOnCurrentStage ? (
+            <p className="mt-3 text-xs text-muted-foreground">
+              You can review the previous decision, but only the current stage owner can confirm or replace it.
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StageSecurityAnalysisPanel({
+  data,
+  tenantSoftwareId,
+  workflowId,
+  queryKey,
+  canActOnCurrentStage,
+}: {
+  data: DecisionContext
+  tenantSoftwareId: string
+  workflowId: string | null
+  queryKey: readonly unknown[]
+  canActOnCurrentStage: boolean
+}) {
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Security analysis uses the shared exposure view to recommend the next move. This scope currently carries{' '}
+            {data.summary.totalVulnerabilities.toLocaleString()} open vulnerabilities across{' '}
+            {data.workflow.affectedDeviceCount.toLocaleString()} affected devices.
+          </p>
+        </div>
+        <RecommendationPanel
+          tenantSoftwareId={tenantSoftwareId}
+          workflowId={workflowId}
+          recommendations={data.recommendations}
+          queryKey={queryKey}
+          readOnly={!canActOnCurrentStage}
+        />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+        <StageMetricCard
+          label="Open vulnerabilities"
+          value={data.summary.totalVulnerabilities.toLocaleString()}
+          detail={`${(data.summary.criticalCount + data.summary.highCount).toLocaleString()} critical or high`}
+        />
+        <StageMetricCard
+          label="Threat pressure"
+          value={data.summary.withKnownExploit.toLocaleString()}
+          detail={`${data.summary.withActiveAlert.toLocaleString()} active alerts`}
+        />
+        <StageMetricCard
+          label="Owner-team scope"
+          value={data.workflow.affectedOwnerTeamCount.toLocaleString()}
+          detail={`${data.workflow.affectedDeviceCount.toLocaleString()} devices in scope`}
+        />
+      </div>
+    </div>
+  )
+}
+
+function StageRemediationDecisionPanel({
+  data,
+  tenantSoftwareId,
+  workflowId,
+  queryKey,
+  canActOnCurrentStage,
+  approving,
+  onApproveReject,
+}: {
+  data: DecisionContext
+  tenantSoftwareId: string
+  workflowId: string | null
+  queryKey: readonly unknown[]
+  canActOnCurrentStage: boolean
+  approving: boolean
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel') => Promise<void>
+}) {
+  if (!data.currentDecision) {
+    return (
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              No remediation decision has been recorded yet. The software owner team now chooses how the organization should handle this software-wide exposure.
+            </p>
+          </div>
+          <DecisionForm
+            tenantSoftwareId={tenantSoftwareId}
+            workflowId={workflowId}
+            queryKey={queryKey}
+            readOnly={!canActOnCurrentStage}
+          />
+        </div>
+        <div className="space-y-3">
+          <StageMetricCard
+            label="Analyst guidance"
+            value={data.recommendations.length.toLocaleString()}
+            detail="Recommendations available to inform the decision"
+          />
+          <StageMetricCard
+            label="Current pressure"
+            value={data.summary.totalVulnerabilities.toLocaleString()}
+            detail={`${(data.summary.criticalCount + data.summary.highCount).toLocaleString()} critical or high vulnerabilities`}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <DecisionSummaryPanel
+      decision={data.currentDecision}
+      readOnly={!canActOnCurrentStage}
+      approving={approving}
+      onApproveReject={onApproveReject}
+      rightColumn={
+        <>
+          <StageMetricCard
+            label="Decision posture"
+            value={outcomeLabel(data.currentDecision.outcome)}
+            detail={approvalStatusLabel(data.currentDecision.approvalStatus)}
+          />
+          <StageMetricCard
+            label="Execution scope"
+            value={data.workflow.affectedOwnerTeamCount.toLocaleString()}
+            detail={`${data.workflow.affectedDeviceCount.toLocaleString()} devices could be affected`}
+          />
+        </>
+      }
+    />
+  )
+}
+
+function StageApprovalPanel({
+  data,
+  canActOnCurrentStage,
+  approving,
+  onApproveReject,
+}: {
+  data: DecisionContext
+  canActOnCurrentStage: boolean
+  approving: boolean
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel') => Promise<void>
+}) {
+  if (!data.currentDecision) {
+    return null
+  }
+
+  return (
+    <DecisionSummaryPanel
+      decision={data.currentDecision}
+      readOnly={!canActOnCurrentStage}
+      approving={approving}
+      onApproveReject={onApproveReject}
+      emphasizeApproval
+      rightColumn={
+        <>
+          <StageMetricCard
+            label="Approval needed"
+            value="Security review"
+            detail="Risk acceptance and alternate mitigation require approval before they become active"
+          />
+          {data.currentDecision.expiryDate ? (
+            <StageMetricCard
+              label="Approval window"
+              value={formatNullableDateTime(data.currentDecision.expiryDate) ?? 'Open-ended'}
+              detail="If approval is not completed in time, the decision will expire"
+            />
+          ) : null}
+        </>
+      }
+    />
+  )
+}
+
+function StageExecutionPanel({
+  data,
+  canActOnCurrentStage,
+  approving,
+  onApproveReject,
+}: {
+  data: DecisionContext
+  canActOnCurrentStage: boolean
+  approving: boolean
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel') => Promise<void>
+}) {
+  if (!data.currentDecision) {
+    return null
+  }
+
+  return (
+    <DecisionSummaryPanel
+      decision={data.currentDecision}
+      readOnly={!canActOnCurrentStage}
+      approving={approving}
+      onApproveReject={onApproveReject}
+      rightColumn={
+        <>
+          <StageMetricCard
+            label="Open patching tasks"
+            value={data.workflow.openPatchingTaskCount.toLocaleString()}
+            detail={`${data.workflow.affectedOwnerTeamCount.toLocaleString()} owner teams carrying execution`}
+          />
+          <StageMetricCard
+            label="Completed tasks"
+            value={data.workflow.completedPatchingTaskCount.toLocaleString()}
+            detail="Completed team tasks feed toward remediation closure"
+          />
+          <Link
+            to="/remediation/tasks"
+            search={{
+              page: 1,
+              pageSize: 25,
+              search: '',
+              vendor: '',
+              criticality: '',
+              assetOwner: '',
+              tenantSoftwareId: data.tenantSoftwareId,
+              deviceAssetId: '',
+            }}
+            className="block rounded-2xl border border-border/70 bg-background/55 p-4 transition hover:border-foreground/20 hover:bg-muted/20"
+          >
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+              Open remediation workbench
+            </p>
+            <p className="mt-2 text-sm font-semibold text-foreground">
+              Review live patching tasks for this software
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Jump to the filtered backlog to see which owner teams still have open execution work.
+            </p>
+          </Link>
+        </>
+      }
+    />
+  )
+}
+
+function StageClosurePanel({ data }: { data: DecisionContext }) {
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+      <div className="rounded-2xl border border-emerald-300/70 bg-emerald-500/6 p-5">
+        <p className="text-[11px] uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+          Remediation complete
+        </p>
+        <h3 className="mt-2 text-xl font-semibold text-foreground">
+          The approved patching flow has cleared this software exposure.
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          All linked vulnerabilities in the active software scope have been resolved, so the remediation can stay closed unless new exposure appears later.
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+        <StageMetricCard
+          label="Resolved exposure"
+          value={data.summary.totalVulnerabilities.toLocaleString()}
+          detail="Open vulnerabilities currently remaining in scope"
+        />
+        <StageMetricCard
+          label="Completed patching tasks"
+          value={data.workflow.completedPatchingTaskCount.toLocaleString()}
+          detail="Recorded team execution tasks that contributed to closure"
+        />
+      </div>
+    </div>
+  )
+}
+
+function DecisionSummaryPanel({
+  decision,
+  readOnly,
+  approving,
+  onApproveReject,
+  rightColumn,
+  emphasizeApproval = false,
+}: {
+  decision: NonNullable<DecisionContext['currentDecision']>
+  readOnly: boolean
+  approving: boolean
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel') => Promise<void>
+  rightColumn: ReactNode
+  emphasizeApproval?: boolean
+}) {
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+      <div className="space-y-4">
+        <div className={`rounded-2xl border p-4 ${emphasizeApproval ? 'border-amber-300/70 bg-amber-500/6' : 'border-border/70 bg-background/60'}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(decision.outcome))}`}>
+              {outcomeLabel(decision.outcome)}
+            </span>
+            <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(approvalStatusTone(decision.approvalStatus))}`}>
+              {approvalStatusLabel(decision.approvalStatus)}
+            </span>
+          </div>
+          <p className="mt-3 text-sm leading-relaxed text-foreground/90">
+            {decision.justification || 'No justification was provided for this decision.'}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground sm:grid-cols-4">
+          <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-3">
+            <span className="block font-medium text-foreground">Decided</span>
+            {formatDateTime(decision.decidedAt)}
+          </div>
+          {decision.approvedAt ? (
+            <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-3">
+              <span className="block font-medium text-foreground">Approved</span>
+              {formatDateTime(decision.approvedAt)}
+            </div>
+          ) : null}
+          {decision.expiryDate ? (
+            <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-3">
+              <span className="block font-medium text-foreground">Expires</span>
+              {formatNullableDateTime(decision.expiryDate)}
+            </div>
+          ) : null}
+          {decision.reEvaluationDate ? (
+            <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-3">
+              <span className="block font-medium text-foreground">Re-evaluate</span>
+              {formatNullableDateTime(decision.reEvaluationDate)}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-1">
+          {decision.approvalStatus === 'PendingApproval' ? (
+            <>
+              <Button size="sm" onClick={() => onApproveReject('approve')} disabled={approving || readOnly}>
+                <CheckCircle className="mr-1.5 size-3.5" />
+                Approve
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => onApproveReject('reject')} disabled={approving || readOnly}>
+                <XCircle className="mr-1.5 size-3.5" />
+                Reject
+              </Button>
+            </>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onApproveReject('cancel')}
+            disabled={approving || readOnly}
+          >
+            <Ban className="mr-1.5 size-3.5" />
+            Cancel Decision
+          </Button>
+        </div>
+
+        {decision.overrides.length > 0 ? (
+          <div className="pt-2">
+            <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+              Vulnerability overrides ({decision.overrides.length})
+            </p>
+            <div className="space-y-1">
+              {decision.overrides.map((ov) => (
+                <div
+                  key={ov.id}
+                  className="flex items-center justify-between rounded border border-border/70 bg-background px-3 py-1.5 text-xs"
+                >
+                  <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${toneBadge(outcomeTone(ov.outcome))}`}>
+                    {outcomeLabel(ov.outcome)}
+                  </span>
+                  <span className="text-muted-foreground">{ov.justification}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="space-y-3">
+        {rightColumn}
+      </div>
+    </div>
+  )
+}
+
+function StageMetricCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string
+  value: string
+  detail: string
+}) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">
+        {value}
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        {detail}
+      </p>
+    </div>
+  )
+}
+
+function DevicesTab({
+  detail,
+  installations,
+  selectedVersion,
+  onSelectVersion,
+  teamStatuses,
+}: {
+  detail?: TenantSoftwareDetail
+  installations?: PagedTenantSoftwareInstallations
+  selectedVersion: string
+  onSelectVersion: (version: string) => void
+  teamStatuses: RemediationTaskTeamStatus[]
+}) {
+  const items = installations?.items ?? []
+  const ownerTeamCount = new Set(items.map((item) => item.ownerTeamId).filter(Boolean)).size
+  const ownerUserCount = new Set(items.map((item) => item.ownerUserId).filter(Boolean)).size
+  const teamStatusById = new Map(teamStatuses.map((status) => [status.ownerTeamId, status]))
+
+  return (
+    <div className="space-y-4">
+      <Card className="rounded-[1.6rem] border-border/70">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Execution scope by version cohort</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {detail ? (
+            <div className="grid gap-3 lg:grid-cols-4">
+              {detail.versionCohorts.map((cohort) => {
+                const versionKey = normalizeVersion(cohort.version)
+                const isSelected = versionKey === selectedVersion
+                return (
+                  <button
+                    key={versionKey || '__unknown__'}
+                    type="button"
+                    onClick={() => onSelectVersion(versionKey)}
+                    className={
+                      isSelected
+                        ? 'rounded-2xl border border-primary/35 bg-primary/8 p-4 text-left'
+                        : 'rounded-2xl border border-border/70 bg-background/55 p-4 text-left hover:border-foreground/20 hover:bg-muted/20'
+                    }
+                  >
+                    <p className="text-sm font-semibold text-foreground">
+                      {formatVersion(cohort.version)}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">
+                      {cohort.deviceCount.toLocaleString()}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      devices · {cohort.activeVulnerabilityCount.toLocaleString()} open vulnerabilities
+                    </p>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Loading version cohorts for this software scope.
+            </p>
+          )}
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <StageMetricCard
+              label="Visible devices"
+              value={items.length.toLocaleString()}
+              detail="Devices in the selected version cohort"
+            />
+            <StageMetricCard
+              label="Assigned owner teams"
+              value={ownerTeamCount.toLocaleString()}
+              detail="Teams with explicit ownership in this cohort"
+            />
+            <StageMetricCard
+              label="Named owners"
+              value={ownerUserCount.toLocaleString()}
+              detail="Devices carrying direct user ownership"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[1.6rem] border-border/70">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Affected devices</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {items.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-8 text-center text-sm text-muted-foreground">
+              No active devices were found for this version cohort.
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-border/70">
+              <table className="min-w-full divide-y divide-border/70 text-sm">
+                <thead className="bg-muted/30 text-left text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Device</th>
+                    <th className="px-4 py-3 font-medium">Owner</th>
+                    <th className="px-4 py-3 font-medium">Task status</th>
+                    <th className="px-4 py-3 font-medium">Criticality</th>
+                    <th className="px-4 py-3 font-medium">Open vulns</th>
+                    <th className="px-4 py-3 font-medium">Last seen</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60 bg-card">
+                  {items.map((item) => (
+                    <tr key={`${item.deviceAssetId}-${item.softwareAssetId}`} className="align-top">
+                      {(() => {
+                        const teamStatus = item.ownerTeamId ? teamStatusById.get(item.ownerTeamId) : undefined
+                        return (
+                          <>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-foreground">{item.deviceName}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {formatVersion(item.version)} · episode {item.currentEpisodeNumber}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-foreground">
+                          {item.ownerTeamName ?? item.ownerUserName ?? 'Unassigned'}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {item.ownerTeamName
+                            ? 'Team owner'
+                            : item.ownerUserName
+                              ? 'Named owner'
+                              : 'No owner assigned'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {teamStatus ? (
+                          <>
+                            <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${toneBadge(taskStatusTone(teamStatus.status))}`}>
+                              {taskStatusLabel(teamStatus.status)}
+                            </span>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Due {formatDate(teamStatus.dueDate)}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-xs text-muted-foreground">
+                            No owner-team task
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex rounded-full border border-border/70 bg-background px-2 py-0.5 text-xs font-medium">
+                          {item.deviceCriticality}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-foreground">
+                        {item.openVulnerabilityCount.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {formatDateTime(item.lastSeenAt)}
+                      </td>
+                          </>
+                        )
+                      })()}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 
 function DecisionHistorySection({
   tenantSoftwareId,
@@ -400,6 +1207,36 @@ function DecisionHistorySection({
       </CardContent>
     </Card>
   )
+}
+
+function formatVersion(version: string | null) {
+  return version?.trim() || 'Version unknown'
+}
+
+function normalizeVersion(version: string | null) {
+  return version?.trim() ?? ''
+}
+
+function taskStatusTone(status: string) {
+  switch (status) {
+    case 'Completed':
+      return 'success'
+    case 'InProgress':
+      return 'info'
+    case 'Pending':
+      return 'warning'
+    default:
+      return 'neutral'
+  }
+}
+
+function taskStatusLabel(status: string) {
+  switch (status) {
+    case 'InProgress':
+      return 'In progress'
+    default:
+      return startCase(status)
+  }
 }
 
 function buildDecisionTimelineTitle(action: string, userDisplayName: string | null) {

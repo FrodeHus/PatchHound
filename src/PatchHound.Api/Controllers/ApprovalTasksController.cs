@@ -16,6 +16,7 @@ namespace PatchHound.Api.Controllers;
 public class ApprovalTasksController(
     ApprovalTaskQueryService queryService,
     ApprovalTaskService approvalTaskService,
+    RemediationWorkflowAuthorizationService workflowAuthorizationService,
     ITenantContext tenantContext
 ) : ControllerBase
 {
@@ -91,6 +92,9 @@ public class ApprovalTasksController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
         var userId = tenantContext.CurrentUserId;
+        var auth = await workflowAuthorizationService.EnsureCanResolveApprovalTaskAsync(tenantId, id, ct);
+        if (!auth.IsSuccess)
+            return BadRequest(new ProblemDetails { Title = auth.Error });
 
         try
         {

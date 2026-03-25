@@ -40,8 +40,9 @@ public class RemediationTasksControllerTests : IDisposable
             TestServiceProviderFactory.Create(_tenantContext)
         );
 
-        var approvalTaskService = new ApprovalTaskService(_dbContext, Substitute.For<INotificationService>(), Substitute.For<IRealTimeNotifier>());
-        var decisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService);
+        var workflowService = new RemediationWorkflowService(_dbContext);
+        var approvalTaskService = new ApprovalTaskService(_dbContext, Substitute.For<INotificationService>(), Substitute.For<IRealTimeNotifier>(), workflowService);
+        var decisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService, workflowService);
         var queryService = new RemediationTaskQueryService(_dbContext, decisionService);
         _controller = new RemediationTasksController(queryService, _tenantContext);
     }
@@ -70,8 +71,9 @@ public class RemediationTasksControllerTests : IDisposable
             .Distinct()
             .ToListAsync();
 
-        var approvalTaskService = new ApprovalTaskService(_dbContext, Substitute.For<INotificationService>(), Substitute.For<IRealTimeNotifier>());
-        var decisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService);
+        var workflowService = new RemediationWorkflowService(_dbContext);
+        var approvalTaskService = new ApprovalTaskService(_dbContext, Substitute.For<INotificationService>(), Substitute.For<IRealTimeNotifier>(), workflowService);
+        var decisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService, workflowService);
         var createResult = await decisionService.CreateDecisionAsync(
             _tenantId,
             softwareAssetIds[0],

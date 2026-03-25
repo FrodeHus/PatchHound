@@ -37,10 +37,12 @@ public class ApprovalTaskServiceTests : IDisposable
 
         _notificationService = Substitute.For<INotificationService>();
         _realTimeNotifier = Substitute.For<IRealTimeNotifier>();
+        var workflowService = new RemediationWorkflowService(_dbContext);
         _sut = new ApprovalTaskService(
             _dbContext,
             _notificationService,
-            _realTimeNotifier
+            _realTimeNotifier,
+            workflowService
         );
     }
 

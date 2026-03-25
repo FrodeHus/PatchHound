@@ -5,7 +5,10 @@ public record DecisionContextDto(
     string SoftwareName,
     string Criticality,
     DecisionSummaryDto Summary,
+    DecisionWorkflowSummaryDto Workflow,
+    DecisionWorkflowStateDto WorkflowState,
     RemediationDecisionDto? CurrentDecision,
+    RemediationDecisionDto? PreviousDecision,
     List<AnalystRecommendationDto> Recommendations,
     List<DecisionVulnDto> TopVulnerabilities,
     DecisionRiskDto? RiskScore,
@@ -21,6 +24,32 @@ public record DecisionSummaryDto(
     int LowCount,
     int WithKnownExploit,
     int WithActiveAlert
+);
+
+public record DecisionWorkflowSummaryDto(
+    int AffectedDeviceCount,
+    int AffectedOwnerTeamCount,
+    int OpenPatchingTaskCount,
+    int CompletedPatchingTaskCount
+);
+
+public record DecisionWorkflowStateDto(
+    Guid? WorkflowId,
+    string CurrentStage,
+    string CurrentStageLabel,
+    string CurrentStageDescription,
+    string CurrentActorSummary,
+    bool CanActOnCurrentStage,
+    bool IsRecurrence,
+    bool HasActiveWorkflow,
+    List<DecisionWorkflowStageDto> Stages
+);
+
+public record DecisionWorkflowStageDto(
+    string Id,
+    string Label,
+    string State,
+    string Description
 );
 
 public record RemediationDecisionDto(
@@ -96,10 +125,6 @@ public record CreateDecisionRequest(
     DateTimeOffset? ReEvaluationDate
 );
 
-public record ApproveRejectDecisionRequest(
-    string Action
-);
-
 public record CreateOverrideRequest(
     Guid TenantVulnerabilityId,
     string Outcome,
@@ -111,4 +136,12 @@ public record CreateRecommendationRequest(
     string Rationale,
     string? PriorityOverride,
     Guid? TenantVulnerabilityId
+);
+
+public record VerifyRemediationRequest(
+    string Action
+);
+
+public record EnsureRemediationWorkflowResponse(
+    Guid WorkflowId
 );

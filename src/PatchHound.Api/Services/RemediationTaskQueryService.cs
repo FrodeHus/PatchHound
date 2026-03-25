@@ -284,6 +284,48 @@ public class RemediationTaskQueryService(
         );
     }
 
+    public async Task<List<RemediationTaskTeamStatusDto>> ListTeamStatusesForSoftwareAsync(
+        Guid tenantId,
+        Guid tenantSoftwareId,
+        CancellationToken ct
+    )
+    {
+        var tasks = await dbContext.PatchingTasks.AsNoTracking()
+            .Where(task => task.TenantId == tenantId && task.TenantSoftwareId == tenantSoftwareId)
+            .ToListAsync(ct);
+
+        var latestTasksByTeamId = tasks
+            .GroupBy(task => task.OwnerTeamId)
+            .Select(group => group
+                .OrderByDescending(task => task.UpdatedAt)
+                .ThenByDescending(task => task.CreatedAt)
+                .First())
+            .ToList();
+
+        var ownerTeamIds = latestTasksByTeamId
+            .Select(task => task.OwnerTeamId)
+            .Distinct()
+            .ToList();
+
+        var teamNamesById = await dbContext.Teams.AsNoTracking()
+            .Where(team => ownerTeamIds.Contains(team.Id))
+            .Select(team => new { team.Id, team.Name })
+            .ToDictionaryAsync(team => team.Id, team => team.Name, ct);
+
+        var latestTasks = latestTasksByTeamId
+            .Select(task => new RemediationTaskTeamStatusDto(
+                task.OwnerTeamId,
+                teamNamesById.GetValueOrDefault(task.OwnerTeamId) ?? "Unknown team",
+                task.Status.ToString(),
+                task.DueDate,
+                task.UpdatedAt
+            ))
+            .OrderBy(item => item.OwnerTeamName)
+            .ToList();
+
+        return latestTasks;
+    }
+
     private IQueryable<LinkedTaskDbRow> BuildLinkedTaskRowsQuery(
         Guid tenantId,
         Guid? deviceAssetId = null,

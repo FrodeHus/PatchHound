@@ -13,6 +13,7 @@ public class RemediationDecisionConfiguration : IEntityTypeConfiguration<Remedia
         builder.HasIndex(rd => rd.TenantId);
         builder.HasIndex(rd => new { rd.TenantId, rd.TenantSoftwareId });
         builder.HasIndex(rd => rd.ApprovalStatus);
+        builder.HasIndex(rd => rd.RemediationWorkflowId);
 
         builder.Property(rd => rd.Outcome).HasConversion<string>().HasMaxLength(32);
         builder.Property(rd => rd.ApprovalStatus).HasConversion<string>().HasMaxLength(32);
@@ -23,6 +24,12 @@ public class RemediationDecisionConfiguration : IEntityTypeConfiguration<Remedia
             .WithMany()
             .HasForeignKey(rd => rd.SoftwareAssetId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder
+            .HasOne(rd => rd.RemediationWorkflow)
+            .WithMany()
+            .HasForeignKey(rd => rd.RemediationWorkflowId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder
             .HasMany(rd => rd.VulnerabilityOverrides)

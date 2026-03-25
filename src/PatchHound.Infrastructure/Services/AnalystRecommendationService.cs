@@ -6,7 +6,10 @@ using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Infrastructure.Services;
 
-public class AnalystRecommendationService(PatchHoundDbContext dbContext)
+public class AnalystRecommendationService(
+    PatchHoundDbContext dbContext,
+    RemediationWorkflowService remediationWorkflowService
+)
 {
     public async Task<Result<AnalystRecommendation>> AddRecommendationAsync(
         Guid tenantId,
@@ -60,7 +63,7 @@ public class AnalystRecommendationService(PatchHoundDbContext dbContext)
         if (representativeSoftwareAssetId == Guid.Empty)
             return Result<AnalystRecommendation>.Failure("No tenant software scope was found for this software.");
 
-        return await AddRecommendationAsync(
+        var result = await AddRecommendationAsync(
             tenantId,
             representativeSoftwareAssetId,
             recommendedOutcome,
@@ -70,5 +73,18 @@ public class AnalystRecommendationService(PatchHoundDbContext dbContext)
             priorityOverride,
             ct
         );
+
+        if (!result.IsSuccess)
+            return result;
+
+        await remediationWorkflowService.AttachRecommendationAsync(
+            tenantId,
+            tenantSoftwareId,
+            result.Value,
+            ct
+        );
+        await dbContext.SaveChangesAsync(ct);
+
+        return result;
     }
 }

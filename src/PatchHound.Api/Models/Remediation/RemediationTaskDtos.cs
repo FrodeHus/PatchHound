@@ -33,6 +33,14 @@ public record RemediationTaskCreateResultDto(
     int EligibleCount
 );
 
+public record RemediationTaskTeamStatusDto(
+    Guid OwnerTeamId,
+    string OwnerTeamName,
+    string Status,
+    DateTimeOffset DueDate,
+    DateTimeOffset UpdatedAt
+);
+
 public record RemediationTaskFilterQuery(
     string? Search = null,
     string? Vendor = null,

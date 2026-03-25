@@ -6,6 +6,7 @@ public class PatchingTask
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public Guid? RemediationWorkflowId { get; private set; }
     public Guid RemediationDecisionId { get; private set; }
     public Guid TenantSoftwareId { get; private set; }
     public Guid SoftwareAssetId { get; private set; }
@@ -17,6 +18,7 @@ public class PatchingTask
     public DateTimeOffset? CompletedAt { get; private set; }
 
     public RemediationDecision RemediationDecision { get; private set; } = null!;
+    public RemediationWorkflow? RemediationWorkflow { get; private set; }
 
     private PatchingTask() { }
 
@@ -55,6 +57,12 @@ public class PatchingTask
     {
         Status = PatchingTaskStatus.Completed;
         CompletedAt = DateTimeOffset.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void AttachToWorkflow(Guid remediationWorkflowId)
+    {
+        RemediationWorkflowId = remediationWorkflowId;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

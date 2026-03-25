@@ -9,7 +9,8 @@ namespace PatchHound.Infrastructure.Services;
 public class ApprovalTaskService(
     PatchHoundDbContext dbContext,
     INotificationService notificationService,
-    IRealTimeNotifier realTimeNotifier
+    IRealTimeNotifier realTimeNotifier,
+    RemediationWorkflowService remediationWorkflowService
 )
 {
     public async Task<ApprovalTask> CreateForDecisionAsync(
@@ -20,6 +21,7 @@ public class ApprovalTaskService(
     {
         var expiresAt = DateTimeOffset.UtcNow.AddHours(expiryHours);
         var task = ApprovalTask.Create(decision.TenantId, decision.Id, decision.Outcome, expiresAt);
+        await remediationWorkflowService.AttachApprovalTaskAsync(task, decision, ct);
 
         await dbContext.ApprovalTasks.AddAsync(task, ct);
         await dbContext.SaveChangesAsync(ct);
@@ -68,6 +70,13 @@ public class ApprovalTaskService(
 
         task.Approve(userId, justification);
         task.RemediationDecision.Approve(userId);
+        await remediationWorkflowService.HandleApprovalOutcomeAsync(
+            task,
+            task.RemediationDecision,
+            true,
+            userId,
+            ct
+        );
 
         await dbContext.SaveChangesAsync(ct);
         return task;
@@ -87,6 +96,13 @@ public class ApprovalTaskService(
 
         task.Deny(userId, justification);
         task.RemediationDecision.Reject(userId);
+        await remediationWorkflowService.HandleApprovalOutcomeAsync(
+            task,
+            task.RemediationDecision,
+            false,
+            userId,
+            ct
+        );
 
         // Notify the analyst who created the decision
         await notificationService.SendAsync(
@@ -117,6 +133,13 @@ public class ApprovalTaskService(
         {
             task.AutoDeny();
             task.RemediationDecision.Reject(Guid.Empty);
+            await remediationWorkflowService.HandleApprovalOutcomeAsync(
+                task,
+                task.RemediationDecision,
+                false,
+                null,
+                ct
+            );
 
             await notificationService.SendAsync(
                 task.RemediationDecision.DecidedBy,

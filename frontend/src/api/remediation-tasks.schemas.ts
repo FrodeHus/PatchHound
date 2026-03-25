@@ -37,7 +37,16 @@ export const remediationTaskCreateResultSchema = z.object({
   eligibleCount: z.number(),
 })
 
+export const remediationTaskTeamStatusSchema = z.object({
+  ownerTeamId: z.string().uuid(),
+  ownerTeamName: z.string(),
+  status: z.string(),
+  dueDate: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+})
+
 export type RemediationTaskSummary = z.infer<typeof remediationTaskSummarySchema>
 export type RemediationTaskListItem = z.infer<typeof remediationTaskListItemSchema>
 export type PagedRemediationTasks = z.infer<typeof pagedRemediationTasksSchema>
 export type RemediationTaskCreateResult = z.infer<typeof remediationTaskCreateResultSchema>
+export type RemediationTaskTeamStatus = z.infer<typeof remediationTaskTeamStatusSchema>

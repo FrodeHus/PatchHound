@@ -15,6 +15,16 @@ internal static class AuditTimelineMapper
         var oldValues = ParseValues(entry.OldValues);
         var newValues = ParseValues(entry.NewValues);
 
+        if (string.Equals(entry.EntityType, nameof(RemediationWorkflowStageRecord), StringComparison.Ordinal))
+        {
+            return new ApprovalAuditEntryDto(
+                ResolveWorkflowStageAction(entry.Action, oldValues, newValues),
+                userDisplayName,
+                ExtractJustification(newValues) ?? ExtractJustification(oldValues),
+                entry.Timestamp
+            );
+        }
+
         var action = entry.Action switch
         {
             AuditAction.Created => "Created",
@@ -32,6 +42,52 @@ internal static class AuditTimelineMapper
             ExtractJustification(newValues),
             entry.Timestamp
         );
+    }
+
+    private static string ResolveWorkflowStageAction(
+        AuditAction action,
+        IReadOnlyDictionary<string, string?> oldValues,
+        IReadOnlyDictionary<string, string?> newValues
+    )
+    {
+        var stage = GetValue(newValues, oldValues, "Stage");
+        var summary = GetValue(newValues, oldValues, "Summary");
+
+        if (string.Equals(stage, nameof(RemediationWorkflowStage.Verification), StringComparison.Ordinal))
+        {
+            if (action == AuditAction.Created)
+            {
+                return "Verification opened";
+            }
+
+            if (TryGetChangedValue(oldValues, newValues, "Status", out _, out var newStatus)
+                && (string.Equals(newStatus, nameof(RemediationWorkflowStageStatus.Completed), StringComparison.Ordinal)
+                    || string.Equals(newStatus, nameof(RemediationWorkflowStageStatus.AutoCompleted), StringComparison.Ordinal)))
+            {
+                if (!string.IsNullOrWhiteSpace(summary)
+                    && summary.Contains("confirmed", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Kept current decision";
+                }
+
+                if (!string.IsNullOrWhiteSpace(summary)
+                    && (summary.Contains("not reused", StringComparison.OrdinalIgnoreCase)
+                        || summary.Contains("new remediation decision", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return "Chose new decision";
+                }
+
+                return "Verification completed";
+            }
+        }
+
+        return action switch
+        {
+            AuditAction.Created => "Created",
+            AuditAction.Updated => "Updated",
+            AuditAction.Deleted => "Deleted",
+            _ => action.ToString(),
+        };
     }
 
     private static string ResolveUpdatedAction(
@@ -91,7 +147,29 @@ internal static class AuditTimelineMapper
         }
 
         values.TryGetValue("ResolutionJustification", out justification);
+        if (!string.IsNullOrWhiteSpace(justification))
+        {
+            return justification;
+        }
+
+        values.TryGetValue("Summary", out justification);
         return string.IsNullOrWhiteSpace(justification) ? null : justification;
+    }
+
+    private static string? GetValue(
+        IReadOnlyDictionary<string, string?> primary,
+        IReadOnlyDictionary<string, string?> secondary,
+        string key
+    )
+    {
+        primary.TryGetValue(key, out var value);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        secondary.TryGetValue(key, out value);
+        return value;
     }
 
     private static IReadOnlyDictionary<string, string?> ParseValues(string? raw)

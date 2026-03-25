@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PatchHound.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PatchHound.Infrastructure.Data;
 namespace PatchHound.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(PatchHoundDbContext))]
-    partial class PatchHoundDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260325072452_AddRemediationWorkflowEngine")]
+    partial class AddRemediationWorkflowEngine
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1737,9 +1740,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
-                    b.Property<Guid?>("RecurrenceSourceWorkflowId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("SoftwareOwnerTeamId")
                         .HasColumnType("uuid");
 
@@ -1764,8 +1764,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.HasIndex("TenantId", "Status");
 
                     b.HasIndex("TenantId", "TenantSoftwareId");
-
-                    b.HasIndex("RecurrenceSourceWorkflowId");
 
                     b.ToTable("RemediationWorkflows");
                 });

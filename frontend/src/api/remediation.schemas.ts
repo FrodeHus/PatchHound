@@ -61,6 +61,32 @@ export const decisionSummarySchema = z.object({
   withActiveAlert: z.number(),
 })
 
+export const decisionWorkflowSummarySchema = z.object({
+  affectedDeviceCount: z.number(),
+  affectedOwnerTeamCount: z.number(),
+  openPatchingTaskCount: z.number(),
+  completedPatchingTaskCount: z.number(),
+})
+
+export const decisionWorkflowStageSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  state: z.string(),
+  description: z.string(),
+})
+
+export const decisionWorkflowStateSchema = z.object({
+  workflowId: z.string().uuid().nullable(),
+  currentStage: z.string(),
+  currentStageLabel: z.string(),
+  currentStageDescription: z.string(),
+  currentActorSummary: z.string(),
+  canActOnCurrentStage: z.boolean(),
+  isRecurrence: z.boolean(),
+  hasActiveWorkflow: z.boolean(),
+  stages: z.array(decisionWorkflowStageSchema),
+})
+
 export const decisionRiskSchema = z.object({
   compositeScore: z.number(),
   riskBand: z.string(),
@@ -81,7 +107,10 @@ export const decisionContextSchema = z.object({
   softwareName: z.string(),
   criticality: z.string(),
   summary: decisionSummarySchema,
+  workflow: decisionWorkflowSummarySchema,
+  workflowState: decisionWorkflowStateSchema,
   currentDecision: remediationDecisionSchema.nullable(),
+  previousDecision: remediationDecisionSchema.nullable(),
   recommendations: z.array(analystRecommendationSchema),
   topVulnerabilities: z.array(decisionVulnSchema),
   riskScore: decisionRiskSchema.nullable(),
@@ -120,6 +149,9 @@ export type RemediationDecision = z.infer<typeof remediationDecisionSchema>
 export type AnalystRecommendation = z.infer<typeof analystRecommendationSchema>
 export type DecisionVuln = z.infer<typeof decisionVulnSchema>
 export type DecisionSummary = z.infer<typeof decisionSummarySchema>
+export type DecisionWorkflowSummary = z.infer<typeof decisionWorkflowSummarySchema>
+export type DecisionWorkflowState = z.infer<typeof decisionWorkflowStateSchema>
+export type DecisionWorkflowStage = z.infer<typeof decisionWorkflowStageSchema>
 export type DecisionRisk = z.infer<typeof decisionRiskSchema>
 export type DecisionSla = z.infer<typeof decisionSlaSchema>
 export type VulnerabilityOverride = z.infer<typeof vulnerabilityOverrideSchema>
