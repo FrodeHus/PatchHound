@@ -254,6 +254,76 @@ public class RemediationDecisionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ApproveRiskAcceptanceDecisionAsync_MovesWorkflowIntoClosure_AndSkipsExecution()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var team = Team.Create(_tenantId, "Infrastructure");
+        await _dbContext.Teams.AddAsync(team);
+
+        var devices = await _dbContext.Assets
+            .Where(item => item.AssetType == AssetType.Device)
+            .ToListAsync();
+        foreach (var device in devices)
+        {
+            device.AssignTeamOwner(team.Id);
+        }
+
+        await _dbContext.SaveChangesAsync();
+
+        var softwareAssetId = await _dbContext.NormalizedSoftwareInstallations
+            .Where(item => item.TenantSoftwareId == graph.TenantSoftware.Id)
+            .Select(item => item.SoftwareAssetId)
+            .OrderBy(id => id)
+            .FirstAsync();
+
+        var createResult = await _sut.CreateDecisionAsync(
+            _tenantId,
+            softwareAssetId,
+            RemediationOutcome.RiskAcceptance,
+            "Accepted with controls.",
+            _userId,
+            DateTimeOffset.UtcNow.AddDays(30),
+            null,
+            CancellationToken.None
+        );
+
+        createResult.IsSuccess.Should().BeTrue();
+
+        var workflowAfterCreate = await _dbContext.RemediationWorkflows
+            .OrderByDescending(item => item.CreatedAt)
+            .FirstAsync();
+        workflowAfterCreate.CurrentStage.Should().Be(RemediationWorkflowStage.Approval);
+
+        var approvalTask = await _dbContext.ApprovalTasks
+            .OrderByDescending(item => item.CreatedAt)
+            .FirstAsync();
+
+        var approvalTaskService = new ApprovalTaskService(
+            _dbContext,
+            Substitute.For<INotificationService>(),
+            Substitute.For<IRealTimeNotifier>(),
+            _workflowService
+        );
+
+        await approvalTaskService.ApproveAsync(
+            approvalTask.Id,
+            _userId,
+            "Approved as active exception",
+            CancellationToken.None
+        );
+
+        var updatedWorkflow = await _dbContext.RemediationWorkflows
+            .FirstAsync(item => item.Id == workflowAfterCreate.Id);
+        updatedWorkflow.CurrentStage.Should().Be(RemediationWorkflowStage.Closure);
+
+        var executionStage = await _dbContext.RemediationWorkflowStageRecords
+            .Where(item => item.RemediationWorkflowId == workflowAfterCreate.Id && item.Stage == RemediationWorkflowStage.Execution)
+            .OrderByDescending(item => item.StartedAt)
+            .FirstAsync();
+        executionStage.Status.Should().Be(RemediationWorkflowStageStatus.Skipped);
+    }
+
+    [Fact]
     public async Task GetOrCreateActiveWorkflowAsync_StartsInSecurityAnalysis_WhenNoPriorWorkflowExists()
     {
         var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
