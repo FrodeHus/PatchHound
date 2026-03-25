@@ -810,7 +810,10 @@ public class RemediationDecisionQueryService(
             RemediationWorkflowStage.Execution =>
                 "Device owner teams execute patching tasks, with Technical Manager or Global Admin oversight.",
             RemediationWorkflowStage.Closure =>
-                "Closure is completed by the system when execution is finished and exposure is resolved.",
+                workflow?.Status == RemediationWorkflowStatus.Active
+                    && workflow.ProposedOutcome is RemediationOutcome.RiskAcceptance or RemediationOutcome.AlternateMitigation
+                    ? "The approved exception or alternate mitigation is the active remediation posture for this software. Execution is not applicable."
+                    : "Closure is completed by the system when execution is finished and exposure is resolved.",
             _ => "This stage is ready for action.",
         };
 
@@ -846,7 +849,7 @@ public class RemediationDecisionQueryService(
             RemediationWorkflowStage.RemediationDecision => "The software owner team chooses how the organization should handle the software exposure.",
             RemediationWorkflowStage.Approval => "Approvers validate the chosen posture when the decision branch requires approval.",
             RemediationWorkflowStage.Execution => "Device owner teams execute approved patching work across affected devices.",
-            RemediationWorkflowStage.Closure => "The system closes the workflow when patching is complete and exposure is resolved.",
+            RemediationWorkflowStage.Closure => "Closure records the active end state of the remediation, whether patching resolved the exposure or an approved exception remains in effect.",
             _ => "The workflow is active.",
         };
 

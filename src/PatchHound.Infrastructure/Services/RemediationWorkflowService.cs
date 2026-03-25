@@ -216,15 +216,25 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
             return;
         }
 
-        workflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
         await dbContext.RemediationWorkflowStageRecords.AddAsync(
             RemediationWorkflowStageRecord.Create(
                 decision.TenantId,
                 workflow.Id,
-                RemediationWorkflowStage.RemediationDecision,
+                RemediationWorkflowStage.Execution,
+                RemediationWorkflowStageStatus.Skipped,
+                summary: "Execution is not applicable for the approved remediation posture."
+            ),
+            ct
+        );
+
+        workflow.MoveToStage(RemediationWorkflowStage.Closure);
+        await dbContext.RemediationWorkflowStageRecords.AddAsync(
+            RemediationWorkflowStageRecord.Create(
+                decision.TenantId,
+                workflow.Id,
+                RemediationWorkflowStage.Closure,
                 RemediationWorkflowStageStatus.InProgress,
-                assignedTeamId: workflow.SoftwareOwnerTeamId,
-                summary: "Approved posture is active for this software."
+                summary: "The approved remediation posture is now active for this software. Execution is not applicable."
             ),
             ct
         );
@@ -295,15 +305,25 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
             return;
         }
 
-        workflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
         await dbContext.RemediationWorkflowStageRecords.AddAsync(
             RemediationWorkflowStageRecord.Create(
                 decision.TenantId,
                 workflow.Id,
-                RemediationWorkflowStage.RemediationDecision,
+                RemediationWorkflowStage.Execution,
+                RemediationWorkflowStageStatus.Skipped,
+                summary: "Execution is not applicable for the approved remediation posture."
+            ),
+            ct
+        );
+
+        workflow.MoveToStage(RemediationWorkflowStage.Closure);
+        await dbContext.RemediationWorkflowStageRecords.AddAsync(
+            RemediationWorkflowStageRecord.Create(
+                decision.TenantId,
+                workflow.Id,
+                RemediationWorkflowStage.Closure,
                 RemediationWorkflowStageStatus.InProgress,
-                assignedTeamId: workflow.SoftwareOwnerTeamId,
-                summary: "Approved posture is active for this software."
+                summary: "The approved remediation posture is now active for this software. Execution is not applicable."
             ),
             ct
         );
