@@ -1,4 +1,4 @@
-import { Check, CircleDot, CircleOff, Clock3 } from 'lucide-react'
+import { Check, CircleDot, CircleOff, Clock3, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type RemediationStageId =
@@ -14,6 +14,7 @@ export type RemediationStageState =
   | 'current'
   | 'pending'
   | 'skipped'
+  | 'rejected'
   | 'closed'
 
 export type RemediationStage = {
@@ -28,6 +29,7 @@ const stageStateCopy: Record<RemediationStageState, string> = {
   current: 'Current',
   pending: 'Pending',
   skipped: 'Skipped',
+  rejected: 'Rejected',
   closed: 'Closed',
 }
 
@@ -42,14 +44,13 @@ export function RemediationStageRail({
     stages.findIndex((stage) => stage.id === currentStageId),
     0,
   )
-  const completedCount = stages.filter((stage) => stage.state === 'complete' || stage.state === 'closed').length
+  const completedCount = stages.filter((stage) =>
+    stage.state === 'complete' || stage.state === 'closed'
+  ).length
   const progressPercent = stages.length <= 1
     ? 100
     : Math.round((currentIndex / (stages.length - 1)) * 100)
   const endpointInsetPercent = stages.length > 0 ? 50 / stages.length : 0
-  const fillTrackPercent = stages.length <= 1
-    ? 100
-    : (currentIndex / (stages.length - 1)) * (100 - endpointInsetPercent * 2)
 
   return (
     <section className="overflow-hidden rounded-[1.9rem] border border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_68%,var(--primary)_8%),var(--color-card))] p-5">
@@ -89,10 +90,33 @@ export function RemediationStageRail({
             className="pointer-events-none absolute top-5 h-[6px] rounded-full bg-muted/80"
             style={{ left: `${endpointInsetPercent}%`, right: `${endpointInsetPercent}%` }}
           />
-          <div
-            className="pointer-events-none absolute top-5 h-[6px] rounded-full bg-[linear-gradient(90deg,color-mix(in_oklab,var(--primary)_72%,white),color-mix(in_oklab,var(--primary)_45%,transparent))] transition-[width] duration-700 ease-out"
-            style={{ left: `${endpointInsetPercent}%`, width: `${Math.max(fillTrackPercent, 0)}%` }}
-          />
+          {stages.slice(0, -1).map((stage, index) => {
+            const nextStage = stages[index + 1]
+            const left = endpointInsetPercent + index * ((100 - endpointInsetPercent * 2) / Math.max(stages.length - 1, 1))
+            const width = (100 - endpointInsetPercent * 2) / Math.max(stages.length - 1, 1)
+            const regressionSegment =
+              (stage.state === 'rejected' && nextStage?.state === 'current')
+              || (stage.state === 'current' && nextStage?.state === 'rejected')
+            const progressedSegment = index < currentIndex
+
+            return (
+              <div
+                key={`${stage.id}-${nextStage.id}`}
+                className={cn(
+                  'pointer-events-none absolute transition-all duration-700 ease-out',
+                  regressionSegment
+                    ? 'top-[22px] h-0 border-t-2 border-dashed border-destructive bg-transparent'
+                    : progressedSegment
+                      ? 'top-5 h-[6px] rounded-full bg-[linear-gradient(90deg,color-mix(in_oklab,var(--primary)_72%,white),color-mix(in_oklab,var(--primary)_45%,transparent))]'
+                      : 'top-5 h-[6px] bg-transparent',
+                )}
+                style={{
+                  left: `${left}%`,
+                  width: `${width}%`,
+                }}
+              />
+            )
+          })}
 
           {stages.map((stage) => (
             <li key={stage.id} className="relative flex flex-col items-center text-center">
@@ -108,6 +132,7 @@ export function RemediationStageRail({
                     stage.state === 'current' && 'border-primary bg-background text-primary shadow-[0_0_0_6px_color-mix(in_oklab,var(--primary)_18%,transparent)]',
                     stage.state === 'pending' && 'border-border/70 bg-background text-muted-foreground',
                     stage.state === 'skipped' && 'border-sky-300 bg-sky-500/8 text-sky-700 dark:text-sky-300',
+                    stage.state === 'rejected' && 'border-destructive bg-destructive text-destructive-foreground',
                   )}
                 >
                   {stage.state === 'current' ? (
@@ -133,6 +158,7 @@ export function RemediationStageRail({
                       stage.state === 'current' && 'border-primary/20 bg-primary/10 text-primary shadow-[0_0_18px_color-mix(in_oklab,var(--primary)_10%,transparent)]',
                       stage.state === 'pending' && 'border-border/70 bg-background text-muted-foreground',
                       stage.state === 'skipped' && 'border-sky-300/70 bg-sky-500/8 text-sky-700 dark:text-sky-300',
+                      stage.state === 'rejected' && 'border-destructive/30 bg-destructive/8 text-destructive',
                     )}
                   >
                     {stageStateCopy[stage.state]}
@@ -159,6 +185,8 @@ function StageIcon({ state }: { state: RemediationStageState }) {
       return <CircleDot className="size-4" />
     case 'skipped':
       return <CircleOff className="size-4" />
+    case 'rejected':
+      return <X className="size-4" />
     default:
       return <Clock3 className="size-4" />
   }

@@ -677,7 +677,8 @@ public class RemediationDecisionQueryService(
             currentUserRoles,
             currentUserTeamIds,
             softwareOwnerTeamName,
-            executionTeamIds
+            executionTeamIds,
+            decision
         );
 
         return new DecisionContextDto(
@@ -708,7 +709,8 @@ public class RemediationDecisionQueryService(
         HashSet<RoleName> currentUserRoles,
         List<Guid> currentUserTeamIds,
         string? softwareOwnerTeamName,
-        List<Guid> executionTeamIds
+        List<Guid> executionTeamIds,
+        RemediationDecision? decision
     )
     {
         var isRecurrence = workflow?.RecurrenceSourceWorkflowId != null;
@@ -741,6 +743,9 @@ public class RemediationDecisionQueryService(
 
             var state = workflow?.Status == RemediationWorkflowStatus.Completed && stage == RemediationWorkflowStage.Closure
                 ? "closed"
+                : stage == RemediationWorkflowStage.Approval
+                    && decision?.ApprovalStatus == DecisionApprovalStatus.Rejected
+                    ? "rejected"
                 : latestRecord?.Status switch
                 {
                     RemediationWorkflowStageStatus.Skipped => "skipped",
