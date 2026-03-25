@@ -41,8 +41,10 @@ public class RemediationTasksControllerTests : IDisposable
         );
 
         var workflowService = new RemediationWorkflowService(_dbContext);
-        var approvalTaskService = new ApprovalTaskService(_dbContext, Substitute.For<INotificationService>(), Substitute.For<IRealTimeNotifier>(), workflowService);
-        var decisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService, workflowService);
+        var notificationService = Substitute.For<INotificationService>();
+        var patchingTaskService = new PatchingTaskService(_dbContext, new SlaService(), workflowService, notificationService);
+        var approvalTaskService = new ApprovalTaskService(_dbContext, notificationService, Substitute.For<IRealTimeNotifier>(), workflowService, patchingTaskService);
+        var decisionService = new RemediationDecisionService(_dbContext, approvalTaskService, workflowService, patchingTaskService);
         var queryService = new RemediationTaskQueryService(_dbContext, decisionService);
         _controller = new RemediationTasksController(queryService, _tenantContext);
     }
@@ -72,8 +74,10 @@ public class RemediationTasksControllerTests : IDisposable
             .ToListAsync();
 
         var workflowService = new RemediationWorkflowService(_dbContext);
-        var approvalTaskService = new ApprovalTaskService(_dbContext, Substitute.For<INotificationService>(), Substitute.For<IRealTimeNotifier>(), workflowService);
-        var decisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService, workflowService);
+        var notificationService = Substitute.For<INotificationService>();
+        var patchingTaskService = new PatchingTaskService(_dbContext, new SlaService(), workflowService, notificationService);
+        var approvalTaskService = new ApprovalTaskService(_dbContext, notificationService, Substitute.For<IRealTimeNotifier>(), workflowService, patchingTaskService);
+        var decisionService = new RemediationDecisionService(_dbContext, approvalTaskService, workflowService, patchingTaskService);
         var createResult = await decisionService.CreateDecisionAsync(
             _tenantId,
             softwareAssetIds[0],
@@ -85,6 +89,14 @@ public class RemediationTasksControllerTests : IDisposable
             CancellationToken.None
         );
         createResult.IsSuccess.Should().BeTrue();
+
+        var approvalTask = await _dbContext.ApprovalTasks.OrderByDescending(item => item.CreatedAt).FirstAsync();
+        await approvalTaskService.ApproveAsync(
+            approvalTask.Id,
+            _tenantContext.CurrentUserId,
+            "Approved for execution",
+            CancellationToken.None
+        );
 
         var action = await _controller.List(
             new RemediationTaskFilterQuery(TenantSoftwareId: graph.TenantSoftware.Id),
@@ -116,12 +128,43 @@ public class RemediationTasksControllerTests : IDisposable
         }
         await _dbContext.SaveChangesAsync();
 
+        var softwareAssetId = await _dbContext.NormalizedSoftwareInstallations
+            .Where(item => item.TenantSoftwareId == graph.TenantSoftware.Id)
+            .Select(item => item.SoftwareAssetId)
+            .OrderBy(id => id)
+            .FirstAsync();
+
+        var workflowService = new RemediationWorkflowService(_dbContext);
+        var notificationService = Substitute.For<INotificationService>();
+        var patchingTaskService = new PatchingTaskService(_dbContext, new SlaService(), workflowService, notificationService);
+        var approvalTaskService = new ApprovalTaskService(_dbContext, notificationService, Substitute.For<IRealTimeNotifier>(), workflowService, patchingTaskService);
+        var decisionService = new RemediationDecisionService(_dbContext, approvalTaskService, workflowService, patchingTaskService);
+        var createResult = await decisionService.CreateDecisionAsync(
+            _tenantId,
+            softwareAssetId,
+            RemediationOutcome.ApprovedForPatching,
+            "Patch it",
+            _tenantContext.CurrentUserId,
+            null,
+            null,
+            CancellationToken.None
+        );
+        createResult.IsSuccess.Should().BeTrue();
+
+        var approvalTask = await _dbContext.ApprovalTasks.OrderByDescending(item => item.CreatedAt).FirstAsync();
+        await approvalTaskService.ApproveAsync(
+            approvalTask.Id,
+            _tenantContext.CurrentUserId,
+            "Approved for execution",
+            CancellationToken.None
+        );
+
         var action = await _controller.CreateForSoftware(graph.TenantSoftware.Id, CancellationToken.None);
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<RemediationTaskCreateResultDto>().Subject;
 
-        payload.CreatedCount.Should().Be(1);
+        payload.CreatedCount.Should().Be(0);
         payload.EligibleCount.Should().Be(2);
         _dbContext.PatchingTasks.Should().HaveCount(1);
     }

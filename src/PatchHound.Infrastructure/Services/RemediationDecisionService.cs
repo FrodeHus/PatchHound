@@ -9,9 +9,9 @@ namespace PatchHound.Infrastructure.Services;
 
 public class RemediationDecisionService(
     PatchHoundDbContext dbContext,
-    SlaService slaService,
     ApprovalTaskService approvalTaskService,
-    RemediationWorkflowService remediationWorkflowService
+    RemediationWorkflowService remediationWorkflowService,
+    PatchingTaskService patchingTaskService
 )
 {
     public async Task<Result<RemediationDecision>> CreateDecisionAsync(
@@ -78,7 +78,7 @@ public class RemediationDecisionService(
         if (decision.Outcome == RemediationOutcome.ApprovedForPatching
             && decision.ApprovalStatus == DecisionApprovalStatus.Approved)
         {
-            await EnsurePatchingTasksAsync(decision, ct);
+            await patchingTaskService.EnsurePatchingTasksAsync(decision, ct);
         }
 
         await dbContext.SaveChangesAsync(ct);
@@ -164,7 +164,7 @@ public class RemediationDecisionService(
         if (decision.Outcome == RemediationOutcome.ApprovedForPatching
             && decision.ApprovalStatus == DecisionApprovalStatus.Approved)
         {
-            await EnsurePatchingTasksAsync(decision, ct);
+            await patchingTaskService.EnsurePatchingTasksAsync(decision, ct);
         }
 
         await dbContext.SaveChangesAsync(ct);
@@ -211,7 +211,7 @@ public class RemediationDecisionService(
 
         if (decision.Outcome == RemediationOutcome.ApprovedForPatching)
         {
-            await EnsurePatchingTasksAsync(decision, ct);
+            await patchingTaskService.EnsurePatchingTasksAsync(decision, ct);
         }
 
         await dbContext.SaveChangesAsync(ct);
@@ -365,104 +365,7 @@ public class RemediationDecisionService(
         if (decision is null)
             return 0;
 
-        return await EnsurePatchingTasksAsync(decision, ct);
-    }
-
-    private async Task<int> EnsurePatchingTasksAsync(
-        RemediationDecision decision,
-        CancellationToken ct
-    )
-    {
-        var scopedInstallations = await dbContext.NormalizedSoftwareInstallations
-            .IgnoreQueryFilters()
-            .Where(item =>
-                item.TenantId == decision.TenantId
-                && item.TenantSoftwareId == decision.TenantSoftwareId
-                && item.IsActive)
-            .Select(item => new { item.DeviceAssetId, item.SoftwareAssetId })
-            .ToListAsync(ct);
-
-        if (scopedInstallations.Count == 0)
-            return 0;
-
-        var deviceAssetIds = scopedInstallations.Select(d => d.DeviceAssetId).Distinct().ToList();
-        var scopedSoftwareAssetIds = scopedInstallations.Select(item => item.SoftwareAssetId).Distinct().ToList();
-
-        var deviceTeams = await dbContext.Assets
-            .IgnoreQueryFilters()
-            .Where(a => deviceAssetIds.Contains(a.Id) && a.TenantId == decision.TenantId)
-            .Select(a => new { a.Id, a.OwnerTeamId, a.FallbackTeamId })
-            .ToListAsync(ct);
-
-        var teamGroups = deviceTeams
-            .Select(d => d.OwnerTeamId ?? d.FallbackTeamId)
-            .OfType<Guid>()
-            .Distinct()
-            .ToList();
-
-        if (teamGroups.Count == 0)
-            return 0;
-
-        var representativeSoftwareAssetId = decision.SoftwareAssetId;
-
-        // Determine due date from highest severity vulnerability
-        var tenantSla = await dbContext.TenantSlaConfigurations
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(c => c.TenantId == decision.TenantId, ct);
-
-        var highestSeverity = await dbContext.SoftwareVulnerabilityMatches
-            .IgnoreQueryFilters()
-            .Where(svm =>
-                svm.TenantId == decision.TenantId
-                && svm.ResolvedAt == null
-                && scopedSoftwareAssetIds.Contains(svm.SoftwareAssetId))
-            .Join(
-                dbContext.VulnerabilityDefinitions,
-                svm => svm.VulnerabilityDefinitionId,
-                vd => vd.Id,
-                (svm, vd) => vd.VendorSeverity
-            )
-            .OrderByDescending(s => s)
-            .FirstOrDefaultAsync(ct);
-
-        var dueDate = slaService.CalculateDueDate(
-            highestSeverity != default ? highestSeverity : Severity.Medium,
-            DateTimeOffset.UtcNow,
-            tenantSla
-        );
-
-        var existingOpenTeamIds = await dbContext.PatchingTasks
-            .IgnoreQueryFilters()
-            .Where(task =>
-                task.TenantId == decision.TenantId
-                && task.TenantSoftwareId == decision.TenantSoftwareId
-                && task.Status != PatchingTaskStatus.Completed)
-            .Select(task => task.OwnerTeamId)
-            .Distinct()
-            .ToListAsync(ct);
-
-        var tasks = teamGroups
-            .Where(teamId => !existingOpenTeamIds.Contains(teamId))
-            .Select(group => PatchingTask.Create(
-                decision.TenantId,
-                decision.Id,
-                decision.TenantSoftwareId,
-                representativeSoftwareAssetId,
-                group,
-                dueDate
-            ))
-            .ToList();
-
-        if (tasks.Count == 0)
-            return 0;
-
-        foreach (var task in tasks)
-        {
-            await remediationWorkflowService.AttachPatchingTaskAsync(task, decision, ct);
-        }
-
-        await dbContext.PatchingTasks.AddRangeAsync(tasks, ct);
-        return tasks.Count;
+        return await patchingTaskService.EnsurePatchingTasksAsync(decision, ct);
     }
 
     private async Task<RemediationScope?> ResolveScopeAsync(

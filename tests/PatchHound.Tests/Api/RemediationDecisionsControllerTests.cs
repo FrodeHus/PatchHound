@@ -45,17 +45,20 @@ public class RemediationDecisionsControllerTests : IDisposable
         );
 
         _workflowService = new RemediationWorkflowService(_dbContext);
+        var notificationService = Substitute.For<INotificationService>();
+        var patchingTaskService = new PatchingTaskService(_dbContext, new SlaService(), _workflowService, notificationService);
         var approvalTaskService = new ApprovalTaskService(
             _dbContext,
-            Substitute.For<INotificationService>(),
+            notificationService,
             Substitute.For<IRealTimeNotifier>(),
-            _workflowService
+            _workflowService,
+            patchingTaskService
         );
         _decisionService = new RemediationDecisionService(
             _dbContext,
-            new SlaService(),
             approvalTaskService,
-            _workflowService
+            _workflowService,
+            patchingTaskService
         );
         var recommendationService = new AnalystRecommendationService(_dbContext, _workflowService);
         var aiConfigResolver = Substitute.For<ITenantAiConfigurationResolver>();
@@ -124,7 +127,8 @@ public class RemediationDecisionsControllerTests : IDisposable
             _dbContext,
             Substitute.For<INotificationService>(),
             Substitute.For<IRealTimeNotifier>(),
-            _workflowService
+            _workflowService,
+            new PatchingTaskService(_dbContext, new SlaService(), _workflowService, Substitute.For<INotificationService>())
         );
         var firstApprovalTask = await _dbContext.ApprovalTasks
             .OrderByDescending(item => item.CreatedAt)
@@ -196,7 +200,8 @@ public class RemediationDecisionsControllerTests : IDisposable
             _dbContext,
             Substitute.For<INotificationService>(),
             Substitute.For<IRealTimeNotifier>(),
-            _workflowService
+            _workflowService,
+            new PatchingTaskService(_dbContext, new SlaService(), _workflowService, Substitute.For<INotificationService>())
         );
         var firstApprovalTask = await _dbContext.ApprovalTasks
             .OrderByDescending(item => item.CreatedAt)
