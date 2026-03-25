@@ -233,4 +233,63 @@ public class RemediationDecisionsControllerTests : IDisposable
             .FirstAsync(item => item.Id == recurringWorkflow.Id);
         updatedWorkflow.CurrentStage.Should().Be(RemediationWorkflowStage.RemediationDecision);
     }
+
+    [Fact]
+    public async Task GetDecisionContext_WhenApprovalWasDenied_ReturnsRejectedDecisionWithRejectionComment()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var team = Team.Create(_tenantId, "Infrastructure");
+        await _dbContext.Teams.AddAsync(team);
+
+        var devices = await _dbContext.Assets
+            .Where(item => item.AssetType == AssetType.Device)
+            .ToListAsync();
+        foreach (var device in devices)
+        {
+            device.AssignTeamOwner(team.Id);
+        }
+
+        await _dbContext.SaveChangesAsync();
+
+        var softwareAssetId = await _dbContext.NormalizedSoftwareInstallations
+            .Where(item => item.TenantSoftwareId == graph.TenantSoftware.Id)
+            .Select(item => item.SoftwareAssetId)
+            .OrderBy(id => id)
+            .FirstAsync();
+
+        var decisionResult = await _decisionService.CreateDecisionAsync(
+            _tenantId,
+            softwareAssetId,
+            RemediationOutcome.RiskAcceptance,
+            "Accept the current risk for now.",
+            _userId,
+            DateTimeOffset.UtcNow.AddDays(14),
+            null,
+            CancellationToken.None
+        );
+        decisionResult.IsSuccess.Should().BeTrue();
+
+        var approvalTaskService = new ApprovalTaskService(
+            _dbContext,
+            Substitute.For<INotificationService>(),
+            Substitute.For<IRealTimeNotifier>(),
+            _workflowService,
+            new PatchingTaskService(_dbContext, new SlaService(), _workflowService, Substitute.For<INotificationService>())
+        );
+
+        var approvalTask = await _dbContext.ApprovalTasks
+            .OrderByDescending(item => item.CreatedAt)
+            .FirstAsync();
+        await approvalTaskService.DenyAsync(approvalTask.Id, _userId, "Risk too high without compensating controls.", CancellationToken.None);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetDecisionContext(graph.TenantSoftware.Id, CancellationToken.None);
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<DecisionContextDto>().Subject;
+
+        payload.CurrentDecision.Should().NotBeNull();
+        payload.CurrentDecision!.ApprovalStatus.Should().Be("Rejected");
+        payload.CurrentDecision.LatestRejection.Should().NotBeNull();
+        payload.CurrentDecision.LatestRejection!.Comment.Should().Be("Risk too high without compensating controls.");
+    }
 }

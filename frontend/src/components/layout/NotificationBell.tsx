@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Bell } from 'lucide-react'
 import { useSSE } from '@/hooks/useSSE'
-import { fetchNotifications, fetchUnreadNotificationCount, markNotificationRead } from '@/api/notifications.functions'
+import { fetchNotifications, fetchUnreadNotificationCount, markAllNotificationsRead, markNotificationRead } from '@/api/notifications.functions'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -30,6 +30,16 @@ export function NotificationBell() {
       await markNotificationRead({ data: { id } })
     },
     onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    },
+  })
+
+  const markAllReadMutation = useMutation({
+    mutationFn: async () => {
+      await markAllNotificationsRead()
+    },
+    onSuccess: async () => {
+      setUnreadCount(0)
       await queryClient.invalidateQueries({ queryKey: ['notifications'] })
     },
   })
@@ -79,11 +89,27 @@ export function NotificationBell() {
       <DropdownMenuContent align="end" className="w-96 rounded-xl border-border/70 bg-popover/95 p-1.5 backdrop-blur">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-3 py-2">
-            <div>
-              <p className="text-sm font-medium text-foreground">Notifications</p>
-              <p className="text-xs text-muted-foreground">
-                {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
-              </p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">Notifications</p>
+                <p className="text-xs text-muted-foreground">
+                  {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+                </p>
+              </div>
+              {unreadCount > 0 ? (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary transition hover:text-primary/80 disabled:pointer-events-none disabled:opacity-50"
+                  disabled={markAllReadMutation.isPending}
+                  onClick={async (event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    await markAllReadMutation.mutateAsync()
+                  }}
+                >
+                  Mark all as read
+                </button>
+              ) : null}
             </div>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
