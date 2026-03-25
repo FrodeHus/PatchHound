@@ -41,20 +41,17 @@ public class PatchingTaskService(
 
         var deviceAssetIds = scopedInstallations.Select(d => d.DeviceAssetId).Distinct().ToList();
         var scopedSoftwareAssetIds = scopedInstallations.Select(item => item.SoftwareAssetId).Distinct().ToList();
+        var defaultTeamId = (await DefaultTeamHelper.EnsureDefaultTeamAsync(dbContext, decision.TenantId, ct)).Id;
 
         var deviceTeams = await dbContext.Assets
             .IgnoreQueryFilters()
             .Where(a => deviceAssetIds.Contains(a.Id) && a.TenantId == decision.TenantId)
-            .Select(a => new { a.Id, TeamId = a.OwnerTeamId ?? a.FallbackTeamId })
+            .Select(a => new { a.Id, a.OwnerTeamId, a.FallbackTeamId })
             .ToListAsync(ct);
 
         var teamGroups = deviceTeams
-            .Where(d => d.TeamId != null)
-            .GroupBy(d => d.TeamId!.Value)
+            .GroupBy(device => device.OwnerTeamId ?? device.FallbackTeamId ?? defaultTeamId)
             .ToDictionary(group => group.Key, group => group.Select(item => item.Id).Distinct().Count());
-
-        if (teamGroups.Count == 0)
-            return 0;
 
         var tenantSla = await dbContext.TenantSlaConfigurations
             .IgnoreQueryFilters()

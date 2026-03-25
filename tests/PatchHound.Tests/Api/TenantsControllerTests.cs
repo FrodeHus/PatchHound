@@ -87,6 +87,11 @@ public class TenantsControllerTests : IDisposable
             .UserTenantRoles.IgnoreQueryFilters()
             .SingleAsync(item => item.TenantId == detail.Id && item.UserId == currentUser.Id);
         role.Role.Should().Be(RoleName.GlobalAdmin);
+
+        var defaultTeam = await _dbContext.Teams
+            .IgnoreQueryFilters()
+            .SingleAsync(item => item.TenantId == detail.Id && item.Name == DefaultTeamHelper.DefaultTeamName);
+        defaultTeam.TenantId.Should().Be(detail.Id);
     }
 
     [Fact]

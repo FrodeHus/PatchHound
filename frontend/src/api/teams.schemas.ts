@@ -6,6 +6,7 @@ export const teamSchema = z.object({
   tenantId: z.string().uuid(),
   tenantName: z.string(),
   name: z.string(),
+  isDefault: z.boolean(),
   memberCount: z.number(),
   currentRiskScore: z.number().nullable(),
 })
@@ -15,6 +16,7 @@ export const teamDetailSchema = z.object({
   tenantId: z.string().uuid(),
   tenantName: z.string(),
   name: z.string(),
+  isDefault: z.boolean(),
   assignedAssetCount: z.number(),
   currentRiskScore: z.number().nullable(),
   topRiskAssets: z.array(z.object({

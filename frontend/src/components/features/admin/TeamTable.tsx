@@ -62,6 +62,11 @@ export function TeamTable({
               <span className="font-medium tracking-tight underline decoration-border/70 underline-offset-4 transition hover:decoration-foreground">
                 {row.original.name}
               </span>
+              {row.original.isDefault ? (
+                <Badge className="rounded-full border border-amber-300/60 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300">
+                  Fallback
+                </Badge>
+              ) : null}
               {selectedTeamId === row.original.id ? (
                 <Badge className="rounded-full border border-primary/20 bg-primary/10 text-primary hover:bg-primary/10">
                   Active

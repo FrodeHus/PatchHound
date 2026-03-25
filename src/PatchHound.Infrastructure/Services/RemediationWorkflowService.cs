@@ -496,22 +496,8 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
         if (candidateTeamIds.Count == 1)
             return candidateTeamIds[0];
 
-        var infrastructureTeamId = await dbContext.Teams
-            .Where(team => team.TenantId == tenantId && team.Name == "Infrastructure")
-            .Select(team => team.Id)
-            .FirstOrDefaultAsync(ct);
-        if (infrastructureTeamId != Guid.Empty)
-            return infrastructureTeamId;
-
-        var fallbackTeamId = await dbContext.Teams
-            .Where(team => team.TenantId == tenantId)
-            .OrderBy(team => team.Name)
-            .Select(team => team.Id)
-            .FirstOrDefaultAsync(ct);
-        if (fallbackTeamId != Guid.Empty)
-            return fallbackTeamId;
-
-        throw new InvalidOperationException("No team is available to own this remediation workflow.");
+        var defaultTeam = await DefaultTeamHelper.EnsureDefaultTeamAsync(dbContext, tenantId, ct);
+        return defaultTeam.Id;
     }
 
     private static bool RequiresApproval(RemediationWorkflowApprovalMode mode) =>

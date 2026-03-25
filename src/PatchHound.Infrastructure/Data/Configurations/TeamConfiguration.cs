@@ -13,6 +13,7 @@ public class TeamConfiguration : IEntityTypeConfiguration<Team>
         builder.HasIndex(t => new { t.TenantId, t.Name }).IsUnique();
 
         builder.Property(t => t.Name).HasMaxLength(256).IsRequired();
+        builder.Property(t => t.IsDefault).HasDefaultValue(false);
 
         builder.HasMany(t => t.Members).WithOne(tm => tm.Team).HasForeignKey(tm => tm.TeamId);
     }
