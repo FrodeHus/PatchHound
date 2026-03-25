@@ -53,8 +53,10 @@ public class SoftwareControllerTests : IDisposable
             _tenantAiConfigurationResolver
         );
         var workflowService = new RemediationWorkflowService(_dbContext);
-        var approvalTaskService = new ApprovalTaskService(_dbContext, Substitute.For<INotificationService>(), Substitute.For<IRealTimeNotifier>(), workflowService);
-        var remediationDecisionService = new RemediationDecisionService(_dbContext, new SlaService(), approvalTaskService, workflowService);
+        var notificationService = Substitute.For<INotificationService>();
+        var patchingTaskService = new PatchingTaskService(_dbContext, new SlaService(), workflowService, notificationService);
+        var approvalTaskService = new ApprovalTaskService(_dbContext, notificationService, Substitute.For<IRealTimeNotifier>(), workflowService, patchingTaskService);
+        var remediationDecisionService = new RemediationDecisionService(_dbContext, approvalTaskService, workflowService, patchingTaskService);
         var remediationTaskQueryService = new PatchHound.Api.Services.RemediationTaskQueryService(
             _dbContext,
             remediationDecisionService

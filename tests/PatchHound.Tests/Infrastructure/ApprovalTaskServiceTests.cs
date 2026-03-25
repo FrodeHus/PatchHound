@@ -4,6 +4,7 @@ using NSubstitute;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
+using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
 using PatchHound.Tests.TestData;
@@ -38,11 +39,18 @@ public class ApprovalTaskServiceTests : IDisposable
         _notificationService = Substitute.For<INotificationService>();
         _realTimeNotifier = Substitute.For<IRealTimeNotifier>();
         var workflowService = new RemediationWorkflowService(_dbContext);
+        var patchingTaskService = new PatchingTaskService(
+            _dbContext,
+            new SlaService(),
+            workflowService,
+            _notificationService
+        );
         _sut = new ApprovalTaskService(
             _dbContext,
             _notificationService,
             _realTimeNotifier,
-            workflowService
+            workflowService,
+            patchingTaskService
         );
     }
 

@@ -88,6 +88,7 @@ public static class DependencyInjection
         services.AddScoped<TeamService>();
         services.AddScoped<SlaService>();
         services.AddScoped<RemediationWorkflowService>();
+        services.AddScoped<PatchingTaskService>();
         services.AddScoped<ApprovalTaskService>();
         services.AddScoped<RemediationDecisionService>();
         services.AddScoped<AnalystRecommendationService>();

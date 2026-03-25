@@ -10,7 +10,8 @@ public class ApprovalTaskService(
     PatchHoundDbContext dbContext,
     INotificationService notificationService,
     IRealTimeNotifier realTimeNotifier,
-    RemediationWorkflowService remediationWorkflowService
+    RemediationWorkflowService remediationWorkflowService,
+    PatchingTaskService patchingTaskService
 )
 {
     public async Task<ApprovalTask> CreateForDecisionAsync(
@@ -80,6 +81,11 @@ public class ApprovalTaskService(
             userId,
             ct
         );
+
+        if (task.RemediationDecision.Outcome == RemediationOutcome.ApprovedForPatching)
+        {
+            await patchingTaskService.EnsurePatchingTasksAsync(task.RemediationDecision, ct);
+        }
 
         await dbContext.SaveChangesAsync(ct);
         return task;
