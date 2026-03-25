@@ -92,6 +92,7 @@ public class DashboardControllerTests : IDisposable
             _tenantId,
             decision.Id,
             RemediationOutcome.RiskAcceptance,
+            ApprovalTaskStatus.Pending,
             timestamp.AddHours(12)
         );
 
@@ -181,6 +182,7 @@ public class DashboardControllerTests : IDisposable
             _tenantId,
             pendingDecision.Id,
             RemediationOutcome.RiskAcceptance,
+            ApprovalTaskStatus.Pending,
             timestamp.AddHours(8)
         );
 

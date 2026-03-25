@@ -182,10 +182,75 @@ public class RemediationDecisionServiceTests : IDisposable
         closedCount.Should().Be(0);
 
         var decision = await _dbContext.RemediationDecisions.IgnoreQueryFilters().FirstAsync();
-        decision.ApprovalStatus.Should().Be(DecisionApprovalStatus.Approved);
+        decision.ApprovalStatus.Should().Be(DecisionApprovalStatus.PendingApproval);
 
         var tasks = await _dbContext.PatchingTasks.IgnoreQueryFilters().ToListAsync();
-        tasks.Should().OnlyContain(task => task.Status != PatchingTaskStatus.Completed);
+        tasks.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CreateAndApprovePatchDecisionAsync_MovesWorkflowIntoExecution()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var team = Team.Create(_tenantId, "Infrastructure");
+        await _dbContext.Teams.AddAsync(team);
+
+        var devices = await _dbContext.Assets
+            .Where(item => item.AssetType == AssetType.Device)
+            .ToListAsync();
+        foreach (var device in devices)
+        {
+            device.AssignTeamOwner(team.Id);
+        }
+
+        await _dbContext.SaveChangesAsync();
+
+        var softwareAssetId = await _dbContext.NormalizedSoftwareInstallations
+            .Where(item => item.TenantSoftwareId == graph.TenantSoftware.Id)
+            .Select(item => item.SoftwareAssetId)
+            .OrderBy(id => id)
+            .FirstAsync();
+
+        var createResult = await _sut.CreateDecisionAsync(
+            _tenantId,
+            softwareAssetId,
+            RemediationOutcome.ApprovedForPatching,
+            "Patch it",
+            _userId,
+            null,
+            null,
+            CancellationToken.None
+        );
+
+        createResult.IsSuccess.Should().BeTrue();
+
+        var workflowAfterCreate = await _dbContext.RemediationWorkflows
+            .OrderByDescending(item => item.CreatedAt)
+            .FirstAsync();
+        workflowAfterCreate.CurrentStage.Should().Be(RemediationWorkflowStage.Approval);
+
+        var approvalTask = await _dbContext.ApprovalTasks
+            .OrderByDescending(item => item.CreatedAt)
+            .FirstAsync();
+        approvalTask.Status.Should().Be(ApprovalTaskStatus.Pending);
+
+        var approvalTaskService = new ApprovalTaskService(
+            _dbContext,
+            Substitute.For<INotificationService>(),
+            Substitute.For<IRealTimeNotifier>(),
+            _workflowService
+        );
+
+        await approvalTaskService.ApproveAsync(
+            approvalTask.Id,
+            _userId,
+            "Approved for execution",
+            CancellationToken.None
+        );
+
+        var updatedWorkflow = await _dbContext.RemediationWorkflows
+            .FirstAsync(item => item.Id == workflowAfterCreate.Id);
+        updatedWorkflow.CurrentStage.Should().Be(RemediationWorkflowStage.Execution);
     }
 
     [Fact]
@@ -248,7 +313,16 @@ public class RemediationDecisionServiceTests : IDisposable
         );
 
         firstDecisionResult.IsSuccess.Should().BeTrue();
-        firstDecisionResult.Value.Approve(_userId);
+        var approvalTaskService = new ApprovalTaskService(
+            _dbContext,
+            Substitute.For<INotificationService>(),
+            Substitute.For<IRealTimeNotifier>(),
+            _workflowService
+        );
+        var firstApprovalTask = await _dbContext.ApprovalTasks
+            .OrderByDescending(item => item.CreatedAt)
+            .FirstAsync();
+        await approvalTaskService.ApproveAsync(firstApprovalTask.Id, _userId, "Renewed exception approved.", CancellationToken.None);
         await _dbContext.SaveChangesAsync();
 
         var firstWorkflow = await _dbContext.RemediationWorkflows
@@ -327,6 +401,16 @@ public class RemediationDecisionServiceTests : IDisposable
         );
 
         firstDecisionResult.IsSuccess.Should().BeTrue();
+        var approvalTaskService = new ApprovalTaskService(
+            _dbContext,
+            Substitute.For<INotificationService>(),
+            Substitute.For<IRealTimeNotifier>(),
+            _workflowService
+        );
+        var firstApprovalTask = await _dbContext.ApprovalTasks
+            .OrderByDescending(item => item.CreatedAt)
+            .FirstAsync();
+        await approvalTaskService.ApproveAsync(firstApprovalTask.Id, _userId, "Patch again if it returns.", CancellationToken.None);
 
         var firstWorkflow = await _dbContext.RemediationWorkflows
             .OrderByDescending(item => item.CreatedAt)

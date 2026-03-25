@@ -48,6 +48,7 @@ public class RemediationDecision
         RemediationOutcome outcome,
         string? justification,
         Guid decidedBy,
+        DecisionApprovalStatus? initialApprovalStatus = null,
         DateTimeOffset? expiryDate = null,
         DateTimeOffset? reEvaluationDate = null
     )
@@ -59,7 +60,11 @@ public class RemediationDecision
             throw new ArgumentException("Re-evaluation date is required for PatchingDeferred.");
 
         var now = DateTimeOffset.UtcNow;
-        var requiresApproval = OutcomesRequiringApproval.Contains(outcome);
+        var requiresApproval = initialApprovalStatus.HasValue
+            ? initialApprovalStatus.Value == DecisionApprovalStatus.PendingApproval
+            : OutcomesRequiringApproval.Contains(outcome);
+        var approvalStatus = initialApprovalStatus
+            ?? (requiresApproval ? DecisionApprovalStatus.PendingApproval : DecisionApprovalStatus.Approved);
 
         return new RemediationDecision
         {
@@ -68,12 +73,12 @@ public class RemediationDecision
             TenantSoftwareId = tenantSoftwareId,
             SoftwareAssetId = softwareAssetId,
             Outcome = outcome,
-            ApprovalStatus = requiresApproval ? DecisionApprovalStatus.PendingApproval : DecisionApprovalStatus.Approved,
+            ApprovalStatus = approvalStatus,
             Justification = justification ?? string.Empty,
             DecidedBy = decidedBy,
             DecidedAt = now,
-            ApprovedBy = requiresApproval ? null : decidedBy,
-            ApprovedAt = requiresApproval ? null : now,
+            ApprovedBy = approvalStatus == DecisionApprovalStatus.Approved ? decidedBy : null,
+            ApprovedAt = approvalStatus == DecisionApprovalStatus.Approved ? now : null,
             ExpiryDate = expiryDate,
             ReEvaluationDate = reEvaluationDate,
             CreatedAt = now,
