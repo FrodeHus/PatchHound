@@ -128,26 +128,6 @@ export function SoftwareDetailPage({
               />
             </div>
 
-            <div className="rounded-2xl border border-border/70 bg-background/45 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    Current software scope
-                  </p>
-                  <p className="mt-1 text-sm text-foreground">
-                    {detail.vulnerableInstallCount} vulnerable installs across {detail.uniqueDeviceCount} device{detail.uniqueDeviceCount === 1 ? '' : 's'}.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  <span className="rounded-full border border-border/70 bg-background px-2.5 py-1">
-                    {detail.versionCount} cohort{detail.versionCount === 1 ? '' : 's'}
-                  </span>
-                  <span className="rounded-full border border-border/70 bg-background px-2.5 py-1">
-                    {detail.sourceAliases.length} aliases
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
 
           <aside className="rounded-[1.35rem] border border-border/70 bg-background/50 p-4">
@@ -310,7 +290,7 @@ function OverviewTab({
       <section className="rounded-2xl border border-border/70 bg-card p-5">
         <VersionCohortChooser
           title="Version cohorts"
-          description="Choose a cohort to inspect installs, owners, and vulnerabilities without letting the version list dominate the page."
+          description="Choose a cohort to inspect installs, owners, and vulnerabilities."
           cohorts={detail.versionCohorts}
           selectedVersion={selectedVersion}
           onSelectVersion={onSelectVersion}

@@ -1154,7 +1154,7 @@ function DevicesTab({
           {detail ? (
             <VersionCohortChooser
               title="Execution scope by version cohort"
-              description="Switch cohorts quickly to see which devices and owner teams are involved in the current remediation."
+              description="Choose a cohort to see which devices and owner teams are involved in this remediation."
               cohorts={detail.versionCohorts}
               selectedVersion={selectedVersion}
               onSelectVersion={onSelectVersion}
