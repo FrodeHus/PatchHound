@@ -142,6 +142,10 @@ public class TenantsController : ControllerBase
 
         var tenant = Tenant.Create(name, entraTenantId);
         await _dbContext.Tenants.AddAsync(tenant, ct);
+        await _dbContext.Teams.AddAsync(
+            Team.CreateDefault(tenant.Id, DefaultTeamHelper.DefaultTeamName),
+            ct
+        );
         await _dbContext.TenantSlaConfigurations.AddAsync(
             TenantSlaConfiguration.CreateDefault(tenant.Id),
             ct

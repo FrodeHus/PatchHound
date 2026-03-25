@@ -5,6 +5,7 @@ public class Team
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public string Name { get; private set; } = null!;
+    public bool IsDefault { get; private set; }
 
     private readonly List<TeamMember> _members = [];
     public IReadOnlyCollection<TeamMember> Members => _members.AsReadOnly();
@@ -18,6 +19,18 @@ public class Team
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             Name = name,
+            IsDefault = false,
+        };
+    }
+
+    public static Team CreateDefault(Guid tenantId, string name)
+    {
+        return new Team
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = name,
+            IsDefault = true,
         };
     }
 

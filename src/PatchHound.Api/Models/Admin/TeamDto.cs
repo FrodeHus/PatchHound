@@ -5,6 +5,7 @@ public record TeamDto(
     Guid TenantId,
     string TenantName,
     string Name,
+    bool IsDefault,
     int MemberCount,
     decimal? CurrentRiskScore
 );
@@ -14,6 +15,7 @@ public record TeamDetailDto(
     Guid TenantId,
     string TenantName,
     string Name,
+    bool IsDefault,
     int AssignedAssetCount,
     decimal? CurrentRiskScore,
     IReadOnlyList<TeamRiskAssetDto> TopRiskAssets,

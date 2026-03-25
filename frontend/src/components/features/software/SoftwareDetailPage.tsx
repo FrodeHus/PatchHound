@@ -62,10 +62,9 @@ export function SoftwareDetailPage({
 
   return (
     <section className="space-y-5">
-      {/* Compact hero header */}
-      <header className="overflow-hidden rounded-2xl border border-border/70 bg-[linear-gradient(140deg,color-mix(in_oklab,var(--primary)_12%,transparent),transparent_45%),linear-gradient(180deg,color-mix(in_oklab,var(--foreground)_4%,transparent),transparent_60%),var(--color-card)] p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-3">
+      <header className="overflow-hidden rounded-[1.75rem] border border-border/70 bg-[linear-gradient(130deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_42%),linear-gradient(180deg,color-mix(in_oklab,var(--foreground)_4%,transparent),transparent_58%),var(--color-card)] p-5">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] xl:items-start">
+          <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
               <Pill>{detail.normalizationMethod}</Pill>
               <Pill>{detail.confidence} confidence</Pill>
@@ -74,55 +73,133 @@ export function SoftwareDetailPage({
               ) : (
                 <Pill>Heuristic identity</Pill>
               )}
+              {canViewRemediation && remediationData?.currentDecision ? (
+                <span className={`rounded-full border px-3 py-1 text-xs ${
+                  pendingApproval
+                    ? toneBadge(approvalStatusTone('PendingApproval'))
+                    : toneBadge(outcomeTone(remediationData.currentDecision.outcome))
+                }`}>
+                  {pendingApproval
+                    ? 'Approval pending'
+                    : outcomeLabel(remediationData.currentDecision.outcome)}
+                </span>
+              ) : null}
             </div>
-            <div>
-              <h1 className="text-3xl font-semibold tracking-[-0.04em]">
-                {startCase(detail.canonicalName)}
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                {detail.canonicalVendor
-                  ? `${startCase(detail.canonicalVendor)} normalized product`
-                  : "Normalized software identity"}{" "}
-                spanning {detail.versionCount} version cohort
-                {detail.versionCount === 1 ? "" : "s"} and{" "}
-                {detail.activeInstallCount} active install
-                {detail.activeInstallCount === 1 ? "" : "s"} in the current
-                tenant.
+
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+                <h1 className="text-[2.15rem] font-semibold tracking-[-0.05em] leading-none">
+                  {startCase(detail.canonicalName)}
+                </h1>
+                {detail.canonicalVendor ? (
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {startCase(detail.canonicalVendor)}
+                  </span>
+                ) : null}
+              </div>
+              <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                {detail.activeVulnerabilityCount > 0
+                  ? `${detail.activeVulnerabilityCount} open vulnerabilities across ${detail.versionCount} version cohorts and ${detail.activeInstallCount} active installs.`
+                  : `${detail.versionCount} version cohorts and ${detail.activeInstallCount} active installs are currently tracked for this software identity.`}
+                {' '}
+                {detail.exposureImpactScore != null
+                  ? `Exposure impact is ${detail.exposureImpactScore.toFixed(1)}.`
+                  : 'Exposure impact is not yet scored.'}
               </p>
             </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <HeaderMetaChip
+                label="First seen"
+                value={detail.firstSeenAt ? formatDate(detail.firstSeenAt) : 'Unknown'}
+              />
+              <HeaderMetaChip
+                label="Last seen"
+                value={detail.lastSeenAt ? formatDate(detail.lastSeenAt) : 'Unknown'}
+              />
+              <HeaderMetaChip
+                label="Primary CPE"
+                value={detail.primaryCpe23Uri ? 'Bound' : 'Not bound'}
+              />
+              <HeaderMetaChip
+                label="Source aliases"
+                value={String(detail.sourceAliases.length)}
+              />
+            </div>
+
+            <div className="rounded-2xl border border-border/70 bg-background/45 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Current software scope
+                  </p>
+                  <p className="mt-1 text-sm text-foreground">
+                    {detail.vulnerableInstallCount} vulnerable installs across {detail.uniqueDeviceCount} device{detail.uniqueDeviceCount === 1 ? '' : 's'}.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <span className="rounded-full border border-border/70 bg-background px-2.5 py-1">
+                    {detail.versionCount} cohort{detail.versionCount === 1 ? '' : 's'}
+                  </span>
+                  <span className="rounded-full border border-border/70 bg-background px-2.5 py-1">
+                    {detail.sourceAliases.length} aliases
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="grid min-w-[220px] gap-3 rounded-xl border border-border/70 bg-background/50 p-4">
-            <Metric
-              label="Active installs"
-              value={String(detail.activeInstallCount)}
-            />
-            <Metric label="Devices" value={String(detail.uniqueDeviceCount)} />
-            <Metric
-              label="Vulnerable installs"
-              value={String(detail.vulnerableInstallCount)}
-              tone={detail.vulnerableInstallCount > 0 ? "danger" : "neutral"}
-            />
-            <Metric
-              label="Open vulnerabilities"
-              value={String(detail.activeVulnerabilityCount)}
-              tone={detail.activeVulnerabilityCount > 0 ? "warning" : "neutral"}
-            />
-            <Metric
-              label="Exposure impact"
-              value={detail.exposureImpactScore != null ? detail.exposureImpactScore.toFixed(1) : "—"}
-              tone={
-                detail.exposureImpactScore == null
-                  ? "neutral"
-                  : detail.exposureImpactScore >= 75
-                    ? "danger"
-                    : detail.exposureImpactScore >= 40
-                      ? "warning"
-                      : detail.exposureImpactScore >= 10
-                        ? "info"
-                        : "success"
-              }
-            />
-          </div>
+
+          <aside className="rounded-[1.35rem] border border-border/70 bg-background/50 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Scope snapshot
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Current tenant-wide footprint for this normalized software.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <HeaderStat
+                label="Active installs"
+                value={String(detail.activeInstallCount)}
+              />
+              <HeaderStat
+                label="Devices"
+                value={String(detail.uniqueDeviceCount)}
+              />
+              <HeaderStat
+                label="Vulnerable installs"
+                value={String(detail.vulnerableInstallCount)}
+                tone={detail.vulnerableInstallCount > 0 ? "danger" : "neutral"}
+              />
+              <HeaderStat
+                label="Open vulnerabilities"
+                value={String(detail.activeVulnerabilityCount)}
+                tone={detail.activeVulnerabilityCount > 0 ? "warning" : "neutral"}
+              />
+              <HeaderStat
+                label="Version cohorts"
+                value={String(detail.versionCount)}
+              />
+              <HeaderStat
+                label="Exposure impact"
+                value={detail.exposureImpactScore != null ? detail.exposureImpactScore.toFixed(1) : "—"}
+                tone={
+                  detail.exposureImpactScore == null
+                    ? "neutral"
+                    : detail.exposureImpactScore >= 75
+                      ? "danger"
+                      : detail.exposureImpactScore >= 40
+                        ? "warning"
+                        : detail.exposureImpactScore >= 10
+                          ? "info"
+                          : "success"
+                }
+              />
+            </div>
+          </aside>
         </div>
       </header>
 
@@ -637,6 +714,40 @@ function Metric({
       <p className={`mt-2 text-sm ${mono ? 'font-mono text-xs break-all' : 'font-medium'} ${toneText(tone)}`}>
         {value}
       </p>
+    </div>
+  )
+}
+
+function HeaderStat({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string
+  value: string
+  tone?: 'neutral' | 'success' | 'info' | 'warning' | 'danger'
+}) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className={`mt-2 text-2xl font-semibold tracking-[-0.04em] ${toneText(tone)}`}>
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function HeaderMetaChip({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-background/55 px-3 py-2.5">
+      <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
     </div>
   )
 }

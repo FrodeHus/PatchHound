@@ -828,11 +828,11 @@ public class RemediationDecisionQueryService(
             RemediationWorkflowStage.Verification when workflow?.ProposedOutcome is RemediationOutcome.RiskAcceptance or RemediationOutcome.AlternateMitigation =>
                 "Waiting for Security Manager or Global Admin to verify whether the previous exception still applies.",
             RemediationWorkflowStage.Verification =>
-                $"Waiting for the software owner team to verify whether the previous remediation should be kept. Current owner: {softwareOwnerTeamName ?? "Infrastructure"}.",
+                $"Waiting for the software owner team to verify whether the previous remediation should be kept. Current owner: {softwareOwnerTeamName ?? DefaultTeamHelper.DefaultTeamName}.",
             RemediationWorkflowStage.SecurityAnalysis =>
                 "Security analysis can be completed by Global Admin, Security Manager, or Security Analyst.",
             RemediationWorkflowStage.RemediationDecision =>
-                $"Waiting for the software owner team to decide. Current owner: {softwareOwnerTeamName ?? "Infrastructure"}.",
+                $"Waiting for the software owner team to decide. Current owner: {softwareOwnerTeamName ?? DefaultTeamHelper.DefaultTeamName}.",
             RemediationWorkflowStage.Approval when workflow?.ApprovalMode == RemediationWorkflowApprovalMode.SecurityApproval =>
                 "Waiting for Security Manager or Global Admin approval.",
             RemediationWorkflowStage.Approval when workflow?.ApprovalMode == RemediationWorkflowApprovalMode.TechnicalApproval =>

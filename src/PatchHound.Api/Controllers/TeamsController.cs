@@ -70,6 +70,7 @@ public class TeamsController : ControllerBase
                     .Select(tenant => tenant.Name)
                     .FirstOrDefault() ?? "Unknown tenant",
                 item.Team.Name,
+                item.Team.IsDefault,
                 item.Team.Members.Count,
                 item.CurrentRiskScore
             ))
@@ -143,6 +144,7 @@ public class TeamsController : ControllerBase
                 team.TenantId,
                 tenantName ?? "Unknown tenant",
                 team.Name,
+                team.IsDefault,
                 assignedAssetCount,
                 currentRiskScore,
                 topRiskAssets,
@@ -175,7 +177,7 @@ public class TeamsController : ControllerBase
         return CreatedAtAction(
             nameof(Get),
             new { id = team.Id },
-            new TeamDto(team.Id, team.TenantId, string.Empty, team.Name, 0, null)
+            new TeamDto(team.Id, team.TenantId, string.Empty, team.Name, team.IsDefault, 0, null)
         );
     }
 

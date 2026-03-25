@@ -120,6 +120,7 @@ public static class DependencyInjection
         services.AddScoped<RiskRefreshService>();
         services.AddScoped<AuditLogWriter>();
         services.AddScoped<NotificationEmailConfigurationResolver>();
+        services.AddHostedService<DefaultTeamSeedHostedService>();
 
         // Notifications & Email
         services.AddScoped<INotificationService, EmailNotificationService>();

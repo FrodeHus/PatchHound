@@ -58,7 +58,14 @@ export function AssignmentGroupDetailView({
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <CardTitle className="text-2xl font-semibold tracking-[-0.04em]">{team.name}</CardTitle>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="text-2xl font-semibold tracking-[-0.04em]">{team.name}</CardTitle>
+                  {team.isDefault ? (
+                    <Badge className="rounded-full border border-amber-300/60 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300">
+                      Fallback
+                    </Badge>
+                  ) : null}
+                </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {team.tenantName} ownership lane with {team.assignedAssetCount} assets currently assigned.
                 </p>
