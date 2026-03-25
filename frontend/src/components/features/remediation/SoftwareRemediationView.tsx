@@ -24,6 +24,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
+import { getApiErrorMessage } from '@/lib/api-errors'
 import { toneBadge } from '@/lib/tone-classes'
 import { formatDate, formatDateTime, formatNullableDateTime, startCase } from '@/lib/formatting'
 import { useTenantScope } from '@/components/layout/tenant-scope'
@@ -71,6 +73,7 @@ export function SoftwareRemediationView({
   const [deviceVersion, setDeviceVersion] = useState(initialDeviceVersion ?? '')
 
   const [approving, setApproving] = useState(false)
+  const [stageError, setStageError] = useState<string | null>(null)
   const workflowId = data.workflowState.workflowId
   const currentStageId = data.workflowState.currentStage as RemediationStageId
   const stages: RemediationStage[] = data.workflowState.stages.map((stage) => ({
@@ -125,9 +128,10 @@ export function SoftwareRemediationView({
   })
   const teamStatuses = teamStatusesQuery.data ?? []
 
-  async function handleApproveReject(action: 'approve' | 'reject' | 'cancel') {
+  async function handleApproveReject(action: 'approve' | 'reject' | 'cancel', justification?: string) {
     if (!data.currentDecision) return
     setApproving(true)
+    setStageError(null)
     try {
       await approveOrRejectDecision({
         data: {
@@ -135,9 +139,12 @@ export function SoftwareRemediationView({
           workflowId,
           decisionId: data.currentDecision.id,
           action,
+          justification,
         },
       })
       await queryClient.invalidateQueries({ queryKey })
+    } catch (error) {
+      setStageError(getApiErrorMessage(error, 'Unable to update the remediation decision.'))
     } finally {
       setApproving(false)
     }
@@ -146,6 +153,7 @@ export function SoftwareRemediationView({
   async function handleVerification(action: 'keepCurrentDecision' | 'chooseNewDecision') {
     if (!workflowId) return
     setApproving(true)
+    setStageError(null)
     try {
       await verifyRecurringRemediation({
         data: {
@@ -154,6 +162,8 @@ export function SoftwareRemediationView({
         },
       })
       await queryClient.invalidateQueries({ queryKey })
+    } catch (error) {
+      setStageError(getApiErrorMessage(error, 'Unable to update the recurrence verification.'))
     } finally {
       setApproving(false)
     }
@@ -225,12 +235,7 @@ export function SoftwareRemediationView({
       />
 
       <Card className="rounded-[1.6rem] border-border/70">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">
-            {data.workflowState.currentStageLabel} is the current focus
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-3">
+        <CardContent className="grid gap-3 pt-6 md:grid-cols-3">
           <WorkflowFact
             label="Exposure in scope"
             value={`${data.summary.totalVulnerabilities.toLocaleString()} vulnerabilities`}
@@ -266,11 +271,11 @@ export function SoftwareRemediationView({
         tenantSoftwareId={tenantSoftwareId}
         queryKey={queryKey}
         currentStageId={currentStageId}
-        currentStageLabel={data.workflowState.currentStageLabel}
         currentActorSummary={data.workflowState.currentActorSummary}
         canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
         workflowId={workflowId}
         approving={approving}
+        stageError={stageError}
         onApproveReject={handleApproveReject}
         onVerify={handleVerification}
       />
@@ -412,11 +417,11 @@ function StagePanel({
   tenantSoftwareId,
   queryKey,
   currentStageId,
-  currentStageLabel,
   currentActorSummary,
   canActOnCurrentStage,
   workflowId,
   approving,
+  stageError,
   onApproveReject,
   onVerify,
 }: {
@@ -424,20 +429,17 @@ function StagePanel({
   tenantSoftwareId: string
   queryKey: readonly unknown[]
   currentStageId: RemediationStageId
-  currentStageLabel: string
   currentActorSummary: string
   canActOnCurrentStage: boolean
   workflowId: string | null
   approving: boolean
-  onApproveReject: (action: 'approve' | 'reject' | 'cancel') => Promise<void>
+  stageError: string | null
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string) => Promise<void>
   onVerify: (action: 'keepCurrentDecision' | 'chooseNewDecision') => Promise<void>
 }) {
   return (
     <Card className="rounded-[1.8rem] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_58%),var(--color-card)]">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">{currentStageLabel} is the current focus</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 pt-6">
         <div className={`rounded-2xl border px-4 py-3 text-sm ${
           canActOnCurrentStage
             ? 'border-emerald-300/70 bg-emerald-500/6 text-foreground'
@@ -450,6 +452,11 @@ function StagePanel({
             {currentActorSummary}
           </p>
         </div>
+        {stageError ? (
+          <div className="rounded-2xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            {stageError}
+          </div>
+        ) : null}
         {currentStageId === 'verification' ? (
           <StageVerificationPanel
             data={data}
@@ -658,8 +665,10 @@ function StageRemediationDecisionPanel({
   queryKey: readonly unknown[]
   canActOnCurrentStage: boolean
   approving: boolean
-  onApproveReject: (action: 'approve' | 'reject' | 'cancel') => Promise<void>
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string) => Promise<void>
 }) {
+  const latestRecommendation = data.recommendations[0] ?? null
+
   if (!data.currentDecision) {
     return (
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
@@ -677,6 +686,10 @@ function StageRemediationDecisionPanel({
           />
         </div>
         <div className="space-y-3">
+          <RecommendationSnapshotCard
+            recommendation={latestRecommendation}
+            recommendationCount={data.recommendations.length}
+          />
           <StageMetricCard
             label="Analyst guidance"
             value={data.recommendations.length.toLocaleString()}
@@ -700,6 +713,10 @@ function StageRemediationDecisionPanel({
       onApproveReject={onApproveReject}
       rightColumn={
         <>
+          <RecommendationSnapshotCard
+            recommendation={latestRecommendation}
+            recommendationCount={data.recommendations.length}
+          />
           <StageMetricCard
             label="Decision posture"
             value={outcomeLabel(data.currentDecision.outcome)}
@@ -716,6 +733,61 @@ function StageRemediationDecisionPanel({
   )
 }
 
+function RecommendationSnapshotCard({
+  recommendation,
+  recommendationCount,
+}: {
+  recommendation: DecisionContext['recommendations'][number] | null
+  recommendationCount: number
+}) {
+  if (!recommendation) {
+    return (
+      <div className="rounded-2xl border border-dashed border-border/70 bg-background/45 p-4">
+        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+          Security recommendation
+        </p>
+        <p className="mt-2 text-sm font-medium text-foreground">
+          No recommendation recorded yet
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          The software owner team can still decide, but there is no security-analysis recommendation to reference yet.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+          Security recommendation
+        </p>
+        {recommendationCount > 1 ? (
+          <span className="text-[11px] font-medium text-muted-foreground">
+            Latest of {recommendationCount}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(recommendation.recommendedOutcome))}`}>
+          {outcomeLabel(recommendation.recommendedOutcome)}
+        </span>
+        {recommendation.priorityOverride ? (
+          <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+            {recommendation.priorityOverride} priority
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-3 text-sm leading-relaxed text-foreground/90">
+        {recommendation.rationale}
+      </p>
+      <p className="mt-3 text-xs text-muted-foreground">
+        {recommendation.analystDisplayName ? `${recommendation.analystDisplayName} · ` : ''}{formatDateTime(recommendation.createdAt)}
+      </p>
+    </div>
+  )
+}
+
 function StageApprovalPanel({
   data,
   canActOnCurrentStage,
@@ -725,7 +797,7 @@ function StageApprovalPanel({
   data: DecisionContext
   canActOnCurrentStage: boolean
   approving: boolean
-  onApproveReject: (action: 'approve' | 'reject' | 'cancel') => Promise<void>
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string) => Promise<void>
 }) {
   if (!data.currentDecision) {
     return null
@@ -738,6 +810,7 @@ function StageApprovalPanel({
       approving={approving}
       onApproveReject={onApproveReject}
       emphasizeApproval
+      requireApprovalJustification
       rightColumn={
         <>
           <StageMetricCard
@@ -767,7 +840,7 @@ function StageExecutionPanel({
   data: DecisionContext
   canActOnCurrentStage: boolean
   approving: boolean
-  onApproveReject: (action: 'approve' | 'reject' | 'cancel') => Promise<void>
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string) => Promise<void>
 }) {
   if (!data.currentDecision) {
     return null
@@ -858,14 +931,18 @@ function DecisionSummaryPanel({
   onApproveReject,
   rightColumn,
   emphasizeApproval = false,
+  requireApprovalJustification = false,
 }: {
   decision: NonNullable<DecisionContext['currentDecision']>
   readOnly: boolean
   approving: boolean
-  onApproveReject: (action: 'approve' | 'reject' | 'cancel') => Promise<void>
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string) => Promise<void>
   rightColumn: ReactNode
   emphasizeApproval?: boolean
+  requireApprovalJustification?: boolean
 }) {
+  const [approvalJustification, setApprovalJustification] = useState('')
+
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
       <div className="space-y-4">
@@ -908,14 +985,45 @@ function DecisionSummaryPanel({
           ) : null}
         </div>
 
+        {decision.approvalStatus === 'PendingApproval' && requireApprovalJustification ? (
+          <div className="space-y-2 pt-1">
+            <label
+              className="text-xs font-medium text-muted-foreground"
+              htmlFor={`approval-justification-${decision.id}`}
+            >
+              Approval justification
+            </label>
+            <Textarea
+              id={`approval-justification-${decision.id}`}
+              value={approvalJustification}
+              onChange={(event) => setApprovalJustification(event.target.value)}
+              placeholder="Explain why you are approving or rejecting this remediation decision..."
+              disabled={approving || readOnly}
+              className="min-h-24 bg-background/70"
+            />
+            <p className="text-xs text-muted-foreground">
+              This note is submitted with the approval action.
+            </p>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-2 pt-1">
           {decision.approvalStatus === 'PendingApproval' ? (
             <>
-              <Button size="sm" onClick={() => onApproveReject('approve')} disabled={approving || readOnly}>
+              <Button
+                size="sm"
+                onClick={() => onApproveReject('approve', approvalJustification)}
+                disabled={approving || readOnly}
+              >
                 <CheckCircle className="mr-1.5 size-3.5" />
                 Approve
               </Button>
-              <Button variant="destructive" size="sm" onClick={() => onApproveReject('reject')} disabled={approving || readOnly}>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => onApproveReject('reject', approvalJustification)}
+                disabled={approving || readOnly}
+              >
                 <XCircle className="mr-1.5 size-3.5" />
                 Reject
               </Button>

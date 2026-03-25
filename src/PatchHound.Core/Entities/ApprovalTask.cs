@@ -32,12 +32,13 @@ public class ApprovalTask
         Guid tenantId,
         Guid remediationDecisionId,
         RemediationOutcome outcome,
+        ApprovalTaskStatus? initialStatus,
         DateTimeOffset expiresAt
     )
     {
         var now = DateTimeOffset.UtcNow;
 
-        var (type, status, roles, requiresJustification) = outcome switch
+        var (type, defaultStatus, roles, requiresJustification) = outcome switch
         {
             RemediationOutcome.RiskAcceptance or RemediationOutcome.AlternateMitigation =>
                 (ApprovalTaskType.RiskAcceptanceApproval, ApprovalTaskStatus.Pending,
@@ -53,6 +54,7 @@ public class ApprovalTask
 
             _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "Unsupported outcome for approval task."),
         };
+        var status = initialStatus ?? defaultStatus;
 
         return new ApprovalTask
         {

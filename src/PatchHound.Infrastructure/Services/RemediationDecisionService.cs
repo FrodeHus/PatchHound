@@ -47,6 +47,19 @@ public class RemediationDecisionService(
             return Result<RemediationDecision>.Failure(
                 "An active remediation decision already exists for this software. Reject or expire the current decision before creating a new one.");
 
+        var existingWorkflow = await dbContext.RemediationWorkflows.AsNoTracking()
+            .Where(workflow =>
+                workflow.TenantId == tenantId
+                && workflow.TenantSoftwareId == remediationScope.TenantSoftwareId
+                && workflow.Status == RemediationWorkflowStatus.Active)
+            .OrderByDescending(workflow => workflow.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+        var priority = existingWorkflow?.Priority ?? RemediationWorkflowPriority.Normal;
+        var approvalMode = RemediationWorkflowService.ResolveApprovalMode(outcome, priority);
+        var initialApprovalStatus = approvalMode is RemediationWorkflowApprovalMode.SecurityApproval or RemediationWorkflowApprovalMode.TechnicalApproval
+            ? DecisionApprovalStatus.PendingApproval
+            : DecisionApprovalStatus.Approved;
+
         var decision = RemediationDecision.Create(
             tenantId,
             remediationScope.TenantSoftwareId,
@@ -54,6 +67,7 @@ public class RemediationDecisionService(
             outcome,
             justification,
             decidedBy,
+            initialApprovalStatus,
             expiryDate,
             reEvaluationDate
         );
@@ -124,16 +138,44 @@ public class RemediationDecisionService(
         if (!verificationResult.IsSuccess)
             return Result<RemediationDecision>.Failure(verificationResult.Error ?? "Verification failed.");
 
-        return await CreateDecisionForTenantSoftwareAsync(
+        var remediationScope = await ResolveScopeByTenantSoftwareAsync(tenantId, previousDecision.TenantSoftwareId, ct);
+        if (remediationScope is null)
+            return Result<RemediationDecision>.Failure("No tenant software scope was found for this software.");
+
+        var carriedApprovalStatus = previousDecision.Outcome == RemediationOutcome.ApprovedForPatching
+            ? DecisionApprovalStatus.Approved
+            : DecisionApprovalStatus.PendingApproval;
+
+        var decision = RemediationDecision.Create(
             tenantId,
             previousDecision.TenantSoftwareId,
+            remediationScope.RepresentativeSoftwareAssetId,
             previousDecision.Outcome,
             previousDecision.Justification,
             actedBy,
+            carriedApprovalStatus,
             previousDecision.ExpiryDate,
-            previousDecision.ReEvaluationDate,
-            ct
+            previousDecision.ReEvaluationDate
         );
+
+        await dbContext.RemediationDecisions.AddAsync(decision, ct);
+        await remediationWorkflowService.AttachDecisionAsync(decision, ct);
+
+        if (decision.Outcome == RemediationOutcome.ApprovedForPatching
+            && decision.ApprovalStatus == DecisionApprovalStatus.Approved)
+        {
+            await EnsurePatchingTasksAsync(decision, ct);
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+
+        var tenantSla = await dbContext.TenantSlaConfigurations
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
+        var expiryHours = tenantSla?.ApprovalExpiryHours ?? 24;
+        await approvalTaskService.CreateForDecisionAsync(decision, expiryHours, ct);
+
+        return Result<RemediationDecision>.Success(decision);
     }
 
     public async Task<Result<bool>> VerifyAndRequireNewDecisionAsync(

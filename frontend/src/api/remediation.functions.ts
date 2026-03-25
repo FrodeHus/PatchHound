@@ -53,9 +53,10 @@ export const approveOrRejectDecision = createServerFn({ method: 'POST' })
       workflowId: z.string().uuid().nullable().optional(),
       decisionId: z.string().uuid(),
       action: z.enum(['approve', 'reject', 'cancel']),
+      justification: z.string().optional(),
     })
   )
-  .handler(async ({ context, data: { tenantSoftwareId, workflowId, decisionId, action } }) => {
+  .handler(async ({ context, data: { tenantSoftwareId, workflowId, decisionId, action, justification } }) => {
     const resolvedWorkflowId = workflowId ?? (await ensureRemediationWorkflowId(tenantSoftwareId, context))
 
     if (action === 'cancel') {
@@ -65,6 +66,7 @@ export const approveOrRejectDecision = createServerFn({ method: 'POST' })
 
     await apiPost(`/remediation/${resolvedWorkflowId}/approval`, context, {
       action: action === 'reject' ? 'deny' : action,
+      justification: justification || undefined,
     })
   })
 

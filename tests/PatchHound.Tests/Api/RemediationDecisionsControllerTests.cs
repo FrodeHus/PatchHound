@@ -120,7 +120,16 @@ public class RemediationDecisionsControllerTests : IDisposable
             CancellationToken.None
         );
         firstDecisionResult.IsSuccess.Should().BeTrue();
-        firstDecisionResult.Value.Approve(_userId);
+        var approvalTaskService = new ApprovalTaskService(
+            _dbContext,
+            Substitute.For<INotificationService>(),
+            Substitute.For<IRealTimeNotifier>(),
+            _workflowService
+        );
+        var firstApprovalTask = await _dbContext.ApprovalTasks
+            .OrderByDescending(item => item.CreatedAt)
+            .FirstAsync();
+        await approvalTaskService.ApproveAsync(firstApprovalTask.Id, _userId, "Exception renewed.", CancellationToken.None);
         await _dbContext.SaveChangesAsync();
 
         var firstWorkflow = await _dbContext.RemediationWorkflows
@@ -183,6 +192,16 @@ public class RemediationDecisionsControllerTests : IDisposable
             CancellationToken.None
         );
         firstDecisionResult.IsSuccess.Should().BeTrue();
+        var approvalTaskService = new ApprovalTaskService(
+            _dbContext,
+            Substitute.For<INotificationService>(),
+            Substitute.For<IRealTimeNotifier>(),
+            _workflowService
+        );
+        var firstApprovalTask = await _dbContext.ApprovalTasks
+            .OrderByDescending(item => item.CreatedAt)
+            .FirstAsync();
+        await approvalTaskService.ApproveAsync(firstApprovalTask.Id, _userId, "Patch confirmed.", CancellationToken.None);
 
         var firstWorkflow = await _dbContext.RemediationWorkflows
             .OrderByDescending(item => item.CreatedAt)

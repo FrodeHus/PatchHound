@@ -181,7 +181,7 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
             );
         }
 
-        if (RequiresApproval(approvalMode))
+        if (decision.ApprovalStatus == DecisionApprovalStatus.PendingApproval && RequiresApproval(approvalMode))
         {
             workflow.MoveToStage(RemediationWorkflowStage.Approval);
             await dbContext.RemediationWorkflowStageRecords.AddAsync(
@@ -506,13 +506,18 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
             RemediationOutcome.RiskAcceptance or RemediationOutcome.AlternateMitigation =>
                 RemediationWorkflowApprovalMode.SecurityApproval,
             RemediationOutcome.ApprovedForPatching =>
-                RemediationWorkflowApprovalMode.TechnicalAutoApproved,
+                RemediationWorkflowApprovalMode.TechnicalApproval,
             RemediationOutcome.PatchingDeferred when priority == RemediationWorkflowPriority.Emergency =>
                 RemediationWorkflowApprovalMode.TechnicalApproval,
             RemediationOutcome.PatchingDeferred =>
                 RemediationWorkflowApprovalMode.TechnicalAutoApproved,
             _ => RemediationWorkflowApprovalMode.None,
         };
+
+    public static RemediationWorkflowApprovalMode ResolveApprovalMode(
+        RemediationOutcome outcome,
+        RemediationWorkflowPriority priority
+    ) => DetermineApprovalMode(outcome, priority);
 
     private static RemediationWorkflowPriority ParsePriority(string? priorityOverride) =>
         string.Equals(priorityOverride?.Trim(), "Emergency", StringComparison.OrdinalIgnoreCase)

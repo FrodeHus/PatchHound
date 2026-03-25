@@ -62,6 +62,7 @@ public class ApprovalTaskServiceTests : IDisposable
             outcome,
             outcome == RemediationOutcome.ApprovedForPatching ? null : "Test justification",
             _userId,
+            outcome == RemediationOutcome.ApprovedForPatching ? DecisionApprovalStatus.PendingApproval : null,
             reEvaluationDate: outcome == RemediationOutcome.PatchingDeferred
                 ? DateTimeOffset.UtcNow.AddDays(30)
                 : null
@@ -87,13 +88,13 @@ public class ApprovalTaskServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateForDecisionAsync_ApprovedForPatching_CreatesAutoApprovedTask()
+    public async Task CreateForDecisionAsync_ApprovedForPatching_CreatesPendingTask_WhenDecisionRequiresApproval()
     {
         var decision = CreateDecision(RemediationOutcome.ApprovedForPatching);
 
         var task = await _sut.CreateForDecisionAsync(decision, 24, CancellationToken.None);
 
-        task.Status.Should().Be(ApprovalTaskStatus.AutoApproved);
+        task.Status.Should().Be(ApprovalTaskStatus.Pending);
         task.Type.Should().Be(ApprovalTaskType.PatchingApproved);
         task.RequiresJustification.Should().BeFalse();
     }
