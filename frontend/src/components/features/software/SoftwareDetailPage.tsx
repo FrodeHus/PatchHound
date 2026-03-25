@@ -9,6 +9,7 @@ import type {
 import type { DecisionContext } from '@/api/remediation.schemas'
 import { SoftwareAiReportTab } from '@/components/features/software/SoftwareAiReportTab'
 import { SoftwareDescriptionPanel } from '@/components/features/software/SoftwareDescriptionPanel'
+import { VersionCohortChooser } from '@/components/features/software/VersionCohortChooser'
 import { SoftwareRemediationView } from '@/components/features/remediation/SoftwareRemediationView'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 import { toneBadge, toneDot, toneText } from '@/lib/tone-classes'
@@ -307,72 +308,15 @@ function OverviewTab({
     <>
       {/* Version Pressure Rail */}
       <section className="rounded-2xl border border-border/70 bg-card p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Version pressure rail</h2>
-            <p className="text-sm text-muted-foreground">
-              Select a cohort to page through installs and focus the detail
-              view.
-            </p>
-          </div>
-          {activeVersion ? (
-            <div className="text-sm text-muted-foreground">
-              Focused cohort:{" "}
-              <span className="font-medium text-foreground">
-                {formatVersion(activeVersion.version)}
-              </span>
-            </div>
-          ) : null}
-        </div>
-        <div className="mt-5 grid gap-3 lg:grid-cols-4">
-          {detail.versionCohorts.map((cohort) => {
-            const versionKey = normalizeVersion(cohort.version);
-            const isSelected = versionKey === selectedVersion;
-            return (
-              <button
-                key={versionKey || "__unknown__"}
-                type="button"
-                onClick={() => onSelectVersion(versionKey)}
-                className={
-                  isSelected
-                    ? "rounded-xl border border-primary/30 bg-primary/10 p-4 text-left"
-                    : "rounded-xl border border-border/70 bg-background p-4 text-left hover:border-foreground/20 hover:bg-muted/20"
-                }
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">
-                      {formatVersion(cohort.version)}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {cohort.activeInstallCount} installs on{" "}
-                      {cohort.deviceCount} devices
-                    </p>
-                  </div>
-                  <div className="rounded-full bg-background/80 px-2 py-1 text-xs text-muted-foreground">
-                    {cohort.activeVulnerabilityCount} vuln
-                    {cohort.activeVulnerabilityCount === 1 ? "" : "s"}
-                  </div>
-                </div>
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={
-                      cohort.activeVulnerabilityCount > 0
-                        ? `h-full rounded-full ${toneDot("warning")}`
-                        : `h-full rounded-full ${toneDot("success")}`
-                    }
-                    style={{
-                      width: `${Math.max(14, Math.min(100, (cohort.activeInstallCount / Math.max(detail.activeInstallCount, 1)) * 100))}%`,
-                    }}
-                  />
-                </div>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Last seen {formatDate(cohort.lastSeenAt)}
-                </p>
-              </button>
-            );
-          })}
-        </div>
+        <VersionCohortChooser
+          title="Version cohorts"
+          description="Choose a cohort to inspect installs, owners, and vulnerabilities without letting the version list dominate the page."
+          cohorts={detail.versionCohorts}
+          selectedVersion={selectedVersion}
+          onSelectVersion={onSelectVersion}
+          formatVersion={formatVersion}
+          normalizeVersion={normalizeVersion}
+        />
       </section>
 
       {/* Two-column layout */}

@@ -41,6 +41,7 @@ import {
   type RemediationStage,
   type RemediationStageId,
 } from './RemediationStageRail'
+import { VersionCohortChooser } from '@/components/features/software/VersionCohortChooser'
 import {
   outcomeLabel,
   outcomeTone,
@@ -1151,34 +1152,15 @@ function DevicesTab({
         </CardHeader>
         <CardContent className="space-y-4">
           {detail ? (
-            <div className="grid gap-3 lg:grid-cols-4">
-              {detail.versionCohorts.map((cohort) => {
-                const versionKey = normalizeVersion(cohort.version)
-                const isSelected = versionKey === selectedVersion
-                return (
-                  <button
-                    key={versionKey || '__unknown__'}
-                    type="button"
-                    onClick={() => onSelectVersion(versionKey)}
-                    className={
-                      isSelected
-                        ? 'rounded-2xl border border-primary/35 bg-primary/8 p-4 text-left'
-                        : 'rounded-2xl border border-border/70 bg-background/55 p-4 text-left hover:border-foreground/20 hover:bg-muted/20'
-                    }
-                  >
-                    <p className="text-sm font-semibold text-foreground">
-                      {formatVersion(cohort.version)}
-                    </p>
-                    <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">
-                      {cohort.deviceCount.toLocaleString()}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      devices · {cohort.activeVulnerabilityCount.toLocaleString()} open vulnerabilities
-                    </p>
-                  </button>
-                )
-              })}
-            </div>
+            <VersionCohortChooser
+              title="Execution scope by version cohort"
+              description="Switch cohorts quickly to see which devices and owner teams are involved in the current remediation."
+              cohorts={detail.versionCohorts}
+              selectedVersion={selectedVersion}
+              onSelectVersion={onSelectVersion}
+              formatVersion={formatVersion}
+              normalizeVersion={normalizeVersion}
+            />
           ) : (
             <p className="text-sm text-muted-foreground">
               Loading version cohorts for this software scope.
