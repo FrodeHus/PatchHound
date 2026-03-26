@@ -65,8 +65,11 @@ export const assetDetailSchema = z.object({
     updatedAt: z.string().datetime({ offset: true }).nullable(),
   }).nullable(),
   ownerType: z.string(),
+  ownerUserName: z.string().nullable(),
   ownerUserId: z.string().uuid().nullable(),
+  ownerTeamName: z.string().nullable(),
   ownerTeamId: z.string().uuid().nullable(),
+  fallbackTeamName: z.string().nullable(),
   fallbackTeamId: z.string().uuid().nullable(),
   securityProfile: z
     .object({
