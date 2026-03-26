@@ -125,7 +125,7 @@ function SecurityProfilesPage() {
   const [draft, setDraft] = useState<SecurityProfileDraft>(defaultDraft)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const tenantNames = new Map(tenants.map((tenant) => [tenant.id, tenant.name]))
-  const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
+  const canViewAudit = (user.activeRoles ?? []).includes('GlobalAdmin') || (user.activeRoles ?? []).includes('Auditor')
 
   const profilesQuery = useQuery({
     queryKey: ['security-profiles', selectedTenantId, search.page, search.pageSize],

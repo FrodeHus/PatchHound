@@ -94,7 +94,7 @@ function SettingsPage() {
           </Card>
         </Link>
 
-        {user.roles.includes("GlobalAdmin") ? (
+        {(user.activeRoles ?? []).includes("GlobalAdmin") ? (
           <Link to="/settings/notifications" className="group">
             <Card className="rounded-2xl border-border/70 bg-card/85 transition-colors group-hover:border-primary/35">
               <CardHeader>

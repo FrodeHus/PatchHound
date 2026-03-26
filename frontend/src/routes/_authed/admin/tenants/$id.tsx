@@ -12,7 +12,7 @@ export const Route = createFileRoute('/_authed/admin/tenants/$id')({
 function TenantDetailPage() {
   const { user } = Route.useRouteContext()
   const tenant = Route.useLoaderData()
-  const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
+  const canViewAudit = (user.activeRoles ?? []).includes('GlobalAdmin') || (user.activeRoles ?? []).includes('Auditor')
 
   const recentAuditQuery = useQuery({
     queryKey: ['audit-log', 'tenant-detail', tenant.id],

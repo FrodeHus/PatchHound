@@ -54,11 +54,11 @@ function DashboardPage() {
   const navigate = Route.useNavigate()
   const { selectedTenantId } = useTenantScope()
   const [selectedDeviceGroup, setSelectedDeviceGroup] = useState<string | null>(null)
-  const isExecutiveViewer = user.roles.includes('Stakeholder')
-  const isAssetOwnerViewer = user.roles.includes('AssetOwner')
-  const isSecurityManagerViewer = user.roles.includes('SecurityManager')
-  const isTechnicalManagerViewer = user.roles.includes('TechnicalManager')
-  const canSwitchModes = user.roles.includes('GlobalAdmin')
+  const isExecutiveViewer = (user.activeRoles ?? []).includes('Stakeholder')
+  const isAssetOwnerViewer = (user.activeRoles ?? []).includes('AssetOwner')
+  const isSecurityManagerViewer = (user.activeRoles ?? []).includes('SecurityManager')
+  const isTechnicalManagerViewer = (user.activeRoles ?? []).includes('TechnicalManager')
+  const canSwitchModes = (user.activeRoles ?? []).includes('GlobalAdmin')
   const requestedMode = search.mode
   const dashboardMode = resolveDashboardViewMode({
     roles: user.roles,
@@ -267,7 +267,7 @@ function DashboardPage() {
 
   return (
     <section className="space-y-6 pb-4">
-      {user.roles.includes('SecurityAnalyst') ? (
+      {(user.activeRoles ?? []).includes('SecurityAnalyst') ? (
         <AnalystTriageWorkbench
           items={summary.latestUnhandledVulnerabilities}
           summary={summary}
