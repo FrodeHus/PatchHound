@@ -160,10 +160,11 @@ public record OwnerAssetSummaryDto(
 );
 
 public record OwnerActionDto(
-    Guid AssetId,
+    Guid TenantSoftwareId,
     Guid TenantVulnerabilityId,
     Guid? TaskId,
-    string AssetName,
+    string SoftwareName,
+    string OwnerTeamName,
     string ExternalId,
     string Title,
     List<string> SoftwareNames,

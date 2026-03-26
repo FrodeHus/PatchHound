@@ -138,6 +138,106 @@ public class DashboardControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetOwnerSummary_ReturnsTeamAssignedPatchingTasks_EvenWithoutOwnedAssets()
+    {
+        var currentUserId = _tenantContext.CurrentUserId;
+        var timestamp = DateTimeOffset.UtcNow;
+        var team = Team.Create(_tenantId, "Infrastructure Operations");
+        var user = User.Create("owner@contoso.local", "Owner User", Guid.NewGuid().ToString());
+        var member = TeamMember.Create(team.Id, currentUserId);
+
+        var normalizedSoftware = NormalizedSoftware.Create(
+            "Acrobat Dc",
+            "Adobe",
+            "adobe:acrobat-dc",
+            null,
+            SoftwareNormalizationMethod.Manual,
+            SoftwareNormalizationConfidence.High,
+            timestamp
+        );
+        var tenantSoftware = TenantSoftware.Create(
+            _tenantId,
+            null,
+            normalizedSoftware.Id,
+            timestamp.AddDays(-10),
+            timestamp
+        );
+        var softwareAsset = Asset.Create(
+            _tenantId,
+            "soft-owner-1",
+            AssetType.Software,
+            "Acrobat Dc",
+            Criticality.Medium
+        );
+        var vulnerabilityDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-8500",
+            "Reader RCE",
+            "Desc",
+            Severity.High,
+            "MicrosoftDefender",
+            8.8m
+        );
+        var tenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            vulnerabilityDefinition.Id,
+            VulnerabilityStatus.Open,
+            timestamp.AddDays(-3)
+        );
+        var approvedDecision = RemediationDecision.Create(
+            _tenantId,
+            tenantSoftware.Id,
+            softwareAsset.Id,
+            RemediationOutcome.ApprovedForPatching,
+            "Patch during the next maintenance window.",
+            currentUserId
+        );
+        var patchingTask = PatchingTask.Create(
+            _tenantId,
+            approvedDecision.Id,
+            tenantSoftware.Id,
+            softwareAsset.Id,
+            team.Id,
+            timestamp.AddDays(7)
+        );
+
+        await _dbContext.AddRangeAsync(
+            user,
+            team,
+            member,
+            normalizedSoftware,
+            tenantSoftware,
+            softwareAsset,
+            vulnerabilityDefinition,
+            tenantVulnerability,
+            approvedDecision,
+            patchingTask,
+            SoftwareVulnerabilityMatch.Create(
+                _tenantId,
+                null,
+                softwareAsset.Id,
+                vulnerabilityDefinition.Id,
+                SoftwareVulnerabilityMatchMethod.DefenderDirect,
+                MatchConfidence.High,
+                softwareAsset.Name,
+                timestamp.AddDays(-3)
+            )
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetOwnerSummary(CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<OwnerDashboardSummaryDto>().Subject;
+
+        payload.OwnedAssetCount.Should().Be(0);
+        payload.OpenActionCount.Should().Be(1);
+        payload.Actions.Should().ContainSingle();
+        payload.Actions[0].SoftwareName.Should().Be("Acrobat Dc");
+        payload.Actions[0].OwnerTeamName.Should().Be("Infrastructure Operations");
+        payload.Actions[0].ActionState.Should().Be(PatchingTaskStatus.Pending.ToString());
+    }
+
+    [Fact]
     public async Task GetTechnicalManagerSummary_ReturnsApprovedPatchingTasks_AndDevicesWithAgedPublishedVulnerabilities()
     {
         var timestamp = DateTimeOffset.UtcNow;

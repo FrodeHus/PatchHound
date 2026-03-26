@@ -658,32 +658,29 @@ public class DashboardController : ControllerBase
             .Select(asset => asset.Id)
             .ToListAsync(ct);
 
-        if (ownedAssetIds.Count == 0)
-        {
-            return Ok(new OwnerDashboardSummaryDto(0, 0, 0, 0, [], []));
-        }
-
-        var topOwnedAssets = await (
-            from asset in ownedAssetsQuery
-            join score in _dbContext.AssetRiskScores.AsNoTracking()
-                on asset.Id equals score.AssetId into scoreJoin
-            from score in scoreJoin.DefaultIfEmpty()
-            select new
-            {
-                asset.Id,
-                asset.Name,
-                Criticality = asset.Criticality.ToString(),
-                CurrentRiskScore = score != null ? (decimal?)score.OverallScore : null,
-                OpenEpisodeCount = score != null ? score.OpenEpisodeCount : 0,
-                CriticalCount = score != null ? score.CriticalCount : 0,
-                HighCount = score != null ? score.HighCount : 0
-            }
-        )
-            .OrderByDescending(item => item.CurrentRiskScore ?? 0m)
-            .ThenByDescending(item => item.CriticalCount)
-            .ThenByDescending(item => item.HighCount)
-            .Take(6)
-            .ToListAsync(ct);
+        var topOwnedAssets = ownedAssetIds.Count == 0
+            ? []
+            : await (
+                from asset in ownedAssetsQuery
+                join score in _dbContext.AssetRiskScores.AsNoTracking()
+                    on asset.Id equals score.AssetId into scoreJoin
+                from score in scoreJoin.DefaultIfEmpty()
+                select new
+                {
+                    asset.Id,
+                    asset.Name,
+                    Criticality = asset.Criticality.ToString(),
+                    CurrentRiskScore = score != null ? (decimal?)score.OverallScore : null,
+                    OpenEpisodeCount = score != null ? score.OpenEpisodeCount : 0,
+                    CriticalCount = score != null ? score.CriticalCount : 0,
+                    HighCount = score != null ? score.HighCount : 0
+                }
+            )
+                .OrderByDescending(item => item.CurrentRiskScore ?? 0m)
+                .ThenByDescending(item => item.CriticalCount)
+                .ThenByDescending(item => item.HighCount)
+                .Take(6)
+                .ToListAsync(ct);
 
         var topAssetIds = topOwnedAssets.Select(item => item.Id).ToList();
         var topDriverRows = await _dbContext.VulnerabilityEpisodeRiskAssessments.AsNoTracking()
@@ -736,13 +733,17 @@ public class DashboardController : ControllerBase
                 on pt.RemediationDecisionId equals decision.Id
             join softwareAsset in _dbContext.Assets.AsNoTracking()
                 on decision.SoftwareAssetId equals softwareAsset.Id
+            join ownerTeam in _dbContext.Teams.AsNoTracking()
+                on pt.OwnerTeamId equals ownerTeam.Id
             where pt.TenantId == tenantId
                   && ownerTeamIds.Contains(pt.OwnerTeamId)
                   && pt.Status != PatchingTaskStatus.Completed
             select new
             {
+                pt.TenantSoftwareId,
                 SoftwareAssetId = decision.SoftwareAssetId,
                 SoftwareAssetName = softwareAsset.Name,
+                OwnerTeamName = ownerTeam.Name,
                 PatchingTaskId = pt.Id,
                 pt.DueDate,
                 ActionState = pt.Status.ToString(),
@@ -792,10 +793,12 @@ public class DashboardController : ControllerBase
             var topVuln = topVulnBySoftware.GetValueOrDefault(p.SoftwareAssetId);
             return new
             {
+                p.TenantSoftwareId,
                 AssetId = p.SoftwareAssetId,
                 TenantVulnerabilityId = topVuln?.Id ?? Guid.Empty,
                 TaskId = (Guid?)p.PatchingTaskId,
                 AssetName = p.SoftwareAssetName,
+                p.OwnerTeamName,
                 ExternalId = topVuln?.ExternalId ?? "-",
                 Title = topVuln?.Title ?? "Patching required",
                 Description = topVuln?.Description ?? "",
@@ -814,10 +817,11 @@ public class DashboardController : ControllerBase
 
         var ownerActions = ownerActionRows
             .Select(item => new OwnerActionDto(
-                item.AssetId,
+                item.TenantSoftwareId,
                 item.TenantVulnerabilityId,
                 item.TaskId,
                 item.AssetName,
+                item.OwnerTeamName,
                 item.ExternalId,
                 item.Title ?? "",
                 [],
