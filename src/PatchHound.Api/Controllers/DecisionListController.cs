@@ -18,7 +18,7 @@ public class DecisionListController(
 {
     [HttpGet]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
-    public async Task<ActionResult<PagedResponse<RemediationDecisionListItemDto>>> List(
+    public async Task<ActionResult<RemediationDecisionListPageDto>> List(
         [FromQuery] RemediationDecisionFilterQuery filter,
         [FromQuery] PaginationQuery pagination,
         CancellationToken ct

@@ -204,6 +204,7 @@ export function AssetDetailPageView({
                     criticality: '',
                     outcome: '',
                     approvalStatus: '',
+                    decisionState: '',
                   }}
                   className="flex w-full items-start justify-between gap-4 rounded-2xl border border-border/70 bg-background p-4 text-left transition hover:border-foreground/20 hover:bg-muted/20"
                 >

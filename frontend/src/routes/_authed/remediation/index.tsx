@@ -11,6 +11,7 @@ const remediationSearchSchema = baseListSearchSchema.extend({
   criticality: searchStringSchema,
   outcome: searchStringSchema,
   approvalStatus: searchStringSchema,
+  decisionState: searchStringSchema,
 })
 
 export const Route = createFileRoute('/_authed/remediation/')({
@@ -61,6 +62,7 @@ function RemediationRoute() {
         criticality: search.criticality,
         outcome: search.outcome,
         approvalStatus: search.approvalStatus,
+        decisionState: search.decisionState,
       }}
       onFiltersChange={(filters) => {
         void navigate({
@@ -88,11 +90,13 @@ function normalizeFilters(search: {
   criticality: string
   outcome: string
   approvalStatus: string
+  decisionState: string
 }) {
   return {
     search: search.search || undefined,
     criticality: search.criticality || undefined,
     outcome: search.outcome || undefined,
     approvalStatus: search.approvalStatus || undefined,
+    decisionState: search.decisionState || undefined,
   }
 }

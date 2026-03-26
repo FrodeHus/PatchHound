@@ -128,6 +128,7 @@ export const fetchDecisionList = createServerFn({ method: 'GET' })
       criticality: z.string().optional(),
       outcome: z.string().optional(),
       approvalStatus: z.string().optional(),
+      decisionState: z.string().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
     })
