@@ -178,20 +178,11 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
                       size="sm"
                       render={
                         <Link
-                          to="/remediation/tasks"
-                          search={{
-                            page: 1,
-                            pageSize: 25,
-                            search: '',
-                            vendor: '',
-                            criticality: '',
-                            assetOwner: '',
-                            taskId: item.taskId ?? '',
-                            tenantSoftwareId: item.tenantSoftwareId,
-                            deviceAssetId: '',
-                          }}
+                          to="/remediation/task/$id"
+                          params={{ id: item.taskId ?? item.tenantSoftwareId }}
                         />
                       }
+                      disabled={!item.taskId}
                     >
                       Open remediation task
                     </Button>
