@@ -94,8 +94,8 @@ function SoftwareDetailRoute() {
   const installations = installationsQuery.data ?? (canUseInitialData ? initialData.installations : undefined)
   const vulnerabilities = vulnerabilitiesQuery.data ?? (canUseInitialData ? initialData.vulnerabilities : undefined)
   const canViewRemediation = (
-    user.roles.includes('GlobalAdmin')
-    || user.roles.includes('AssetOwner')
+    (user.activeRoles ?? []).includes('GlobalAdmin')
+    || (user.activeRoles ?? []).includes('AssetOwner')
   )
 
   const remediationQuery = useQuery({

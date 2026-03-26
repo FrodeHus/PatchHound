@@ -28,7 +28,7 @@ function SourcesAdministrationPage() {
   const { user } = Route.useRouteContext()
   const { selectedTenantId, tenants } = useTenantScope()
   const activeView = search.activeView ?? 'tenant'
-  const canManageEnrichment = hasGlobalEnrichmentAccess(user.roles)
+  const canManageEnrichment = hasGlobalEnrichmentAccess(user.activeRoles ?? [])
   const tenantQuery = useQuery({
     queryKey: ['tenant-detail', selectedTenantId],
     queryFn: () => fetchTenantDetail({ data: { tenantId: selectedTenantId! } }),
@@ -47,7 +47,7 @@ function SourcesAdministrationPage() {
     queryFn: () => fetchEnrichmentSources(),
     enabled: canManageEnrichment,
   })
-  const canViewAudit = user.roles.includes('GlobalAdmin') || user.roles.includes('Auditor')
+  const canViewAudit = (user.activeRoles ?? []).includes('GlobalAdmin') || (user.activeRoles ?? []).includes('Auditor')
   const tenantAuditQuery = useQuery({
     queryKey: ['tenant-source-audit', selectedTenantId],
     queryFn: () =>

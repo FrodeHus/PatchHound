@@ -105,7 +105,8 @@ function canAccess(item: NavItem, user: CurrentUser): boolean {
     return true
   }
 
-  return user.roles.some((role) => item.roles?.includes(role as RoleName))
+  const effective: string[] = ['Stakeholder', ...(user.activeRoles ?? [])]
+  return effective.some((role) => item.roles?.includes(role as RoleName))
 }
 
 export function Sidebar({

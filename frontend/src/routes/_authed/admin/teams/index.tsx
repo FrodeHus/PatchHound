@@ -32,7 +32,7 @@ function TeamsPage() {
   const navigate = Route.useNavigate()
   const { user } = Route.useRouteContext()
   const [createState, setCreateState] = useState<'idle' | 'success' | 'error'>('idle')
-  const canManageGroup = user.roles.includes('GlobalAdmin')
+  const canManageGroup = (user.activeRoles ?? []).includes('GlobalAdmin')
 
   const createMutation = useMutation({
     mutationFn: async (payload: { name: string; tenantId: string }) => {
