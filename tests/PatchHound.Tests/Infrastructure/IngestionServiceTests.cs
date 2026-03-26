@@ -3117,6 +3117,84 @@ public class IngestionServiceTests : IDisposable
             ),
         ];
 
+    [Fact]
+    public async Task PublishSnapshot_RekeysRemediationDecisionTenantSoftwareId()
+    {
+        // Arrange: set up two snapshots with TenantSoftware rows sharing the same NormalizedSoftware
+        var normalizedSoftware = NormalizedSoftware.Create(
+            "Microsoft Edge", "Microsoft", "|microsoft|microsoftedge",
+            null, SoftwareNormalizationMethod.Heuristic,
+            SoftwareNormalizationConfidence.High, DateTimeOffset.UtcNow
+        );
+        await _dbContext.NormalizedSoftware.AddAsync(normalizedSoftware);
+
+        var sourceConfig = TenantSourceConfiguration.Create(
+            _tenantId, "microsoft-defender", "Defender", enabled: true, syncSchedule: "0 */6 * * *"
+        );
+        await _dbContext.TenantSourceConfigurations.AddAsync(sourceConfig);
+
+        // Snapshot 1 (active) — old TenantSoftware row
+        var run1 = IngestionRun.Start(_tenantId, "microsoft-defender", DateTimeOffset.UtcNow);
+        await _dbContext.IngestionRuns.AddAsync(run1);
+        var snapshot1 = IngestionSnapshot.Create(_tenantId, "microsoft-defender", run1.Id, DateTimeOffset.UtcNow);
+        snapshot1.MarkPublished();
+        await _dbContext.IngestionSnapshots.AddAsync(snapshot1);
+
+        var oldTenantSoftware = TenantSoftware.Create(
+            _tenantId, snapshot1.Id, normalizedSoftware.Id,
+            DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(-1)
+        );
+        await _dbContext.TenantSoftware.AddAsync(oldTenantSoftware);
+        sourceConfig.SetSnapshotPointers(snapshot1.Id, null);
+
+        // Create a RemediationDecision pointing to the old TenantSoftware
+        var asset = Asset.Create(_tenantId, "REKEY-ASSET-1", AssetType.Software, "Microsoft Edge", Criticality.High);
+        await _dbContext.Assets.AddAsync(asset);
+
+        var decision = RemediationDecision.Create(
+            _tenantId, oldTenantSoftware.Id, asset.Id,
+            RemediationOutcome.ApprovedForPatching, justification: null, decidedBy: Guid.NewGuid()
+        );
+        await _dbContext.RemediationDecisions.AddAsync(decision);
+
+        // Snapshot 2 (building) — new TenantSoftware row with same NormalizedSoftwareId
+        var run2 = IngestionRun.Start(_tenantId, "microsoft-defender", DateTimeOffset.UtcNow);
+        await _dbContext.IngestionRuns.AddAsync(run2);
+        var snapshot2 = IngestionSnapshot.Create(_tenantId, "microsoft-defender", run2.Id, DateTimeOffset.UtcNow);
+        await _dbContext.IngestionSnapshots.AddAsync(snapshot2);
+
+        var newTenantSoftware = TenantSoftware.Create(
+            _tenantId, snapshot2.Id, normalizedSoftware.Id,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow
+        );
+        await _dbContext.TenantSoftware.AddAsync(newTenantSoftware);
+        sourceConfig.SetSnapshotPointers(snapshot1.Id, snapshot2.Id);
+        await _dbContext.SaveChangesAsync();
+
+        var oldTenantSoftwareId = oldTenantSoftware.Id;
+        var newTenantSoftwareId = newTenantSoftware.Id;
+        oldTenantSoftwareId.Should().NotBe(newTenantSoftwareId, "sanity: different GUIDs");
+
+        // Act: publish snapshot 2 (retires snapshot 1, cleans up old TenantSoftware)
+        // Use reflection to call private PublishSnapshotAsync
+        var publishMethod = typeof(IngestionService).GetMethod(
+            "PublishSnapshotAsync",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance
+        )!;
+        await (Task)publishMethod.Invoke(_service, [_tenantId, "microsoft-defender", snapshot2.Id, CancellationToken.None])!;
+
+        // Assert: old TenantSoftware should be gone
+        var oldRowExists = await _dbContext.TenantSoftware.IgnoreQueryFilters()
+            .AnyAsync(ts => ts.Id == oldTenantSoftwareId);
+        oldRowExists.Should().BeFalse("old TenantSoftware row should be deleted with retired snapshot");
+
+        // The decision's TenantSoftwareId should now point to the new row
+        var updatedDecision = await _dbContext.RemediationDecisions.IgnoreQueryFilters()
+            .FirstAsync(d => d.Id == decision.Id);
+        updatedDecision.TenantSoftwareId.Should().Be(newTenantSoftwareId,
+            "RemediationDecision.TenantSoftwareId should be re-keyed to the new snapshot's TenantSoftware");
+    }
+
     public void Dispose() => _dbContext.Dispose();
 
     private static IServiceProvider BuildServiceProvider(ITenantContext tenantContext)

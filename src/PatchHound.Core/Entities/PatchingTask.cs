@@ -65,4 +65,10 @@ public class PatchingTask
         RemediationWorkflowId = remediationWorkflowId;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
+
+    public void ReassignTenantSoftware(Guid newTenantSoftwareId)
+    {
+        TenantSoftwareId = newTenantSoftwareId;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
 }

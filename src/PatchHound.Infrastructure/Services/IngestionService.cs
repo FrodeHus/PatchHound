@@ -2414,8 +2414,61 @@ public class IngestionService
 
         if (retiredSnapshotId.HasValue)
         {
+            await RekeyTenantSoftwareReferencesAsync(retiredSnapshotId.Value, snapshotId, ct);
             await CleanupSnapshotDataAsync(retiredSnapshotId.Value, ct);
         }
+    }
+
+    private async Task RekeyTenantSoftwareReferencesAsync(
+        Guid oldSnapshotId,
+        Guid newSnapshotId,
+        CancellationToken ct
+    )
+    {
+        var oldRows = await _dbContext
+            .TenantSoftware.IgnoreQueryFilters()
+            .Where(ts => ts.SnapshotId == oldSnapshotId)
+            .Select(ts => new { ts.Id, ts.NormalizedSoftwareId })
+            .ToListAsync(ct);
+
+        var newRows = await _dbContext
+            .TenantSoftware.IgnoreQueryFilters()
+            .Where(ts => ts.SnapshotId == newSnapshotId)
+            .Select(ts => new { ts.Id, ts.NormalizedSoftwareId })
+            .ToListAsync(ct);
+
+        var newByNormalized = newRows.ToDictionary(r => r.NormalizedSoftwareId, r => r.Id);
+        var oldToNew = oldRows
+            .Where(old => newByNormalized.ContainsKey(old.NormalizedSoftwareId))
+            .ToDictionary(old => old.Id, old => newByNormalized[old.NormalizedSoftwareId]);
+
+        if (oldToNew.Count == 0)
+            return;
+
+        var oldIds = oldToNew.Keys.ToHashSet();
+
+        var decisions = await _dbContext
+            .RemediationDecisions.IgnoreQueryFilters()
+            .Where(d => oldIds.Contains(d.TenantSoftwareId))
+            .ToListAsync(ct);
+        foreach (var decision in decisions)
+            decision.ReassignTenantSoftware(oldToNew[decision.TenantSoftwareId]);
+
+        var workflows = await _dbContext
+            .RemediationWorkflows.IgnoreQueryFilters()
+            .Where(w => oldIds.Contains(w.TenantSoftwareId))
+            .ToListAsync(ct);
+        foreach (var workflow in workflows)
+            workflow.ReassignTenantSoftware(oldToNew[workflow.TenantSoftwareId]);
+
+        var tasks = await _dbContext
+            .PatchingTasks.IgnoreQueryFilters()
+            .Where(t => oldIds.Contains(t.TenantSoftwareId))
+            .ToListAsync(ct);
+        foreach (var task in tasks)
+            task.ReassignTenantSoftware(oldToNew[task.TenantSoftwareId]);
+
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     private async Task DiscardBuildingSnapshotAsync(

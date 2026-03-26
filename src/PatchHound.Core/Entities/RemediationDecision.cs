@@ -114,6 +114,12 @@ public class RemediationDecision
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    public void ReassignTenantSoftware(Guid newTenantSoftwareId)
+    {
+        TenantSoftwareId = newTenantSoftwareId;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
     public void MarkSlaNotified()
     {
         LastSlaNotifiedAt = DateTimeOffset.UtcNow;
