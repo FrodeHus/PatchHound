@@ -41,6 +41,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<UserTenantRole> UserTenantRoles => Set<UserTenantRole>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
+    public DbSet<TeamMembershipRule> TeamMembershipRules => Set<TeamMembershipRule>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<AssetSecurityProfile> AssetSecurityProfiles => Set<AssetSecurityProfile>();
     public DbSet<SoftwareCpeBinding> SoftwareCpeBindings => Set<SoftwareCpeBinding>();
@@ -155,6 +156,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             );
         modelBuilder
             .Entity<AssetSecurityProfile>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<TeamMembershipRule>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<SoftwareVulnerabilityMatch>()

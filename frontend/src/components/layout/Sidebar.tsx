@@ -38,6 +38,7 @@ type RoleName =
   | 'Auditor'
   | 'AssetOwner'
   | 'TechnicalManager'
+  | 'Stakeholder'
 
 type NavItem = {
   to: string
@@ -84,7 +85,7 @@ const navItems: NavItem[] = [
     to: "/admin",
     label: "Admin Console",
     icon: ShieldCheck,
-    roles: ["GlobalAdmin", "SecurityManager"],
+    roles: ["GlobalAdmin", "SecurityManager", "SecurityAnalyst", "AssetOwner", "TechnicalManager", "Auditor", "Stakeholder"],
   },
 ];
 

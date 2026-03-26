@@ -2,6 +2,7 @@ namespace PatchHound.Api.Auth;
 
 public static class Policies
 {
+    public const string ViewTeams = nameof(ViewTeams);
     public const string ViewVulnerabilities = nameof(ViewVulnerabilities);
     public const string ModifyVulnerabilities = nameof(ModifyVulnerabilities);
     public const string AdjustSeverity = nameof(AdjustSeverity);

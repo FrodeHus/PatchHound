@@ -6,9 +6,12 @@ using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Admin;
 using PatchHound.Api.Models.RiskScore;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Interfaces;
+using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Api.Controllers;
 
@@ -19,21 +22,24 @@ public class TeamsController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly TeamService _teamService;
+    private readonly TeamMembershipRuleService _teamMembershipRuleService;
     private readonly ITenantContext _tenantContext;
 
     public TeamsController(
         PatchHoundDbContext dbContext,
         TeamService teamService,
+        TeamMembershipRuleService teamMembershipRuleService,
         ITenantContext tenantContext
     )
     {
         _dbContext = dbContext;
         _teamService = teamService;
+        _teamMembershipRuleService = teamMembershipRuleService;
         _tenantContext = tenantContext;
     }
 
     [HttpGet]
-    [Authorize(Policy = Policies.ManageTeams)]
+    [Authorize(Policy = Policies.ViewTeams)]
     public async Task<ActionResult<PagedResponse<TeamDto>>> List(
         [FromQuery] Guid? tenantId,
         [FromQuery] PaginationQuery pagination,
@@ -73,6 +79,7 @@ public class TeamsController : ControllerBase
                     .FirstOrDefault() ?? "Unknown tenant",
                 item.Team.Name,
                 item.Team.IsDefault,
+                item.Team.IsDynamic,
                 item.Team.Members.Count,
                 item.CurrentRiskScore
             ))
@@ -89,7 +96,7 @@ public class TeamsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    [Authorize(Policy = Policies.ManageTeams)]
+    [Authorize(Policy = Policies.ViewTeams)]
     public async Task<ActionResult<TeamDetailDto>> Get(Guid id, CancellationToken ct)
     {
         var team = await _dbContext
@@ -129,6 +136,8 @@ public class TeamsController : ControllerBase
                 score.CalculationVersion,
             })
             .FirstOrDefaultAsync(ct);
+        var membershipRule = await _dbContext.TeamMembershipRules.AsNoTracking()
+            .FirstOrDefaultAsync(rule => rule.TeamId == team.Id, ct);
         var topRiskAssets = await _dbContext.AssetRiskScores.AsNoTracking()
             .Where(score => score.TenantId == team.TenantId)
             .Join(
@@ -168,6 +177,7 @@ public class TeamsController : ControllerBase
                 tenantName ?? "Unknown tenant",
                 team.Name,
                 team.IsDefault,
+                team.IsDynamic,
                 assignedAssetCount,
                 currentRiskScore?.CurrentRiskScore,
                 currentRiskScore is null
@@ -192,7 +202,8 @@ public class TeamsController : ControllerBase
                         users.TryGetValue(m.UserId, out var u) ? u.DisplayName : "Unknown",
                         users.TryGetValue(m.UserId, out var u2) ? u2.Email : "Unknown"
                     ))
-                    .ToList()
+                    .ToList(),
+                membershipRule is null ? null : ToMembershipRuleDto(membershipRule)
             )
         );
     }
@@ -286,7 +297,7 @@ public class TeamsController : ControllerBase
         return CreatedAtAction(
             nameof(Get),
             new { id = team.Id },
-            new TeamDto(team.Id, team.TenantId, string.Empty, team.Name, team.IsDefault, 0, null)
+            new TeamDto(team.Id, team.TenantId, string.Empty, team.Name, team.IsDefault, team.IsDynamic, 0, null)
         );
     }
 
@@ -303,6 +314,8 @@ public class TeamsController : ControllerBase
             return NotFound();
         if (!_tenantContext.HasAccessToTenant(team.TenantId))
             return Forbid();
+        if (team.IsDynamic)
+            return BadRequest(new ProblemDetails { Title = "Dynamic groups manage membership through rules and cannot be edited manually." });
 
         var result = request.Action.ToLowerInvariant() switch
         {
@@ -320,5 +333,124 @@ public class TeamsController : ControllerBase
             return BadRequest(new ProblemDetails { Title = result.Error });
 
         return NoContent();
+    }
+
+    [HttpPut("{id:guid}/rule")]
+    [Authorize(Policy = Policies.ManageTeams)]
+    public async Task<ActionResult<TeamMembershipRuleDto>> UpsertRule(
+        Guid id,
+        [FromBody] UpdateTeamMembershipRuleRequest request,
+        CancellationToken ct
+    )
+    {
+        var team = await _dbContext.Teams
+            .Include(item => item.Members)
+            .FirstOrDefaultAsync(item => item.Id == id, ct);
+        if (team is null)
+            return NotFound();
+        if (!_tenantContext.HasAccessToTenant(team.TenantId))
+            return Forbid();
+
+        var filter = DeserializeFilter(request.FilterDefinition);
+        if (filter is null)
+            return BadRequest(new ProblemDetails { Title = "Invalid rule filter JSON." });
+
+        var rule = await _dbContext.TeamMembershipRules.FirstOrDefaultAsync(item => item.TeamId == team.Id, ct);
+
+        if (!request.IsDynamic)
+        {
+            team.SetDynamic(false);
+            if (rule is not null)
+            {
+                _dbContext.TeamMembershipRules.Remove(rule);
+            }
+
+            await _dbContext.SaveChangesAsync(ct);
+            return NoContent();
+        }
+
+        if (!team.IsDynamic && team.Members.Count > 0 && !request.AcknowledgeMemberReset)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Enabling dynamic membership will remove all current members before applying the rule."
+            });
+        }
+
+        if (!team.IsDynamic && request.IsDynamic && team.Members.Count > 0)
+        {
+            foreach (var member in team.Members.ToList())
+            {
+                team.RemoveMember(member.UserId);
+            }
+        }
+
+        team.SetDynamic(true);
+
+        if (rule is null)
+        {
+            rule = TeamMembershipRule.Create(team.TenantId, team.Id, filter);
+            await _dbContext.TeamMembershipRules.AddAsync(rule, ct);
+        }
+        rule.Update(filter, enabled: true);
+
+        await _dbContext.SaveChangesAsync(ct);
+        await _teamMembershipRuleService.ApplyAsync(rule, ct);
+
+        return NoContent();
+    }
+
+    [HttpPost("{id:guid}/rule/preview")]
+    [Authorize(Policy = Policies.ViewTeams)]
+    public async Task<ActionResult<TeamMembershipRulePreviewDto>> PreviewRule(
+        Guid id,
+        [FromBody] UpdateTeamMembershipRuleRequest request,
+        CancellationToken ct
+    )
+    {
+        var team = await _dbContext.Teams.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id, ct);
+        if (team is null)
+            return NotFound();
+        if (!_tenantContext.HasAccessToTenant(team.TenantId))
+            return Forbid();
+
+        var filter = DeserializeFilter(request.FilterDefinition);
+        if (filter is null)
+            return BadRequest(new ProblemDetails { Title = "Invalid rule filter JSON." });
+
+        var preview = await _teamMembershipRuleService.PreviewAsync(team.TenantId, filter, ct);
+        return Ok(new TeamMembershipRulePreviewDto(
+            preview.Count,
+            preview.Samples.Select(user => new TeamMembershipRulePreviewUserDto(
+                user.Id,
+                user.DisplayName,
+                user.Email,
+                user.Company
+            )).ToList()
+        ));
+    }
+
+    private static TeamMembershipRuleDto ToMembershipRuleDto(TeamMembershipRule rule) => new(
+        rule.Id,
+        JsonDocument.Parse(rule.FilterDefinition).RootElement,
+        rule.CreatedAt,
+        rule.UpdatedAt,
+        rule.LastExecutedAt,
+        rule.LastMatchCount
+    );
+
+    private static FilterNode? DeserializeFilter(JsonElement element)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<FilterNode>(
+                element.GetRawText(),
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
+            );
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

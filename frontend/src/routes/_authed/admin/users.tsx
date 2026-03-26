@@ -1,24 +1,46 @@
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { fetchUsers } from '@/api/users.functions'
-import { updateUserRoles } from '@/api/users.functions'
-import { fetchTenants } from '@/api/settings.functions'
+import { fetchTeams } from '@/api/teams.functions'
+import { fetchUserAudit, fetchUserDetail, fetchUsers, updateUser } from '@/api/users.functions'
+import { UserDetailPanel } from '@/components/features/admin/UserDetailPanel'
 import { UserTable } from '@/components/features/admin/UserTable'
-import { baseListSearchSchema } from '@/routes/-list-search'
+import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
+
+const userSearchSchema = baseListSearchSchema.extend({
+  search: searchStringSchema,
+  role: searchStringSchema,
+  status: searchStringSchema,
+  teamId: searchStringSchema,
+})
 
 export const Route = createFileRoute('/_authed/admin/users')({
-  validateSearch: baseListSearchSchema,
+  validateSearch: userSearchSchema,
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
-    const [users, tenants] = await Promise.all([
-      fetchUsers({ data: { page: deps.page, pageSize: deps.pageSize } }),
-      fetchTenants({ data: { page: 1, pageSize: 100 } }),
+    const [users, teams] = await Promise.all([
+      fetchUsers({
+        data: {
+          search: deps.search || undefined,
+          role: deps.role || undefined,
+          status: deps.status || undefined,
+          teamId: deps.teamId || undefined,
+          page: deps.page,
+          pageSize: deps.pageSize,
+        },
+      }),
+      fetchTeams({ data: { page: 1, pageSize: 200 } }),
     ])
+
+    const initialUserDetail = users.items[0]
+      ? await fetchUserDetail({ data: { userId: users.items[0].id } })
+      : null
 
     return {
       users,
-      tenants: tenants.items,
+      teams: teams.items,
+      initialUserDetail,
     }
   },
   component: UsersPage,
@@ -28,55 +50,164 @@ function UsersPage() {
   const data = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  const router = useRouter()
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(data.users.items[0]?.id ?? null)
+  const [auditFilters, setAuditFilters] = useState({
+    entityType: '',
+    action: '',
+  })
+
   const usersQuery = useQuery({
-    queryKey: ['users', search.page, search.pageSize],
-    queryFn: () => fetchUsers({ data: { page: search.page, pageSize: search.pageSize } }),
+    queryKey: ['users', search],
+    queryFn: () => fetchUsers({
+      data: {
+        search: search.search || undefined,
+        role: search.role || undefined,
+        status: search.status || undefined,
+        teamId: search.teamId || undefined,
+        page: search.page,
+        pageSize: search.pageSize,
+      },
+    }),
     initialData: data.users,
   })
-  const mutation = useMutation({
-    mutationFn: async (payload: { userId: string; roles: Array<{ tenantId: string; role: string }> }) => {
-      await updateUserRoles({
-        data: {
-          userId: payload.userId,
-          roles: payload.roles,
-        },
-      })
-    },
-    onSuccess: () => {
-      toast.success('User roles updated')
-      void router.invalidate()
+
+  const teamsQuery = useQuery({
+    queryKey: ['teams', 'user-admin'],
+    queryFn: () => fetchTeams({ data: { page: 1, pageSize: 200 } }),
+    initialData: { items: data.teams, totalCount: data.teams.length, page: 1, pageSize: 200, totalPages: 1 },
+  })
+
+  useEffect(() => {
+    const currentItems = usersQuery.data.items
+    if (currentItems.length === 0) {
+      if (selectedUserId !== null) {
+        setSelectedUserId(null)
+      }
+      return
+    }
+
+    if (!selectedUserId || !currentItems.some((user) => user.id === selectedUserId)) {
+      setSelectedUserId(currentItems[0].id)
+    }
+  }, [selectedUserId, usersQuery.data.items])
+
+  const userDetailQuery = useQuery({
+    queryKey: ['user-detail', selectedUserId],
+    queryFn: () => fetchUserDetail({ data: { userId: selectedUserId! } }),
+    enabled: Boolean(selectedUserId),
+    initialData: data.initialUserDetail ?? undefined,
+  })
+
+  const userAuditQuery = useQuery({
+    queryKey: ['user-audit', selectedUserId, auditFilters],
+    queryFn: () => fetchUserAudit({
+      data: {
+        userId: selectedUserId!,
+        entityType: auditFilters.entityType || undefined,
+        action: auditFilters.action || undefined,
+        page: 1,
+        pageSize: 50,
+      },
+    }),
+    enabled: Boolean(selectedUserId),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: async (payload: {
+      userId: string
+      displayName: string
+      email: string
+      company: string | null
+      isEnabled: boolean
+      roles: string[]
+      teamIds: string[]
+    }) => updateUser({ data: payload }),
+    onSuccess: async () => {
+      toast.success('User updated')
+      await Promise.all([
+        usersQuery.refetch(),
+        userDetailQuery.refetch(),
+        userAuditQuery.refetch(),
+      ])
     },
     onError: () => {
-      toast.error('Failed to update user roles')
+      toast.error('Failed to update user')
     },
   })
 
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-semibold">Users</h1>
-      <UserTable
-        users={usersQuery.data.items}
-        totalCount={usersQuery.data.totalCount}
-        page={usersQuery.data.page}
-        pageSize={usersQuery.data.pageSize}
-        totalPages={usersQuery.data.totalPages}
-        isUpdatingRoles={mutation.isPending}
-        tenants={data.tenants.map((tenant) => ({ id: tenant.id, name: tenant.name }))}
-        onPageChange={(page) => {
-          void navigate({
-            search: (prev) => ({ ...prev, page }),
-          })
-        }}
-        onPageSizeChange={(nextPageSize) => {
-          void navigate({
-            search: (prev) => ({ ...prev, pageSize: nextPageSize, page: 1 }),
-          })
-        }}
-        onUpdateRoles={(userId, roles) => {
-          mutation.mutate({ userId, roles })
-        }}
-      />
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold">User Management</h1>
+        <p className="text-sm text-muted-foreground">
+          Review tenant users, update access, manage assignment groups, and inspect audit history.
+        </p>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+        <UserTable
+          users={usersQuery.data.items}
+          totalCount={usersQuery.data.totalCount}
+          page={usersQuery.data.page}
+          pageSize={usersQuery.data.pageSize}
+          totalPages={usersQuery.data.totalPages}
+          selectedUserId={selectedUserId}
+          filters={{
+            search: search.search,
+            role: search.role,
+            status: search.status,
+            teamId: search.teamId,
+          }}
+          teams={teamsQuery.data.items}
+          onFilterChange={(next) => {
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                ...next,
+                page: 1,
+              }),
+            })
+          }}
+          onPageChange={(page) => {
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                page,
+              }),
+            })
+          }}
+          onPageSizeChange={(pageSize) => {
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                pageSize,
+                page: 1,
+              }),
+            })
+          }}
+          onSelectUser={(userId) => setSelectedUserId(userId)}
+        />
+
+        <UserDetailPanel
+          user={userDetailQuery.data}
+          teams={teamsQuery.data.items}
+          auditItems={userAuditQuery.data?.items ?? []}
+          auditFilters={auditFilters}
+          isLoading={userDetailQuery.isLoading}
+          isSaving={updateMutation.isPending}
+          onAuditFilterChange={setAuditFilters}
+          onSave={(payload) => {
+            if (!selectedUserId) {
+              return
+            }
+
+            updateMutation.mutate({
+              userId: selectedUserId,
+              ...payload,
+            })
+          }}
+        />
+      </div>
     </section>
   )
 }

@@ -6,6 +6,7 @@ public class Team
     public Guid TenantId { get; private set; }
     public string Name { get; private set; } = null!;
     public bool IsDefault { get; private set; }
+    public bool IsDynamic { get; private set; }
 
     private readonly List<TeamMember> _members = [];
     public IReadOnlyCollection<TeamMember> Members => _members.AsReadOnly();
@@ -20,6 +21,7 @@ public class Team
             TenantId = tenantId,
             Name = name,
             IsDefault = false,
+            IsDynamic = false,
         };
     }
 
@@ -31,7 +33,13 @@ public class Team
             TenantId = tenantId,
             Name = name,
             IsDefault = true,
+            IsDynamic = false,
         };
+    }
+
+    public void SetDynamic(bool isDynamic)
+    {
+        IsDynamic = isDynamic;
     }
 
     public void AddMember(User user)

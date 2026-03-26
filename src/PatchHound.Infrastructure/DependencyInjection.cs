@@ -86,6 +86,8 @@ public static class DependencyInjection
         services.AddScoped<AssetService>();
         services.AddScoped<UserService>();
         services.AddScoped<TeamService>();
+        services.AddScoped<TeamMembershipRuleFilterBuilder>();
+        services.AddScoped<TeamMembershipRuleService>();
         services.AddScoped<SlaService>();
         services.AddScoped<RemediationWorkflowService>();
         services.AddScoped<PatchingTaskService>();
