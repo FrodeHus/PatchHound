@@ -14,30 +14,32 @@ Users log in with a baseline "User" role granting read-only access to non-admin 
 - Active roles reset when the session ends (logout or expiry)
 - The UI clearly indicates the current privilege level
 
-## Backend
+## Architecture: Two-Layer Role Activation
 
-### New Endpoint: `POST /api/roles/activate`
+Role activation spans two systems: the frontend session (iron-session in PostgreSQL) and the backend API (.NET). These systems have separate session stores and cannot directly share state. The design uses a two-layer approach:
 
-**Request body:**
-```json
-{ "roles": ["SecurityManager", "Auditor"] }
-```
+1. **Frontend server function** handles the activation request, validates against the backend API, stores `activeRoles` in the frontend session, and returns the updated user.
+2. **Frontend middleware** sends `activeRoles` to the backend on every API request via an `X-Active-Roles` header.
+3. **Backend `RoleRequirementHandler`** reads the header, validates each role is assigned to the user (preventing header spoofing), and authorizes against only the active set.
 
-This represents the desired set of active roles. An empty array deactivates all roles (back to User-only).
+This keeps the frontend session as the source of truth for active roles, while the backend independently validates on every request.
 
-**Validation:**
-1. Authenticate the user (existing middleware)
-2. Resolve the current tenant (existing `TenantContext`)
-3. Load the user's assigned roles for this tenant from `UserTenantRole` table
-4. Verify every requested role exists in the assigned set — reject with `403 Forbidden` if any role is not assigned
-5. Compare the new active set with the previous active set to determine what changed
+## Frontend Server
 
-**Response:** Returns the updated `CurrentUser` object (same shape as `getCurrentUser()`) so the frontend can update state without a round-trip.
+### New Server Function: `activateRoles`
 
-**Error cases:**
-- `401` — not authenticated
-- `403` — one or more requested roles not assigned to user for this tenant
-- `400` — invalid role name
+A TanStack server function (in `frontend/src/api/roles.functions.ts`) that:
+
+1. Reads the current session
+2. Calls the backend `POST /api/roles/activate` with the requested roles — this validates assignment and writes audit logs
+3. On success, stores `activeRoles` in the frontend session and calls `session.save()`
+4. Returns the updated `CurrentUser`
+
+**Request:** `{ roles: string[] }` — the desired set of active roles. Empty array = deactivate all.
+
+**Error handling:**
+- Backend returns `403` → role not assigned → return error to UI, don't update session
+- Backend returns `400` → invalid role name → return error to UI
 
 ### Session Changes
 
@@ -46,18 +48,71 @@ This represents the desired set of active roles. An empty array deactivates all 
 activeRoles?: string[]  // defaults to undefined (= no elevated roles = User only)
 ```
 
-- `getCurrentUser()` returns both `roles` (all assigned) and `activeRoles` (currently elevated)
+- `getCurrentUser()` returns both `roles` (all assigned) and `activeRoles` (currently elevated, defaults to `[]`)
+- `session.save()` must persist `activeRoles` (add to the explicit field list in save method)
 - On logout, session is destroyed — active roles reset automatically
-- On session expiry + token refresh, `activeRoles` persists (same session)
+- On token refresh, `activeRoles` persists within the same session
+
+### API Request Header
+
+Active roles must be sent to the backend on every API request. This happens in `frontend/src/server/api.ts`:
+
+1. Add `activeRoles` to the `ApiRequestContext` type
+2. In `buildHeaders()`, add the `X-Active-Roles` header from the context:
+   ```
+   X-Active-Roles: SecurityManager,Auditor
+   ```
+   Empty or absent header = no elevated roles (User only).
+
+3. In `frontend/src/server/middleware.ts`, add `activeRoles` to the context passed to `next()` so server functions have access to it from the session:
+   ```typescript
+   activeRoles: session.activeRoles ?? []
+   ```
+
+This ensures the backend receives the active role set on every API call and can validate it independently.
+
+## Backend API
+
+### New Endpoint: `POST /api/roles/activate`
+
+**Controller:** New `RolesController` (or added to existing auth-related controller).
+
+**Request body:**
+```json
+{ "roles": ["SecurityManager", "Auditor"] }
+```
+
+**Logic:**
+1. Authenticate the user (existing middleware)
+2. Resolve the current tenant (existing `TenantContext`)
+3. Load the user's assigned roles for this tenant from `UserTenantRole` table
+4. Verify every requested role exists in the assigned set — reject with `403 Forbidden` if any role is not assigned
+5. Read the previous active roles from the `X-Active-Roles` header (the current state)
+6. Compare old and new sets, write audit log entries for each change
+7. Return `200 OK` with the validated role list
+
+**Authorization:** `[Authorize]` only (any authenticated user). No policy required — the endpoint validates role assignment server-side.
+
+**Error cases:**
+- `401` — not authenticated
+- `403` — one or more requested roles not assigned to user for this tenant
+- `400` — invalid role name
+
+**Idempotency:** Activating an already-active role is a no-op (no audit entry for that role).
+
+**Header on activation call:** The `activateRoles` server function must include the current `X-Active-Roles` header (from the session, before updating) so the backend can compute the diff for audit logging.
 
 ### Authorization Changes
 
 **`RoleRequirementHandler`** currently checks all assigned roles (from Entra claims + database). Change to:
 
-1. Read `activeRoles` from the session/context
-2. If `activeRoles` is set, check against that set only
-3. The implicit "User" role is always considered active (grants read-only access via existing policies that have no role requirements)
-4. If `activeRoles` is not set (empty/undefined), the user has no elevated roles — only policies with no role requirement pass
+1. Read the `X-Active-Roles` header from the HTTP request
+2. If the header is present and non-empty, parse it into a role list
+3. Validate each role in the header is actually assigned to the user for the current tenant (prevents header spoofing — this is security-critical)
+4. Authorize against only the validated active roles
+5. If the header is absent or empty, the user has no elevated roles — only policies with no role requirement pass
+
+The implicit "User" base access is granted by existing policies that have no role requirements (e.g., viewing vulnerabilities read-only).
 
 **No changes needed to:**
 - Policy definitions in `Program.cs`
@@ -72,16 +127,17 @@ Use the existing audit infrastructure. Log entries for role activation/deactivat
 
 - **EntityType:** `RoleActivation`
 - **Action:** `Activated` or `Deactivated`
-- **NewValues:** `{ "Role": "SecurityManager" }` (or the deactivated role)
+- **NewValues:** `{ "Role": "SecurityManager" }` (for activation)
+- **OldValues:** `{ "Role": "Auditor" }` (for deactivation)
 - **UserId, TenantId, Timestamp:** standard audit fields
 
-Each role change in a single request produces its own audit entry. Example: activating SecurityManager and deactivating Auditor in one call = 2 audit entries.
+Each role change in a single request produces its own audit entry. Example: activating SecurityManager and deactivating Auditor in one call = 2 audit entries. Re-activating an already-active role produces no audit entry.
 
 ### Tenant Switching
 
 When the user switches tenants:
-- Active roles reset (different tenants may have different role assignments)
-- The frontend calls `POST /api/roles/activate` with an empty set or the user re-activates roles for the new tenant
+- Frontend clears `activeRoles` from the session (different tenants may have different role assignments)
+- The user must re-activate roles for the new tenant
 
 ## Frontend
 
@@ -157,6 +213,15 @@ With no roles activated, users see:
 - No access to: Remediation, Approvals, Audit Trail, Settings, Admin Console
 
 This matches routes/features that have no role requirement in the sidebar nav config.
+
+### GlobalAdmin Treatment
+
+GlobalAdmin follows the same activation pattern — it must be explicitly activated. There is no special treatment. This means:
+- OpenBao unseal (TopNav) requires GlobalAdmin to be active
+- Portal view switcher requires GlobalAdmin to be active
+- Admin user management requires GlobalAdmin to be active
+
+This is intentional: even administrators should operate with least privilege by default.
 
 ## Out of Scope
 
