@@ -61,6 +61,7 @@ export interface SessionData {
   roles?: string[]
   tenantIds?: string[]
   oauthState?: string
+  activeRoles?: string[]
 }
 
 const COOKIE_NAME = 'patchhound-session'
@@ -153,6 +154,7 @@ class AppSession implements SessionData {
   roles?: string[]
   tenantIds?: string[]
   oauthState?: string
+  activeRoles?: string[]
 
   private sid?: string
 
@@ -179,6 +181,7 @@ class AppSession implements SessionData {
       roles: this.roles,
       tenantIds: this.tenantIds,
       oauthState: this.oauthState,
+      activeRoles: this.activeRoles,
     }
 
     const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000)

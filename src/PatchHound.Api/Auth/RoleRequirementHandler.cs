@@ -7,10 +7,12 @@ namespace PatchHound.Api.Auth;
 public class RoleRequirementHandler : AuthorizationHandler<RoleRequirement>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public RoleRequirementHandler(ITenantContext tenantContext)
+    public RoleRequirementHandler(ITenantContext tenantContext, IHttpContextAccessor httpContextAccessor)
     {
         _tenantContext = tenantContext;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     protected override Task HandleRequirementAsync(
@@ -18,46 +20,39 @@ public class RoleRequirementHandler : AuthorizationHandler<RoleRequirement>
         RoleRequirement requirement
     )
     {
-        var normalizedClaimRoles = EntraRoleNormalizer.Normalize(
-            RoleClaimReader.ReadClaims(context.User)
-        );
-
-        if (normalizedClaimRoles.Any(role => requirement.AllowedRoles.Contains(role)))
-        {
-            context.Succeed(requirement);
-            return Task.CompletedTask;
-        }
+        // All roles — including Entra claim roles — must be explicitly activated.
+        // Per spec: "GlobalAdmin follows the same activation pattern — no special treatment."
 
         if (_tenantContext.AccessibleTenantIds.Count == 0)
             return Task.CompletedTask;
 
-        // If a current tenant is selected, check roles only for that tenant.
-        // Otherwise, check if the user has the required role in any accessible tenant.
+        // Read active roles from header
+        var activeRolesHeader = _httpContextAccessor.HttpContext?
+            .Request.Headers["X-Active-Roles"].FirstOrDefault();
+
+        var headerRoles = string.IsNullOrWhiteSpace(activeRolesHeader)
+            ? Array.Empty<string>()
+            : activeRolesHeader.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        // Check against current tenant or all accessible tenants
         if (_tenantContext.CurrentTenantId is Guid currentTenantId)
         {
-            var tenantRoles = _tenantContext.GetRolesForTenant(currentTenantId);
-            if (
-                tenantRoles.Any(role =>
-                    Enum.TryParse<RoleName>(role, out var roleName)
-                    && requirement.AllowedRoles.Contains(roleName)
-                )
-            )
+            var assignedRoles = _tenantContext.GetRolesForTenant(currentTenantId);
+            var effectiveRoles = BuildEffectiveRoles(headerRoles, assignedRoles);
+
+            if (effectiveRoles.Any(role => requirement.AllowedRoles.Contains(role)))
             {
                 context.Succeed(requirement);
             }
         }
         else
         {
-            // No specific tenant selected — check all accessible tenants
             foreach (var tenantId in _tenantContext.AccessibleTenantIds)
             {
-                var tenantRoles = _tenantContext.GetRolesForTenant(tenantId);
-                if (
-                    tenantRoles.Any(role =>
-                        Enum.TryParse<RoleName>(role, out var roleName)
-                        && requirement.AllowedRoles.Contains(roleName)
-                    )
-                )
+                var assignedRoles = _tenantContext.GetRolesForTenant(tenantId);
+                var effectiveRoles = BuildEffectiveRoles(headerRoles, assignedRoles);
+
+                if (effectiveRoles.Any(role => requirement.AllowedRoles.Contains(role)))
                 {
                     context.Succeed(requirement);
                     break;
@@ -66,5 +61,30 @@ public class RoleRequirementHandler : AuthorizationHandler<RoleRequirement>
         }
 
         return Task.CompletedTask;
+    }
+
+    private static List<RoleName> BuildEffectiveRoles(
+        string[] headerRoles,
+        IReadOnlyList<string> assignedRoles)
+    {
+        var effective = new List<RoleName>();
+
+        // Stakeholder is always active when assigned — cannot be deactivated
+        if (assignedRoles.Contains(RoleName.Stakeholder.ToString(), StringComparer.OrdinalIgnoreCase))
+        {
+            effective.Add(RoleName.Stakeholder);
+        }
+
+        foreach (var headerRole in headerRoles)
+        {
+            if (Enum.TryParse<RoleName>(headerRole, out var roleName)
+                && roleName != RoleName.Stakeholder
+                && assignedRoles.Contains(headerRole, StringComparer.OrdinalIgnoreCase))
+            {
+                effective.Add(roleName);
+            }
+        }
+
+        return effective;
     }
 }
