@@ -49,197 +49,233 @@ export function AssetDetailPageView({
     [asset.metadata],
   );
   const timelineItems = useMemo(() => buildTimelineItems(asset), [asset]);
+  const displayTitle =
+    asset.assetType === "Device"
+      ? asset.deviceComputerDnsName ?? asset.name
+      : asset.name;
+  const deviceLastSeen = asset.deviceLastSeenAt
+    ? formatDateTime(asset.deviceLastSeenAt)
+    : "Unknown";
+  const topSummaryCards = [
+    {
+      label: asset.assetType === "Device" ? "Asset risk score" : "Current risk score",
+      value: asset.risk ? asset.risk.overallScore.toFixed(0) : "None",
+      accent: asset.risk?.riskBand ?? null,
+    },
+    {
+      label: asset.assetType === "Device" ? "Open episodes" : "Linked vulnerabilities",
+      value: asset.risk
+        ? String(asset.risk.openEpisodeCount)
+        : String(asset.vulnerabilities.length),
+      accent: null,
+    },
+    {
+      label: asset.assetType === "Device" ? "Remediation tasks" : "Installed software",
+      value:
+        asset.assetType === "Device"
+          ? String(asset.remediation?.openTaskCount ?? 0)
+          : String(asset.softwareInventory.length),
+      accent:
+        asset.assetType === "Device" && asset.remediation
+          ? `${asset.remediation.overdueTaskCount} overdue`
+          : null,
+    },
+  ];
 
   return (
     <>
       <section className="space-y-5">
-      <header className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              <Pill>{asset.assetType}</Pill>
-              <Pill>{asset.criticality} criticality</Pill>
-              {asset.securityProfile ? (
-                <Pill>{asset.securityProfile.name}</Pill>
-              ) : null}
-            </div>
-            <div>
-              <h1 className="text-3xl font-semibold tracking-[-0.04em]">
-                {asset.name}
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                {asset.description ?? getDefaultDescription(asset.assetType)}
-              </p>
-              {asset.assetType === "Software" && asset.tenantSoftwareId ? (
-                <Link
-                  to="/software/$id"
-                  params={{ id: asset.tenantSoftwareId }}
-                  search={{ page: 1, pageSize: 25, version: "", tab: "overview" }}
-                  className="mt-3 inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
-                >
-                  Open software workspace
-                </Link>
-              ) : null}
-              {asset.assetType === "Software" ? (
-                <Link
-                  to="/software/$id/remediation"
-                  params={{ id: asset.tenantSoftwareId ?? asset.id }}
-                  className="mt-3 ml-2 inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
-                >
-                  Open remediation view
-                </Link>
-              ) : null}
-            </div>
-          </div>
-          <div className="rounded-2xl border border-border/70 bg-background/50 p-4 text-right">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              External ID
-            </p>
-            <code className="mt-1 block text-xs">{asset.externalId}</code>
-          </div>
-        </div>
-      </header>
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-        <section className="rounded-3xl border border-border/70 bg-card p-4">
-          <div className="mb-4 flex flex-wrap gap-2">
-            <TabButton
-              label="Overview"
-              active={activeTab === "overview"}
-              onClick={() => setActiveTab("overview")}
-            />
-            <TabButton
-              label="Vulnerabilities"
-              active={activeTab === "vulnerabilities"}
-              onClick={() => setActiveTab("vulnerabilities")}
-            />
-            <TabButton
-              label="Software Inventory"
-              active={activeTab === "software"}
-              onClick={() => setActiveTab("software")}
-            />
-            <TabButton
-              label="Activity Timeline"
-              active={activeTab === "timeline"}
-              onClick={() => setActiveTab("timeline")}
-            />
-          </div>
-
-          {activeTab === "overview" ? (
-            <div className="space-y-5">
-              <button
-                type="button"
-                className="w-full rounded-2xl border border-border/70 bg-background p-4 text-left transition hover:border-foreground/20 hover:bg-muted/20"
-                onClick={() => setSecurityProfileSheetOpen(true)}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      Environmental severity profile
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Pill>{asset.securityProfile?.name ?? "Vendor severity only"}</Pill>
-                      {asset.securityProfile ? (
-                        <span className="text-sm text-muted-foreground">
-                          {asset.securityProfile.internetReachability}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {asset.securityProfile
-                        ? `${asset.securityProfile.environmentClass} profile applied for adjusted vulnerability severity.`
-                        : "No profile is applied. Vendor severity is used directly."}
-                    </p>
-                  </div>
-                  <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                    Manage
-                  </span>
-                </div>
-              </button>
-              <button
-                type="button"
-                className="w-full rounded-2xl border border-border/70 bg-background p-4 text-left transition hover:border-foreground/20 hover:bg-muted/20"
-                onClick={() => setCriticalitySheetOpen(true)}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      Criticality
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Pill>{asset.criticality}</Pill>
-                      <span className="text-sm text-muted-foreground">
-                        {asset.criticalityDetail?.source ?? "Unknown"}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {asset.criticalityDetail?.reason
-                        ?? "Used directly by PatchHound risk scoring and prioritization."}
-                    </p>
-                  </div>
-                  <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                    Manage
-                  </span>
-                </div>
-              </button>
-              <section className="grid gap-3 md:grid-cols-2">
-                {asset.ownerType === "Team" ? (
-                  <MetricCard
-                    label="Assignment Group"
-                    value={asset.ownerTeamId ?? "Unassigned"}
-                    mono
-                  />
-                ) : (
-                  <MetricCard
-                    label="Owner User"
-                    value={asset.ownerUserId ?? "Unassigned"}
-                    mono
-                  />
-                )}
+        <header className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(22rem,0.75fr)]">
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Pill>{asset.assetType}</Pill>
+                <Pill>{asset.criticality} criticality</Pill>
+                {asset.assetType === "Device" && asset.deviceHealthStatus ? (
+                  <Pill>{asset.deviceHealthStatus}</Pill>
+                ) : null}
+                {asset.securityProfile ? <Pill>{asset.securityProfile.name}</Pill> : null}
+              </div>
+              <div className="space-y-2">
+                <h1 className="text-3xl font-semibold tracking-[-0.04em]">
+                  {displayTitle}
+                </h1>
+                <p className="max-w-3xl text-sm text-muted-foreground">
+                  {asset.assetType === "Device"
+                    ? [
+                        asset.deviceOsPlatform,
+                        asset.deviceOsVersion,
+                        asset.deviceGroupName,
+                        `Last seen ${deviceLastSeen}`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                    : asset.description ?? getDefaultDescription(asset.assetType)}
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <MetricCard
+                  label={asset.ownerType === "Team" ? "Assignment Group" : "Owner User"}
+                  value={
+                    asset.ownerType === "Team"
+                      ? asset.ownerTeamId ?? "Unassigned"
+                      : asset.ownerUserId ?? "Unassigned"
+                  }
+                  mono
+                />
                 <MetricCard
                   label="Fallback Assignment Group"
                   value={asset.fallbackTeamId ?? "None"}
                   mono
                 />
-              </section>
-              {asset.assetType === "Device" && asset.remediation ? (
-                <Link
-                  to="/remediation"
-                  search={{
-                    page: 1,
-                    pageSize: 25,
-                    search: '',
-                    criticality: '',
-                    outcome: '',
-                    approvalStatus: '',
-                    decisionState: '',
-                  }}
-                  className="flex w-full items-start justify-between gap-4 rounded-2xl border border-border/70 bg-background p-4 text-left transition hover:border-foreground/20 hover:bg-muted/20"
-                >
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      Remediation tasks
+                {asset.assetType === "Device" ? (
+                  <MetricCard
+                    label="Device Group"
+                    value={asset.deviceGroupName ?? "Unknown"}
+                  />
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {asset.assetType === "Software" && asset.tenantSoftwareId ? (
+                  <Link
+                    to="/software/$id"
+                    params={{ id: asset.tenantSoftwareId }}
+                    search={{ page: 1, pageSize: 25, version: "", tab: "overview" }}
+                    className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
+                  >
+                    Open software workspace
+                  </Link>
+                ) : null}
+                {asset.assetType === "Software" ? (
+                  <Link
+                    to="/software/$id/remediation"
+                    params={{ id: asset.tenantSoftwareId ?? asset.id }}
+                    className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
+                  >
+                    Open remediation view
+                  </Link>
+                ) : null}
+                {asset.assetType === "Device" && asset.remediation ? (
+                  <Link
+                    to="/remediation"
+                    search={{
+                      page: 1,
+                      pageSize: 25,
+                      search: '',
+                      criticality: '',
+                      outcome: '',
+                      approvalStatus: '',
+                      decisionState: '',
+                    }}
+                    className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
+                  >
+                    Open remediation workbench
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+            <div className="space-y-3 rounded-3xl border border-border/70 bg-background/60 p-4">
+              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                {topSummaryCards.map((card) => (
+                  <div
+                    key={card.label}
+                    className="rounded-2xl border border-border/70 bg-card px-4 py-3"
+                  >
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                      {card.label}
                     </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Pill>{asset.remediation.openTaskCount} open</Pill>
-                      <span className="text-sm text-muted-foreground">
-                        {asset.remediation.overdueTaskCount} overdue
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Review every open software remediation task linked to this device and see which patching work needs follow-through next.
+                    <p className="mt-2 text-3xl font-semibold tracking-[-0.04em]">
+                      {card.value}
                     </p>
+                    {card.accent ? (
+                      <p className="mt-1 text-xs text-muted-foreground">{card.accent}</p>
+                    ) : null}
                   </div>
-                  <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                    Open
-                  </span>
-                </Link>
+                ))}
+              </div>
+              <div className="rounded-2xl border border-border/70 bg-card px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Reference
+                </p>
+                <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-1">
+                  <div>
+                    <p className="text-xs text-muted-foreground">External ID</p>
+                    <code className="mt-1 block text-xs break-all">{asset.externalId}</code>
+                  </div>
+                  {asset.assetType === "Device" ? (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Entra device ID</p>
+                      <code className="mt-1 block text-xs break-all">
+                        {asset.deviceAadDeviceId ?? "Unknown"}
+                      </code>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+          <section className="rounded-3xl border border-border/70 bg-card p-4">
+            <div className="mb-4 flex flex-wrap gap-2">
+              <TabButton
+                label="Overview"
+                active={activeTab === "overview"}
+                onClick={() => setActiveTab("overview")}
+              />
+              <TabButton
+                label="Vulnerabilities"
+                active={activeTab === "vulnerabilities"}
+                onClick={() => setActiveTab("vulnerabilities")}
+              />
+              <TabButton
+                label="Software Inventory"
+                active={activeTab === "software"}
+                onClick={() => setActiveTab("software")}
+              />
+              <TabButton
+                label="Activity Timeline"
+                active={activeTab === "timeline"}
+                onClick={() => setActiveTab("timeline")}
+              />
+            </div>
+
+          {activeTab === "overview" ? (
+            <div className="space-y-5">
+              {asset.assetType === "Device" && asset.remediation ? (
+                <section className="rounded-2xl border border-border/70 bg-background p-4">
+                  <SectionHeader
+                    title="Action summary"
+                    description="Open remediation work linked to this device and where ownership currently sits."
+                  />
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <MetricCard label="Open remediation tasks" value={String(asset.remediation.openTaskCount)} />
+                    <MetricCard label="Overdue" value={String(asset.remediation.overdueTaskCount)} />
+                    <MetricCard label="Linked vulnerabilities" value={String(asset.vulnerabilities.length)} />
+                  </div>
+                  <Link
+                    to="/remediation"
+                    search={{
+                      page: 1,
+                      pageSize: 25,
+                      search: '',
+                      criticality: '',
+                      outcome: '',
+                      approvalStatus: '',
+                      decisionState: '',
+                    }}
+                    className="mt-4 inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
+                  >
+                    Open remediation workbench
+                  </Link>
+                </section>
               ) : null}
               {asset.assetType === "Device" ? (
                 <section className="rounded-2xl border border-border/70 bg-background p-4">
                   <SectionHeader
                     title="Device context"
-                    description="Normalized telemetry and identification fields captured for this endpoint."
+                    description="Operational identity and health data used to understand this endpoint quickly."
                   />
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <MetricCard
@@ -292,6 +328,63 @@ export function AssetDetailPageView({
                   </div>
                 </section>
               ) : null}
+              <section className="grid gap-4 lg:grid-cols-2">
+                <button
+                  type="button"
+                  className="w-full rounded-2xl border border-border/70 bg-background p-4 text-left transition hover:border-foreground/20 hover:bg-muted/20"
+                  onClick={() => setSecurityProfileSheetOpen(true)}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-2">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                        Environmental severity profile
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Pill>{asset.securityProfile?.name ?? "Vendor severity only"}</Pill>
+                        {asset.securityProfile ? (
+                          <span className="text-sm text-muted-foreground">
+                            {asset.securityProfile.internetReachability}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {asset.securityProfile
+                          ? `${asset.securityProfile.environmentClass} profile applied for adjusted vulnerability severity.`
+                          : "No profile is applied. Vendor severity is used directly."}
+                      </p>
+                    </div>
+                    <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                      Manage
+                    </span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="w-full rounded-2xl border border-border/70 bg-background p-4 text-left transition hover:border-foreground/20 hover:bg-muted/20"
+                  onClick={() => setCriticalitySheetOpen(true)}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-2">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                        Criticality
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Pill>{asset.criticality}</Pill>
+                        <span className="text-sm text-muted-foreground">
+                          {asset.criticalityDetail?.source ?? "Unknown"}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {asset.criticalityDetail?.reason
+                          ?? "Used directly by PatchHound risk scoring and prioritization."}
+                      </p>
+                    </div>
+                    <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                      Manage
+                    </span>
+                  </div>
+                </button>
+              </section>
               {asset.assetType === "Software" ? (
                 <section className="rounded-2xl border border-border/70 bg-background p-4">
                   <SectionHeader
@@ -572,10 +665,10 @@ export function AssetDetailPageView({
             <section className="rounded-3xl border border-border/70 bg-card p-4">
               <SectionHeader
                 title="Current risk"
-                description="Episode-backed asset risk with the top open drivers."
+                description="Current device risk and the open episodes driving it most."
               />
               <div className="mt-4 space-y-3">
-                <div className="flex items-start justify-between gap-3 rounded-2xl border border-border/70 bg-background/40 px-3 py-3">
+                <div className="flex items-start justify-between gap-3 rounded-2xl border border-border/70 bg-background/40 px-4 py-4">
                   <div>
                     <div className="flex items-center gap-1.5">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -591,18 +684,18 @@ export function AssetDetailPageView({
                   </div>
                   <Pill>{asset.risk.riskBand}</Pill>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-3">
                   <MetricCard label="Open episodes" value={String(asset.risk.openEpisodeCount)} />
                   <MetricCard label="Max episode risk" value={asset.risk.maxEpisodeRiskScore.toFixed(0)} />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <MetricCard label="Critical drivers" value={String(asset.risk.criticalCount)} />
-                  <MetricCard label="High drivers" value={String(asset.risk.highCount)} />
+                  <MetricCard
+                    label="High / critical"
+                    value={`${asset.risk.highCount + asset.risk.criticalCount}`}
+                  />
                 </div>
                 {asset.risk.topDrivers.length > 0 ? (
                   <div className="space-y-2">
                     <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Top episode drivers
+                      Highest-risk episodes
                     </p>
                     {asset.risk.topDrivers.slice(0, 3).map((driver) => (
                       <Link
@@ -613,14 +706,22 @@ export function AssetDetailPageView({
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{driver.title}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {driver.externalId} • {driver.riskBand}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-medium">{driver.externalId}</p>
+                              <Pill>{driver.riskBand}</Pill>
+                            </div>
+                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                              {driver.title}
                             </p>
                           </div>
-                          <span className="text-sm font-semibold tabular-nums">
-                            {driver.episodeRiskScore.toFixed(0)}
-                          </span>
+                          <div className="text-right">
+                            <p className="text-lg font-semibold tabular-nums">
+                              {driver.episodeRiskScore.toFixed(0)}
+                            </p>
+                            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                              risk
+                            </p>
+                          </div>
                         </div>
                       </Link>
                     ))}
@@ -629,27 +730,6 @@ export function AssetDetailPageView({
               </div>
             </section>
           ) : null}
-          <section className="rounded-3xl border border-border/70 bg-card p-4">
-            <SectionHeader
-              title="Asset summary"
-              description="Quick operational summary for this asset."
-            />
-            <div className="mt-4 grid gap-3">
-              <MetricCard
-                label="Linked Vulnerabilities"
-                value={String(asset.vulnerabilities.length)}
-              />
-              <MetricCard
-                label="Installed Software"
-                value={String(asset.softwareInventory.length)}
-              />
-              <MetricCard
-                label="Security Profile"
-                value={asset.securityProfile?.name ?? "Not assigned"}
-              />
-              <MetricCard label="Asset Type" value={asset.assetType} />
-            </div>
-          </section>
         </aside>
       </div>
       </section>
