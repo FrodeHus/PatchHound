@@ -239,14 +239,8 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
                     <div className="text-2xl font-semibold tracking-[-0.05em]">
                       {item.currentRiskScore ? Math.round(item.currentRiskScore) : 0}
                     </div>
-                    <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">risk</div>
                   </div>
                 </div>
-                {item.topDriverTitle ? (
-                  <div className="mt-3 rounded-xl border border-border/60 bg-card/70 px-3 py-2 text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">{item.topDriverSummary ?? item.topDriverTitle}</span>
-                  </div>
-                ) : null}
                 <div className="mt-3">
                   <Button size="sm" variant="outline" render={<Link to="/assets/$id" params={{ id: item.assetId }} />}>
                     Review asset
