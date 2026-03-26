@@ -83,4 +83,10 @@ public class RemediationWorkflow
         CancelledAt = DateTimeOffset.UtcNow;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
+
+    public void ReassignTenantSoftware(Guid newTenantSoftwareId)
+    {
+        TenantSoftwareId = newTenantSoftwareId;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
 }
