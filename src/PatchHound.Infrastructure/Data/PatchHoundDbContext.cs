@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 
 namespace PatchHound.Infrastructure.Data;
@@ -145,7 +146,13 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         // Referencing the instance property ensures EF Core re-evaluates per query.
         modelBuilder
             .Entity<Asset>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || (
+                    AccessibleTenantIds.Contains(e.TenantId)
+                    && (e.AssetType != AssetType.Device || e.DeviceActiveInTenant)
+                )
+            );
         modelBuilder
             .Entity<AssetSecurityProfile>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
@@ -157,16 +164,25 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<NormalizedSoftwareInstallation>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || (AccessibleTenantIds.Contains(e.TenantId) && e.DeviceAsset.DeviceActiveInTenant)
+            );
         modelBuilder
             .Entity<NormalizedSoftwareVulnerabilityProjection>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<DeviceSoftwareInstallation>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || (AccessibleTenantIds.Contains(e.TenantId) && e.DeviceAsset.DeviceActiveInTenant)
+            );
         modelBuilder
             .Entity<DeviceSoftwareInstallationEpisode>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || (AccessibleTenantIds.Contains(e.TenantId) && e.DeviceAsset.DeviceActiveInTenant)
+            );
         modelBuilder
             .Entity<TenantVulnerability>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
@@ -177,17 +193,36 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
                 || (
                     AccessibleTenantIds.Contains(e.TenantVulnerability.TenantId)
                     && AccessibleTenantIds.Contains(e.Asset.TenantId)
+                    && (e.Asset.AssetType != AssetType.Device || e.Asset.DeviceActiveInTenant)
                 )
             );
         modelBuilder
             .Entity<VulnerabilityAssetEpisode>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || (
+                    AccessibleTenantIds.Contains(e.TenantId)
+                    && (e.Asset.AssetType != AssetType.Device || e.Asset.DeviceActiveInTenant)
+                )
+            );
         modelBuilder
             .Entity<VulnerabilityAssetAssessment>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || (
+                    AccessibleTenantIds.Contains(e.TenantId)
+                    && (e.Asset.AssetType != AssetType.Device || e.Asset.DeviceActiveInTenant)
+                )
+            );
         modelBuilder
             .Entity<VulnerabilityEpisodeRiskAssessment>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || (
+                    AccessibleTenantIds.Contains(e.TenantId)
+                    && (e.Asset.AssetType != AssetType.Device || e.Asset.DeviceActiveInTenant)
+                )
+            );
         modelBuilder
             .Entity<Comment>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
@@ -260,7 +295,13 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<AssetRiskScore>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || (
+                    AccessibleTenantIds.Contains(e.TenantId)
+                    && (e.Asset.AssetType != AssetType.Device || e.Asset.DeviceActiveInTenant)
+                )
+            );
         modelBuilder
             .Entity<DeviceGroupRiskScore>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));

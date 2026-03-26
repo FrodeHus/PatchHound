@@ -20,6 +20,13 @@ public class RemediationDecisionQueryService(
     ITenantContext tenantContext
 )
 {
+    private sealed record OpenEpisodeRow(
+        Guid AssetId,
+        Guid VulnerabilityDefinitionId,
+        DateTimeOffset FirstSeenAt,
+        DateTimeOffset? ResolvedAt
+    );
+
     public async Task<PagedResponse<RemediationDecisionListItemDto>> ListAsync(
         Guid tenantId,
         RemediationDecisionFilterQuery filter,
@@ -84,6 +91,12 @@ public class RemediationDecisionQueryService(
         var deviceCountByTenantSoftwareId = activeInstallations
             .GroupBy(item => item.TenantSoftwareId)
             .ToDictionary(group => group.Key, group => group.Select(item => item.DeviceAssetId).Distinct().Count());
+        var deviceIdsByTenantSoftwareId = activeInstallations
+            .GroupBy(item => item.TenantSoftwareId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(item => item.DeviceAssetId).Distinct().ToHashSet()
+            );
 
         var decisionsLookup = await dbContext.RemediationDecisions.AsNoTracking()
             .Where(d => d.TenantId == tenantId
@@ -111,6 +124,13 @@ public class RemediationDecisionQueryService(
         var tenantSoftwareIdBySoftwareAssetId = activeInstallations
             .GroupBy(item => item.SoftwareAssetId)
             .ToDictionary(group => group.Key, group => group.First().TenantSoftwareId);
+        var vulnerabilityDefinitionIdsByTenantSoftwareId = openMatchRows
+            .Where(item => tenantSoftwareIdBySoftwareAssetId.ContainsKey(item.SoftwareAssetId))
+            .GroupBy(item => tenantSoftwareIdBySoftwareAssetId[item.SoftwareAssetId])
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(item => item.VulnerabilityDefinitionId).Distinct().ToHashSet()
+            );
 
         var vulnCounts = openMatchRows
             .Where(item => tenantSoftwareIdBySoftwareAssetId.ContainsKey(item.SoftwareAssetId))
@@ -136,6 +156,12 @@ public class RemediationDecisionQueryService(
         var items = new List<RemediationDecisionListItemDto>();
         foreach (var software in tenantSoftwareRows)
         {
+            var activeVulnerabilityCount = vulnCounts.GetValueOrDefault(software.Id)?.Total ?? 0;
+            if (activeVulnerabilityCount == 0)
+            {
+                continue;
+            }
+
             if (!highestCriticalityByTenantSoftwareId.TryGetValue(software.Id, out var criticality))
                 criticality = Criticality.Low;
 
@@ -197,14 +223,15 @@ public class RemediationDecisionQueryService(
                 decision?.ApprovalStatus.ToString(),
                 decision?.DecidedAt,
                 decision?.ExpiryDate,
-                vulnCounts.GetValueOrDefault(software.Id)?.Total ?? 0,
+                activeVulnerabilityCount,
                 vulnCounts.GetValueOrDefault(software.Id)?.Critical ?? 0,
                 vulnCounts.GetValueOrDefault(software.Id)?.High ?? 0,
                 riskScore,
                 riskBand,
                 slaStatus,
                 slaDueDate,
-                deviceCountByTenantSoftwareId.GetValueOrDefault(software.Id)
+                deviceCountByTenantSoftwareId.GetValueOrDefault(software.Id),
+                BuildEmptyTrend()
             ));
         }
 
@@ -212,6 +239,21 @@ public class RemediationDecisionQueryService(
         var paged = items
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
+            .ToList();
+
+        var pagedEpisodeTrendBySoftwareId = await BuildOpenEpisodeTrendsBySoftwareAsync(
+            tenantId,
+            paged.Select(item => item.TenantSoftwareId).ToList(),
+            deviceIdsByTenantSoftwareId,
+            vulnerabilityDefinitionIdsByTenantSoftwareId,
+            ct
+        );
+
+        paged = paged
+            .Select(item => item with
+            {
+                OpenEpisodeTrend = pagedEpisodeTrendBySoftwareId.GetValueOrDefault(item.TenantSoftwareId) ?? BuildEmptyTrend()
+            })
             .ToList();
 
         return new PagedResponse<RemediationDecisionListItemDto>(paged, totalCount, pagination.Page, pagination.BoundedPageSize);
@@ -352,6 +394,12 @@ public class RemediationDecisionQueryService(
             .GroupBy(x => x.VulnerabilityDefinitionId)
             .ToDictionary(g => g.Key, g => g.First().Id);
         var allTenantVulnIds = tenantVulnLookup.Select(x => x.Id).ToList();
+        var openEpisodeTrend = await BuildOpenEpisodeTrendForScopeAsync(
+            tenantId,
+            scopedDeviceAssetIds,
+            vulnDefIds,
+            ct
+        );
 
         // Episode risk assessments for effective severity/score
         var assessmentsByTenantVulnId = await dbContext.VulnerabilityAssetAssessments.AsNoTracking()
@@ -690,7 +738,8 @@ public class RemediationDecisionQueryService(
                 scopedDeviceAssetIds.Count,
                 affectedOwnerTeamCount,
                 patchingTaskCounts?.Open ?? 0,
-                patchingTaskCounts?.Completed ?? 0
+                patchingTaskCounts?.Completed ?? 0,
+                openEpisodeTrend
             ),
             workflowState,
             decisionDto,
@@ -896,6 +945,158 @@ public class RemediationDecisionQueryService(
         }
 
         return "Unknown software";
+    }
+
+    private async Task<Dictionary<Guid, List<OpenEpisodeTrendPointDto>>> BuildOpenEpisodeTrendsBySoftwareAsync(
+        Guid tenantId,
+        List<Guid> tenantSoftwareIds,
+        Dictionary<Guid, HashSet<Guid>> deviceIdsByTenantSoftwareId,
+        Dictionary<Guid, HashSet<Guid>> vulnerabilityDefinitionIdsByTenantSoftwareId,
+        CancellationToken ct
+    )
+    {
+        if (tenantSoftwareIds.Count == 0)
+        {
+            return [];
+        }
+
+        var relevantDeviceIds = tenantSoftwareIds
+            .SelectMany(id => deviceIdsByTenantSoftwareId.GetValueOrDefault(id) ?? [])
+            .Distinct()
+            .ToList();
+        var relevantDefinitionIds = tenantSoftwareIds
+            .SelectMany(id => vulnerabilityDefinitionIdsByTenantSoftwareId.GetValueOrDefault(id) ?? [])
+            .Distinct()
+            .ToList();
+
+        if (relevantDeviceIds.Count == 0 || relevantDefinitionIds.Count == 0)
+        {
+            return tenantSoftwareIds.ToDictionary(id => id, _ => BuildEmptyTrend());
+        }
+
+        var episodeRows = await LoadOpenEpisodeRowsAsync(
+            tenantId,
+            relevantDeviceIds,
+            relevantDefinitionIds,
+            ct
+        );
+
+        return tenantSoftwareIds.ToDictionary(
+            id => id,
+            id => BuildOpenEpisodeTrend(
+                episodeRows,
+                deviceIdsByTenantSoftwareId.GetValueOrDefault(id) ?? [],
+                vulnerabilityDefinitionIdsByTenantSoftwareId.GetValueOrDefault(id) ?? []
+            )
+        );
+    }
+
+    private async Task<List<OpenEpisodeTrendPointDto>> BuildOpenEpisodeTrendForScopeAsync(
+        Guid tenantId,
+        List<Guid> deviceAssetIds,
+        List<Guid> vulnerabilityDefinitionIds,
+        CancellationToken ct
+    )
+    {
+        if (deviceAssetIds.Count == 0 || vulnerabilityDefinitionIds.Count == 0)
+        {
+            return BuildEmptyTrend();
+        }
+
+        var episodeRows = await LoadOpenEpisodeRowsAsync(
+            tenantId,
+            deviceAssetIds,
+            vulnerabilityDefinitionIds,
+            ct
+        );
+
+        return BuildOpenEpisodeTrend(episodeRows, deviceAssetIds, vulnerabilityDefinitionIds);
+    }
+
+    private async Task<List<OpenEpisodeRow>> LoadOpenEpisodeRowsAsync(
+        Guid tenantId,
+        List<Guid> deviceAssetIds,
+        List<Guid> vulnerabilityDefinitionIds,
+        CancellationToken ct
+    )
+    {
+        var start = StartOfUtcDay(DateTimeOffset.UtcNow).AddDays(-29);
+        return await dbContext.VulnerabilityAssetEpisodes.AsNoTracking()
+            .Where(episode =>
+                episode.TenantId == tenantId
+                && deviceAssetIds.Contains(episode.AssetId)
+                && episode.FirstSeenAt < start.AddDays(30)
+                && (episode.ResolvedAt == null || episode.ResolvedAt >= start))
+            .Join(
+                dbContext.TenantVulnerabilities.AsNoTracking()
+                    .Where(tv => tv.TenantId == tenantId && vulnerabilityDefinitionIds.Contains(tv.VulnerabilityDefinitionId)),
+                episode => episode.TenantVulnerabilityId,
+                tenantVulnerability => tenantVulnerability.Id,
+                (episode, tenantVulnerability) => new OpenEpisodeRow(
+                    episode.AssetId,
+                    tenantVulnerability.VulnerabilityDefinitionId,
+                    episode.FirstSeenAt,
+                    episode.ResolvedAt
+                )
+            )
+            .ToListAsync(ct);
+    }
+
+    private static List<OpenEpisodeTrendPointDto> BuildOpenEpisodeTrend(
+        IReadOnlyList<OpenEpisodeRow> episodeRows,
+        IEnumerable<Guid> deviceAssetIds,
+        IEnumerable<Guid> vulnerabilityDefinitionIds
+    )
+    {
+        var deviceAssetIdSet = deviceAssetIds.ToHashSet();
+        var vulnerabilityDefinitionIdSet = vulnerabilityDefinitionIds.ToHashSet();
+        if (deviceAssetIdSet.Count == 0 || vulnerabilityDefinitionIdSet.Count == 0)
+        {
+            return BuildEmptyTrend();
+        }
+
+        var scopedRows = episodeRows
+            .Where(row =>
+                deviceAssetIdSet.Contains(row.AssetId)
+                && vulnerabilityDefinitionIdSet.Contains(row.VulnerabilityDefinitionId))
+            .ToList();
+
+        if (scopedRows.Count == 0)
+        {
+            return BuildEmptyTrend();
+        }
+
+        var start = StartOfUtcDay(DateTimeOffset.UtcNow).AddDays(-29);
+        var points = new List<OpenEpisodeTrendPointDto>(30);
+        for (var offset = 0; offset < 30; offset++)
+        {
+            var day = start.AddDays(offset);
+            var nextDay = day.AddDays(1);
+            var openCount = scopedRows
+                .Where(row =>
+                    row.FirstSeenAt < nextDay
+                    && (row.ResolvedAt == null || row.ResolvedAt >= day))
+                .Select(row => row.AssetId)
+                .Distinct()
+                .Count();
+            points.Add(new OpenEpisodeTrendPointDto(day, openCount));
+        }
+
+        return points;
+    }
+
+    private static List<OpenEpisodeTrendPointDto> BuildEmptyTrend()
+    {
+        var start = StartOfUtcDay(DateTimeOffset.UtcNow).AddDays(-29);
+        return Enumerable.Range(0, 30)
+            .Select(offset => new OpenEpisodeTrendPointDto(start.AddDays(offset), 0))
+            .ToList();
+    }
+
+    private static DateTimeOffset StartOfUtcDay(DateTimeOffset value)
+    {
+        var utc = value.ToUniversalTime();
+        return new DateTimeOffset(utc.Year, utc.Month, utc.Day, 0, 0, 0, TimeSpan.Zero);
     }
 
     private async Task<string?> GenerateAiNarrativeAsync(

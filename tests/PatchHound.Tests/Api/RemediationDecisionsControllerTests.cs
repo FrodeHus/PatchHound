@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using PatchHound.Api.Controllers;
+using PatchHound.Api.Models;
 using PatchHound.Api.Models.Decisions;
 using PatchHound.Api.Services;
 using PatchHound.Core.Common;
@@ -291,5 +292,47 @@ public class RemediationDecisionsControllerTests : IDisposable
         payload.CurrentDecision!.ApprovalStatus.Should().Be("Rejected");
         payload.CurrentDecision.LatestRejection.Should().NotBeNull();
         payload.CurrentDecision.LatestRejection!.Comment.Should().Be("Risk too high without compensating controls.");
+    }
+
+    [Fact]
+    public async Task DecisionList_ExcludesSoftwareWithZeroOpenVulnerabilities()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var aiConfigResolver = Substitute.For<ITenantAiConfigurationResolver>();
+        var queryService = new RemediationDecisionQueryService(
+            _dbContext,
+            new TenantSnapshotResolver(_dbContext),
+            new SlaService(),
+            aiConfigResolver,
+            new TenantAiTextGenerationService(Array.Empty<IAiReportProvider>(), aiConfigResolver),
+            _tenantContext
+        );
+        var listController = new DecisionListController(queryService, _tenantContext);
+
+        var projections = await _dbContext.NormalizedSoftwareVulnerabilityProjections
+            .Where(item => item.TenantSoftwareId == graph.TenantSoftware.Id)
+            .ToListAsync();
+        _dbContext.NormalizedSoftwareVulnerabilityProjections.RemoveRange(projections);
+
+        var matches = await _dbContext.SoftwareVulnerabilityMatches
+            .Where(item => item.TenantId == _tenantId)
+            .ToListAsync();
+        foreach (var match in matches)
+        {
+            match.Resolve(DateTimeOffset.UtcNow);
+        }
+
+        await _dbContext.SaveChangesAsync();
+
+        var action = await listController.List(
+            new RemediationDecisionFilterQuery(),
+            new PaginationQuery(1, 20),
+            CancellationToken.None
+        );
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<RemediationDecisionListItemDto>>().Subject;
+        payload.TotalCount.Should().Be(0);
+        payload.Items.Should().BeEmpty();
     }
 }

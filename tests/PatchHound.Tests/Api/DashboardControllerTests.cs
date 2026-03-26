@@ -835,18 +835,53 @@ public class DashboardControllerTests : IDisposable
             currentTenantVulnerability,
             otherTenantVulnerability
         );
+        var currentAsset = Asset.Create(
+            _tenantId,
+            "trend-current-asset",
+            AssetType.Device,
+            "Trend Current Asset",
+            Criticality.Medium
+        );
+        currentAsset.UpdateDeviceDetails(
+            "trend-current-asset.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "Medium",
+            DateTimeOffset.UtcNow,
+            "10.0.0.10",
+            "aad-trend-current"
+        );
+        var otherAsset = Asset.Create(
+            otherTenantId,
+            "trend-other-asset",
+            AssetType.Device,
+            "Trend Other Asset",
+            Criticality.Medium
+        );
+        otherAsset.UpdateDeviceDetails(
+            "trend-other-asset.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "Medium",
+            DateTimeOffset.UtcNow,
+            "10.0.0.11",
+            "aad-trend-other"
+        );
+        await _dbContext.AddRangeAsync(currentAsset, otherAsset);
         await _dbContext.VulnerabilityAssetEpisodes.AddRangeAsync(
             VulnerabilityAssetEpisode.Create(
                 _tenantId,
                 currentTenantVulnerability.Id,
-                Guid.NewGuid(),
+                currentAsset.Id,
                 1,
                 DateTimeOffset.UtcNow.AddDays(-1)
             ),
             VulnerabilityAssetEpisode.Create(
                 otherTenantId,
                 otherTenantVulnerability.Id,
-                Guid.NewGuid(),
+                otherAsset.Id,
                 1,
                 DateTimeOffset.UtcNow.AddDays(-1)
             )

@@ -89,10 +89,40 @@ public class SoftwareControllerTests : IDisposable
         payload.ActiveVulnerabilityCount.Should().Be(1);
         payload.VulnerableInstallCount.Should().Be(2);
         payload.VersionCount.Should().Be(2);
+        payload.ExposureImpactScore.Should().NotBeNull();
+        payload.ExposureImpactExplanation.Should().NotBeNull();
+        payload.ExposureImpactExplanation!.Score.Should().Be(payload.ExposureImpactScore!.Value);
+        payload.ExposureImpactExplanation.DeviceCount.Should().Be(2);
+        payload.ExposureImpactExplanation.HighValueDeviceCount.Should().Be(1);
+        payload.ExposureImpactExplanation.VulnerabilityCount.Should().Be(1);
+        payload.ExposureImpactExplanation.VulnerabilityFactors.Should().ContainSingle();
+        payload.ExposureImpactExplanation.VulnerabilityFactors[0].ExternalId.Should().Be("CVE-2026-1000");
         payload.VersionCohorts.Should().HaveCount(2);
         payload.VersionCohorts.Select(item => item.Version).Should().BeEquivalentTo("1.0", "2.0");
         payload.SourceAliases.Should().HaveCount(2);
         payload.Description.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Get_ExcludesInactiveDevicesFromCountsAndCohorts()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var inactiveDevice = await _dbContext.Assets
+            .IgnoreQueryFilters()
+            .SingleAsync(item => item.ExternalId == "device-2");
+        inactiveDevice.SetDeviceActiveInTenant(false);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Get(graph.TenantSoftware.Id, CancellationToken.None);
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<TenantSoftwareDetailDto>().Subject;
+
+        payload.ActiveInstallCount.Should().Be(1);
+        payload.UniqueDeviceCount.Should().Be(1);
+        payload.VulnerableInstallCount.Should().Be(1);
+        payload.VersionCount.Should().Be(1);
+        payload.VersionCohorts.Should().ContainSingle();
+        payload.VersionCohorts[0].Version.Should().Be("1.0");
     }
 
     [Fact]

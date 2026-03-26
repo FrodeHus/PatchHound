@@ -535,6 +535,156 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RunIngestionAsync_UpdatesDeviceActiveFlagBasedOnLastSeenAndReactivatesReturningDevices()
+    {
+        await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
+        await _dbContext.TenantSourceConfigurations.AddAsync(
+            TenantSourceConfiguration.Create(
+                _tenantId,
+                "test-source",
+                "Test Source",
+                true,
+                "0 * * * *"
+            )
+        );
+
+        var staleLastSeen = DateTimeOffset.UtcNow.AddDays(-45);
+        var recentLastSeen = DateTimeOffset.UtcNow.AddDays(-5);
+        var device = Asset.Create(
+            _tenantId,
+            "device-reactivate",
+            AssetType.Device,
+            "Device Reactivate",
+            Criticality.Medium
+        );
+        device.UpdateDeviceDetails(
+            "device-reactivate.contoso.local",
+            "Active",
+            "Windows",
+            "11",
+            "Medium",
+            staleLastSeen,
+            "10.0.0.10",
+            "aad-reactivate"
+        );
+
+        await _dbContext.Assets.AddAsync(device);
+        await _dbContext.SaveChangesAsync();
+
+        _assetInventorySource
+            .FetchAssetsAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(
+                new IngestionAssetInventorySnapshot(
+                    [
+                        new IngestionAsset(
+                            "device-reactivate",
+                            "device-reactivate.contoso.local",
+                            AssetType.Device,
+                            null,
+                            "device-reactivate.contoso.local",
+                            "Active",
+                            "Windows",
+                            "11",
+                            "Medium",
+                            staleLastSeen,
+                            "10.0.0.10",
+                            "aad-reactivate"
+                        ),
+                    ],
+                    []
+                )
+            );
+        _source
+            .FetchVulnerabilitiesAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<IngestionResult>());
+
+        await _service.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        var persisted = await _dbContext.Assets.IgnoreQueryFilters()
+            .SingleAsync(item => item.ExternalId == "device-reactivate");
+        persisted.DeviceActiveInTenant.Should().BeFalse();
+
+        var secondSource = Substitute.For<IVulnerabilitySource, IAssetInventorySource>();
+        secondSource.SourceKey.Returns("test-source");
+        secondSource.SourceName.Returns("TestSource");
+        ((IAssetInventorySource)secondSource)
+            .FetchAssetsAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(
+                new IngestionAssetInventorySnapshot(
+                    [
+                        new IngestionAsset(
+                            "device-reactivate",
+                            "device-reactivate.contoso.local",
+                            AssetType.Device,
+                            null,
+                            "device-reactivate.contoso.local",
+                            "Active",
+                            "Windows",
+                            "11",
+                            "Medium",
+                            recentLastSeen,
+                            "10.0.0.10",
+                            "aad-reactivate"
+                        ),
+                    ],
+                    []
+                )
+            );
+        ((IVulnerabilitySource)secondSource)
+            .FetchVulnerabilitiesAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<IngestionResult>());
+
+        var secondService = new IngestionService(
+            _dbContext,
+            [secondSource],
+            new EnrichmentJobEnqueuer(
+                _dbContext,
+                Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
+            ),
+            new VulnerabilityAssessmentService(
+                _dbContext,
+                new EnvironmentalSeverityCalculator(),
+                new TenantSnapshotResolver(_dbContext)
+            ),
+            new SoftwareVulnerabilityMatchService(
+                _dbContext,
+                new NormalizedSoftwareProjectionService(
+                    _dbContext,
+                    new NormalizedSoftwareResolver(_dbContext)
+                )
+            ),
+            new NormalizedSoftwareProjectionService(
+                _dbContext,
+                new NormalizedSoftwareResolver(_dbContext)
+            ),
+            new StagedVulnerabilityMergeService(
+                _dbContext,
+                CreateDbContextFactory(),
+                new VulnerabilityAssessmentService(
+                    _dbContext,
+                    new EnvironmentalSeverityCalculator(),
+                    new TenantSnapshotResolver(_dbContext)
+                ),
+                new VulnerabilityThreatAssessmentService(_dbContext),
+                new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
+                Substitute.For<IWorkflowTriggerService>(),
+                new IngestionStateCache()
+            ),
+            new StagedAssetMergeService(_dbContext),
+            Substitute.For<IAssetRuleEvaluationService>(),
+            new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
+            Substitute.For<ILogger<IngestionService>>()
+        );
+
+        await secondService.RunIngestionAsync(_tenantId, CancellationToken.None);
+
+        persisted = await _dbContext.Assets.IgnoreQueryFilters()
+            .SingleAsync(item => item.ExternalId == "device-reactivate");
+        persisted.DeviceActiveInTenant.Should().BeTrue();
+        persisted.DeviceLastSeenAt.Should().Be(recentLastSeen);
+    }
+
+    [Fact]
     public async Task RunIngestionAsync_WhenAuthFails_MarksRunAsFailedTerminal()
     {
         await _dbContext.Tenants.AddAsync(Tenant.Create("Acme", _tenantId.ToString()));
