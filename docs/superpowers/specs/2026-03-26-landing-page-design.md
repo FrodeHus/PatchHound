@@ -68,7 +68,7 @@ Each step: numbered circle or icon + title + one-line description. Stacks vertic
 
 - Stylized mockup or placeholder of the PatchHound dashboard
 - Wrapped in a card-like container with slight shadow for depth
-- Can use a real screenshot or a wireframe-style illustration initially
+- Use a styled placeholder div (wireframe-style with CSS) initially — no image asset needed
 - Full-width with max-width constraint
 
 ### 6. Bottom CTA
@@ -80,7 +80,7 @@ Each step: numbered circle or icon + title + one-line description. Stacks vertic
 ### 7. Minimal Footer
 
 - Copyright: "© 2026 PatchHound"
-- Links: Docs, GitHub, Contact (placeholder hrefs for now)
+- Links: Docs, GitHub, Contact (all using `#` placeholder hrefs)
 - Simple single-row layout
 
 ## Technical Details
