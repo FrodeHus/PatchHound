@@ -65,6 +65,40 @@ public class RemediationDecisionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateDecisionAsync_UsesDefaultApprovalExpiry_WhenTenantSlaExpiryHoursIsZero()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+
+        var sla = TenantSlaConfiguration.CreateDefault(_tenantId);
+        await _dbContext.TenantSlaConfigurations.AddAsync(sla);
+        _dbContext.Entry(sla).Property(nameof(TenantSlaConfiguration.ApprovalExpiryHours)).CurrentValue = 0;
+        await _dbContext.SaveChangesAsync();
+
+        var softwareAssetId = await _dbContext.NormalizedSoftwareInstallations
+            .Where(item => item.TenantSoftwareId == graph.TenantSoftware.Id)
+            .Select(item => item.SoftwareAssetId)
+            .OrderBy(id => id)
+            .FirstAsync();
+
+        var beforeCreate = DateTimeOffset.UtcNow;
+        var createResult = await _sut.CreateDecisionAsync(
+            _tenantId,
+            softwareAssetId,
+            RemediationOutcome.RiskAcceptance,
+            "Accept temporarily.",
+            _userId,
+            DateTimeOffset.UtcNow.AddDays(7),
+            null,
+            CancellationToken.None
+        );
+
+        createResult.IsSuccess.Should().BeTrue();
+
+        var approvalTask = await _dbContext.ApprovalTasks.IgnoreQueryFilters().FirstAsync();
+        approvalTask.ExpiresAt.Should().BeOnOrAfter(beforeCreate.AddHours(23.5));
+    }
+
+    [Fact]
     public async Task ReconcileResolvedSoftwareRemediationsAsync_ClosesDecisionAndTasks_WhenNoUnresolvedVulnerabilitiesRemain()
     {
         var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
@@ -282,6 +316,68 @@ public class RemediationDecisionServiceTests : IDisposable
         var workflow = await _dbContext.RemediationWorkflows.IgnoreQueryFilters().FirstAsync();
         workflow.Status.Should().Be(RemediationWorkflowStatus.Completed);
         workflow.CurrentStage.Should().Be(RemediationWorkflowStage.Closure);
+    }
+
+    [Fact]
+    public async Task ExpireAsync_CancelsPendingApprovalDecision_ReopensRemediationDecisionStage()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+
+        var softwareOwnerTeam = Team.Create(_tenantId, "Infrastructure Operations");
+        await _dbContext.Teams.AddAsync(softwareOwnerTeam);
+
+        var devices = await _dbContext.Assets
+            .Where(item => item.AssetType == AssetType.Device)
+            .ToListAsync();
+        foreach (var device in devices)
+        {
+            device.AssignTeamOwner(softwareOwnerTeam.Id);
+        }
+
+        await _dbContext.SaveChangesAsync();
+
+        var softwareAssetId = await _dbContext.NormalizedSoftwareInstallations
+            .Where(item => item.TenantSoftwareId == graph.TenantSoftware.Id)
+            .Select(item => item.SoftwareAssetId)
+            .OrderBy(id => id)
+            .FirstAsync();
+
+        var createResult = await _sut.CreateDecisionAsync(
+            _tenantId,
+            softwareAssetId,
+            RemediationOutcome.RiskAcceptance,
+            "Accept temporarily.",
+            _userId,
+            DateTimeOffset.UtcNow.AddDays(7),
+            null,
+            CancellationToken.None
+        );
+
+        createResult.IsSuccess.Should().BeTrue();
+
+        var decision = createResult.Value;
+        var expireResult = await _sut.ExpireAsync(decision.Id, CancellationToken.None);
+
+        expireResult.IsSuccess.Should().BeTrue();
+
+        var refreshedDecision = await _dbContext.RemediationDecisions.IgnoreQueryFilters()
+            .FirstAsync(item => item.Id == decision.Id);
+        refreshedDecision.ApprovalStatus.Should().Be(DecisionApprovalStatus.Expired);
+
+        var approvalTask = await _dbContext.ApprovalTasks.IgnoreQueryFilters().FirstAsync();
+        approvalTask.Status.Should().Be(ApprovalTaskStatus.AutoDenied);
+
+        var workflow = await _dbContext.RemediationWorkflows.IgnoreQueryFilters().FirstAsync();
+        workflow.CurrentStage.Should().Be(RemediationWorkflowStage.RemediationDecision);
+        workflow.Status.Should().Be(RemediationWorkflowStatus.Active);
+        workflow.ProposedOutcome.Should().BeNull();
+        workflow.ApprovalMode.Should().Be(RemediationWorkflowApprovalMode.None);
+
+        var latestDecisionStage = await _dbContext.RemediationWorkflowStageRecords.IgnoreQueryFilters()
+            .Where(record => record.RemediationWorkflowId == workflow.Id && record.Stage == RemediationWorkflowStage.RemediationDecision)
+            .OrderByDescending(record => record.StartedAt)
+            .FirstAsync();
+        latestDecisionStage.Status.Should().Be(RemediationWorkflowStageStatus.InProgress);
     }
 
     [Fact]

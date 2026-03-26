@@ -14,6 +14,8 @@ public class RemediationDecisionService(
     PatchingTaskService patchingTaskService
 )
 {
+    private const int DefaultApprovalExpiryHours = 24;
+
     public async Task<Result<RemediationDecision>> CreateDecisionAsync(
         Guid tenantId,
         Guid softwareAssetId,
@@ -87,7 +89,7 @@ public class RemediationDecisionService(
         var tenantSla = await dbContext.TenantSlaConfigurations
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
-        var expiryHours = tenantSla?.ApprovalExpiryHours ?? 24;
+        var expiryHours = NormalizeApprovalExpiryHours(tenantSla?.ApprovalExpiryHours);
         await approvalTaskService.CreateForDecisionAsync(decision, expiryHours, ct);
 
         return Result<RemediationDecision>.Success(decision);
@@ -172,10 +174,17 @@ public class RemediationDecisionService(
         var tenantSla = await dbContext.TenantSlaConfigurations
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
-        var expiryHours = tenantSla?.ApprovalExpiryHours ?? 24;
+        var expiryHours = NormalizeApprovalExpiryHours(tenantSla?.ApprovalExpiryHours);
         await approvalTaskService.CreateForDecisionAsync(decision, expiryHours, ct);
 
         return Result<RemediationDecision>.Success(decision);
+    }
+
+    private static int NormalizeApprovalExpiryHours(int? approvalExpiryHours)
+    {
+        return approvalExpiryHours is > 0
+            ? approvalExpiryHours.Value
+            : DefaultApprovalExpiryHours;
     }
 
     public async Task<Result<bool>> VerifyAndRequireNewDecisionAsync(
@@ -247,7 +256,19 @@ public class RemediationDecisionService(
         if (decision is null)
             return Result<RemediationDecision>.Failure("Decision not found.");
 
+        var pendingApprovalTasks = await dbContext.ApprovalTasks
+            .Where(task =>
+                task.RemediationDecisionId == decisionId
+                && task.Status == ApprovalTaskStatus.Pending)
+            .ToListAsync(ct);
+
+        foreach (var task in pendingApprovalTasks)
+        {
+            task.AutoDeny();
+        }
+
         decision.Expire();
+        await remediationWorkflowService.HandleDecisionCancelledAsync(decision, ct);
         await dbContext.SaveChangesAsync(ct);
 
         return Result<RemediationDecision>.Success(decision);

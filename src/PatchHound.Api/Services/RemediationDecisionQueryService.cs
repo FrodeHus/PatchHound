@@ -854,6 +854,9 @@ public class RemediationDecisionQueryService(
             StageDescription(currentStage),
             CurrentActorSummary(currentStage, workflow, softwareOwnerTeamName),
             CanActOnCurrentStage(currentStage, workflow, currentUserRoles, currentUserTeamIds, executionTeamIds),
+            currentUserRoles.Select(role => role.ToString()).OrderBy(role => role).ToList(),
+            ExpectedRoles(currentStage, workflow),
+            ExpectedTeamName(currentStage, workflow, softwareOwnerTeamName),
             isRecurrence,
             workflow?.Status == RemediationWorkflowStatus.Active,
             stageDtos
@@ -929,6 +932,43 @@ public class RemediationDecisionQueryService(
                     ? "The approved exception or alternate mitigation is the active remediation posture for this software. Execution is not applicable."
                     : "Closure is completed by the system when execution is finished and exposure is resolved.",
             _ => "This stage is ready for action.",
+        };
+
+    private static List<string> ExpectedRoles(
+        RemediationWorkflowStage stage,
+        RemediationWorkflow? workflow
+    ) =>
+        stage switch
+        {
+            RemediationWorkflowStage.Verification when workflow?.ProposedOutcome is RemediationOutcome.RiskAcceptance or RemediationOutcome.AlternateMitigation =>
+                [RoleName.GlobalAdmin.ToString(), RoleName.SecurityManager.ToString()],
+            RemediationWorkflowStage.Verification =>
+                [RoleName.GlobalAdmin.ToString()],
+            RemediationWorkflowStage.SecurityAnalysis =>
+                [RoleName.GlobalAdmin.ToString(), RoleName.SecurityManager.ToString(), RoleName.SecurityAnalyst.ToString()],
+            RemediationWorkflowStage.RemediationDecision =>
+                [RoleName.GlobalAdmin.ToString()],
+            RemediationWorkflowStage.Approval when workflow?.ApprovalMode == RemediationWorkflowApprovalMode.SecurityApproval =>
+                [RoleName.GlobalAdmin.ToString(), RoleName.SecurityManager.ToString()],
+            RemediationWorkflowStage.Approval when workflow?.ApprovalMode == RemediationWorkflowApprovalMode.TechnicalApproval =>
+                [RoleName.GlobalAdmin.ToString(), RoleName.TechnicalManager.ToString()],
+            RemediationWorkflowStage.Execution =>
+                [RoleName.GlobalAdmin.ToString(), RoleName.TechnicalManager.ToString()],
+            _ => [],
+        };
+
+    private static string? ExpectedTeamName(
+        RemediationWorkflowStage stage,
+        RemediationWorkflow? workflow,
+        string? softwareOwnerTeamName
+    ) =>
+        stage switch
+        {
+            RemediationWorkflowStage.Verification when workflow?.ProposedOutcome is not RemediationOutcome.RiskAcceptance and not RemediationOutcome.AlternateMitigation =>
+                softwareOwnerTeamName ?? DefaultTeamHelper.DefaultTeamName,
+            RemediationWorkflowStage.RemediationDecision =>
+                softwareOwnerTeamName ?? DefaultTeamHelper.DefaultTeamName,
+            _ => null,
         };
 
     private static string StageId(RemediationWorkflowStage stage) =>

@@ -678,21 +678,71 @@ function StageRemediationDecisionPanel({
   onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string) => Promise<void>
 }) {
   const latestRecommendation = data.recommendations[0] ?? null
+  const rejectedDecision = data.currentDecision?.approvalStatus === 'Rejected'
 
-  if (!data.currentDecision) {
+  if (!data.currentDecision || rejectedDecision) {
     return (
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
         <div className="space-y-4">
-          <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              No remediation decision has been recorded yet. The software owner team now chooses how the organization should handle this software-wide exposure.
-            </p>
-          </div>
+          {rejectedDecision && data.currentDecision ? (
+            <>
+              <div className="rounded-2xl border border-destructive/40 bg-destructive/6 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-full border border-destructive/30 bg-destructive/10 p-2 text-destructive">
+                    <XCircle className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-destructive">
+                      Approval was rejected
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-foreground/90">
+                      {data.currentDecision.latestRejection?.comment?.trim()
+                        ? data.currentDecision.latestRejection.comment
+                        : 'The approver rejected this remediation decision without leaving a written comment.'}
+                    </p>
+                    {data.currentDecision.latestRejection?.rejectedAt ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Rejected {formatDateTime(data.currentDecision.latestRejection.rejectedAt)}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-destructive/30 bg-background/70 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(data.currentDecision.outcome))}`}>
+                    {outcomeLabel(data.currentDecision.outcome)}
+                  </span>
+                  <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(approvalStatusTone(data.currentDecision.approvalStatus))}`}>
+                    {approvalStatusLabel(data.currentDecision.approvalStatus)}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-foreground/90">
+                  {data.currentDecision.justification || 'No justification was provided for this decision.'}
+                </p>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Update this decision below or resubmit the same posture if it is still the correct remediation choice.
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                No remediation decision has been recorded yet. The software owner team now chooses how the organization should handle this software-wide exposure.
+              </p>
+            </div>
+          )}
           <DecisionForm
             tenantSoftwareId={tenantSoftwareId}
             workflowId={workflowId}
             queryKey={queryKey}
             readOnly={!canActOnCurrentStage}
+            initialOutcome={data.currentDecision?.outcome}
+            initialJustification={data.currentDecision?.justification}
+            initialExpiryDate={data.currentDecision?.expiryDate}
+            initialReEvaluationDate={data.currentDecision?.reEvaluationDate}
+            submitLabel={rejectedDecision ? 'Update Decision' : 'Submit Decision'}
           />
         </div>
         <div className="space-y-3">
@@ -700,9 +750,13 @@ function StageRemediationDecisionPanel({
             recommendation={latestRecommendation}
           />
           <StageMetricCard
-            label="Analyst guidance"
-            value={latestRecommendation ? 'Available' : 'Missing'}
-            detail={latestRecommendation ? 'Security recommendation available to inform the decision' : 'No security recommendation has been recorded yet'}
+            label={rejectedDecision ? 'Resubmission mode' : 'Analyst guidance'}
+            value={rejectedDecision ? 'Editable' : latestRecommendation ? 'Available' : 'Missing'}
+            detail={rejectedDecision
+              ? 'The owner team can revise the decision immediately after a rejected approval.'
+              : latestRecommendation
+                ? 'Security recommendation available to inform the decision'
+                : 'No security recommendation has been recorded yet'}
           />
           <StageMetricCard
             label="Current pressure"
@@ -997,7 +1051,13 @@ function DecisionSummaryPanel({
             <span className="block font-medium text-foreground">Decided</span>
             {formatDateTime(decision.decidedAt)}
           </div>
-          {decision.approvedAt ? (
+          {isRejected && decision.latestRejection?.rejectedAt ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-3">
+              <span className="block font-medium text-destructive">Rejected</span>
+              {formatDateTime(decision.latestRejection.rejectedAt)}
+            </div>
+          ) : null}
+          {decision.approvedAt && !isRejected ? (
             <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-3">
               <span className="block font-medium text-foreground">Approved</span>
               {formatDateTime(decision.approvedAt)}
@@ -1061,15 +1121,17 @@ function DecisionSummaryPanel({
               </Button>
             </>
           ) : null}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onApproveReject('cancel')}
-            disabled={approving || readOnly}
-          >
-            <Ban className="mr-1.5 size-3.5" />
-            Cancel Decision
-          </Button>
+          {!isRejected ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onApproveReject('cancel')}
+              disabled={approving || readOnly}
+            >
+              <Ban className="mr-1.5 size-3.5" />
+              Cancel Decision
+            </Button>
+          ) : null}
         </div>
 
         {decision.overrides.length > 0 ? (

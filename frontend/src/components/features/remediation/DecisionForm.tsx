@@ -18,6 +18,11 @@ type DecisionFormProps = {
   workflowId?: string | null
   queryKey: readonly unknown[]
   readOnly?: boolean
+  initialOutcome?: string | null
+  initialJustification?: string | null
+  initialExpiryDate?: string | null
+  initialReEvaluationDate?: string | null
+  submitLabel?: string
 }
 
 const OUTCOMES = [
@@ -40,13 +45,18 @@ export function DecisionForm({
   workflowId,
   queryKey,
   readOnly = false,
+  initialOutcome = null,
+  initialJustification = null,
+  initialExpiryDate = null,
+  initialReEvaluationDate = null,
+  submitLabel = 'Submit Decision',
 }: DecisionFormProps) {
   const queryClient = useQueryClient()
-  const [outcome, setOutcome] = useState('')
-  const [justification, setJustification] = useState('')
-  const [expiryDate, setExpiryDate] = useState('')
+  const [outcome, setOutcome] = useState(initialOutcome ?? '')
+  const [justification, setJustification] = useState(initialJustification ?? '')
+  const [expiryDate, setExpiryDate] = useState(toDateInputValue(initialExpiryDate))
   const [expiryMode, setExpiryMode] = useState<'permanent' | 'expires'>('permanent')
-  const [reEvaluationDate, setReEvaluationDate] = useState('')
+  const [reEvaluationDate, setReEvaluationDate] = useState(toDateInputValue(initialReEvaluationDate))
   const [submitting, setSubmitting] = useState(false)
 
   const needsJustification = REQUIRES_JUSTIFICATION.has(outcome)
@@ -54,11 +64,24 @@ export function DecisionForm({
   const needsReEvaluation = REQUIRES_REEVALUATION.has(outcome)
 
   useEffect(() => {
+    setOutcome(initialOutcome ?? '')
+    setJustification(initialJustification ?? '')
+    setExpiryDate(toDateInputValue(initialExpiryDate))
+    setReEvaluationDate(toDateInputValue(initialReEvaluationDate))
+  }, [initialOutcome, initialJustification, initialExpiryDate, initialReEvaluationDate])
+
+  useEffect(() => {
     if (!needsExpiry) {
       setExpiryMode('permanent')
       setExpiryDate('')
     }
   }, [needsExpiry])
+
+  useEffect(() => {
+    if (needsExpiry) {
+      setExpiryMode(initialExpiryDate ? 'expires' : 'permanent')
+    }
+  }, [initialExpiryDate, needsExpiry])
 
   const canSubmit =
     outcome !== '' &&
@@ -92,11 +115,6 @@ export function DecisionForm({
 
   return (
     <div className="space-y-4">
-      {readOnly ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-background/50 px-4 py-3 text-sm text-muted-foreground">
-          This stage is visible in read-only mode. Only the current remediation decision owner can submit the next decision.
-        </div>
-      ) : null}
       <div className="space-y-2">
         <label className="text-sm font-medium">Outcome</label>
         <Select value={outcome} onValueChange={(v) => setOutcome(v ?? '')} disabled={readOnly}>
@@ -190,7 +208,7 @@ export function DecisionForm({
         disabled={readOnly || !canSubmit || submitting}
         className="w-full sm:w-auto"
       >
-        {submitting ? 'Submitting...' : 'Submit Decision'}
+        {submitting ? 'Submitting...' : submitLabel}
       </Button>
     </div>
   )
@@ -202,4 +220,8 @@ function toIsoDateBoundary(value: string) {
   }
 
   return `${value}T00:00:00Z`
+}
+
+function toDateInputValue(value?: string | null) {
+  return value ? value.slice(0, 10) : ''
 }

@@ -16,7 +16,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 table: "TenantSlaConfigurations",
                 type: "integer",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 24);
 
             migrationBuilder.CreateTable(
                 name: "ApprovalTasks",

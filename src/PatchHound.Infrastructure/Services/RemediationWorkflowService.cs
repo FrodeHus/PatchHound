@@ -329,6 +329,42 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
         );
     }
 
+    public async Task HandleDecisionCancelledAsync(
+        RemediationDecision decision,
+        CancellationToken ct
+    )
+    {
+        if (!decision.RemediationWorkflowId.HasValue)
+            return;
+
+        var workflow = await dbContext.RemediationWorkflows
+            .FirstOrDefaultAsync(item => item.Id == decision.RemediationWorkflowId.Value, ct);
+        if (workflow is null || workflow.Status != RemediationWorkflowStatus.Active)
+            return;
+
+        await CompleteOpenStageAsync(
+            workflow.Id,
+            workflow.CurrentStage,
+            null,
+            "Decision was cancelled and remediation returned to the software owner team for a new choice.",
+            ct
+        );
+
+        workflow.SetDecisionContext(null, workflow.Priority, RemediationWorkflowApprovalMode.None);
+        workflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+        await dbContext.RemediationWorkflowStageRecords.AddAsync(
+            RemediationWorkflowStageRecord.Create(
+                decision.TenantId,
+                workflow.Id,
+                RemediationWorkflowStage.RemediationDecision,
+                RemediationWorkflowStageStatus.InProgress,
+                assignedTeamId: workflow.SoftwareOwnerTeamId,
+                summary: "Previous decision was cancelled. The software owner team must record a new remediation decision."
+            ),
+            ct
+        );
+    }
+
     public Task AttachPatchingTaskAsync(PatchingTask task, RemediationDecision decision, CancellationToken ct)
     {
         if (decision.RemediationWorkflowId.HasValue)
