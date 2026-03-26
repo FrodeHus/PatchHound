@@ -1,8 +1,13 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Shield, Clock, Users, LayoutDashboard, Workflow } from 'lucide-react'
 
 export const Route = createFileRoute('/')({
+  beforeLoad: ({ context }) => {
+    if (context.user) {
+      throw redirect({ to: '/dashboard' })
+    }
+  },
   component: LandingPage,
 })
 

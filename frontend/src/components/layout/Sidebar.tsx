@@ -54,7 +54,7 @@ type NavGroup = {
 }
 
 const navItems: NavItem[] = [
-  { to: "/", label: "Overview", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { to: "/vulnerabilities", label: "Vulnerabilities", icon: Bug },
   {
     to: "/remediation",

@@ -9,16 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as SetupIndexRouteImport } from './routes/setup/index'
-import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthLogoutRouteImport } from './routes/auth/logout'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as ApiIngestionRunEventsRouteImport } from './routes/api/ingestion-run-events'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
+import { Route as AuthedDashboardRouteImport } from './routes/_authed/dashboard'
 import { Route as AuthedVulnerabilitiesIndexRouteImport } from './routes/_authed/vulnerabilities/index'
 import { Route as AuthedSoftwareIndexRouteImport } from './routes/_authed/software/index'
 import { Route as AuthedSettingsIndexRouteImport } from './routes/_authed/settings/index'
@@ -53,29 +52,19 @@ import { Route as AuthedAdminTenantsIdRouteImport } from './routes/_authed/admin
 import { Route as AuthedAdminAssetRulesNewRouteImport } from './routes/_authed/admin/asset-rules/new'
 import { Route as AuthedAdminAssetRulesIdRouteImport } from './routes/_authed/admin/asset-rules/$id'
 
+const AuthedRoute = AuthedRouteImport.update({
+  id: '/_authed',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthedRoute = AuthedRouteImport.update({
-  id: '/_authed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SetupIndexRoute = SetupIndexRouteImport.update({
   id: '/setup/',
   path: '/setup/',
   getParentRoute: () => rootRouteImport,
-} as any)
-const AuthedIndexRoute = AuthedIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AuthedRoute,
 } as any)
 const AuthLogoutRoute = AuthLogoutRouteImport.update({
   id: '/auth/logout',
@@ -101,6 +90,11 @@ const ApiEventsRoute = ApiEventsRouteImport.update({
   id: '/api/events',
   path: '/api/events',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthedDashboardRoute = AuthedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedVulnerabilitiesIndexRoute =
   AuthedVulnerabilitiesIndexRouteImport.update({
@@ -279,7 +273,7 @@ const AuthedAdminAssetRulesIdRoute = AuthedAdminAssetRulesIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/login': typeof LoginRoute
+  '/dashboard': typeof AuthedDashboardRoute
   '/api/events': typeof ApiEventsRoute
   '/api/ingestion-run-events': typeof ApiIngestionRunEventsRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -321,13 +315,13 @@ export interface FileRoutesByFullPath {
   '/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/login': typeof LoginRoute
+  '/': typeof IndexRoute
+  '/dashboard': typeof AuthedDashboardRoute
   '/api/events': typeof ApiEventsRoute
   '/api/ingestion-run-events': typeof ApiIngestionRunEventsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
-  '/': typeof IndexRoute
   '/setup': typeof SetupIndexRoute
   '/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
   '/admin/sources': typeof AuthedAdminSourcesRoute
@@ -367,13 +361,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authed': typeof AuthedRouteWithChildren
-  '/login': typeof LoginRoute
+  '/_authed/dashboard': typeof AuthedDashboardRoute
   '/api/events': typeof ApiEventsRoute
   '/api/ingestion-run-events': typeof ApiIngestionRunEventsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
-  '/_authed/': typeof AuthedIndexRoute
   '/setup/': typeof SetupIndexRoute
   '/_authed/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
   '/_authed/admin/sources': typeof AuthedAdminSourcesRoute
@@ -413,7 +406,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/login'
+    | '/dashboard'
     | '/api/events'
     | '/api/ingestion-run-events'
     | '/auth/callback'
@@ -455,13 +448,13 @@ export interface FileRouteTypes {
     | '/admin/workflows/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/login'
+    | '/'
+    | '/dashboard'
     | '/api/events'
     | '/api/ingestion-run-events'
     | '/auth/callback'
     | '/auth/login'
     | '/auth/logout'
-    | '/'
     | '/setup'
     | '/admin/security-profiles'
     | '/admin/sources'
@@ -500,13 +493,12 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authed'
-    | '/login'
+    | '/_authed/dashboard'
     | '/api/events'
     | '/api/ingestion-run-events'
     | '/auth/callback'
     | '/auth/login'
     | '/auth/logout'
-    | '/_authed/'
     | '/setup/'
     | '/_authed/admin/security-profiles'
     | '/_authed/admin/sources'
@@ -546,7 +538,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthedRoute: typeof AuthedRouteWithChildren
-  LoginRoute: typeof LoginRoute
   ApiEventsRoute: typeof ApiEventsRoute
   ApiIngestionRunEventsRoute: typeof ApiIngestionRunEventsRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
@@ -558,25 +549,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authed': {
       id: '/_authed'
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/setup/': {
@@ -585,13 +569,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/setup/'
       preLoaderRoute: typeof SetupIndexRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/_authed/': {
-      id: '/_authed/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof AuthedIndexRouteImport
-      parentRoute: typeof AuthedRoute
     }
     '/auth/logout': {
       id: '/auth/logout'
@@ -627,6 +604,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/events'
       preLoaderRoute: typeof ApiEventsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authed/dashboard': {
+      id: '/_authed/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthedDashboardRouteImport
+      parentRoute: typeof AuthedRoute
     }
     '/_authed/vulnerabilities/': {
       id: '/_authed/vulnerabilities/'
@@ -863,7 +847,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthedRouteChildren {
-  AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedDashboardRoute: typeof AuthedDashboardRoute
   AuthedAdminSecurityProfilesRoute: typeof AuthedAdminSecurityProfilesRoute
   AuthedAdminSourcesRoute: typeof AuthedAdminSourcesRoute
   AuthedAdminTeamsRoute: typeof AuthedAdminTeamsRoute
@@ -899,7 +883,7 @@ interface AuthedRouteChildren {
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
-  AuthedIndexRoute: AuthedIndexRoute,
+  AuthedDashboardRoute: AuthedDashboardRoute,
   AuthedAdminSecurityProfilesRoute: AuthedAdminSecurityProfilesRoute,
   AuthedAdminSourcesRoute: AuthedAdminSourcesRoute,
   AuthedAdminTeamsRoute: AuthedAdminTeamsRoute,
@@ -940,7 +924,6 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
-  LoginRoute: LoginRoute,
   ApiEventsRoute: ApiEventsRoute,
   ApiIngestionRunEventsRoute: ApiIngestionRunEventsRoute,
   AuthCallbackRoute: AuthCallbackRoute,
