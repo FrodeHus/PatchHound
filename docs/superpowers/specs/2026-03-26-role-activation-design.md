@@ -2,12 +2,12 @@
 
 ## Overview
 
-Users log in with a baseline "User" role granting read-only access to non-admin areas. Their assigned roles (SecurityManager, Auditor, etc.) are available but dormant until explicitly activated. This follows the principle of least privilege and prevents accidental privileged actions. All activations reset on logout.
+Users log in with a baseline "Stakeholder" role granting read-only access to non-admin areas. Their assigned roles (SecurityManager, Auditor, etc.) are available but dormant until explicitly activated. This follows the principle of least privilege and prevents accidental privileged actions. All activations reset on logout.
 
 ## Requirements
 
-- Users start each session with only the implicit "User" role (read-only)
-- Users can activate/deactivate any role assigned to them for the current tenant
+- Users start each session with the "Stakeholder" role always active (read-only, non-deactivatable)
+- Users can activate/deactivate any other role assigned to them for the current tenant
 - Multiple roles can be active simultaneously
 - The API must verify that each activated role is actually assigned to the user (security-critical)
 - Every activation and deactivation is audit-logged
@@ -35,7 +35,7 @@ A TanStack server function (in `frontend/src/api/roles.functions.ts`) that:
 3. On success, stores `activeRoles` in the frontend session and calls `session.save()`
 4. Returns the updated `CurrentUser`
 
-**Request:** `{ roles: string[] }` — the desired set of active roles. Empty array = deactivate all.
+**Request:** `{ roles: string[] }` — the desired set of active elevated roles (not including Stakeholder, which is always active). Empty array = deactivate all elevated roles.
 
 **Error handling:**
 - Backend returns `403` → role not assigned → return error to UI, don't update session
@@ -45,7 +45,7 @@ A TanStack server function (in `frontend/src/api/roles.functions.ts`) that:
 
 **New field on `SessionData`:**
 ```typescript
-activeRoles?: string[]  // defaults to undefined (= no elevated roles = User only)
+activeRoles?: string[]  // defaults to undefined (= no elevated roles = Stakeholder only)
 ```
 
 - `getCurrentUser()` returns both `roles` (all assigned) and `activeRoles` (currently elevated, defaults to `[]`)
@@ -62,7 +62,7 @@ Active roles must be sent to the backend on every API request. This happens in `
    ```
    X-Active-Roles: SecurityManager,Auditor
    ```
-   Empty or absent header = no elevated roles (User only).
+   Empty or absent header = no elevated roles (Stakeholder only).
 
 3. In `frontend/src/server/middleware.ts`, add `activeRoles` to the context passed to `next()` so server functions have access to it from the session:
    ```typescript
@@ -110,9 +110,10 @@ This ensures the backend receives the active role set on every API call and can 
 2. If the header is present and non-empty, parse it into a role list
 3. Validate each role in the header is actually assigned to the user for the current tenant (prevents header spoofing — this is security-critical)
 4. Authorize against only the validated active roles
-5. If the header is absent or empty, the user has no elevated roles — only policies with no role requirement pass
+5. **Always include Stakeholder** in the effective role set, regardless of the header. Stakeholder is permanent and cannot be deactivated.
+6. If the header is absent or empty, the user has only Stakeholder — policies requiring Stakeholder pass, all others fail.
 
-The implicit "User" base access is granted by existing policies that have no role requirements (e.g., viewing vulnerabilities read-only).
+The Stakeholder role provides baseline read-only access (viewing vulnerabilities, devices, software).
 
 **No changes needed to:**
 - Policy definitions in `Program.cs`
@@ -167,7 +168,8 @@ A modal dialog opened from the menu item.
 **Content:**
 - Title: "Activate Roles"
 - Subtitle: "Elevated roles grant additional permissions. Active roles reset when you log out."
-- List of all assigned roles for the current tenant, each with:
+- Stakeholder role shown but non-toggleable (always active, visually distinct — greyed-out toggle or "Always active" label)
+- List of all other assigned roles for the current tenant, each with:
   - Role name (e.g., "Security Manager" — display-friendly)
   - Toggle switch reflecting active state
 - Footer: muted text "Active roles reset when you log out"
@@ -179,14 +181,14 @@ A modal dialog opened from the menu item.
 - The dialog stays open so users can toggle multiple roles without re-opening
 
 **Edge cases:**
-- If the user has no assigned roles (only User), the dialog shows: "No elevated roles are assigned to your account. Contact your administrator to request role access."
+- If the user has no assigned roles beyond Stakeholder, the dialog shows only Stakeholder (always active) and a message: "No additional roles are assigned to your account. Contact your administrator to request role access."
 - If the API returns 403 (role was unassigned while dialog was open), show error toast and refresh the role list
 
 ### Role Indicator in TopNav
 
-When any elevated role is active, show a visual indicator:
+When any elevated role is active (beyond Stakeholder), show a visual indicator:
 - A small dot or badge on or near the user avatar
-- Primary color (lime) when elevated, absent when in User-only mode
+- Primary color (lime) when elevated, absent when in Stakeholder-only mode
 - Provides at-a-glance awareness of privilege level
 
 ### Frontend Role Gating Changes
@@ -203,16 +205,16 @@ The `CurrentUser` type gains a new field:
 activeRoles: string[]  // currently elevated roles
 ```
 
-### What the "User" Base Role Sees
+### What Stakeholder-Only Sees
 
-With no roles activated, users see:
+With no elevated roles activated (Stakeholder only), users see:
 - Dashboard (read-only, default view only)
 - Vulnerabilities (read-only browse)
 - Devices (read-only browse)
 - Software (read-only browse)
 - No access to: Remediation, Approvals, Audit Trail, Settings, Admin Console
 
-This matches routes/features that have no role requirement in the sidebar nav config.
+This matches routes/features that require only the Stakeholder role or no specific role in the sidebar nav config.
 
 ### GlobalAdmin Treatment
 
