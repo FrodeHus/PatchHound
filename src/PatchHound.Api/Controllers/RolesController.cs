@@ -36,6 +36,16 @@ public class RolesController : ControllerBase
         public string[] Roles { get; set; } = Array.Empty<string>();
     }
 
+    [HttpGet("assigned")]
+    public IActionResult GetAssignedRoles()
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest("No tenant selected.");
+
+        var roles = _tenantContext.GetRolesForTenant(tenantId);
+        return Ok(new { roles });
+    }
+
     [HttpPost("activate")]
     public async Task<IActionResult> Activate(
         [FromBody] ActivateRequest request,
