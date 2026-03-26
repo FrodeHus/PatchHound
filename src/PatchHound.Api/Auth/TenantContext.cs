@@ -4,6 +4,7 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Api.Auth;
 
@@ -44,7 +45,11 @@ public class TenantContext : ITenantContext
         return _rolesByTenantId.Values.SelectMany(r => r).Distinct().ToList();
     }
 
-    internal async Task InitializeAsync(HttpContext httpContext, PatchHoundDbContext dbContext)
+    internal async Task InitializeAsync(
+        HttpContext httpContext,
+        PatchHoundDbContext dbContext,
+        TeamMembershipRuleService teamMembershipRuleService
+    )
     {
         if (_initialized)
             return;
@@ -72,6 +77,10 @@ public class TenantContext : ITenantContext
                 httpContext.User?.FindFirstValue("name")
                 ?? httpContext.User?.FindFirstValue(ClaimTypes.Name)
                 ?? email;
+            var company =
+                httpContext.User?.FindFirstValue("companyName")
+                ?? httpContext.User?.FindFirstValue("company")
+                ?? httpContext.User?.FindFirstValue("organization");
 
             var user = await dbContext
                 .Users.IgnoreQueryFilters()
@@ -81,7 +90,7 @@ public class TenantContext : ITenantContext
             {
                 try
                 {
-                    user = User.Create(email.Trim(), displayName.Trim(), oid);
+                    user = User.Create(email.Trim(), displayName.Trim(), oid, company);
                     await dbContext.Users.AddAsync(user);
                     await dbContext.SaveChangesAsync();
                 }
@@ -107,25 +116,23 @@ public class TenantContext : ITenantContext
                         normalizedDisplayName,
                         StringComparison.Ordinal
                     )
+                    || !string.Equals(user.Company, string.IsNullOrWhiteSpace(company) ? null : company.Trim(), StringComparison.Ordinal)
                 )
                 {
-                    user.UpdateProfile(normalizedEmail, normalizedDisplayName);
+                    user.UpdateProfile(normalizedEmail, normalizedDisplayName, company);
                     await dbContext.SaveChangesAsync();
                 }
             }
 
+            if (!user.IsEnabled)
+            {
+                _currentUserId = user.Id;
+                _accessibleTenantIds = Array.Empty<Guid>();
+                _rolesByTenantId = [];
+                return;
+            }
+
             _currentUserId = user.Id;
-
-            var userTenantRoles = await dbContext
-                .UserTenantRoles.AsNoTracking()
-                .IgnoreQueryFilters()
-                .Where(utr => utr.UserId == _currentUserId)
-                .Select(utr => new { utr.TenantId, utr.Role })
-                .ToListAsync();
-
-            _rolesByTenantId = userTenantRoles
-                .GroupBy(r => r.TenantId)
-                .ToDictionary(g => g.Key, g => g.Select(r => r.Role).Distinct().ToList());
         }
 
         if (!string.IsNullOrWhiteSpace(tokenTenantId) && _normalizedClaimRoles.Count > 0)
@@ -136,6 +143,55 @@ public class TenantContext : ITenantContext
                 .Where(tenant => tenant.EntraTenantId == tokenTenantId)
                 .Select(tenant => tenant.Id)
                 .ToListAsync();
+
+            if (_currentUserId != Guid.Empty)
+            {
+                var existingTokenRoles = await dbContext
+                    .UserTenantRoles.IgnoreQueryFilters()
+                    .Where(role =>
+                        role.UserId == _currentUserId
+                        && internalTenantIds.Contains(role.TenantId)
+                    )
+                    .Select(role => new { role.TenantId, role.Role })
+                    .ToListAsync();
+
+                var missingRoles = internalTenantIds
+                    .SelectMany(tenantId => _normalizedClaimRoles.Select(roleName => new { tenantId, roleName }))
+                    .Where(candidate => existingTokenRoles.All(existing =>
+                        existing.TenantId != candidate.tenantId || existing.Role != candidate.roleName))
+                    .ToList();
+
+                if (missingRoles.Count > 0)
+                {
+                    await dbContext.UserTenantRoles.AddRangeAsync(
+                        missingRoles.Select(candidate =>
+                            UserTenantRole.Create(_currentUserId, candidate.tenantId, candidate.roleName)),
+                        CancellationToken.None
+                    );
+                    await dbContext.SaveChangesAsync();
+                }
+            }
+
+            if (internalTenantIds.Count > 0)
+            {
+                foreach (var tenantId in internalTenantIds)
+                {
+                    await teamMembershipRuleService.ApplyForUserAsync(tenantId, _currentUserId, CancellationToken.None);
+                }
+            }
+
+            var userTenantRoles = _currentUserId == Guid.Empty
+                ? []
+                : await dbContext
+                    .UserTenantRoles.AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Where(utr => utr.UserId == _currentUserId)
+                    .Select(utr => new { utr.TenantId, utr.Role })
+                    .ToListAsync();
+
+            _rolesByTenantId = userTenantRoles
+                .GroupBy(r => r.TenantId)
+                .ToDictionary(g => g.Key, g => g.Select(r => r.Role).Distinct().ToList());
 
             foreach (var tenantId in internalTenantIds)
             {
@@ -150,6 +206,19 @@ public class TenantContext : ITenantContext
                     .Distinct()
                     .ToList();
             }
+        }
+        else if (_currentUserId != Guid.Empty)
+        {
+            var userTenantRoles = await dbContext
+                .UserTenantRoles.AsNoTracking()
+                .IgnoreQueryFilters()
+                .Where(utr => utr.UserId == _currentUserId)
+                .Select(utr => new { utr.TenantId, utr.Role })
+                .ToListAsync();
+
+            _rolesByTenantId = userTenantRoles
+                .GroupBy(r => r.TenantId)
+                .ToDictionary(g => g.Key, g => g.Select(r => r.Role).Distinct().ToList());
         }
 
         _accessibleTenantIds = _rolesByTenantId.Keys.ToList();

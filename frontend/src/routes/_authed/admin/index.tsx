@@ -10,7 +10,7 @@ type AdminArea = {
   title: string
   description: string
   to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/sources' | '/admin/security-profiles' | '/admin/asset-rules' | '/admin/workflows'
-  roles: Array<'GlobalAdmin' | 'SecurityManager'>
+  roles: Array<'GlobalAdmin' | 'SecurityManager' | 'SecurityAnalyst' | 'AssetOwner' | 'TechnicalManager' | 'Auditor' | 'Stakeholder'>
   icon: typeof Users
 }
 
@@ -26,7 +26,7 @@ const adminAreas: AdminArea[] = [
     title: 'Assignment Groups',
     description: 'Create ownership groups and use them for asset assignment and fallback routing.',
     to: '/admin/teams',
-    roles: ['GlobalAdmin', 'SecurityManager'],
+    roles: ['GlobalAdmin', 'SecurityManager', 'SecurityAnalyst', 'AssetOwner', 'TechnicalManager', 'Auditor', 'Stakeholder'],
     icon: ShieldCheck,
   },
   {
@@ -69,7 +69,7 @@ const adminAreas: AdminArea[] = [
 function AdminLandingPage() {
   const { user } = Route.useRouteContext()
   const accessibleAreas = adminAreas.filter((area) =>
-    user.roles.some((role) => area.roles.includes(role as 'GlobalAdmin' | 'SecurityManager')),
+    user.roles.some((role) => area.roles.includes(role as 'GlobalAdmin' | 'SecurityManager' | 'SecurityAnalyst' | 'AssetOwner' | 'TechnicalManager' | 'Auditor' | 'Stakeholder')),
   )
 
   return (

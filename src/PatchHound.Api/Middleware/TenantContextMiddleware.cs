@@ -21,7 +21,8 @@ public class TenantContextMiddleware
             if (tenantContext is TenantContext tc)
             {
                 var dbContext = context.RequestServices.GetRequiredService<PatchHoundDbContext>();
-                await tc.InitializeAsync(context, dbContext);
+                var teamMembershipRuleService = context.RequestServices.GetRequiredService<PatchHound.Infrastructure.Services.TeamMembershipRuleService>();
+                await tc.InitializeAsync(context, dbContext, teamMembershipRuleService);
             }
         }
 

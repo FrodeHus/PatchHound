@@ -1,4 +1,5 @@
 using FluentAssertions;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
@@ -10,6 +11,7 @@ using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
@@ -43,7 +45,12 @@ public class TeamsControllerTests : IDisposable
             _dbContext
         );
 
-        _controller = new TeamsController(_dbContext, teamService, _tenantContext);
+        _controller = new TeamsController(
+            _dbContext,
+            teamService,
+            new TeamMembershipRuleService(_dbContext, new TeamMembershipRuleFilterBuilder()),
+            _tenantContext
+        );
     }
 
     [Fact]
@@ -115,6 +122,71 @@ public class TeamsControllerTests : IDisposable
         payload.TopRiskAssets.Should().ContainSingle();
         payload.TopRiskAssets[0].AssetId.Should().Be(asset.Id);
         payload.TopRiskAssets[0].CurrentRiskScore.Should().Be(710m);
+    }
+
+    [Fact]
+    public async Task UpsertRule_SavesMembershipRule_AndReturnsItOnGet()
+    {
+        var tenant = Tenant.Create("Contoso", "entra-contoso");
+        var team = Team.Create(_tenantId, "Operations");
+
+        await _dbContext.AddRangeAsync(tenant, team);
+        await _dbContext.SaveChangesAsync();
+
+        var filter = JsonDocument.Parse("""
+            {
+              "type": "group",
+              "operator": "AND",
+              "conditions": [
+                { "type": "condition", "field": "Email", "operator": "Contains", "value": "@contoso.com" }
+              ]
+            }
+            """).RootElement.Clone();
+
+        var updateAction = await _controller.UpsertRule(
+            team.Id,
+            new UpdateTeamMembershipRuleRequest(true, false, filter),
+            CancellationToken.None
+        );
+
+        updateAction.Result.Should().BeOfType<NoContentResult>();
+
+        var getAction = await _controller.Get(team.Id, CancellationToken.None);
+        var getResult = getAction.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var getPayload = getResult.Value.Should().BeOfType<TeamDetailDto>().Subject;
+
+        getPayload.MembershipRule.Should().NotBeNull();
+        getPayload.IsDynamic.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UpsertRule_WhenEnablingDynamicWithMembersWithoutAcknowledgement_ReturnsBadRequest()
+    {
+        var tenant = Tenant.Create("Contoso", "entra-contoso");
+        var team = Team.Create(_tenantId, "Operations");
+        var user = User.Create("owner@contoso.com", "Owner", Guid.NewGuid().ToString(), "Contoso");
+        team.AddMember(user);
+
+        await _dbContext.AddRangeAsync(tenant, team, user);
+        await _dbContext.SaveChangesAsync();
+
+        var filter = JsonDocument.Parse("""
+            {
+              "type": "group",
+              "operator": "AND",
+              "conditions": [
+                { "type": "condition", "field": "Email", "operator": "Contains", "value": "@contoso.com" }
+              ]
+            }
+            """).RootElement.Clone();
+
+        var action = await _controller.UpsertRule(
+            team.Id,
+            new UpdateTeamMembershipRuleRequest(true, false, filter),
+            CancellationToken.None
+        );
+
+        action.Result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     public void Dispose()

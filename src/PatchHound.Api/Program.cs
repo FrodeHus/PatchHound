@@ -220,6 +220,22 @@ builder.Services.AddAuthorization(options =>
     );
 
     options.AddPolicy(
+        Policies.ViewTeams,
+        policy =>
+            policy.AddRequirements(
+                new RoleRequirement(
+                    RoleName.GlobalAdmin,
+                    RoleName.SecurityManager,
+                    RoleName.SecurityAnalyst,
+                    RoleName.AssetOwner,
+                    RoleName.Stakeholder,
+                    RoleName.Auditor,
+                    RoleName.TechnicalManager
+                )
+            )
+    );
+
+    options.AddPolicy(
         Policies.ConfigureTenant,
         policy =>
             policy.AddRequirements(
@@ -254,10 +270,7 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy(
         Policies.ManageTeams,
-        policy =>
-            policy.AddRequirements(
-                new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager)
-            )
+        policy => policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin))
     );
 
     options.AddPolicy(

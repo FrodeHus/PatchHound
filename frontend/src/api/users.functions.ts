@@ -1,14 +1,18 @@
 import { createServerFn } from '@tanstack/react-start'
+import { z } from 'zod'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost, apiPut } from '@/server/api'
-import { pagedUsersSchema } from './users.schemas'
+import { pagedUserAuditSchema, pagedUsersSchema, userDetailSchema } from './users.schemas'
 import { buildFilterParams } from './utils'
-import { z } from 'zod'
 
 export const fetchUsers = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(
     z.object({
+      search: z.string().optional(),
+      role: z.string().optional(),
+      status: z.string().optional(),
+      teamId: z.string().uuid().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
     }),
@@ -17,6 +21,31 @@ export const fetchUsers = createServerFn({ method: 'GET' })
     const params = buildFilterParams(filters)
     const data = await apiGet(`/users?${params.toString()}`, context)
     return pagedUsersSchema.parse(data)
+  })
+
+export const fetchUserDetail = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ userId: z.string().uuid() }))
+  .handler(async ({ context, data: { userId } }) => {
+    const data = await apiGet(`/users/${userId}`, context)
+    return userDetailSchema.parse(data)
+  })
+
+export const fetchUserAudit = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      userId: z.string().uuid(),
+      entityType: z.string().optional(),
+      action: z.string().optional(),
+      page: z.number().optional(),
+      pageSize: z.number().optional(),
+    }),
+  )
+  .handler(async ({ context, data: { userId, ...filters } }) => {
+    const params = buildFilterParams(filters)
+    const data = await apiGet(`/users/${userId}/audit?${params.toString()}`, context)
+    return pagedUserAuditSchema.parse(data)
   })
 
 export const inviteUser = createServerFn({ method: 'POST' })
@@ -32,14 +61,19 @@ export const inviteUser = createServerFn({ method: 'POST' })
     await apiPost('/users/invite', context, payload)
   })
 
-export const updateUserRoles = createServerFn({ method: 'POST' })
+export const updateUser = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(
     z.object({
-      userId: z.string(),
-      roles: z.array(z.object({ tenantId: z.string(), role: z.string() })),
+      userId: z.string().uuid(),
+      displayName: z.string(),
+      email: z.string().email(),
+      company: z.string().nullable(),
+      isEnabled: z.boolean(),
+      roles: z.array(z.string()),
+      teamIds: z.array(z.string().uuid()),
     }),
   )
-  .handler(async ({ context, data: { userId, roles } }) => {
-    await apiPut(`/users/${userId}/roles`, context, { roles })
+  .handler(async ({ context, data: { userId, ...payload } }) => {
+    await apiPut(`/users/${userId}`, context, payload)
   })

@@ -16,6 +16,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Email).HasMaxLength(256).IsRequired();
         builder.Property(u => u.DisplayName).HasMaxLength(256).IsRequired();
         builder.Property(u => u.EntraObjectId).HasMaxLength(256).IsRequired();
+        builder.Property(u => u.Company).HasMaxLength(256);
+        builder.Property(u => u.IsEnabled).HasDefaultValue(true);
 
         builder
             .HasMany(u => u.TenantRoles)

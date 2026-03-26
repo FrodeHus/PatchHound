@@ -1,6 +1,9 @@
-import { CircleQuestionMark } from 'lucide-react'
+import { CircleQuestionMark, Plus, UserMinus } from 'lucide-react'
 import type { Asset } from '@/api/assets.schemas'
+import type { FilterGroup } from '@/api/asset-rules.schemas'
 import type { TeamDetail } from '@/api/teams.schemas'
+import type { TeamMembershipRulePreview } from '@/api/teams.schemas'
+import type { UserListItem } from '@/api/users.schemas'
 import { Link } from '@tanstack/react-router'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,9 +19,17 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { UserRuleBuilder } from './UserRuleBuilder'
 
 type AssignmentGroupDetailViewProps = {
   team: TeamDetail
+  canManageGroup: boolean
+  availableMembers: UserListItem[]
+  selectedMemberId: string
+  memberSearch: string
+  ruleFilter: FilterGroup
+  isDynamic: boolean
+  rulePreview: TeamMembershipRulePreview | null
   assets: Asset[]
   totalAssetCount: number
   assetPage: number
@@ -32,6 +43,17 @@ type AssignmentGroupDetailViewProps = {
   }
   isLoadingAssets: boolean
   isAssigningAssets: boolean
+  isUpdatingMembers: boolean
+  isPreviewingRule: boolean
+  isSavingRule: boolean
+  onMemberSearchChange: (value: string) => void
+  onSelectedMemberChange: (userId: string) => void
+  onAddMember: () => void
+  onRemoveMember: (userId: string) => void
+  onRuleFilterChange: (value: FilterGroup) => void
+  onDynamicChange: (value: boolean) => void
+  onPreviewRule: () => void
+  onSaveRule: () => void
   onFilterChange: (next: { search: string; assetType: string; criticality: string }) => void
   onAssetPageChange: (page: number) => void
   onAssetPageSizeChange: (pageSize: number) => void
@@ -42,6 +64,13 @@ type AssignmentGroupDetailViewProps = {
 
 export function AssignmentGroupDetailView({
   team,
+  canManageGroup,
+  availableMembers,
+  selectedMemberId,
+  memberSearch,
+  ruleFilter,
+  isDynamic,
+  rulePreview,
   assets,
   totalAssetCount,
   assetPage,
@@ -51,6 +80,17 @@ export function AssignmentGroupDetailView({
   filters,
   isLoadingAssets,
   isAssigningAssets,
+  isUpdatingMembers,
+  isPreviewingRule,
+  isSavingRule,
+  onMemberSearchChange,
+  onSelectedMemberChange,
+  onAddMember,
+  onRemoveMember,
+  onRuleFilterChange,
+  onDynamicChange,
+  onPreviewRule,
+  onSaveRule,
   onFilterChange,
   onAssetPageChange,
   onAssetPageSizeChange,
@@ -59,6 +99,8 @@ export function AssignmentGroupDetailView({
   onAssignSelected,
 }: AssignmentGroupDetailViewProps) {
   const allVisibleSelected = assets.length > 0 && assets.every((asset) => selectedAssetIds.includes(asset.id))
+  const selectedCandidate = availableMembers.find((member) => member.id === selectedMemberId) ?? null
+  const canManageMembersManually = canManageGroup && !team.isDynamic
 
   return (
     <section className="space-y-4">
@@ -72,6 +114,11 @@ export function AssignmentGroupDetailView({
                   {team.isDefault ? (
                     <Badge className="rounded-full border border-amber-300/60 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300">
                       Fallback
+                    </Badge>
+                  ) : null}
+                  {team.isDynamic ? (
+                    <Badge className="rounded-full border border-primary/20 bg-primary/10 text-primary hover:bg-primary/10">
+                      Dynamic
                     </Badge>
                   ) : null}
                 </div>
@@ -103,15 +150,80 @@ export function AssignmentGroupDetailView({
             </Badge>
           </div>
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Members</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Members</p>
+              {canManageGroup ? null : (
+                <Badge variant="outline" className="rounded-full border-border/70 bg-background/50 text-muted-foreground">
+                  Read-only
+                </Badge>
+              )}
+            </div>
+            {canManageMembersManually ? (
+              <InsetPanel emphasis="subtle" className="space-y-3 px-3 py-3">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
+                  <Input
+                    placeholder="Find tenant user by name or email"
+                    value={memberSearch}
+                    onChange={(event) => onMemberSearchChange(event.target.value)}
+                  />
+                  <select
+                    className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={selectedMemberId}
+                    onChange={(event) => onSelectedMemberChange(event.target.value)}
+                  >
+                    <option value="">Select user</option>
+                    {availableMembers.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.displayName} · {member.email}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    className="rounded-full"
+                    onClick={onAddMember}
+                    disabled={!selectedCandidate || isUpdatingMembers}
+                  >
+                    <Plus className="mr-2 size-4" />
+                    {isUpdatingMembers ? 'Updating...' : 'Add member'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Add tenant users to this assignment group so they can take ownership of related work.
+                </p>
+              </InsetPanel>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {team.isDynamic
+                  ? 'This group is dynamic. Membership is controlled by rules and matched users are added or removed automatically.'
+                  : 'Membership is visible to all roles. Only Global Admin can add or remove group members.'}
+              </p>
+            )}
             {team.members.length === 0 ? (
               <p className="text-sm text-muted-foreground">No members have been added yet.</p>
             ) : (
               <div className="space-y-2">
                 {team.members.map((member) => (
                   <InsetPanel key={member.userId} emphasis="subtle" className="px-3 py-2">
-                    <p className="text-sm font-medium">{member.displayName}</p>
-                    <p className="text-xs text-muted-foreground">{member.email}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">{member.displayName}</p>
+                        <p className="text-xs text-muted-foreground">{member.email}</p>
+                      </div>
+                      {canManageMembersManually ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full"
+                          onClick={() => onRemoveMember(member.userId)}
+                          disabled={isUpdatingMembers}
+                        >
+                          <UserMinus className="mr-2 size-4" />
+                          Remove
+                        </Button>
+                      ) : null}
+                    </div>
                   </InsetPanel>
                 ))}
               </div>
@@ -147,6 +259,98 @@ export function AssignmentGroupDetailView({
               </div>
             )}
           </div>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Membership Rule</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Dynamic groups automatically sync members from user profile rules.
+                </p>
+              </div>
+              {canManageGroup ? null : (
+                <Badge variant="outline" className="rounded-full border-border/70 bg-background/50 text-muted-foreground">
+                  Read-only
+                </Badge>
+              )}
+            </div>
+            <InsetPanel emphasis="subtle" className="space-y-4 px-4 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Automatic member assignment</p>
+                  <p className="text-xs text-muted-foreground">
+                    Matching users are added to the group on rule save and on future sign-ins.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    {isDynamic ? 'Dynamic' : 'Static'}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isDynamic}
+                    onClick={() => onDynamicChange(!isDynamic)}
+                    disabled={!canManageGroup}
+                    className={`relative h-7 w-12 rounded-full border transition ${
+                      isDynamic
+                        ? 'border-primary/40 bg-primary/20'
+                        : 'border-border/70 bg-background/60'
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    <span
+                      className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition ${
+                        isDynamic ? 'left-6' : 'left-0.5'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+              {team.isDynamic || isDynamic ? (
+                <UserRuleBuilder value={ruleFilter} onChange={onRuleFilterChange} readOnly={!canManageGroup} />
+              ) : (
+                <InsetPanel emphasis="subtle" className="px-3 py-3 text-sm text-muted-foreground">
+                  Turn on dynamic membership to define rule-based group membership.
+                </InsetPanel>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" className="rounded-full" onClick={onPreviewRule} disabled={isPreviewingRule}>
+                  {isPreviewingRule ? 'Previewing...' : 'Preview matches'}
+                </Button>
+                <Button type="button" className="rounded-full" onClick={onSaveRule} disabled={!canManageGroup || isSavingRule}>
+                  {isSavingRule ? 'Saving...' : isDynamic ? 'Save dynamic rule' : 'Save as static group'}
+                </Button>
+              </div>
+              {rulePreview ? (
+                <InsetPanel emphasis="subtle" className="space-y-2 px-3 py-3">
+                  <p className="text-sm font-medium">{rulePreview.count} matching users</p>
+                  {rulePreview.samples.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No current tenant users match this rule yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {rulePreview.samples.map((sample) => (
+                        <div key={sample.userId} className="flex items-start justify-between gap-3 text-sm">
+                          <div>
+                            <p className="font-medium">{sample.displayName}</p>
+                            <p className="text-xs text-muted-foreground">{sample.email}</p>
+                          </div>
+                          {sample.company ? (
+                            <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
+                              {sample.company}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </InsetPanel>
+              ) : null}
+              {team.membershipRule?.lastExecutedAt ? (
+                <p className="text-xs text-muted-foreground">
+                  Last applied at {new Date(team.membershipRule.lastExecutedAt).toLocaleString()} for {team.membershipRule.lastMatchCount ?? 0} matching users.
+                </p>
+              ) : null}
+            </InsetPanel>
+          </div>
         </CardContent>
         </Card>
 
@@ -159,9 +363,16 @@ export function AssignmentGroupDetailView({
                 Filter tenant assets, narrow the candidate set, and assign ownership in bulk.
               </p>
             </div>
-            <Badge variant="outline" className="rounded-full border-primary/30 bg-primary/10 text-primary">
-              {selectedAssetIds.length} selected
-            </Badge>
+            <div className="flex flex-wrap gap-2">
+              {canManageGroup ? null : (
+                <Badge variant="outline" className="rounded-full border-border/70 bg-background/50 text-muted-foreground">
+                  Read-only
+                </Badge>
+              )}
+              <Badge variant="outline" className="rounded-full border-primary/30 bg-primary/10 text-primary">
+                {selectedAssetIds.length} selected
+              </Badge>
+            </div>
           </div>
           <div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
             <Input
@@ -194,10 +405,10 @@ export function AssignmentGroupDetailView({
             <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{totalAssetCount} matching assets</p>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" className="rounded-full" onClick={onToggleAllVisible} disabled={assets.length === 0}>
+              <Button type="button" variant="outline" className="rounded-full" onClick={onToggleAllVisible} disabled={!canManageGroup || assets.length === 0}>
                 {allVisibleSelected ? 'Clear visible selection' : 'Select visible'}
               </Button>
-              <Button type="button" className="rounded-full" onClick={onAssignSelected} disabled={selectedAssetIds.length === 0 || isAssigningAssets}>
+              <Button type="button" className="rounded-full" onClick={onAssignSelected} disabled={!canManageGroup || selectedAssetIds.length === 0 || isAssigningAssets}>
                 {isAssigningAssets ? 'Assigning...' : 'Assign selected assets'}
               </Button>
             </div>
@@ -229,6 +440,7 @@ export function AssignmentGroupDetailView({
                           type="checkbox"
                           checked={selectedAssetIds.includes(asset.id)}
                           onChange={() => onToggleAsset(asset.id)}
+                          disabled={!canManageGroup}
                         />
                       </td>
                       <td className="px-4 py-3 pr-2">

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { pagedResponseMetaSchema } from './pagination.schemas'
+import { filterNodeSchema } from './asset-rules.schemas'
+import { isoDateTimeSchema } from './common.schemas'
 
 const rollupRiskExplanationSchema = z.object({
   score: z.number(),
@@ -31,6 +33,7 @@ export const teamSchema = z.object({
   tenantName: z.string(),
   name: z.string(),
   isDefault: z.boolean(),
+  isDynamic: z.boolean(),
   memberCount: z.number(),
   currentRiskScore: z.number().nullable(),
 })
@@ -41,6 +44,7 @@ export const teamDetailSchema = z.object({
   tenantName: z.string(),
   name: z.string(),
   isDefault: z.boolean(),
+  isDynamic: z.boolean(),
   assignedAssetCount: z.number(),
   currentRiskScore: z.number().nullable(),
   riskExplanation: rollupRiskExplanationSchema.nullable(),
@@ -57,6 +61,24 @@ export const teamDetailSchema = z.object({
     displayName: z.string(),
     email: z.string(),
   })),
+  membershipRule: z.object({
+    id: z.string().uuid(),
+    filterDefinition: filterNodeSchema,
+    createdAt: isoDateTimeSchema,
+    updatedAt: isoDateTimeSchema,
+    lastExecutedAt: isoDateTimeSchema.nullable(),
+    lastMatchCount: z.number().nullable(),
+  }).nullable(),
+})
+
+export const teamMembershipRulePreviewSchema = z.object({
+  count: z.number(),
+  samples: z.array(z.object({
+    userId: z.string().uuid(),
+    displayName: z.string(),
+    email: z.string().email(),
+    company: z.string().nullable(),
+  })),
 })
 
 export const pagedTeamsSchema = pagedResponseMetaSchema.extend({
@@ -65,3 +87,4 @@ export const pagedTeamsSchema = pagedResponseMetaSchema.extend({
 
 export type TeamItem = z.infer<typeof teamSchema>
 export type TeamDetail = z.infer<typeof teamDetailSchema>
+export type TeamMembershipRulePreview = z.infer<typeof teamMembershipRulePreviewSchema>
