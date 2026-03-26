@@ -39,7 +39,8 @@ export const Route = createFileRoute('/auth/callback')({
         await session.regenerate()
         session.accessToken = tokens.access_token
         session.tokenExpiry = Date.now() + tokens.expires_in * 1000
-        session.refreshToken = tokens.refresh_token
+        session.homeAccountId = tokens.homeAccountId
+        session.msalCache = tokens.msalCache
         session.userId = claims.oid
         session.email = claims.preferred_username
         session.displayName = claims.name

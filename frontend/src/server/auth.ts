@@ -35,17 +35,17 @@ type TokenExchangeResult = {
   expires_in: number
   id_token?: string
   claims?: IdTokenClaims
-  refresh_token?: string
+  homeAccountId?: string
+  msalCache?: string
 }
 
 type TokenRefreshResult = {
   access_token: string
   expires_in: number
-  refresh_token?: string
+  msalCache?: string
 }
 
 const GRAPH_SCOPE = 'https://graph.microsoft.com/.default'
-const TOKEN_ENDPOINT = `https://login.microsoftonline.com/${ENTRA_TENANT_ID}/oauth2/v2.0/token`
 
 export function getClaimString(
   claims: IdTokenClaims | undefined,
@@ -94,54 +94,51 @@ export async function exchangeCodeForTokens(code: string): Promise<TokenExchange
     ? result.idTokenClaims as IdTokenClaims
     : undefined
 
+  // Persist MSAL cache so refresh tokens survive server restarts
+  const msalCache = msalClient.getTokenCache().serialize()
+
   return {
     access_token: result.accessToken,
     expires_in: expiresIn,
     id_token: result.idToken,
     claims,
-    refresh_token: undefined,
+    homeAccountId: result.account?.homeAccountId,
+    msalCache,
   }
 }
 
-export async function refreshAccessTokenByRefreshToken(refreshToken: string): Promise<TokenRefreshResult> {
-  const body = new URLSearchParams({
-    client_id: ENTRA_CLIENT_ID,
-    client_secret: ENTRA_CLIENT_SECRET,
-    grant_type: 'refresh_token',
-    refresh_token: refreshToken,
-    scope: SCOPES.join(' '),
+export async function refreshAccessTokenSilent(
+  homeAccountId: string,
+  msalCache?: string,
+): Promise<TokenRefreshResult> {
+  // Restore persisted MSAL cache (survives server restarts)
+  if (msalCache) {
+    msalClient.getTokenCache().deserialize(msalCache)
+  }
+
+  const account = await msalClient.getTokenCache().getAccountByHomeId(homeAccountId)
+  if (!account) {
+    throw new Error('Token refresh failed: account not found in MSAL cache')
+  }
+
+  const result = await msalClient.acquireTokenSilent({
+    account,
+    scopes: SCOPES,
+    forceRefresh: true,
   })
 
-  const response = await fetch(TOKEN_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body,
-  })
-
-  if (!response.ok) {
-    throw new Error(`Token refresh failed: ${response.status} ${response.statusText}`)
+  if (!result?.accessToken) {
+    throw new Error('Token refresh failed: acquireTokenSilent returned no access token')
   }
 
-  const result = await response.json() as {
-    access_token?: string
-    expires_in?: number
-    refresh_token?: string
-  }
-
-  if (!result.access_token) {
-    throw new Error('Token refresh failed: access token missing')
-  }
-
-  const expiresIn = typeof result.expires_in === 'number' && result.expires_in > 0
-    ? Math.max(60, result.expires_in)
+  const expiresIn = result.expiresOn
+    ? Math.max(60, Math.floor((result.expiresOn.getTime() - Date.now()) / 1000))
     : 3600
 
   return {
-    access_token: result.access_token,
+    access_token: result.accessToken,
     expires_in: expiresIn,
-    refresh_token: result.refresh_token,
+    msalCache: msalClient.getTokenCache().serialize(),
   }
 }
 
