@@ -143,6 +143,10 @@ public class RemediationDecisionServiceTests : IDisposable
         var tasks = await _dbContext.PatchingTasks.IgnoreQueryFilters().ToListAsync();
         tasks.Should().OnlyContain(task => task.Status == PatchingTaskStatus.Completed);
 
+        var workflow = await _dbContext.RemediationWorkflows.IgnoreQueryFilters().FirstAsync();
+        workflow.Status.Should().Be(RemediationWorkflowStatus.Completed);
+        workflow.CurrentStage.Should().Be(RemediationWorkflowStage.Closure);
+
     }
 
     [Fact]
@@ -194,6 +198,90 @@ public class RemediationDecisionServiceTests : IDisposable
 
         var tasks = await _dbContext.PatchingTasks.IgnoreQueryFilters().ToListAsync();
         tasks.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ReconcileResolvedSoftwareRemediationsAsync_ClosesPendingApprovalWorkflow_WhenExposureIsGone()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var team = Team.Create(_tenantId, "Platform");
+        await _dbContext.Teams.AddAsync(team);
+
+        var devices = await _dbContext.Assets
+            .Where(item => item.AssetType == AssetType.Device)
+            .ToListAsync();
+        foreach (var device in devices)
+        {
+            device.AssignTeamOwner(team.Id);
+        }
+
+        await _dbContext.SaveChangesAsync();
+
+        var softwareAssetId = await _dbContext.NormalizedSoftwareInstallations
+            .Where(item => item.TenantSoftwareId == graph.TenantSoftware.Id)
+            .Select(item => item.SoftwareAssetId)
+            .OrderBy(id => id)
+            .FirstAsync();
+
+        var createResult = await _sut.CreateDecisionAsync(
+            _tenantId,
+            softwareAssetId,
+            RemediationOutcome.RiskAcceptance,
+            "Accept temporarily.",
+            _userId,
+            DateTimeOffset.UtcNow.AddDays(7),
+            null,
+            CancellationToken.None
+        );
+
+        createResult.IsSuccess.Should().BeTrue();
+
+        var openMatches = await _dbContext.SoftwareVulnerabilityMatches.IgnoreQueryFilters()
+            .Where(item => item.TenantId == _tenantId && item.ResolvedAt == null)
+            .ToListAsync();
+        foreach (var match in openMatches)
+        {
+            match.Resolve(DateTimeOffset.UtcNow);
+        }
+
+        var projections = await _dbContext.NormalizedSoftwareVulnerabilityProjections.IgnoreQueryFilters()
+            .Where(item => item.TenantId == _tenantId && item.TenantSoftwareId == graph.TenantSoftware.Id)
+            .ToListAsync();
+        foreach (var projection in projections)
+        {
+            projection.UpdateProjection(
+                projection.SnapshotId,
+                projection.BestMatchMethod,
+                projection.BestConfidence,
+                projection.AffectedInstallCount,
+                projection.AffectedDeviceCount,
+                projection.AffectedVersionCount,
+                projection.FirstSeenAt,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow,
+                projection.EvidenceJson
+            );
+        }
+
+        await _dbContext.SaveChangesAsync();
+
+        var closedCount = await _sut.ReconcileResolvedSoftwareRemediationsAsync(
+            _tenantId,
+            null,
+            CancellationToken.None
+        );
+
+        closedCount.Should().Be(1);
+
+        var decision = await _dbContext.RemediationDecisions.IgnoreQueryFilters().FirstAsync();
+        decision.ApprovalStatus.Should().Be(DecisionApprovalStatus.Expired);
+
+        var approvalTask = await _dbContext.ApprovalTasks.IgnoreQueryFilters().FirstAsync();
+        approvalTask.Status.Should().Be(ApprovalTaskStatus.AutoDenied);
+
+        var workflow = await _dbContext.RemediationWorkflows.IgnoreQueryFilters().FirstAsync();
+        workflow.Status.Should().Be(RemediationWorkflowStatus.Completed);
+        workflow.CurrentStage.Should().Be(RemediationWorkflowStage.Closure);
     }
 
     [Fact]

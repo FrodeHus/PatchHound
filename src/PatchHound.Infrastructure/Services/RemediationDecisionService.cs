@@ -259,19 +259,17 @@ public class RemediationDecisionService(
         CancellationToken ct
     )
     {
-        var openPatchingDecisions = await dbContext.RemediationDecisions
-            .Where(d =>
-                d.TenantId == tenantId
-                && d.Outcome == RemediationOutcome.ApprovedForPatching
-                && d.ApprovalStatus != DecisionApprovalStatus.Rejected
-                && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+        var activeWorkflows = await dbContext.RemediationWorkflows
+            .Where(workflow =>
+                workflow.TenantId == tenantId
+                && workflow.Status == RemediationWorkflowStatus.Active)
             .ToListAsync(ct);
 
-        if (openPatchingDecisions.Count == 0)
+        if (activeWorkflows.Count == 0)
             return 0;
 
-        var tenantSoftwareIds = openPatchingDecisions
-            .Select(d => d.TenantSoftwareId)
+        var tenantSoftwareIds = activeWorkflows
+            .Select(workflow => workflow.TenantSoftwareId)
             .Distinct()
             .ToList();
 
@@ -286,13 +284,22 @@ public class RemediationDecisionService(
             .Distinct()
             .ToListAsync(ct);
 
-        var decisionsToClose = openPatchingDecisions
-            .Where(d => !unresolvedTenantSoftwareIds.Contains(d.TenantSoftwareId))
+        var workflowsToClose = activeWorkflows
+            .Where(workflow => !unresolvedTenantSoftwareIds.Contains(workflow.TenantSoftwareId))
             .ToList();
 
-        if (decisionsToClose.Count == 0)
+        if (workflowsToClose.Count == 0)
             return 0;
 
+        var workflowIds = workflowsToClose.Select(workflow => workflow.Id).ToList();
+        var decisionsToClose = await dbContext.RemediationDecisions
+            .Where(d =>
+                d.TenantId == tenantId
+                && d.RemediationWorkflowId.HasValue
+                && workflowIds.Contains(d.RemediationWorkflowId.Value)
+                && d.ApprovalStatus != DecisionApprovalStatus.Rejected
+                && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+            .ToListAsync(ct);
         var decisionIds = decisionsToClose.Select(d => d.Id).ToList();
         var openTasks = await dbContext.PatchingTasks
             .Where(task =>
@@ -306,14 +313,32 @@ public class RemediationDecisionService(
             task.Complete();
         }
 
+        var pendingApprovalTasks = decisionIds.Count == 0
+            ? []
+            : await dbContext.ApprovalTasks
+                .Where(task =>
+                    task.TenantId == tenantId
+                    && decisionIds.Contains(task.RemediationDecisionId)
+                    && task.Status == ApprovalTaskStatus.Pending)
+                .ToListAsync(ct);
+
+        foreach (var task in pendingApprovalTasks)
+        {
+            task.AutoDeny();
+        }
+
         foreach (var decision in decisionsToClose)
         {
             decision.Expire();
-            await remediationWorkflowService.MarkPatchedWorkflowClosedAsync(decision, ct);
+        }
+
+        foreach (var workflow in workflowsToClose)
+        {
+            await remediationWorkflowService.MarkWorkflowClosedForResolvedExposureAsync(workflow, ct);
         }
 
         await dbContext.SaveChangesAsync(ct);
-        return decisionsToClose.Count;
+        return workflowsToClose.Count;
     }
 
     public async Task<Result<RemediationDecisionVulnerabilityOverride>> AddVulnerabilityOverrideAsync(

@@ -373,6 +373,41 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
         workflow.Complete();
     }
 
+    public async Task MarkWorkflowClosedForResolvedExposureAsync(
+        RemediationWorkflow workflow,
+        CancellationToken ct
+    )
+    {
+        if (workflow.Status != RemediationWorkflowStatus.Active)
+            return;
+
+        await CompleteOpenStageAsync(
+            workflow.Id,
+            workflow.CurrentStage,
+            null,
+            "Exposure resolved automatically during ingestion reconciliation.",
+            ct,
+            systemCompleted: true
+        );
+
+        if (workflow.CurrentStage != RemediationWorkflowStage.Closure)
+        {
+            workflow.MoveToStage(RemediationWorkflowStage.Closure);
+            await dbContext.RemediationWorkflowStageRecords.AddAsync(
+                RemediationWorkflowStageRecord.Create(
+                    workflow.TenantId,
+                    workflow.Id,
+                    RemediationWorkflowStage.Closure,
+                    RemediationWorkflowStageStatus.AutoCompleted,
+                    summary: "Remediation closed automatically after no unresolved exposure remained."
+                ),
+                ct
+            );
+        }
+
+        workflow.Complete();
+    }
+
     public async Task<Result<bool>> VerifyRecurringWorkflowAsync(
         Guid tenantId,
         Guid workflowId,
