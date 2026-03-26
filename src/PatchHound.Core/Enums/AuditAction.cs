@@ -8,4 +8,6 @@ public enum AuditAction
     Approved,
     Denied,
     AutoDenied,
+    Activated,
+    Deactivated,
 }
