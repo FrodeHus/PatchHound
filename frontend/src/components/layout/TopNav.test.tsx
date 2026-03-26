@@ -56,7 +56,7 @@ const globalAdminUser: CurrentUser = {
   email: 'admin@example.com',
   displayName: 'Global Admin',
   roles: ['GlobalAdmin'],
-  activeRoles: [],
+  activeRoles: ['GlobalAdmin'],
   tenantId: 'tenant-1',
   tenantIds: ['tenant-1'],
   requiresSetup: false,
