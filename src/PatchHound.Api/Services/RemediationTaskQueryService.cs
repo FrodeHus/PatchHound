@@ -61,6 +61,7 @@ public class RemediationTaskQueryService(
         var linkedRows = await ApplyFilters(
                 BuildLinkedTaskRowsQuery(
                     tenantId,
+                    taskId: filter.TaskId,
                     deviceAssetId: filter.DeviceAssetId,
                     tenantSoftwareId: filter.TenantSoftwareId
                 ),
@@ -328,6 +329,7 @@ public class RemediationTaskQueryService(
 
     private IQueryable<LinkedTaskDbRow> BuildLinkedTaskRowsQuery(
         Guid tenantId,
+        Guid? taskId = null,
         Guid? deviceAssetId = null,
         Guid? tenantSoftwareId = null
     )
@@ -345,6 +347,7 @@ public class RemediationTaskQueryService(
                 on installation.DeviceAssetId equals device.Id
             where task.TenantId == tenantId
                 && task.Status != PatchingTaskStatus.Completed
+                && (!taskId.HasValue || task.Id == taskId.Value)
                 && installation.TenantId == tenantId
                 && installation.IsActive
                 && (!tenantSoftwareId.HasValue || installation.TenantSoftwareId == tenantSoftwareId.Value)

@@ -1011,6 +1011,7 @@ function StageExecutionPanel({
               vendor: '',
               criticality: '',
               assetOwner: '',
+              taskId: '',
               tenantSoftwareId: data.tenantSoftwareId,
               deviceAssetId: '',
             }}

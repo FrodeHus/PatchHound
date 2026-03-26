@@ -46,6 +46,7 @@ public record RemediationTaskFilterQuery(
     string? Vendor = null,
     string? Criticality = null,
     string? AssetOwner = null,
+    Guid? TaskId = null,
     Guid? DeviceAssetId = null,
     Guid? TenantSoftwareId = null
 );

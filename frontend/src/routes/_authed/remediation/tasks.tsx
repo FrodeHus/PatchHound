@@ -11,6 +11,7 @@ const remediationTasksSearchSchema = baseListSearchSchema.extend({
   vendor: searchStringSchema,
   criticality: searchStringSchema,
   assetOwner: searchStringSchema,
+  taskId: searchStringSchema,
   tenantSoftwareId: searchStringSchema,
   deviceAssetId: searchStringSchema,
 })
@@ -94,12 +95,14 @@ function normalizeFilters(search: {
   assetOwner: string
   tenantSoftwareId: string
   deviceAssetId: string
+  taskId: string
 }) {
   return {
     search: search.search || undefined,
     vendor: search.vendor || undefined,
     criticality: search.criticality || undefined,
     assetOwner: search.assetOwner || undefined,
+    taskId: search.taskId || undefined,
     tenantSoftwareId: search.tenantSoftwareId || undefined,
     deviceAssetId: search.deviceAssetId || undefined,
   }
