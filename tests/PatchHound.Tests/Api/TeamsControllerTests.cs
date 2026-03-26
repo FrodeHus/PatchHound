@@ -189,6 +189,47 @@ public class TeamsControllerTests : IDisposable
         action.Result.Should().BeOfType<BadRequestObjectResult>();
     }
 
+    [Fact]
+    public async Task UpdateMembers_RemoveMissingMembership_IsIdempotent()
+    {
+        var tenant = Tenant.Create("Contoso", "entra-contoso");
+        var team = Team.Create(_tenantId, "Operations");
+        var user = User.Create("owner@contoso.com", "Owner", Guid.NewGuid().ToString(), "Contoso");
+
+        await _dbContext.AddRangeAsync(tenant, team, user);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.UpdateMembers(
+            team.Id,
+            new UpdateMembersRequest(user.Id, "remove"),
+            CancellationToken.None
+        );
+
+        action.Should().BeOfType<NoContentResult>();
+    }
+
+    [Fact]
+    public async Task UpdateMembers_AddExistingMembership_IsIdempotent()
+    {
+        var tenant = Tenant.Create("Contoso", "entra-contoso");
+        var team = Team.Create(_tenantId, "Operations");
+        var user = User.Create("owner@contoso.com", "Owner", Guid.NewGuid().ToString(), "Contoso");
+        team.AddMember(user);
+
+        await _dbContext.AddRangeAsync(tenant, team, user);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.UpdateMembers(
+            team.Id,
+            new UpdateMembersRequest(user.Id, "add"),
+            CancellationToken.None
+        );
+
+        action.Should().BeOfType<NoContentResult>();
+        (await _dbContext.TeamMembers.CountAsync(member => member.TeamId == team.Id && member.UserId == user.Id))
+            .Should().Be(1);
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

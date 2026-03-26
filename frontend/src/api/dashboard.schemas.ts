@@ -142,6 +142,7 @@ export const dashboardFilterOptionsSchema = z.object({
 export const ownerAssetSummarySchema = z.object({
   assetId: z.string().uuid(),
   assetName: z.string(),
+  deviceGroupName: z.string().nullable(),
   criticality: z.string(),
   currentRiskScore: z.number().nullable(),
   riskBand: z.string().nullable(),

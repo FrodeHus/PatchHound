@@ -151,6 +151,7 @@ public record OwnerDashboardSummaryDto(
 public record OwnerAssetSummaryDto(
     Guid AssetId,
     string AssetName,
+    string? DeviceGroupName,
     string Criticality,
     decimal? CurrentRiskScore,
     string? RiskBand,

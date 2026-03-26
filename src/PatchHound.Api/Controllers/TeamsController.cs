@@ -317,20 +317,36 @@ public class TeamsController : ControllerBase
         if (team.IsDynamic)
             return BadRequest(new ProblemDetails { Title = "Dynamic groups manage membership through rules and cannot be edited manually." });
 
-        var result = request.Action.ToLowerInvariant() switch
-        {
-            "add" => await _teamService.AddMemberAsync(id, request.UserId, ct),
-            "remove" => await _teamService.RemoveMemberAsync(id, request.UserId, ct),
-            _ => null,
-        };
+        var userExists = await _dbContext.Users.AsNoTracking()
+            .AnyAsync(user => user.Id == request.UserId, ct);
+        if (!userExists)
+            return BadRequest(new ProblemDetails { Title = "User not found" });
 
-        if (result is null)
+        var action = request.Action.ToLowerInvariant();
+        if (action is not ("add" or "remove"))
             return BadRequest(
                 new ProblemDetails { Title = "Invalid action. Use 'add' or 'remove'." }
             );
 
-        if (!result.IsSuccess)
-            return BadRequest(new ProblemDetails { Title = result.Error });
+        var existingMembership = await _dbContext.TeamMembers
+            .FirstOrDefaultAsync(member => member.TeamId == id && member.UserId == request.UserId, ct);
+
+        if (action == "add")
+        {
+            if (existingMembership is null)
+            {
+                await _dbContext.TeamMembers.AddAsync(TeamMember.Create(id, request.UserId), ct);
+                await _dbContext.SaveChangesAsync(ct);
+            }
+
+            return NoContent();
+        }
+
+        if (existingMembership is not null)
+        {
+            _dbContext.TeamMembers.Remove(existingMembership);
+            await _dbContext.SaveChangesAsync(ct);
+        }
 
         return NoContent();
     }
