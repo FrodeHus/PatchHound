@@ -88,11 +88,7 @@ export function RecommendationPanel({
         <p className="text-sm text-muted-foreground">No analyst recommendation has been recorded yet.</p>
       )}
 
-      {readOnly ? (
-        <p className="text-xs text-muted-foreground">
-          You can review the current recommendation here, but only the current stage owner can add or update it.
-        </p>
-      ) : showForm ? (
+      {readOnly ? null : showForm ? (
         <div className="space-y-3 rounded-lg border border-border/70 bg-background p-3">
           <div className="space-y-2">
             <label className="text-sm font-medium">Recommended Outcome</label>

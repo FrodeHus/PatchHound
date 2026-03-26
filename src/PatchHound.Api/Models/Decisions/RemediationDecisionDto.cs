@@ -41,6 +41,9 @@ public record DecisionWorkflowStateDto(
     string CurrentStageDescription,
     string CurrentActorSummary,
     bool CanActOnCurrentStage,
+    List<string> CurrentUserRoles,
+    List<string> ExpectedRoles,
+    string? ExpectedTeamName,
     bool IsRecurrence,
     bool HasActiveWorkflow,
     List<DecisionWorkflowStageDto> Stages
