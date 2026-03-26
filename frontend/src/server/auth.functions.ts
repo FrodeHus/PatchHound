@@ -66,6 +66,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       email: session.email ?? '',
       displayName: session.displayName ?? '',
       roles: session.roles ?? [],
+      activeRoles: session.activeRoles ?? [],
       tenantId: session.tenantId,
       tenantIds,
       requiresSetup: setupStatus?.requiresSetup ?? false,
