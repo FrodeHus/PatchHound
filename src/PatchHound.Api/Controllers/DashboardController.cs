@@ -668,7 +668,9 @@ public class DashboardController : ControllerBase
                 select new
                 {
                     asset.Id,
-                    asset.Name,
+                    AssetName = asset.AssetType == AssetType.Device
+                        ? asset.DeviceComputerDnsName ?? asset.Name
+                        : asset.Name,
                     asset.DeviceGroupName,
                     Criticality = asset.Criticality.ToString(),
                     CurrentRiskScore = score != null ? (decimal?)score.OverallScore : null,
@@ -709,7 +711,7 @@ public class DashboardController : ControllerBase
 
                 return new OwnerAssetSummaryDto(
                     item.Id,
-                    item.Name,
+                    item.AssetName,
                     item.DeviceGroupName,
                     item.Criticality,
                     item.CurrentRiskScore,
