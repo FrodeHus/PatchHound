@@ -104,9 +104,9 @@ export function TopNav({
     writeDashboardViewPreference(nextMode);
 
     const pathname = router.state.location.pathname;
-    if (pathname === "/") {
+    if (pathname === "/dashboard") {
       void router.navigate({
-        to: "/",
+        to: "/dashboard",
         search: (prev: Record<string, unknown>) => ({ ...prev, mode: nextMode }),
       });
     }

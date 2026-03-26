@@ -22,7 +22,7 @@ export function RouteError({ error, reset }: RouteErrorProps) {
         </p>
       </div>
       <div className="flex gap-2">
-        <Button variant="outline" onClick={() => void router.navigate({ to: '/' })}>
+        <Button variant="outline" onClick={() => void router.navigate({ to: '/dashboard' })}>
           Go home
         </Button>
         <Button onClick={() => reset ? reset() : window.location.reload()}>

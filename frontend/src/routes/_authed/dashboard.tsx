@@ -43,7 +43,7 @@ const dashboardSearchSchema = z.object({
   deviceGroup: z.string().optional().catch(undefined),
 })
 
-export const Route = createFileRoute('/_authed/')({
+export const Route = createFileRoute('/_authed/dashboard')({
   validateSearch: dashboardSearchSchema,
   component: DashboardPage,
 })

@@ -9,7 +9,7 @@ export const Route = createFileRoute('/setup/')({
   loader: async () => {
     const status = await fetchSetupStatus()
     if (!status.requiresSetup) {
-      throw redirect({ to: '/' })
+      throw redirect({ to: '/dashboard' })
     }
     try {
       const setupContext = await fetchSetupContext()
@@ -37,7 +37,7 @@ function SetupPage() {
     onSuccess: async () => {
       toast.success('Setup completed')
       await router.invalidate()
-      await router.navigate({ to: '/' })
+      await router.navigate({ to: '/dashboard' })
     },
     onError: () => {
       toast.error('Failed to complete setup')

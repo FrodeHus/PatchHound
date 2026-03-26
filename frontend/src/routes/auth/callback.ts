@@ -51,7 +51,7 @@ export const Route = createFileRoute('/auth/callback')({
         session.oauthState = undefined
         await session.save()
 
-        return redirectTo('/')
+        return redirectTo('/dashboard')
       },
     },
   },
