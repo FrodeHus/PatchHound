@@ -120,6 +120,29 @@ public class RolesControllerTests : IDisposable
         auditEntries[0].Action.Should().Be(AuditAction.Activated);
     }
 
+    [Fact]
+    public async Task Activate_EmptyArray_WritesAuditLogForDeactivation()
+    {
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Headers["X-Active-Roles"] = "SecurityManager";
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext,
+        };
+
+        _tenantContext.GetRolesForTenant(_tenantId)
+            .Returns(new List<string> { "Stakeholder", "SecurityManager" });
+
+        await _controller.Activate(
+            new RolesController.ActivateRequest { Roles = Array.Empty<string>() },
+            CancellationToken.None
+        );
+
+        var auditEntries = await _dbContext.AuditLogEntries.ToListAsync();
+        auditEntries.Should().ContainSingle();
+        auditEntries[0].Action.Should().Be(AuditAction.Deactivated);
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();
