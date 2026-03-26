@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { z } from 'zod'
 import { fetchVulnerabilities } from '@/api/vulnerabilities.functions'
 import { VulnerabilityTable } from '@/components/features/vulnerabilities/VulnerabilityTable'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { buildVulnerabilitiesListRequest, vulnerabilityQueryKeys } from '@/features/vulnerabilities/list-state'
+import { vulnerabilityStatusOptions } from '@/lib/options/vulnerabilities'
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
 import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 
 const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
   severity: searchStringSchema,
-  status: searchStringSchema,
+  status: z.string().catch(vulnerabilityStatusOptions[0]),
   source: searchStringSchema,
   recurrenceOnly: searchBooleanSchema,
   presentOnly: searchBooleanSchema.catch(true),
@@ -119,7 +121,7 @@ function VulnerabilitiesPage() {
           searchActions.updateFields({
             search: '',
             severity: '',
-            status: '',
+            status: vulnerabilityStatusOptions[0],
             source: '',
             recurrenceOnly: false,
             presentOnly: true,

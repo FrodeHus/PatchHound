@@ -27,7 +27,7 @@ public class RemediationDecisionQueryService(
         DateTimeOffset? ResolvedAt
     );
 
-    public async Task<PagedResponse<RemediationDecisionListItemDto>> ListAsync(
+    public async Task<RemediationDecisionListPageDto> ListAsync(
         Guid tenantId,
         RemediationDecisionFilterQuery filter,
         PaginationQuery pagination,
@@ -173,6 +173,18 @@ public class RemediationDecisionQueryService(
             }
 
             decisionsLookup.TryGetValue(software.Id, out var decision);
+            if (string.Equals(filter.DecisionState, "WithDecision", StringComparison.OrdinalIgnoreCase)
+                && decision is null)
+            {
+                continue;
+            }
+
+            if (string.Equals(filter.DecisionState, "NoDecision", StringComparison.OrdinalIgnoreCase)
+                && decision is not null)
+            {
+                continue;
+            }
+
             if (!string.IsNullOrWhiteSpace(filter.Outcome)
                 && !string.Equals(decision?.Outcome.ToString(), filter.Outcome, StringComparison.OrdinalIgnoreCase))
             {
@@ -236,6 +248,12 @@ public class RemediationDecisionQueryService(
         }
 
         var totalCount = items.Count;
+        var summary = new RemediationDecisionListSummaryDto(
+            totalCount,
+            items.Count(item => item.Outcome is not null),
+            items.Count(item => string.Equals(item.ApprovalStatus, DecisionApprovalStatus.PendingApproval.ToString(), StringComparison.OrdinalIgnoreCase)),
+            items.Count(item => item.Outcome is null)
+        );
         var paged = items
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
@@ -256,7 +274,18 @@ public class RemediationDecisionQueryService(
             })
             .ToList();
 
-        return new PagedResponse<RemediationDecisionListItemDto>(paged, totalCount, pagination.Page, pagination.BoundedPageSize);
+        var boundedPage = Math.Max(pagination.Page, 1);
+        var boundedPageSize = Math.Max(pagination.BoundedPageSize, 1);
+        var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)boundedPageSize);
+
+        return new RemediationDecisionListPageDto(
+            paged,
+            totalCount,
+            boundedPage,
+            boundedPageSize,
+            totalPages,
+            summary
+        );
     }
 
     public async Task<DecisionContextDto?> BuildAsync(

@@ -1,16 +1,17 @@
+import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { PagedDecisionList } from '@/api/remediation.schemas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { toneBadge } from '@/lib/tone-classes'
 import { formatDate, startCase } from '@/lib/formatting'
+import { toneBadge } from '@/lib/tone-classes'
 import { OpenEpisodeSparkline } from './OpenEpisodeSparkline'
 import {
-  outcomeLabel,
-  outcomeTone,
   approvalStatusLabel,
   approvalStatusTone,
+  outcomeLabel,
+  outcomeTone,
   riskBandTone,
   severityTone,
 } from './remediation-utils'
@@ -20,6 +21,7 @@ type Filters = {
   criticality: string
   outcome: string
   approvalStatus: string
+  decisionState: string
 }
 
 type Props = {
@@ -35,87 +37,168 @@ export function RemediationWorkbench({
   onFiltersChange,
   onPageChange,
 }: Props) {
-  const withDecision = data.items.filter((i) => i.outcome !== null)
-  const pendingCount = data.items.filter((i) => i.approvalStatus === 'PendingApproval').length
-  const noDecisionCount = data.items.filter((i) => i.outcome === null).length
+  const quickFilterLabel = filters.approvalStatus === 'PendingApproval'
+    ? 'Pending approval'
+    : filters.decisionState === 'WithDecision'
+      ? 'With decision'
+      : filters.decisionState === 'NoDecision'
+        ? 'No decision'
+        : null
 
   return (
     <section className="space-y-5">
-      <header className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
+      <header className="rounded-[28px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_45%),var(--color-card)] p-5">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.8fr)_minmax(360px,1fr)] xl:items-start">
+          <div className="space-y-3">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Remediation workbench</p>
-            <h1 className="text-3xl font-semibold tracking-[-0.04em]">Software remediation decisions</h1>
-            <p className="max-w-3xl text-sm text-muted-foreground">
-              Review remediation status across tracked software, including every active version cohort. Track decisions, approval status, risk scores, and SLA compliance.
-            </p>
+            <div className="space-y-1.5">
+              <h1 className="text-3xl font-semibold tracking-[-0.04em]">Software remediation decisions</h1>
+              <p className="max-w-3xl text-sm text-muted-foreground">
+                Review the remediation posture across tracked software and move items that still need ownership,
+                approval, or execution.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1">Tenant-wide queue</span>
+              <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1">Active exposure only</span>
+              <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1">Software-level workflow view</span>
+            </div>
           </div>
-          <div className="grid min-w-[220px] gap-3 rounded-xl border border-border/70 bg-background/50 p-4">
-            <Metric label="Software in scope" value={String(data.totalCount)} />
-            <Metric label="With decision" value={String(withDecision.length)} />
-            <Metric label="Pending approval" value={String(pendingCount)} />
-            <Metric label="No decision" value={String(noDecisionCount)} />
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Metric
+              label="Software in scope"
+              value={String(data.summary.softwareInScope)}
+              active={!filters.decisionState && !filters.approvalStatus}
+              onClick={() => onFiltersChange({ ...filters, decisionState: '', approvalStatus: '' })}
+            />
+            <Metric
+              label="With decision"
+              value={String(data.summary.withDecision)}
+              active={filters.decisionState === 'WithDecision'}
+              onClick={() =>
+                onFiltersChange({
+                  ...filters,
+                  decisionState: filters.decisionState === 'WithDecision' ? '' : 'WithDecision',
+                  approvalStatus: '',
+                })
+              }
+            />
+            <Metric
+              label="Pending approval"
+              value={String(data.summary.pendingApproval)}
+              active={filters.approvalStatus === 'PendingApproval'}
+              onClick={() =>
+                onFiltersChange({
+                  ...filters,
+                  approvalStatus: filters.approvalStatus === 'PendingApproval' ? '' : 'PendingApproval',
+                  decisionState: '',
+                })
+              }
+            />
+            <Metric
+              label="No decision"
+              value={String(data.summary.noDecision)}
+              active={filters.decisionState === 'NoDecision'}
+              onClick={() =>
+                onFiltersChange({
+                  ...filters,
+                  decisionState: filters.decisionState === 'NoDecision' ? '' : 'NoDecision',
+                  approvalStatus: '',
+                })
+              }
+            />
           </div>
         </div>
       </header>
 
       <section className="rounded-2xl border border-border/70 bg-card p-5">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
-          <Input
-            placeholder="Search software name"
-            value={filters.search}
-            onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
-          />
-          <Select
-            value={filters.criticality || '__all__'}
-            onValueChange={(value) =>
-              onFiltersChange({ ...filters, criticality: value && value !== '__all__' ? value : '' })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Criticality" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All criticalities</SelectItem>
-              <SelectItem value="Critical">Critical</SelectItem>
-              <SelectItem value="High">High</SelectItem>
-              <SelectItem value="Medium">Medium</SelectItem>
-              <SelectItem value="Low">Low</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.outcome || '__all__'}
-            onValueChange={(value) =>
-              onFiltersChange({ ...filters, outcome: value && value !== '__all__' ? value : '' })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Outcome" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All outcomes</SelectItem>
-              <SelectItem value="ApprovedForPatching">{outcomeLabel('ApprovedForPatching')}</SelectItem>
-              <SelectItem value="RiskAcceptance">{outcomeLabel('RiskAcceptance')}</SelectItem>
-              <SelectItem value="AlternateMitigation">{outcomeLabel('AlternateMitigation')}</SelectItem>
-              <SelectItem value="PatchingDeferred">{outcomeLabel('PatchingDeferred')}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.approvalStatus || '__all__'}
-            onValueChange={(value) =>
-              onFiltersChange({ ...filters, approvalStatus: value && value !== '__all__' ? value : '' })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Approval status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All statuses</SelectItem>
-              <SelectItem value="PendingApproval">Pending Approval</SelectItem>
-              <SelectItem value="Approved">Approved</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(180px,1fr))]">
+          <LabeledFilter label="Search software">
+            <Input
+              placeholder="Search software name"
+              value={filters.search}
+              onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
+            />
+          </LabeledFilter>
+
+          <LabeledFilter label="Criticality">
+            <Select
+              value={filters.criticality || 'all'}
+              onValueChange={(value) => {
+                const nextValue = value ?? 'all'
+                onFiltersChange({ ...filters, criticality: nextValue !== 'all' ? nextValue : '' })
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All criticalities" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All criticalities</SelectItem>
+                <SelectItem value="Critical">Critical</SelectItem>
+                <SelectItem value="High">High</SelectItem>
+                <SelectItem value="Medium">Medium</SelectItem>
+                <SelectItem value="Low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </LabeledFilter>
+
+          <LabeledFilter label="Decision">
+            <Select
+              value={filters.outcome || 'all'}
+              onValueChange={(value) => {
+                const nextValue = value ?? 'all'
+                onFiltersChange({ ...filters, outcome: nextValue !== 'all' ? nextValue : '' })
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All decisions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All decisions</SelectItem>
+                <SelectItem value="ApprovedForPatching">{outcomeLabel('ApprovedForPatching')}</SelectItem>
+                <SelectItem value="RiskAcceptance">{outcomeLabel('RiskAcceptance')}</SelectItem>
+                <SelectItem value="AlternateMitigation">{outcomeLabel('AlternateMitigation')}</SelectItem>
+                <SelectItem value="PatchingDeferred">{outcomeLabel('PatchingDeferred')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </LabeledFilter>
+
+          <LabeledFilter label="Approval status">
+            <Select
+              value={filters.approvalStatus || 'all'}
+              onValueChange={(value) => {
+                const nextValue = value ?? 'all'
+                onFiltersChange({ ...filters, approvalStatus: nextValue !== 'all' ? nextValue : '' })
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All approval states" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All approval states</SelectItem>
+                <SelectItem value="PendingApproval">Pending approval</SelectItem>
+                <SelectItem value="Approved">Approved</SelectItem>
+              </SelectContent>
+            </Select>
+          </LabeledFilter>
         </div>
+
+        {quickFilterLabel ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              Quick filter
+            </span>
+            <button
+              type="button"
+              onClick={() => onFiltersChange({ ...filters, decisionState: '', approvalStatus: '' })}
+              className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-foreground transition hover:border-primary/40 hover:bg-primary/15"
+            >
+              {quickFilterLabel}
+              <span className="ml-2 text-muted-foreground">Clear</span>
+            </button>
+          </div>
+        ) : null}
 
         <div className="mt-5 overflow-hidden rounded-xl border border-border/70">
           <table className="min-w-full divide-y divide-border/70 text-sm">
@@ -153,13 +236,15 @@ export function RemediationWorkbench({
                           <span className="font-medium">{startCase(item.softwareName)}</span>
                         )}
                         <div className="flex gap-1.5">
-                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(severityTone(item.criticality))}`}>
+                          <span
+                            className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(severityTone(item.criticality))}`}
+                          >
                             {item.criticality}
                           </span>
-                        {item.tenantSoftwareId ? (
-                          <Link
-                            to="/software/$id"
-                            params={{ id: item.tenantSoftwareId }}
+                          {item.tenantSoftwareId ? (
+                            <Link
+                              to="/software/$id"
+                              params={{ id: item.tenantSoftwareId }}
                               search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
                               className="text-[10px] text-muted-foreground hover:text-primary"
                             >
@@ -172,10 +257,14 @@ export function RemediationWorkbench({
                     <td className="px-4 py-3">
                       {item.outcome ? (
                         <div className="space-y-1">
-                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(outcomeTone(item.outcome))}`}>
+                          <span
+                            className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(outcomeTone(item.outcome))}`}
+                          >
                             {outcomeLabel(item.outcome)}
                           </span>
-                          <span className={`ml-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(approvalStatusTone(item.approvalStatus!))}`}>
+                          <span
+                            className={`ml-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(approvalStatusTone(item.approvalStatus!))}`}
+                          >
                             {approvalStatusLabel(item.approvalStatus!)}
                           </span>
                           {item.decidedAt ? (
@@ -199,7 +288,9 @@ export function RemediationWorkbench({
                     </td>
                     <td className="px-4 py-3">
                       {item.riskBand ? (
-                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${toneBadge(riskBandTone(item.riskBand))}`}>
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${toneBadge(riskBandTone(item.riskBand))}`}
+                        >
                           {item.riskBand} ({item.riskScore?.toFixed(0)})
                         </span>
                       ) : (
@@ -209,7 +300,9 @@ export function RemediationWorkbench({
                     <td className="px-4 py-3">
                       {item.slaStatus ? (
                         <div className="space-y-0.5">
-                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(slaTone(item.slaStatus))}`}>
+                          <span
+                            className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(slaTone(item.slaStatus))}`}
+                          >
                             {item.slaStatus}
                           </span>
                           {item.slaDueDate ? (
@@ -261,12 +354,41 @@ export function RemediationWorkbench({
   )
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
+function Metric({
+  label,
+  value,
+  active = false,
+  onClick,
+}: {
+  label: string
+  value: string
+  active?: boolean
+  onClick?: () => void
+}) {
+  const content = (
+    <div className={`rounded-2xl border px-4 py-3 transition ${active ? 'border-primary/40 bg-primary/10' : 'border-border/70 bg-background/70'}`}>
       <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-sm font-medium">{value}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-[-0.03em]">{value}</p>
     </div>
+  )
+
+  if (!onClick) {
+    return content
+  }
+
+  return (
+    <button type="button" onClick={onClick} className="text-left">
+      {content}
+    </button>
+  )
+}
+
+function LabeledFilter({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="space-y-2">
+      <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</span>
+      {children}
+    </label>
   )
 }
 

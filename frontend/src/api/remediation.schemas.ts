@@ -148,12 +148,20 @@ export const decisionListItemSchema = z.object({
   })),
 })
 
+export const decisionListSummarySchema = z.object({
+  softwareInScope: z.number(),
+  withDecision: z.number(),
+  pendingApproval: z.number(),
+  noDecision: z.number(),
+})
+
 export const pagedDecisionListSchema = z.object({
   items: z.array(decisionListItemSchema),
   totalCount: z.number(),
   page: z.number(),
   pageSize: z.number(),
   totalPages: z.number(),
+  summary: decisionListSummarySchema,
 })
 
 export type DecisionContext = z.infer<typeof decisionContextSchema>
@@ -168,4 +176,5 @@ export type DecisionRisk = z.infer<typeof decisionRiskSchema>
 export type DecisionSla = z.infer<typeof decisionSlaSchema>
 export type VulnerabilityOverride = z.infer<typeof vulnerabilityOverrideSchema>
 export type DecisionListItem = z.infer<typeof decisionListItemSchema>
+export type DecisionListSummary = z.infer<typeof decisionListSummarySchema>
 export type PagedDecisionList = z.infer<typeof pagedDecisionListSchema>

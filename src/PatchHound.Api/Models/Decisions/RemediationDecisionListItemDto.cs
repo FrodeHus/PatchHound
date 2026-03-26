@@ -19,6 +19,22 @@ public record RemediationDecisionListItemDto(
     List<OpenEpisodeTrendPointDto> OpenEpisodeTrend
 );
 
+public record RemediationDecisionListSummaryDto(
+    int SoftwareInScope,
+    int WithDecision,
+    int PendingApproval,
+    int NoDecision
+);
+
+public record RemediationDecisionListPageDto(
+    IReadOnlyList<RemediationDecisionListItemDto> Items,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    int TotalPages,
+    RemediationDecisionListSummaryDto Summary
+);
+
 public record OpenEpisodeTrendPointDto(
     DateTimeOffset Day,
     int OpenEpisodeCount
@@ -28,5 +44,6 @@ public record RemediationDecisionFilterQuery(
     string? Search = null,
     string? Criticality = null,
     string? Outcome = null,
-    string? ApprovalStatus = null
+    string? ApprovalStatus = null,
+    string? DecisionState = null
 );
