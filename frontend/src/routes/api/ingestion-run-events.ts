@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { getSession, isTokenExpired } from '@/server/session'
-import { refreshAccessTokenByRefreshToken } from '@/server/auth'
+import { refreshAccessTokenSilent } from '@/server/auth'
 import { apiGet } from '@/server/api'
 
 type IngestionRunProgressDto = {
@@ -41,12 +41,12 @@ export const Route = createFileRoute('/api/ingestion-run-events' as never)({
           return new Response('Unauthorized', { status: 401 })
         }
 
-        if (isTokenExpired(session) && session.refreshToken) {
+        if (isTokenExpired(session) && session.homeAccountId) {
           try {
-            const tokens = await refreshAccessTokenByRefreshToken(session.refreshToken)
+            const tokens = await refreshAccessTokenSilent(session.homeAccountId, session.msalCache)
             session.accessToken = tokens.access_token
             session.tokenExpiry = Date.now() + tokens.expires_in * 1000
-            session.refreshToken = tokens.refresh_token ?? session.refreshToken
+            session.msalCache = tokens.msalCache
             await session.save()
           } catch {
             await session.destroy()

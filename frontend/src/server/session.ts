@@ -52,6 +52,8 @@ export interface SessionData {
   accessToken?: string
   tokenExpiry?: number
   refreshToken?: string
+  homeAccountId?: string
+  msalCache?: string
   userId?: string
   email?: string
   displayName?: string
@@ -145,6 +147,8 @@ class AppSession implements SessionData {
   accessToken?: string
   tokenExpiry?: number
   refreshToken?: string
+  homeAccountId?: string
+  msalCache?: string
   userId?: string
   email?: string
   displayName?: string
@@ -172,6 +176,8 @@ class AppSession implements SessionData {
       accessToken: this.accessToken,
       tokenExpiry: this.tokenExpiry,
       refreshToken: this.refreshToken,
+      homeAccountId: this.homeAccountId,
+      msalCache: this.msalCache,
       userId: this.userId,
       email: this.email,
       displayName: this.displayName,

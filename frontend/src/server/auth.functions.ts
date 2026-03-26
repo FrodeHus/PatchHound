@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { apiGet } from '@/server/api'
-import { getSession } from '@/server/session'
+import { getSession, isTokenExpired } from '@/server/session'
+import { refreshAccessTokenSilent } from '@/server/auth'
 
 type SystemStatus = {
   openBaoAvailable: boolean
@@ -22,6 +23,21 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
     const session = await getSession()
 
     if (!session.accessToken || !session.userId) {
+      return null
+    }
+
+    // Refresh token if expired or about to expire
+    if (isTokenExpired(session) && session.homeAccountId) {
+      try {
+        const tokens = await refreshAccessTokenSilent(session.homeAccountId, session.msalCache)
+        session.accessToken = tokens.access_token
+        session.tokenExpiry = Date.now() + tokens.expires_in * 1000
+        session.msalCache = tokens.msalCache
+        await session.save()
+      } catch {
+        return null
+      }
+    } else if (isTokenExpired(session)) {
       return null
     }
 
