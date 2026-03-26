@@ -2882,6 +2882,69 @@ public class IngestionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessResultsAsync_SecondMiss_ResolvesEpisodeRiskAssessment_WhenProjectionIsMissing()
+    {
+        var vulnerability = VulnerabilityDefinition.Create(
+            "CVE-2025-missing-projection",
+            "Recurring vulnerability",
+            "Desc",
+            Severity.High,
+            "TestSource"
+        );
+        var asset = Asset.Create(
+            _tenantId,
+            "asset-missing-projection",
+            AssetType.Device,
+            "Server1",
+            Criticality.Medium
+        );
+        await _dbContext.VulnerabilityDefinitions.AddAsync(vulnerability);
+        var tenantVulnerability = await CreateTenantVulnerabilityAsync(vulnerability);
+        await _dbContext.Assets.AddAsync(asset);
+        await _dbContext.SaveChangesAsync();
+
+        var episode = VulnerabilityAssetEpisode.Create(
+            _tenantId,
+            tenantVulnerability.Id,
+            asset.Id,
+            1,
+            DateTimeOffset.UtcNow.AddDays(-1)
+        );
+        episode.MarkMissing();
+        await _dbContext.VulnerabilityAssetEpisodes.AddAsync(episode);
+
+        var assessment = VulnerabilityEpisodeRiskAssessment.Create(
+            _tenantId,
+            episode.Id,
+            tenantVulnerability.Id,
+            asset.Id,
+            null,
+            80m,
+            70m,
+            55m,
+            730m,
+            "High",
+            "[]",
+            VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+        );
+        await _dbContext.VulnerabilityEpisodeRiskAssessments.AddAsync(assessment);
+        await _dbContext.SaveChangesAsync();
+
+        await _service.ProcessResultsAsync(_tenantId, "TestSource", [], CancellationToken.None);
+
+        var updatedEpisode = await _dbContext
+            .VulnerabilityAssetEpisodes.IgnoreQueryFilters()
+            .SingleAsync(current => current.Id == episode.Id);
+        var updatedAssessment = await _dbContext
+            .VulnerabilityEpisodeRiskAssessments.IgnoreQueryFilters()
+            .SingleAsync(current => current.Id == assessment.Id);
+
+        updatedEpisode.Status.Should().Be(VulnerabilityStatus.Resolved);
+        updatedEpisode.ResolvedAt.Should().NotBeNull();
+        updatedAssessment.ResolvedAt.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task RunIngestionAsync_WhenNvdConfigured_QueuesEnrichmentJobsForMergedVulnerabilities()
     {
         var source = Substitute.For<IVulnerabilitySource>();
