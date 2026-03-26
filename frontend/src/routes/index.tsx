@@ -104,7 +104,7 @@ function LandingPage() {
               <div className="size-3 rounded-full bg-tone-success/40" />
               <span className="ml-2 text-xs text-muted-foreground">PatchHound Console</span>
             </div>
-            <div className="grid grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               {['Critical', 'High', 'Medium', 'Low'].map((label) => (
                 <div key={label} className="rounded-lg bg-card p-3 text-center">
                   <div className="text-xs text-muted-foreground mb-1">{label}</div>
