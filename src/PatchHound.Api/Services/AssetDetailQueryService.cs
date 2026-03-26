@@ -52,6 +52,25 @@ public class AssetDetailQueryService(
                 .FirstOrDefaultAsync(ct)
             : null;
 
+        var ownerUserName = asset.OwnerUserId is Guid ownerUserId
+            ? await dbContext.Users.AsNoTracking()
+                .Where(user => user.Id == ownerUserId)
+                .Select(user => user.DisplayName)
+                .FirstOrDefaultAsync(ct)
+            : null;
+
+        var relevantTeamIds = new[] { asset.OwnerTeamId, asset.FallbackTeamId }
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToArray();
+
+        var teamNamesById = relevantTeamIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : await dbContext.Teams.AsNoTracking()
+                .Where(team => relevantTeamIds.Contains(team.Id))
+                .ToDictionaryAsync(team => team.Id, team => team.Name, ct);
+
         var episodeRows = await dbContext
             .VulnerabilityAssetEpisodes.AsNoTracking()
             .Where(episode => episode.AssetId == assetId)
@@ -425,8 +444,15 @@ public class AssetDetailQueryService(
                 )
                 : null,
             asset.OwnerType.ToString(),
+            ownerUserName,
             asset.OwnerUserId,
+            asset.OwnerTeamId is Guid ownerTeamId
+                ? teamNamesById.GetValueOrDefault(ownerTeamId)
+                : null,
             asset.OwnerTeamId,
+            asset.FallbackTeamId is Guid fallbackTeamId
+                ? teamNamesById.GetValueOrDefault(fallbackTeamId)
+                : null,
             asset.FallbackTeamId,
             securityProfile,
             asset.DeviceComputerDnsName,

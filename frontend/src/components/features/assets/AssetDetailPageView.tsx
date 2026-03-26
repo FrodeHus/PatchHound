@@ -56,31 +56,6 @@ export function AssetDetailPageView({
   const deviceLastSeen = asset.deviceLastSeenAt
     ? formatDateTime(asset.deviceLastSeenAt)
     : "Unknown";
-  const topSummaryCards = [
-    {
-      label: asset.assetType === "Device" ? "Asset risk score" : "Current risk score",
-      value: asset.risk ? asset.risk.overallScore.toFixed(0) : "None",
-      accent: asset.risk?.riskBand ?? null,
-    },
-    {
-      label: asset.assetType === "Device" ? "Open episodes" : "Linked vulnerabilities",
-      value: asset.risk
-        ? String(asset.risk.openEpisodeCount)
-        : String(asset.vulnerabilities.length),
-      accent: null,
-    },
-    {
-      label: asset.assetType === "Device" ? "Remediation tasks" : "Installed software",
-      value:
-        asset.assetType === "Device"
-          ? String(asset.remediation?.openTaskCount ?? 0)
-          : String(asset.softwareInventory.length),
-      accent:
-        asset.assetType === "Device" && asset.remediation
-          ? `${asset.remediation.overdueTaskCount} overdue`
-          : null,
-    },
-  ];
 
   return (
     <>
@@ -94,6 +69,10 @@ export function AssetDetailPageView({
                 {asset.assetType === "Device" && asset.deviceHealthStatus ? (
                   <Pill>{asset.deviceHealthStatus}</Pill>
                 ) : null}
+                {asset.assetType === "Device" && asset.deviceGroupName ? (
+                  <Pill>{asset.deviceGroupName}</Pill>
+                ) : null}
+                {asset.risk ? <Pill>Risk {asset.risk.overallScore.toFixed(0)}</Pill> : null}
                 {asset.securityProfile ? <Pill>{asset.securityProfile.name}</Pill> : null}
               </div>
               <div className="space-y-2">
@@ -105,33 +84,33 @@ export function AssetDetailPageView({
                     ? [
                         asset.deviceOsPlatform,
                         asset.deviceOsVersion,
-                        asset.deviceGroupName,
                         `Last seen ${deviceLastSeen}`,
                       ]
                         .filter(Boolean)
                         .join(" · ")
                     : asset.description ?? getDefaultDescription(asset.assetType)}
                 </p>
+                {asset.assetType === "Device" ? (
+                  <p className="text-sm text-muted-foreground">
+                    Fallback group: {asset.fallbackTeamName ?? "None"}
+                  </p>
+                ) : null}
               </div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <MetricCard
-                  label={asset.ownerType === "Team" ? "Assignment Group" : "Owner User"}
-                  value={
-                    asset.ownerType === "Team"
-                      ? asset.ownerTeamId ?? "Unassigned"
-                      : asset.ownerUserId ?? "Unassigned"
-                  }
-                  mono
-                />
+                {asset.ownerType === "Team" ? (
+                  <MetricCard
+                    label="Assignment Group"
+                    value={asset.ownerTeamName ?? "Unassigned"}
+                  />
+                ) : null}
                 <MetricCard
                   label="Fallback Assignment Group"
-                  value={asset.fallbackTeamId ?? "None"}
-                  mono
+                  value={asset.fallbackTeamName ?? "None"}
                 />
-                {asset.assetType === "Device" ? (
+                {asset.assetType !== "Device" ? (
                   <MetricCard
-                    label="Device Group"
-                    value={asset.deviceGroupName ?? "Unknown"}
+                    label="Asset Type"
+                    value={asset.assetType}
                   />
                 ) : null}
               </div>
@@ -175,23 +154,48 @@ export function AssetDetailPageView({
               </div>
             </div>
             <div className="space-y-3 rounded-3xl border border-border/70 bg-background/60 p-4">
-              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                {topSummaryCards.map((card) => (
-                  <div
-                    key={card.label}
-                    className="rounded-2xl border border-border/70 bg-card px-4 py-3"
-                  >
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      {card.label}
+              <div className="rounded-2xl border border-border/70 bg-card px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Asset risk score
+                </p>
+                <div className="mt-2 flex items-end justify-between gap-3">
+                  <p className="text-4xl font-semibold tracking-[-0.04em]">
+                    {asset.risk ? asset.risk.overallScore.toFixed(0) : "None"}
+                  </p>
+                  {asset.risk?.riskBand ? (
+                    <Pill>{asset.risk.riskBand}</Pill>
+                  ) : null}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border/70 bg-card px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Exposure and follow-through
+                </p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Open episodes
                     </p>
-                    <p className="mt-2 text-3xl font-semibold tracking-[-0.04em]">
-                      {card.value}
+                    <p className="mt-1 text-3xl font-semibold tracking-[-0.04em]">
+                      {asset.risk ? String(asset.risk.openEpisodeCount) : String(asset.vulnerabilities.length)}
                     </p>
-                    {card.accent ? (
-                      <p className="mt-1 text-xs text-muted-foreground">{card.accent}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Remediation tasks
+                    </p>
+                    <p className="mt-1 text-3xl font-semibold tracking-[-0.04em]">
+                      {asset.assetType === "Device"
+                        ? String(asset.remediation?.openTaskCount ?? 0)
+                        : String(asset.softwareInventory.length)}
+                    </p>
+                    {asset.assetType === "Device" && asset.remediation ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {asset.remediation.overdueTaskCount} overdue
+                      </p>
                     ) : null}
                   </div>
-                ))}
+                </div>
               </div>
               <div className="rounded-2xl border border-border/70 bg-card px-4 py-3">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -277,51 +281,49 @@ export function AssetDetailPageView({
                     title="Device context"
                     description="Operational identity and health data used to understand this endpoint quickly."
                   />
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <MetricCard
-                      label="Machine Name"
-                      value={
-                        asset.deviceComputerDnsName ?? asset.name ?? "Unknown"
-                      }
+                  <div className="mt-4 grid gap-x-6 gap-y-4 md:grid-cols-2">
+                    <DefinitionItem
+                      label="Machine name"
+                      value={asset.deviceComputerDnsName ?? asset.name ?? "Unknown"}
                     />
-                    <MetricCard
-                      label="Health Status"
+                    <DefinitionItem
+                      label="Health status"
                       value={asset.deviceHealthStatus ?? "Unknown"}
                     />
-                    <MetricCard
-                      label="OS Platform"
+                    <DefinitionItem
+                      label="OS platform"
                       value={asset.deviceOsPlatform ?? "Unknown"}
                     />
-                    <MetricCard
-                      label="OS Version"
+                    <DefinitionItem
+                      label="OS version"
                       value={asset.deviceOsVersion ?? "Unknown"}
                     />
-                    <MetricCard
-                      label="Risk Score"
+                    <DefinitionItem
+                      label="Risk score"
                       value={asset.deviceRiskScore ?? "Unknown"}
                     />
-                    <MetricCard
-                      label="Last Seen"
+                    <DefinitionItem
+                      label="Last seen"
                       value={
                         asset.deviceLastSeenAt
                           ? new Date(asset.deviceLastSeenAt).toLocaleString()
                           : "Unknown"
                       }
                     />
-                    <MetricCard
-                      label="Last IP Address"
+                    <DefinitionItem
+                      label="Last IP address"
                       value={asset.deviceLastIpAddress ?? "Unknown"}
                     />
-                    <MetricCard
-                      label="Device Group"
+                    <DefinitionItem
+                      label="Device group"
                       value={asset.deviceGroupName ?? "Unknown"}
                     />
-                    <MetricCard
-                      label="Device Value"
+                    <DefinitionItem
+                      label="Device value"
                       value={asset.deviceValue ?? "Unknown"}
                     />
-                    <MetricCard
-                      label="Entra Device ID"
+                    <DefinitionItem
+                      label="Entra device ID"
                       value={asset.deviceAadDeviceId ?? "Unknown"}
                       mono
                     />
@@ -990,6 +992,27 @@ function MetricCard({ label, value, mono = false }: { label: string; value: stri
     <div className="rounded-xl border border-border/70 bg-card px-3 py-3">
       <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
       <p className={mono ? 'mt-1 break-all font-mono text-sm' : 'mt-1 text-sm font-medium'}>{value}</p>
+    </div>
+  )
+}
+
+function DefinitionItem({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string
+  value: string
+  mono?: boolean
+}) {
+  return (
+    <div className="border-b border-border/50 pb-3 last:border-b-0">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </p>
+      <p className={mono ? 'mt-1 break-all font-mono text-sm' : 'mt-1 text-sm font-medium'}>
+        {value}
+      </p>
     </div>
   )
 }
