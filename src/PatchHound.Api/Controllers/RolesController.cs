@@ -50,7 +50,7 @@ public class RolesController : ControllerBase
 
         // Validate all requested role names are valid enum values
         var invalidRoles = request.Roles
-            .Where(r => !Enum.TryParse<RoleName>(r, out _))
+            .Where(r => !Enum.TryParse<RoleName>(r, ignoreCase: true, out _))
             .ToList();
 
         if (invalidRoles.Count > 0)
@@ -78,8 +78,10 @@ public class RolesController : ControllerBase
 
         var newRoles = new HashSet<string>(request.Roles, StringComparer.OrdinalIgnoreCase);
 
-        // Activated: in new but not in previous
-        foreach (var role in newRoles.Except(previousRoles, StringComparer.OrdinalIgnoreCase))
+        var activatedRoles = newRoles.Except(previousRoles, StringComparer.OrdinalIgnoreCase).ToList();
+        var deactivatedRoles = previousRoles.Except(newRoles, StringComparer.OrdinalIgnoreCase).ToList();
+
+        foreach (var role in activatedRoles)
         {
             await _auditLogWriter.WriteAsync(
                 tenantId,
@@ -91,8 +93,7 @@ public class RolesController : ControllerBase
                 ct);
         }
 
-        // Deactivated: in previous but not in new
-        foreach (var role in previousRoles.Except(newRoles, StringComparer.OrdinalIgnoreCase))
+        foreach (var role in deactivatedRoles)
         {
             await _auditLogWriter.WriteAsync(
                 tenantId,
@@ -104,7 +105,10 @@ public class RolesController : ControllerBase
                 ct);
         }
 
-        await _dbContext.SaveChangesAsync(ct);
+        if (activatedRoles.Count > 0 || deactivatedRoles.Count > 0)
+        {
+            await _dbContext.SaveChangesAsync(ct);
+        }
 
         return Ok(new ActivateResponse { Roles = request.Roles });
     }
