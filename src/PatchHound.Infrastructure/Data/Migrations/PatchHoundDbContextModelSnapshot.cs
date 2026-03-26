@@ -1111,6 +1111,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("DeactivatedMachineCount")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Error")
                         .IsRequired()
                         .HasMaxLength(512)

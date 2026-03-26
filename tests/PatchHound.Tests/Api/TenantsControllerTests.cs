@@ -220,6 +220,7 @@ public class TenantsControllerTests : IDisposable
             2,
             10,
             5,
+            1,
             2,
             10
         );
@@ -237,6 +238,7 @@ public class TenantsControllerTests : IDisposable
             1,
             1,
             4,
+            2,
             2,
             1
         );
@@ -266,6 +268,7 @@ public class TenantsControllerTests : IDisposable
         payload.Items[1].StagedVulnerabilityCount.Should().Be(10);
         payload.Items[1].StagedSoftwareCount.Should().Be(2);
         payload.Items[1].PersistedMachineCount.Should().Be(5);
+        payload.Items[1].DeactivatedMachineCount.Should().Be(1);
     }
 
     [Fact]
@@ -293,6 +296,7 @@ public class TenantsControllerTests : IDisposable
             1,
             1,
             1,
+            0,
             1,
             1
         );
@@ -550,6 +554,7 @@ public class TenantsControllerTests : IDisposable
         var run = IngestionRun.Start(tenant.Id, source.SourceKey, DateTimeOffset.UtcNow.AddMinutes(-10));
         run.CompleteSucceeded(
             DateTimeOffset.UtcNow.AddMinutes(-9),
+            0,
             0,
             0,
             0,

@@ -500,7 +500,10 @@ function RunHistoryCard({
         <RunMetric label="Staged machines" value={run.stagedMachineCount} />
         <RunMetric label="Staged vulnerabilities" value={run.stagedVulnerabilityCount} />
         <RunMetric label="Staged software" value={run.stagedSoftwareCount} />
-        <RunMetric label="Persisted machines" value={run.persistedMachineCount} />
+        <RunMetric
+          label="Persisted machines"
+          value={`${run.persistedMachineCount} / ${run.deactivatedMachineCount} deactivated`}
+        />
         <RunMetric label="Persisted vulnerabilities" value={run.persistedVulnerabilityCount} />
         <RunMetric label="Persisted software" value={run.persistedSoftwareCount} />
       </div>
@@ -575,7 +578,7 @@ function getFilterLabel(filter: Exclude<RunFilter, 'all'>) {
   }
 }
 
-function RunMetric({ label, value }: { label: string; value: number }) {
+function RunMetric({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-xl border border-border/60 bg-background/30 px-3 py-2">
       <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
