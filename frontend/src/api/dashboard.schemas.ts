@@ -151,10 +151,11 @@ export const ownerAssetSummarySchema = z.object({
 })
 
 export const ownerActionSchema = z.object({
-  assetId: z.string().uuid(),
+  tenantSoftwareId: z.string().uuid(),
   tenantVulnerabilityId: z.string().uuid(),
   taskId: z.string().uuid().nullable(),
-  assetName: z.string(),
+  softwareName: z.string(),
+  ownerTeamName: z.string(),
   externalId: z.string(),
   title: z.string(),
   softwareNames: z.array(z.string()),

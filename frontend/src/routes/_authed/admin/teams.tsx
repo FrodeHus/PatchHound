@@ -70,36 +70,42 @@ function TeamsPage() {
     },
   })
 
-  const detailMutation = useMutation({
-    mutationFn: async (teamId: string) => fetchTeamDetail({ data: { teamId } }),
-    onError: () => {
+  const teamDetailQuery = useQuery({
+    queryKey: ['team-detail', effectiveTeamId],
+    queryFn: () => fetchTeamDetail({ data: { teamId: effectiveTeamId! } }),
+    enabled: Boolean(effectiveTeamId),
+  })
+
+  useEffect(() => {
+    if (teamDetailQuery.error) {
       setDetailState('error')
       toast.error('Failed to load assignment group details')
-    },
-  })
-  const { mutateAsync: fetchDetailAsync } = detailMutation
+    }
+  }, [teamDetailQuery.error])
 
-  const assetsMutation = useMutation({
-    mutationFn: async (payload: {
-      tenantId: string
-      search: string
-      assetType: string
-      criticality: string
-      page: number
-      pageSize: number
-    }) =>
+  const assetsQuery = useQuery({
+    queryKey: [
+      'team-detail-assets',
+      teamDetailQuery.data?.tenantId,
+      filters.search,
+      filters.assetType,
+      filters.criticality,
+      assetPage,
+      assetPageSize,
+    ],
+    queryFn: () =>
       fetchAssets({
         data: {
-          tenantId: payload.tenantId,
-          search: payload.search || undefined,
-          assetType: payload.assetType || undefined,
-          criticality: payload.criticality || undefined,
-          page: payload.page,
-          pageSize: payload.pageSize,
+          tenantId: teamDetailQuery.data!.tenantId,
+          search: filters.search || undefined,
+          assetType: filters.assetType || undefined,
+          criticality: filters.criticality || undefined,
+          page: assetPage,
+          pageSize: assetPageSize,
         },
       }),
+    enabled: Boolean(teamDetailQuery.data?.tenantId),
   })
-  const { mutateAsync: fetchAssetsAsync } = assetsMutation
 
   const assignAssetsMutation = useMutation({
     mutationFn: async (payload: { assetIds: string[]; teamId: string }) =>
@@ -113,9 +119,6 @@ function TeamsPage() {
     onSuccess: async () => {
       setSelectedAssetIds([])
       toast.success('Assets assigned')
-      if (effectiveTeamId) {
-        await fetchDetailAsync(effectiveTeamId)
-      }
       await router.invalidate()
     },
     onError: () => {
@@ -125,37 +128,10 @@ function TeamsPage() {
 
   const selectTeam = useCallback((teamId: string | null) => {
     setSelectedTeamId(teamId)
-    if (teamId) {
-      setDetailState('idle')
-      setAssetPage(1)
-      setSelectedAssetIds([])
-      void fetchDetailAsync(teamId)
-    }
-  }, [fetchDetailAsync])
-
-  // Fetch detail for the initial/fallback team selection
-  useEffect(() => {
-    if (!effectiveTeamId || detailMutation.data || detailMutation.isPending) {
-      return
-    }
-    void fetchDetailAsync(effectiveTeamId)
-  }, [effectiveTeamId, detailMutation.data, detailMutation.isPending, fetchDetailAsync])
-
-  // Fetch assets when the detail's tenant or filter/pagination state changes
-  useEffect(() => {
-    if (!detailMutation.data?.tenantId) {
-      return
-    }
-
-    void fetchAssetsAsync({
-      tenantId: detailMutation.data.tenantId,
-      search: filters.search,
-      assetType: filters.assetType,
-      criticality: filters.criticality,
-      page: assetPage,
-      pageSize: assetPageSize,
-    })
-  }, [detailMutation.data?.tenantId, filters.search, filters.assetType, filters.criticality, assetPage, assetPageSize, fetchAssetsAsync])
+    setDetailState('idle')
+    setAssetPage(1)
+    setSelectedAssetIds([])
+  }, [])
 
   return (
     <section className="space-y-4">
@@ -201,17 +177,17 @@ function TeamsPage() {
       {detailState === 'error' ? (
         <p className="text-sm text-destructive">Failed to load assignment group details.</p>
       ) : null}
-      {detailMutation.data ? (
+      {teamDetailQuery.data ? (
         <AssignmentGroupDetailView
-          team={detailMutation.data}
-          assets={assetsMutation.data?.items ?? []}
-          totalAssetCount={assetsMutation.data?.totalCount ?? 0}
-          assetPage={assetsMutation.data?.page ?? assetPage}
-          assetPageSize={assetsMutation.data?.pageSize ?? assetPageSize}
-          assetTotalPages={assetsMutation.data?.totalPages ?? 0}
+          team={teamDetailQuery.data}
+          assets={assetsQuery.data?.items ?? []}
+          totalAssetCount={assetsQuery.data?.totalCount ?? 0}
+          assetPage={assetsQuery.data?.page ?? assetPage}
+          assetPageSize={assetsQuery.data?.pageSize ?? assetPageSize}
+          assetTotalPages={assetsQuery.data?.totalPages ?? 0}
           selectedAssetIds={selectedAssetIds}
           filters={filters}
-          isLoadingAssets={detailMutation.isPending || assetsMutation.isPending}
+          isLoadingAssets={teamDetailQuery.isLoading || assetsQuery.isLoading}
           isAssigningAssets={assignAssetsMutation.isPending}
           onFilterChange={(next) => {
             setFilters(next)
@@ -230,7 +206,7 @@ function TeamsPage() {
             )
           }}
           onToggleAllVisible={() => {
-            const visibleIds = (assetsMutation.data?.items ?? []).map((asset) => asset.id)
+            const visibleIds = (assetsQuery.data?.items ?? []).map((asset) => asset.id)
             const allVisibleSelected = visibleIds.every((id) => selectedAssetIds.includes(id))
             setSelectedAssetIds((current) =>
               allVisibleSelected

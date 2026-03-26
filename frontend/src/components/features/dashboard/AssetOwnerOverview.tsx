@@ -23,6 +23,17 @@ function summarizeSoftware(names: string[]) {
   return `${names[0]}, ${names[1]}, and ${names.length - 2} more`
 }
 
+function actionStateTone(value: string) {
+  switch (value) {
+    case 'InProgress':
+      return 'bg-blue-50 text-blue-700 border-blue-200'
+    case 'Pending':
+      return 'bg-amber-50 text-amber-700 border-amber-200'
+    default:
+      return 'bg-muted text-muted-foreground border-border'
+  }
+}
+
 export function AssetOwnerOverview({ summary, isLoading }: Props) {
   return (
     <section className="space-y-6 pb-4">
@@ -125,25 +136,28 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
               </div>
             ) : (
               summary.actions.map((item) => (
-                <div key={`${item.assetId}-${item.tenantVulnerabilityId}`} className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-4">
+                <div key={`${item.tenantSoftwareId}-${item.tenantVulnerabilityId}`} className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
                           {item.severity}
                         </Badge>
+                        <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
+                          {item.ownerTeamName}
+                        </Badge>
+                        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${actionStateTone(item.actionState)}`}>
+                          {item.actionState}
+                        </span>
                         {item.episodeRiskBand ? (
                           <span className="text-xs text-muted-foreground">{item.episodeRiskBand} risk</span>
                         ) : null}
                       </div>
                       <div className="mt-2 text-base font-medium tracking-tight">
-                        Review {summarizeSoftware(item.softwareNames)} on {item.assetName}
+                        Review {summarizeSoftware(item.softwareNames)} for {item.softwareName}
                       </div>
                       <div className="mt-1 text-sm text-muted-foreground">
                         {item.ownerSummary}
-                      </div>
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        Asset: {item.assetName}
                       </div>
                       {item.softwareNames.length > 0 ? (
                         <div className="mt-2 text-sm text-muted-foreground">
@@ -156,12 +170,29 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
                     </div>
                     <div className="text-right text-sm text-muted-foreground">
                       <div>Due {formatDueDate(item.dueDate)}</div>
-                      <div className="mt-1">{item.actionState}</div>
+                      <div className="mt-1">Assigned to {item.ownerTeamName}</div>
                     </div>
                   </div>
                   <div className="mt-3 flex gap-2">
-                    <Button size="sm" render={<Link to="/assets/$id" params={{ id: item.assetId }} />}>
-                      Open asset view
+                    <Button
+                      size="sm"
+                      render={
+                        <Link
+                          to="/remediation/tasks"
+                          search={{
+                            page: 1,
+                            pageSize: 25,
+                            search: '',
+                            vendor: '',
+                            criticality: '',
+                            assetOwner: '',
+                            tenantSoftwareId: item.tenantSoftwareId,
+                            deviceAssetId: '',
+                          }}
+                        />
+                      }
+                    >
+                      Open remediation task
                     </Button>
                     <Button size="sm" variant="outline" render={<Link to="/vulnerabilities/$id" params={{ id: item.tenantVulnerabilityId }} />}>
                       Vulnerability detail

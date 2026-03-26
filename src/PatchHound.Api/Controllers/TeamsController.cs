@@ -136,20 +136,29 @@ public class TeamsController : ControllerBase
                     .Where(asset => asset.OwnerTeamId == team.Id || asset.FallbackTeamId == team.Id),
                 score => score.AssetId,
                 asset => asset.Id,
-                (score, asset) => new TeamRiskAssetDto(
+                (score, asset) => new
+                {
                     asset.Id,
-                    asset.AssetType == PatchHound.Core.Enums.AssetType.Device
+                    AssetName = asset.AssetType == PatchHound.Core.Enums.AssetType.Device
                         ? asset.DeviceComputerDnsName ?? asset.Name
                         : asset.Name,
-                    asset.AssetType.ToString(),
-                    score.OverallScore,
+                    AssetType = asset.AssetType.ToString(),
+                    CurrentRiskScore = score.OverallScore,
                     score.MaxEpisodeRiskScore,
                     score.OpenEpisodeCount
-                )
+                }
             )
             .OrderByDescending(item => item.CurrentRiskScore)
             .ThenByDescending(item => item.OpenEpisodeCount)
             .Take(5)
+            .Select(item => new TeamRiskAssetDto(
+                item.Id,
+                item.AssetName,
+                item.AssetType,
+                item.CurrentRiskScore,
+                item.MaxEpisodeRiskScore,
+                item.OpenEpisodeCount
+            ))
             .ToListAsync(ct);
 
         return Ok(
