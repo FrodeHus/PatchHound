@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { ArrowLeft, Ban, CheckCircle, XCircle } from 'lucide-react'
+import { ArrowLeft, Ban, CheckCircle, Lock, XCircle } from 'lucide-react'
 import {
   fetchTenantSoftwareDetail,
   fetchTenantSoftwareInstallations,
@@ -25,6 +25,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { toneBadge } from '@/lib/tone-classes'
 import { formatDate, formatDateTime, formatNullableDateTime, startCase } from '@/lib/formatting'
@@ -276,6 +281,7 @@ export function SoftwareRemediationView({
         currentStageId={currentStageId}
         currentActorSummary={data.workflowState.currentActorSummary}
         canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
+        workflowState={data.workflowState}
         workflowId={workflowId}
         approving={approving}
         stageError={stageError}
@@ -427,6 +433,7 @@ function StagePanel({
   currentStageId,
   currentActorSummary,
   canActOnCurrentStage,
+  workflowState,
   workflowId,
   approving,
   stageError,
@@ -439,6 +446,7 @@ function StagePanel({
   currentStageId: RemediationStageId
   currentActorSummary: string
   canActOnCurrentStage: boolean
+  workflowState: DecisionContext['workflowState']
   workflowId: string | null
   approving: boolean
   stageError: string | null
@@ -448,27 +456,20 @@ function StagePanel({
   return (
     <Card className="rounded-[1.8rem] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_58%),var(--color-card)]">
       <CardContent className="space-y-4 pt-6">
-        <div className={`rounded-2xl border px-4 py-3 text-sm ${
-          canActOnCurrentStage
-            ? 'border-emerald-300/70 bg-emerald-500/6 text-foreground'
-            : 'border-amber-300/70 bg-amber-500/6 text-foreground'
-        }`}>
-          <p className="font-medium">
-            {canActOnCurrentStage ? 'You can complete this stage.' : 'You can review this stage, but you cannot complete it.'}
-          </p>
-          <p className="mt-1 text-muted-foreground">
-            {currentActorSummary}
-          </p>
-        </div>
+        {!canActOnCurrentStage ? (
+          <div className="flex justify-end">
+            <StageReadOnlyIndicator workflowState={workflowState} currentActorSummary={currentActorSummary} />
+          </div>
+        ) : null}
         {stageError ? (
           <div className="rounded-2xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {stageError}
           </div>
         ) : null}
         {currentStageId === 'verification' ? (
-          <StageVerificationPanel
-            data={data}
-            canActOnCurrentStage={canActOnCurrentStage}
+        <StageVerificationPanel
+          data={data}
+          canActOnCurrentStage={canActOnCurrentStage}
             approving={approving}
             onVerify={onVerify}
           />
@@ -596,15 +597,76 @@ function StageVerificationPanel({
               Choose a new decision
             </Button>
           </div>
-          {!canActOnCurrentStage ? (
-            <p className="mt-3 text-xs text-muted-foreground">
-              You can review the previous decision, but only the current stage owner can confirm or replace it.
-            </p>
-          ) : null}
         </div>
       </div>
     </div>
   )
+}
+
+function StageReadOnlyIndicator({
+  workflowState,
+  currentActorSummary,
+}: {
+  workflowState: DecisionContext['workflowState']
+  currentActorSummary: string
+}) {
+  const currentRoles = workflowState.currentUserRoles.length > 0
+    ? workflowState.currentUserRoles.map(formatRoleName).join(', ')
+    : 'No remediation role in this tenant'
+  const expectedRoles = workflowState.expectedRoles.length > 0
+    ? workflowState.expectedRoles.map(formatRoleName).join(', ')
+    : null
+
+  return (
+    <Popover>
+      <PopoverTrigger className="inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-amber-500/6 px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-amber-500/10">
+        <Lock className="size-3.5 text-amber-700" />
+        Read-only
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[320px] rounded-2xl border-border/70 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Read-only access
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-foreground/90">
+          {currentActorSummary}
+        </p>
+        <div className="mt-3 space-y-2 text-sm">
+          <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+              Your roles
+            </p>
+            <p className="mt-1 text-foreground">
+              {currentRoles}
+            </p>
+          </div>
+          {expectedRoles ? (
+            <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                Expected roles
+              </p>
+              <p className="mt-1 text-foreground">
+                {expectedRoles}
+              </p>
+            </div>
+          ) : null}
+          {workflowState.expectedTeamName ? (
+            <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                Expected team
+              </p>
+              <p className="mt-1 text-foreground">
+                {workflowState.expectedTeamName}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function formatRoleName(value: string) {
+  return value.replace(/([a-z])([A-Z])/g, '$1 $2')
 }
 
 function StageSecurityAnalysisPanel({
