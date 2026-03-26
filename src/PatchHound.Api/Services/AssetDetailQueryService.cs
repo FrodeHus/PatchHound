@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Models.Assets;
 using PatchHound.Core.Enums;
@@ -349,6 +350,8 @@ public class AssetDetailQueryService(
                 item.MediumCount,
                 item.LowCount,
                 item.OpenEpisodeCount,
+                item.FactorsJson,
+                item.CalculationVersion,
                 item.CalculatedAt,
             })
             .FirstOrDefaultAsync(ct);
@@ -383,6 +386,17 @@ public class AssetDetailQueryService(
                 assetRiskScore.MediumCount,
                 assetRiskScore.LowCount,
                 assetRiskScore.CalculatedAt,
+                ToAssetRiskExplanationDto(
+                    assetRiskScore.OverallScore,
+                    assetRiskScore.MaxEpisodeRiskScore,
+                    assetRiskScore.OpenEpisodeCount,
+                    assetRiskScore.CriticalCount,
+                    assetRiskScore.HighCount,
+                    assetRiskScore.MediumCount,
+                    assetRiskScore.LowCount,
+                    assetRiskScore.FactorsJson,
+                    assetRiskScore.CalculationVersion
+                ),
                 topDrivers
             );
         }
@@ -463,6 +477,66 @@ public class AssetDetailQueryService(
         return "Low";
     }
 
+    private static AssetRiskExplanationDto ToAssetRiskExplanationDto(
+        decimal overallScore,
+        decimal maxEpisodeRiskScore,
+        int openEpisodeCount,
+        int criticalCount,
+        int highCount,
+        int mediumCount,
+        int lowCount,
+        string factorsJson,
+        string calculationVersion
+    )
+    {
+        var factors = ParseRiskFactors(factorsJson);
+        var topThreeAverage = factors.FirstOrDefault(item => item.Name == "TopThreeAverage")?.Impact ?? 0m;
+        var criticalContribution = factors.FirstOrDefault(item => item.Name == "CriticalEpisodes")?.Impact ?? 0m;
+        var highContribution = factors.FirstOrDefault(item => item.Name == "HighEpisodes")?.Impact ?? 0m;
+        var mediumContribution = factors.FirstOrDefault(item => item.Name == "MediumEpisodes")?.Impact ?? 0m;
+        var lowContribution = factors.FirstOrDefault(item => item.Name == "LowEpisodes")?.Impact ?? 0m;
+
+        return new AssetRiskExplanationDto(
+            overallScore,
+            calculationVersion,
+            maxEpisodeRiskScore,
+            topThreeAverage,
+            Math.Round(0.7m * maxEpisodeRiskScore, 2),
+            Math.Round(0.2m * topThreeAverage, 2),
+            openEpisodeCount,
+            criticalCount,
+            highCount,
+            mediumCount,
+            lowCount,
+            criticalContribution,
+            highContribution,
+            mediumContribution,
+            lowContribution,
+            factors.Select(item => new AssetRiskExplanationFactorDto(
+                item.Name,
+                item.Description,
+                item.Impact
+            )).ToList()
+        );
+    }
+
+    private static IReadOnlyList<ParsedRiskFactor> ParseRiskFactors(string factorsJson)
+    {
+        if (string.IsNullOrWhiteSpace(factorsJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<ParsedRiskFactor>>(factorsJson) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     private static IReadOnlyList<string> RankPossibleCorrelatedSoftware(
         IReadOnlyList<SoftwareCorrelationRow> softwareRows,
         IReadOnlyDictionary<Guid, string> softwareNamesByAssetId,
@@ -486,4 +560,10 @@ public class AssetDetailQueryService(
                 .ToList()
         );
     }
+
+    private sealed record ParsedRiskFactor(
+        string Name,
+        string Description,
+        decimal Impact
+    );
 }

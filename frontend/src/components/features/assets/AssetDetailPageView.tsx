@@ -1,12 +1,20 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from "@tanstack/react-router";
-import { Loader2, RotateCcw } from 'lucide-react'
+import { CircleQuestionMark, Loader2, RotateCcw } from 'lucide-react'
 import type { AssetDetail } from '@/api/assets.schemas'
 import { Button } from '@/components/ui/button'
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
+import { formatDateTime, formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import { toneDot, toneText, type Tone } from '@/lib/tone-classes'
 
@@ -569,9 +577,14 @@ export function AssetDetailPageView({
               <div className="mt-4 space-y-3">
                 <div className="flex items-start justify-between gap-3 rounded-2xl border border-border/70 bg-background/40 px-3 py-3">
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Asset risk score
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                        Asset risk score
+                      </p>
+                      {asset.risk.explanation ? (
+                        <AssetRiskExplanationPopover asset={asset} />
+                      ) : null}
+                    </div>
                     <p className="mt-2 text-3xl font-semibold tracking-[-0.04em]">
                       {asset.risk.overallScore.toFixed(0)}
                     </p>
@@ -794,6 +807,79 @@ export function AssetDetailPageView({
       </Sheet>
     </>
   );
+}
+
+function AssetRiskExplanationPopover({ asset }: { asset: AssetDetail }) {
+  const explanation = asset.risk?.explanation
+  if (!explanation) {
+    return null
+  }
+  const calculatedAt = asset.risk!.calculatedAt
+
+  return (
+    <Popover>
+      <PopoverTrigger className="inline-flex items-center rounded-full text-muted-foreground/80 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:text-foreground">
+        <CircleQuestionMark className="size-4" />
+      </PopoverTrigger>
+      <PopoverContent side="left" align="end" sideOffset={10} className="w-[30rem] gap-3 rounded-2xl p-4">
+        <PopoverHeader>
+          <PopoverTitle>Asset risk breakdown</PopoverTitle>
+          <PopoverDescription>
+            This device score is calculated from its top unresolved episode risks and the current severity mix.
+          </PopoverDescription>
+        </PopoverHeader>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MetricCard label="Score" value={explanation.score.toFixed(0)} />
+          <MetricCard label="Formula version" value={explanation.calculationVersion} />
+          <MetricCard label="Open episodes" value={String(explanation.openEpisodeCount)} />
+          <MetricCard label="Max episode risk" value={explanation.maxEpisodeRiskScore.toFixed(0)} />
+          <MetricCard label="Top 3 average" value={explanation.topThreeAverage.toFixed(2)} />
+          <MetricCard label="Calculated at" value={formatDateTime(calculatedAt)} />
+        </div>
+
+        <div className="rounded-2xl border border-border/70 bg-background/60 p-3">
+          <p className="text-xs font-medium text-muted-foreground">
+            Formula
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-foreground/90">
+            <span className="font-medium">0.70 × max episode risk</span> + <span className="font-medium">0.20 × top 3 average</span> + severity bonuses
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <MetricCard label="Max episode contribution" value={explanation.maxEpisodeContribution.toFixed(2)} />
+            <MetricCard label="Top 3 contribution" value={explanation.topThreeContribution.toFixed(2)} />
+            <MetricCard label={`Critical (${explanation.criticalCount})`} value={explanation.criticalContribution.toFixed(2)} />
+            <MetricCard label={`High (${explanation.highCount})`} value={explanation.highContribution.toFixed(2)} />
+            <MetricCard label={`Medium (${explanation.mediumCount})`} value={explanation.mediumContribution.toFixed(2)} />
+            <MetricCard label={`Low (${explanation.lowCount})`} value={explanation.lowContribution.toFixed(2)} />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            Persisted factors
+          </p>
+          {explanation.factors.map((factor) => (
+            <div key={factor.name} className="rounded-xl border border-border/70 bg-background/60 px-3 py-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    {factor.name}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    {factor.description}
+                  </p>
+                </div>
+                <span className="text-sm font-semibold tabular-nums text-foreground">
+                  {factor.impact.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 function TabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
