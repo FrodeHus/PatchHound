@@ -67,7 +67,13 @@ public class RoleRequirementHandler : AuthorizationHandler<RoleRequirement>
         string[] headerRoles,
         IReadOnlyList<string> assignedRoles)
     {
-        var effective = new List<RoleName> { RoleName.Stakeholder };
+        var effective = new List<RoleName>();
+
+        // Stakeholder is always active when assigned — cannot be deactivated
+        if (assignedRoles.Contains(RoleName.Stakeholder.ToString(), StringComparer.OrdinalIgnoreCase))
+        {
+            effective.Add(RoleName.Stakeholder);
+        }
 
         foreach (var headerRole in headerRoles)
         {
