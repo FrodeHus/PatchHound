@@ -69,7 +69,7 @@ const adminAreas: AdminArea[] = [
 function AdminLandingPage() {
   const { user } = Route.useRouteContext()
   const accessibleAreas = adminAreas.filter((area) =>
-    user.roles.some((role) => area.roles.includes(role as 'GlobalAdmin' | 'SecurityManager' | 'SecurityAnalyst' | 'AssetOwner' | 'TechnicalManager' | 'Auditor' | 'Stakeholder')),
+    [...(user.activeRoles ?? []), 'Stakeholder'].some((role) => area.roles.includes(role as 'GlobalAdmin' | 'SecurityManager' | 'SecurityAnalyst' | 'AssetOwner' | 'TechnicalManager' | 'Auditor' | 'Stakeholder')),
   )
 
   return (
