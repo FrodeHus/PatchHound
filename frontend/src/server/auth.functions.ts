@@ -18,6 +18,10 @@ type TenantListResponse = {
   items: Array<{ id: string }>
 }
 
+type AssignedRolesResponse = {
+  roles: string[]
+}
+
 export const getCurrentUser = createServerFn({ method: 'GET' })
   .handler(async () => {
     const session = await getSession()
@@ -43,6 +47,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
 
     let systemStatus: SystemStatus | null = null
     let setupStatus: SetupStatus | null = null
+    let roles = session.roles ?? []
     let tenantIds = session.tenantIds ?? (session.tenantId ? [session.tenantId] : [])
     try {
       systemStatus = await apiGet<SystemStatus>('/system/status', {
@@ -60,6 +65,20 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       })
     } catch {
       setupStatus = null
+    }
+
+    try {
+      const assignedRoles = await apiGet<AssignedRolesResponse>('/roles/assigned', {
+        token: session.accessToken,
+        tenantId: session.tenantId,
+      })
+      if (assignedRoles.roles.length > 0) {
+        roles = assignedRoles.roles
+        session.roles = roles
+        await session.save()
+      }
+    } catch {
+      // Fall back to session roles from token claims
     }
 
     try {
@@ -81,7 +100,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       id: session.userId,
       email: session.email ?? '',
       displayName: session.displayName ?? '',
-      roles: session.roles ?? [],
+      roles,
       activeRoles: session.activeRoles ?? [],
       tenantId: session.tenantId,
       tenantIds,
