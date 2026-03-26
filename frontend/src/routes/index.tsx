@@ -30,7 +30,13 @@ function LandingPage() {
         </p>
         <div className="mt-8 flex gap-4">
           <Button size="lg" render={<a href="/auth/login" />}>Get Started</Button>
-          <Button variant="outline" size="lg" render={<a href="#features" />}>Learn More</Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+          >
+            Learn More
+          </Button>
         </div>
         <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5"><Shield className="size-4 text-primary" /> Defender Integration</span>
