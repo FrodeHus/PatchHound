@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as SetupIndexRouteImport } from './routes/setup/index'
@@ -52,6 +53,11 @@ import { Route as AuthedAdminTenantsIdRouteImport } from './routes/_authed/admin
 import { Route as AuthedAdminAssetRulesNewRouteImport } from './routes/_authed/admin/asset-rules/new'
 import { Route as AuthedAdminAssetRulesIdRouteImport } from './routes/_authed/admin/asset-rules/$id'
 
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -272,7 +278,7 @@ const AuthedAdminAssetRulesIdRoute = AuthedAdminAssetRulesIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AuthedIndexRoute
+  '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/api/events': typeof ApiEventsRoute
   '/api/ingestion-run-events': typeof ApiIngestionRunEventsRoute
@@ -321,7 +327,7 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
-  '/': typeof AuthedIndexRoute
+  '/': typeof IndexRoute
   '/setup': typeof SetupIndexRoute
   '/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
   '/admin/sources': typeof AuthedAdminSourcesRoute
@@ -359,6 +365,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
   '/api/events': typeof ApiEventsRoute
@@ -491,6 +498,7 @@ export interface FileRouteTypes {
     | '/admin/workflows'
   id:
     | '__root__'
+    | '/'
     | '/_authed'
     | '/login'
     | '/api/events'
@@ -536,6 +544,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   AuthedRoute: typeof AuthedRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiEventsRoute: typeof ApiEventsRoute
@@ -549,6 +558,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -922,6 +938,7 @@ const AuthedRouteWithChildren =
   AuthedRoute._addFileChildren(AuthedRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiEventsRoute: ApiEventsRoute,
