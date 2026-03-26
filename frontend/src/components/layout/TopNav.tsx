@@ -8,6 +8,7 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Shield,
   ShieldCheck,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -30,6 +31,8 @@ import { TenantSelector } from "@/components/layout/TenantSelector";
 import { useTenantScope } from "@/components/layout/tenant-scope";
 import type { CurrentUser } from "@/server/auth.functions";
 import { unsealOpenBao } from "@/server/system.functions";
+import { clearActiveRoles } from "@/api/roles.functions";
+import { RoleActivationDialog } from "@/components/features/roles/RoleActivationDialog";
 import { ThemeSelector } from "@/components/layout/ThemeSelector";
 import { readDashboardViewPreference, writeDashboardViewPreference, type DashboardViewMode } from "@/lib/dashboard-view";
 import {
@@ -65,11 +68,12 @@ export function TopNav({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isUnsealDialogOpen, setIsUnsealDialogOpen] = useState(false);
+  const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [dashboardViewMode, setDashboardViewMode] = useState<DashboardViewMode>("executive");
   const { selectedTenantId, setSelectedTenantId, tenants } = useTenantScope();
-  const canUnsealOpenBao = user.roles.includes("GlobalAdmin");
-  const canSwitchPortalView = user.roles.includes("GlobalAdmin");
+  const canUnsealOpenBao = (user.activeRoles ?? []).includes("GlobalAdmin");
+  const canSwitchPortalView = (user.activeRoles ?? []).includes("GlobalAdmin");
   const unsealMutation = useMutation({
     mutationFn: (keys: [string, string, string]) =>
       unsealOpenBao({ data: { keys } }),
@@ -226,6 +230,7 @@ export function TopNav({
               }
 
               setSelectedTenantId(tenantId);
+              void clearActiveRoles();
               void queryClient.invalidateQueries();
               void router.invalidate();
             }}
@@ -240,17 +245,24 @@ export function TopNav({
                 />
               }
             >
-              <Avatar className="size-7">
-                <AvatarFallback className="bg-primary/15 text-[11px] font-semibold text-primary">
-                  {getInitials(user.displayName, user.email)}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="size-7">
+                  <AvatarFallback className="bg-primary/15 text-[11px] font-semibold text-primary">
+                    {getInitials(user.displayName, user.email)}
+                  </AvatarFallback>
+                </Avatar>
+                {(user.activeRoles ?? []).length > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-lime-500 ring-2 ring-background" />
+                )}
+              </div>
               <div className="hidden text-left sm:block">
                 <p className="text-sm font-medium leading-none">
                   {user.displayName || user.email}
                 </p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {user.roles[0] ?? "Member"}
+                  {(user.activeRoles ?? []).length > 0
+                    ? `${(user.activeRoles ?? []).length} role${(user.activeRoles ?? []).length === 1 ? "" : "s"} active`
+                    : "Stakeholder"}
                 </p>
               </div>
             </DropdownMenuTrigger>
@@ -328,6 +340,16 @@ export function TopNav({
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="rounded-lg px-3 py-2"
+                onClick={() => setIsRoleDialogOpen(true)}
+              >
+                <Shield className="size-4" />
+                Activate Roles{(user.activeRoles ?? []).length > 0
+                  ? ` (${(user.activeRoles ?? []).length})`
+                  : "..."}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="rounded-lg px-3 py-2"
                 onClick={onLogout}
               >
                 <LogOut className="size-4" />
@@ -357,6 +379,11 @@ export function TopNav({
         onSubmit={(keys) => {
           unsealMutation.mutate(keys);
         }}
+      />
+      <RoleActivationDialog
+        open={isRoleDialogOpen}
+        onOpenChange={setIsRoleDialogOpen}
+        user={user}
       />
     </header>
   );
