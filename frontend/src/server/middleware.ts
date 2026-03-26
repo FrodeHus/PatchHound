@@ -58,6 +58,7 @@ export const authMiddleware = createMiddleware({ type: 'function' })
         activeTenantId,
         accessibleTenantIds,
         roles: session.roles ?? [],
+        activeRoles: session.activeRoles ?? [],
       },
     })
   })

@@ -3,6 +3,7 @@ const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:8080/api'
 export type ApiRequestContext = {
   token: string
   tenantId?: string
+  activeRoles?: string[]
 }
 
 export class ApiRequestError extends Error {
@@ -57,6 +58,10 @@ function buildHeaders(context: ApiRequestContext, includeJsonContentType = false
 
   if (context.tenantId) {
     headers['X-Tenant-Id'] = context.tenantId
+  }
+
+  if (context.activeRoles?.length) {
+    headers['X-Active-Roles'] = context.activeRoles.join(',')
   }
 
   if (includeJsonContentType) {
