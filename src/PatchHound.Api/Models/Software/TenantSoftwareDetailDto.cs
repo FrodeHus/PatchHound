@@ -24,9 +24,34 @@ public record TenantSoftwareDetailDto(
     int ActiveVulnerabilityCount,
     int VersionCount,
     decimal? ExposureImpactScore,
+    ExposureImpactExplanationDto? ExposureImpactExplanation,
     RemediationTaskSummaryDto Remediation,
     IReadOnlyList<TenantSoftwareVersionCohortDto> VersionCohorts,
     IReadOnlyList<TenantSoftwareSourceAliasDto> SourceAliases
+);
+
+public record ExposureImpactExplanationDto(
+    decimal Score,
+    string CalculationVersion,
+    int DeviceCount,
+    int HighValueDeviceCount,
+    decimal DeviceReachWeight,
+    decimal HighValueRatio,
+    decimal HighValueBonus,
+    int VulnerabilityCount,
+    decimal RawVulnerabilitySum,
+    decimal VulnerabilityComponent,
+    decimal RawScore,
+    IReadOnlyList<ExposureImpactFactorDto> VulnerabilityFactors
+);
+
+public record ExposureImpactFactorDto(
+    string ExternalId,
+    string Severity,
+    decimal? CvssScore,
+    decimal SeverityWeight,
+    decimal NormalizedScore,
+    decimal Contribution
 );
 
 public record TenantSoftwareVersionCohortDto(

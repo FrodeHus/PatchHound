@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { Link } from "@tanstack/react-router";
-import { ShieldAlert, LayoutList, Sparkles } from 'lucide-react'
+import { CircleQuestionMark, ShieldAlert, LayoutList, Sparkles } from 'lucide-react'
 import type {
   TenantSoftwareDetail,
   TenantSoftwareVulnerability,
@@ -11,6 +11,14 @@ import { SoftwareAiReportTab } from '@/components/features/software/SoftwareAiRe
 import { SoftwareDescriptionPanel } from '@/components/features/software/SoftwareDescriptionPanel'
 import { VersionCohortChooser } from '@/components/features/software/VersionCohortChooser'
 import { SoftwareRemediationView } from '@/components/features/remediation/SoftwareRemediationView'
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 import { toneBadge, toneDot, toneText } from '@/lib/tone-classes'
 import {
@@ -167,6 +175,9 @@ export function SoftwareDetailPage({
               <HeaderStat
                 label="Exposure impact"
                 value={detail.exposureImpactScore != null ? detail.exposureImpactScore.toFixed(1) : "—"}
+                info={detail.exposureImpactExplanation ? (
+                  <ImpactScoreExplanationPopover detail={detail} />
+                ) : null}
                 tone={
                   detail.exposureImpactScore == null
                     ? "neutral"
@@ -646,14 +657,19 @@ function HeaderStat({
   label,
   value,
   tone = 'neutral',
+  info,
 }: {
   label: string
   value: string
   tone?: 'neutral' | 'success' | 'info' | 'warning' | 'danger'
+  info?: ReactNode
 }) {
   return (
     <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
-      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+        {info}
+      </div>
       <p className={`mt-2 text-2xl font-semibold tracking-[-0.04em] ${toneText(tone)}`}>
         {value}
       </p>
@@ -711,4 +727,94 @@ function normalizeVersion(version: string | null) {
 
 function formatVersion(version: string | null) {
   return version && version.trim().length > 0 ? version : 'Unknown version'
+}
+
+function ImpactScoreExplanationPopover({ detail }: { detail: TenantSoftwareDetail }) {
+  const explanation = detail.exposureImpactExplanation
+  if (!explanation) {
+    return null
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger className="inline-flex items-center rounded-full text-muted-foreground/80 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:text-foreground">
+        <CircleQuestionMark className="size-4" />
+      </PopoverTrigger>
+      <PopoverContent side="left" align="end" sideOffset={10} className="w-[30rem] gap-3 rounded-2xl p-4">
+        <PopoverHeader>
+          <PopoverTitle>Exposure impact breakdown</PopoverTitle>
+          <PopoverDescription>
+            Formula {explanation.calculationVersion}. This score reflects the current software footprint in this tenant.
+          </PopoverDescription>
+        </PopoverHeader>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <BreakdownMetric label="Open vulnerabilities" value={String(explanation.vulnerabilityCount)} />
+          <BreakdownMetric label="Affected devices" value={String(explanation.deviceCount)} />
+          <BreakdownMetric label="High-value devices" value={`${explanation.highValueDeviceCount} (${(explanation.highValueRatio * 100).toFixed(0)}%)`} />
+          <BreakdownMetric label="Final score" value={explanation.score.toFixed(1)} tone="info" />
+        </div>
+
+        <div className="rounded-xl border border-border/70 bg-background/70 p-3">
+          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Calculation</p>
+          <div className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+            <p>Vulnerability sum: <span className="font-medium text-foreground">{explanation.rawVulnerabilitySum.toFixed(2)}</span></p>
+            <p>Diminished vulnerability component: <span className="font-medium text-foreground">{explanation.vulnerabilityComponent.toFixed(2)}</span></p>
+            <p>Device reach weight: <span className="font-medium text-foreground">{explanation.deviceReachWeight.toFixed(2)}</span></p>
+            <p>High-value bonus: <span className="font-medium text-foreground">{explanation.highValueBonus.toFixed(2)}</span></p>
+            <p>Raw score before clamp: <span className="font-medium text-foreground">{explanation.rawScore.toFixed(2)}</span></p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border/70 bg-background/70">
+          <div className="border-b border-border/70 px-3 py-2">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Vulnerability inputs</p>
+          </div>
+          <div className="max-h-64 overflow-auto">
+            <table className="min-w-full text-xs">
+              <thead className="sticky top-0 bg-background/95 text-left uppercase tracking-[0.12em] text-muted-foreground backdrop-blur">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Vulnerability</th>
+                  <th className="px-3 py-2 font-medium">Severity</th>
+                  <th className="px-3 py-2 font-medium">CVSS</th>
+                  <th className="px-3 py-2 font-medium">Weight</th>
+                  <th className="px-3 py-2 font-medium">Contribution</th>
+                </tr>
+              </thead>
+              <tbody>
+                {explanation.vulnerabilityFactors.map((factor) => (
+                  <tr key={factor.externalId} className="border-t border-border/60">
+                    <td className="px-3 py-2 font-medium text-foreground">{factor.externalId}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{startCase(factor.severity)}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {factor.cvssScore != null ? factor.cvssScore.toFixed(1) : factor.normalizedScore.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">{factor.severityWeight.toFixed(1)}</td>
+                    <td className="px-3 py-2 font-medium text-foreground">{factor.contribution.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function BreakdownMetric({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string
+  value: string
+  tone?: 'neutral' | 'success' | 'info' | 'warning' | 'danger'
+}) {
+  return (
+    <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2.5">
+      <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className={`mt-1.5 text-sm font-medium ${toneText(tone)}`}>{value}</p>
+    </div>
+  )
 }

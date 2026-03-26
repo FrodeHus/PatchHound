@@ -296,6 +296,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("DeviceLastSeenAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("DeviceActiveInTenant")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("DeviceOnboardingStatus")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
@@ -356,6 +361,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("SecurityProfileId");
+
+                    b.HasIndex("TenantId", "AssetType", "DeviceActiveInTenant");
 
                     b.HasIndex("TenantId");
 

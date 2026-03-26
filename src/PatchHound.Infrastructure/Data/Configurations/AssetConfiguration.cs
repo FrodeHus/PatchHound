@@ -13,6 +13,7 @@ public class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.HasIndex(a => new { a.TenantId, a.ExternalId }).IsUnique();
         builder.HasIndex(a => a.TenantId);
         builder.HasIndex(a => a.SecurityProfileId);
+        builder.HasIndex(a => new { a.TenantId, a.AssetType, a.DeviceActiveInTenant });
 
         builder.Property(a => a.ExternalId).HasMaxLength(256).IsRequired();
         builder.Property(a => a.Name).HasMaxLength(256).IsRequired();
@@ -29,6 +30,7 @@ public class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.Property(a => a.DeviceExposureLevel).HasMaxLength(64);
         builder.Property(a => a.DeviceOnboardingStatus).HasMaxLength(64);
         builder.Property(a => a.DeviceValue).HasMaxLength(64);
+        builder.Property(a => a.DeviceActiveInTenant).HasDefaultValue(true);
         builder.Property(a => a.AssetType).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.BaselineCriticality).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.Criticality).HasConversion<string>().HasMaxLength(32);

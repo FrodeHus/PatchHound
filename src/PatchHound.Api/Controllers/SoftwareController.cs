@@ -38,6 +38,12 @@ public class SoftwareController(
         DateTimeOffset? ResolvedAt
     );
 
+    private sealed record ExposureImpactVulnerabilityRow(
+        string ExternalId,
+        Severity Severity,
+        decimal? CvssScore
+    );
+
     [HttpGet("{id:guid}")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<TenantSoftwareDetailDto>> Get(
@@ -131,6 +137,39 @@ public class SoftwareController(
             .ThenBy(item => item.Version ?? string.Empty, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        var openVulnerabilityRows = await dbContext
+            .NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
+            .Where(item =>
+                item.TenantSoftwareId == id
+                && item.SnapshotId == activeSnapshotId
+                && item.ResolvedAt == null
+            )
+            .Select(item => new ExposureImpactVulnerabilityRow(
+                item.VulnerabilityDefinition.ExternalId,
+                item.VulnerabilityDefinition.VendorSeverity,
+                item.VulnerabilityDefinition.CvssScore
+            ))
+            .ToListAsync(ct);
+
+        var activeDeviceIds = activeInstallations
+            .Select(item => item.DeviceAssetId)
+            .Distinct()
+            .ToList();
+        var highValueDeviceCount = activeDeviceIds.Count == 0
+            ? 0
+            : await dbContext.Assets.AsNoTracking()
+                .Where(asset => activeDeviceIds.Contains(asset.Id))
+                .CountAsync(asset =>
+                    asset.Criticality == Criticality.High || asset.Criticality == Criticality.Critical,
+                    ct
+                );
+        var impactBreakdown = BuildExposureImpactBreakdown(
+            id,
+            activeDeviceIds.Count,
+            highValueDeviceCount,
+            openVulnerabilityRows
+        );
+
         var remediationSummary = await remediationTaskQueryService.BuildSoftwareSummaryAsync(
             currentTenantId,
             id,
@@ -159,20 +198,14 @@ public class SoftwareController(
                 activeInstallations.Count(item =>
                     openMatchSoftwareAssetIds.Contains(item.SoftwareAssetId)
                 ),
-                await dbContext
-                    .NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
-                    .CountAsync(
-                        item =>
-                            item.TenantSoftwareId == id
-                            && item.SnapshotId == activeSnapshotId
-                            && item.ResolvedAt == null,
-                        ct
-                    ),
+                openVulnerabilityRows.Count,
                 versionCohorts.Count,
-                await dbContext.Assets.AsNoTracking()
-                    .Where(a => softwareAssetIds.Contains(a.Id))
-                    .Select(a => a.ExposureImpactScore)
-                    .MaxAsync(ct),
+                impactBreakdown.ImpactScore,
+                ToExposureImpactExplanationDto(
+                    activeDeviceIds.Count,
+                    highValueDeviceCount,
+                    impactBreakdown
+                ),
                 remediationSummary,
                 versionCohorts,
                 aliases
@@ -1073,6 +1106,65 @@ public class SoftwareController(
         var cveSummary = cveIds.Count == 0 ? string.Empty : $" Related CVEs: {string.Join(", ", cveIds.Take(5))}.";
         var cpeSummary = string.IsNullOrWhiteSpace(primaryCpe23Uri) ? string.Empty : $" CPE: {primaryCpe23Uri}.";
         return $"Explain the security risks and exploitation mechanics for {product}.{cpeSummary}{cveSummary}";
+    }
+
+    private static ExposureImpactCalculator.SoftwareImpactBreakdown BuildExposureImpactBreakdown(
+        Guid tenantSoftwareId,
+        int deviceCount,
+        int highValueDeviceCount,
+        IReadOnlyList<ExposureImpactVulnerabilityRow> vulnerabilities
+    )
+    {
+        return ExposureImpactCalculator.CalculateSoftwareImpactBreakdown(
+            new ExposureImpactCalculator.SoftwareImpactInput(
+                tenantSoftwareId,
+                deviceCount,
+                highValueDeviceCount,
+                vulnerabilities
+                    .Select(item => new ExposureImpactCalculator.SoftwareVulnerabilityInput(
+                        item.Severity,
+                        item.CvssScore,
+                        item.ExternalId
+                    ))
+                    .ToList()
+            )
+        );
+    }
+
+    private static ExposureImpactExplanationDto? ToExposureImpactExplanationDto(
+        int deviceCount,
+        int highValueDeviceCount,
+        ExposureImpactCalculator.SoftwareImpactBreakdown breakdown
+    )
+    {
+        if (deviceCount == 0 || breakdown.VulnerabilityFactors.Count == 0)
+        {
+            return null;
+        }
+
+        return new ExposureImpactExplanationDto(
+            breakdown.ImpactScore,
+            ExposureImpactCalculator.CalculationVersion,
+            deviceCount,
+            highValueDeviceCount,
+            breakdown.DeviceReachWeight,
+            breakdown.HighValueRatio,
+            breakdown.HighValueBonus,
+            breakdown.VulnerabilityFactors.Count,
+            breakdown.RawVulnerabilitySum,
+            breakdown.VulnerabilityComponent,
+            breakdown.RawScore,
+            breakdown.VulnerabilityFactors
+                .Select(item => new ExposureImpactFactorDto(
+                    item.ExternalId ?? "Unknown vulnerability",
+                    item.Severity.ToString(),
+                    item.CvssScore,
+                    item.SeverityWeight,
+                    item.NormalizedScore,
+                    item.Contribution
+                ))
+                .ToList()
+        );
     }
 
     private static IReadOnlyList<TenantSoftwareVulnerabilityEvidenceDto> ParseEvidence(

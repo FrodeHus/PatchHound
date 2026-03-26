@@ -30,7 +30,8 @@ public record DecisionWorkflowSummaryDto(
     int AffectedDeviceCount,
     int AffectedOwnerTeamCount,
     int OpenPatchingTaskCount,
-    int CompletedPatchingTaskCount
+    int CompletedPatchingTaskCount,
+    List<OpenEpisodeTrendPointDto> OpenEpisodeTrend
 );
 
 public record DecisionWorkflowStateDto(

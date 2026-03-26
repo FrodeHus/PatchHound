@@ -10,6 +10,7 @@ namespace PatchHound.Infrastructure.Services;
 public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 {
     private const int AssetChunkSize = 500;
+    private static readonly TimeSpan DeviceInactiveThreshold = TimeSpan.FromDays(30);
 
     public async Task<StagedAssetMergeSummary> ProcessAsync(
         Guid ingestionRunId,
@@ -133,6 +134,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                             asset.DeviceOnboardingStatus,
                             asset.DeviceValue
                         );
+                        existing.SetDeviceActiveInTenant(IsDeviceActiveInTenant(asset.DeviceLastSeenAt));
 
                         SyncDefenderTags(dbContext, tenantId, existing.Id, asset.MachineTags, tagsByAssetId);
                     }
@@ -161,6 +163,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                         asset.DeviceOnboardingStatus,
                         asset.DeviceValue
                     );
+                    existing.SetDeviceActiveInTenant(IsDeviceActiveInTenant(asset.DeviceLastSeenAt));
 
                     SyncDefenderTags(dbContext, tenantId, existing.Id, asset.MachineTags, tagsByAssetId);
                 }
@@ -210,6 +213,11 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
             softwareLinkSummary.StaleInstallationsMarked,
             softwareLinkSummary.InstallationsRemoved
         );
+    }
+
+    private static bool IsDeviceActiveInTenant(DateTimeOffset? lastSeenAt)
+    {
+        return lastSeenAt.HasValue && lastSeenAt.Value >= DateTimeOffset.UtcNow.Subtract(DeviceInactiveThreshold);
     }
 
     private async Task<StagedAssetSoftwareLinkSummary> ProcessDeviceSoftwareLinksAsync(

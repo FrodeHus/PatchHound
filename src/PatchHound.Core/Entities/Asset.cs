@@ -27,6 +27,7 @@ public class Asset
     public string? DeviceOsVersion { get; private set; }
     public string? DeviceRiskScore { get; private set; }
     public DateTimeOffset? DeviceLastSeenAt { get; private set; }
+    public bool DeviceActiveInTenant { get; private set; } = true;
     public string? DeviceLastIpAddress { get; private set; }
     public string? DeviceAadDeviceId { get; private set; }
     public string? DeviceGroupId { get; private set; }
@@ -62,6 +63,7 @@ public class Asset
             CriticalityUpdatedAt = DateTimeOffset.UtcNow,
             Description = description,
             OwnerType = OwnerType.User,
+            DeviceActiveInTenant = true,
         };
     }
 
@@ -166,6 +168,11 @@ public class Asset
         DeviceIsAadJoined = isAadJoined;
         DeviceOnboardingStatus = onboardingStatus;
         DeviceValue = deviceValue;
+    }
+
+    public void SetDeviceActiveInTenant(bool isActive)
+    {
+        DeviceActiveInTenant = isActive;
     }
 
     public void SetExposureImpactScore(decimal? score)

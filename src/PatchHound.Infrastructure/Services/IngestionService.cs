@@ -17,6 +17,7 @@ public class IngestionService
     private const int MaxSourceAttempts = 2;
     private const int AssetBatchSize = 200;
     private const int VulnerabilityBatchSize = 250;
+    private static readonly TimeSpan DeviceInactiveThreshold = TimeSpan.FromDays(30);
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan IngestionArtifactRetention = TimeSpan.FromDays(7);
     private static readonly TimeSpan FailedIngestionRetention = TimeSpan.FromHours(24);
@@ -182,6 +183,8 @@ public class IngestionService
                             "vulnerability-merge",
                             ct
                         );
+
+                        await RefreshDeviceActivityForTenantAsync(tenantId, ct);
 
                         if (SupportsSoftwareSnapshots(source.SourceKey))
                         {
@@ -761,6 +764,23 @@ public class IngestionService
         }
 
         return startedAny;
+    }
+
+    private async Task RefreshDeviceActivityForTenantAsync(Guid tenantId, CancellationToken ct)
+    {
+        var cutoff = DateTimeOffset.UtcNow.Subtract(DeviceInactiveThreshold);
+        var devices = await _dbContext.Assets
+            .IgnoreQueryFilters()
+            .Where(asset => asset.TenantId == tenantId && asset.AssetType == AssetType.Device)
+            .ToListAsync(ct);
+
+        foreach (var device in devices)
+        {
+            var isActive = device.DeviceLastSeenAt.HasValue && device.DeviceLastSeenAt.Value >= cutoff;
+            device.SetDeviceActiveInTenant(isActive);
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     private sealed record AssetBatchStageSummary(

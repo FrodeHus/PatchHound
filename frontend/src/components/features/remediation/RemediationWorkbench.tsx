@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toneBadge } from '@/lib/tone-classes'
 import { formatDate, startCase } from '@/lib/formatting'
+import { OpenEpisodeSparkline } from './OpenEpisodeSparkline'
 import {
   outcomeLabel,
   outcomeTone,
@@ -221,8 +222,11 @@ export function RemediationWorkbench({
                         <span className="text-xs text-muted-foreground">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {item.affectedDeviceCount}
+                    <td className="px-4 py-3">
+                      <div className="space-y-1">
+                        <div className="font-medium text-foreground">{item.affectedDeviceCount}</div>
+                        <OpenEpisodeSparkline points={item.openEpisodeTrend} />
+                      </div>
                     </td>
                   </tr>
                 ))

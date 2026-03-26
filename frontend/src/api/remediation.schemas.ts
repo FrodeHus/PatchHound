@@ -70,6 +70,10 @@ export const decisionWorkflowSummarySchema = z.object({
   affectedOwnerTeamCount: z.number(),
   openPatchingTaskCount: z.number(),
   completedPatchingTaskCount: z.number(),
+  openEpisodeTrend: z.array(z.object({
+    day: z.string(),
+    openEpisodeCount: z.number(),
+  })),
 })
 
 export const decisionWorkflowStageSchema = z.object({
@@ -138,6 +142,10 @@ export const decisionListItemSchema = z.object({
   slaStatus: z.string().nullable(),
   slaDueDate: z.string().nullable(),
   affectedDeviceCount: z.number(),
+  openEpisodeTrend: z.array(z.object({
+    day: z.string(),
+    openEpisodeCount: z.number(),
+  })),
 })
 
 export const pagedDecisionListSchema = z.object({

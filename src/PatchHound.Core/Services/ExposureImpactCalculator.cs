@@ -8,8 +8,14 @@ namespace PatchHound.Core.Services;
 /// </summary>
 public static class ExposureImpactCalculator
 {
+    public const string CalculationVersion = "software-impact-v1";
+
     /// <summary>A vulnerability linked to a software product.</summary>
-    public record SoftwareVulnerabilityInput(Severity Severity, decimal? CvssScore);
+    public record SoftwareVulnerabilityInput(
+        Severity Severity,
+        decimal? CvssScore,
+        string? ExternalId = null
+    );
 
     /// <summary>Input describing a single software product for impact scoring.</summary>
     public record SoftwareImpactInput(
@@ -21,6 +27,29 @@ public static class ExposureImpactCalculator
 
     /// <summary>Computed impact score for one software product.</summary>
     public record SoftwareImpactResult(Guid TenantSoftwareId, decimal ImpactScore);
+
+    /// <summary>Detailed breakdown of one vulnerability's contribution to software impact.</summary>
+    public record SoftwareImpactVulnerabilityFactor(
+        string? ExternalId,
+        Severity Severity,
+        decimal? CvssScore,
+        decimal SeverityWeight,
+        decimal NormalizedScore,
+        decimal Contribution
+    );
+
+    /// <summary>Detailed breakdown of the software impact calculation.</summary>
+    public record SoftwareImpactBreakdown(
+        Guid TenantSoftwareId,
+        decimal ImpactScore,
+        decimal RawVulnerabilitySum,
+        decimal VulnerabilityComponent,
+        decimal DeviceReachWeight,
+        decimal HighValueRatio,
+        decimal HighValueBonus,
+        decimal RawScore,
+        IReadOnlyList<SoftwareImpactVulnerabilityFactor> VulnerabilityFactors
+    );
 
     /// <summary>Input describing one installed software on a device.</summary>
     public record InstalledSoftwareInput(Guid TenantSoftwareId, decimal ImpactScore);
@@ -43,18 +72,51 @@ public static class ExposureImpactCalculator
     /// </summary>
     public static SoftwareImpactResult CalculateSoftwareImpact(SoftwareImpactInput input)
     {
+        var breakdown = CalculateSoftwareImpactBreakdown(input);
+        return new SoftwareImpactResult(input.TenantSoftwareId, breakdown.ImpactScore);
+    }
+
+    /// <summary>
+    /// Calculates the exposure impact score for a software product and returns the intermediate values.
+    /// </summary>
+    public static SoftwareImpactBreakdown CalculateSoftwareImpactBreakdown(SoftwareImpactInput input)
+    {
         if (input.Vulnerabilities.Count == 0 || input.DeviceCount == 0)
-            return new SoftwareImpactResult(input.TenantSoftwareId, 0m);
+        {
+            return new SoftwareImpactBreakdown(
+                input.TenantSoftwareId,
+                0m,
+                0m,
+                0m,
+                1m,
+                0m,
+                1m,
+                0m,
+                []
+            );
+        }
 
         // Vulnerability severity sum uses the shared severity weighting for impact scoring.
         var rawVulnSum = 0m;
+        var vulnerabilityFactors = new List<SoftwareImpactVulnerabilityFactor>(input.Vulnerabilities.Count);
         foreach (var vuln in input.Vulnerabilities)
         {
             var severityWeight = SeverityWeights.GetValueOrDefault(vuln.Severity, 1m);
             var normalizedScore = vuln.CvssScore.HasValue
                 ? vuln.CvssScore.Value / 10m
                 : severityWeight / 10m;
-            rawVulnSum += severityWeight * normalizedScore;
+            var contribution = severityWeight * normalizedScore;
+            rawVulnSum += contribution;
+            vulnerabilityFactors.Add(
+                new SoftwareImpactVulnerabilityFactor(
+                    vuln.ExternalId,
+                    vuln.Severity,
+                    vuln.CvssScore,
+                    severityWeight,
+                    normalizedScore,
+                    contribution
+                )
+            );
         }
 
         // Diminishing returns on vulnerability severity
@@ -72,7 +134,17 @@ public static class ExposureImpactCalculator
         var rawScore = vulnComponent * deviceReachWeight * highValueBonus / 3m;
         var clamped = Math.Clamp(Math.Round(rawScore, 1), 0m, 100m);
 
-        return new SoftwareImpactResult(input.TenantSoftwareId, clamped);
+        return new SoftwareImpactBreakdown(
+            input.TenantSoftwareId,
+            clamped,
+            Math.Round(rawVulnSum, 3),
+            Math.Round(vulnComponent, 3),
+            Math.Round(deviceReachWeight, 3),
+            Math.Round(highValueRatio, 3),
+            Math.Round(highValueBonus, 3),
+            Math.Round(rawScore, 3),
+            vulnerabilityFactors
+        );
     }
 
     /// <summary>

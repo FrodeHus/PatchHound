@@ -15,7 +15,13 @@ public record RemediationDecisionListItemDto(
     string? RiskBand,
     string? SlaStatus,
     DateTimeOffset? SlaDueDate,
-    int AffectedDeviceCount
+    int AffectedDeviceCount,
+    List<OpenEpisodeTrendPointDto> OpenEpisodeTrend
+);
+
+public record OpenEpisodeTrendPointDto(
+    DateTimeOffset Day,
+    int OpenEpisodeCount
 );
 
 public record RemediationDecisionFilterQuery(

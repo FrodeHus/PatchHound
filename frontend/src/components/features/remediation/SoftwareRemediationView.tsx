@@ -42,6 +42,7 @@ import {
   type RemediationStageId,
 } from './RemediationStageRail'
 import { VersionCohortChooser } from '@/components/features/software/VersionCohortChooser'
+import { OpenEpisodeSparkline } from './OpenEpisodeSparkline'
 import {
   outcomeLabel,
   outcomeTone,
@@ -241,6 +242,7 @@ export function SoftwareRemediationView({
             label="Exposure in scope"
             value={`${data.summary.totalVulnerabilities.toLocaleString()} vulnerabilities`}
             detail={`${data.workflow.affectedDeviceCount.toLocaleString()} devices across ${data.workflow.affectedOwnerTeamCount.toLocaleString()} owner teams`}
+            sparkline={data.workflow.openEpisodeTrend}
           />
           <WorkflowFact
             label="Decision posture"
@@ -393,10 +395,12 @@ function WorkflowFact({
   label,
   value,
   detail,
+  sparkline,
 }: {
   label: string
   value: string
   detail: string
+  sparkline?: DecisionContext['workflow']['openEpisodeTrend']
 }) {
   return (
     <div className="rounded-2xl border border-border/60 bg-background/55 px-4 py-3">
@@ -409,6 +413,9 @@ function WorkflowFact({
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
         {detail}
       </p>
+      {sparkline ? (
+        <OpenEpisodeSparkline points={sparkline} className="mt-3" />
+      ) : null}
     </div>
   )
 }
@@ -564,6 +571,7 @@ function StageVerificationPanel({
           label="Recurrence scope"
           value={data.summary.totalVulnerabilities.toLocaleString()}
           detail={`${data.workflow.affectedDeviceCount.toLocaleString()} affected devices in the recurring software scope`}
+          sparkline={data.workflow.openEpisodeTrend}
         />
         <StageMetricCard
           label="Default path"
@@ -645,6 +653,7 @@ function StageSecurityAnalysisPanel({
           label="Owner-team scope"
           value={data.workflow.affectedOwnerTeamCount.toLocaleString()}
           detail={`${data.workflow.affectedDeviceCount.toLocaleString()} devices in scope`}
+          sparkline={data.workflow.openEpisodeTrend}
         />
       </div>
     </div>
@@ -727,6 +736,7 @@ function StageRemediationDecisionPanel({
             label="Execution scope"
             value={data.workflow.affectedOwnerTeamCount.toLocaleString()}
             detail={`${data.workflow.affectedDeviceCount.toLocaleString()} devices could be affected`}
+            sparkline={data.workflow.openEpisodeTrend}
           />
         </>
       }
@@ -1106,10 +1116,12 @@ function StageMetricCard({
   label,
   value,
   detail,
+  sparkline,
 }: {
   label: string
   value: string
   detail: string
+  sparkline?: DecisionContext['workflow']['openEpisodeTrend']
 }) {
   return (
     <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
@@ -1122,6 +1134,9 @@ function StageMetricCard({
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
         {detail}
       </p>
+      {sparkline ? (
+        <OpenEpisodeSparkline points={sparkline} className="mt-3" />
+      ) : null}
     </div>
   )
 }
