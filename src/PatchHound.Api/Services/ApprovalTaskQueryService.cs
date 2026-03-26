@@ -253,58 +253,58 @@ public class ApprovalTaskQueryService(
 
         var vulnList = new PagedVulnerabilityList(vulnDtos, vulnTotalCount, vulnPagination.Page, vulnPagination.BoundedPageSize);
 
-        // Devices (only for patching-type tasks)
+        // Devices in scope for the approval's software scope
         var deviceVersionCohorts = new List<ApprovalDeviceVersionCohortDto>();
         PagedDeviceList? deviceList = null;
-        if (task.Type is ApprovalTaskType.PatchingApproved or ApprovalTaskType.PatchingDeferred && devicePagination is not null)
+        var activeInstallations = dbContext.NormalizedSoftwareInstallations.AsNoTracking()
+            .Where(nsi =>
+                nsi.TenantId == tenantId
+                && nsi.TenantSoftwareId == tenantSoftwareId
+                && nsi.IsActive)
+            .Select(nsi => new
+            {
+                nsi.DeviceAssetId,
+                nsi.DetectedVersion,
+                nsi.FirstSeenAt,
+                nsi.LastSeenAt,
+                nsi.SoftwareAssetId,
+            });
+
+        var installationRows = await activeInstallations.ToListAsync(ct);
+        var softwareAssetIdsForInstalls = installationRows
+            .Select(item => item.SoftwareAssetId)
+            .Distinct()
+            .ToList();
+        var openMatchRows = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
+            .Where(match =>
+                match.TenantId == tenantId
+                && match.ResolvedAt == null
+                && softwareAssetIdsForInstalls.Contains(match.SoftwareAssetId))
+            .Select(match => new { match.SoftwareAssetId, match.VulnerabilityDefinitionId })
+            .Distinct()
+            .ToListAsync(ct);
+
+        deviceVersionCohorts = installationRows
+            .GroupBy(item => NormalizeVersionKey(item.DetectedVersion))
+            .Select(group =>
+            {
+                var cohortSoftwareAssetIds = group.Select(item => item.SoftwareAssetId).ToHashSet();
+                return new ApprovalDeviceVersionCohortDto(
+                    RestoreVersion(group.Key),
+                    group.Count(),
+                    group.Select(item => item.DeviceAssetId).Distinct().Count(),
+                    openMatchRows.Count(item => cohortSoftwareAssetIds.Contains(item.SoftwareAssetId)),
+                    group.Min(item => item.FirstSeenAt),
+                    group.Max(item => item.LastSeenAt)
+                );
+            })
+            .OrderByDescending(item => item.ActiveInstallCount)
+            .ThenByDescending(item => item.ActiveVulnerabilityCount)
+            .ThenBy(item => item.Version ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (devicePagination is not null)
         {
-            var activeInstallations = dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-                .Where(nsi =>
-                    nsi.TenantId == tenantId
-                    && nsi.TenantSoftwareId == tenantSoftwareId
-                    && nsi.IsActive)
-                .Select(nsi => new
-                {
-                    nsi.DeviceAssetId,
-                    nsi.DetectedVersion,
-                    nsi.FirstSeenAt,
-                    nsi.LastSeenAt,
-                    nsi.SoftwareAssetId,
-                });
-
-            var installationRows = await activeInstallations.ToListAsync(ct);
-            var softwareAssetIdsForInstalls = installationRows
-                .Select(item => item.SoftwareAssetId)
-                .Distinct()
-                .ToList();
-            var openMatchRows = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-                .Where(match =>
-                    match.TenantId == tenantId
-                    && match.ResolvedAt == null
-                    && softwareAssetIdsForInstalls.Contains(match.SoftwareAssetId))
-                .Select(match => new { match.SoftwareAssetId, match.VulnerabilityDefinitionId })
-                .Distinct()
-                .ToListAsync(ct);
-
-            deviceVersionCohorts = installationRows
-                .GroupBy(item => NormalizeVersionKey(item.DetectedVersion))
-                .Select(group =>
-                {
-                    var cohortSoftwareAssetIds = group.Select(item => item.SoftwareAssetId).ToHashSet();
-                    return new ApprovalDeviceVersionCohortDto(
-                        RestoreVersion(group.Key),
-                        group.Count(),
-                        group.Select(item => item.DeviceAssetId).Distinct().Count(),
-                        openMatchRows.Count(item => cohortSoftwareAssetIds.Contains(item.SoftwareAssetId)),
-                        group.Min(item => item.FirstSeenAt),
-                        group.Max(item => item.LastSeenAt)
-                    );
-                })
-                .OrderByDescending(item => item.ActiveInstallCount)
-                .ThenByDescending(item => item.ActiveVulnerabilityCount)
-                .ThenBy(item => item.Version ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
             var selectedVersionKey = deviceVersion is null
                 ? NormalizeVersionKey(deviceVersionCohorts.FirstOrDefault()?.Version)
                 : NormalizeVersionKey(deviceVersion);
@@ -353,13 +353,19 @@ public class ApprovalTaskQueryService(
         }
 
         // Recommendations
-        var recommendations = await dbContext.AnalystRecommendations.AsNoTracking()
-            .Where(r => r.TenantId == tenantId && r.SoftwareAssetId == assetId)
-            .OrderByDescending(r => r.CreatedAt)
-            .Select(r => new ApprovalRecommendationDto(
-                r.Id, r.RecommendedOutcome.ToString(), r.Rationale,
-                r.PriorityOverride, r.AnalystId, r.CreatedAt))
-            .ToListAsync(ct);
+        var decisionWorkflowId = decision.RemediationWorkflowId;
+        var recommendations = decisionWorkflowId is Guid resolvedDecisionWorkflowId
+            ? await dbContext.AnalystRecommendations.AsNoTracking()
+                .Where(r =>
+                    r.TenantId == tenantId
+                    && r.RemediationWorkflowId == resolvedDecisionWorkflowId)
+                .OrderByDescending(r => r.CreatedAt)
+                .Take(1)
+                .Select(r => new ApprovalRecommendationDto(
+                    r.Id, r.RecommendedOutcome.ToString(), r.Rationale,
+                    r.PriorityOverride, r.AnalystId, r.CreatedAt))
+                .ToListAsync(ct)
+            : [];
 
         // Audit trail
         var auditEntries = await dbContext.AuditLogEntries.AsNoTracking()

@@ -478,10 +478,16 @@ public class RemediationDecisionQueryService(
             .ToDictionary(vo => vo.TenantVulnerabilityId);
 
         // Analyst recommendations
-        var recommendations = await dbContext.AnalystRecommendations.AsNoTracking()
-            .Where(r => r.TenantId == tenantId && scopedSoftwareAssetIds.Contains(r.SoftwareAssetId))
-            .OrderByDescending(r => r.CreatedAt)
-            .ToListAsync(ct);
+        var activeWorkflowId = activeWorkflow?.Id;
+        var recommendations = activeWorkflowId is Guid resolvedActiveWorkflowId
+            ? await dbContext.AnalystRecommendations.AsNoTracking()
+                .Where(r =>
+                    r.TenantId == tenantId
+                    && r.RemediationWorkflowId == resolvedActiveWorkflowId)
+                .OrderByDescending(r => r.CreatedAt)
+                .Take(1)
+                .ToListAsync(ct)
+            : [];
         var recommendationAnalystIds = recommendations.Select(r => r.AnalystId).Distinct().ToList();
         var recommendationAnalystNames = recommendationAnalystIds.Count > 0
             ? await dbContext.Users.AsNoTracking()

@@ -49,6 +49,12 @@ public class AnalystRecommendationService(
         CancellationToken ct = default
     )
     {
+        var activeWorkflow = await remediationWorkflowService.GetOrCreateActiveWorkflowAsync(
+            tenantId,
+            tenantSoftwareId,
+            ct
+        );
+
         var representativeSoftwareAssetId = await dbContext.NormalizedSoftwareInstallations
             .IgnoreQueryFilters()
             .Where(item =>
@@ -63,28 +69,46 @@ public class AnalystRecommendationService(
         if (representativeSoftwareAssetId == Guid.Empty)
             return Result<AnalystRecommendation>.Failure("No tenant software scope was found for this software.");
 
-        var result = await AddRecommendationAsync(
-            tenantId,
-            representativeSoftwareAssetId,
-            recommendedOutcome,
-            rationale,
-            analystId,
-            tenantVulnerabilityId,
-            priorityOverride,
-            ct
-        );
+        var recommendation = await dbContext.AnalystRecommendations
+            .FirstOrDefaultAsync(item =>
+                item.TenantId == tenantId
+                && item.RemediationWorkflowId == activeWorkflow.Id,
+                ct
+            );
 
-        if (!result.IsSuccess)
-            return result;
+        if (recommendation is null)
+        {
+            recommendation = AnalystRecommendation.Create(
+                tenantId,
+                representativeSoftwareAssetId,
+                recommendedOutcome,
+                rationale,
+                analystId,
+                tenantVulnerabilityId,
+                priorityOverride
+            );
+
+            await dbContext.AnalystRecommendations.AddAsync(recommendation, ct);
+        }
+        else
+        {
+            recommendation.Update(
+                recommendedOutcome,
+                rationale,
+                analystId,
+                tenantVulnerabilityId,
+                priorityOverride
+            );
+        }
 
         await remediationWorkflowService.AttachRecommendationAsync(
             tenantId,
             tenantSoftwareId,
-            result.Value,
+            recommendation,
             ct
         );
         await dbContext.SaveChangesAsync(ct);
 
-        return result;
+        return Result<AnalystRecommendation>.Success(recommendation);
     }
 }

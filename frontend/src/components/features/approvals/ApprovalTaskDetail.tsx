@@ -104,7 +104,7 @@ export function ApprovalTaskDetail({
   return (
     <section className="space-y-5">
       <header className="rounded-[28px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%),var(--color-card)] p-5">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
           <div className="space-y-4">
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -152,7 +152,7 @@ export function ApprovalTaskDetail({
               </div>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
               <section className="rounded-2xl border border-primary/15 bg-background/70 p-4">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   Requested action
@@ -196,23 +196,80 @@ export function ApprovalTaskDetail({
                 </div>
               </section>
             </div>
+
+            {isPending ? (
+              <section className="rounded-2xl border border-primary/20 bg-background/80 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <h2 className="text-sm font-semibold tracking-[-0.02em]">
+                      Approve or deny this request
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Record the reasoning for accepting this request or sending it back.
+                    </p>
+                  </div>
+                  {justificationRequired ? (
+                    <span className="inline-flex rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] text-muted-foreground">
+                      Justification required
+                    </span>
+                  ) : (
+                    <span className="inline-flex rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] text-muted-foreground">
+                      Justification optional
+                    </span>
+                  )}
+                </div>
+                <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                      Approval justification
+                    </label>
+                    <Textarea
+                      placeholder={
+                        justificationRequired
+                          ? 'Explain why you approve or deny this risk exception.'
+                          : 'Add context for your approval or denial.'
+                      }
+                      value={justification}
+                      onChange={(e) => setJustification(e.target.value)}
+                      rows={4}
+                    />
+                    {resolveAction && justificationRequired && !justification.trim() ? (
+                      <p className="flex items-center gap-1.5 text-sm text-tone-danger-foreground">
+                        <AlertTriangle className="size-3.5" />
+                        Justification is required to {resolveAction} this task.
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-3 lg:flex-col">
+                    <Button onClick={() => handleResolve('approve')} className="min-w-[140px]">
+                      <CheckCircle className="mr-1.5 size-4" />
+                      Approve
+                    </Button>
+                    <Button variant="destructive" onClick={() => handleResolve('deny')} className="min-w-[140px]">
+                      <XCircle className="mr-1.5 size-4" />
+                      Deny
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            ) : null}
           </div>
 
           <aside className="grid auto-rows-fr gap-3 content-start">
-            <div className="flex min-h-[88px] flex-col justify-center rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+            <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
               <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                 Expiry
               </p>
-              <div className="mt-2">
+              <div className="mt-2 min-h-[52px]">
                 <ApprovalExpiryCountdown expiresAt={data.expiresAt} />
               </div>
             </div>
             {data.riskBand ? (
-              <div className="flex min-h-[88px] flex-col justify-center rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   Risk
                 </p>
-                <p className="mt-2">
+                <p className="mt-2 min-h-[52px]">
                   <span
                     className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${toneBadge(riskBandTone(data.riskBand))}`}
                   >
@@ -222,11 +279,11 @@ export function ApprovalTaskDetail({
               </div>
             ) : null}
             {data.slaStatus ? (
-              <div className="flex min-h-[88px] flex-col justify-center rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   SLA
                 </p>
-                <p className="mt-2 text-sm">
+                <p className="mt-2 min-h-[52px] text-sm">
                   {data.slaStatus}
                   {data.slaDueDate ? (
                     <span className="ml-1 text-muted-foreground">
@@ -234,41 +291,6 @@ export function ApprovalTaskDetail({
                     </span>
                   ) : null}
                 </p>
-              </div>
-            ) : null}
-            {isPending ? (
-              <div className="rounded-2xl border border-primary/20 bg-background/80 p-4">
-                <h2 className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                  Your decision
-                </h2>
-                <div className="mt-3 space-y-4">
-                  <Textarea
-                    placeholder={
-                      justificationRequired
-                        ? 'Justification required for both approve and deny'
-                        : 'Optional justification'
-                    }
-                    value={justification}
-                    onChange={(e) => setJustification(e.target.value)}
-                    rows={3}
-                  />
-                  {resolveAction && justificationRequired && !justification.trim() ? (
-                    <p className="flex items-center gap-1.5 text-sm text-tone-danger-foreground">
-                      <AlertTriangle className="size-3.5" />
-                      Justification is required to {resolveAction} this task.
-                    </p>
-                  ) : null}
-                  <div className="flex gap-3">
-                    <Button onClick={() => handleResolve('approve')}>
-                      <CheckCircle className="mr-1.5 size-4" />
-                      Approve
-                    </Button>
-                    <Button variant="destructive" onClick={() => handleResolve('deny')}>
-                      <XCircle className="mr-1.5 size-4" />
-                      Deny
-                    </Button>
-                  </div>
-                </div>
               </div>
             ) : null}
           </aside>

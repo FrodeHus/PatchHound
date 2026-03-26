@@ -50,4 +50,23 @@ public class AnalystRecommendation
     {
         RemediationWorkflowId = remediationWorkflowId;
     }
+
+    public void Update(
+        RemediationOutcome recommendedOutcome,
+        string rationale,
+        Guid analystId,
+        Guid? tenantVulnerabilityId = null,
+        string? priorityOverride = null
+    )
+    {
+        if (string.IsNullOrWhiteSpace(rationale))
+            throw new ArgumentException("Rationale is required.");
+
+        RecommendedOutcome = recommendedOutcome;
+        Rationale = rationale;
+        AnalystId = analystId;
+        TenantVulnerabilityId = tenantVulnerabilityId;
+        PriorityOverride = priorityOverride;
+        CreatedAt = DateTimeOffset.UtcNow;
+    }
 }
