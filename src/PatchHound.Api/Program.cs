@@ -301,6 +301,11 @@ builder.Services.AddAuthorization(options =>
                 new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager)
             )
     );
+
+    options.AddPolicy(
+        Policies.PerformMaintenance,
+        policy => policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin))
+    );
 });
 
 builder.Services.AddScoped<IAuthorizationHandler, RoleRequirementHandler>();
