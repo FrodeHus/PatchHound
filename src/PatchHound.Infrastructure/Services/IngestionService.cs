@@ -135,6 +135,7 @@ public class IngestionService
             var softwareWithoutMachineReferencesCount = 0;
             var vulnerabilityMergeSummary = new StagedVulnerabilityMergeSummary(0, 0, 0, 0, 0, 0);
             var assetMergeSummary = new StagedAssetMergeSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            var deactivatedMachineCount = 0;
 
             try
             {
@@ -184,7 +185,7 @@ public class IngestionService
                             ct
                         );
 
-                        await RefreshDeviceActivityForTenantAsync(tenantId, ct);
+                        deactivatedMachineCount = await RefreshDeviceActivityForTenantAsync(tenantId, ct);
 
                         if (SupportsSoftwareSnapshots(source.SourceKey))
                         {
@@ -679,6 +680,7 @@ public class IngestionService
                             error: null,
                             vulnerabilityMergeSummary,
                             assetMergeSummary,
+                            deactivatedMachineCount,
                             null,
                             ct
                         );
@@ -745,6 +747,7 @@ public class IngestionService
                             error: failureReason,
                             vulnerabilityMergeSummary,
                             assetMergeSummary,
+                            deactivatedMachineCount,
                             failureStatus,
                             ct
                         );
@@ -766,21 +769,27 @@ public class IngestionService
         return startedAny;
     }
 
-    private async Task RefreshDeviceActivityForTenantAsync(Guid tenantId, CancellationToken ct)
+    private async Task<int> RefreshDeviceActivityForTenantAsync(Guid tenantId, CancellationToken ct)
     {
         var cutoff = DateTimeOffset.UtcNow.Subtract(DeviceInactiveThreshold);
         var devices = await _dbContext.Assets
             .IgnoreQueryFilters()
             .Where(asset => asset.TenantId == tenantId && asset.AssetType == AssetType.Device)
             .ToListAsync(ct);
+        var deactivatedCount = 0;
 
         foreach (var device in devices)
         {
             var isActive = device.DeviceLastSeenAt.HasValue && device.DeviceLastSeenAt.Value >= cutoff;
             device.SetDeviceActiveInTenant(isActive);
+            if (!isActive)
+            {
+                deactivatedCount++;
+            }
         }
 
         await _dbContext.SaveChangesAsync(ct);
+        return deactivatedCount;
     }
 
     private sealed record AssetBatchStageSummary(
@@ -1235,6 +1244,7 @@ public class IngestionService
         string? error,
         StagedVulnerabilityMergeSummary vulnerabilityMergeSummary,
         StagedAssetMergeSummary assetMergeSummary,
+        int deactivatedMachineCount,
         string? failureStatus,
         CancellationToken ct
     )
@@ -1259,6 +1269,7 @@ public class IngestionService
                     assetMergeSummary.StagedSoftwareCount,
                     vulnerabilityMergeSummary.StagedVulnerabilityCount,
                     assetMergeSummary.PersistedMachineCount,
+                    deactivatedMachineCount,
                     assetMergeSummary.PersistedSoftwareCount,
                     vulnerabilityMergeSummary.PersistedVulnerabilityCount
                 );
@@ -1273,6 +1284,7 @@ public class IngestionService
                     assetMergeSummary.StagedSoftwareCount,
                     vulnerabilityMergeSummary.StagedVulnerabilityCount,
                     assetMergeSummary.PersistedMachineCount,
+                    deactivatedMachineCount,
                     assetMergeSummary.PersistedSoftwareCount,
                     vulnerabilityMergeSummary.PersistedVulnerabilityCount
                 );
@@ -1345,6 +1357,7 @@ public class IngestionService
                                 .SetProperty(item => item.StagedSoftwareCount, assetMergeSummary.StagedSoftwareCount)
                                 .SetProperty(item => item.StagedVulnerabilityCount, vulnerabilityMergeSummary.StagedVulnerabilityCount)
                                 .SetProperty(item => item.PersistedMachineCount, assetMergeSummary.PersistedMachineCount)
+                                .SetProperty(item => item.DeactivatedMachineCount, deactivatedMachineCount)
                                 .SetProperty(item => item.PersistedSoftwareCount, assetMergeSummary.PersistedSoftwareCount)
                                 .SetProperty(item => item.PersistedVulnerabilityCount, vulnerabilityMergeSummary.PersistedVulnerabilityCount)
                                 .SetProperty(item => item.Error, string.Empty),
@@ -1362,6 +1375,7 @@ public class IngestionService
                                 .SetProperty(item => item.StagedSoftwareCount, assetMergeSummary.StagedSoftwareCount)
                                 .SetProperty(item => item.StagedVulnerabilityCount, vulnerabilityMergeSummary.StagedVulnerabilityCount)
                                 .SetProperty(item => item.PersistedMachineCount, assetMergeSummary.PersistedMachineCount)
+                                .SetProperty(item => item.DeactivatedMachineCount, deactivatedMachineCount)
                                 .SetProperty(item => item.PersistedSoftwareCount, assetMergeSummary.PersistedSoftwareCount)
                                 .SetProperty(item => item.PersistedVulnerabilityCount, vulnerabilityMergeSummary.PersistedVulnerabilityCount)
                                 .SetProperty(
@@ -2272,6 +2286,7 @@ public class IngestionService
                     stagedMachineCount,
                     stagedSoftwareCount,
                     persistedMachineCount,
+                    0,
                     persistedSoftwareCount
                 );
                 await _dbContext.SaveChangesAsync(callbackCt);
@@ -2295,6 +2310,10 @@ public class IngestionService
                             .SetProperty(
                                 item => item.PersistedMachineCount,
                                 persistedMachineCount
+                            )
+                            .SetProperty(
+                                item => item.DeactivatedMachineCount,
+                                0
                             )
                             .SetProperty(
                                 item => item.PersistedSoftwareCount,

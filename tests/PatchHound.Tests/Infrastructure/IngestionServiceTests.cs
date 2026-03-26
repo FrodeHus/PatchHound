@@ -2019,7 +2019,7 @@ public class IngestionServiceTests : IDisposable
             "test-source",
             DateTimeOffset.UtcNow.AddDays(-10)
         );
-        oldRun.CompleteSucceeded(DateTimeOffset.UtcNow.AddDays(-8), 1, 1, 1, 1, 1, 1);
+        oldRun.CompleteSucceeded(DateTimeOffset.UtcNow.AddDays(-8), 1, 1, 1, 1, 0, 1, 1);
         await _dbContext.IngestionRuns.AddAsync(oldRun);
         await _dbContext.StagedVulnerabilities.AddAsync(
             StagedVulnerability.Create(
@@ -2157,6 +2157,7 @@ public class IngestionServiceTests : IDisposable
             1,
             1,
             1,
+            0,
             1,
             1
         );

@@ -23,6 +23,7 @@ public class IngestionRun
     public int StagedSoftwareCount { get; private set; }
     public int StagedVulnerabilityCount { get; private set; }
     public int PersistedMachineCount { get; private set; }
+    public int DeactivatedMachineCount { get; private set; }
     public int PersistedSoftwareCount { get; private set; }
     public int PersistedVulnerabilityCount { get; private set; }
     public string Error { get; private set; } = string.Empty;
@@ -86,6 +87,7 @@ public class IngestionRun
         int stagedMachineCount,
         int stagedSoftwareCount,
         int persistedMachineCount,
+        int deactivatedMachineCount,
         int persistedSoftwareCount
     )
     {
@@ -97,6 +99,7 @@ public class IngestionRun
         StagedMachineCount = stagedMachineCount;
         StagedSoftwareCount = stagedSoftwareCount;
         PersistedMachineCount = persistedMachineCount;
+        DeactivatedMachineCount = deactivatedMachineCount;
         PersistedSoftwareCount = persistedSoftwareCount;
     }
 
@@ -106,6 +109,7 @@ public class IngestionRun
         int stagedSoftwareCount,
         int stagedVulnerabilityCount,
         int persistedMachineCount,
+        int deactivatedMachineCount,
         int persistedSoftwareCount,
         int persistedVulnerabilityCount
     )
@@ -116,6 +120,7 @@ public class IngestionRun
         StagedSoftwareCount = stagedSoftwareCount;
         StagedVulnerabilityCount = stagedVulnerabilityCount;
         PersistedMachineCount = persistedMachineCount;
+        DeactivatedMachineCount = deactivatedMachineCount;
         PersistedSoftwareCount = persistedSoftwareCount;
         PersistedVulnerabilityCount = persistedVulnerabilityCount;
         Error = string.Empty;
@@ -129,6 +134,7 @@ public class IngestionRun
         int stagedSoftwareCount,
         int stagedVulnerabilityCount,
         int persistedMachineCount,
+        int deactivatedMachineCount,
         int persistedSoftwareCount,
         int persistedVulnerabilityCount
     )
@@ -139,6 +145,7 @@ public class IngestionRun
         StagedSoftwareCount = stagedSoftwareCount;
         StagedVulnerabilityCount = stagedVulnerabilityCount;
         PersistedMachineCount = persistedMachineCount;
+        DeactivatedMachineCount = deactivatedMachineCount;
         PersistedSoftwareCount = persistedSoftwareCount;
         PersistedVulnerabilityCount = persistedVulnerabilityCount;
         Error = error;

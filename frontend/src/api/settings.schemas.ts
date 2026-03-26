@@ -42,6 +42,7 @@ export const tenantIngestionRunSchema = z.object({
   stagedVulnerabilityCount: z.number(),
   stagedSoftwareCount: z.number(),
   persistedMachineCount: z.number(),
+  deactivatedMachineCount: z.number(),
   persistedVulnerabilityCount: z.number(),
   persistedSoftwareCount: z.number(),
   error: z.string(),

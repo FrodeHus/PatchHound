@@ -82,6 +82,7 @@ public record TenantIngestionRunDto(
     int StagedVulnerabilityCount,
     int StagedSoftwareCount,
     int PersistedMachineCount,
+    int DeactivatedMachineCount,
     int PersistedVulnerabilityCount,
     int PersistedSoftwareCount,
     string Error,
