@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using NSubstitute;
 using PatchHound.Api.Auth;
 using PatchHound.Core.Enums;
@@ -11,6 +12,8 @@ namespace PatchHound.Tests.Auth;
 public class AuthorizationTests
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly DefaultHttpContext _defaultHttpContext;
     private readonly Guid _tenantId = Guid.NewGuid();
     private readonly Guid _userId = Guid.NewGuid();
 
@@ -20,13 +23,18 @@ public class AuthorizationTests
         _tenantContext.CurrentUserId.Returns(_userId);
         _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { _tenantId });
         _tenantContext.CurrentTenantId.Returns(_tenantId);
+
+        _httpContextAccessor = Substitute.For<IHttpContextAccessor>();
+        _defaultHttpContext = new DefaultHttpContext();
+        _httpContextAccessor.HttpContext.Returns(_defaultHttpContext);
     }
 
     [Fact]
-    public async Task SecurityAnalyst_CanAdjustSeverity()
+    public async Task SecurityAnalyst_CanAdjustSeverity_WhenActivated()
     {
         SetupRolesForTenant(RoleName.SecurityAnalyst);
-        var handler = new RoleRequirementHandler(_tenantContext);
+        _defaultHttpContext.Request.Headers["X-Active-Roles"] = "SecurityAnalyst";
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
         var requirement = new RoleRequirement(
             RoleName.GlobalAdmin,
             RoleName.SecurityManager,
@@ -40,10 +48,28 @@ public class AuthorizationTests
     }
 
     [Fact]
+    public async Task SecurityAnalyst_CannotAdjustSeverity_WithoutActivation()
+    {
+        SetupRolesForTenant(RoleName.SecurityAnalyst);
+        // No X-Active-Roles header set
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
+        var requirement = new RoleRequirement(
+            RoleName.GlobalAdmin,
+            RoleName.SecurityManager,
+            RoleName.SecurityAnalyst
+        );
+        var context = CreateAuthContext(requirement);
+
+        await handler.HandleAsync(context);
+
+        context.HasSucceeded.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task AssetOwner_CannotAdjustSeverity()
     {
         SetupRolesForTenant(RoleName.AssetOwner);
-        var handler = new RoleRequirementHandler(_tenantContext);
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
         var requirement = new RoleRequirement(
             RoleName.GlobalAdmin,
             RoleName.SecurityManager,
@@ -60,7 +86,7 @@ public class AuthorizationTests
     public async Task Stakeholder_CanViewVulnerabilities()
     {
         SetupRolesForTenant(RoleName.Stakeholder);
-        var handler = new RoleRequirementHandler(_tenantContext);
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
         var requirement = new RoleRequirement(
             RoleName.GlobalAdmin,
             RoleName.SecurityManager,
@@ -80,7 +106,7 @@ public class AuthorizationTests
     public async Task Stakeholder_CannotAddComments()
     {
         SetupRolesForTenant(RoleName.Stakeholder);
-        var handler = new RoleRequirementHandler(_tenantContext);
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
         var requirement = new RoleRequirement(
             RoleName.GlobalAdmin,
             RoleName.SecurityManager,
@@ -95,10 +121,11 @@ public class AuthorizationTests
     }
 
     [Fact]
-    public async Task GlobalAdmin_CanDoEverything()
+    public async Task GlobalAdmin_CanDoEverything_WhenActivated()
     {
         SetupRolesForTenant(RoleName.GlobalAdmin);
-        var handler = new RoleRequirementHandler(_tenantContext);
+        _defaultHttpContext.Request.Headers["X-Active-Roles"] = "GlobalAdmin";
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin);
         var context = CreateAuthContext(requirement);
 
@@ -108,10 +135,11 @@ public class AuthorizationTests
     }
 
     [Fact]
-    public async Task UnknownUser_IsRejected()
+    public async Task GlobalAdmin_CannotDoEverything_WithoutActivation()
     {
-        _tenantContext.CurrentUserId.Returns(Guid.Empty);
-        var handler = new RoleRequirementHandler(_tenantContext);
+        SetupRolesForTenant(RoleName.GlobalAdmin);
+        // No X-Active-Roles header set
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin);
         var context = CreateAuthContext(requirement);
 
@@ -121,44 +149,43 @@ public class AuthorizationTests
     }
 
     [Fact]
-    public async Task NormalizedEntraTenantAdminRole_SatisfiesGlobalAdminRequirement()
+    public async Task UnknownUser_IsRejected()
     {
         _tenantContext.CurrentUserId.Returns(Guid.Empty);
-        _tenantContext.AccessibleTenantIds.Returns(Array.Empty<Guid>());
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
+        var requirement = new RoleRequirement(RoleName.GlobalAdmin);
+        var context = CreateAuthContext(requirement);
 
-        var handler = new RoleRequirementHandler(_tenantContext);
+        await handler.HandleAsync(context);
+
+        context.HasSucceeded.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task EntraClaimRole_DoesNotBypassActivation()
+    {
+        // Entra claim roles no longer bypass activation — they must also be activated via header
+        _tenantContext.CurrentUserId.Returns(Guid.Empty);
+        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { _tenantId });
+        _tenantContext.CurrentTenantId.Returns(_tenantId);
+        _tenantContext.GetRolesForTenant(_tenantId).Returns(new List<string> { "GlobalAdmin" });
+
+        // No X-Active-Roles header set
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin);
         var context = CreateAuthContext(requirement, roles: ["Tenant.Admin"]);
 
         await handler.HandleAsync(context);
 
-        context.HasSucceeded.Should().BeTrue();
+        context.HasSucceeded.Should().BeFalse();
     }
 
     [Fact]
-    public async Task ClaimTypesRole_IsReadAndNormalizedDuringAuthorization()
-    {
-        _tenantContext.CurrentUserId.Returns(Guid.Empty);
-        _tenantContext.AccessibleTenantIds.Returns(Array.Empty<Guid>());
-
-        var handler = new RoleRequirementHandler(_tenantContext);
-        var requirement = new RoleRequirement(RoleName.GlobalAdmin);
-        var context = CreateAuthContext(
-            requirement,
-            roleClaimType: ClaimTypes.Role,
-            roles: ["Tenant.Admin"]
-        );
-
-        await handler.HandleAsync(context);
-
-        context.HasSucceeded.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task Auditor_CanViewAuditLogs()
+    public async Task Auditor_CanViewAuditLogs_WhenActivated()
     {
         SetupRolesForTenant(RoleName.Auditor);
-        var handler = new RoleRequirementHandler(_tenantContext);
+        _defaultHttpContext.Request.Headers["X-Active-Roles"] = "Auditor";
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin, RoleName.Auditor);
         var context = CreateAuthContext(requirement);
 
@@ -171,7 +198,8 @@ public class AuthorizationTests
     public async Task Auditor_CannotManageUsers()
     {
         SetupRolesForTenant(RoleName.Auditor);
-        var handler = new RoleRequirementHandler(_tenantContext);
+        _defaultHttpContext.Request.Headers["X-Active-Roles"] = "Auditor";
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
         var requirement = new RoleRequirement(RoleName.GlobalAdmin);
         var context = CreateAuthContext(requirement);
 
@@ -196,7 +224,10 @@ public class AuthorizationTests
             .GetRolesForTenant(tenantB)
             .Returns(new List<string> { RoleName.Stakeholder.ToString() });
 
-        var handler = new RoleRequirementHandler(_tenantContext);
+        // Even with SecurityAnalyst activated, user only has Stakeholder in tenantB
+        _defaultHttpContext.Request.Headers["X-Active-Roles"] = "SecurityAnalyst";
+
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
         var requirement = new RoleRequirement(
             RoleName.GlobalAdmin,
             RoleName.SecurityManager,
