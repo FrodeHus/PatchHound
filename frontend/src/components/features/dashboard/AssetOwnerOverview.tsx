@@ -217,7 +217,20 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-medium tracking-tight">{item.assetName}</div>
-                    <div className="mt-1 text-sm text-muted-foreground">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
+                        {item.criticality}
+                      </Badge>
+                      <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
+                        {item.deviceGroupName || 'Ungrouped'}
+                      </Badge>
+                      {item.riskBand ? (
+                        <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
+                          {item.riskBand}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div className="mt-2 text-sm text-muted-foreground">
                       {item.openEpisodeCount} open exposure items
                     </div>
                   </div>

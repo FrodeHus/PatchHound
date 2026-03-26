@@ -38,17 +38,18 @@ import { Route as AuthedRemediationTasksRouteImport } from './routes/_authed/rem
 import { Route as AuthedAssetsIdRouteImport } from './routes/_authed/assets/$id'
 import { Route as AuthedApprovalsIdRouteImport } from './routes/_authed/approvals/$id'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
-import { Route as AuthedAdminTeamsRouteImport } from './routes/_authed/admin/teams'
 import { Route as AuthedAdminSourcesRouteImport } from './routes/_authed/admin/sources'
 import { Route as AuthedAdminSecurityProfilesRouteImport } from './routes/_authed/admin/security-profiles'
 import { Route as AuthedAdminWorkflowsIndexRouteImport } from './routes/_authed/admin/workflows/index'
 import { Route as AuthedAdminTenantsIndexRouteImport } from './routes/_authed/admin/tenants/index'
+import { Route as AuthedAdminTeamsIndexRouteImport } from './routes/_authed/admin/teams/index'
 import { Route as AuthedAdminAssetRulesIndexRouteImport } from './routes/_authed/admin/asset-rules/index'
 import { Route as AuthedSoftwareIdRemediationRouteImport } from './routes/_authed/software/$id_.remediation'
 import { Route as AuthedAssetsIdRemediationRouteImport } from './routes/_authed/assets/$id_.remediation'
 import { Route as AuthedAdminWorkflowsNewRouteImport } from './routes/_authed/admin/workflows/new'
 import { Route as AuthedAdminWorkflowsIdRouteImport } from './routes/_authed/admin/workflows/$id'
 import { Route as AuthedAdminTenantsIdRouteImport } from './routes/_authed/admin/tenants/$id'
+import { Route as AuthedAdminTeamsIdRouteImport } from './routes/_authed/admin/teams/$id'
 import { Route as AuthedAdminAssetRulesNewRouteImport } from './routes/_authed/admin/asset-rules/new'
 import { Route as AuthedAdminAssetRulesIdRouteImport } from './routes/_authed/admin/asset-rules/$id'
 
@@ -199,11 +200,6 @@ const AuthedAdminUsersRoute = AuthedAdminUsersRouteImport.update({
   path: '/admin/users',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAdminTeamsRoute = AuthedAdminTeamsRouteImport.update({
-  id: '/admin/teams',
-  path: '/admin/teams',
-  getParentRoute: () => AuthedRoute,
-} as any)
 const AuthedAdminSourcesRoute = AuthedAdminSourcesRouteImport.update({
   id: '/admin/sources',
   path: '/admin/sources',
@@ -224,6 +220,11 @@ const AuthedAdminWorkflowsIndexRoute =
 const AuthedAdminTenantsIndexRoute = AuthedAdminTenantsIndexRouteImport.update({
   id: '/admin/tenants/',
   path: '/admin/tenants/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAdminTeamsIndexRoute = AuthedAdminTeamsIndexRouteImport.update({
+  id: '/admin/teams/',
+  path: '/admin/teams/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedAdminAssetRulesIndexRoute =
@@ -259,6 +260,11 @@ const AuthedAdminTenantsIdRoute = AuthedAdminTenantsIdRouteImport.update({
   path: '/admin/tenants/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAdminTeamsIdRoute = AuthedAdminTeamsIdRouteImport.update({
+  id: '/admin/teams/$id',
+  path: '/admin/teams/$id',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedAdminAssetRulesNewRoute =
   AuthedAdminAssetRulesNewRouteImport.update({
     id: '/admin/asset-rules/new',
@@ -282,7 +288,6 @@ export interface FileRoutesByFullPath {
   '/setup/': typeof SetupIndexRoute
   '/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
   '/admin/sources': typeof AuthedAdminSourcesRoute
-  '/admin/teams': typeof AuthedAdminTeamsRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/approvals/$id': typeof AuthedApprovalsIdRoute
   '/assets/$id': typeof AuthedAssetsIdRoute
@@ -305,12 +310,14 @@ export interface FileRoutesByFullPath {
   '/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/admin/asset-rules/$id': typeof AuthedAdminAssetRulesIdRoute
   '/admin/asset-rules/new': typeof AuthedAdminAssetRulesNewRoute
+  '/admin/teams/$id': typeof AuthedAdminTeamsIdRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
   '/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
   '/admin/workflows/new': typeof AuthedAdminWorkflowsNewRoute
   '/assets/$id/remediation': typeof AuthedAssetsIdRemediationRoute
   '/software/$id/remediation': typeof AuthedSoftwareIdRemediationRoute
   '/admin/asset-rules/': typeof AuthedAdminAssetRulesIndexRoute
+  '/admin/teams/': typeof AuthedAdminTeamsIndexRoute
   '/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
   '/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
 }
@@ -325,7 +332,6 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupIndexRoute
   '/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
   '/admin/sources': typeof AuthedAdminSourcesRoute
-  '/admin/teams': typeof AuthedAdminTeamsRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/approvals/$id': typeof AuthedApprovalsIdRoute
   '/assets/$id': typeof AuthedAssetsIdRoute
@@ -348,12 +354,14 @@ export interface FileRoutesByTo {
   '/vulnerabilities': typeof AuthedVulnerabilitiesIndexRoute
   '/admin/asset-rules/$id': typeof AuthedAdminAssetRulesIdRoute
   '/admin/asset-rules/new': typeof AuthedAdminAssetRulesNewRoute
+  '/admin/teams/$id': typeof AuthedAdminTeamsIdRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
   '/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
   '/admin/workflows/new': typeof AuthedAdminWorkflowsNewRoute
   '/assets/$id/remediation': typeof AuthedAssetsIdRemediationRoute
   '/software/$id/remediation': typeof AuthedSoftwareIdRemediationRoute
   '/admin/asset-rules': typeof AuthedAdminAssetRulesIndexRoute
+  '/admin/teams': typeof AuthedAdminTeamsIndexRoute
   '/admin/tenants': typeof AuthedAdminTenantsIndexRoute
   '/admin/workflows': typeof AuthedAdminWorkflowsIndexRoute
 }
@@ -370,7 +378,6 @@ export interface FileRoutesById {
   '/setup/': typeof SetupIndexRoute
   '/_authed/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
   '/_authed/admin/sources': typeof AuthedAdminSourcesRoute
-  '/_authed/admin/teams': typeof AuthedAdminTeamsRoute
   '/_authed/admin/users': typeof AuthedAdminUsersRoute
   '/_authed/approvals/$id': typeof AuthedApprovalsIdRoute
   '/_authed/assets/$id': typeof AuthedAssetsIdRoute
@@ -393,12 +400,14 @@ export interface FileRoutesById {
   '/_authed/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/_authed/admin/asset-rules/$id': typeof AuthedAdminAssetRulesIdRoute
   '/_authed/admin/asset-rules/new': typeof AuthedAdminAssetRulesNewRoute
+  '/_authed/admin/teams/$id': typeof AuthedAdminTeamsIdRoute
   '/_authed/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
   '/_authed/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
   '/_authed/admin/workflows/new': typeof AuthedAdminWorkflowsNewRoute
   '/_authed/assets/$id_/remediation': typeof AuthedAssetsIdRemediationRoute
   '/_authed/software/$id_/remediation': typeof AuthedSoftwareIdRemediationRoute
   '/_authed/admin/asset-rules/': typeof AuthedAdminAssetRulesIndexRoute
+  '/_authed/admin/teams/': typeof AuthedAdminTeamsIndexRoute
   '/_authed/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
   '/_authed/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
 }
@@ -415,7 +424,6 @@ export interface FileRouteTypes {
     | '/setup/'
     | '/admin/security-profiles'
     | '/admin/sources'
-    | '/admin/teams'
     | '/admin/users'
     | '/approvals/$id'
     | '/assets/$id'
@@ -438,12 +446,14 @@ export interface FileRouteTypes {
     | '/vulnerabilities/'
     | '/admin/asset-rules/$id'
     | '/admin/asset-rules/new'
+    | '/admin/teams/$id'
     | '/admin/tenants/$id'
     | '/admin/workflows/$id'
     | '/admin/workflows/new'
     | '/assets/$id/remediation'
     | '/software/$id/remediation'
     | '/admin/asset-rules/'
+    | '/admin/teams/'
     | '/admin/tenants/'
     | '/admin/workflows/'
   fileRoutesByTo: FileRoutesByTo
@@ -458,7 +468,6 @@ export interface FileRouteTypes {
     | '/setup'
     | '/admin/security-profiles'
     | '/admin/sources'
-    | '/admin/teams'
     | '/admin/users'
     | '/approvals/$id'
     | '/assets/$id'
@@ -481,12 +490,14 @@ export interface FileRouteTypes {
     | '/vulnerabilities'
     | '/admin/asset-rules/$id'
     | '/admin/asset-rules/new'
+    | '/admin/teams/$id'
     | '/admin/tenants/$id'
     | '/admin/workflows/$id'
     | '/admin/workflows/new'
     | '/assets/$id/remediation'
     | '/software/$id/remediation'
     | '/admin/asset-rules'
+    | '/admin/teams'
     | '/admin/tenants'
     | '/admin/workflows'
   id:
@@ -502,7 +513,6 @@ export interface FileRouteTypes {
     | '/setup/'
     | '/_authed/admin/security-profiles'
     | '/_authed/admin/sources'
-    | '/_authed/admin/teams'
     | '/_authed/admin/users'
     | '/_authed/approvals/$id'
     | '/_authed/assets/$id'
@@ -525,12 +535,14 @@ export interface FileRouteTypes {
     | '/_authed/vulnerabilities/'
     | '/_authed/admin/asset-rules/$id'
     | '/_authed/admin/asset-rules/new'
+    | '/_authed/admin/teams/$id'
     | '/_authed/admin/tenants/$id'
     | '/_authed/admin/workflows/$id'
     | '/_authed/admin/workflows/new'
     | '/_authed/assets/$id_/remediation'
     | '/_authed/software/$id_/remediation'
     | '/_authed/admin/asset-rules/'
+    | '/_authed/admin/teams/'
     | '/_authed/admin/tenants/'
     | '/_authed/admin/workflows/'
   fileRoutesById: FileRoutesById
@@ -752,13 +764,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminUsersRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/admin/teams': {
-      id: '/_authed/admin/teams'
-      path: '/admin/teams'
-      fullPath: '/admin/teams'
-      preLoaderRoute: typeof AuthedAdminTeamsRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/admin/sources': {
       id: '/_authed/admin/sources'
       path: '/admin/sources'
@@ -785,6 +790,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/tenants'
       fullPath: '/admin/tenants/'
       preLoaderRoute: typeof AuthedAdminTenantsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/admin/teams/': {
+      id: '/_authed/admin/teams/'
+      path: '/admin/teams'
+      fullPath: '/admin/teams/'
+      preLoaderRoute: typeof AuthedAdminTeamsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/admin/asset-rules/': {
@@ -829,6 +841,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminTenantsIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/teams/$id': {
+      id: '/_authed/admin/teams/$id'
+      path: '/admin/teams/$id'
+      fullPath: '/admin/teams/$id'
+      preLoaderRoute: typeof AuthedAdminTeamsIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/admin/asset-rules/new': {
       id: '/_authed/admin/asset-rules/new'
       path: '/admin/asset-rules/new'
@@ -850,7 +869,6 @@ interface AuthedRouteChildren {
   AuthedDashboardRoute: typeof AuthedDashboardRoute
   AuthedAdminSecurityProfilesRoute: typeof AuthedAdminSecurityProfilesRoute
   AuthedAdminSourcesRoute: typeof AuthedAdminSourcesRoute
-  AuthedAdminTeamsRoute: typeof AuthedAdminTeamsRoute
   AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
   AuthedApprovalsIdRoute: typeof AuthedApprovalsIdRoute
   AuthedAssetsIdRoute: typeof AuthedAssetsIdRoute
@@ -872,12 +890,14 @@ interface AuthedRouteChildren {
   AuthedVulnerabilitiesIndexRoute: typeof AuthedVulnerabilitiesIndexRoute
   AuthedAdminAssetRulesIdRoute: typeof AuthedAdminAssetRulesIdRoute
   AuthedAdminAssetRulesNewRoute: typeof AuthedAdminAssetRulesNewRoute
+  AuthedAdminTeamsIdRoute: typeof AuthedAdminTeamsIdRoute
   AuthedAdminTenantsIdRoute: typeof AuthedAdminTenantsIdRoute
   AuthedAdminWorkflowsIdRoute: typeof AuthedAdminWorkflowsIdRoute
   AuthedAdminWorkflowsNewRoute: typeof AuthedAdminWorkflowsNewRoute
   AuthedAssetsIdRemediationRoute: typeof AuthedAssetsIdRemediationRoute
   AuthedSoftwareIdRemediationRoute: typeof AuthedSoftwareIdRemediationRoute
   AuthedAdminAssetRulesIndexRoute: typeof AuthedAdminAssetRulesIndexRoute
+  AuthedAdminTeamsIndexRoute: typeof AuthedAdminTeamsIndexRoute
   AuthedAdminTenantsIndexRoute: typeof AuthedAdminTenantsIndexRoute
   AuthedAdminWorkflowsIndexRoute: typeof AuthedAdminWorkflowsIndexRoute
 }
@@ -886,7 +906,6 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedDashboardRoute: AuthedDashboardRoute,
   AuthedAdminSecurityProfilesRoute: AuthedAdminSecurityProfilesRoute,
   AuthedAdminSourcesRoute: AuthedAdminSourcesRoute,
-  AuthedAdminTeamsRoute: AuthedAdminTeamsRoute,
   AuthedAdminUsersRoute: AuthedAdminUsersRoute,
   AuthedApprovalsIdRoute: AuthedApprovalsIdRoute,
   AuthedAssetsIdRoute: AuthedAssetsIdRoute,
@@ -908,12 +927,14 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedVulnerabilitiesIndexRoute: AuthedVulnerabilitiesIndexRoute,
   AuthedAdminAssetRulesIdRoute: AuthedAdminAssetRulesIdRoute,
   AuthedAdminAssetRulesNewRoute: AuthedAdminAssetRulesNewRoute,
+  AuthedAdminTeamsIdRoute: AuthedAdminTeamsIdRoute,
   AuthedAdminTenantsIdRoute: AuthedAdminTenantsIdRoute,
   AuthedAdminWorkflowsIdRoute: AuthedAdminWorkflowsIdRoute,
   AuthedAdminWorkflowsNewRoute: AuthedAdminWorkflowsNewRoute,
   AuthedAssetsIdRemediationRoute: AuthedAssetsIdRemediationRoute,
   AuthedSoftwareIdRemediationRoute: AuthedSoftwareIdRemediationRoute,
   AuthedAdminAssetRulesIndexRoute: AuthedAdminAssetRulesIndexRoute,
+  AuthedAdminTeamsIndexRoute: AuthedAdminTeamsIndexRoute,
   AuthedAdminTenantsIndexRoute: AuthedAdminTenantsIndexRoute,
   AuthedAdminWorkflowsIndexRoute: AuthedAdminWorkflowsIndexRoute,
 }

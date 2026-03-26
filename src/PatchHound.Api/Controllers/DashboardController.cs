@@ -669,6 +669,7 @@ public class DashboardController : ControllerBase
                 {
                     asset.Id,
                     asset.Name,
+                    asset.DeviceGroupName,
                     Criticality = asset.Criticality.ToString(),
                     CurrentRiskScore = score != null ? (decimal?)score.OverallScore : null,
                     OpenEpisodeCount = score != null ? score.OpenEpisodeCount : 0,
@@ -709,6 +710,7 @@ public class DashboardController : ControllerBase
                 return new OwnerAssetSummaryDto(
                     item.Id,
                     item.Name,
+                    item.DeviceGroupName,
                     item.Criticality,
                     item.CurrentRiskScore,
                     topDriver?.RiskBand,

@@ -504,17 +504,31 @@ public class UsersController : ControllerBase
             nameof(User) => values.TryGetValue("IsEnabled", out var enabled)
                 ? $"Enabled set to {enabled.ToString().ToLowerInvariant()}."
                 : values.TryGetValue("DisplayName", out var displayName)
-                    ? $"Profile updated to {displayName.GetString()}."
+                    ? $"Profile updated to {GetAuditValueText(displayName) ?? "updated values"}."
                     : entry.Action.ToString(),
             nameof(UserTenantRole) => values.TryGetValue("Role", out var role)
-                ? $"Role changed to {role.GetString()}."
+                ? $"Role changed to {GetAuditValueText(role) ?? "updated value"}."
                 : oldValues.TryGetValue("Role", out var oldRole)
-                    ? $"Role removed: {oldRole.GetString()}."
+                    ? $"Role removed: {GetAuditValueText(oldRole) ?? "previous value"}."
                     : entry.Action.ToString(),
             nameof(TeamMember) => values.TryGetValue("TeamId", out _)
                 ? "Added to assignment group."
                 : "Removed from assignment group.",
             _ => entry.Action.ToString(),
+        };
+    }
+
+    private static string? GetAuditValueText(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number => element.GetRawText(),
+            JsonValueKind.True => bool.TrueString.ToLowerInvariant(),
+            JsonValueKind.False => bool.FalseString.ToLowerInvariant(),
+            JsonValueKind.Null => null,
+            JsonValueKind.Undefined => null,
+            _ => element.GetRawText(),
         };
     }
 }
