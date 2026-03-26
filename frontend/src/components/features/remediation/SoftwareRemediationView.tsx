@@ -251,7 +251,7 @@ export function SoftwareRemediationView({
               data.currentDecision
                 ? approvalStatusLabel(data.currentDecision.approvalStatus)
                 : data.recommendations.length > 0
-                  ? `${data.recommendations.length.toLocaleString()} analyst recommendations ready`
+                  ? 'Security recommendation ready'
                   : 'Review exposure and capture guidance'
             }
           />
@@ -302,15 +302,15 @@ export function SoftwareRemediationView({
         </TabsList>
 
         <TabsContent value="decision" className="space-y-4 pt-1">
-          <Card className="rounded-[1.6rem] border-border/70">
+            <Card className="rounded-[1.6rem] border-border/70">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Analyst recommendations</CardTitle>
+              <CardTitle className="text-sm">Security recommendation</CardTitle>
             </CardHeader>
             <CardContent>
               {data.recommendations.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-4">
                   <p className="text-sm text-muted-foreground">
-                    No analyst recommendations have been recorded yet.
+                    No security recommendation has been recorded yet.
                   </p>
                   <div className="mt-3">
                     <RecommendationPanel
@@ -698,12 +698,11 @@ function StageRemediationDecisionPanel({
         <div className="space-y-3">
           <RecommendationSnapshotCard
             recommendation={latestRecommendation}
-            recommendationCount={data.recommendations.length}
           />
           <StageMetricCard
             label="Analyst guidance"
-            value={data.recommendations.length.toLocaleString()}
-            detail="Recommendations available to inform the decision"
+            value={latestRecommendation ? 'Available' : 'Missing'}
+            detail={latestRecommendation ? 'Security recommendation available to inform the decision' : 'No security recommendation has been recorded yet'}
           />
           <StageMetricCard
             label="Current pressure"
@@ -725,7 +724,6 @@ function StageRemediationDecisionPanel({
         <>
           <RecommendationSnapshotCard
             recommendation={latestRecommendation}
-            recommendationCount={data.recommendations.length}
           />
           <StageMetricCard
             label="Decision posture"
@@ -746,10 +744,8 @@ function StageRemediationDecisionPanel({
 
 function RecommendationSnapshotCard({
   recommendation,
-  recommendationCount,
 }: {
   recommendation: DecisionContext['recommendations'][number] | null
-  recommendationCount: number
 }) {
   if (!recommendation) {
     return (
@@ -769,16 +765,9 @@ function RecommendationSnapshotCard({
 
   return (
     <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-          Security recommendation
-        </p>
-        {recommendationCount > 1 ? (
-          <span className="text-[11px] font-medium text-muted-foreground">
-            Latest of {recommendationCount}
-          </span>
-        ) : null}
-      </div>
+      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+        Security recommendation
+      </p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(recommendation.recommendedOutcome))}`}>
           {outcomeLabel(recommendation.recommendedOutcome)}

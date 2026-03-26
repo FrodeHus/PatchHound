@@ -38,9 +38,10 @@ export function RecommendationPanel({
   readOnly = false,
 }: RecommendationPanelProps) {
   const queryClient = useQueryClient()
+  const currentRecommendation = recommendations[0] ?? null
   const [showForm, setShowForm] = useState(false)
-  const [outcome, setOutcome] = useState('')
-  const [rationale, setRationale] = useState('')
+  const [outcome, setOutcome] = useState(currentRecommendation?.recommendedOutcome ?? '')
+  const [rationale, setRationale] = useState(currentRecommendation?.rationale ?? '')
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit() {
@@ -66,37 +67,30 @@ export function RecommendationPanel({
 
   return (
     <div className="space-y-3">
-      {recommendations.length > 0 ? (
-        <div className="space-y-2">
-          {recommendations.map((rec) => (
-            <div
-              key={rec.id}
-              className="rounded-lg border border-border/70 bg-background p-3 space-y-1.5"
-            >
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(rec.recommendedOutcome))}`}>
-                  {outcomeLabel(rec.recommendedOutcome)}
-                </span>
-                {rec.priorityOverride ? (
-                  <span className="text-xs text-muted-foreground">
-                    Priority: {rec.priorityOverride}
-                  </span>
-                ) : null}
-              </div>
-              <p className="text-sm">{rec.rationale}</p>
-              <p className="text-xs text-muted-foreground">
-                {rec.analystDisplayName ? `${rec.analystDisplayName} · ` : ''}{formatDateTime(rec.createdAt)}
-              </p>
-            </div>
-          ))}
+      {currentRecommendation ? (
+        <div className="rounded-lg border border-border/70 bg-background p-3 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(currentRecommendation.recommendedOutcome))}`}>
+              {outcomeLabel(currentRecommendation.recommendedOutcome)}
+            </span>
+            {currentRecommendation.priorityOverride ? (
+              <span className="text-xs text-muted-foreground">
+                Priority: {currentRecommendation.priorityOverride}
+              </span>
+            ) : null}
+          </div>
+          <p className="text-sm">{currentRecommendation.rationale}</p>
+          <p className="text-xs text-muted-foreground">
+            {currentRecommendation.analystDisplayName ? `${currentRecommendation.analystDisplayName} · ` : ''}{formatDateTime(currentRecommendation.createdAt)}
+          </p>
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">No analyst recommendations yet.</p>
+        <p className="text-sm text-muted-foreground">No analyst recommendation has been recorded yet.</p>
       )}
 
       {readOnly ? (
         <p className="text-xs text-muted-foreground">
-          You can review analyst recommendations here, but only the current stage owner can add or change them.
+          You can review the current recommendation here, but only the current stage owner can add or update it.
         </p>
       ) : showForm ? (
         <div className="space-y-3 rounded-lg border border-border/70 bg-background p-3">
@@ -130,20 +124,32 @@ export function RecommendationPanel({
               disabled={!outcome || !rationale.trim() || submitting}
               size="sm"
             >
-              {submitting ? 'Submitting...' : 'Submit'}
+              {submitting ? (currentRecommendation ? 'Updating...' : 'Submitting...') : (currentRecommendation ? 'Update recommendation' : 'Save recommendation')}
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { setShowForm(false); setOutcome(''); setRationale('') }}
+              onClick={() => {
+                setShowForm(false)
+                setOutcome(currentRecommendation?.recommendedOutcome ?? '')
+                setRationale(currentRecommendation?.rationale ?? '')
+              }}
             >
               Cancel
             </Button>
           </div>
         </div>
       ) : (
-        <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
-          Add Recommendation
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setOutcome(currentRecommendation?.recommendedOutcome ?? '')
+            setRationale(currentRecommendation?.rationale ?? '')
+            setShowForm(true)
+          }}
+        >
+          {currentRecommendation ? 'Update recommendation' : 'Add recommendation'}
         </Button>
       )}
     </div>
