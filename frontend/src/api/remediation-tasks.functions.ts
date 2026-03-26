@@ -17,6 +17,7 @@ export const fetchRemediationTasks = createServerFn({ method: 'GET' })
       vendor: z.string().optional(),
       criticality: z.string().optional(),
       assetOwner: z.string().optional(),
+      taskId: z.string().uuid().optional(),
       deviceAssetId: z.string().uuid().optional(),
       tenantSoftwareId: z.string().uuid().optional(),
       page: z.number().optional(),

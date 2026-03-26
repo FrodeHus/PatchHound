@@ -186,6 +186,7 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
                             vendor: '',
                             criticality: '',
                             assetOwner: '',
+                            taskId: item.taskId ?? '',
                             tenantSoftwareId: item.tenantSoftwareId,
                             deviceAssetId: '',
                           }}
