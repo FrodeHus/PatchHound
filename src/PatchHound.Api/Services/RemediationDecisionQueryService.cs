@@ -730,10 +730,11 @@ public class RemediationDecisionQueryService(
             .OfType<RoleName>()
             .ToHashSet();
 
-        var currentUserTeamIds = await dbContext.TeamMembers.AsNoTracking()
+        var currentUserTeams = await dbContext.TeamMembers.AsNoTracking()
             .Where(member => member.UserId == tenantContext.CurrentUserId && member.Team.TenantId == tenantId)
-            .Select(member => member.TeamId)
+            .Select(member => new { member.TeamId, member.Team.Name })
             .ToListAsync(ct);
+        var currentUserTeamIds = currentUserTeams.Select(item => item.TeamId).ToList();
 
         var softwareOwnerTeamId = activeWorkflow?.SoftwareOwnerTeamId;
         var softwareOwnerTeamName = softwareOwnerTeamId is Guid resolvedSoftwareOwnerTeamId
@@ -759,6 +760,7 @@ public class RemediationDecisionQueryService(
             stageRecords,
             currentUserRoles,
             currentUserTeamIds,
+            currentUserTeams.Select(item => item.Name).Distinct().OrderBy(name => name).ToList(),
             softwareOwnerTeamName,
             executionTeamIds,
             decision
@@ -792,6 +794,7 @@ public class RemediationDecisionQueryService(
         List<RemediationWorkflowStageRecord> stageRecords,
         HashSet<RoleName> currentUserRoles,
         List<Guid> currentUserTeamIds,
+        List<string> currentUserTeamNames,
         string? softwareOwnerTeamName,
         List<Guid> executionTeamIds,
         RemediationDecision? decision
@@ -855,8 +858,10 @@ public class RemediationDecisionQueryService(
             CurrentActorSummary(currentStage, workflow, softwareOwnerTeamName),
             CanActOnCurrentStage(currentStage, workflow, currentUserRoles, currentUserTeamIds, executionTeamIds),
             currentUserRoles.Select(role => role.ToString()).OrderBy(role => role).ToList(),
+            currentUserTeamNames,
             ExpectedRoles(currentStage, workflow),
             ExpectedTeamName(currentStage, workflow, softwareOwnerTeamName),
+            IsInExpectedTeam(currentStage, workflow, currentUserTeamIds, executionTeamIds),
             isRecurrence,
             workflow?.Status == RemediationWorkflowStatus.Active,
             stageDtos
@@ -968,6 +973,23 @@ public class RemediationDecisionQueryService(
                 softwareOwnerTeamName ?? DefaultTeamHelper.DefaultTeamName,
             RemediationWorkflowStage.RemediationDecision =>
                 softwareOwnerTeamName ?? DefaultTeamHelper.DefaultTeamName,
+            _ => null,
+        };
+
+    private static bool? IsInExpectedTeam(
+        RemediationWorkflowStage stage,
+        RemediationWorkflow? workflow,
+        List<Guid> currentUserTeamIds,
+        List<Guid> executionTeamIds
+    ) =>
+        stage switch
+        {
+            RemediationWorkflowStage.Verification when workflow?.ProposedOutcome is not RemediationOutcome.RiskAcceptance and not RemediationOutcome.AlternateMitigation =>
+                workflow is not null ? currentUserTeamIds.Contains(workflow.SoftwareOwnerTeamId) : null,
+            RemediationWorkflowStage.RemediationDecision =>
+                workflow is not null ? currentUserTeamIds.Contains(workflow.SoftwareOwnerTeamId) : null,
+            RemediationWorkflowStage.Execution =>
+                executionTeamIds.Count > 0 ? executionTeamIds.Any(currentUserTeamIds.Contains) : null,
             _ => null,
         };
 

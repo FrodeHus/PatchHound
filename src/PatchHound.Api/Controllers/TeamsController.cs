@@ -1,9 +1,11 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Admin;
+using PatchHound.Api.Models.RiskScore;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
@@ -113,7 +115,19 @@ public class TeamsController : ControllerBase
             .CountAsync(asset => asset.OwnerTeamId == team.Id || asset.FallbackTeamId == team.Id, ct);
         var currentRiskScore = await _dbContext.TeamRiskScores.AsNoTracking()
             .Where(score => score.TeamId == team.Id)
-            .Select(score => (decimal?)score.OverallScore)
+            .Select(score => new
+            {
+                CurrentRiskScore = (decimal?)score.OverallScore,
+                score.MaxAssetRiskScore,
+                score.AssetCount,
+                score.OpenEpisodeCount,
+                score.CriticalEpisodeCount,
+                score.HighEpisodeCount,
+                score.MediumEpisodeCount,
+                score.LowEpisodeCount,
+                score.FactorsJson,
+                score.CalculationVersion,
+            })
             .FirstOrDefaultAsync(ct);
         var topRiskAssets = await _dbContext.AssetRiskScores.AsNoTracking()
             .Where(score => score.TenantId == team.TenantId)
@@ -146,7 +160,23 @@ public class TeamsController : ControllerBase
                 team.Name,
                 team.IsDefault,
                 assignedAssetCount,
-                currentRiskScore,
+                currentRiskScore?.CurrentRiskScore,
+                currentRiskScore is null
+                    ? null
+                    : ToRollupRiskExplanationDto(
+                        currentRiskScore.CurrentRiskScore ?? 0m,
+                        currentRiskScore.MaxAssetRiskScore,
+                        currentRiskScore.AssetCount,
+                        currentRiskScore.OpenEpisodeCount,
+                        currentRiskScore.CriticalEpisodeCount,
+                        currentRiskScore.HighEpisodeCount,
+                        currentRiskScore.MediumEpisodeCount,
+                        currentRiskScore.LowEpisodeCount,
+                        currentRiskScore.FactorsJson,
+                        currentRiskScore.CalculationVersion,
+                        0.60m,
+                        0.25m
+                    ),
                 topRiskAssets,
                 team.Members.Select(m => new TeamMemberDto(
                         m.UserId,
@@ -157,6 +187,76 @@ public class TeamsController : ControllerBase
             )
         );
     }
+
+    private static RollupRiskExplanationDto ToRollupRiskExplanationDto(
+        decimal overallScore,
+        decimal maxAssetRiskScore,
+        int assetCount,
+        int openEpisodeCount,
+        int criticalEpisodeCount,
+        int highEpisodeCount,
+        int mediumEpisodeCount,
+        int lowEpisodeCount,
+        string factorsJson,
+        string calculationVersion,
+        decimal maxWeight,
+        decimal topThreeWeight
+    )
+    {
+        var factors = ParseRiskFactors(factorsJson);
+        var topThreeAverage = factors.FirstOrDefault(item => item.Name == "TopThreeAverage")?.Impact ?? 0m;
+        var criticalContribution = factors.FirstOrDefault(item => item.Name == "CriticalEpisodes")?.Impact ?? 0m;
+        var highContribution = factors.FirstOrDefault(item => item.Name == "HighEpisodes")?.Impact ?? 0m;
+        var mediumContribution = factors.FirstOrDefault(item => item.Name == "MediumEpisodes")?.Impact ?? 0m;
+        var lowContribution = factors.FirstOrDefault(item => item.Name == "LowEpisodes")?.Impact ?? 0m;
+
+        return new RollupRiskExplanationDto(
+            overallScore,
+            calculationVersion,
+            maxAssetRiskScore,
+            topThreeAverage,
+            Math.Round(maxWeight * maxAssetRiskScore, 2),
+            Math.Round(topThreeWeight * topThreeAverage, 2),
+            assetCount,
+            openEpisodeCount,
+            criticalEpisodeCount,
+            highEpisodeCount,
+            mediumEpisodeCount,
+            lowEpisodeCount,
+            criticalContribution,
+            highContribution,
+            mediumContribution,
+            lowContribution,
+            factors.Select(item => new RollupRiskExplanationFactorDto(
+                item.Name,
+                item.Description,
+                item.Impact
+            )).ToList()
+        );
+    }
+
+    private static IReadOnlyList<ParsedRiskFactor> ParseRiskFactors(string factorsJson)
+    {
+        if (string.IsNullOrWhiteSpace(factorsJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<ParsedRiskFactor>>(factorsJson) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private sealed record ParsedRiskFactor(
+        string Name,
+        string Description,
+        decimal Impact
+    );
 
     [HttpPost]
     [Authorize(Policy = Policies.ManageTeams)]

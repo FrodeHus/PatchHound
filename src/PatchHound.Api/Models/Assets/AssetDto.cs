@@ -79,7 +79,33 @@ public record AssetRiskDetailDto(
     int MediumCount,
     int LowCount,
     DateTimeOffset CalculatedAt,
+    AssetRiskExplanationDto? Explanation,
     IReadOnlyList<AssetRiskDriverDto> TopDrivers
+);
+
+public record AssetRiskExplanationDto(
+    decimal Score,
+    string CalculationVersion,
+    decimal MaxEpisodeRiskScore,
+    decimal TopThreeAverage,
+    decimal MaxEpisodeContribution,
+    decimal TopThreeContribution,
+    int OpenEpisodeCount,
+    int CriticalCount,
+    int HighCount,
+    int MediumCount,
+    int LowCount,
+    decimal CriticalContribution,
+    decimal HighContribution,
+    decimal MediumContribution,
+    decimal LowContribution,
+    IReadOnlyList<AssetRiskExplanationFactorDto> Factors
+);
+
+public record AssetRiskExplanationFactorDto(
+    string Name,
+    string Description,
+    decimal Impact
 );
 
 public record AssetRiskDriverDto(

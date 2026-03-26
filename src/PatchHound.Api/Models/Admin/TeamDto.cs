@@ -1,3 +1,5 @@
+using PatchHound.Api.Models.RiskScore;
+
 namespace PatchHound.Api.Models.Admin;
 
 public record TeamDto(
@@ -18,6 +20,7 @@ public record TeamDetailDto(
     bool IsDefault,
     int AssignedAssetCount,
     decimal? CurrentRiskScore,
+    RollupRiskExplanationDto? RiskExplanation,
     IReadOnlyList<TeamRiskAssetDto> TopRiskAssets,
     IReadOnlyList<TeamMemberDto> Members
 );

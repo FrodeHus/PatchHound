@@ -52,6 +52,7 @@ public record DeviceGroupRiskDetailDto(
     int HighEpisodeCount,
     int MediumEpisodeCount,
     int LowEpisodeCount,
+    RollupRiskExplanationDto? Explanation,
     List<AssetRiskScoreSummaryDto> TopRiskAssets
 );
 
@@ -68,4 +69,30 @@ public record SoftwareRiskDetailDto(
     int MediumEpisodeCount,
     int LowEpisodeCount,
     List<AssetRiskScoreSummaryDto> TopRiskAssets
+);
+
+public record RollupRiskExplanationDto(
+    decimal Score,
+    string CalculationVersion,
+    decimal MaxAssetRiskScore,
+    decimal TopThreeAverage,
+    decimal MaxAssetContribution,
+    decimal TopThreeContribution,
+    int AssetCount,
+    int OpenEpisodeCount,
+    int CriticalEpisodeCount,
+    int HighEpisodeCount,
+    int MediumEpisodeCount,
+    int LowEpisodeCount,
+    decimal CriticalContribution,
+    decimal HighContribution,
+    decimal MediumContribution,
+    decimal LowContribution,
+    IReadOnlyList<RollupRiskExplanationFactorDto> Factors
+);
+
+public record RollupRiskExplanationFactorDto(
+    string Name,
+    string Description,
+    decimal Impact
 );

@@ -613,6 +613,9 @@ function StageReadOnlyIndicator({
   const currentRoles = workflowState.currentUserRoles.length > 0
     ? workflowState.currentUserRoles.map(formatRoleName).join(', ')
     : 'No remediation role in this tenant'
+  const currentTeams = workflowState.currentUserTeams.length > 0
+    ? workflowState.currentUserTeams.join(', ')
+    : 'No team membership'
   const expectedRoles = workflowState.expectedRoles.length > 0
     ? workflowState.expectedRoles.map(formatRoleName).join(', ')
     : null
@@ -639,6 +642,14 @@ function StageReadOnlyIndicator({
               {currentRoles}
             </p>
           </div>
+          <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+              Your teams
+            </p>
+            <p className="mt-1 text-foreground">
+              {currentTeams}
+            </p>
+          </div>
           {expectedRoles ? (
             <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
               <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -651,9 +662,20 @@ function StageReadOnlyIndicator({
           ) : null}
           {workflowState.expectedTeamName ? (
             <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                Expected team
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  Expected team
+                </p>
+                {workflowState.isInExpectedTeam !== null ? (
+                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                    workflowState.isInExpectedTeam
+                      ? 'border-emerald-300/70 bg-emerald-500/8 text-emerald-800'
+                      : 'border-border/70 bg-background text-muted-foreground'
+                  }`}>
+                    {workflowState.isInExpectedTeam ? 'You are in this team' : 'You are not in this team'}
+                  </span>
+                ) : null}
+              </div>
               <p className="mt-1 text-foreground">
                 {workflowState.expectedTeamName}
               </p>

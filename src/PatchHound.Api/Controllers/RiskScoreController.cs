@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -217,6 +218,20 @@ public class RiskScoreController : ControllerBase
             groupScore.HighEpisodeCount,
             groupScore.MediumEpisodeCount,
             groupScore.LowEpisodeCount,
+            ToRollupRiskExplanationDto(
+                groupScore.OverallScore,
+                groupScore.MaxAssetRiskScore,
+                groupScore.AssetCount,
+                groupScore.OpenEpisodeCount,
+                groupScore.CriticalEpisodeCount,
+                groupScore.HighEpisodeCount,
+                groupScore.MediumEpisodeCount,
+                groupScore.LowEpisodeCount,
+                groupScore.FactorsJson,
+                groupScore.CalculationVersion,
+                0.55m,
+                0.25m
+            ),
             topRiskAssets.Select(item => new AssetRiskScoreSummaryDto(
                 item.AssetId,
                 item.AssetName,
@@ -372,4 +387,74 @@ public class RiskScoreController : ControllerBase
             )).ToList()
         ));
     }
+
+    private static RollupRiskExplanationDto ToRollupRiskExplanationDto(
+        decimal overallScore,
+        decimal maxAssetRiskScore,
+        int assetCount,
+        int openEpisodeCount,
+        int criticalEpisodeCount,
+        int highEpisodeCount,
+        int mediumEpisodeCount,
+        int lowEpisodeCount,
+        string factorsJson,
+        string calculationVersion,
+        decimal maxWeight,
+        decimal topThreeWeight
+    )
+    {
+        var factors = ParseRiskFactors(factorsJson);
+        var topThreeAverage = factors.FirstOrDefault(item => item.Name == "TopThreeAverage")?.Impact ?? 0m;
+        var criticalContribution = factors.FirstOrDefault(item => item.Name == "CriticalEpisodes")?.Impact ?? 0m;
+        var highContribution = factors.FirstOrDefault(item => item.Name == "HighEpisodes")?.Impact ?? 0m;
+        var mediumContribution = factors.FirstOrDefault(item => item.Name == "MediumEpisodes")?.Impact ?? 0m;
+        var lowContribution = factors.FirstOrDefault(item => item.Name == "LowEpisodes")?.Impact ?? 0m;
+
+        return new RollupRiskExplanationDto(
+            overallScore,
+            calculationVersion,
+            maxAssetRiskScore,
+            topThreeAverage,
+            Math.Round(maxWeight * maxAssetRiskScore, 2),
+            Math.Round(topThreeWeight * topThreeAverage, 2),
+            assetCount,
+            openEpisodeCount,
+            criticalEpisodeCount,
+            highEpisodeCount,
+            mediumEpisodeCount,
+            lowEpisodeCount,
+            criticalContribution,
+            highContribution,
+            mediumContribution,
+            lowContribution,
+            factors.Select(item => new RollupRiskExplanationFactorDto(
+                item.Name,
+                item.Description,
+                item.Impact
+            )).ToList()
+        );
+    }
+
+    private static IReadOnlyList<ParsedRiskFactor> ParseRiskFactors(string factorsJson)
+    {
+        if (string.IsNullOrWhiteSpace(factorsJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<ParsedRiskFactor>>(factorsJson) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private sealed record ParsedRiskFactor(
+        string Name,
+        string Description,
+        decimal Impact
+    );
 }
