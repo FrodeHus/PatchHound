@@ -167,36 +167,6 @@ export function AssetDetailPageView({
                   ) : null}
                 </div>
               </div>
-              <div className="rounded-2xl border border-border/70 bg-card px-4 py-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Exposure and follow-through
-                </p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                      Open episodes
-                    </p>
-                    <p className="mt-1 text-3xl font-semibold tracking-[-0.04em]">
-                      {asset.risk ? String(asset.risk.openEpisodeCount) : String(asset.vulnerabilities.length)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                      Remediation tasks
-                    </p>
-                    <p className="mt-1 text-3xl font-semibold tracking-[-0.04em]">
-                      {asset.assetType === "Device"
-                        ? String(asset.remediation?.openTaskCount ?? 0)
-                        : String(asset.softwareInventory.length)}
-                    </p>
-                    {asset.assetType === "Device" && asset.remediation ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {asset.remediation.overdueTaskCount} overdue
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
               <div className="rounded-2xl border border-border/70 bg-card px-4 py-3">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                   Reference
