@@ -13,7 +13,6 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
         StringComparer.OrdinalIgnoreCase
     )
     {
-        "SecretRef",
         "ClientSecret",
         "PasswordHash",
     };

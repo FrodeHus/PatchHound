@@ -21,19 +21,16 @@ public class TenantsController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly ISecretStore _secretStore;
-    private readonly AuditLogWriter _auditLogWriter;
     private readonly ITenantContext _tenantContext;
 
     public TenantsController(
         PatchHoundDbContext dbContext,
         ISecretStore secretStore,
-        AuditLogWriter auditLogWriter,
         ITenantContext tenantContext
     )
     {
         _dbContext = dbContext;
         _secretStore = secretStore;
-        _auditLogWriter = auditLogWriter;
         _tenantContext = tenantContext;
     }
 
@@ -232,16 +229,7 @@ public class TenantsController : ControllerBase
             .ToDictionaryAsync(source => source.SourceKey, StringComparer.OrdinalIgnoreCase, ct);
 
         // Collect pending secret writes — vault writes happen after DB commit
-        var pendingSecretWrites =
-            new List<(
-                string Path,
-                string Key,
-                string Value,
-                Guid SourceId,
-                bool HadSecret,
-                string OldSecretRef,
-                string SourceKey
-            )>();
+        var pendingSecretWrites = new List<(string Path, string Key, string Value)>();
 
         foreach (var source in request.IngestionSources)
         {
@@ -256,8 +244,6 @@ public class TenantsController : ControllerBase
 
             if (!string.IsNullOrWhiteSpace(secretValue))
             {
-                var hadSecret = !string.IsNullOrWhiteSpace(secretRef);
-                var oldSecretRef = secretRef;
                 secretRef = $"tenants/{tenant.Id}/sources/{source.Key}";
 
                 // Defer the actual vault write
@@ -265,11 +251,7 @@ public class TenantsController : ControllerBase
                     (
                         secretRef,
                         TenantSourceCatalog.GetSecretKeyName(source.Key),
-                        secretValue,
-                        existingSource?.Id ?? Guid.Empty,
-                        hadSecret,
-                        oldSecretRef,
-                        source.Key
+                        secretValue
                     )
                 );
             }
@@ -308,54 +290,14 @@ public class TenantsController : ControllerBase
         await _dbContext.SaveChangesAsync(ct);
 
         // Write secrets to vault after DB commit succeeds
-        foreach (
-            var (
-                path,
-                key,
-                value,
-                sourceId,
-                hadSecret,
-                oldSecretRef,
-                sourceKey
-            ) in pendingSecretWrites
-        )
+        foreach (var (path, key, value) in pendingSecretWrites)
         {
             await _secretStore.PutSecretAsync(
                 path,
                 new Dictionary<string, string> { [key] = value },
                 ct
             );
-
-            existingSources.TryGetValue(sourceKey, out var auditSource);
-            var auditEntityId = auditSource?.Id ?? sourceId;
-            if (auditEntityId != Guid.Empty)
-            {
-                await _auditLogWriter.WriteAsync(
-                    tenant.Id,
-                    "TenantSourceSecret",
-                    auditEntityId,
-                    hadSecret ? AuditAction.Updated : AuditAction.Created,
-                    hadSecret
-                        ? new
-                        {
-                            Key = sourceKey,
-                            HasSecret = true,
-                            SecretRef = oldSecretRef,
-                        }
-                        : null,
-                    new
-                    {
-                        Key = sourceKey,
-                        HasSecret = true,
-                        SecretRef = path,
-                    },
-                    ct
-                );
-            }
         }
-
-        if (pendingSecretWrites.Count > 0)
-            await _dbContext.SaveChangesAsync(ct);
 
         return NoContent();
     }

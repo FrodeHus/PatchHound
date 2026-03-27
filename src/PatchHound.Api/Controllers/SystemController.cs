@@ -420,15 +420,7 @@ public class SystemController : ControllerBase
             ct
         );
 
-        var pendingSecretWrites =
-            new List<(
-                string Path,
-                string Key,
-                string Value,
-                string SourceKey,
-                bool HadSecret,
-                string OldSecretRef
-            )>();
+        var pendingSecretWrites = new List<(string Path, string Key, string Value)>();
 
         foreach (var source in request)
         {
@@ -438,17 +430,12 @@ public class SystemController : ControllerBase
 
             if (!string.IsNullOrWhiteSpace(secretValue))
             {
-                var hadSecret = !string.IsNullOrWhiteSpace(secretRef);
-                var oldSecretRef = secretRef;
                 secretRef = $"system/enrichment-sources/{source.Key}";
                 pendingSecretWrites.Add(
                     (
                         secretRef,
                         EnrichmentSourceCatalog.GetSecretKeyName(source.Key),
-                        secretValue,
-                        source.Key,
-                        hadSecret,
-                        oldSecretRef
+                        secretValue
                     )
                 );
             }
@@ -480,42 +467,14 @@ public class SystemController : ControllerBase
         await _dbContext.SaveChangesAsync(ct);
 
         // Write secrets to vault after DB commit succeeds
-        foreach (var (path, key, value, sourceKey, hadSecret, oldSecretRef) in pendingSecretWrites)
+        foreach (var (path, key, value) in pendingSecretWrites)
         {
             await _secretStore.PutSecretAsync(
                 path,
                 new Dictionary<string, string> { [key] = value },
                 ct
             );
-
-            if (existingSources.TryGetValue(sourceKey, out var auditSource))
-            {
-                await _auditLogWriter.WriteAsync(
-                    Guid.Empty,
-                    "EnrichmentSourceSecret",
-                    auditSource.Id,
-                    hadSecret ? AuditAction.Updated : AuditAction.Created,
-                    hadSecret
-                        ? new
-                        {
-                            Key = sourceKey,
-                            HasSecret = true,
-                            SecretRef = oldSecretRef,
-                        }
-                        : null,
-                    new
-                    {
-                        Key = sourceKey,
-                        HasSecret = true,
-                        SecretRef = path,
-                    },
-                    ct
-                );
-            }
         }
-
-        if (pendingSecretWrites.Count > 0)
-            await _dbContext.SaveChangesAsync(ct);
 
         return NoContent();
     }
