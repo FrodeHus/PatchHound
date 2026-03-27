@@ -69,10 +69,10 @@ public class EndOfLifeSoftwareEnrichmentRunner(
             ? EnrichmentSourceCatalog.DefaultEndOfLifeApiBaseUrl
             : sourceConfig.ApiBaseUrl;
 
-        // Use stored slug or fall back to the external key (CanonicalProductKey)
+        // Use stored slug or fall back to the product name from the canonical key (vendor|product)
         var productSlug = !string.IsNullOrWhiteSpace(software.EolProductSlug)
             ? software.EolProductSlug
-            : job.ExternalKey;
+            : ExtractProductName(job.ExternalKey);
 
         try
         {
@@ -176,5 +176,13 @@ public class EndOfLifeSoftwareEnrichmentRunner(
         }
 
         return DateTimeOffset.TryParse(value, out var result) ? result : null;
+    }
+
+    private static string ExtractProductName(string canonicalProductKey)
+    {
+        var separatorIndex = canonicalProductKey.IndexOf('|');
+        return separatorIndex >= 0
+            ? canonicalProductKey[(separatorIndex + 1)..]
+            : canonicalProductKey;
     }
 }
