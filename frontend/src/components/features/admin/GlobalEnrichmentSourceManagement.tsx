@@ -67,7 +67,7 @@ export function GlobalEnrichmentSourceManagement({
         isOpen={historySource !== null}
         onOpenChange={(open) => {
           if (!open) {
-            setHistorySource(null)
+            setHistorySource(null);
           }
         }}
       />
@@ -76,48 +76,47 @@ export function GlobalEnrichmentSourceManagement({
         <CardHeader className="border-b border-border/60 pb-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-1">
-              <h2 className="text-2xl font-semibold tracking-[-0.04em]">Global Enrichment</h2>
+              <h2 className="text-2xl font-semibold tracking-[-0.04em]">
+                Global Enrichment
+              </h2>
               <p className="text-sm text-muted-foreground">
-                Configure shared enrichment providers used across all tenants during vulnerability processing.
+                Configure shared enrichment providers used across all tenants
+                during vulnerability processing.
               </p>
             </div>
-            <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="rounded-full px-5">
-              {mutation.isPending ? 'Saving...' : 'Save enrichment changes'}
+            <Button
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending}
+              className="rounded-full px-5"
+            >
+              {mutation.isPending ? "Saving..." : "Save enrichment changes"}
             </Button>
           </div>
         </CardHeader>
 
         <CardContent className="space-y-5 pt-5">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-border/70 bg-background/30 p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Providers</p>
-              <p className="mt-2 text-2xl font-semibold">{sources.length}</p>
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-background/30 p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Enabled</p>
-              <p className="mt-2 text-2xl font-semibold">{sources.filter((source) => source.enabled).length}</p>
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-background/30 p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Configured</p>
-              <p className="mt-2 text-2xl font-semibold">
-                {sources.filter((source) => source.credentialMode === 'no-credential' || source.credentialMode === 'tenant-source' || source.credentials.hasSecret).length}
-              </p>
-            </div>
-          </div>
-
           <div className="grid gap-3 lg:grid-cols-3">
             {sources.map((source) => (
-              <div key={`${source.key}-status`} className="rounded-2xl border border-border/70 bg-background/30 p-4">
+              <div
+                key={`${source.key}-status`}
+                className="rounded-2xl border border-border/70 bg-background/30 p-4"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{source.displayName}</p>
-                    <p className="mt-2 text-sm font-medium">{getProviderStatusLabel(source)}</p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                      {source.displayName}
+                    </p>
+                    <p className="mt-2 text-sm font-medium">
+                      {getProviderStatusLabel(source)}
+                    </p>
                   </div>
                   <Badge className={getProviderStatusBadgeClassName(source)}>
-                    {source.enabled ? 'Enabled' : 'Disabled'}
+                    {source.enabled ? "Enabled" : "Disabled"}
                   </Badge>
                 </div>
-                <p className="mt-3 text-sm leading-6 text-muted-foreground">{getProviderStatusDescription(source)}</p>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                  {getProviderStatusDescription(source)}
+                </p>
               </div>
             ))}
           </div>
@@ -126,32 +125,51 @@ export function GlobalEnrichmentSourceManagement({
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold">Enrichment Providers</h3>
-                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
+                  <h3 className="text-lg font-semibold">
+                    Enrichment Providers
+                  </h3>
+                  <Badge
+                    variant="outline"
+                    className="rounded-full border-border/70 bg-background/50"
+                  >
                     {sources.length}
                   </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  These providers are not tenant-specific. The worker invokes them while processing vulnerability ingestion.
+                  These providers are not tenant-specific. The worker invokes
+                  them while processing vulnerability ingestion.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                {saveState === 'saved' ? <p className="rounded-full border border-tone-success-border bg-tone-success px-3 py-1 text-tone-success-foreground">Configuration saved</p> : null}
-                {saveState === 'error' ? <p className="rounded-full border border-destructive/25 bg-destructive/10 px-3 py-1 text-destructive">Save failed</p> : null}
+                {saveState === "saved" ? (
+                  <p className="rounded-full border border-tone-success-border bg-tone-success px-3 py-1 text-tone-success-foreground">
+                    Configuration saved
+                  </p>
+                ) : null}
+                {saveState === "error" ? (
+                  <p className="rounded-full border border-destructive/25 bg-destructive/10 px-3 py-1 text-destructive">
+                    Save failed
+                  </p>
+                ) : null}
               </div>
             </div>
 
             <div className="mt-5 space-y-4">
               {sources.map((source) => {
-                const isExpanded = expandedSourceKey === source.key
+                const isExpanded = expandedSourceKey === source.key;
 
                 return (
-                  <Card key={source.key} className="rounded-3xl border-border/70 bg-card/85 shadow-sm">
+                  <Card
+                    key={source.key}
+                    className="rounded-3xl border-border/70 bg-card/85 shadow-sm"
+                  >
                     <button
                       type="button"
                       className="flex w-full flex-wrap items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-background/30"
                       onClick={() => {
-                        setExpandedSourceKey((current) => (current === source.key ? null : source.key))
+                        setExpandedSourceKey((current) =>
+                          current === source.key ? null : source.key,
+                        );
                       }}
                     >
                       <div className="min-w-0 flex-1">
@@ -159,23 +177,29 @@ export function GlobalEnrichmentSourceManagement({
                           <div className="flex size-8 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
                             <Sparkles className="size-4" />
                           </div>
-                          <CardTitle className="text-base">{source.displayName}</CardTitle>
-                          <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
+                          <CardTitle className="text-base">
+                            {source.displayName}
+                          </CardTitle>
+                          <Badge
+                            variant="outline"
+                            className="rounded-full border-border/70 bg-background/70"
+                          >
                             {source.key}
                           </Badge>
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="rounded-full border border-border/70 bg-background/50 px-3 py-1">
-                          Last run {formatTimestamp(source.runtime.lastCompletedAt)}
+                          Last run{" "}
+                          {formatTimestamp(source.runtime.lastCompletedAt)}
                         </span>
                         <StatusBadge tone={getProviderStatusTone(source)}>
                           {getProviderStatusLabel(source)}
                         </StatusBadge>
                         <span
                           className={cn(
-                            'inline-flex size-8 items-center justify-center rounded-full border border-border/70 bg-background/50 transition-transform',
-                            isExpanded ? 'rotate-180' : '',
+                            "inline-flex size-8 items-center justify-center rounded-full border border-border/70 bg-background/50 transition-transform",
+                            isExpanded ? "rotate-180" : "",
                           )}
                         >
                           <ChevronDown className="size-4" />
@@ -197,41 +221,79 @@ export function GlobalEnrichmentSourceManagement({
                             }
                           />
                           <div>
-                            <p className="text-sm font-medium">Enable provider</p>
+                            <p className="text-sm font-medium">
+                              Enable provider
+                            </p>
                             <p className="text-xs text-muted-foreground">
-                              When enabled, the worker will invoke this enrichment source during vulnerability processing.
+                              When enabled, the worker will invoke this
+                              enrichment source during vulnerability processing.
                             </p>
                           </div>
                         </label>
 
                         <div className="rounded-2xl border border-border/70 bg-background/30 px-4 py-3">
-                          <p className="text-sm font-medium">{getProviderStatusDescription(source)}</p>
+                          <p className="text-sm font-medium">
+                            {getProviderStatusDescription(source)}
+                          </p>
                           <p className="mt-2 text-xs text-muted-foreground">
-                            Last success: {formatTimestamp(source.runtime.lastSucceededAt)}
+                            Last success:{" "}
+                            {formatTimestamp(source.runtime.lastSucceededAt)}
                           </p>
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-5">
-                          <QueueMetric label="Pending" value={source.queue.pendingCount} tone="warning" />
-                          <QueueMetric label="Retry" value={source.queue.retryScheduledCount} tone="warning" />
-                          <QueueMetric label="Running" value={source.queue.runningCount} tone="info" />
-                          <QueueMetric label="Failed" value={source.queue.failedCount} tone={source.queue.failedCount > 0 ? 'error' : 'neutral'} />
-                          <QueueMetric label="Oldest Due" value={formatTimestamp(source.queue.oldestPendingAt)} tone="neutral" />
+                          <QueueMetric
+                            label="Pending"
+                            value={source.queue.pendingCount}
+                            tone="warning"
+                          />
+                          <QueueMetric
+                            label="Retry"
+                            value={source.queue.retryScheduledCount}
+                            tone="warning"
+                          />
+                          <QueueMetric
+                            label="Running"
+                            value={source.queue.runningCount}
+                            tone="info"
+                          />
+                          <QueueMetric
+                            label="Failed"
+                            value={source.queue.failedCount}
+                            tone={
+                              source.queue.failedCount > 0 ? "error" : "neutral"
+                            }
+                          />
+                          <QueueMetric
+                            label="Oldest Due"
+                            value={formatTimestamp(
+                              source.queue.oldestPendingAt,
+                            )}
+                            tone="neutral"
+                          />
                         </div>
 
                         <div className="rounded-2xl border border-border/70 bg-background/30 p-4">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                              <p className="text-sm font-medium">Recent enrichment runs</p>
+                              <p className="text-sm font-medium">
+                                Recent enrichment runs
+                              </p>
                               <p className="text-xs text-muted-foreground">
-                                Latest queue-processing outcomes for this provider.
+                                Latest queue-processing outcomes for this
+                                provider.
                               </p>
                             </div>
                             <Button
                               type="button"
                               variant="outline"
                               className="rounded-full"
-                              onClick={() => setHistorySource({ key: source.key, displayName: source.displayName })}
+                              onClick={() =>
+                                setHistorySource({
+                                  key: source.key,
+                                  displayName: source.displayName,
+                                })
+                              }
                             >
                               View full history
                             </Button>
@@ -245,13 +307,29 @@ export function GlobalEnrichmentSourceManagement({
                                   className="grid gap-2 rounded-2xl border border-border/60 bg-background/30 px-4 py-3 text-xs text-muted-foreground sm:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]"
                                 >
                                   <div>
-                                    <p className="font-medium text-foreground">{run.status}</p>
-                                    <p>Started {formatTimestamp(run.startedAt)}</p>
+                                    <p className="font-medium text-foreground">
+                                      {run.status}
+                                    </p>
+                                    <p>
+                                      Started {formatTimestamp(run.startedAt)}
+                                    </p>
                                   </div>
-                                  <RunStat label="Claimed" value={run.jobsClaimed} />
-                                  <RunStat label="Succeeded" value={run.jobsSucceeded} />
-                                  <RunStat label="No Data" value={run.jobsNoData} />
-                                  <RunStat label="Failed" value={run.jobsFailed} />
+                                  <RunStat
+                                    label="Claimed"
+                                    value={run.jobsClaimed}
+                                  />
+                                  <RunStat
+                                    label="Succeeded"
+                                    value={run.jobsSucceeded}
+                                  />
+                                  <RunStat
+                                    label="No Data"
+                                    value={run.jobsNoData}
+                                  />
+                                  <RunStat
+                                    label="Failed"
+                                    value={run.jobsFailed}
+                                  />
                                 </div>
                               ))}
                             </div>
@@ -264,7 +342,9 @@ export function GlobalEnrichmentSourceManagement({
 
                         <div className="grid gap-4 md:grid-cols-2">
                           <label className="space-y-2">
-                            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Display Name</span>
+                            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                              Display Name
+                            </span>
                             <Input
                               value={source.displayName}
                               onChange={(event) =>
@@ -276,7 +356,9 @@ export function GlobalEnrichmentSourceManagement({
                             />
                           </label>
                           <label className="space-y-2">
-                            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">API Base URL</span>
+                            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                              API Base URL
+                            </span>
                             <Input
                               value={source.credentials.apiBaseUrl}
                               onChange={(event) =>
@@ -290,58 +372,84 @@ export function GlobalEnrichmentSourceManagement({
                               }
                             />
                           </label>
-                          {source.key === 'microsoft-defender' ? (
+                          {source.key === "microsoft-defender" ? (
                             <label className="space-y-2">
-                              <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Refresh TTL (hours)</span>
+                              <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                Refresh TTL (hours)
+                              </span>
                               <Input
                                 type="number"
                                 min={1}
                                 step={1}
-                                value={source.refreshTtlHours ?? ''}
+                                value={source.refreshTtlHours ?? ""}
                                 onChange={(event) =>
                                   updateSource(source.key, (current) => ({
                                     ...current,
                                     refreshTtlHours:
-                                      event.target.value.trim() === ''
+                                      event.target.value.trim() === ""
                                         ? null
-                                        : Math.max(1, Number.parseInt(event.target.value, 10) || 1),
+                                        : Math.max(
+                                            1,
+                                            Number.parseInt(
+                                              event.target.value,
+                                              10,
+                                            ) || 1,
+                                          ),
                                   }))
                                 }
                               />
                               <p className="text-xs text-muted-foreground">
-                                Defender CVE detail is refreshed asynchronously when stored detail is older than this threshold.
+                                Defender CVE detail is refreshed asynchronously
+                                when stored detail is older than this threshold.
                               </p>
                             </label>
                           ) : null}
                         </div>
 
-                        {source.credentialMode === 'global-secret' ? (
+                        {source.credentialMode === "global-secret" ? (
                           <label className="space-y-2">
-                            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">API Key</span>
+                            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                              API Key
+                            </span>
                             <Input
                               type="password"
-                              placeholder={source.credentials.hasSecret ? 'API key stored. Enter a new key to replace it.' : 'Enter API key'}
+                              placeholder={
+                                source.credentials.hasSecret
+                                  ? "API key stored. Enter a new key to replace it."
+                                  : "Enter API key"
+                              }
                               value={source.credentials.secret}
                               onChange={(event) =>
                                 updateSource(source.key, (current) => ({
                                   ...current,
-                                  credentials: { ...current.credentials, secret: event.target.value },
+                                  credentials: {
+                                    ...current.credentials,
+                                    secret: event.target.value,
+                                  },
                                 }))
                               }
                             />
                           </label>
-                        ) : source.credentialMode === 'no-credential' ? (
+                        ) : source.credentialMode === "no-credential" ? (
                           <div className="rounded-2xl border border-border/70 bg-background/30 px-4 py-3">
-                            <p className="text-sm font-medium">No credentials required</p>
+                            <p className="text-sm font-medium">
+                              No credentials required
+                            </p>
                             <p className="mt-2 text-xs text-muted-foreground">
-                              This provider uses a public API and does not require any API key or authentication.
+                              This provider uses a public API and does not
+                              require any API key or authentication.
                             </p>
                           </div>
                         ) : (
                           <div className="rounded-2xl border border-border/70 bg-background/30 px-4 py-3">
-                            <p className="text-sm font-medium">Credential source</p>
+                            <p className="text-sm font-medium">
+                              Credential source
+                            </p>
                             <p className="mt-2 text-xs text-muted-foreground">
-                              This provider reuses each tenant&apos;s Microsoft Defender credentials from the tenant source configuration in OpenBao. No global API key is required here.
+                              This provider reuses each tenant&apos;s Microsoft
+                              Defender credentials from the tenant source
+                              configuration in OpenBao. No global API key is
+                              required here.
                             </p>
                           </div>
                         )}
@@ -354,14 +462,14 @@ export function GlobalEnrichmentSourceManagement({
                       </CardContent>
                     ) : null}
                   </Card>
-                )
+                );
               })}
             </div>
           </div>
         </CardContent>
       </Card>
     </section>
-  )
+  );
 }
 
 function QueueMetric({
