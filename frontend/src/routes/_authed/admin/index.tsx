@@ -84,29 +84,23 @@ function AdminLandingPage() {
       <div className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Administration</p>
-            <h1 className="text-3xl font-semibold tracking-[-0.04em]">Admin Console</h1>
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              Centralized access to tenant administration, user access control, and assignment-group ownership management.
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              Administration
             </p>
-          </div>
-          <div className="rounded-2xl border border-border/70 bg-background/30 p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl border border-border/70 bg-card/75 p-2">
-                <Settings2 className="size-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Accessible Areas</p>
-                <p className="mt-1 text-xl font-semibold">{accessibleAreas.length}</p>
-              </div>
-            </div>
+            <h1 className="text-3xl font-semibold tracking-[-0.04em]">
+              Admin Console
+            </h1>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Centralized access to tenant administration, user access control,
+              and assignment-group ownership management.
+            </p>
           </div>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         {accessibleAreas.map((area) => {
-          const Icon = area.icon
+          const Icon = area.icon;
           return (
             <Link key={area.to} to={area.to} className="block">
               <Card className="h-full rounded-2xl border-border/70 bg-card/92 transition hover:border-primary/30 hover:bg-accent/10">
@@ -119,17 +113,21 @@ function AdminLandingPage() {
                   </div>
                   <div>
                     <CardTitle>{area.title}</CardTitle>
-                    <p className="mt-2 text-sm text-muted-foreground">{area.description}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {area.description}
+                    </p>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Open admin area</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    Open admin area
+                  </p>
                 </CardContent>
               </Card>
             </Link>
-          )
+          );
         })}
       </div>
     </section>
-  )
+  );
 }
