@@ -80,7 +80,6 @@ public class SettingsAuditControllerTests : IDisposable
         var controller = new TenantsController(
             _dbContext,
             _secretStore,
-            new AuditLogWriter(_dbContext, _tenantContext),
             _tenantContext
         );
 
