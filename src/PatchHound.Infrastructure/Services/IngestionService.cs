@@ -1948,6 +1948,23 @@ public class IngestionService
             vulnerabilityDefinitionIds,
             ct
         );
+
+        var normalizedSoftwareIds = await _dbContext
+            .TenantSoftware.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(ts => ts.TenantId == tenantId)
+            .Select(ts => ts.NormalizedSoftwareId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        if (normalizedSoftwareIds.Count > 0)
+        {
+            await _enrichmentJobEnqueuer.EnqueueSoftwareEndOfLifeJobsAsync(
+                tenantId,
+                normalizedSoftwareIds,
+                ct
+            );
+        }
     }
 
     internal async Task ProcessResultsAsync(
