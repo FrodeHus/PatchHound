@@ -120,32 +120,6 @@ export function GlobalEnrichmentSourceManagement({
         </CardHeader>
 
         <CardContent className="space-y-5 pt-5">
-          <div className="grid gap-3 lg:grid-cols-3">
-            {sources.map((source) => (
-              <div
-                key={`${source.key}-status`}
-                className="rounded-2xl border border-border/70 bg-background/30 p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      {source.displayName}
-                    </p>
-                    <p className="mt-2 text-sm font-medium">
-                      {getProviderStatusLabel(source)}
-                    </p>
-                  </div>
-                  <Badge className={getProviderStatusBadgeClassName(source)}>
-                    {source.enabled ? "Enabled" : "Disabled"}
-                  </Badge>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                  {getProviderStatusDescription(source)}
-                </p>
-              </div>
-            ))}
-          </div>
-
           <div className="rounded-3xl border border-border/70 bg-background/30 p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-4">
               <div className="space-y-1">
