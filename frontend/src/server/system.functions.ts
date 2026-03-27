@@ -163,6 +163,16 @@ export const updateEnrichmentSources = createServerFn({ method: 'POST' })
     await apiPut('/system/enrichment-sources', context, data)
   })
 
+export const triggerEndOfLifeEnrichment = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({
+    tenantId: z.string(),
+  }))
+  .handler(async ({ context, data: { tenantId } }) => {
+    const response = await apiPost(`/tenants/${tenantId}/enrichment/endoflife/trigger`, context, {})
+    return z.object({ enqueuedCount: z.number() }).parse(response)
+  })
+
 export const fetchEnrichmentRuns = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({

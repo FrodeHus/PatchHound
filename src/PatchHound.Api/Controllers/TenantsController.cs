@@ -354,6 +354,56 @@ public class TenantsController : ControllerBase
         return Accepted();
     }
 
+    [HttpPost("{id:guid}/enrichment/endoflife/trigger")]
+    [Authorize(Policy = Policies.ConfigureTenant)]
+    public async Task<IActionResult> TriggerEndOfLifeEnrichment(Guid id, CancellationToken ct)
+    {
+        if (!_tenantContext.HasAccessToTenant(id))
+            return Forbid();
+
+        var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (tenant is null)
+            return NotFound();
+
+        var eolEnabled = await _dbContext
+            .EnrichmentSourceConfigurations.IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(
+                source =>
+                    source.SourceKey == EnrichmentSourceCatalog.EndOfLifeSourceKey
+                    && source.Enabled,
+                ct
+            );
+
+        if (!eolEnabled)
+        {
+            return BadRequest(
+                new ProblemDetails
+                {
+                    Title = "Enable the End of Life enrichment source before triggering.",
+                }
+            );
+        }
+
+        var normalizedSoftwareIds = await _dbContext
+            .TenantSoftware.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(ts => ts.TenantId == id)
+            .Select(ts => ts.NormalizedSoftwareId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        if (normalizedSoftwareIds.Count == 0)
+        {
+            return Ok(new { enqueuedCount = 0 });
+        }
+
+        var enqueuer = HttpContext.RequestServices.GetRequiredService<EnrichmentJobEnqueuer>();
+        await enqueuer.EnqueueSoftwareEndOfLifeJobsAsync(id, normalizedSoftwareIds, ct);
+
+        return Accepted(new { enqueuedCount = normalizedSoftwareIds.Count });
+    }
+
     [HttpGet("{id:guid}/ingestion-sources/{sourceKey}/runs")]
     [Authorize(Policy = Policies.ConfigureTenant)]
     public async Task<ActionResult<PagedResponse<TenantIngestionRunDto>>> ListRuns(
