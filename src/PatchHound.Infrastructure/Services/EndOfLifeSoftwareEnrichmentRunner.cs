@@ -72,7 +72,7 @@ public class EndOfLifeSoftwareEnrichmentRunner(
         // Use stored slug or fall back to the product name from the canonical key (vendor|product)
         var productSlug = !string.IsNullOrWhiteSpace(software.EolProductSlug)
             ? software.EolProductSlug
-            : ExtractProductName(job.ExternalKey);
+            : ResolveProductSlug(job.ExternalKey, software.CanonicalName);
 
         try
         {
@@ -178,8 +178,16 @@ public class EndOfLifeSoftwareEnrichmentRunner(
         return DateTimeOffset.TryParse(value, out var result) ? result : null;
     }
 
-    private static string ExtractProductName(string canonicalProductKey)
+    private static string ResolveProductSlug(string canonicalProductKey, string canonicalName)
     {
+        var name = canonicalName.ToLowerInvariant();
+
+        // Map Windows OS variants to their endoflife.date product slugs
+        if (name.Contains("windows server"))
+            return "windows-server";
+        if (name.Contains("windows 10") || name.Contains("windows 11"))
+            return "windows";
+
         var separatorIndex = canonicalProductKey.IndexOf('|');
         return separatorIndex >= 0
             ? canonicalProductKey[(separatorIndex + 1)..]
