@@ -161,7 +161,9 @@ public class TenantContext : ITenantContext
                     .ToListAsync();
 
                 var missingRoles = internalTenantIds
-                    .SelectMany(tenantId => rolesToSync.Select(roleName => new { tenantId, roleName }))
+                    .SelectMany(tenantId =>
+                        rolesToSync.Select(roleName => new { tenantId, roleName })
+                    )
                     .Where(candidate => existingTokenRoles.All(existing =>
                         existing.TenantId != candidate.tenantId || existing.Role != candidate.roleName))
                     .ToList();
