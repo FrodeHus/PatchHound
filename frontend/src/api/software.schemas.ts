@@ -68,6 +68,15 @@ export const tenantSoftwareDetailSchema = z.object({
   remediation: remediationTaskSummarySchema,
   versionCohorts: z.array(tenantSoftwareVersionCohortSchema),
   sourceAliases: z.array(tenantSoftwareSourceAliasSchema),
+  lifecycle: z.object({
+    eolDate: isoDateTimeSchema.nullable(),
+    latestVersion: z.string().nullable(),
+    isLts: z.boolean().nullable(),
+    supportEndDate: isoDateTimeSchema.nullable(),
+    isDiscontinued: z.boolean().nullable(),
+    enrichedAt: isoDateTimeSchema.nullable(),
+    productSlug: z.string().nullable(),
+  }).nullable(),
 })
 
 export const tenantSoftwareListItemSchema = z.object({

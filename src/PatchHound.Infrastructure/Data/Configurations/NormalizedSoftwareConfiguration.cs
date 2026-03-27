@@ -22,5 +22,9 @@ public class NormalizedSoftwareConfiguration : IEntityTypeConfiguration<Normaliz
         builder.Property(item => item.DescriptionModel).HasMaxLength(256);
         builder.Property(item => item.NormalizationMethod).HasConversion<string>().HasMaxLength(32);
         builder.Property(item => item.Confidence).HasConversion<string>().HasMaxLength(16);
+
+        // End-of-life enrichment fields
+        builder.Property(item => item.EolProductSlug).HasMaxLength(256);
+        builder.Property(item => item.EolLatestVersion).HasMaxLength(128);
     }
 }
