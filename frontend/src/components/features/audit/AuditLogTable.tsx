@@ -60,22 +60,12 @@ export function AuditLogTable({
   const [selected, setSelected] = useState<AuditLogItem | null>(null)
 
   const entityTypeOptions = useMemo(
-    () => Array.from(new Set(items.map((item) => item.entityType))).sort((left, right) => left.localeCompare(right)),
+    () =>
+      Array.from(new Set(items.map((item) => item.entityType))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
     [items],
-  )
-
-  const summaryItems = useMemo(() => {
-    const createdCount = items.filter((item) => item.action === 'Created').length
-    const updatedCount = items.filter((item) => item.action === 'Updated').length
-    const deletedCount = items.filter((item) => item.action === 'Deleted').length
-
-    return [
-      { label: 'Rows on page', value: items.length.toString(), tone: 'accent' as const },
-      { label: 'Created', value: createdCount.toString() },
-      { label: 'Updated', value: updatedCount.toString() },
-      { label: 'Deleted', value: deletedCount.toString(), tone: 'warning' as const },
-    ]
-  }, [items])
+  );  
 
   const activeFilters = useMemo(
     () =>
@@ -175,17 +165,13 @@ export function AuditLogTable({
         totalCount={totalCount}
       >
         <DataTableToolbar>
-          <DataTableToolbarRow>
-            <DataTableSummaryStrip items={summaryItems} className="flex-1" />
-          </DataTableToolbarRow>
-
           <DataTableFilterBar className="lg:grid-cols-[repeat(2,minmax(220px,0.8fr))]">
             <DataTableField label="Action">
               <Select
-                value={actionFilter || 'all'}
+                value={actionFilter || "all"}
                 onValueChange={(value) => {
-                  const nextValue = value ?? 'all'
-                  onActionFilterChange(nextValue === 'all' ? '' : nextValue)
+                  const nextValue = value ?? "all";
+                  onActionFilterChange(nextValue === "all" ? "" : nextValue);
                 }}
               >
                 <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
@@ -204,10 +190,12 @@ export function AuditLogTable({
 
             <DataTableField label="Entity type">
               <Select
-                value={entityTypeFilter || 'all'}
+                value={entityTypeFilter || "all"}
                 onValueChange={(value) => {
-                  const nextValue = value ?? 'all'
-                  onEntityTypeFilterChange(nextValue === 'all' ? '' : nextValue)
+                  const nextValue = value ?? "all";
+                  onEntityTypeFilterChange(
+                    nextValue === "all" ? "" : nextValue,
+                  );
                 }}
               >
                 <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
@@ -226,7 +214,11 @@ export function AuditLogTable({
           </DataTableFilterBar>
 
           <DataTableToolbarRow>
-            <DataTableActiveFilters filters={activeFilters} onClearAll={onClearFilters} className="flex-1" />
+            <DataTableActiveFilters
+              filters={activeFilters}
+              onClearAll={onClearFilters}
+              className="flex-1"
+            />
           </DataTableToolbarRow>
         </DataTableToolbar>
 
@@ -237,7 +229,12 @@ export function AuditLogTable({
           />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/30">
-            <DataTable columns={columns} data={items} getRowId={(row) => row.id} className="min-w-[1120px]" />
+            <DataTable
+              columns={columns}
+              data={items}
+              getRowId={(row) => row.id}
+              className="min-w-[1120px]"
+            />
           </div>
         )}
 
@@ -254,11 +251,11 @@ export function AuditLogTable({
       <AuditDetailDialog
         selected={selected}
         onClose={() => {
-          setSelected(null)
+          setSelected(null);
         }}
       />
     </>
-  )
+  );
 }
 
 function summarizeEntry(item: AuditLogItem) {
