@@ -2,7 +2,11 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ChevronDown, Sparkles } from 'lucide-react'
-import { type EnrichmentSource, triggerEndOfLifeEnrichment, updateEnrichmentSources } from '@/server/system.functions'
+import {
+  type EnrichmentSource,
+  triggerEndOfLifeEnrichment,
+  updateEnrichmentSources,
+} from "@/server/system.functions";
 import { EnrichmentRunHistorySheet } from '@/components/features/admin/EnrichmentRunHistorySheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { cn } from '@/lib/utils'
-import { useTenantScope } from '@/components/layout/tenant-scope'
+import { useTenantScope } from "@/components/layout/tenant-scope";
 
 type GlobalEnrichmentSourceManagementProps = {
   sources: EnrichmentSource[]
@@ -25,20 +29,26 @@ export function GlobalEnrichmentSourceManagement({
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
   const [expandedSourceKey, setExpandedSourceKey] = useState<string | null>(null)
   const [historySource, setHistorySource] = useState<{ key: string; displayName: string } | null>(null)
-  const { selectedTenantId } = useTenantScope()
+  const { selectedTenantId } = useTenantScope();
 
   const eolTriggerMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedTenantId) throw new Error('No tenant selected')
-      return triggerEndOfLifeEnrichment({ data: { tenantId: selectedTenantId } })
+      if (!selectedTenantId) throw new Error("No tenant selected");
+      return triggerEndOfLifeEnrichment({
+        data: { tenantId: selectedTenantId },
+      });
     },
     onSuccess: (result) => {
-      toast.success(`EOL enrichment triggered for ${result.enqueuedCount} software items`)
+      toast.success(
+        `EOL enrichment triggered for ${result.enqueuedCount} software items`,
+      );
     },
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, 'Failed to trigger EOL enrichment'))
+      toast.error(
+        getApiErrorMessage(error, "Failed to trigger EOL enrichment"),
+      );
     },
-  })
+  });
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -472,21 +482,25 @@ export function GlobalEnrichmentSourceManagement({
                         {source.key === "endoflife" && source.enabled ? (
                           <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-background/30 px-4 py-3">
                             <div>
-                              <p className="text-sm font-medium">
-                                Manual sync
-                              </p>
+                              <p className="text-sm font-medium">Manual sync</p>
                               <p className="text-xs text-muted-foreground">
-                                Queue end-of-life enrichment for all software in the current tenant.
+                                Queue end-of-life enrichment for all software in
+                                the current tenant.
                               </p>
                             </div>
                             <Button
                               type="button"
                               variant="outline"
                               className="rounded-full"
-                              disabled={eolTriggerMutation.isPending || !selectedTenantId}
+                              disabled={
+                                eolTriggerMutation.isPending ||
+                                !selectedTenantId
+                              }
                               onClick={() => eolTriggerMutation.mutate()}
                             >
-                              {eolTriggerMutation.isPending ? "Triggering…" : "Trigger EOL sync"}
+                              {eolTriggerMutation.isPending
+                                ? "Triggering…"
+                                : "Trigger EOL sync"}
                             </Button>
                           </div>
                         ) : null}
