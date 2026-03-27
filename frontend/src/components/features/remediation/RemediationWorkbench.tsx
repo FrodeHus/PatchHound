@@ -50,18 +50,17 @@ export function RemediationWorkbench({
       <header className="rounded-[28px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_45%),var(--color-card)] p-5">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.8fr)_minmax(360px,1fr)] xl:items-start">
           <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Remediation workbench</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              Remediation workbench
+            </p>
             <div className="space-y-1.5">
-              <h1 className="text-3xl font-semibold tracking-[-0.04em]">Software remediation decisions</h1>
+              <h1 className="text-3xl font-semibold tracking-[-0.04em]">
+                Software remediation decisions
+              </h1>
               <p className="max-w-3xl text-sm text-muted-foreground">
-                Review the remediation posture across tracked software and move items that still need ownership,
-                approval, or execution.
+                Review the remediation posture across tracked software and move
+                items that still need ownership, approval, or execution.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1">Tenant-wide queue</span>
-              <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1">Active exposure only</span>
-              <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1">Software-level workflow view</span>
             </div>
           </div>
 
@@ -70,41 +69,54 @@ export function RemediationWorkbench({
               label="Software in scope"
               value={String(data.summary.softwareInScope)}
               active={!filters.decisionState && !filters.approvalStatus}
-              onClick={() => onFiltersChange({ ...filters, decisionState: '', approvalStatus: '' })}
+              onClick={() =>
+                onFiltersChange({
+                  ...filters,
+                  decisionState: "",
+                  approvalStatus: "",
+                })
+              }
             />
             <Metric
               label="With decision"
               value={String(data.summary.withDecision)}
-              active={filters.decisionState === 'WithDecision'}
+              active={filters.decisionState === "WithDecision"}
               onClick={() =>
                 onFiltersChange({
                   ...filters,
-                  decisionState: filters.decisionState === 'WithDecision' ? '' : 'WithDecision',
-                  approvalStatus: '',
+                  decisionState:
+                    filters.decisionState === "WithDecision"
+                      ? ""
+                      : "WithDecision",
+                  approvalStatus: "",
                 })
               }
             />
             <Metric
               label="Pending approval"
               value={String(data.summary.pendingApproval)}
-              active={filters.approvalStatus === 'PendingApproval'}
+              active={filters.approvalStatus === "PendingApproval"}
               onClick={() =>
                 onFiltersChange({
                   ...filters,
-                  approvalStatus: filters.approvalStatus === 'PendingApproval' ? '' : 'PendingApproval',
-                  decisionState: '',
+                  approvalStatus:
+                    filters.approvalStatus === "PendingApproval"
+                      ? ""
+                      : "PendingApproval",
+                  decisionState: "",
                 })
               }
             />
             <Metric
               label="No decision"
               value={String(data.summary.noDecision)}
-              active={filters.decisionState === 'NoDecision'}
+              active={filters.decisionState === "NoDecision"}
               onClick={() =>
                 onFiltersChange({
                   ...filters,
-                  decisionState: filters.decisionState === 'NoDecision' ? '' : 'NoDecision',
-                  approvalStatus: '',
+                  decisionState:
+                    filters.decisionState === "NoDecision" ? "" : "NoDecision",
+                  approvalStatus: "",
                 })
               }
             />
@@ -118,16 +130,21 @@ export function RemediationWorkbench({
             <Input
               placeholder="Search software name"
               value={filters.search}
-              onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
+              onChange={(event) =>
+                onFiltersChange({ ...filters, search: event.target.value })
+              }
             />
           </LabeledFilter>
 
           <LabeledFilter label="Criticality">
             <Select
-              value={filters.criticality || 'all'}
+              value={filters.criticality || "all"}
               onValueChange={(value) => {
-                const nextValue = value ?? 'all'
-                onFiltersChange({ ...filters, criticality: nextValue !== 'all' ? nextValue : '' })
+                const nextValue = value ?? "all";
+                onFiltersChange({
+                  ...filters,
+                  criticality: nextValue !== "all" ? nextValue : "",
+                });
               }}
             >
               <SelectTrigger>
@@ -145,10 +162,13 @@ export function RemediationWorkbench({
 
           <LabeledFilter label="Decision">
             <Select
-              value={filters.outcome || 'all'}
+              value={filters.outcome || "all"}
               onValueChange={(value) => {
-                const nextValue = value ?? 'all'
-                onFiltersChange({ ...filters, outcome: nextValue !== 'all' ? nextValue : '' })
+                const nextValue = value ?? "all";
+                onFiltersChange({
+                  ...filters,
+                  outcome: nextValue !== "all" ? nextValue : "",
+                });
               }}
             >
               <SelectTrigger>
@@ -156,20 +176,31 @@ export function RemediationWorkbench({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All decisions</SelectItem>
-                <SelectItem value="ApprovedForPatching">{outcomeLabel('ApprovedForPatching')}</SelectItem>
-                <SelectItem value="RiskAcceptance">{outcomeLabel('RiskAcceptance')}</SelectItem>
-                <SelectItem value="AlternateMitigation">{outcomeLabel('AlternateMitigation')}</SelectItem>
-                <SelectItem value="PatchingDeferred">{outcomeLabel('PatchingDeferred')}</SelectItem>
+                <SelectItem value="ApprovedForPatching">
+                  {outcomeLabel("ApprovedForPatching")}
+                </SelectItem>
+                <SelectItem value="RiskAcceptance">
+                  {outcomeLabel("RiskAcceptance")}
+                </SelectItem>
+                <SelectItem value="AlternateMitigation">
+                  {outcomeLabel("AlternateMitigation")}
+                </SelectItem>
+                <SelectItem value="PatchingDeferred">
+                  {outcomeLabel("PatchingDeferred")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </LabeledFilter>
 
           <LabeledFilter label="Approval status">
             <Select
-              value={filters.approvalStatus || 'all'}
+              value={filters.approvalStatus || "all"}
               onValueChange={(value) => {
-                const nextValue = value ?? 'all'
-                onFiltersChange({ ...filters, approvalStatus: nextValue !== 'all' ? nextValue : '' })
+                const nextValue = value ?? "all";
+                onFiltersChange({
+                  ...filters,
+                  approvalStatus: nextValue !== "all" ? nextValue : "",
+                });
               }}
             >
               <SelectTrigger>
@@ -177,7 +208,9 @@ export function RemediationWorkbench({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All approval states</SelectItem>
-                <SelectItem value="PendingApproval">Pending approval</SelectItem>
+                <SelectItem value="PendingApproval">
+                  Pending approval
+                </SelectItem>
                 <SelectItem value="Approved">Approved</SelectItem>
               </SelectContent>
             </Select>
@@ -191,7 +224,13 @@ export function RemediationWorkbench({
             </span>
             <button
               type="button"
-              onClick={() => onFiltersChange({ ...filters, decisionState: '', approvalStatus: '' })}
+              onClick={() =>
+                onFiltersChange({
+                  ...filters,
+                  decisionState: "",
+                  approvalStatus: "",
+                })
+              }
               className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-foreground transition hover:border-primary/40 hover:bg-primary/15"
             >
               {quickFilterLabel}
@@ -215,7 +254,10 @@ export function RemediationWorkbench({
             <tbody className="divide-y divide-border/60 bg-background">
               {data.items.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>
+                  <td
+                    className="px-4 py-6 text-sm text-muted-foreground"
+                    colSpan={6}
+                  >
                     No software matches the current filters.
                   </td>
                 </tr>
@@ -233,7 +275,9 @@ export function RemediationWorkbench({
                             {startCase(item.softwareName)}
                           </Link>
                         ) : (
-                          <span className="font-medium">{startCase(item.softwareName)}</span>
+                          <span className="font-medium">
+                            {startCase(item.softwareName)}
+                          </span>
                         )}
                         <div className="flex gap-1.5">
                           <span
@@ -245,7 +289,12 @@ export function RemediationWorkbench({
                             <Link
                               to="/software/$id"
                               params={{ id: item.tenantSoftwareId }}
-                              search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
+                              search={{
+                                page: 1,
+                                pageSize: 25,
+                                version: "",
+                                tab: "overview",
+                              }}
                               className="text-[10px] text-muted-foreground hover:text-primary"
                             >
                               Software detail
@@ -274,16 +323,24 @@ export function RemediationWorkbench({
                           ) : null}
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">No decision</span>
+                        <span className="text-xs text-muted-foreground">
+                          No decision
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      <div className="text-sm">{item.totalVulnerabilities} total</div>
+                      <div className="text-sm">
+                        {item.totalVulnerabilities} total
+                      </div>
                       {item.criticalCount > 0 ? (
-                        <div className="text-xs text-tone-danger-foreground">{item.criticalCount} critical</div>
+                        <div className="text-xs text-tone-danger-foreground">
+                          {item.criticalCount} critical
+                        </div>
                       ) : null}
                       {item.highCount > 0 ? (
-                        <div className="text-xs text-tone-warning-foreground">{item.highCount} high</div>
+                        <div className="text-xs text-tone-warning-foreground">
+                          {item.highCount} high
+                        </div>
                       ) : null}
                     </td>
                     <td className="px-4 py-3">
@@ -317,7 +374,9 @@ export function RemediationWorkbench({
                     </td>
                     <td className="px-4 py-3">
                       <div className="space-y-1">
-                        <div className="font-medium text-foreground">{item.affectedDeviceCount}</div>
+                        <div className="font-medium text-foreground">
+                          {item.affectedDeviceCount}
+                        </div>
                         <OpenEpisodeSparkline points={item.openEpisodeTrend} />
                       </div>
                     </td>
@@ -351,7 +410,7 @@ export function RemediationWorkbench({
         </div>
       </section>
     </section>
-  )
+  );
 }
 
 function Metric({
