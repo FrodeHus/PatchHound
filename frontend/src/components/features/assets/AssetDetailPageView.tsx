@@ -706,7 +706,23 @@ export function AssetDetailPageView({
                   ) : null}
                 </div>
               </section>
-            ) : null}
+            ) : (
+              <section className="rounded-3xl border border-tone-success-border bg-tone-success p-6">
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <span className="flex size-14 items-center justify-center rounded-full border border-tone-success-border bg-background/60 text-3xl">
+                    👍
+                  </span>
+                  <div className="space-y-1">
+                    <p className="text-lg font-semibold tracking-[-0.02em] text-tone-success-foreground">
+                      No known vulnerabilities
+                    </p>
+                    <p className="text-sm text-tone-success-foreground/80">
+                      This device has no linked vulnerabilities and no open risk episodes. Keep it up!
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
           </aside>
         </div>
       </section>
