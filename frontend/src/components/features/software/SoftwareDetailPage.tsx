@@ -546,6 +546,10 @@ function OverviewTab({
             </div>
           </section>
 
+          {detail.lifecycle ? (
+            <SoftwareLifecycleSection lifecycle={detail.lifecycle} />
+          ) : null}
+
           <section className="rounded-2xl border border-border/70 bg-card p-5">
             <h2 className="text-lg font-semibold">Source identities</h2>
             <div className="mt-4 space-y-3">
@@ -689,6 +693,61 @@ function HeaderMetaChip({
       <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
     </div>
+  )
+}
+
+function SoftwareLifecycleSection({ lifecycle }: { lifecycle: NonNullable<TenantSoftwareDetail['lifecycle']> }) {
+  const now = new Date()
+  const eolDate = lifecycle.eolDate ? new Date(lifecycle.eolDate) : null
+  const supportEnd = lifecycle.supportEndDate ? new Date(lifecycle.supportEndDate) : null
+  const isEol = eolDate ? eolDate <= now : false
+  const isSupportEnded = supportEnd ? supportEnd <= now : false
+
+  return (
+    <section className="rounded-2xl border border-border/70 bg-card p-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">Lifecycle</h2>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {lifecycle.isLts ? (
+            <span className="rounded-full border border-tone-success-border bg-tone-success px-2.5 py-0.5 text-[11px] font-medium text-tone-success-foreground">
+              LTS
+            </span>
+          ) : null}
+          {lifecycle.isDiscontinued ? (
+            <span className="rounded-full border border-destructive/25 bg-destructive/10 px-2.5 py-0.5 text-[11px] font-medium text-destructive">
+              Discontinued
+            </span>
+          ) : isEol ? (
+            <span className="rounded-full border border-destructive/25 bg-destructive/10 px-2.5 py-0.5 text-[11px] font-medium text-destructive">
+              End of life
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3">
+        <Metric
+          label="End of life"
+          value={eolDate ? formatDate(lifecycle.eolDate!) : 'Unknown'}
+          tone={isEol ? 'danger' : 'neutral'}
+        />
+        <Metric
+          label="Active support ends"
+          value={supportEnd ? formatDate(lifecycle.supportEndDate!) : 'Unknown'}
+          tone={isSupportEnded ? 'warning' : 'neutral'}
+        />
+        {lifecycle.latestVersion ? (
+          <Metric label="Latest version" value={lifecycle.latestVersion} />
+        ) : null}
+        {lifecycle.enrichedAt ? (
+          <Metric label="Last enriched" value={formatDate(lifecycle.enrichedAt)} />
+        ) : null}
+      </div>
+      {lifecycle.productSlug ? (
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          Source: endoflife.date/{lifecycle.productSlug}
+        </p>
+      ) : null}
+    </section>
   )
 }
 

@@ -104,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<TenantSnapshotResolver>();
         services.AddScoped<IEnrichmentSourceRunner, NvdVulnerabilityEnrichmentRunner>();
         services.AddScoped<IEnrichmentSourceRunner, DefenderVulnerabilityEnrichmentRunner>();
+        services.AddScoped<IEnrichmentSourceRunner, EndOfLifeSoftwareEnrichmentRunner>();
         services.AddScoped<AiReportService>();
         services.AddScoped<TenantAiTextGenerationService>();
         services.AddScoped<SoftwareDescriptionGenerationService>();
@@ -153,6 +154,7 @@ public static class DependencyInjection
             .AddHttpClient<MailgunEmailSender>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services.AddHttpClient<NvdApiClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 1);
+        services.AddHttpClient<EndOfLifeApiClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services
             .AddHttpClient<ISecretStore, OpenBaoSecretStore>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 4);

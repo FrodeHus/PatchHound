@@ -239,4 +239,109 @@ public class EnrichmentJobEnqueuer(
             || referenceCount == 0
             || affectedSoftwareCount == 0;
     }
+
+    public async Task EnqueueSoftwareEndOfLifeJobsAsync(
+        Guid tenantId,
+        IReadOnlyList<Guid> normalizedSoftwareIds,
+        CancellationToken ct
+    )
+    {
+        if (normalizedSoftwareIds.Count == 0)
+        {
+            return;
+        }
+
+        var eolEnabled = await dbContext
+            .EnrichmentSourceConfigurations.IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(
+                source =>
+                    source.SourceKey == EnrichmentSourceCatalog.EndOfLifeSourceKey
+                    && source.Enabled,
+                ct
+            );
+
+        if (!eolEnabled)
+        {
+            return;
+        }
+
+        var softwareItems = await dbContext
+            .NormalizedSoftware.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(software => normalizedSoftwareIds.Contains(software.Id))
+            .Select(software => new
+            {
+                software.Id,
+                software.CanonicalProductKey,
+                software.EolEnrichedAt,
+            })
+            .ToListAsync(ct);
+
+        if (softwareItems.Count == 0)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var existingJobs = await dbContext
+            .EnrichmentJobs.IgnoreQueryFilters()
+            .Where(job =>
+                job.SourceKey == EnrichmentSourceCatalog.EndOfLifeSourceKey
+                && job.TargetModel == EnrichmentTargetModel.SoftwareAsset
+                && normalizedSoftwareIds.Contains(job.TargetId)
+            )
+            .ToDictionaryAsync(job => job.TargetId, ct);
+
+        var createdCount = 0;
+        var refreshedCount = 0;
+
+        foreach (var software in softwareItems)
+        {
+            // Skip if already enriched within the last 7 days
+            if (software.EolEnrichedAt.HasValue && now - software.EolEnrichedAt.Value < TimeSpan.FromDays(7))
+            {
+                continue;
+            }
+
+            if (existingJobs.TryGetValue(software.Id, out var existingJob))
+            {
+                if (existingJob.Status == EnrichmentJobStatus.Running)
+                {
+                    continue;
+                }
+
+                existingJob.Refresh(priority: 50, nextAttemptAt: now);
+                refreshedCount++;
+                continue;
+            }
+
+            var job = EnrichmentJob.Create(
+                tenantId,
+                EnrichmentSourceCatalog.EndOfLifeSourceKey,
+                EnrichmentTargetModel.SoftwareAsset,
+                software.Id,
+                software.CanonicalProductKey,
+                priority: 50,
+                queuedAt: now
+            );
+            await dbContext.EnrichmentJobs.AddAsync(job, ct);
+            existingJobs[software.Id] = job;
+            createdCount++;
+        }
+
+        if (createdCount == 0 && refreshedCount == 0)
+        {
+            return;
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "Queued end-of-life enrichment jobs for tenant {TenantId}: created={CreatedCount} refreshed={RefreshedCount}.",
+            tenantId,
+            createdCount,
+            refreshedCount
+        );
+    }
 }

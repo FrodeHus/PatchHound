@@ -12,6 +12,7 @@ public static class Policies
     public const string ApproveRiskAcceptance = nameof(ApproveRiskAcceptance);
     public const string ViewAuditLogs = nameof(ViewAuditLogs);
     public const string ManageUsers = nameof(ManageUsers);
+    public const string ViewTenants = nameof(ViewTenants);
     public const string ConfigureTenant = nameof(ConfigureTenant);
     public const string GenerateAiReports = nameof(GenerateAiReports);
     public const string AddComments = nameof(AddComments);

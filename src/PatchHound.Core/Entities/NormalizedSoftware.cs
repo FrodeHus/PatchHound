@@ -20,6 +20,15 @@ public class NormalizedSoftware
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    // End-of-life enrichment fields (from endoflife.date)
+    public string? EolProductSlug { get; private set; }
+    public DateTimeOffset? EolDate { get; private set; }
+    public string? EolLatestVersion { get; private set; }
+    public bool? EolIsLts { get; private set; }
+    public DateTimeOffset? EolSupportEndDate { get; private set; }
+    public bool? EolIsDiscontinued { get; private set; }
+    public DateTimeOffset? EolEnrichedAt { get; private set; }
+
     private NormalizedSoftware() { }
 
     public static NormalizedSoftware Create(
@@ -81,5 +90,25 @@ public class NormalizedSoftware
         DescriptionProfileName = profileName.Trim();
         DescriptionModel = model.Trim();
         UpdatedAt = generatedAt;
+    }
+
+    public void UpdateEndOfLife(
+        string productSlug,
+        DateTimeOffset? eolDate,
+        string? latestVersion,
+        bool? isLts,
+        DateTimeOffset? supportEndDate,
+        bool? isDiscontinued,
+        DateTimeOffset enrichedAt
+    )
+    {
+        EolProductSlug = productSlug.Trim().ToLowerInvariant();
+        EolDate = eolDate;
+        EolLatestVersion = latestVersion;
+        EolIsLts = isLts;
+        EolSupportEndDate = supportEndDate;
+        EolIsDiscontinued = isDiscontinued;
+        EolEnrichedAt = enrichedAt;
+        UpdatedAt = enrichedAt;
     }
 }

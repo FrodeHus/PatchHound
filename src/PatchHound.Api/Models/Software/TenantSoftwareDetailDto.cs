@@ -27,7 +27,8 @@ public record TenantSoftwareDetailDto(
     ExposureImpactExplanationDto? ExposureImpactExplanation,
     RemediationTaskSummaryDto Remediation,
     IReadOnlyList<TenantSoftwareVersionCohortDto> VersionCohorts,
-    IReadOnlyList<TenantSoftwareSourceAliasDto> SourceAliases
+    IReadOnlyList<TenantSoftwareSourceAliasDto> SourceAliases,
+    SoftwareLifecycleDto? Lifecycle
 );
 
 public record ExposureImpactExplanationDto(
@@ -71,6 +72,16 @@ public record TenantSoftwareSourceAliasDto(
     string? RawVersion,
     string AliasConfidence,
     string MatchReason
+);
+
+public record SoftwareLifecycleDto(
+    DateTimeOffset? EolDate,
+    string? LatestVersion,
+    bool? IsLts,
+    DateTimeOffset? SupportEndDate,
+    bool? IsDiscontinued,
+    DateTimeOffset? EnrichedAt,
+    string? ProductSlug
 );
 
 public record TenantSoftwareInstallationDto(

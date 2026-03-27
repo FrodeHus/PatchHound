@@ -499,7 +499,9 @@ public class SystemController : ControllerBase
                 StringComparison.OrdinalIgnoreCase
             )
                 ? "tenant-source"
-                : "global-secret",
+                : !EnrichmentSourceCatalog.RequiresCredentials(source.SourceKey)
+                    ? "no-credential"
+                    : "global-secret",
             source.RefreshTtlHours,
             new EnrichmentSourceRuntimeDto(
                 source.LastStartedAt,

@@ -100,7 +100,7 @@ export function GlobalEnrichmentSourceManagement({
             <div className="rounded-2xl border border-border/70 bg-background/30 p-4">
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Configured</p>
               <p className="mt-2 text-2xl font-semibold">
-                {sources.filter((source) => source.credentials.hasSecret).length}
+                {sources.filter((source) => source.credentialMode === 'no-credential' || source.credentialMode === 'tenant-source' || source.credentials.hasSecret).length}
               </p>
             </div>
           </div>
@@ -330,6 +330,13 @@ export function GlobalEnrichmentSourceManagement({
                               }
                             />
                           </label>
+                        ) : source.credentialMode === 'no-credential' ? (
+                          <div className="rounded-2xl border border-border/70 bg-background/30 px-4 py-3">
+                            <p className="text-sm font-medium">No credentials required</p>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              This provider uses a public API and does not require any API key or authentication.
+                            </p>
+                          </div>
                         ) : (
                           <div className="rounded-2xl border border-border/70 bg-background/30 px-4 py-3">
                             <p className="text-sm font-medium">Credential source</p>
@@ -460,6 +467,18 @@ function getProviderStatusDescription(source: EnrichmentSource) {
     }
 
     return `Defender CVE detail is refreshed asynchronously after ${source.refreshTtlHours ?? 24} hour(s), instead of being refetched during every ingestion run.`
+  }
+
+  if (source.key === 'endoflife') {
+    if (!source.enabled) {
+      return 'Software end-of-life enrichment is configured but currently inactive.'
+    }
+
+    if (source.runtime.lastError) {
+      return 'The worker is attempting end-of-life enrichment, but the latest run failed and should be reviewed.'
+    }
+
+    return 'Enriches normalized software with end-of-life dates, latest version, LTS status, support dates, and discontinued status from endoflife.date.'
   }
 
   return source.enabled

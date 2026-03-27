@@ -135,7 +135,7 @@ public class TenantContext : ITenantContext
             _currentUserId = user.Id;
         }
 
-        if (!string.IsNullOrWhiteSpace(tokenTenantId) && _normalizedClaimRoles.Count > 0)
+        if (!string.IsNullOrWhiteSpace(tokenTenantId))
         {
             var internalTenantIds = await dbContext
                 .Tenants.AsNoTracking()
@@ -144,8 +144,13 @@ public class TenantContext : ITenantContext
                 .Select(tenant => tenant.Id)
                 .ToListAsync();
 
-            if (_currentUserId != Guid.Empty)
+            if (_currentUserId != Guid.Empty && internalTenantIds.Count > 0)
             {
+                // Stakeholder is always granted; merge with any Entra claim roles
+                var rolesToSync = _normalizedClaimRoles.ToList();
+                if (!rolesToSync.Contains(RoleName.Stakeholder))
+                    rolesToSync.Add(RoleName.Stakeholder);
+
                 var existingTokenRoles = await dbContext
                     .UserTenantRoles.IgnoreQueryFilters()
                     .Where(role =>
@@ -156,7 +161,7 @@ public class TenantContext : ITenantContext
                     .ToListAsync();
 
                 var missingRoles = internalTenantIds
-                    .SelectMany(tenantId => _normalizedClaimRoles.Select(roleName => new { tenantId, roleName }))
+                    .SelectMany(tenantId => rolesToSync.Select(roleName => new { tenantId, roleName }))
                     .Where(candidate => existingTokenRoles.All(existing =>
                         existing.TenantId != candidate.tenantId || existing.Role != candidate.roleName))
                     .ToList();
@@ -193,16 +198,21 @@ public class TenantContext : ITenantContext
                 .GroupBy(r => r.TenantId)
                 .ToDictionary(g => g.Key, g => g.Select(r => r.Role).Distinct().ToList());
 
+            // Ensure Stakeholder + Entra claim roles are in the in-memory map
+            var rolesToMerge = _normalizedClaimRoles.ToList();
+            if (!rolesToMerge.Contains(RoleName.Stakeholder))
+                rolesToMerge.Add(RoleName.Stakeholder);
+
             foreach (var tenantId in internalTenantIds)
             {
                 if (!_rolesByTenantId.TryGetValue(tenantId, out var existingRoles))
                 {
-                    _rolesByTenantId[tenantId] = _normalizedClaimRoles.ToList();
+                    _rolesByTenantId[tenantId] = rolesToMerge;
                     continue;
                 }
 
                 _rolesByTenantId[tenantId] = existingRoles
-                    .Concat(_normalizedClaimRoles)
+                    .Concat(rolesToMerge)
                     .Distinct()
                     .ToList();
             }

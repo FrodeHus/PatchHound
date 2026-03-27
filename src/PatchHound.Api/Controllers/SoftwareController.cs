@@ -82,6 +82,13 @@ public class SoftwareController(
                 item.NormalizedSoftware.DescriptionModel,
                 NormalizationMethod = item.NormalizedSoftware.NormalizationMethod.ToString(),
                 Confidence = item.NormalizedSoftware.Confidence.ToString(),
+                item.NormalizedSoftware.EolProductSlug,
+                item.NormalizedSoftware.EolDate,
+                item.NormalizedSoftware.EolLatestVersion,
+                item.NormalizedSoftware.EolIsLts,
+                item.NormalizedSoftware.EolSupportEndDate,
+                item.NormalizedSoftware.EolIsDiscontinued,
+                item.NormalizedSoftware.EolEnrichedAt,
             })
             .FirstOrDefaultAsync(ct);
         if (tenantSoftware is null)
@@ -218,7 +225,18 @@ public class SoftwareController(
                         item.AliasConfidence.ToString(),
                         item.MatchReason
                     ))
-                    .ToList()
+                    .ToList(),
+                tenantSoftware.EolEnrichedAt.HasValue
+                    ? new SoftwareLifecycleDto(
+                        tenantSoftware.EolDate,
+                        tenantSoftware.EolLatestVersion,
+                        tenantSoftware.EolIsLts,
+                        tenantSoftware.EolSupportEndDate,
+                        tenantSoftware.EolIsDiscontinued,
+                        tenantSoftware.EolEnrichedAt,
+                        tenantSoftware.EolProductSlug
+                    )
+                    : null
             )
         );
     }

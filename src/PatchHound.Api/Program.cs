@@ -236,6 +236,22 @@ builder.Services.AddAuthorization(options =>
     );
 
     options.AddPolicy(
+        Policies.ViewTenants,
+        policy =>
+            policy.AddRequirements(
+                new RoleRequirement(
+                    RoleName.GlobalAdmin,
+                    RoleName.SecurityManager,
+                    RoleName.SecurityAnalyst,
+                    RoleName.AssetOwner,
+                    RoleName.Stakeholder,
+                    RoleName.Auditor,
+                    RoleName.TechnicalManager
+                )
+            )
+    );
+
+    options.AddPolicy(
         Policies.ConfigureTenant,
         policy =>
             policy.AddRequirements(

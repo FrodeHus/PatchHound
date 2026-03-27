@@ -35,7 +35,7 @@ public class TenantsController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Policy = Policies.ConfigureTenant)]
+    [Authorize(Policy = Policies.ViewTenants)]
     public async Task<ActionResult<PagedResponse<TenantListItemDto>>> List(
         [FromQuery] PaginationQuery pagination,
         CancellationToken ct
