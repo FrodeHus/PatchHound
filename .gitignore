@@ -4,6 +4,7 @@ obj/
 .vs/
 .idea/
 *.user
+.env
 *.env
 node_modules/
 dist/
