@@ -133,7 +133,8 @@ builder.Services.AddAuthorization(options =>
                     RoleName.SecurityAnalyst,
                     RoleName.AssetOwner,
                     RoleName.Stakeholder,
-                    RoleName.Auditor
+                    RoleName.Auditor,
+                    RoleName.TechnicalManager
                 )
             )
     );

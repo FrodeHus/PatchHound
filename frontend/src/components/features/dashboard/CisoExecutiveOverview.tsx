@@ -19,8 +19,6 @@ type Props = {
   trends: TrendData
   isLoading: boolean
   filters: Filters
-  canSwitchToOperations: boolean
-  onShowOperations?: () => void
 }
 
 type ExecutiveTone = 'contained' | 'watch' | 'critical'
@@ -167,8 +165,6 @@ export function CisoExecutiveOverview({
   trends,
   isLoading,
   filters,
-  canSwitchToOperations,
-  onShowOperations,
 }: Props) {
   const tone = deriveTone(summary)
   const trend = getTrendDirection(trends)
@@ -284,11 +280,9 @@ export function CisoExecutiveOverview({
                     Average remediation time is {formatDays(summary.averageRemediationDays)}.
                   </div>
                 </div>
-                {canSwitchToOperations && onShowOperations ? (
-                  <Button variant="outline" className="mt-2 w-full" onClick={onShowOperations}>
-                    Open operational dashboard
-                  </Button>
-                ) : null}
+                <Link to="/dashboard" className="mt-2 inline-flex w-full items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground">
+                  Open operational dashboard
+                </Link>
               </div>
             </div>
           </div>

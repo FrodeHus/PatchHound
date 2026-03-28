@@ -19,8 +19,6 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -34,7 +32,6 @@ import { unsealOpenBao } from "@/server/system.functions";
 import { clearActiveRoles } from "@/api/roles.functions";
 import { RoleActivationDialog } from "@/components/features/roles/RoleActivationDialog";
 import { ThemeSelector } from "@/components/layout/ThemeSelector";
-import { readDashboardViewPreference, writeDashboardViewPreference, type DashboardViewMode } from "@/lib/dashboard-view";
 import {
   Tooltip,
   TooltipContent,
@@ -70,10 +67,8 @@ export function TopNav({
   const [isUnsealDialogOpen, setIsUnsealDialogOpen] = useState(false);
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [dashboardViewMode, setDashboardViewMode] = useState<DashboardViewMode>("executive");
   const { selectedTenantId, setSelectedTenantId, tenants } = useTenantScope();
   const canUnsealOpenBao = (user.activeRoles ?? []).includes("GlobalAdmin");
-  const canSwitchPortalView = (user.activeRoles ?? []).includes("GlobalAdmin");
   const unsealMutation = useMutation({
     mutationFn: (keys: [string, string, string]) =>
       unsealOpenBao({ data: { keys } }),
@@ -94,27 +89,6 @@ export function TopNav({
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  useEffect(() => {
-    if (!canSwitchPortalView) {
-      return;
-    }
-
-    setDashboardViewMode(readDashboardViewPreference() ?? "executive");
-  }, [canSwitchPortalView]);
-
-  const handlePortalViewChange = (nextMode: DashboardViewMode) => {
-    setDashboardViewMode(nextMode);
-    writeDashboardViewPreference(nextMode);
-
-    const pathname = router.state.location.pathname;
-    if (pathname === "/dashboard") {
-      void router.navigate({
-        to: "/dashboard",
-        search: (prev: Record<string, unknown>) => ({ ...prev, mode: nextMode }),
-      });
-    }
-  };
 
   return (
     <header
@@ -287,53 +261,6 @@ export function TopNav({
                 <ThemeSelector />
               </div>
               <DropdownMenuSeparator />
-              {canSwitchPortalView ? (
-                <>
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel className="px-3 pb-1 pt-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Portal view
-                    </DropdownMenuLabel>
-                    <DropdownMenuRadioGroup
-                      value={dashboardViewMode}
-                      onValueChange={(value) =>
-                        handlePortalViewChange(value as DashboardViewMode)
-                      }
-                    >
-                      <DropdownMenuRadioItem
-                        value="executive"
-                        className="rounded-lg px-3 py-2"
-                      >
-                        Executive overview
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem
-                        value="operations"
-                        className="rounded-lg px-3 py-2"
-                      >
-                        Analyst workbench
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem
-                        value="owner"
-                        className="rounded-lg px-3 py-2"
-                      >
-                        Asset owner view
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem
-                        value="security-manager"
-                        className="rounded-lg px-3 py-2"
-                      >
-                        Security manager view
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem
-                        value="technical-manager"
-                        className="rounded-lg px-3 py-2"
-                      >
-                        Technical manager view
-                      </DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuGroup>
-                  <DropdownMenuSeparator />
-                </>
-              ) : null}
               <DropdownMenuItem className="rounded-lg px-3 py-2">
                 {user.tenantIds.length} tenant scope
                 {user.tenantIds.length === 1 ? "" : "s"}

@@ -1,6 +1,7 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useEffect, useState, type ComponentType } from 'react'
 import {
+  BarChart3,
   Bug,
   ClipboardCheck,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import {
   ChevronDown,
   ChevronRight,
   Laptop,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from '@/components/ui/separator'
@@ -91,6 +93,16 @@ const navItems: NavItem[] = [
 
 const navGroups: NavGroup[] = [
   {
+    label: "Dashboards",
+    icon: BarChart3,
+    items: [
+      { to: "/dashboard/executive", label: "Executive Summary", icon: BarChart3, roles: ["Stakeholder", "GlobalAdmin"] },
+      { to: "/dashboard/security", label: "Security Summary", icon: ShieldAlert, roles: ["SecurityManager", "GlobalAdmin"] },
+      { to: "/dashboard/technical", label: "Technical Summary", icon: Wrench, roles: ["TechnicalManager", "GlobalAdmin"] },
+      { to: "/dashboard/my-assets", label: "My Assets", icon: Laptop, roles: ["AssetOwner", "GlobalAdmin"] },
+    ],
+  },
+  {
     label: "Assets",
     icon: Server,
     items: [
@@ -125,15 +137,22 @@ export function Sidebar({
     }))
     .filter((group) => group.items.length > 0)
   const showLabels = compact || !collapsed;
+  const dashboardsGroupActive = pathname.startsWith('/dashboard/')
   const assetsGroupActive =
     pathname.startsWith('/devices') || pathname.startsWith('/software') || pathname.startsWith('/remediation')
-  const [isAssetsGroupOpen, setIsAssetsGroupOpen] = useState(assetsGroupActive || !collapsed)
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    Dashboards: dashboardsGroupActive || !collapsed,
+    Assets: assetsGroupActive || !collapsed,
+  })
 
   useEffect(() => {
-    if (assetsGroupActive) {
-      setIsAssetsGroupOpen(true)
+    if (dashboardsGroupActive) {
+      setOpenGroups((prev) => ({ ...prev, Dashboards: true }))
     }
-  }, [assetsGroupActive])
+    if (assetsGroupActive) {
+      setOpenGroups((prev) => ({ ...prev, Assets: true }))
+    }
+  }, [dashboardsGroupActive, assetsGroupActive])
 
   return (
     <aside
@@ -177,10 +196,10 @@ export function Sidebar({
       >
         {accessibleGroups.map((group) => {
           const GroupIcon = group.icon
-          const isOpen = collapsed && !compact ? false : isAssetsGroupOpen
+          const isOpen = collapsed && !compact ? false : (openGroups[group.label] ?? false)
           const toggleGroup = () => {
             if (!collapsed || compact) {
-              setIsAssetsGroupOpen((current) => !current)
+              setOpenGroups((prev) => ({ ...prev, [group.label]: !prev[group.label] }))
             }
           }
 
