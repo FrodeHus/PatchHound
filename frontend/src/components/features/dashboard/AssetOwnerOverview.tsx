@@ -174,18 +174,23 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
                     </div>
                   </div>
                   <div className="mt-3 flex gap-2">
-                    <Button
-                      size="sm"
-                      render={
-                        <Link
-                          to="/remediation/task/$id"
-                          params={{ id: item.taskId ?? item.tenantSoftwareId }}
-                        />
-                      }
-                      disabled={!item.taskId}
-                    >
-                      Open remediation task
-                    </Button>
+                    {item.taskId ? (
+                      <Button
+                        size="sm"
+                        render={
+                          <Link
+                            to="/remediation/task/$id"
+                            params={{ id: item.taskId }}
+                          />
+                        }
+                      >
+                        Open remediation task
+                      </Button>
+                    ) : (
+                      <Button size="sm" disabled>
+                        Open remediation task
+                      </Button>
+                    )}
                     <Button size="sm" variant="outline" render={<Link to="/vulnerabilities/$id" params={{ id: item.tenantVulnerabilityId }} />}>
                       Vulnerability detail
                     </Button>
