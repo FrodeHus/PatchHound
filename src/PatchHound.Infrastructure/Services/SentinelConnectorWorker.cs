@@ -119,13 +119,19 @@ public sealed class SentinelConnectorWorker : BackgroundService
                 e.NewValues,
                 UserId = e.UserId.ToString(),
                 AuditEntryId = e.AuditEntryId.ToString(),
-            });
+                })
+                .ToList();
+
+            var jsonBytes = JsonSerializer.SerializeToUtf8Bytes(payload, PayloadJsonOptions);
 
             using var client = _httpClientFactory.CreateClient("SentinelConnector");
             using var request = new HttpRequestMessage(HttpMethod.Post, url)
             {
-                Content = JsonContent.Create(payload, options: PayloadJsonOptions),
+                Content = new ByteArrayContent(jsonBytes),
             };
+            request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+                "application/json"
+            );
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             using var response = await client.SendAsync(request, ct);
