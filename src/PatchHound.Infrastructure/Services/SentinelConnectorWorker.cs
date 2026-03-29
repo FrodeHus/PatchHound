@@ -24,6 +24,7 @@ public sealed class SentinelConnectorWorker : BackgroundService
     private static readonly JsonSerializerOptions PayloadJsonOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
     private readonly SentinelAuditQueue _queue;

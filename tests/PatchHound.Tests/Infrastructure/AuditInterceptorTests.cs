@@ -147,6 +147,31 @@ public class AuditInterceptorTests : IDisposable
         auditEntries.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task UpdatingOnlyBookkeepingFields_DoesNotCreateAuditEntry()
+    {
+        var team = Team.Create(_tenantId, "Dynamic team");
+        team.SetDynamic(true);
+        var rule = TeamMembershipRule.Create(
+            _tenantId,
+            team.Id,
+            new PatchHound.Core.Models.FilterGroup("and", [])
+        );
+
+        _dbContext.Teams.Add(team);
+        _dbContext.TeamMembershipRules.Add(rule);
+        await _dbContext.SaveChangesAsync();
+
+        _dbContext.AuditLogEntries.RemoveRange(_dbContext.AuditLogEntries.IgnoreQueryFilters());
+        await _dbContext.SaveChangesAsync();
+
+        rule.RecordExecution(12);
+        await _dbContext.SaveChangesAsync();
+
+        var auditEntries = await _dbContext.AuditLogEntries.IgnoreQueryFilters().ToListAsync();
+        auditEntries.Should().BeEmpty();
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

@@ -17,6 +17,34 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
         "ClientSecret",
         "PasswordHash",
     };
+    private static readonly HashSet<string> NoiseOnlyModifiedProperties = new(
+        StringComparer.OrdinalIgnoreCase
+    )
+    {
+        "UpdatedAt",
+        "LastExecutedAt",
+        "LastMatchCount",
+        "LeaseAcquiredAt",
+        "LeaseExpiresAt",
+        "ActiveIngestionRunId",
+        "ActiveEnrichmentRunId",
+        "LastStartedAt",
+        "LastCompletedAt",
+        "LastSucceededAt",
+        "LastStatus",
+        "LastError",
+        "ManualRequestedAt",
+        "CompletedAt",
+        "Error",
+        "StagedMachineCount",
+        "StagedSoftwareCount",
+        "StagedVulnerabilityCount",
+        "PersistedMachineCount",
+        "PersistedSoftwareCount",
+        "PersistedVulnerabilityCount",
+        "DeactivatedMachineCount",
+        "Status",
+    };
     private static readonly HashSet<string> IngestionCleanupEntityTypes = new(
         StringComparer.Ordinal
     )
@@ -68,6 +96,23 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
                 continue;
             }
 
+            var auditableProperties = entry
+                .Properties.Where(p => !ExcludedProperties.Contains(p.Metadata.Name))
+                .ToList();
+
+            var auditableChangedProperties = entry.State switch
+            {
+                EntityState.Modified => auditableProperties.Where(p => p.IsModified).ToList(),
+                EntityState.Added => auditableProperties,
+                EntityState.Deleted => auditableProperties,
+                _ => [],
+            };
+
+            if (entry.State == EntityState.Modified && ShouldSkipNoiseOnlyUpdate(auditableChangedProperties))
+            {
+                continue;
+            }
+
             var entityId = GetEntityId(entry);
             var tenantId = GetTenantId(entry);
             var action = entry.State switch
@@ -81,11 +126,7 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
             string? oldValues =
                 entry.State != EntityState.Added
                     ? SerializeValues(
-                        entry
-                            .Properties.Where(p =>
-                                (entry.State == EntityState.Deleted || p.IsModified)
-                                && !ExcludedProperties.Contains(p.Metadata.Name)
-                            )
+                        auditableChangedProperties
                             .ToDictionary(p => p.Metadata.Name, p => p.OriginalValue)
                     )
                     : null;
@@ -93,11 +134,7 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
             string? newValues =
                 entry.State != EntityState.Deleted
                     ? SerializeValues(
-                        entry
-                            .Properties.Where(p =>
-                                (entry.State == EntityState.Added || p.IsModified)
-                                && !ExcludedProperties.Contains(p.Metadata.Name)
-                            )
+                        auditableChangedProperties
                             .ToDictionary(p => p.Metadata.Name, p => p.CurrentValue)
                     )
                     : null;
@@ -134,6 +171,14 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
     {
         return entry.State == EntityState.Deleted
             && IngestionCleanupEntityTypes.Contains(entry.Entity.GetType().Name);
+    }
+
+    private static bool ShouldSkipNoiseOnlyUpdate(
+        List<Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry> changedProperties
+    )
+    {
+        return changedProperties.Count > 0
+            && changedProperties.All(p => NoiseOnlyModifiedProperties.Contains(p.Metadata.Name));
     }
 
     private static Guid GetEntityId(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry)
