@@ -52,10 +52,7 @@ Create a policy for PatchHound and issue a token for the API/worker:
 
 ```bash
 docker compose exec openbao sh -c 'cat >/tmp/patchhound-policy.hcl <<EOF
-path "patchhound/data/tenants/*" {
-  capabilities = ["create", "update", "read"]
-}
-path "patchhound/data/system/enrichment-sources/*" {
+path "patchhound/data/*" {
   capabilities = ["create", "update", "read"]
 }
 EOF
@@ -63,7 +60,7 @@ bao policy write patchhound /tmp/patchhound-policy.hcl
 bao token create -policy=patchhound'
 ```
 
-Set the resulting token in `.env` as `OPENBAO_TOKEN`.
+This matches the canonical policy in the root [README](../../README.md). Set the resulting token in `.env` as `OPENBAO_TOKEN`.
 
 ## Example Secret
 
@@ -80,4 +77,5 @@ docker compose exec openbao bao kv put patchhound/tenants/<tenant-id>/sources/mi
 - TLS is disabled in this local self-hosting profile. Put OpenBao behind TLS before exposing it outside a trusted network.
 - PatchHound now stores tenant source secrets in OpenBao and keeps only secret references in tenant settings.
 - PatchHound also stores global enrichment source secrets under `patchhound/data/system/enrichment-sources/*`.
-- If `OPENBAO_TOKEN` is missing or lacks access to either secret path, tenant or enrichment secret writes will fail.
+- PatchHound also stores notification provider secrets under `patchhound/data/system/notification-services/*`.
+- If `OPENBAO_TOKEN` is missing or lacks access to any of those secret paths, secret reads and writes will fail for the affected feature.

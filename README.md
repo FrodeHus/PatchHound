@@ -93,6 +93,18 @@ To set up the Sentinel integration, first deploy the PatchHound data connector. 
 
 [![Open in Connector Studio](https://connector-studio.reothor.no/badge.svg)](https://connector-studio.reothor.no/?project=https://raw.githubusercontent.com/FrodeHus/PatchHound/refs/heads/main/PatchHound-project.json)
 
+## OpenBao Policy
+
+PatchHound expects a KV v2 mount named `patchhound` and an application token with access to the full application data path:
+
+```hcl
+path "patchhound/data/*" {
+  capabilities = ["create", "update", "read"]
+}
+```
+
+Set the resulting token in `.env` as `OPENBAO_TOKEN`.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
