@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, CircleHelp } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, CircleHelp } from 'lucide-react'
 import type { SetupContext, SetupPayload } from '@/api/setup.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,12 @@ type SetupWizardProps = {
 }
 
 const steps = [
+  {
+    id: 'entra',
+    label: 'Entra app',
+    title: 'Onboard the PatchHound Entra application',
+    description: 'Grant tenant-wide admin consent to the configured multi-tenant app before completing workspace setup.',
+  },
   {
     id: 'workspace',
     label: 'Workspace',
@@ -75,8 +81,10 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
 
   const canContinue =
     stepIndex === 0
-      ? !tenantValidationMessage
+      ? true
       : stepIndex === 1
+        ? !tenantValidationMessage
+        : stepIndex === 2
         ? !defenderValidationMessage
         : true
 
@@ -94,7 +102,7 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
             </Badge>
             <div className="space-y-1">
               <CardTitle className="text-2xl tracking-[-0.04em] text-foreground">
-                Stand up a tenant in three short steps
+                Stand up a tenant in four short steps
               </CardTitle>
               <CardDescription className="text-sm leading-6 text-muted-foreground">
                 Only onboarding fields are shown here. Admin identity and defaults are provisioned automatically.
@@ -166,6 +174,66 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
 
           {stepIndex === 0 ? (
             <div className="space-y-4">
+              <div className="rounded-2xl border border-border/70 bg-muted/50 p-4">
+                <p className="text-sm leading-6 text-muted-foreground">
+                  PatchHound uses a multi-tenant Microsoft Entra application for sign-in. Before this tenant can use it, an Entra administrator must onboard the application into the tenant by granting admin consent to the app registration configured for this deployment.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-border/70 bg-background p-4">
+                  <p className="text-sm font-medium text-foreground">What this consent covers</p>
+                  <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
+                    <li>Standard delegated sign-in permissions: `openid`, `profile`, `email`, and `offline_access`.</li>
+                    <li>`Microsoft Graph` delegated permission: `User.Read` for basic signed-in user profile access.</li>
+                    <li>If this same Entra app is reused for Defender ingestion, the consent will also approve these `WindowsDefenderATP` application permissions: `Machine.Read.All`, `Score.Read.All`, `Software.Read.All`, and `Vulnerability.Read.All`.</li>
+                  </ul>
+                </div>
+
+                <div className="rounded-2xl border border-border/70 bg-background p-4">
+                  <p className="text-sm font-medium text-foreground">Configured application</p>
+                  <dl className="mt-3 space-y-3 text-sm">
+                    <div>
+                      <dt className="text-muted-foreground">Entra tenant</dt>
+                      <dd className="mt-1 font-medium text-foreground break-all">{setupContext.entraTenantId}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Client ID</dt>
+                      <dd className="mt-1 font-medium text-foreground break-all">
+                        {setupContext.appClientId || 'Not configured'}
+                      </dd>
+                    </div>
+                  </dl>
+                  <div className="mt-4">
+                    {setupContext.adminConsentUrl ? (
+                      <Button
+                        render={(
+                          <a
+                            href={setupContext.adminConsentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          />
+                        )}
+                      >
+                        Grant admin consent
+                        <ArrowUpRight className="size-4" />
+                      </Button>
+                    ) : (
+                      <Button type="button" disabled>
+                        Grant admin consent
+                      </Button>
+                    )}
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                    This opens Microsoft Entra in a new tab for tenant-wide consent. After consent is granted, return here and continue setup.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {stepIndex === 1 ? (
+            <div className="space-y-4">
               <Field
                 label="Workspace name"
                 htmlFor="tenant-name"
@@ -193,7 +261,7 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
             </div>
           ) : null}
 
-          {stepIndex === 1 ? (
+          {stepIndex === 2 ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-muted/50 p-4">
                 <div className="space-y-1">
@@ -268,13 +336,17 @@ export function SetupWizard({ setupContext, isSubmitting, onComplete }: SetupWiz
             </div>
           ) : null}
 
-          {stepIndex === 2 ? (
+          {stepIndex === 3 ? (
             <div className="space-y-4">
               <div className="rounded-2xl border border-border/70 bg-muted/50 p-4">
                 <dl className="grid gap-4 text-sm sm:grid-cols-2">
                   <div>
                     <dt className="text-muted-foreground">Workspace name</dt>
                     <dd className="mt-1 font-medium text-foreground">{tenantName.trim()}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Entra application</dt>
+                    <dd className="mt-1 font-medium text-foreground break-all">{setupContext.appClientId || 'Not configured'}</dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Defender</dt>

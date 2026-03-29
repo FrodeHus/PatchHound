@@ -11,6 +11,8 @@ export const setupContextSchema = z.object({
   adminEmail: z.string().email(),
   adminDisplayName: z.string().min(1),
   adminEntraObjectId: z.string().min(1),
+  appClientId: z.string(),
+  adminConsentUrl: z.string().url().nullable(),
 })
 
 export const setupPayloadSchema = z

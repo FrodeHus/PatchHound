@@ -19,6 +19,9 @@ export const fetchSetupContext = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .handler(async () => {
     const session = await getSession()
+    const appClientId = process.env.ENTRA_CLIENT_ID
+      ?? process.env.AZURE_AD_CLIENT_ID
+      ?? ''
 
     if (!session.tenantId || !session.userId || !session.email) {
       throw new Error('Authenticated setup context is incomplete')
@@ -39,6 +42,10 @@ export const fetchSetupContext = createServerFn({ method: 'GET' })
       adminEmail: session.email,
       adminDisplayName: session.displayName ?? session.email,
       adminEntraObjectId: session.userId,
+      appClientId,
+      adminConsentUrl: appClientId
+        ? `https://login.microsoftonline.com/${encodeURIComponent(session.tenantId)}/adminconsent?client_id=${encodeURIComponent(appClientId)}`
+        : null,
     })
   })
 
