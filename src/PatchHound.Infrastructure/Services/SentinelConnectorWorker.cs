@@ -123,12 +123,16 @@ public sealed class SentinelConnectorWorker : BackgroundService
                 })
                 .ToList();
 
-            var jsonBytes = JsonSerializer.SerializeToUtf8Bytes(payload, PayloadJsonOptions);
+            var serializedPayload = JsonSerializer.Serialize(payload, PayloadJsonOptions);
 
             using var client = _httpClientFactory.CreateClient("SentinelConnector");
             using var request = new HttpRequestMessage(HttpMethod.Post, url)
             {
-                Content = new ByteArrayContent(jsonBytes),
+                Content = new StringContent(
+                    serializedPayload,
+                    System.Text.Encoding.UTF8,
+                    "application/json"
+                ),
             };
             request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
                 "application/json"
