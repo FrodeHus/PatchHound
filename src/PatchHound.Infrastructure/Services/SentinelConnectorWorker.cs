@@ -1,5 +1,4 @@
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
@@ -134,9 +133,7 @@ public sealed class SentinelConnectorWorker : BackgroundService
                     "application/json"
                 ),
             };
-            request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
-                "application/json"
-            );
+
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             using var response = await client.SendAsync(request, ct);
