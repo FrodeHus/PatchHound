@@ -112,7 +112,7 @@ public sealed class SentinelConnectorWorker : BackgroundService
                 .Select(e => new
                 {
                     TimeGenerated = e.Timestamp.UtcDateTime.ToString("O"),
-                    Tenant = e.Tenant.ToString(),
+                    TenantId = e.TenantId.ToString(),
                     e.EntityType,
                     EntityId = e.EntityId.ToString(),
                     e.Action,
