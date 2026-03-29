@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Satellite, Loader2 } from 'lucide-react'
+import { Satellite, Loader2, ExternalLinkIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,11 @@ import {
   updateSentinelConnector,
 } from '@/api/integrations.functions'
 import type { UpdateSentinelConnectorInput } from '@/api/integrations.schemas'
+
+const CONNECTOR_STUDIO_URL =
+  'https://connector-studio.reothor.no/?project=https://raw.githubusercontent.com/FrodeHus/PatchHound/main/PatchHound-project.json'
+
+const CONNECTOR_STUDIO_BADGE_URL = 'https://connector-studio.reothor.no/badge.svg'
 
 export function SentinelConnectorCard() {
   const queryClient = useQueryClient()
@@ -50,10 +55,11 @@ export function SentinelConnectorCard() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <p className="mb-4 text-sm text-muted-foreground">
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
             Not configured. You will need a Data Collection Endpoint, Data Collection Rule, and an Entra app registration with the Monitoring Metrics Publisher role.
           </p>
+          <SentinelConnectorStudioCallout />
           <Button onClick={() => setEditing(true)}>Configure connector</Button>
         </CardContent>
       </Card>
@@ -154,10 +160,17 @@ function SentinelConnectorForm({
           <div className="rounded-2xl border border-border/70 bg-background/50 p-3">
             <Satellite className="size-5 text-primary" />
           </div>
-          <CardTitle>Microsoft Sentinel Data Connector</CardTitle>
+          <div>
+            <CardTitle>Microsoft Sentinel Data Connector</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Deploy the PatchHound data connector first, then copy the generated values into this form.
+            </p>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
+        <SentinelConnectorStudioCallout />
+
         <div className="flex items-center gap-3">
           <Switch
             id="sentinel-enabled"
@@ -250,5 +263,29 @@ function SentinelConnectorForm({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function SentinelConnectorStudioCallout() {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
+      <p className="text-sm text-foreground">
+        To set up the Sentinel integration, first deploy the PatchHound data connector. Opening the link below guides you through that deployment in Connector Studio.
+      </p>
+      <a
+        href={CONNECTOR_STUDIO_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 inline-flex items-center gap-2 rounded-xl border border-border/70 bg-background px-3 py-2 transition-colors hover:bg-muted"
+      >
+        <img
+          src={CONNECTOR_STUDIO_BADGE_URL}
+          alt="Open in Connector Studio"
+          className="h-5 w-auto"
+        />
+        <span className="text-sm font-medium">Open in Connector Studio</span>
+        <ExternalLinkIcon className="size-3.5 text-muted-foreground" />
+      </a>
+    </div>
   )
 }

@@ -72,6 +72,12 @@ npm run dev
 - [Remediation flow](REMEDIATION_FLOW.md)
 - [OpenBao deployment notes](deploy/openbao/README.md)
 
+## Microsoft Sentinel Integration
+
+To set up the Sentinel integration, first deploy the PatchHound data connector. Opening the link below will guide you through that deployment in Connector Studio.
+
+[![Open in Connector Studio](https://connector-studio.reothor.no/badge.svg)](https://connector-studio.reothor.no/?project=https://raw.githubusercontent.com/FrodeHus/PatchHound/main/PatchHound-project.json)
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
