@@ -1,0 +1,230 @@
+{
+  "solution": {
+    "name": "PatchHound",
+    "publisherId": "reothorlabs",
+    "offerId": "reothorlabs-patchhound",
+    "version": "1.0.0",
+    "categories": {
+      "domains": [
+        "Security - Threat Protection"
+      ],
+      "verticals": []
+    },
+    "support": {
+      "name": "Reothor Labs Support",
+      "email": "support@reothor.no",
+      "tier": "Community",
+      "link": "https://github.com/FrodeHus/PatchHound"
+    },
+    "firstPublishDate": "2026-03-29"
+  },
+  "connectors": [
+    {
+      "meta": {
+        "connectorId": "PatchhoundAuditEvents",
+        "title": "PatchHound Audit Events",
+        "publisher": "Reothor Labs",
+        "descriptionMarkdown": "Used to ingest audit events from PatchHound",
+        "logo": "",
+        "connectorKind": "Push"
+      },
+      "schema": {
+        "tableName": "PatchhoundAuditEvents_CL",
+        "columns": [
+          {
+            "name": "TimeGenerated",
+            "type": "datetime"
+          },
+          {
+            "name": "TenantId",
+            "type": "string"
+          },
+          {
+            "name": "EntityType",
+            "type": "string"
+          },
+          {
+            "name": "EntityId",
+            "type": "string"
+          },
+          {
+            "name": "Action",
+            "type": "string"
+          },
+          {
+            "name": "OldValues",
+            "type": "string"
+          },
+          {
+            "name": "NewValues",
+            "type": "string"
+          },
+          {
+            "name": "UserId",
+            "type": "string"
+          },
+          {
+            "name": "AuditEntryId",
+            "type": "string"
+          }
+        ]
+      },
+      "dataFlow": {
+        "streamName": "Custom-PatchhoundAuditEvents",
+        "transformKql": "source",
+        "inputColumnsOverride": false,
+        "inputColumns": []
+      },
+      "connectorUI": {
+        "graphQueries": [
+          {
+            "metricName": "Total events received",
+            "legend": "Events",
+            "baseQuery": "{{graphQueriesTableName}}"
+          }
+        ],
+        "sampleQueries": [
+          {
+            "description": "All events",
+            "query": "PatchhoundAuditEvents_CL\n| sort by TimeGenerated desc\n| take 10"
+          },
+          {
+            "description": "Events by TenantId",
+            "query": "PatchhoundAuditEvents_CL\n| summarize count() by TenantId\n| sort by count_ desc"
+          }
+        ],
+        "connectivityCriteria": [
+          {
+            "type": "IsConnectedQuery",
+            "value": [
+              "PatchhoundAuditEvents_CL\n| summarize LastLogReceived = max(TimeGenerated)\n| project IsConnected = LastLogReceived > ago(30d)"
+            ]
+          }
+        ],
+        "isConnectivityCriteriasMatchSome": false,
+        "permissions": {
+          "resourceProvider": [
+            {
+              "provider": "Microsoft.OperationalInsights/workspaces",
+              "permissionsDisplayText": "Read and Write permissions on the Log Analytics workspace.",
+              "providerDisplayName": "Workspace",
+              "scope": "Workspace",
+              "requiredPermissions": {
+                "write": true,
+                "read": true,
+                "delete": false,
+                "action": false
+              }
+            },
+            {
+              "provider": "Microsoft.OperationalInsights/workspaces/sharedKeys",
+              "permissionsDisplayText": "Read permissions to shared keys for the workspace.",
+              "providerDisplayName": "Keys",
+              "scope": "Workspace",
+              "requiredPermissions": {
+                "write": false,
+                "read": true,
+                "delete": false,
+                "action": true
+              }
+            }
+          ],
+          "customs": [
+            {
+              "name": "Microsoft Entra application",
+              "description": "Permissions to create or use an existing Microsoft Entra application for data ingestion."
+            },
+            {
+              "name": "Azure RBAC",
+              "description": "Monitoring Metrics Publisher role assignment on the Data Collection Rule resource."
+            }
+          ]
+        },
+        "instructionSteps": [
+          {
+            "title": "Deploy the Push Connector",
+            "description": "Click the **Deploy to Azure** button below to deploy the required resources.",
+            "instructions": [
+              {
+                "type": "DeployPushConnectorButton",
+                "parameters": {
+                  "label": "Deploy PatchhoundAuditEvents Push connector resources",
+                  "applicationDisplayName": "PatchhoundAuditEvents Push Connector Application"
+                }
+              }
+            ]
+          },
+          {
+            "title": "Configure Your Application",
+            "description": "Use the following connection details to configure your application to send data to this connector.",
+            "instructions": [
+              {
+                "type": "CopyableLabel",
+                "parameters": {
+                  "label": "Tenant ID",
+                  "fillWith": [
+                    "TenantId"
+                  ],
+                  "isBlankValueEnabled": true
+                }
+              },
+              {
+                "type": "CopyableLabel",
+                "parameters": {
+                  "label": "Application (Client) ID",
+                  "fillWith": [
+                    "ApplicationId"
+                  ],
+                  "isBlankValueEnabled": true
+                }
+              },
+              {
+                "type": "CopyableLabel",
+                "parameters": {
+                  "label": "Application Client Secret",
+                  "fillWith": [
+                    "ApplicationSecret"
+                  ],
+                  "isBlankValueEnabled": true
+                }
+              },
+              {
+                "type": "CopyableLabel",
+                "parameters": {
+                  "label": "Data Collection Endpoint",
+                  "fillWith": [
+                    "DataCollectionEndpoint"
+                  ],
+                  "isBlankValueEnabled": true
+                }
+              },
+              {
+                "type": "CopyableLabel",
+                "parameters": {
+                  "label": "Data Collection Rule ID",
+                  "fillWith": [
+                    "DataCollectionRuleId"
+                  ],
+                  "isBlankValueEnabled": true
+                }
+              },
+              {
+                "type": "CopyableLabel",
+                "parameters": {
+                  "label": "Stream Name",
+                  "value": "Custom-PatchhoundAuditEvents",
+                  "isBlankValueEnabled": true
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "activeConnectorIndex": 0,
+  "analyticRules": [],
+  "huntingQueries": [],
+  "asimParsers": [],
+  "workbooks": []
+}
