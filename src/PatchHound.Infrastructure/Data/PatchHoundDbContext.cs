@@ -102,6 +102,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<ApprovalTaskVisibleRole> ApprovalTaskVisibleRoles => Set<ApprovalTaskVisibleRole>();
     public DbSet<RemediationWorkflow> RemediationWorkflows => Set<RemediationWorkflow>();
     public DbSet<RemediationWorkflowStageRecord> RemediationWorkflowStageRecords => Set<RemediationWorkflowStageRecord>();
+    public DbSet<SentinelConnectorConfiguration> SentinelConnectorConfigurations =>
+        Set<SentinelConnectorConfiguration>();
 
     public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken ct = default)
     {
