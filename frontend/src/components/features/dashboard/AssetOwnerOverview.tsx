@@ -23,6 +23,14 @@ function summarizeSoftware(names: string[]) {
   return `${names[0]}, ${names[1]}, and ${names.length - 2} more`
 }
 
+function buildActionHeadline(softwareName: string, softwareNames: string[]) {
+  if (softwareNames.length === 0) {
+    return `Review remediation needed for ${softwareName}`
+  }
+
+  return `Review ${summarizeSoftware(softwareNames)} on ${softwareName}`
+}
+
 function actionStateTone(value: string) {
   switch (value) {
     case 'InProgress':
@@ -154,7 +162,7 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
                         ) : null}
                       </div>
                       <div className="mt-2 text-base font-medium tracking-tight">
-                        Review {summarizeSoftware(item.softwareNames)} for {item.softwareName}
+                        {buildActionHeadline(item.softwareName, item.softwareNames)}
                       </div>
                       <div className="mt-1 text-sm text-muted-foreground">
                         {item.ownerSummary}
