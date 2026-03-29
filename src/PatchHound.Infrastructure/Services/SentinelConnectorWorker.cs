@@ -111,7 +111,7 @@ public sealed class SentinelConnectorWorker : BackgroundService
             var payload = batch.Select(e => new
             {
                 TimeGenerated = e.Timestamp.UtcDateTime.ToString("O"),
-                Tenant = e.TenantId.ToString(),
+                    Tenant = e.Tenant.ToString(),
                 e.EntityType,
                 EntityId = e.EntityId.ToString(),
                 e.Action,
