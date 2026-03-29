@@ -9,8 +9,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Models;
-using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Secrets;
 
 namespace PatchHound.Infrastructure.Services;
 
@@ -108,17 +108,18 @@ public sealed class SentinelConnectorWorker : BackgroundService
                 $"{config.DceEndpoint.TrimEnd('/')}/dataCollectionRules/{config.DcrImmutableId}"
                 + $"/streams/{config.StreamName}?api-version=2023-01-01";
 
-            var payload = batch.Select(e => new
-            {
-                TimeGenerated = e.Timestamp.UtcDateTime.ToString("O"),
+            var payload = batch
+                .Select(e => new
+                {
+                    TimeGenerated = e.Timestamp.UtcDateTime.ToString("O"),
                     Tenant = e.Tenant.ToString(),
-                e.EntityType,
-                EntityId = e.EntityId.ToString(),
-                e.Action,
-                e.OldValues,
-                e.NewValues,
-                UserId = e.UserId.ToString(),
-                AuditEntryId = e.AuditEntryId.ToString(),
+                    e.EntityType,
+                    EntityId = e.EntityId.ToString(),
+                    e.Action,
+                    e.OldValues,
+                    e.NewValues,
+                    UserId = e.UserId.ToString(),
+                    AuditEntryId = e.AuditEntryId.ToString(),
                 })
                 .ToList();
 
@@ -162,9 +163,11 @@ public sealed class SentinelConnectorWorker : BackgroundService
         CancellationToken ct
     )
     {
-        if (_msalApp is null
+        if (
+            _msalApp is null
             || _cachedClientId != config.ClientId
-            || _cachedTenantId != config.TenantId)
+            || _cachedTenantId != config.TenantId
+        )
         {
             var secret = await LoadClientSecretAsync(config, ct);
             _msalApp = ConfidentialClientApplicationBuilder
@@ -200,8 +203,8 @@ public sealed class SentinelConnectorWorker : BackgroundService
         {
             using var scope = _scopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<PatchHoundDbContext>();
-            return await dbContext.SentinelConnectorConfigurations
-                .AsNoTracking()
+            return await dbContext
+                .SentinelConnectorConfigurations.AsNoTracking()
                 .FirstOrDefaultAsync(ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
