@@ -48,8 +48,8 @@ import { Route as AuthedAdminMaintenanceRouteImport } from './routes/_authed/adm
 import { Route as AuthedAdminWorkflowsIndexRouteImport } from './routes/_authed/admin/workflows/index'
 import { Route as AuthedAdminTenantsIndexRouteImport } from './routes/_authed/admin/tenants/index'
 import { Route as AuthedAdminTeamsIndexRouteImport } from './routes/_authed/admin/teams/index'
-import { Route as AuthedAdminAssetRulesIndexRouteImport } from './routes/_authed/admin/asset-rules/index'
 import { Route as AuthedAdminIntegrationsIndexRouteImport } from './routes/_authed/admin/integrations/index'
+import { Route as AuthedAdminAssetRulesIndexRouteImport } from './routes/_authed/admin/asset-rules/index'
 import { Route as AuthedSoftwareIdRemediationRouteImport } from './routes/_authed/software/$id_.remediation'
 import { Route as AuthedRemediationTaskIdRouteImport } from './routes/_authed/remediation/task.$id'
 import { Route as AuthedAssetsIdRemediationRouteImport } from './routes/_authed/assets/$id_.remediation'
@@ -261,16 +261,16 @@ const AuthedAdminTeamsIndexRoute = AuthedAdminTeamsIndexRouteImport.update({
   path: '/admin/teams/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAdminAssetRulesIndexRoute =
-  AuthedAdminAssetRulesIndexRouteImport.update({
-    id: '/admin/asset-rules/',
-    path: '/admin/asset-rules/',
-    getParentRoute: () => AuthedRoute,
-  } as any)
 const AuthedAdminIntegrationsIndexRoute =
   AuthedAdminIntegrationsIndexRouteImport.update({
     id: '/admin/integrations/',
     path: '/admin/integrations/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAdminAssetRulesIndexRoute =
+  AuthedAdminAssetRulesIndexRouteImport.update({
+    id: '/admin/asset-rules/',
+    path: '/admin/asset-rules/',
     getParentRoute: () => AuthedRoute,
   } as any)
 const AuthedSoftwareIdRemediationRoute =
@@ -921,18 +921,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminTeamsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/admin/asset-rules/': {
-      id: '/_authed/admin/asset-rules/'
-      path: '/admin/asset-rules'
-      fullPath: '/admin/asset-rules/'
-      preLoaderRoute: typeof AuthedAdminAssetRulesIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/admin/integrations/': {
       id: '/_authed/admin/integrations/'
       path: '/admin/integrations'
       fullPath: '/admin/integrations/'
       preLoaderRoute: typeof AuthedAdminIntegrationsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/admin/asset-rules/': {
+      id: '/_authed/admin/asset-rules/'
+      path: '/admin/asset-rules'
+      fullPath: '/admin/asset-rules/'
+      preLoaderRoute: typeof AuthedAdminAssetRulesIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/software/$id_/remediation': {
