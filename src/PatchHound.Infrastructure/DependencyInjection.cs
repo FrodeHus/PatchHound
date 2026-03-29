@@ -33,6 +33,7 @@ public static class DependencyInjection
         }
 
         // Database
+        services.AddSingleton<SentinelAuditQueue>();
         services.AddScoped<AuditSaveChangesInterceptor>();
         void ConfigureDbContext(IServiceProvider sp, DbContextOptionsBuilder options) =>
             options

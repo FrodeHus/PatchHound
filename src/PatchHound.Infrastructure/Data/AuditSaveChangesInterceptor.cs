@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
+using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Infrastructure.Data;
 
@@ -29,10 +30,15 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
     };
 
     private readonly ITenantContext _tenantContext;
+    private readonly SentinelAuditQueue? _sentinelQueue;
 
-    public AuditSaveChangesInterceptor(ITenantContext tenantContext)
+    public AuditSaveChangesInterceptor(
+        ITenantContext tenantContext,
+        SentinelAuditQueue? sentinelQueue = null
+    )
     {
         _tenantContext = tenantContext;
+        _sentinelQueue = sentinelQueue;
     }
 
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
@@ -107,6 +113,18 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
             );
 
             context.Set<AuditLogEntry>().Add(auditEntry);
+
+            _sentinelQueue?.TryWrite(new PatchHound.Core.Models.SentinelAuditEvent(
+                AuditEntryId: auditEntry.Id,
+                TenantId: auditEntry.TenantId,
+                EntityType: auditEntry.EntityType,
+                EntityId: auditEntry.EntityId,
+                Action: action.ToString(),
+                OldValues: oldValues,
+                NewValues: newValues,
+                UserId: auditEntry.UserId,
+                Timestamp: auditEntry.Timestamp
+            ));
         }
 
         return base.SavingChangesAsync(eventData, result, cancellationToken);
