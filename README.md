@@ -10,6 +10,20 @@ PatchHound is a self-hosted vulnerability operations platform. It pulls security
 - Audit logging and background processing
 - ASP.NET Core backend with a React frontend
 
+## Screenshots
+
+**Executive dashboard**
+
+![Executive dashboard](images/executive-dashboard.png)
+
+**Remediation workbench**
+
+![Remediation workbench](images/remediation-overview.png)
+
+**Remediation workflow**
+
+![Remediation workflow](images/remediation-workflow.png)
+
 ## Stack
 
 - Backend: .NET, ASP.NET Core, EF Core, SignalR
