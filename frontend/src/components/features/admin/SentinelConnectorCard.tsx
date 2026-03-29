@@ -270,7 +270,9 @@ function SentinelConnectorStudioCallout() {
   return (
     <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
       <p className="text-sm text-foreground">
-        To set up the Sentinel integration, first deploy the PatchHound data connector. Opening the link below guides you through that deployment in Connector Studio.
+        To set up the Sentinel integration, first deploy the PatchHound data
+        connector. Opening the link below guides you through that deployment in
+        Connector Studio.
       </p>
       <a
         href={CONNECTOR_STUDIO_URL}
@@ -283,9 +285,8 @@ function SentinelConnectorStudioCallout() {
           alt="Open in Connector Studio"
           className="h-5 w-auto"
         />
-        <span className="text-sm font-medium">Open in Connector Studio</span>
         <ExternalLinkIcon className="size-3.5 text-muted-foreground" />
       </a>
     </div>
-  )
+  );
 }
