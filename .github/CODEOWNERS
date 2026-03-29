@@ -1,0 +1,18 @@
+# Default owner for the repository.
+* @FrodeHus
+
+# Backend
+/src/ @FrodeHus
+/tests/ @FrodeHus
+
+# Frontend
+/frontend/ @FrodeHus
+
+# Infrastructure and operations
+/docker-compose.yml @FrodeHus
+/deploy/ @FrodeHus
+
+# Repository governance
+/.github/ @FrodeHus
+/README.md @FrodeHus
+/docs/ @FrodeHus
