@@ -14,7 +14,7 @@ import {
 import type { UpdateSentinelConnectorInput } from '@/api/integrations.schemas'
 
 const CONNECTOR_STUDIO_URL =
-  'https://connector-studio.reothor.no/?project=https://raw.githubusercontent.com/FrodeHus/PatchHound/main/PatchHound-project.json'
+  "https://connector-studio.reothor.no/?project=https://raw.githubusercontent.com/FrodeHus/PatchHound/refs/heads/main/PatchHound-project.json";
 
 const CONNECTOR_STUDIO_BADGE_URL = 'https://connector-studio.reothor.no/badge.svg'
 
