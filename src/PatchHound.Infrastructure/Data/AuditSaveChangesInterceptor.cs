@@ -116,7 +116,7 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
 
             _sentinelQueue?.TryWrite(new PatchHound.Core.Models.SentinelAuditEvent(
                 AuditEntryId: auditEntry.Id,
-                    Tenant: auditEntry.TenantId,
+                TenantId: auditEntry.TenantId,
                 EntityType: auditEntry.EntityType,
                 EntityId: auditEntry.EntityId,
                 Action: action.ToString(),

@@ -2,7 +2,7 @@ namespace PatchHound.Core.Models;
 
 public sealed record SentinelAuditEvent(
     Guid AuditEntryId,
-    Guid Tenant,
+    Guid TenantId,
     string EntityType,
     Guid EntityId,
     string Action,

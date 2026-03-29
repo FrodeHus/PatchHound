@@ -10,11 +10,17 @@ public class AuditLogWriter
 {
     private readonly PatchHoundDbContext _dbContext;
     private readonly ITenantContext _tenantContext;
+    private readonly SentinelAuditQueue? _sentinelQueue;
 
-    public AuditLogWriter(PatchHoundDbContext dbContext, ITenantContext tenantContext)
+    public AuditLogWriter(
+        PatchHoundDbContext dbContext,
+        ITenantContext tenantContext,
+        SentinelAuditQueue? sentinelQueue = null
+    )
     {
         _dbContext = dbContext;
         _tenantContext = tenantContext;
+        _sentinelQueue = sentinelQueue;
     }
 
     public async Task WriteAsync(
@@ -38,6 +44,18 @@ public class AuditLogWriter
         );
 
         await _dbContext.AuditLogEntries.AddAsync(entry, ct);
+
+        _sentinelQueue?.TryWrite(new Core.Models.SentinelAuditEvent(
+            AuditEntryId: entry.Id,
+            TenantId: entry.TenantId,
+            EntityType: entry.EntityType,
+            EntityId: entry.EntityId,
+            Action: entry.Action.ToString(),
+            OldValues: entry.OldValues,
+            NewValues: entry.NewValues,
+            UserId: entry.UserId,
+            Timestamp: entry.Timestamp
+        ));
     }
 
     private static string? SerializeValues(object? values)

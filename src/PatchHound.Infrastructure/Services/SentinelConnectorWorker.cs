@@ -23,7 +23,6 @@ public sealed class SentinelConnectorWorker : BackgroundService
 
     private static readonly JsonSerializerOptions PayloadJsonOptions = new()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
@@ -112,7 +111,7 @@ public sealed class SentinelConnectorWorker : BackgroundService
                 .Select(e => new
                 {
                     TimeGenerated = e.Timestamp.UtcDateTime.ToString("O"),
-                    Tenant = e.Tenant.ToString(),
+                    Tenant = e.TenantId.ToString(),
                     e.EntityType,
                     EntityId = e.EntityId.ToString(),
                     e.Action,
