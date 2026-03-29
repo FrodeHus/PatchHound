@@ -21,7 +21,7 @@
   "connectors": [
     {
       "meta": {
-        "connectorId": "PatchhoundAuditEvents",
+        "connectorId": "PatchHoundAuditLog",
         "title": "PatchHound Audit Events",
         "publisher": "Reothor Labs",
         "descriptionMarkdown": "Used to ingest audit events from PatchHound",
@@ -29,14 +29,14 @@
         "connectorKind": "Push"
       },
       "schema": {
-        "tableName": "PatchhoundAuditEvents_CL",
+        "tableName": "PatchHoundAuditLog_CL",
         "columns": [
           {
             "name": "TimeGenerated",
             "type": "datetime"
           },
           {
-            "name": "TenantId",
+            "name": "Tenant",
             "type": "string"
           },
           {
