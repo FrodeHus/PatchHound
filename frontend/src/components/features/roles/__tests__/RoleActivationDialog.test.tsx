@@ -8,15 +8,8 @@ vi.mock('@/api/roles.functions', () => ({
 }))
 
 vi.mock('@tanstack/react-query', () => ({
-  useMutation: vi.fn(({ mutationFn, onSuccess, onError }) => ({
-    mutate: vi.fn((roles, opts) => {
-      mutationFn(roles).then(() => {
-        onSuccess?.()
-        opts?.onSuccess?.()
-      }).catch((err: Error) => {
-        onError?.(err)
-      })
-    }),
+  useMutation: vi.fn(() => ({
+    mutate: vi.fn(),
     isPending: false,
   })),
   useQueryClient: vi.fn(() => ({

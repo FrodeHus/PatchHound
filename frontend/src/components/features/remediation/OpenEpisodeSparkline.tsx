@@ -26,7 +26,6 @@ export function OpenEpisodeSparkline({
       return `${x},${y}`
     })
     .join(' ')
-  const areaPoints = `0,${height} ${linePoints} ${width},${height}`
   const current = points[points.length - 1]?.openEpisodeCount ?? 0
   const peak = Math.max(...values)
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Bell } from 'lucide-react'
@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 export function NotificationBell() {
-  const [unreadCount, setUnreadCount] = useState(0)
+  const [unreadCountOverride, setUnreadCountOverride] = useState<number | null>(null)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
@@ -39,22 +39,19 @@ export function NotificationBell() {
       await markAllNotificationsRead()
     },
     onSuccess: async () => {
-      setUnreadCount(0)
+      setUnreadCountOverride(0)
       await queryClient.invalidateQueries({ queryKey: ['notifications'] })
     },
   })
 
   const handleCountUpdated = useCallback((count: unknown) => {
     if (typeof count === 'number') {
-      setUnreadCount(count)
+      setUnreadCountOverride(count)
     }
   }, [])
 
-  useEffect(() => {
-    if (typeof unreadCountQuery.data === 'number') {
-      setUnreadCount(unreadCountQuery.data)
-    }
-  }, [unreadCountQuery.data])
+  const unreadCount =
+    unreadCountOverride ?? (typeof unreadCountQuery.data === 'number' ? unreadCountQuery.data : 0)
 
   useSSE('NotificationCountUpdated', handleCountUpdated)
 
@@ -122,7 +119,7 @@ export function NotificationBell() {
               onClick={async () => {
                 if (!item.readAt) {
                   await markReadMutation.mutateAsync(item.id)
-                  setUnreadCount((count) => Math.max(0, count - 1))
+                  setUnreadCountOverride((count) => Math.max(0, (count ?? unreadCount) - 1))
                 }
                 if (item.path) {
                   void navigate({ to: item.path as never })

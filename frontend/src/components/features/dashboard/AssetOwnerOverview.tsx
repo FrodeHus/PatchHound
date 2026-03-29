@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { AlertTriangle, Clock3, ShieldAlert, Wrench } from 'lucide-react'
+import { Clock3, ShieldAlert, Wrench } from 'lucide-react'
 import type { OwnerDashboardSummary } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

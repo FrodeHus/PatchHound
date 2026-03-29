@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Building2, ChevronRight, DatabaseZap, GitBranchPlus, Plug, Settings2, ShieldCheck, ShieldEllipsis, Users, Workflow, Wrench } from 'lucide-react'
+import { Building2, ChevronRight, DatabaseZap, GitBranchPlus, Plug, ShieldCheck, ShieldEllipsis, Users, Workflow, Wrench } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({

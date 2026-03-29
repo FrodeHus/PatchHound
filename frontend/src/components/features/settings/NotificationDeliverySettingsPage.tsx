@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Mail, Send, ShieldCheck } from 'lucide-react'
@@ -28,40 +28,66 @@ type DraftState = {
   }
 }
 
+function toDraftState(data: Awaited<ReturnType<typeof fetchNotificationProviders>>): DraftState {
+  return {
+    activeProvider: data.activeProvider,
+    mailgun: {
+      enabled: data.mailgun.enabled,
+      region: data.mailgun.region,
+      domain: data.mailgun.domain,
+      fromAddress: data.mailgun.fromAddress,
+      fromName: data.mailgun.fromName ?? '',
+      replyToAddress: data.mailgun.replyToAddress ?? '',
+      apiKey: '',
+      hasApiKey: data.mailgun.hasApiKey,
+    },
+  }
+}
+
 export function NotificationDeliverySettingsPage() {
   const query = useQuery({
     queryKey: ['notification-providers'],
     queryFn: () => fetchNotificationProviders(),
     staleTime: 30_000,
   })
-  const [draft, setDraft] = useState<DraftState | null>(null)
+  if (!query.data) {
+    return (
+      <section className="space-y-4 pb-4">
+        <h1 className="text-2xl font-semibold">Notification Delivery</h1>
+        <Card className="rounded-2xl border-border/70 bg-card/85">
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            Loading notification provider settings…
+          </CardContent>
+        </Card>
+      </section>
+    )
+  }
 
-  useEffect(() => {
-    if (!query.data) {
-      return
-    }
+  const dataSnapshotKey = [
+    query.data.activeProvider,
+    String(query.data.mailgun.enabled),
+    query.data.mailgun.region,
+    query.data.mailgun.domain,
+    query.data.mailgun.fromAddress,
+    query.data.mailgun.fromName ?? '',
+    query.data.mailgun.replyToAddress ?? '',
+    String(query.data.mailgun.hasApiKey),
+  ].join('|')
 
-    setDraft({
-      activeProvider: query.data.activeProvider,
-      mailgun: {
-        enabled: query.data.mailgun.enabled,
-        region: query.data.mailgun.region,
-        domain: query.data.mailgun.domain,
-        fromAddress: query.data.mailgun.fromAddress,
-        fromName: query.data.mailgun.fromName ?? '',
-        replyToAddress: query.data.mailgun.replyToAddress ?? '',
-        apiKey: '',
-        hasApiKey: query.data.mailgun.hasApiKey,
-      },
-    })
-  }, [query.data])
+  return <NotificationDeliverySettingsEditor key={dataSnapshotKey} data={query.data} onRefresh={() => query.refetch()} />
+}
+
+function NotificationDeliverySettingsEditor({
+  data,
+  onRefresh,
+}: {
+  data: Awaited<ReturnType<typeof fetchNotificationProviders>>
+  onRefresh: () => Promise<unknown>
+}) {
+  const [draft, setDraft] = useState<DraftState>(() => toDraftState(data))
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!draft) {
-        return
-      }
-
       await updateNotificationProviders({
         data: {
           activeProvider: draft.activeProvider,
@@ -79,7 +105,7 @@ export function NotificationDeliverySettingsPage() {
     },
     onSuccess: async () => {
       toast.success('Notification delivery settings saved')
-      await query.refetch()
+      await onRefresh()
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, 'Failed to save notification delivery settings'))
@@ -107,20 +133,7 @@ export function NotificationDeliverySettingsPage() {
   })
 
   function updateDraft(mutator: (current: DraftState) => DraftState) {
-    setDraft((current) => (current ? mutator(current) : current))
-  }
-
-  if (!draft) {
-    return (
-      <section className="space-y-4 pb-4">
-        <h1 className="text-2xl font-semibold">Notification Delivery</h1>
-        <Card className="rounded-2xl border-border/70 bg-card/85">
-          <CardContent className="p-6 text-sm text-muted-foreground">
-            Loading notification provider settings…
-          </CardContent>
-        </Card>
-      </section>
-    )
+    setDraft((current) => mutator(current))
   }
 
   return (
@@ -180,10 +193,10 @@ export function NotificationDeliverySettingsPage() {
             <div className="rounded-2xl border border-border/70 bg-background/30 p-4 text-sm text-muted-foreground">
               <p className="font-medium text-foreground">Current SMTP fallback</p>
               <p className="mt-2">
-                Host: {query.data?.smtp.host}:{query.data?.smtp.port}
+                Host: {data.smtp.host}:{data.smtp.port}
               </p>
-              <p>From: {query.data?.smtp.fromAddress}</p>
-              <p>Encryption: {query.data?.smtp.enableSsl ? 'STARTTLS/SSL enabled' : 'No TLS upgrade configured'}</p>
+              <p>From: {data.smtp.fromAddress}</p>
+              <p>Encryption: {data.smtp.enableSsl ? 'STARTTLS/SSL enabled' : 'No TLS upgrade configured'}</p>
             </div>
           </CardContent>
         </Card>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { toast } from 'sonner'
@@ -77,39 +77,32 @@ function UsersPage() {
     initialData: { items: data.teams, totalCount: data.teams.length, page: 1, pageSize: 200, totalPages: 1 },
   })
 
-  useEffect(() => {
-    const currentItems = usersQuery.data.items
-    if (currentItems.length === 0) {
-      if (selectedUserId !== null) {
-        setSelectedUserId(null)
-      }
-      return
-    }
-
-    if (!selectedUserId || !currentItems.some((user) => user.id === selectedUserId)) {
-      setSelectedUserId(currentItems[0].id)
-    }
-  }, [selectedUserId, usersQuery.data.items])
+  const effectiveSelectedUserId = usersQuery.data.items.some((user) => user.id === selectedUserId)
+    ? selectedUserId
+    : (usersQuery.data.items[0]?.id ?? null)
 
   const userDetailQuery = useQuery({
-    queryKey: ['user-detail', selectedUserId],
-    queryFn: () => fetchUserDetail({ data: { userId: selectedUserId! } }),
-    enabled: Boolean(selectedUserId),
-    initialData: data.initialUserDetail ?? undefined,
+    queryKey: ['user-detail', effectiveSelectedUserId],
+    queryFn: () => fetchUserDetail({ data: { userId: effectiveSelectedUserId! } }),
+    enabled: Boolean(effectiveSelectedUserId),
+    initialData:
+      effectiveSelectedUserId === data.initialUserDetail?.id
+        ? (data.initialUserDetail ?? undefined)
+        : undefined,
   })
 
   const userAuditQuery = useQuery({
-    queryKey: ['user-audit', selectedUserId, auditFilters],
+    queryKey: ['user-audit', effectiveSelectedUserId, auditFilters],
     queryFn: () => fetchUserAudit({
       data: {
-        userId: selectedUserId!,
+        userId: effectiveSelectedUserId!,
         entityType: auditFilters.entityType || undefined,
         action: auditFilters.action || undefined,
         page: 1,
         pageSize: 50,
       },
     }),
-    enabled: Boolean(selectedUserId),
+    enabled: Boolean(effectiveSelectedUserId),
   })
 
   const updateMutation = useMutation({
@@ -151,7 +144,7 @@ function UsersPage() {
           page={usersQuery.data.page}
           pageSize={usersQuery.data.pageSize}
           totalPages={usersQuery.data.totalPages}
-          selectedUserId={selectedUserId}
+          selectedUserId={effectiveSelectedUserId}
           filters={{
             search: search.search,
             role: search.role,
@@ -197,12 +190,12 @@ function UsersPage() {
           isSaving={updateMutation.isPending}
           onAuditFilterChange={setAuditFilters}
           onSave={(payload) => {
-            if (!selectedUserId) {
+            if (!effectiveSelectedUserId) {
               return
             }
 
             updateMutation.mutate({
-              userId: selectedUserId,
+              userId: effectiveSelectedUserId,
               ...payload,
             })
           }}

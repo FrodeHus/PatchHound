@@ -619,18 +619,6 @@ function getProviderStatusDescription(source: EnrichmentSource) {
     : 'This shared provider is configured but not currently used by the worker.'
 }
 
-function getProviderStatusBadgeClassName(source: EnrichmentSource) {
-  if (!source.enabled) {
-    return 'rounded-full border border-border/70 bg-background/70 text-muted-foreground hover:bg-background/70'
-  }
-
-  if ((source.credentialMode === 'global-secret' && !source.credentials.hasSecret) || source.runtime.lastError) {
-    return 'rounded-full border border-tone-warning-border bg-tone-warning text-tone-warning-foreground hover:bg-tone-warning'
-  }
-
-  return 'rounded-full border border-tone-success-border bg-tone-success text-tone-success-foreground hover:bg-tone-success'
-}
-
 function StatusBadge({
   children,
   tone,

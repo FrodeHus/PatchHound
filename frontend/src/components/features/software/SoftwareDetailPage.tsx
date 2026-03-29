@@ -20,7 +20,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
-import { toneBadge, toneDot, toneText } from '@/lib/tone-classes'
+import { toneBadge, toneText } from '@/lib/tone-classes'
 import {
   approvalStatusTone,
   outcomeTone,

@@ -1,5 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router'
-import { useEffect, useState, type ComponentType } from 'react'
+import { useState, type ComponentType } from 'react'
 import {
   BarChart3,
   Bug,
@@ -145,15 +145,6 @@ export function Sidebar({
     Assets: assetsGroupActive || !collapsed,
   })
 
-  useEffect(() => {
-    if (dashboardsGroupActive) {
-      setOpenGroups((prev) => ({ ...prev, Dashboards: true }))
-    }
-    if (assetsGroupActive) {
-      setOpenGroups((prev) => ({ ...prev, Assets: true }))
-    }
-  }, [dashboardsGroupActive, assetsGroupActive])
-
   return (
     <aside
       className={cn(
@@ -196,7 +187,11 @@ export function Sidebar({
       >
         {accessibleGroups.map((group) => {
           const GroupIcon = group.icon
-          const isOpen = collapsed && !compact ? false : (openGroups[group.label] ?? false)
+          const isOpen = collapsed && !compact
+            ? false
+            : ((openGroups[group.label] ?? false)
+              || (group.label === 'Dashboards' && dashboardsGroupActive)
+              || (group.label === 'Assets' && assetsGroupActive))
           const toggleGroup = () => {
             if (!collapsed || compact) {
               setOpenGroups((prev) => ({ ...prev, [group.label]: !prev[group.label] }))

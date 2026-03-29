@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, Building2, Clock3, Flame, RefreshCw, ShieldAlert, Siren, Trophy } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, Building2, Clock3, Flame, RefreshCw, Siren, Trophy } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import type { DashboardSummary, TrendData } from '@/api/dashboard.schemas'
 import { MetricInfoTooltip } from '@/components/features/dashboard/MetricInfoTooltip'
@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import type { LucideIcon } from 'lucide-react'
 
 type Filters = {
   minAgeDays?: number
@@ -128,7 +129,7 @@ function ExecutiveSignalCard({
   value: string
   detail: string
   tone: ExecutiveTone
-  icon: typeof ShieldAlert
+  icon: LucideIcon
 }) {
   return (
     <Card className={cn(

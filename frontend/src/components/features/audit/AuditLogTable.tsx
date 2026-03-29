@@ -11,7 +11,6 @@ import {
   DataTableEmptyState,
   DataTableField,
   DataTableFilterBar,
-  DataTableSummaryStrip,
   DataTableToolbar,
   DataTableToolbarRow,
   DataTableWorkbench,

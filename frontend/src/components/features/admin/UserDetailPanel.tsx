@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { TeamItem } from '@/api/teams.schemas'
 import type { UserAuditItem, UserDetail } from '@/api/users.schemas'
 import { AuditTimeline, type AuditTimelineEvent } from '@/components/features/audit/AuditTimeline'
@@ -49,26 +49,6 @@ export function UserDetailPanel({
   onAuditFilterChange,
   onSave,
 }: UserDetailPanelProps) {
-  const [displayName, setDisplayName] = useState('')
-  const [email, setEmail] = useState('')
-  const [company, setCompany] = useState('')
-  const [isEnabled, setIsEnabled] = useState(true)
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([])
-  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([])
-
-  useEffect(() => {
-    if (!user) {
-      return
-    }
-
-    setDisplayName(user.displayName)
-    setEmail(user.email)
-    setCompany(user.company ?? '')
-    setIsEnabled(user.isEnabled)
-    setSelectedRoles(user.roles)
-    setSelectedTeamIds(user.teams.map((team) => team.teamId))
-  }, [user])
-
   if (!user) {
     return (
       <Card className="rounded-2xl border-border/70">
@@ -78,6 +58,60 @@ export function UserDetailPanel({
       </Card>
     )
   }
+
+  const userSnapshotKey = [
+    user.id,
+    user.displayName,
+    user.email,
+    user.company ?? '',
+    String(user.isEnabled),
+    user.roles.join(','),
+    user.teams.map((team) => team.teamId).join(','),
+  ].join('|')
+
+  return (
+    <UserDetailEditor
+      key={userSnapshotKey}
+      user={user}
+      teams={teams}
+      auditItems={auditItems}
+      auditFilters={auditFilters}
+      isLoading={isLoading}
+      isSaving={isSaving}
+      onAuditFilterChange={onAuditFilterChange}
+      onSave={onSave}
+    />
+  )
+}
+
+function UserDetailEditor({
+  user,
+  teams,
+  auditItems,
+  auditFilters,
+  isLoading,
+  isSaving,
+  onAuditFilterChange,
+  onSave,
+}: {
+  user: UserDetail
+  teams: TeamItem[]
+  auditItems: UserAuditItem[]
+  auditFilters: {
+    entityType: string
+    action: string
+  }
+  isLoading: boolean
+  isSaving: boolean
+  onAuditFilterChange: (next: { entityType: string; action: string }) => void
+  onSave: UserDetailPanelProps['onSave']
+}) {
+  const [displayName, setDisplayName] = useState(user.displayName)
+  const [email, setEmail] = useState(user.email)
+  const [company, setCompany] = useState(user.company ?? '')
+  const [isEnabled, setIsEnabled] = useState(user.isEnabled)
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(user.roles)
+  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>(user.teams.map((team) => team.teamId))
 
   const auditEvents: AuditTimelineEvent[] = auditItems.map((item) => ({
     id: item.id,

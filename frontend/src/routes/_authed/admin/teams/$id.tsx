@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -28,17 +28,7 @@ function AssignmentGroupDetailPage() {
   const { id } = Route.useParams()
   const data = Route.useLoaderData()
   const { user } = Route.useRouteContext()
-  const queryClient = useQueryClient()
   const canManageGroup = user?.roles.includes('GlobalAdmin') ?? false
-  const [memberSearch, setMemberSearch] = useState('')
-  const [selectedMemberId, setSelectedMemberId] = useState('')
-  const [isDynamic, setIsDynamic] = useState(data.team.isDynamic)
-  const [ruleFilter, setRuleFilter] = useState<FilterGroup>(() => {
-    const filterDefinition = data.team.membershipRule?.filterDefinition
-    return filterDefinition?.type === 'group' ? filterDefinition as FilterGroup : emptyRuleFilter
-  })
-  const [rulePreview, setRulePreview] = useState<TeamMembershipRulePreview | null>(null)
-  const [isDynamicConfirmOpen, setIsDynamicConfirmOpen] = useState(false)
 
   const teamDetailQuery = useQuery({
     queryKey: ['team-detail', id],
@@ -59,23 +49,51 @@ function AssignmentGroupDetailPage() {
     enabled: canManageGroup,
   })
 
-  useEffect(() => {
-    const nextRule = teamDetailQuery.data.membershipRule
-    setIsDynamic(teamDetailQuery.data.isDynamic)
-    if (nextRule?.filterDefinition?.type === 'group') {
-      setRuleFilter(nextRule.filterDefinition as FilterGroup)
-    } else {
-      setRuleFilter(emptyRuleFilter)
-    }
-    setRulePreview(null)
-  }, [teamDetailQuery.data.id, teamDetailQuery.data.isDynamic, teamDetailQuery.data.membershipRule])
+  const teamSnapshotKey = [
+    teamDetailQuery.data.id,
+    String(teamDetailQuery.data.isDynamic),
+    teamDetailQuery.data.membershipRule?.filterDefinition?.type ?? '',
+    teamDetailQuery.data.members.map((member) => member.userId).join(','),
+  ].join('|')
+
+  return (
+    <AssignmentGroupDetailEditor
+      key={teamSnapshotKey}
+      id={id}
+      team={teamDetailQuery.data}
+      canManageGroup={canManageGroup}
+      candidateMembers={usersQuery.data?.items ?? []}
+    />
+  )
+}
+
+function AssignmentGroupDetailEditor({
+  id,
+  team,
+  canManageGroup,
+  candidateMembers,
+}: {
+  id: string
+  team: Awaited<ReturnType<typeof fetchTeamDetail>>
+  canManageGroup: boolean
+  candidateMembers: Awaited<ReturnType<typeof fetchUsers>>['items']
+}) {
+  const queryClient = useQueryClient()
+  const [memberSearch, setMemberSearch] = useState('')
+  const [selectedMemberId, setSelectedMemberId] = useState('')
+  const [isDynamic, setIsDynamic] = useState(team.isDynamic)
+  const [ruleFilter, setRuleFilter] = useState<FilterGroup>(() => {
+    const filterDefinition = team.membershipRule?.filterDefinition
+    return filterDefinition?.type === 'group' ? filterDefinition : emptyRuleFilter
+  })
+  const [rulePreview, setRulePreview] = useState<TeamMembershipRulePreview | null>(null)
+  const [isDynamicConfirmOpen, setIsDynamicConfirmOpen] = useState(false)
 
   const availableMembers = useMemo(() => {
-    const currentMemberIds = new Set(teamDetailQuery.data.members.map((member: { userId: string }) => member.userId))
-    const pool = usersQuery.data?.items ?? []
+    const currentMemberIds = new Set(team.members.map((member) => member.userId))
     const query = memberSearch.trim().toLowerCase()
 
-    return pool
+    return candidateMembers
       .filter((userItem) => !currentMemberIds.has(userItem.id))
       .filter((userItem) => {
         if (!query) {
@@ -89,17 +107,11 @@ function AssignmentGroupDetailPage() {
         )
       })
       .sort((left, right) => left.displayName.localeCompare(right.displayName))
-  }, [memberSearch, teamDetailQuery.data.members, usersQuery.data?.items])
+  }, [candidateMembers, memberSearch, team.members])
 
-  useEffect(() => {
-    if (!selectedMemberId) {
-      return
-    }
-
-    if (!availableMembers.some((member) => member.id === selectedMemberId)) {
-      setSelectedMemberId('')
-    }
-  }, [availableMembers, selectedMemberId])
+  const effectiveSelectedMemberId = availableMembers.some((member) => member.id === selectedMemberId)
+    ? selectedMemberId
+    : ''
 
   const updateMembersMutation = useMutation({
     mutationFn: async (payload: { userId: string; action: 'add' | 'remove' }) =>
@@ -182,17 +194,17 @@ function AssignmentGroupDetailPage() {
               Assignment Groups
             </Link>
             <span className="mx-2">/</span>
-            <span>{teamDetailQuery.data.name}</span>
+            <span>{team.name}</span>
           </div>
           <h1 className="text-2xl font-semibold tracking-[-0.04em]">Assignment group</h1>
         </div>
       </div>
 
       <AssignmentGroupDetailView
-        team={teamDetailQuery.data}
+        team={team}
         canManageGroup={canManageGroup}
         availableMembers={availableMembers}
-        selectedMemberId={selectedMemberId}
+        selectedMemberId={effectiveSelectedMemberId}
         memberSearch={memberSearch}
         ruleFilter={ruleFilter}
         isDynamic={isDynamic}
@@ -203,12 +215,12 @@ function AssignmentGroupDetailPage() {
         onMemberSearchChange={setMemberSearch}
         onSelectedMemberChange={setSelectedMemberId}
         onAddMember={() => {
-          if (!selectedMemberId) {
+          if (!effectiveSelectedMemberId) {
             return
           }
 
           updateMembersMutation.mutate({
-            userId: selectedMemberId,
+            userId: effectiveSelectedMemberId,
             action: 'add',
           })
         }}

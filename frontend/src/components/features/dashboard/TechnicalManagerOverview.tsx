@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, Clock3, ShieldAlert } from 'lucide-react'
 import type { TechnicalManagerDashboardSummary } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
@@ -26,7 +27,8 @@ function attentionTone(state: string) {
 }
 
 export function TechnicalManagerOverview({ summary, isLoading }: Props) {
-  const overdueApprovedTasks = summary.approvedPatchingTasks.filter((item) => new Date(item.dueDate).getTime() < Date.now()).length
+  const [now] = useState(() => Date.now())
+  const overdueApprovedTasks = summary.approvedPatchingTasks.filter((item) => new Date(item.dueDate).getTime() < now).length
 
   return (
     <section className="space-y-6 pb-4">
