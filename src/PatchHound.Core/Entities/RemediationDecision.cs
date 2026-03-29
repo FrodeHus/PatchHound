@@ -21,6 +21,8 @@ public class RemediationDecision
     public DateTimeOffset? LastSlaNotifiedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+    public int ReopenCount { get; private set; }
+    public DateTimeOffset? ReopenedAt { get; private set; }
 
     public Asset SoftwareAsset { get; private set; } = null!;
     public RemediationWorkflow? RemediationWorkflow { get; private set; }
@@ -88,7 +90,7 @@ public class RemediationDecision
 
     public void Approve(Guid approvedBy)
     {
-        if (ApprovalStatus != DecisionApprovalStatus.PendingApproval)
+        if (ApprovalStatus is not (DecisionApprovalStatus.PendingApproval or DecisionApprovalStatus.Reopened))
             throw new InvalidOperationException($"Cannot approve a decision with status {ApprovalStatus}.");
 
         ApprovedBy = approvedBy;
@@ -99,7 +101,7 @@ public class RemediationDecision
 
     public void Reject(Guid rejectedBy)
     {
-        if (ApprovalStatus != DecisionApprovalStatus.PendingApproval)
+        if (ApprovalStatus is not (DecisionApprovalStatus.PendingApproval or DecisionApprovalStatus.Reopened))
             throw new InvalidOperationException($"Cannot reject a decision with status {ApprovalStatus}.");
 
         ApprovedBy = rejectedBy;
@@ -111,6 +113,35 @@ public class RemediationDecision
     public void Expire()
     {
         ApprovalStatus = DecisionApprovalStatus.Expired;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void Reopen()
+    {
+        if (ApprovalStatus is not (DecisionApprovalStatus.Approved
+            or DecisionApprovalStatus.Expired
+            or DecisionApprovalStatus.Rejected))
+        {
+            throw new InvalidOperationException(
+                $"Cannot reopen a decision with status '{ApprovalStatus}'.");
+        }
+
+        ApprovalStatus = DecisionApprovalStatus.Reopened;
+        ReopenCount++;
+        ReopenedAt = DateTimeOffset.UtcNow;
+        ApprovedBy = null;
+        ApprovedAt = null;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void UpdateDecision(RemediationOutcome outcome, string justification)
+    {
+        if (ApprovalStatus != DecisionApprovalStatus.Reopened)
+            throw new InvalidOperationException(
+                $"Cannot update a decision with status '{ApprovalStatus}'. Only reopened decisions can be updated.");
+
+        Outcome = outcome;
+        Justification = justification;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 

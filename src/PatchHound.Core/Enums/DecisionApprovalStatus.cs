@@ -6,4 +6,5 @@ public enum DecisionApprovalStatus
     Approved,
     Rejected,
     Expired,
+    Reopened,
 }
