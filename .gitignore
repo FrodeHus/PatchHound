@@ -10,7 +10,10 @@ node_modules/
 dist/
 *.DotSettings.user
 .worktrees/
+.openbao-init/
+.DS_Store
+frontend/.output/
+frontend/.tanstack/
 .claude/
 .codex/
 .superpowers/
-.openbao-init/

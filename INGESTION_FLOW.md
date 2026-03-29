@@ -2,12 +2,12 @@
 
 This document visualizes the current PatchHound ingestion and enrichment pipeline as implemented in:
 
-- [IngestionService.cs](/Users/frode.hus/src/github.com/frodehus/PatchHound/src/PatchHound.Infrastructure/Services/IngestionService.cs)
-- [StagedAssetMergeService.cs](/Users/frode.hus/src/github.com/frodehus/PatchHound/src/PatchHound.Infrastructure/Services/StagedAssetMergeService.cs)
-- [StagedVulnerabilityMergeService.cs](/Users/frode.hus/src/github.com/frodehus/PatchHound/src/PatchHound.Infrastructure/Services/StagedVulnerabilityMergeService.cs)
-- [SoftwareVulnerabilityMatchService.cs](/Users/frode.hus/src/github.com/frodehus/PatchHound/src/PatchHound.Infrastructure/Services/SoftwareVulnerabilityMatchService.cs)
-- [NormalizedSoftwareProjectionService.cs](/Users/frode.hus/src/github.com/frodehus/PatchHound/src/PatchHound.Infrastructure/Services/NormalizedSoftwareProjectionService.cs)
-- [EnrichmentWorker.cs](/Users/frode.hus/src/github.com/frodehus/PatchHound/src/PatchHound.Worker/EnrichmentWorker.cs)
+- `src/PatchHound.Infrastructure/Services/IngestionService.cs`
+- `src/PatchHound.Infrastructure/Services/StagedAssetMergeService.cs`
+- `src/PatchHound.Infrastructure/Services/StagedVulnerabilityMergeService.cs`
+- `src/PatchHound.Infrastructure/Services/SoftwareVulnerabilityMatchService.cs`
+- `src/PatchHound.Infrastructure/Services/NormalizedSoftwareProjectionService.cs`
+- `src/PatchHound.Worker/EnrichmentWorker.cs`
 
 ## High-Level Flow
 

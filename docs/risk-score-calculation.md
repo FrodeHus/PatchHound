@@ -5,9 +5,9 @@ This document describes how PatchHound currently calculates risk in the implemen
 It reflects the running code, not just the original design intent.
 
 Primary implementation sources:
-- [VulnerabilityThreatAssessmentService.cs](/Users/frode.hus/src/github.com/frodehus/PatchHound/src/PatchHound.Infrastructure/Services/VulnerabilityThreatAssessmentService.cs)
-- [VulnerabilityEpisodeRiskAssessmentService.cs](/Users/frode.hus/src/github.com/frodehus/PatchHound/src/PatchHound.Infrastructure/Services/VulnerabilityEpisodeRiskAssessmentService.cs)
-- [RiskScoreService.cs](/Users/frode.hus/src/github.com/frodehus/PatchHound/src/PatchHound.Infrastructure/Services/RiskScoreService.cs)
+- `src/PatchHound.Infrastructure/Services/VulnerabilityThreatAssessmentService.cs`
+- `src/PatchHound.Infrastructure/Services/VulnerabilityEpisodeRiskAssessmentService.cs`
+- `src/PatchHound.Infrastructure/Services/RiskScoreService.cs`
 
 ## Overview
 
@@ -63,7 +63,7 @@ The key rule is:
 ## 1. Threat Assessment
 
 Code:
-- [VulnerabilityThreatAssessmentService.cs](/Users/frode.hus/src/github.com/frodehus/PatchHound/src/PatchHound.Infrastructure/Services/VulnerabilityThreatAssessmentService.cs)
+- `src/PatchHound.Infrastructure/Services/VulnerabilityThreatAssessmentService.cs`
 
 Current calculation version:
 - `2`
@@ -177,7 +177,7 @@ ThreatScore
 ## 2. Episode Risk Assessment
 
 Code:
-- [VulnerabilityEpisodeRiskAssessmentService.cs](/Users/frode.hus/src/github.com/frodehus/PatchHound/src/PatchHound.Infrastructure/Services/VulnerabilityEpisodeRiskAssessmentService.cs)
+- `src/PatchHound.Infrastructure/Services/VulnerabilityEpisodeRiskAssessmentService.cs`
 
 Current calculation version:
 - `1`
@@ -322,7 +322,7 @@ EpisodeRiskScore
 ## 3. Asset Risk Rollup
 
 Code:
-- [RiskScoreService.cs](/Users/frode.hus/src/github.com/frodehus/PatchHound/src/PatchHound.Infrastructure/Services/RiskScoreService.cs)
+- `src/PatchHound.Infrastructure/Services/RiskScoreService.cs`
 
 Assets are rolled up from unresolved episode risk assessments.
 
