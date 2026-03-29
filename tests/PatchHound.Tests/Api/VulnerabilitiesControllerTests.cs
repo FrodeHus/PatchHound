@@ -91,16 +91,45 @@ public class VulnerabilitiesControllerTests : IDisposable
     [Fact]
     public async Task List_ThreatFilters_ReturnsThreatSignalsFromPersistedAssessment()
     {
+        var snapshotId = Guid.NewGuid();
         var projection = TenantVulnerabilityGraphFactory.CreateProjection(
             _tenantId,
             "CVE-2026-0300",
             "Threat-filtered vulnerability",
             Severity.Critical
         );
+        var asset = Asset.Create(
+            _tenantId,
+            "device-threat-filter",
+            AssetType.Device,
+            "Threat Filter Device",
+            Criticality.High
+        );
+        var source = TenantSourceConfiguration.Create(
+            _tenantId,
+            TenantSourceCatalog.DefenderSourceKey,
+            "Microsoft Defender",
+            true,
+            "0 */6 * * *",
+            "tenant",
+            "client",
+            "tenants/source/secret",
+            TenantSourceCatalog.DefaultDefenderApiBaseUrl,
+            TenantSourceCatalog.DefaultDefenderTokenScope
+        );
+        source.SetSnapshotPointers(snapshotId, null);
 
         await _dbContext.AddRangeAsync(
+            asset,
+            source,
             projection.Definition,
             projection.TenantVulnerability,
+            VulnerabilityAsset.Create(
+                snapshotId,
+                projection.TenantVulnerability.Id,
+                asset.Id,
+                DateTimeOffset.UtcNow.AddDays(-2)
+            ),
             VulnerabilityThreatAssessment.Create(
                 projection.Definition.Id,
                 88m,
@@ -119,7 +148,7 @@ public class VulnerabilitiesControllerTests : IDisposable
             VulnerabilityAssetEpisode.Create(
                 _tenantId,
                 projection.TenantVulnerability.Id,
-                Guid.NewGuid(),
+                asset.Id,
                 1,
                 DateTimeOffset.UtcNow.AddDays(-2)
             )

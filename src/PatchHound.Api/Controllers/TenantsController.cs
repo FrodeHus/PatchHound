@@ -22,16 +22,19 @@ public class TenantsController : ControllerBase
     private readonly PatchHoundDbContext _dbContext;
     private readonly ISecretStore _secretStore;
     private readonly ITenantContext _tenantContext;
+    private readonly AuditLogWriter _auditLogWriter;
 
     public TenantsController(
         PatchHoundDbContext dbContext,
         ISecretStore secretStore,
-        ITenantContext tenantContext
+        ITenantContext tenantContext,
+        AuditLogWriter auditLogWriter
     )
     {
         _dbContext = dbContext;
         _secretStore = secretStore;
         _tenantContext = tenantContext;
+        _auditLogWriter = auditLogWriter;
     }
 
     [HttpGet]
@@ -230,6 +233,7 @@ public class TenantsController : ControllerBase
 
         // Collect pending secret writes — vault writes happen after DB commit
         var pendingSecretWrites = new List<(string Path, string Key, string Value)>();
+        var pendingSecretAudits = new List<(Guid EntityId, string? OldSecretRef, string NewSecretRef)>();
 
         foreach (var source in request.IngestionSources)
         {
@@ -256,6 +260,8 @@ public class TenantsController : ControllerBase
                 );
             }
 
+            var oldSecretRef = existingSource?.SecretRef;
+
             if (existingSource is null)
             {
                 var created = TenantSourceConfiguration.Create(
@@ -272,6 +278,10 @@ public class TenantsController : ControllerBase
                 );
                 await _dbContext.TenantSourceConfigurations.AddAsync(created, ct);
                 existingSources[source.Key] = created;
+                if (!string.IsNullOrWhiteSpace(secretValue))
+                {
+                    pendingSecretAudits.Add((created.Id, oldSecretRef, secretRef));
+                }
                 continue;
             }
 
@@ -285,6 +295,14 @@ public class TenantsController : ControllerBase
                 source.Credentials.ApiBaseUrl,
                 source.Credentials.TokenScope
             );
+
+            if (
+                !string.IsNullOrWhiteSpace(secretValue)
+                && !string.Equals(oldSecretRef, secretRef, StringComparison.Ordinal)
+            )
+            {
+                pendingSecretAudits.Add((existingSource.Id, oldSecretRef, secretRef));
+            }
         }
 
         await _dbContext.SaveChangesAsync(ct);
@@ -297,6 +315,24 @@ public class TenantsController : ControllerBase
                 new Dictionary<string, string> { [key] = value },
                 ct
             );
+        }
+
+        foreach (var (entityId, oldSecretRef, newSecretRef) in pendingSecretAudits)
+        {
+            await _auditLogWriter.WriteAsync(
+                tenant.Id,
+                "TenantSourceSecret",
+                entityId,
+                AuditAction.Updated,
+                string.IsNullOrWhiteSpace(oldSecretRef) ? null : new { SecretRef = oldSecretRef },
+                new { SecretRef = newSecretRef },
+                ct
+            );
+        }
+
+        if (pendingSecretAudits.Count > 0)
+        {
+            await _dbContext.SaveChangesAsync(ct);
         }
 
         return NoContent();

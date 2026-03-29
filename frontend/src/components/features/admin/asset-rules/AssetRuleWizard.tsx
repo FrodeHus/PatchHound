@@ -477,6 +477,7 @@ function OperationEditor({
   const existing = operations.find((op) => op.type === type)
   const isActive = !!existing
   const selectedValue = existing?.parameters[paramKey] ?? ''
+  const selectedOption = options.find((opt) => opt.value === selectedValue)
 
   const toggle = () => {
     if (isActive) {
@@ -514,7 +515,9 @@ function OperationEditor({
       {isActive && (
         <Select value={selectedValue} onValueChange={(v) => v && updateValue(v)}>
           <SelectTrigger className="h-9 rounded-lg text-sm">
-            <SelectValue placeholder={`Select ${label.toLowerCase()}...`} />
+            <SelectValue placeholder={`Select ${label.toLowerCase()}...`}>
+              {selectedOption?.label}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {options.map((opt) => (

@@ -331,7 +331,7 @@ public class RemediationDecisionsControllerTests : IDisposable
         );
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var payload = result.Value.Should().BeOfType<PagedResponse<RemediationDecisionListItemDto>>().Subject;
+        var payload = result.Value.Should().BeOfType<RemediationDecisionListPageDto>().Subject;
         payload.TotalCount.Should().Be(0);
         payload.Items.Should().BeEmpty();
     }

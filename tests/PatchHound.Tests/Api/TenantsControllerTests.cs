@@ -41,7 +41,8 @@ public class TenantsControllerTests : IDisposable
         _controller = new TenantsController(
             _dbContext,
             _secretStore,
-            _tenantContext
+            _tenantContext,
+            new AuditLogWriter(_dbContext, _tenantContext)
         );
     }
 

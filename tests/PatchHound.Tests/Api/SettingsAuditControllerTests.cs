@@ -80,7 +80,8 @@ public class SettingsAuditControllerTests : IDisposable
         var controller = new TenantsController(
             _dbContext,
             _secretStore,
-            _tenantContext
+            _tenantContext,
+            new AuditLogWriter(_dbContext, _tenantContext)
         );
 
         var action = await controller.Update(

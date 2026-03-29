@@ -9,6 +9,7 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Tests.Auth;
 
@@ -228,6 +229,8 @@ public class TenantContextMiddlewareTests
         var services = new ServiceCollection();
         services.AddSingleton<ITenantContext>(tenantContext);
         services.AddSingleton(dbContext);
+        services.AddSingleton(new TeamMembershipRuleFilterBuilder());
+        services.AddScoped<TeamMembershipRuleService>(_ => new TeamMembershipRuleService(dbContext, new TeamMembershipRuleFilterBuilder()));
 
         var httpContext = new DefaultHttpContext
         {

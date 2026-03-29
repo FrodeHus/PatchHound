@@ -421,12 +421,14 @@ public class SystemController : ControllerBase
         );
 
         var pendingSecretWrites = new List<(string Path, string Key, string Value)>();
+        var pendingSecretAudits = new List<(Guid EntityId, string? OldSecretRef, string NewSecretRef)>();
 
         foreach (var source in request)
         {
             existingSources.TryGetValue(source.Key, out var existingSource);
             var secretRef = existingSource?.SecretRef ?? string.Empty;
             var secretValue = source.Credentials.Secret.Trim();
+            var oldSecretRef = existingSource?.SecretRef;
 
             if (!string.IsNullOrWhiteSpace(secretValue))
             {
@@ -452,6 +454,10 @@ public class SystemController : ControllerBase
                 );
                 await _dbContext.EnrichmentSourceConfigurations.AddAsync(existingSource, ct);
                 existingSources[source.Key] = existingSource;
+                if (!string.IsNullOrWhiteSpace(secretValue))
+                {
+                    pendingSecretAudits.Add((existingSource.Id, oldSecretRef, secretRef));
+                }
                 continue;
             }
 
@@ -462,6 +468,14 @@ public class SystemController : ControllerBase
                 source.Credentials.ApiBaseUrl,
                 source.RefreshTtlHours
             );
+
+            if (
+                !string.IsNullOrWhiteSpace(secretValue)
+                && !string.Equals(oldSecretRef, secretRef, StringComparison.Ordinal)
+            )
+            {
+                pendingSecretAudits.Add((existingSource.Id, oldSecretRef, secretRef));
+            }
         }
 
         await _dbContext.SaveChangesAsync(ct);
@@ -474,6 +488,24 @@ public class SystemController : ControllerBase
                 new Dictionary<string, string> { [key] = value },
                 ct
             );
+        }
+
+        foreach (var (entityId, oldSecretRef, newSecretRef) in pendingSecretAudits)
+        {
+            await _auditLogWriter.WriteAsync(
+                Guid.Empty,
+                "EnrichmentSourceSecret",
+                entityId,
+                AuditAction.Updated,
+                string.IsNullOrWhiteSpace(oldSecretRef) ? null : new { SecretRef = oldSecretRef },
+                new { SecretRef = newSecretRef },
+                ct
+            );
+        }
+
+        if (pendingSecretAudits.Count > 0)
+        {
+            await _dbContext.SaveChangesAsync(ct);
         }
 
         return NoContent();
