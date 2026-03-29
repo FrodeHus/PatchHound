@@ -55,6 +55,13 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
         nameof(StagedVulnerability),
         nameof(StagedVulnerabilityExposure),
         nameof(StagedDeviceSoftwareInstallation),
+        nameof(TenantSoftwareRiskScore),
+        nameof(VulnerabilityAssetAssessment),
+        nameof(TeamRiskScore),
+        nameof(AssetRiskScore),
+        nameof(DeviceGroupRiskScore),
+        nameof(VulnerabilityEpisodeRiskAssessment),
+        nameof(TenantRiskScoreSnapshot),
     };
 
     private readonly ITenantContext _tenantContext;
@@ -108,7 +115,10 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
                 _ => [],
             };
 
-            if (entry.State == EntityState.Modified && ShouldSkipNoiseOnlyUpdate(auditableChangedProperties))
+            if (
+                entry.State == EntityState.Modified
+                && ShouldSkipNoiseOnlyUpdate(auditableChangedProperties)
+            )
             {
                 continue;
             }
@@ -126,16 +136,20 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
             string? oldValues =
                 entry.State != EntityState.Added
                     ? SerializeValues(
-                        auditableChangedProperties
-                            .ToDictionary(p => p.Metadata.Name, p => p.OriginalValue)
+                        auditableChangedProperties.ToDictionary(
+                            p => p.Metadata.Name,
+                            p => p.OriginalValue
+                        )
                     )
                     : null;
 
             string? newValues =
                 entry.State != EntityState.Deleted
                     ? SerializeValues(
-                        auditableChangedProperties
-                            .ToDictionary(p => p.Metadata.Name, p => p.CurrentValue)
+                        auditableChangedProperties.ToDictionary(
+                            p => p.Metadata.Name,
+                            p => p.CurrentValue
+                        )
                     )
                     : null;
 
@@ -151,23 +165,27 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
 
             context.Set<AuditLogEntry>().Add(auditEntry);
 
-            _sentinelQueue?.TryWrite(new PatchHound.Core.Models.SentinelAuditEvent(
-                AuditEntryId: auditEntry.Id,
-                TenantId: auditEntry.TenantId,
-                EntityType: auditEntry.EntityType,
-                EntityId: auditEntry.EntityId,
-                Action: action.ToString(),
-                OldValues: oldValues,
-                NewValues: newValues,
-                UserId: auditEntry.UserId,
-                Timestamp: auditEntry.Timestamp
-            ));
+            _sentinelQueue?.TryWrite(
+                new PatchHound.Core.Models.SentinelAuditEvent(
+                    AuditEntryId: auditEntry.Id,
+                    TenantId: auditEntry.TenantId,
+                    EntityType: auditEntry.EntityType,
+                    EntityId: auditEntry.EntityId,
+                    Action: action.ToString(),
+                    OldValues: oldValues,
+                    NewValues: newValues,
+                    UserId: auditEntry.UserId,
+                    Timestamp: auditEntry.Timestamp
+                )
+            );
         }
 
         return base.SavingChangesAsync(eventData, result, cancellationToken);
     }
 
-    private static bool ShouldSkipAudit(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry)
+    private static bool ShouldSkipAudit(
+        Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry
+    )
     {
         return entry.State == EntityState.Deleted
             && IngestionCleanupEntityTypes.Contains(entry.Entity.GetType().Name);
