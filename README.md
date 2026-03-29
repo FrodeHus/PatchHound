@@ -138,13 +138,7 @@ docker compose exec openbao bao secrets enable -path=patchhound kv-v2
 
 ```bash
 docker compose exec openbao sh -c 'cat >/tmp/patchhound-policy.hcl <<EOF
-path "patchhound/data/tenants/*" {
-  capabilities = ["create", "update", "read"]
-}
-path "patchhound/data/system/enrichment-sources/*" {
-  capabilities = ["create", "update", "read"]
-}
-path "patchhound/data/system/notification-services/*" {
+path "patchhound/data/*" {
   capabilities = ["create", "update", "read"]
 }
 EOF
