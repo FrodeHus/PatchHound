@@ -76,7 +76,7 @@ npm run dev
 
 To set up the Sentinel integration, first deploy the PatchHound data connector. Opening the link below will guide you through that deployment in Connector Studio.
 
-[![Open in Connector Studio](https://connector-studio.reothor.no/badge.svg)](https://connector-studio.reothor.no/?project=https://raw.githubusercontent.com/FrodeHus/PatchHound/main/PatchHound-project.json)
+[![Open in Connector Studio](https://connector-studio.reothor.no/badge.svg)](https://connector-studio.reothor.no/?project=https://raw.githubusercontent.com/FrodeHus/PatchHound/refs/heads/main/PatchHound-project.json)
 
 ## Contributing
 
