@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Building2, ChevronRight, DatabaseZap, GitBranchPlus, Settings2, ShieldCheck, ShieldEllipsis, Users, Workflow, Wrench } from 'lucide-react'
+import { Building2, ChevronRight, DatabaseZap, GitBranchPlus, Plug, Settings2, ShieldCheck, ShieldEllipsis, Users, Workflow, Wrench } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({
@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_authed/admin/')({
 type AdminArea = {
   title: string
   description: string
-  to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/sources' | '/admin/security-profiles' | '/admin/asset-rules' | '/admin/workflows' | '/admin/maintenance'
+  to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/sources' | '/admin/security-profiles' | '/admin/asset-rules' | '/admin/workflows' | '/admin/integrations' | '/admin/maintenance'
   roles: Array<'GlobalAdmin' | 'SecurityManager' | 'SecurityAnalyst' | 'AssetOwner' | 'TechnicalManager' | 'Auditor' | 'Stakeholder'>
   icon: typeof Users
 }
@@ -63,6 +63,13 @@ const adminAreas: AdminArea[] = [
     to: '/admin/workflows',
     roles: ['GlobalAdmin', 'SecurityManager'],
     icon: Workflow,
+  },
+  {
+    title: 'Integrations',
+    description: 'Configure external service connectors such as Microsoft Sentinel for audit log forwarding.',
+    to: '/admin/integrations',
+    roles: ['GlobalAdmin'],
+    icon: Plug,
   },
   {
     title: 'Maintenance',

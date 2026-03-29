@@ -49,6 +49,7 @@ import { Route as AuthedAdminWorkflowsIndexRouteImport } from './routes/_authed/
 import { Route as AuthedAdminTenantsIndexRouteImport } from './routes/_authed/admin/tenants/index'
 import { Route as AuthedAdminTeamsIndexRouteImport } from './routes/_authed/admin/teams/index'
 import { Route as AuthedAdminAssetRulesIndexRouteImport } from './routes/_authed/admin/asset-rules/index'
+import { Route as AuthedAdminIntegrationsIndexRouteImport } from './routes/_authed/admin/integrations/index'
 import { Route as AuthedSoftwareIdRemediationRouteImport } from './routes/_authed/software/$id_.remediation'
 import { Route as AuthedRemediationTaskIdRouteImport } from './routes/_authed/remediation/task.$id'
 import { Route as AuthedAssetsIdRemediationRouteImport } from './routes/_authed/assets/$id_.remediation'
@@ -266,6 +267,12 @@ const AuthedAdminAssetRulesIndexRoute =
     path: '/admin/asset-rules/',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedAdminIntegrationsIndexRoute =
+  AuthedAdminIntegrationsIndexRouteImport.update({
+    id: '/admin/integrations/',
+    path: '/admin/integrations/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedSoftwareIdRemediationRoute =
   AuthedSoftwareIdRemediationRouteImport.update({
     id: '/software/$id_/remediation',
@@ -361,6 +368,7 @@ export interface FileRoutesByFullPath {
   '/remediation/task/$id': typeof AuthedRemediationTaskIdRoute
   '/software/$id/remediation': typeof AuthedSoftwareIdRemediationRoute
   '/admin/asset-rules/': typeof AuthedAdminAssetRulesIndexRoute
+  '/admin/integrations/': typeof AuthedAdminIntegrationsIndexRoute
   '/admin/teams/': typeof AuthedAdminTeamsIndexRoute
   '/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
   '/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
@@ -411,6 +419,7 @@ export interface FileRoutesByTo {
   '/remediation/task/$id': typeof AuthedRemediationTaskIdRoute
   '/software/$id/remediation': typeof AuthedSoftwareIdRemediationRoute
   '/admin/asset-rules': typeof AuthedAdminAssetRulesIndexRoute
+  '/admin/integrations': typeof AuthedAdminIntegrationsIndexRoute
   '/admin/teams': typeof AuthedAdminTeamsIndexRoute
   '/admin/tenants': typeof AuthedAdminTenantsIndexRoute
   '/admin/workflows': typeof AuthedAdminWorkflowsIndexRoute
@@ -463,6 +472,7 @@ export interface FileRoutesById {
   '/_authed/remediation/task/$id': typeof AuthedRemediationTaskIdRoute
   '/_authed/software/$id_/remediation': typeof AuthedSoftwareIdRemediationRoute
   '/_authed/admin/asset-rules/': typeof AuthedAdminAssetRulesIndexRoute
+  '/_authed/admin/integrations/': typeof AuthedAdminIntegrationsIndexRoute
   '/_authed/admin/teams/': typeof AuthedAdminTeamsIndexRoute
   '/_authed/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
   '/_authed/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
@@ -515,6 +525,7 @@ export interface FileRouteTypes {
     | '/remediation/task/$id'
     | '/software/$id/remediation'
     | '/admin/asset-rules/'
+    | '/admin/integrations/'
     | '/admin/teams/'
     | '/admin/tenants/'
     | '/admin/workflows/'
@@ -565,6 +576,7 @@ export interface FileRouteTypes {
     | '/remediation/task/$id'
     | '/software/$id/remediation'
     | '/admin/asset-rules'
+    | '/admin/integrations'
     | '/admin/teams'
     | '/admin/tenants'
     | '/admin/workflows'
@@ -616,6 +628,7 @@ export interface FileRouteTypes {
     | '/_authed/remediation/task/$id'
     | '/_authed/software/$id_/remediation'
     | '/_authed/admin/asset-rules/'
+    | '/_authed/admin/integrations/'
     | '/_authed/admin/teams/'
     | '/_authed/admin/tenants/'
     | '/_authed/admin/workflows/'
@@ -915,6 +928,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminAssetRulesIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/integrations/': {
+      id: '/_authed/admin/integrations/'
+      path: '/admin/integrations'
+      fullPath: '/admin/integrations/'
+      preLoaderRoute: typeof AuthedAdminIntegrationsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/software/$id_/remediation': {
       id: '/_authed/software/$id_/remediation'
       path: '/software/$id/remediation'
@@ -1019,6 +1039,7 @@ interface AuthedRouteChildren {
   AuthedRemediationTaskIdRoute: typeof AuthedRemediationTaskIdRoute
   AuthedSoftwareIdRemediationRoute: typeof AuthedSoftwareIdRemediationRoute
   AuthedAdminAssetRulesIndexRoute: typeof AuthedAdminAssetRulesIndexRoute
+  AuthedAdminIntegrationsIndexRoute: typeof AuthedAdminIntegrationsIndexRoute
   AuthedAdminTeamsIndexRoute: typeof AuthedAdminTeamsIndexRoute
   AuthedAdminTenantsIndexRoute: typeof AuthedAdminTenantsIndexRoute
   AuthedAdminWorkflowsIndexRoute: typeof AuthedAdminWorkflowsIndexRoute
@@ -1062,6 +1083,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedRemediationTaskIdRoute: AuthedRemediationTaskIdRoute,
   AuthedSoftwareIdRemediationRoute: AuthedSoftwareIdRemediationRoute,
   AuthedAdminAssetRulesIndexRoute: AuthedAdminAssetRulesIndexRoute,
+  AuthedAdminIntegrationsIndexRoute: AuthedAdminIntegrationsIndexRoute,
   AuthedAdminTeamsIndexRoute: AuthedAdminTeamsIndexRoute,
   AuthedAdminTenantsIndexRoute: AuthedAdminTenantsIndexRoute,
   AuthedAdminWorkflowsIndexRoute: AuthedAdminWorkflowsIndexRoute,
