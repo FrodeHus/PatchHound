@@ -25,4 +25,5 @@ public static class Policies
     public const string ApproveDecision = nameof(ApproveDecision);
     public const string AddRecommendation = nameof(AddRecommendation);
     public const string PerformMaintenance = nameof(PerformMaintenance);
+    public const string ManageGlobalSettings = nameof(ManageGlobalSettings);
 }

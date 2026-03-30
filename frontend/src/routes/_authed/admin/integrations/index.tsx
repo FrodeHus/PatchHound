@@ -1,7 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { SentinelConnectorCard } from '@/components/features/admin/SentinelConnectorCard'
 
 export const Route = createFileRoute('/_authed/admin/integrations/')({
+  beforeLoad: ({ context }) => {
+    if (!(context.user?.activeRoles ?? []).includes('GlobalAdmin')) {
+      throw redirect({ to: '/admin' })
+    }
+  },
   component: IntegrationsPage,
 })
 

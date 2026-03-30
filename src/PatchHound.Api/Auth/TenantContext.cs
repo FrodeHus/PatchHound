@@ -10,10 +10,14 @@ namespace PatchHound.Api.Auth;
 
 public class TenantContext : ITenantContext
 {
+    public const string BlockedTenantAccessItemsKey = "__blocked_tenant_access_attempts";
+
     private Guid _currentUserId;
     private IReadOnlyList<Guid> _accessibleTenantIds = Array.Empty<Guid>();
     private Dictionary<Guid, List<RoleName>> _rolesByTenantId = new();
     private IReadOnlyList<RoleName> _normalizedClaimRoles = Array.Empty<RoleName>();
+    private UserAccessScope _currentAccessScope = UserAccessScope.Internal;
+    private HttpContext? _httpContext;
     private Guid? _currentTenantId;
     private bool _initialized;
 
@@ -21,8 +25,19 @@ public class TenantContext : ITenantContext
     public IReadOnlyList<Guid> AccessibleTenantIds => _accessibleTenantIds;
     public Guid CurrentUserId => _currentUserId;
     public bool IsSystemContext => false;
+    public bool IsInternalUser => _currentAccessScope == UserAccessScope.Internal;
+    public UserAccessScope CurrentAccessScope => _currentAccessScope;
 
-    public bool HasAccessToTenant(Guid tenantId) => _accessibleTenantIds.Contains(tenantId);
+    public bool HasAccessToTenant(Guid tenantId)
+    {
+        var hasAccess = _accessibleTenantIds.Contains(tenantId);
+        if (!hasAccess)
+        {
+            TrackBlockedAccess(tenantId, "Requested tenant is outside the current user's allowed tenant scope.");
+        }
+
+        return hasAccess;
+    }
 
     public IReadOnlyList<string> GetRolesForTenant(Guid tenantId)
     {
@@ -55,6 +70,7 @@ public class TenantContext : ITenantContext
             return;
 
         _initialized = true;
+        _httpContext = httpContext;
 
         var oid =
             httpContext
@@ -127,99 +143,17 @@ public class TenantContext : ITenantContext
             if (!user.IsEnabled)
             {
                 _currentUserId = user.Id;
+                _currentAccessScope = user.AccessScope;
                 _accessibleTenantIds = Array.Empty<Guid>();
                 _rolesByTenantId = [];
                 return;
             }
 
             _currentUserId = user.Id;
+            _currentAccessScope = user.AccessScope;
         }
 
-        if (!string.IsNullOrWhiteSpace(tokenTenantId))
-        {
-            var internalTenantIds = await dbContext
-                .Tenants.AsNoTracking()
-                .IgnoreQueryFilters()
-                .Where(tenant => tenant.EntraTenantId == tokenTenantId)
-                .Select(tenant => tenant.Id)
-                .ToListAsync();
-
-            if (_currentUserId != Guid.Empty && internalTenantIds.Count > 0)
-            {
-                // Stakeholder is always granted; merge with any Entra claim roles
-                var rolesToSync = _normalizedClaimRoles.ToList();
-                if (!rolesToSync.Contains(RoleName.Stakeholder))
-                    rolesToSync.Add(RoleName.Stakeholder);
-
-                var existingTokenRoles = await dbContext
-                    .UserTenantRoles.IgnoreQueryFilters()
-                    .Where(role =>
-                        role.UserId == _currentUserId
-                        && internalTenantIds.Contains(role.TenantId)
-                    )
-                    .Select(role => new { role.TenantId, role.Role })
-                    .ToListAsync();
-
-                var missingRoles = internalTenantIds
-                    .SelectMany(tenantId =>
-                        rolesToSync.Select(roleName => new { tenantId, roleName })
-                    )
-                    .Where(candidate => existingTokenRoles.All(existing =>
-                        existing.TenantId != candidate.tenantId || existing.Role != candidate.roleName))
-                    .ToList();
-
-                if (missingRoles.Count > 0)
-                {
-                    await dbContext.UserTenantRoles.AddRangeAsync(
-                        missingRoles.Select(candidate =>
-                            UserTenantRole.Create(_currentUserId, candidate.tenantId, candidate.roleName)),
-                        CancellationToken.None
-                    );
-                    await dbContext.SaveChangesAsync();
-                }
-            }
-
-            if (internalTenantIds.Count > 0)
-            {
-                foreach (var tenantId in internalTenantIds)
-                {
-                    await teamMembershipRuleService.ApplyForUserAsync(tenantId, _currentUserId, CancellationToken.None);
-                }
-            }
-
-            var userTenantRoles = _currentUserId == Guid.Empty
-                ? []
-                : await dbContext
-                    .UserTenantRoles.AsNoTracking()
-                    .IgnoreQueryFilters()
-                    .Where(utr => utr.UserId == _currentUserId)
-                    .Select(utr => new { utr.TenantId, utr.Role })
-                    .ToListAsync();
-
-            _rolesByTenantId = userTenantRoles
-                .GroupBy(r => r.TenantId)
-                .ToDictionary(g => g.Key, g => g.Select(r => r.Role).Distinct().ToList());
-
-            // Ensure Stakeholder + Entra claim roles are in the in-memory map
-            var rolesToMerge = _normalizedClaimRoles.ToList();
-            if (!rolesToMerge.Contains(RoleName.Stakeholder))
-                rolesToMerge.Add(RoleName.Stakeholder);
-
-            foreach (var tenantId in internalTenantIds)
-            {
-                if (!_rolesByTenantId.TryGetValue(tenantId, out var existingRoles))
-                {
-                    _rolesByTenantId[tenantId] = rolesToMerge;
-                    continue;
-                }
-
-                _rolesByTenantId[tenantId] = existingRoles
-                    .Concat(rolesToMerge)
-                    .Distinct()
-                    .ToList();
-            }
-        }
-        else if (_currentUserId != Guid.Empty)
+        if (_currentUserId != Guid.Empty)
         {
             var userTenantRoles = await dbContext
                 .UserTenantRoles.AsNoTracking()
@@ -231,6 +165,61 @@ public class TenantContext : ITenantContext
             _rolesByTenantId = userTenantRoles
                 .GroupBy(r => r.TenantId)
                 .ToDictionary(g => g.Key, g => g.Select(r => r.Role).Distinct().ToList());
+
+            if (_currentAccessScope == UserAccessScope.Internal)
+            {
+                var allTenantIds = await dbContext
+                    .Tenants.AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .OrderBy(tenant => tenant.Name)
+                    .Select(tenant => tenant.Id)
+                    .ToListAsync();
+
+                var rolesToMerge = _normalizedClaimRoles.ToList();
+                if (!rolesToMerge.Contains(RoleName.Stakeholder))
+                {
+                    rolesToMerge.Add(RoleName.Stakeholder);
+                }
+
+                foreach (var tenantId in allTenantIds)
+                {
+                    if (!_rolesByTenantId.TryGetValue(tenantId, out var existingRoles))
+                    {
+                        _rolesByTenantId[tenantId] = rolesToMerge.ToList();
+                    }
+                    else
+                    {
+                        _rolesByTenantId[tenantId] = existingRoles
+                            .Concat(rolesToMerge)
+                            .Distinct()
+                            .ToList();
+                    }
+
+                    await teamMembershipRuleService.ApplyForUserAsync(
+                        tenantId,
+                        _currentUserId,
+                        CancellationToken.None
+                    );
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(tokenTenantId))
+            {
+                var matchingTenantIds = await dbContext
+                    .Tenants.AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Where(tenant => tenant.EntraTenantId == tokenTenantId)
+                    .Select(tenant => tenant.Id)
+                    .ToListAsync();
+
+                foreach (var tenantId in matchingTenantIds.Where(_rolesByTenantId.ContainsKey))
+                {
+                    await teamMembershipRuleService.ApplyForUserAsync(
+                        tenantId,
+                        _currentUserId,
+                        CancellationToken.None
+                    );
+                }
+            }
         }
 
         _accessibleTenantIds = _rolesByTenantId.Keys.ToList();
@@ -238,15 +227,52 @@ public class TenantContext : ITenantContext
         // Resolve current tenant: prefer explicit header, fall back to single-tenant
         if (
             httpContext.Request.Headers.TryGetValue("X-Tenant-Id", out var tenantHeader)
-            && Guid.TryParse(tenantHeader.FirstOrDefault(), out var requestedTenantId)
-            && _accessibleTenantIds.Contains(requestedTenantId)
         )
         {
-            _currentTenantId = requestedTenantId;
+            var headerValue = tenantHeader.FirstOrDefault();
+            if (Guid.TryParse(headerValue, out var requestedTenantId))
+            {
+                if (_accessibleTenantIds.Contains(requestedTenantId))
+                {
+                    _currentTenantId = requestedTenantId;
+                }
+                else
+                {
+                    TrackBlockedAccess(requestedTenantId, "Tenant header requested a tenant outside the allowed tenant scope.");
+                }
+            }
         }
         else if (_accessibleTenantIds.Count == 1)
         {
             _currentTenantId = _accessibleTenantIds[0];
         }
+    }
+
+    private void TrackBlockedAccess(Guid attemptedTenantId, string reason)
+    {
+        var httpContext = _httpContext;
+        if (httpContext is null)
+        {
+            return;
+        }
+
+        if (!httpContext.Items.TryGetValue(BlockedTenantAccessItemsKey, out var existing)
+            || existing is not List<BlockedTenantAccessAttempt> attempts)
+        {
+            attempts = [];
+            httpContext.Items[BlockedTenantAccessItemsKey] = attempts;
+        }
+
+        if (attempts.Any(item => item.AttemptedTenantId == attemptedTenantId && item.Reason == reason))
+        {
+            return;
+        }
+
+        attempts.Add(new BlockedTenantAccessAttempt(
+            attemptedTenantId,
+            reason,
+            httpContext.Request.Path,
+            httpContext.Request.Method
+        ));
     }
 }

@@ -129,6 +129,9 @@ builder.Services.AddAuthorization(options =>
             policy.AddRequirements(
                 new RoleRequirement(
                     RoleName.GlobalAdmin,
+                    RoleName.CustomerAdmin,
+                    RoleName.CustomerOperator,
+                    RoleName.CustomerViewer,
                     RoleName.SecurityManager,
                     RoleName.SecurityAnalyst,
                     RoleName.AssetOwner,
@@ -145,6 +148,8 @@ builder.Services.AddAuthorization(options =>
             policy.AddRequirements(
                 new RoleRequirement(
                     RoleName.GlobalAdmin,
+                    RoleName.CustomerAdmin,
+                    RoleName.CustomerOperator,
                     RoleName.SecurityManager,
                     RoleName.SecurityAnalyst
                 )
@@ -157,6 +162,8 @@ builder.Services.AddAuthorization(options =>
             policy.AddRequirements(
                 new RoleRequirement(
                     RoleName.GlobalAdmin,
+                    RoleName.CustomerAdmin,
+                    RoleName.CustomerOperator,
                     RoleName.SecurityManager,
                     RoleName.SecurityAnalyst
                 )
@@ -169,6 +176,8 @@ builder.Services.AddAuthorization(options =>
             policy.AddRequirements(
                 new RoleRequirement(
                     RoleName.GlobalAdmin,
+                    RoleName.CustomerAdmin,
+                    RoleName.CustomerOperator,
                     RoleName.SecurityManager,
                     RoleName.SecurityAnalyst
                 )
@@ -181,6 +190,8 @@ builder.Services.AddAuthorization(options =>
             policy.AddRequirements(
                 new RoleRequirement(
                     RoleName.GlobalAdmin,
+                    RoleName.CustomerAdmin,
+                    RoleName.CustomerOperator,
                     RoleName.SecurityManager,
                     RoleName.SecurityAnalyst,
                     RoleName.AssetOwner
@@ -194,6 +205,8 @@ builder.Services.AddAuthorization(options =>
             policy.AddRequirements(
                 new RoleRequirement(
                     RoleName.GlobalAdmin,
+                    RoleName.CustomerAdmin,
+                    RoleName.CustomerOperator,
                     RoleName.SecurityManager,
                     RoleName.SecurityAnalyst,
                     RoleName.AssetOwner
@@ -205,19 +218,19 @@ builder.Services.AddAuthorization(options =>
         Policies.ApproveRiskAcceptance,
         policy =>
             policy.AddRequirements(
-                new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager)
+                new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager, RoleName.CustomerAdmin)
             )
     );
 
     options.AddPolicy(
         Policies.ViewAuditLogs,
         policy =>
-            policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin, RoleName.Auditor))
+            policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin, RoleName.Auditor, RoleName.CustomerAdmin))
     );
 
     options.AddPolicy(
         Policies.ManageUsers,
-        policy => policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin))
+        policy => policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin, RoleName.CustomerAdmin))
     );
 
     options.AddPolicy(
@@ -226,6 +239,9 @@ builder.Services.AddAuthorization(options =>
             policy.AddRequirements(
                 new RoleRequirement(
                     RoleName.GlobalAdmin,
+                    RoleName.CustomerAdmin,
+                    RoleName.CustomerOperator,
+                    RoleName.CustomerViewer,
                     RoleName.SecurityManager,
                     RoleName.SecurityAnalyst,
                     RoleName.AssetOwner,
@@ -242,6 +258,9 @@ builder.Services.AddAuthorization(options =>
             policy.AddRequirements(
                 new RoleRequirement(
                     RoleName.GlobalAdmin,
+                    RoleName.CustomerAdmin,
+                    RoleName.CustomerOperator,
+                    RoleName.CustomerViewer,
                     RoleName.SecurityManager,
                     RoleName.SecurityAnalyst,
                     RoleName.AssetOwner,
@@ -266,6 +285,8 @@ builder.Services.AddAuthorization(options =>
             policy.AddRequirements(
                 new RoleRequirement(
                     RoleName.GlobalAdmin,
+                    RoleName.CustomerAdmin,
+                    RoleName.CustomerOperator,
                     RoleName.SecurityManager,
                     RoleName.SecurityAnalyst
                 )
@@ -278,6 +299,8 @@ builder.Services.AddAuthorization(options =>
             policy.AddRequirements(
                 new RoleRequirement(
                     RoleName.GlobalAdmin,
+                    RoleName.CustomerAdmin,
+                    RoleName.CustomerOperator,
                     RoleName.SecurityManager,
                     RoleName.SecurityAnalyst,
                     RoleName.AssetOwner
@@ -294,7 +317,7 @@ builder.Services.AddAuthorization(options =>
         Policies.ViewApprovalTasks,
         policy =>
             policy.AddRequirements(
-                new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager, RoleName.TechnicalManager)
+                new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager, RoleName.TechnicalManager, RoleName.CustomerAdmin, RoleName.CustomerOperator)
             )
     );
 
@@ -302,7 +325,7 @@ builder.Services.AddAuthorization(options =>
         Policies.ResolveApprovalTask,
         policy =>
             policy.AddRequirements(
-                new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager, RoleName.TechnicalManager)
+                new RoleRequirement(RoleName.GlobalAdmin, RoleName.SecurityManager, RoleName.TechnicalManager, RoleName.CustomerAdmin, RoleName.CustomerOperator)
             )
     );
 
@@ -323,6 +346,11 @@ builder.Services.AddAuthorization(options =>
         Policies.PerformMaintenance,
         policy => policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin))
     );
+
+    options.AddPolicy(
+        Policies.ManageGlobalSettings,
+        policy => policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin))
+    );
 });
 
 builder.Services.AddScoped<IAuthorizationHandler, RoleRequirementHandler>();
@@ -338,6 +366,7 @@ builder.Services.AddScoped<PatchHound.Api.Services.VulnerabilityDetailQueryServi
 builder.Services.AddScoped<PatchHound.Api.Services.AssetDetailQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.RemediationDecisionQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.RemediationWorkflowAuthorizationService>();
+builder.Services.AddScoped<PatchHound.Api.Services.BlockedTenantAccessLogger>();
 builder.Services.AddScoped<PatchHound.Api.Services.ApprovalTaskQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.RemediationTaskQueryService>();
 builder.Services.AddHttpContextAccessor();

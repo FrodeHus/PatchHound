@@ -1,5 +1,6 @@
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
+using PatchHound.Core.Enums;
 using PatchHound.Infrastructure;
 using PatchHound.Worker;
 
@@ -35,6 +36,8 @@ internal class WorkerTenantContext : ITenantContext
 
     public Guid CurrentUserId => Guid.Empty;
     public bool IsSystemContext => true;
+    public bool IsInternalUser => true;
+    public UserAccessScope CurrentAccessScope => UserAccessScope.Internal;
 
     public bool HasAccessToTenant(Guid tenantId) => true;
 

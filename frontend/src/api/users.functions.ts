@@ -70,8 +70,13 @@ export const updateUser = createServerFn({ method: 'POST' })
       email: z.string().email(),
       company: z.string().nullable(),
       isEnabled: z.boolean(),
+      accessScope: z.string(),
       roles: z.array(z.string()),
       teamIds: z.array(z.string().uuid()),
+      tenantAccess: z.array(z.object({
+        tenantId: z.string().uuid(),
+        roles: z.array(z.string()),
+      })),
     }),
   )
   .handler(async ({ context, data: { userId, ...payload } }) => {

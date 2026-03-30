@@ -58,7 +58,7 @@ public class SystemController : ControllerBase
     }
 
     [HttpGet("notification-providers")]
-    [Authorize(Policy = Policies.ManageUsers)]
+    [Authorize(Policy = Policies.ManageGlobalSettings)]
     public async Task<ActionResult<NotificationProviderSettingsDto>> GetNotificationProviders(
         CancellationToken ct
     )
@@ -88,7 +88,7 @@ public class SystemController : ControllerBase
     }
 
     [HttpPut("notification-providers")]
-    [Authorize(Policy = Policies.ManageUsers)]
+    [Authorize(Policy = Policies.ManageGlobalSettings)]
     public async Task<IActionResult> UpdateNotificationProviders(
         [FromBody] UpdateNotificationProviderSettingsRequest request,
         CancellationToken ct
@@ -189,7 +189,7 @@ public class SystemController : ControllerBase
     }
 
     [HttpPost("notification-providers/mailgun/validate")]
-    [Authorize(Policy = Policies.ManageUsers)]
+    [Authorize(Policy = Policies.ManageGlobalSettings)]
     public async Task<ActionResult<NotificationProviderValidationResponseDto>> ValidateMailgun(
         CancellationToken ct
     )
@@ -227,7 +227,7 @@ public class SystemController : ControllerBase
     }
 
     [HttpPost("notification-providers/mailgun/test")]
-    [Authorize(Policy = Policies.ManageUsers)]
+    [Authorize(Policy = Policies.ManageGlobalSettings)]
     public async Task<ActionResult<NotificationProviderValidationResponseDto>> SendMailgunTestEmail(
         CancellationToken ct
     )
@@ -294,7 +294,7 @@ public class SystemController : ControllerBase
     }
 
     [HttpGet("enrichment-sources")]
-    [Authorize(Policy = Policies.ManageUsers)]
+    [Authorize(Policy = Policies.ManageGlobalSettings)]
     public async Task<ActionResult<IReadOnlyList<EnrichmentSourceDto>>> GetEnrichmentSources(
         CancellationToken ct
     )
@@ -376,7 +376,7 @@ public class SystemController : ControllerBase
     }
 
     [HttpGet("enrichment-sources/{sourceKey}/runs")]
-    [Authorize(Policy = Policies.ManageUsers)]
+    [Authorize(Policy = Policies.ManageGlobalSettings)]
     public async Task<ActionResult<PagedResponse<EnrichmentRunDto>>> GetEnrichmentRuns(
         string sourceKey,
         [FromQuery] PaginationQuery pagination,

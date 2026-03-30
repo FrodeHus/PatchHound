@@ -209,6 +209,34 @@ public class AuthorizationTests
     }
 
     [Fact]
+    public async Task CustomerAdmin_CannotManageGlobalSettings()
+    {
+        SetupRolesForTenant(RoleName.CustomerAdmin);
+        _defaultHttpContext.Request.Headers["X-Active-Roles"] = "CustomerAdmin";
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
+        var requirement = new RoleRequirement(RoleName.GlobalAdmin);
+        var context = CreateAuthContext(requirement);
+
+        await handler.HandleAsync(context);
+
+        context.HasSucceeded.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GlobalAdmin_CanManageGlobalSettings_WhenActivated()
+    {
+        SetupRolesForTenant(RoleName.GlobalAdmin);
+        _defaultHttpContext.Request.Headers["X-Active-Roles"] = "GlobalAdmin";
+        var handler = new RoleRequirementHandler(_tenantContext, _httpContextAccessor);
+        var requirement = new RoleRequirement(RoleName.GlobalAdmin);
+        var context = CreateAuthContext(requirement);
+
+        await handler.HandleAsync(context);
+
+        context.HasSucceeded.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task MultiTenant_RolesCheckedForCurrentTenantOnly()
     {
         var tenantA = Guid.NewGuid();

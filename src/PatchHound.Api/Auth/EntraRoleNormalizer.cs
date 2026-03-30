@@ -31,6 +31,13 @@ public static class EntraRoleNormalizer
 
     private static RoleName? ParseFallback(string rawRole)
     {
-        return Enum.TryParse<RoleName>(rawRole, out var parsedRole) ? parsedRole : null;
+        if (!Enum.TryParse<RoleName>(rawRole, out var parsedRole))
+        {
+            return null;
+        }
+
+        return parsedRole is RoleName.CustomerAdmin or RoleName.CustomerOperator or RoleName.CustomerViewer
+            ? null
+            : parsedRole;
     }
 }

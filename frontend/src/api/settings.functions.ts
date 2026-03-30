@@ -72,6 +72,15 @@ export const updateTenant = createServerFn({ method: 'POST' })
     await apiPut(`/tenants/${tenantId}`, context, { name, sla, ingestionSources })
   })
 
+export const deleteTenant = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({
+    tenantId: z.string().uuid(),
+  }))
+  .handler(async ({ context, data: { tenantId } }) => {
+    await apiDelete(`/tenants/${tenantId}`, context)
+  })
+
 export const triggerTenantIngestionSync = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(z.object({

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 
 namespace PatchHound.Infrastructure.Data.Configurations;
 
@@ -18,6 +19,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.EntraObjectId).HasMaxLength(256).IsRequired();
         builder.Property(u => u.Company).HasMaxLength(256);
         builder.Property(u => u.IsEnabled).HasDefaultValue(true);
+        builder.Property(u => u.AccessScope).HasConversion<string>().HasMaxLength(32).HasDefaultValue(UserAccessScope.Internal);
 
         builder
             .HasMany(u => u.TenantRoles)

@@ -146,6 +146,13 @@ public class TenantsController : ControllerBase
             Team.CreateDefault(tenant.Id, DefaultTeamHelper.DefaultTeamName),
             ct
         );
+        foreach (var customerTeam in (await DefaultTeamHelper.EnsureCustomerAccessTeamsAsync(_dbContext, tenant.Id, ct)).Values)
+        {
+            if (_dbContext.Entry(customerTeam).State == EntityState.Detached)
+            {
+                await _dbContext.Teams.AddAsync(customerTeam, ct);
+            }
+        }
         await _dbContext.TenantSlaConfigurations.AddAsync(
             TenantSlaConfiguration.CreateDefault(tenant.Id),
             ct
@@ -334,6 +341,159 @@ public class TenantsController : ControllerBase
         {
             await _dbContext.SaveChangesAsync(ct);
         }
+
+        return NoContent();
+    }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Policies.ConfigureTenant)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        if (!_tenantContext.HasAccessToTenant(id))
+            return Forbid();
+
+        var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (tenant is null)
+            return NotFound();
+
+        var tenantSourceSecretRefs = await _dbContext.TenantSourceConfigurations
+            .IgnoreQueryFilters()
+            .Where(source => source.TenantId == id && source.SecretRef != string.Empty)
+            .Select(source => source.SecretRef)
+            .ToListAsync(ct);
+        var aiProfileSecretRefs = await _dbContext.TenantAiProfiles
+            .IgnoreQueryFilters()
+            .Where(profile => profile.TenantId == id && profile.SecretRef != string.Empty)
+            .Select(profile => profile.SecretRef)
+            .ToListAsync(ct);
+        var secretRefs = tenantSourceSecretRefs
+            .Concat(aiProfileSecretRefs)
+            .Where(secretRef => !string.IsNullOrWhiteSpace(secretRef))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        foreach (var secretRef in secretRefs)
+        {
+            await _secretStore.DeleteSecretPathAsync(secretRef, ct);
+        }
+
+        var affectedUserIds = await _dbContext.UserTenantRoles
+            .IgnoreQueryFilters()
+            .Where(role => role.TenantId == id)
+            .Select(role => role.UserId)
+            .Distinct()
+            .ToListAsync(ct);
+        var userIdsToDelete = affectedUserIds.Count == 0
+            ? []
+            : await _dbContext.Users
+                .IgnoreQueryFilters()
+                .Where(user => affectedUserIds.Contains(user.Id) && user.AccessScope == UserAccessScope.Customer)
+                .Where(user => !_dbContext.UserTenantRoles.IgnoreQueryFilters()
+                    .Any(role => role.UserId == user.Id && role.TenantId != id))
+                .Where(user => !_dbContext.TeamMembers.IgnoreQueryFilters()
+                    .Any(member => member.UserId == user.Id && member.Team.TenantId != id))
+                .Select(user => user.Id)
+                .ToListAsync(ct);
+
+        await DeleteEntitiesAsync(
+            _dbContext.WorkflowNodeExecutions
+                .IgnoreQueryFilters()
+                .Where(execution =>
+                    _dbContext.WorkflowInstances
+                        .IgnoreQueryFilters()
+                        .Where(instance => instance.TenantId == id)
+                        .Select(instance => instance.Id)
+                        .Contains(execution.WorkflowInstanceId)),
+            ct);
+        await DeleteEntitiesAsync(
+            _dbContext.ApprovalTaskVisibleRoles
+                .IgnoreQueryFilters()
+                .Where(item =>
+                    _dbContext.ApprovalTasks
+                        .IgnoreQueryFilters()
+                        .Where(task => task.TenantId == id)
+                        .Select(task => task.Id)
+                        .Contains(item.ApprovalTaskId)),
+            ct);
+        await DeleteEntitiesAsync(
+            _dbContext.RemediationDecisionVulnerabilityOverrides
+                .IgnoreQueryFilters()
+                .Where(item =>
+                    _dbContext.RemediationDecisions
+                        .IgnoreQueryFilters()
+                        .Where(decision => decision.TenantId == id)
+                        .Select(decision => decision.Id)
+                        .Contains(item.RemediationDecisionId)),
+            ct);
+        await DeleteEntitiesAsync(
+            _dbContext.VulnerabilityAssets
+                .IgnoreQueryFilters()
+                .Where(item => item.TenantVulnerability.TenantId == id),
+            ct);
+        await DeleteEntitiesAsync(
+            _dbContext.TeamMembers
+                .IgnoreQueryFilters()
+                .Where(member => member.Team.TenantId == id),
+            ct);
+
+        await DeleteEntitiesAsync(_dbContext.RemediationWorkflowStageRecords.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.WorkflowActions.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.WorkflowInstances.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.WorkflowDefinitions.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.ApprovalTasks.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.PatchingTasks.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.AnalystRecommendations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.RemediationDecisions.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.RemediationWorkflows.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.Comments.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.RiskAcceptances.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.Notifications.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.AIReports.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.SoftwareDescriptionJobs.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.AssetTags.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.AssetRules.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.AssetRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.DeviceGroupRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.TeamRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.TenantSoftwareRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.TenantRiskScoreSnapshots.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.OrganizationalSeverities.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.VulnerabilityEpisodeRiskAssessments.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.VulnerabilityAssetAssessments.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.VulnerabilityAssetEpisodes.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.TenantVulnerabilities.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.DeviceSoftwareInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.NormalizedSoftwareVulnerabilityProjections.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.NormalizedSoftwareInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.SoftwareVulnerabilityMatches.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.TenantSoftware.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.AssetSecurityProfiles.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.Assets.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.TeamMembershipRules.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.Teams.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.UserTenantRoles.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.TenantAiProfiles.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.TenantSlaConfigurations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.EnrichmentJobs.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.StagedDeviceSoftwareInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.StagedAssets.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.StagedVulnerabilityExposures.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.StagedVulnerabilities.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.IngestionCheckpoints.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.IngestionSnapshots.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.IngestionRuns.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.TenantSourceConfigurations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+
+        if (userIdsToDelete.Count > 0)
+        {
+            await DeleteEntitiesAsync(
+                _dbContext.Users.IgnoreQueryFilters().Where(user => userIdsToDelete.Contains(user.Id)),
+                ct);
+        }
+
+        _dbContext.Tenants.Remove(tenant);
+        await _dbContext.SaveChangesAsync(ct);
 
         return NoContent();
     }
@@ -713,6 +873,19 @@ public class TenantsController : ControllerBase
             ),
             recentRuns
         );
+    }
+
+    private async Task DeleteEntitiesAsync<TEntity>(
+        IQueryable<TEntity> query,
+        CancellationToken ct) where TEntity : class
+    {
+        var items = await query.ToListAsync(ct);
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        _dbContext.RemoveRange(items);
     }
 
     private async Task<TenantDetailDto> BuildTenantDetailDto(

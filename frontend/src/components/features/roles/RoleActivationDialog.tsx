@@ -15,6 +15,9 @@ import {
 import { Switch } from '@/components/ui/switch'
 
 const ROLE_DISPLAY_NAMES: Record<string, string> = {
+  CustomerAdmin: 'Customer Admin',
+  CustomerOperator: 'Customer Operator',
+  CustomerViewer: 'Customer Viewer',
   SecurityManager: 'Security Manager',
   SecurityAnalyst: 'Security Analyst',
   AssetOwner: 'Asset Owner',

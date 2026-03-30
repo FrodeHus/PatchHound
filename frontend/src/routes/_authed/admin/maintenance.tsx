@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Wrench, AlertTriangle } from 'lucide-react'
@@ -18,6 +18,11 @@ import {
 import { revokeAllRemediations } from '@/api/maintenance.functions'
 
 export const Route = createFileRoute('/_authed/admin/maintenance')({
+  beforeLoad: ({ context }) => {
+    if (!(context.user?.activeRoles ?? []).includes('GlobalAdmin')) {
+      throw redirect({ to: '/admin' })
+    }
+  },
   component: MaintenancePage,
 })
 

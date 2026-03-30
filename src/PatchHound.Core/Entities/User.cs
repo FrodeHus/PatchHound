@@ -1,3 +1,5 @@
+using PatchHound.Core.Enums;
+
 namespace PatchHound.Core.Entities;
 
 public class User
@@ -8,6 +10,7 @@ public class User
     public string EntraObjectId { get; private set; } = null!;
     public string? Company { get; private set; }
     public bool IsEnabled { get; private set; }
+    public UserAccessScope AccessScope { get; private set; }
 
     private readonly List<UserTenantRole> _tenantRoles = [];
     public IReadOnlyCollection<UserTenantRole> TenantRoles => _tenantRoles.AsReadOnly();
@@ -29,6 +32,7 @@ public class User
             EntraObjectId = entraObjectId,
             Company = string.IsNullOrWhiteSpace(company) ? null : company.Trim(),
             IsEnabled = true,
+            AccessScope = UserAccessScope.Internal,
         };
     }
 
@@ -42,5 +46,10 @@ public class User
     public void SetEnabled(bool isEnabled)
     {
         IsEnabled = isEnabled;
+    }
+
+    public void SetAccessScope(UserAccessScope accessScope)
+    {
+        AccessScope = accessScope;
     }
 }

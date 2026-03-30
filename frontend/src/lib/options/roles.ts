@@ -1,5 +1,8 @@
 export const roleOptions = [
   'GlobalAdmin',
+  'CustomerAdmin',
+  'CustomerOperator',
+  'CustomerViewer',
   'SecurityManager',
   'SecurityAnalyst',
   'AssetOwner',

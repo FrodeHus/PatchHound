@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { toast } from 'sonner'
+import { fetchTenants } from '@/api/settings.functions'
 import { fetchTeams } from '@/api/teams.functions'
 import { fetchUserAudit, fetchUserDetail, fetchUsers, updateUser } from '@/api/users.functions'
 import { UserDetailPanel } from '@/components/features/admin/UserDetailPanel'
@@ -19,7 +20,7 @@ export const Route = createFileRoute('/_authed/admin/users')({
   validateSearch: userSearchSchema,
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
-    const [users, teams] = await Promise.all([
+    const [users, teams, tenants] = await Promise.all([
       fetchUsers({
         data: {
           search: deps.search || undefined,
@@ -31,6 +32,7 @@ export const Route = createFileRoute('/_authed/admin/users')({
         },
       }),
       fetchTeams({ data: { page: 1, pageSize: 200 } }),
+      fetchTenants({ data: { page: 1, pageSize: 200 } }),
     ])
 
     const initialUserDetail = users.items[0]
@@ -40,6 +42,7 @@ export const Route = createFileRoute('/_authed/admin/users')({
     return {
       users,
       teams: teams.items,
+      tenants: tenants.items,
       initialUserDetail,
     }
   },
@@ -48,6 +51,7 @@ export const Route = createFileRoute('/_authed/admin/users')({
 
 function UsersPage() {
   const data = Route.useLoaderData()
+  const { user } = Route.useRouteContext()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const [selectedUserId, setSelectedUserId] = useState<string | null>(data.users.items[0]?.id ?? null)
@@ -112,8 +116,10 @@ function UsersPage() {
       email: string
       company: string | null
       isEnabled: boolean
+      accessScope: string
       roles: string[]
       teamIds: string[]
+      tenantAccess: Array<{ tenantId: string; roles: string[] }>
     }) => updateUser({ data: payload }),
     onSuccess: async () => {
       toast.success('User updated')
@@ -183,7 +189,9 @@ function UsersPage() {
 
         <UserDetailPanel
           user={userDetailQuery.data}
+          currentUser={user}
           teams={teamsQuery.data.items}
+          tenants={data.tenants}
           auditItems={userAuditQuery.data?.items ?? []}
           auditFilters={auditFilters}
           isLoading={userDetailQuery.isLoading}

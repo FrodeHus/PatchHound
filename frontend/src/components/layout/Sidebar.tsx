@@ -34,6 +34,9 @@ type SidebarProps = {
 };
 
 type RoleName =
+  | 'CustomerAdmin'
+  | 'CustomerOperator'
+  | 'CustomerViewer'
   | 'SecurityManager'
   | 'SecurityAnalyst'
   | 'GlobalAdmin'
@@ -75,7 +78,7 @@ const navItems: NavItem[] = [
     to: "/audit-log",
     label: "Audit Trail",
     icon: ScrollText,
-    roles: ["Auditor", "GlobalAdmin"],
+    roles: ["Auditor", "GlobalAdmin", "CustomerAdmin"],
   },
   {
     to: "/settings",
@@ -87,7 +90,7 @@ const navItems: NavItem[] = [
     to: "/admin",
     label: "Admin Console",
     icon: ShieldCheck,
-    roles: ["GlobalAdmin", "SecurityManager", "SecurityAnalyst", "AssetOwner", "TechnicalManager", "Auditor", "Stakeholder"],
+    roles: ["GlobalAdmin", "CustomerAdmin", "SecurityManager", "SecurityAnalyst", "AssetOwner", "TechnicalManager", "Auditor", "Stakeholder"],
   },
 ];
 
@@ -96,10 +99,10 @@ const navGroups: NavGroup[] = [
     label: "Dashboards",
     icon: BarChart3,
     items: [
-      { to: "/dashboard/executive", label: "Executive Summary", icon: BarChart3, roles: ["Stakeholder", "GlobalAdmin"] },
-      { to: "/dashboard/security", label: "Security Summary", icon: ShieldAlert, roles: ["SecurityManager", "GlobalAdmin"] },
-      { to: "/dashboard/technical", label: "Technical Summary", icon: Wrench, roles: ["TechnicalManager", "GlobalAdmin"] },
-      { to: "/dashboard/my-assets", label: "My Assets", icon: Laptop, roles: ["AssetOwner", "GlobalAdmin"] },
+      { to: "/dashboard/executive", label: "Executive Summary", icon: BarChart3, roles: ["Stakeholder", "CustomerViewer", "GlobalAdmin"] },
+      { to: "/dashboard/security", label: "Security Summary", icon: ShieldAlert, roles: ["SecurityManager", "CustomerOperator", "CustomerAdmin", "GlobalAdmin"] },
+      { to: "/dashboard/technical", label: "Technical Summary", icon: Wrench, roles: ["TechnicalManager", "CustomerOperator", "CustomerAdmin", "GlobalAdmin"] },
+      { to: "/dashboard/my-assets", label: "My Assets", icon: Laptop, roles: ["AssetOwner", "CustomerOperator", "CustomerAdmin", "GlobalAdmin"] },
     ],
   },
   {

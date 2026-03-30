@@ -73,6 +73,24 @@ public class OpenBaoSecretStore : ISecretStore
         using var response = await SendAsync(request, ct);
     }
 
+    public async Task DeleteSecretPathAsync(string path, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(Options.Token))
+        {
+            throw new InvalidOperationException(
+                "OpenBao token is not configured. Secret deletes are disabled."
+            );
+        }
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Delete,
+            $"/v1/{Options.KvMount}/metadata/{path}"
+        );
+        request.Headers.Add("X-Vault-Token", Options.Token);
+
+        using var response = await SendAsync(request, ct);
+    }
+
     public async Task<OpenBaoStatus> GetStatusAsync(CancellationToken ct)
     {
         try
@@ -152,10 +170,10 @@ public class OpenBaoSecretStore : ISecretStore
                 return response;
             }
 
-            // 404 is a valid "not found" response only for GET requests
+            // 404 is a valid "not found" response for GET and DELETE requests
             if (
                 response.StatusCode == System.Net.HttpStatusCode.NotFound
-                && request.Method == HttpMethod.Get
+                && (request.Method == HttpMethod.Get || request.Method == HttpMethod.Delete)
             )
             {
                 return response;

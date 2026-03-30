@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 
@@ -125,6 +126,93 @@ public class TeamMembershipRuleService
                     _dbContext.TeamMembers.Remove(membership);
                 }
             }
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
+    }
+
+    public async Task ApplyCustomerAccessGroupsForUserAsync(Guid userId, CancellationToken ct)
+    {
+        var roleAssignments = await _dbContext.UserTenantRoles
+            .AsNoTracking()
+            .Where(roleAssignment =>
+                roleAssignment.UserId == userId
+                && (roleAssignment.Role == RoleName.CustomerAdmin
+                    || roleAssignment.Role == RoleName.CustomerOperator
+                    || roleAssignment.Role == RoleName.CustomerViewer))
+            .ToListAsync(ct);
+
+        var tenantIds = roleAssignments
+            .Select(item => item.TenantId)
+            .Distinct()
+            .ToList();
+
+        if (tenantIds.Count == 0)
+        {
+            var existingCustomerMemberships = await _dbContext.TeamMembers
+                .Where(member => member.UserId == userId)
+                .Where(member =>
+                    member.Team.Name == DefaultTeamHelper.CustomerAdminsTeamName
+                    || member.Team.Name == DefaultTeamHelper.CustomerOperatorsTeamName
+                    || member.Team.Name == DefaultTeamHelper.CustomerViewersTeamName)
+                .ToListAsync(ct);
+
+            if (existingCustomerMemberships.Count > 0)
+            {
+                _dbContext.TeamMembers.RemoveRange(existingCustomerMemberships);
+                await _dbContext.SaveChangesAsync(ct);
+            }
+
+            return;
+        }
+
+        foreach (var tenantId in tenantIds)
+        {
+            await DefaultTeamHelper.EnsureCustomerAccessTeamsAsync(_dbContext, tenantId, ct);
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
+
+        var customerTeams = await _dbContext.Teams
+            .Where(team =>
+                tenantIds.Contains(team.TenantId)
+                && (team.Name == DefaultTeamHelper.CustomerAdminsTeamName
+                    || team.Name == DefaultTeamHelper.CustomerOperatorsTeamName
+                    || team.Name == DefaultTeamHelper.CustomerViewersTeamName))
+            .ToListAsync(ct);
+
+        var desiredMemberships = roleAssignments
+            .SelectMany(roleAssignment => customerTeams
+                .Where(team => team.TenantId == roleAssignment.TenantId)
+                .Where(team =>
+                    (roleAssignment.Role == RoleName.CustomerAdmin && team.Name == DefaultTeamHelper.CustomerAdminsTeamName)
+                    || (roleAssignment.Role == RoleName.CustomerOperator && team.Name == DefaultTeamHelper.CustomerOperatorsTeamName)
+                    || (roleAssignment.Role == RoleName.CustomerViewer && team.Name == DefaultTeamHelper.CustomerViewersTeamName))
+                .Select(team => team.Id))
+            .ToHashSet();
+
+        var existingMemberships = await _dbContext.TeamMembers
+            .Where(member => member.UserId == userId)
+            .Where(member => customerTeams.Select(team => team.Id).Contains(member.TeamId))
+            .ToListAsync(ct);
+
+        var membershipsToRemove = existingMemberships
+            .Where(member => !desiredMemberships.Contains(member.TeamId))
+            .ToList();
+        if (membershipsToRemove.Count > 0)
+        {
+            _dbContext.TeamMembers.RemoveRange(membershipsToRemove);
+        }
+
+        var existingTeamIds = existingMemberships.Select(member => member.TeamId).ToHashSet();
+        var membershipsToAdd = desiredMemberships
+            .Where(teamId => !existingTeamIds.Contains(teamId))
+            .Select(teamId => TeamMember.Create(teamId, userId))
+            .ToList();
+
+        if (membershipsToAdd.Count > 0)
+        {
+            await _dbContext.TeamMembers.AddRangeAsync(membershipsToAdd, ct);
         }
 
         await _dbContext.SaveChangesAsync(ct);

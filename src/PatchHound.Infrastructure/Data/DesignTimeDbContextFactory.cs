@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.DependencyInjection;
+using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 
 namespace PatchHound.Infrastructure.Data;
@@ -27,6 +28,8 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<PatchHound
         public IReadOnlyList<Guid> AccessibleTenantIds => Array.Empty<Guid>();
         public Guid CurrentUserId => Guid.Empty;
         public bool IsSystemContext => false;
+        public bool IsInternalUser => true;
+        public UserAccessScope CurrentAccessScope => UserAccessScope.Internal;
 
         public bool HasAccessToTenant(Guid tenantId) => false;
 

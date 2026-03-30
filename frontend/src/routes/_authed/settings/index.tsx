@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, redirect } from "@tanstack/react-router";
 import {
   AlertTriangle,
   Bot,
@@ -13,6 +13,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/_authed/settings/")({
+  beforeLoad: ({ context }) => {
+    const activeRoles = context.user?.activeRoles ?? []
+    if (!activeRoles.includes("GlobalAdmin") && !activeRoles.includes("SecurityManager")) {
+      throw redirect({ to: "/dashboard" })
+    }
+  },
   component: SettingsPage,
 });
 

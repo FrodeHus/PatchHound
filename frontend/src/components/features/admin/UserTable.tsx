@@ -42,9 +42,9 @@ export function UserTable({
     <Card className="rounded-2xl border-border/70">
       <CardHeader className="space-y-4">
         <div>
-          <CardTitle>Tenant users</CardTitle>
+          <CardTitle>Access directory</CardTitle>
           <CardDescription>
-            Search people in the current tenant, then open a profile to manage access, groups, and audit history.
+            Review identities, tenant reach, and assignment posture before opening the access editor.
           </CardDescription>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -60,6 +60,9 @@ export function UserTable({
           >
             <option value="">All roles</option>
             <option value="GlobalAdmin">Global Admin</option>
+            <option value="CustomerAdmin">Customer Admin</option>
+            <option value="CustomerOperator">Customer Operator</option>
+            <option value="CustomerViewer">Customer Viewer</option>
             <option value="SecurityManager">Security Manager</option>
             <option value="SecurityAnalyst">Security Analyst</option>
             <option value="TechnicalManager">Technical Manager</option>
@@ -117,6 +120,9 @@ export function UserTable({
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium tracking-tight">{user.displayName}</p>
+                        <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+                          {user.accessScope}
+                        </Badge>
                         <Badge
                           variant="outline"
                           className={user.isEnabled
@@ -140,7 +146,13 @@ export function UserTable({
                     </div>
                     <div className="text-right text-sm text-muted-foreground">
                       <div>{user.teams.length} groups</div>
-                      <div className="mt-1">{user.tenantName}</div>
+                      <div className="mt-1">
+                        {user.tenantNames.length === 0
+                          ? 'No tenant access'
+                          : user.tenantNames.length === 1
+                            ? user.tenantNames[0]
+                            : `${user.tenantNames.length} tenants`}
+                      </div>
                     </div>
                   </div>
                 </button>

@@ -1,4 +1,5 @@
 using PatchHound.Api.Auth;
+using PatchHound.Api.Services;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 
@@ -27,5 +28,19 @@ public class TenantContextMiddleware
         }
 
         await _next(context);
+
+        if (context.Items.TryGetValue(TenantContext.BlockedTenantAccessItemsKey, out var existing)
+            && existing is List<BlockedTenantAccessAttempt> attempts
+            && attempts.Count > 0
+            && context.User.Identity?.IsAuthenticated == true)
+        {
+            var logger = context.RequestServices.GetService<BlockedTenantAccessLogger>();
+            var dbContext = context.RequestServices.GetService<PatchHoundDbContext>();
+            if (logger is not null && dbContext is not null)
+            {
+                await logger.LogAsync(attempts, context.RequestAborted);
+                await dbContext.SaveChangesAsync(context.RequestAborted);
+            }
+        }
     }
 }

@@ -2,14 +2,24 @@ import { useState } from 'react'
 import { Link, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, CircleHelp, Landmark } from 'lucide-react'
-import { updateTenant } from '@/api/settings.functions'
+import { AlertTriangle, ArrowLeft, CircleHelp, Landmark, Trash2 } from 'lucide-react'
+import { deleteTenant, updateTenant } from '@/api/settings.functions'
 import type { TenantDetail } from '@/api/settings.schemas'
 import type { AuditLogItem } from '@/api/audit-log.schemas'
 import { RecentAuditPanel } from '@/components/features/audit/RecentAuditPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Separator } from '@/components/ui/separator'
@@ -36,6 +46,8 @@ export function TenantAdministrationDetail({
     lowDays: String(tenant.sla.lowDays),
   })
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -72,6 +84,26 @@ export function TenantAdministrationDetail({
     onError: (error) => {
       setSaveState('error')
       toast.error(getApiErrorMessage(error, 'Failed to save tenant configuration'))
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await deleteTenant({
+        data: {
+          tenantId: tenant.id,
+        },
+      })
+    },
+    onSuccess: async () => {
+      toast.success('Tenant deleted')
+      setDeleteDialogOpen(false)
+      setDeleteConfirmation('')
+      await router.invalidate()
+      await router.navigate({ to: '/admin/tenants', search: { page: 1, pageSize: 25 } })
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to delete tenant'))
     },
   })
 
@@ -237,6 +269,74 @@ export function TenantAdministrationDetail({
                 />
               </div>
             </FormSection>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl border-destructive/30 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--destructive)_6%,var(--card)),var(--card))]">
+        <CardHeader className="border-b border-destructive/20 pb-5">
+          <CardTitle>Danger Zone</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-2xl space-y-2">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="size-4" />
+                <p className="font-medium">Delete this tenant</p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                This permanently removes the tenant, its inventory, remediation data, workflows, audit log entries, tenant-scoped users, and stored tenant secrets. This action cannot be undone.
+              </p>
+            </div>
+            <Dialog open={deleteDialogOpen} onOpenChange={(open) => {
+              setDeleteDialogOpen(open)
+              if (!open) {
+                setDeleteConfirmation('')
+              }
+            }}>
+              <DialogTrigger render={<Button variant="destructive" />}>
+                <Trash2 className="mr-2 size-4" />
+                Delete tenant
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete {tenant.name}?</DialogTitle>
+                  <DialogDescription>
+                    This permanently deletes all tenant-scoped data and tenant-owned secrets. Type the tenant name exactly to confirm.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 py-2">
+                  <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm text-muted-foreground">
+                    <p>Tenant: <span className="font-medium text-foreground">{tenant.name}</span></p>
+                    <p>Assets: <span className="font-medium text-foreground">{tenant.assets.totalCount}</span></p>
+                    <p>Configured sources: <span className="font-medium text-foreground">{tenant.ingestionSources.length}</span></p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="tenant-delete-confirmation" className="text-sm font-medium">
+                      Type <span className="font-mono">{tenant.name}</span> to confirm
+                    </label>
+                    <Input
+                      id="tenant-delete-confirmation"
+                      value={deleteConfirmation}
+                      onChange={(event) => setDeleteConfirmation(event.target.value)}
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <DialogClose render={<Button variant="outline" />}>
+                    Cancel
+                  </DialogClose>
+                  <Button
+                    variant="destructive"
+                    disabled={deleteConfirmation.trim() !== tenant.name || deleteMutation.isPending}
+                    onClick={() => deleteMutation.mutate()}
+                  >
+                    {deleteMutation.isPending ? 'Deleting...' : 'Permanently delete tenant'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardContent>
       </Card>
 

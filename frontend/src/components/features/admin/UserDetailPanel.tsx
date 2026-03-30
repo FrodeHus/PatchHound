@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import type { TenantListItem } from '@/api/settings.schemas'
 import type { TeamItem } from '@/api/teams.schemas'
 import type { UserAuditItem, UserDetail } from '@/api/users.schemas'
+import type { CurrentUser } from '@/server/auth.functions'
 import { AuditTimeline, type AuditTimelineEvent } from '@/components/features/audit/AuditTimeline'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-const roleOptions = [
+const globalRoleOptions = [
   'GlobalAdmin',
   'SecurityManager',
   'SecurityAnalyst',
@@ -18,9 +20,17 @@ const roleOptions = [
   'Auditor',
 ] as const
 
+const customerRoleOptions = [
+  'CustomerAdmin',
+  'CustomerOperator',
+  'CustomerViewer',
+] as const
+
 type UserDetailPanelProps = {
   user: UserDetail | undefined
+  currentUser: CurrentUser
   teams: TeamItem[]
+  tenants: TenantListItem[]
   auditItems: UserAuditItem[]
   auditFilters: {
     entityType: string
@@ -34,14 +44,18 @@ type UserDetailPanelProps = {
     email: string
     company: string | null
     isEnabled: boolean
+    accessScope: string
     roles: string[]
     teamIds: string[]
+    tenantAccess: Array<{ tenantId: string; roles: string[] }>
   }) => void
 }
 
 export function UserDetailPanel({
   user,
+  currentUser,
   teams,
+  tenants,
   auditItems,
   auditFilters,
   isLoading,
@@ -53,7 +67,7 @@ export function UserDetailPanel({
     return (
       <Card className="rounded-2xl border-border/70">
         <CardContent className="px-6 py-10 text-sm text-muted-foreground">
-          Select a user to review profile, access, assignment groups, and audit history.
+          Select a user to review profile, tenant reach, customer scope, assignment groups, and audit history.
         </CardContent>
       </Card>
     )
@@ -65,7 +79,9 @@ export function UserDetailPanel({
     user.email,
     user.company ?? '',
     String(user.isEnabled),
+    user.accessScope,
     user.roles.join(','),
+    user.tenantAccess.map((item) => `${item.tenantId}:${item.roles.join(',')}`).join('|'),
     user.teams.map((team) => team.teamId).join(','),
   ].join('|')
 
@@ -73,7 +89,9 @@ export function UserDetailPanel({
     <UserDetailEditor
       key={userSnapshotKey}
       user={user}
+      currentUser={currentUser}
       teams={teams}
+      tenants={tenants}
       auditItems={auditItems}
       auditFilters={auditFilters}
       isLoading={isLoading}
@@ -86,7 +104,9 @@ export function UserDetailPanel({
 
 function UserDetailEditor({
   user,
+  currentUser,
   teams,
+  tenants,
   auditItems,
   auditFilters,
   isLoading,
@@ -95,7 +115,9 @@ function UserDetailEditor({
   onSave,
 }: {
   user: UserDetail
+  currentUser: CurrentUser
   teams: TeamItem[]
+  tenants: TenantListItem[]
   auditItems: UserAuditItem[]
   auditFilters: {
     entityType: string
@@ -110,8 +132,21 @@ function UserDetailEditor({
   const [email, setEmail] = useState(user.email)
   const [company, setCompany] = useState(user.company ?? '')
   const [isEnabled, setIsEnabled] = useState(user.isEnabled)
+  const [accessScope, setAccessScope] = useState(user.accessScope)
   const [selectedRoles, setSelectedRoles] = useState<string[]>(user.roles)
   const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>(user.teams.map((team) => team.teamId))
+  const [tenantAccess, setTenantAccess] = useState<Array<{ tenantId: string; roles: string[] }>>(
+    user.tenantAccess.map((item) => ({ tenantId: item.tenantId, roles: [...item.roles] })),
+  )
+
+  const roleOptions = accessScope === 'Customer' ? customerRoleOptions : globalRoleOptions
+  const canManageAcrossTenants = (currentUser.activeRoles ?? []).includes('GlobalAdmin')
+  const availableScopeOptions = canManageAcrossTenants
+    ? ['Internal', 'Customer']
+    : ['Customer']
+  const visibleTenants = canManageAcrossTenants
+    ? tenants
+    : tenants.filter((tenant) => tenant.id === user.currentTenantId)
 
   const auditEvents: AuditTimelineEvent[] = auditItems.map((item) => ({
     id: item.id,
@@ -125,6 +160,29 @@ function UserDetailEditor({
     ],
   }))
 
+  function toggleTenant(tenantId: string) {
+    setTenantAccess((current) =>
+      current.some((item) => item.tenantId === tenantId)
+        ? current.filter((item) => item.tenantId !== tenantId)
+        : [...current, { tenantId, roles: accessScope === 'Customer' ? ['CustomerViewer'] : ['Stakeholder'] }],
+    )
+  }
+
+  function toggleTenantRole(tenantId: string, role: string) {
+    setTenantAccess((current) =>
+      current.map((item) =>
+        item.tenantId !== tenantId
+          ? item
+          : {
+              ...item,
+              roles: item.roles.includes(role)
+                ? item.roles.filter((existing) => existing !== role)
+                : [...item.roles, role],
+            },
+      ),
+    )
+  }
+
   return (
     <Card className="rounded-2xl border-border/70">
       <CardHeader>
@@ -132,12 +190,17 @@ function UserDetailEditor({
           <div>
             <CardTitle className="text-2xl tracking-[-0.04em]">{user.displayName}</CardTitle>
             <CardDescription className="mt-1">
-              Manage tenant access, assignment groups, and the audit trail for this identity.
+              Set identity scope, assign tenant reach, and tune the roles this user carries inside each customer boundary.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {user.currentTenantName ? (
+              <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+                Viewing {user.currentTenantName}
+              </Badge>
+            ) : null}
             <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
-              {user.tenantName}
+              {accessScope}
             </Badge>
             <Badge
               variant="outline"
@@ -173,31 +236,56 @@ function UserDetailEditor({
               </Field>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-background/50 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Access status</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant={isEnabled ? 'default' : 'outline'}
-                  className="rounded-full"
-                  onClick={() => setIsEnabled(true)}
-                >
-                  Enabled
-                </Button>
-                <Button
-                  type="button"
-                  variant={!isEnabled ? 'destructive' : 'outline'}
-                  className="rounded-full"
-                  onClick={() => setIsEnabled(false)}
-                >
-                  Disabled
-                </Button>
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <div className="rounded-xl border border-border/70 bg-background/50 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Access status</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" variant={isEnabled ? 'default' : 'outline'} className="rounded-full" onClick={() => setIsEnabled(true)}>
+                    Enabled
+                  </Button>
+                  <Button type="button" variant={!isEnabled ? 'destructive' : 'outline'} className="rounded-full" onClick={() => setIsEnabled(false)}>
+                    Disabled
+                  </Button>
+                </div>
+
+                <p className="mt-5 text-xs uppercase tracking-[0.18em] text-muted-foreground">Identity scope</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Internal users can operate across the MSSP tenant portfolio. Customer users are restricted to the tenants assigned below.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {availableScopeOptions.includes('Internal') ? (
+                    <Button type="button" variant={accessScope === 'Internal' ? 'default' : 'outline'} className="rounded-full" onClick={() => setAccessScope('Internal')}>
+                      Internal MSSP
+                    </Button>
+                  ) : null}
+                  <Button type="button" variant={accessScope === 'Customer' ? 'default' : 'outline'} className="rounded-full" onClick={() => setAccessScope('Customer')}>
+                    Customer
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,var(--background)),var(--background)_62%)] p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Access summary</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
+                    {tenantAccess.length} tenant{tenantAccess.length === 1 ? '' : 's'}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
+                    {selectedTeamIds.length} local groups
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
+                    {selectedRoles.length} current-tenant role{selectedRoles.length === 1 ? '' : 's'}
+                  </Badge>
+                </div>
+                <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                  The tenant access matrix below is the security source of truth. Default customer groups can be derived automatically from those assignments.
+                </p>
               </div>
             </div>
 
             <SelectionSection
-              title="Roles"
-              description="Tenant roles granted to this user."
+              title="Current tenant roles"
+              description="These are the roles active for the tenant currently selected in the session. They control what the user can do when operating inside this tenant."
               items={roleOptions.map((role) => ({ id: role, label: role }))}
               selectedIds={selectedRoles}
               onToggle={(role) => {
@@ -209,9 +297,84 @@ function UserDetailEditor({
               }}
             />
 
+            <div className="rounded-xl border border-border/70 bg-background/50 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Tenant access matrix</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Assign exactly which tenants this identity may enter. For customer users, this defines the full trust boundary.
+                  </p>
+                </div>
+                {canManageAcrossTenants ? (
+                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
+                    MSSP control plane
+                  </Badge>
+                ) : null}
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {visibleTenants.map((tenant) => {
+                  const assignment = tenantAccess.find((item) => item.tenantId === tenant.id)
+                  const isAssigned = Boolean(assignment)
+                  const tenantRoleChoices = accessScope === 'Customer' ? customerRoleOptions : globalRoleOptions
+
+                  return (
+                    <div
+                      key={tenant.id}
+                      className={`rounded-2xl border p-4 transition ${
+                        isAssigned
+                          ? 'border-primary/30 bg-primary/5'
+                          : 'border-border/70 bg-background/60'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium tracking-tight">{tenant.name}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{tenant.entraTenantId}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant={isAssigned ? 'default' : 'outline'}
+                          className="rounded-full"
+                          onClick={() => toggleTenant(tenant.id)}
+                        >
+                          {isAssigned ? 'Assigned' : 'Grant access'}
+                        </Button>
+                      </div>
+
+                      {isAssigned ? (
+                        <div className="mt-4">
+                          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Tenant roles</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {tenantRoleChoices.map((role) => {
+                              const active = assignment?.roles.includes(role) ?? false
+                              return (
+                                <button
+                                  key={`${tenant.id}-${role}`}
+                                  type="button"
+                                  onClick={() => toggleTenantRole(tenant.id, role)}
+                                  className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                                    active
+                                      ? 'border-primary/40 bg-primary/10 text-primary'
+                                      : 'border-border/70 bg-background text-foreground/80'
+                                  }`}
+                                >
+                                  {role}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
             <SelectionSection
-              title="Assignment groups"
-              description="Membership controls which group-owned workflows and remediation tasks the user can act on."
+              title="Current tenant groups"
+              description="These memberships affect routing and local task ownership in the currently selected tenant."
               items={teams.map((team) => ({
                 id: team.id,
                 label: team.name,
@@ -237,11 +400,16 @@ function UserDetailEditor({
                   email: email.trim(),
                   company: company.trim().length > 0 ? company.trim() : null,
                   isEnabled,
+                  accessScope,
                   roles: selectedRoles,
                   teamIds: selectedTeamIds,
+                  tenantAccess: tenantAccess.map((item) => ({
+                    tenantId: item.tenantId,
+                    roles: item.roles,
+                  })),
                 })}
               >
-                {isSaving ? 'Saving...' : 'Save user'}
+                {isSaving ? 'Saving access...' : 'Save access model'}
               </Button>
             </div>
           </TabsContent>

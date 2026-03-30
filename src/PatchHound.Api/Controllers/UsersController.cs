@@ -53,13 +53,17 @@ public class UsersController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        var tenantName = await _dbContext.Tenants.AsNoTracking()
-            .Where(item => item.Id == tenantId)
-            .Select(item => item.Name)
-            .FirstOrDefaultAsync(ct) ?? "Unknown tenant";
+        var canManageAcrossTenants = _tenantContext.IsInternalUser;
 
         var query = _dbContext.Users.AsNoTracking()
-            .Where(user => user.TenantRoles.Any(roleAssignment => roleAssignment.TenantId == tenantId));
+            .Where(user =>
+                canManageAcrossTenants
+                    || user.TenantRoles.Any(roleAssignment => roleAssignment.TenantId == tenantId));
+
+        if (!canManageAcrossTenants)
+        {
+            query = query.Where(user => user.AccessScope == UserAccessScope.Customer);
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -73,7 +77,8 @@ public class UsersController : ControllerBase
         if (!string.IsNullOrWhiteSpace(role) && Enum.TryParse<RoleName>(role, out var parsedRole))
         {
             query = query.Where(user => user.TenantRoles.Any(roleAssignment =>
-                roleAssignment.TenantId == tenantId && roleAssignment.Role == parsedRole));
+                roleAssignment.Role == parsedRole
+                && (canManageAcrossTenants || roleAssignment.TenantId == tenantId)));
         }
 
         if (!string.IsNullOrWhiteSpace(status))
@@ -101,14 +106,23 @@ public class UsersController : ControllerBase
             .ToListAsync(ct);
 
         var userIds = users.Select(item => item.Id).ToList();
+        var manageableTenantIds = canManageAcrossTenants
+            ? _tenantContext.AccessibleTenantIds
+            : new[] { tenantId };
         var roleAssignments = await _dbContext.UserTenantRoles.AsNoTracking()
-            .Where(roleAssignment => roleAssignment.TenantId == tenantId && userIds.Contains(roleAssignment.UserId))
+            .Where(roleAssignment =>
+                userIds.Contains(roleAssignment.UserId)
+                && manageableTenantIds.Contains(roleAssignment.TenantId))
             .Select(roleAssignment => new
             {
                 roleAssignment.UserId,
+                roleAssignment.TenantId,
                 RoleName = roleAssignment.Role.ToString()
             })
             .ToListAsync(ct);
+        var tenantNames = await _dbContext.Tenants.AsNoTracking()
+            .Where(item => manageableTenantIds.Contains(item.Id))
+            .ToDictionaryAsync(item => item.Id, item => item.Name, ct);
         var teamMemberships = await _dbContext.TeamMembers.AsNoTracking()
             .Where(member => userIds.Contains(member.UserId) && member.Team.TenantId == tenantId)
             .Select(member => new
@@ -122,12 +136,11 @@ public class UsersController : ControllerBase
 
         var items = users.Select(user => new UserListItemDto(
             user.Id,
-            tenantId,
-            tenantName,
             user.Email,
             user.DisplayName,
             user.Company,
             user.IsEnabled,
+            user.AccessScope.ToString(),
             roleAssignments
                 .Where(roleAssignment => roleAssignment.UserId == user.Id)
                 .Select(roleAssignment => roleAssignment.RoleName)
@@ -141,7 +154,14 @@ public class UsersController : ControllerBase
                     membership.TeamId,
                     membership.TeamName,
                     membership.IsDefault))
-                .ToList()
+                .ToList(),
+            roleAssignments
+                .Where(roleAssignment => roleAssignment.UserId == user.Id)
+                .Select(roleAssignment => tenantNames.GetValueOrDefault(roleAssignment.TenantId))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct()
+                .OrderBy(name => name)
+                .ToList()!
         )).ToList();
 
         return Ok(new PagedResponse<UserListItemDto>(
@@ -166,10 +186,16 @@ public class UsersController : ControllerBase
             .Select(item => item.Name)
             .FirstOrDefaultAsync(ct) ?? "Unknown tenant";
 
-        var user = await _dbContext.Users.AsNoTracking()
-            .Where(item => item.Id == id)
-            .Where(item => item.TenantRoles.Any(roleAssignment => roleAssignment.TenantId == tenantId))
-            .FirstOrDefaultAsync(ct);
+        var userQuery = _dbContext.Users.AsNoTracking()
+            .Where(item => item.Id == id);
+
+        if (!_tenantContext.IsInternalUser)
+        {
+            userQuery = userQuery.Where(item =>
+                item.TenantRoles.Any(roleAssignment => roleAssignment.TenantId == tenantId));
+        }
+
+        var user = await userQuery.FirstOrDefaultAsync(ct);
 
         if (user is null)
         {
@@ -194,19 +220,26 @@ public class UsersController : ControllerBase
             .ToListAsync(ct);
 
         var auditEntries = await BuildUserAuditAsync(tenantId, id, null, null, ct);
+        var tenantAccess = await BuildTenantAccessAsync(
+            id,
+            _tenantContext.IsInternalUser ? null : [tenantId],
+            ct
+        );
 
         return Ok(new UserDetailDto(
             user.Id,
-            tenantId,
-            tenantName,
             user.Email,
             user.DisplayName,
             user.Company,
             user.IsEnabled,
             user.EntraObjectId,
+            user.AccessScope.ToString(),
+            tenantId,
+            tenantName,
             roles,
             teams,
-            auditEntries.Take(12).ToList()
+            auditEntries.Take(12).ToList(),
+            tenantAccess
         ));
     }
 
@@ -275,13 +308,15 @@ public class UsersController : ControllerBase
 
         return CreatedAtAction(nameof(Get), new { id = result.Value.Id }, new UserDetailDto(
             result.Value.Id,
-            tenantId,
-            tenantName,
             result.Value.Email,
             result.Value.DisplayName,
             result.Value.Company,
             result.Value.IsEnabled,
             result.Value.EntraObjectId,
+            result.Value.AccessScope.ToString(),
+            tenantId,
+            tenantName,
+            [],
             [],
             [],
             []
@@ -310,40 +345,130 @@ public class UsersController : ControllerBase
             return NotFound();
         }
 
+        if (!_tenantContext.IsInternalUser && user.AccessScope != UserAccessScope.Customer)
+        {
+            return NotFound();
+        }
+
         var currentTenantRoles = await _dbContext.UserTenantRoles
             .Where(roleAssignment => roleAssignment.UserId == id && roleAssignment.TenantId == tenantId)
             .ToListAsync(ct);
 
+        var parsedAccessScope = Enum.TryParse<UserAccessScope>(request.AccessScope, out var requestedAccessScope)
+            ? requestedAccessScope
+            : (UserAccessScope?)null;
+        if (parsedAccessScope is null)
+        {
+            return BadRequest(new ProblemDetails { Title = "Access scope is invalid." });
+        }
+
         var requestedRoles = request.Roles
             .Select(roleName => Enum.TryParse<RoleName>(roleName, out var parsedRole) ? parsedRole : (RoleName?)null)
             .ToList();
+        var requestedTenantAccess = request.TenantAccess
+            .Select(item => new
+            {
+                item.TenantId,
+                Roles = item.Roles
+                    .Select(roleName => Enum.TryParse<RoleName>(roleName, out var parsedRole) ? parsedRole : (RoleName?)null)
+                    .ToList(),
+            })
+            .ToList();
 
-        if (requestedRoles.Any(roleName => roleName is null))
+        if (requestedRoles.Any(roleName => roleName is null) || requestedTenantAccess.Any(item => item.Roles.Any(roleName => roleName is null)))
         {
             return BadRequest(new ProblemDetails { Title = "One or more roles are invalid." });
         }
 
         user.UpdateProfile(request.Email.Trim(), request.DisplayName.Trim(), request.Company);
         user.SetEnabled(request.IsEnabled);
-
-        var requestedRoleSet = requestedRoles.Select(roleName => roleName!.Value).ToHashSet();
-        var existingRoleSet = currentTenantRoles.Select(roleAssignment => roleAssignment.Role).ToHashSet();
-
-        var rolesToRemove = currentTenantRoles
-            .Where(roleAssignment => !requestedRoleSet.Contains(roleAssignment.Role))
-            .ToList();
-        if (rolesToRemove.Count > 0)
+        if (_tenantContext.IsInternalUser)
         {
-            _dbContext.UserTenantRoles.RemoveRange(rolesToRemove);
+            user.SetAccessScope(parsedAccessScope.Value);
+
+            var allowedTenantIds = _tenantContext.AccessibleTenantIds.ToHashSet();
+            if (request.TenantAccess.Any(item => !allowedTenantIds.Contains(item.TenantId)))
+            {
+                return BadRequest(new ProblemDetails { Title = "One or more tenant assignments are invalid." });
+            }
+
+            var existingAssignments = await _dbContext.UserTenantRoles
+                .Where(roleAssignment =>
+                    roleAssignment.UserId == id
+                    && allowedTenantIds.Contains(roleAssignment.TenantId))
+                .ToListAsync(ct);
+
+            if (existingAssignments.Count > 0)
+            {
+                _dbContext.UserTenantRoles.RemoveRange(existingAssignments);
+            }
+
+            var rolesToAdd = requestedTenantAccess
+                .SelectMany(item => item.Roles.Select(roleName => new { item.TenantId, Role = roleName!.Value }))
+                .Distinct()
+                .Select(item => UserTenantRole.Create(id, item.TenantId, item.Role))
+                .ToList();
+
+            if (rolesToAdd.Count > 0)
+            {
+                await _dbContext.UserTenantRoles.AddRangeAsync(rolesToAdd, ct);
+            }
         }
-
-        var rolesToAdd = requestedRoleSet
-            .Where(roleName => !existingRoleSet.Contains(roleName))
-            .Select(roleName => UserTenantRole.Create(id, tenantId, roleName))
-            .ToList();
-        if (rolesToAdd.Count > 0)
+        else
         {
-            await _dbContext.UserTenantRoles.AddRangeAsync(rolesToAdd, ct);
+            if (user.AccessScope != UserAccessScope.Customer || parsedAccessScope != UserAccessScope.Customer)
+            {
+                return Forbid();
+            }
+
+            if (
+                request.TenantAccess.Any(item =>
+                    item.TenantId != tenantId || item.Roles.Any(roleName => roleName is not null))
+            )
+            {
+                return BadRequest(
+                    new ProblemDetails
+                    {
+                        Title = "Customer tenant administrators can only manage customer access within the active tenant.",
+                    }
+                );
+            }
+
+            var requestedRoleSet = requestedRoles.Select(roleName => roleName!.Value).ToHashSet();
+            var allowedCustomerRoles = new HashSet<RoleName>
+            {
+                RoleName.CustomerAdmin,
+                RoleName.CustomerOperator,
+                RoleName.CustomerViewer,
+            };
+            if (requestedRoleSet.Any(roleName => !allowedCustomerRoles.Contains(roleName)))
+            {
+                return BadRequest(
+                    new ProblemDetails
+                    {
+                        Title = "Customer tenant administrators can only assign customer roles.",
+                    }
+                );
+            }
+
+            var existingRoleSet = currentTenantRoles.Select(roleAssignment => roleAssignment.Role).ToHashSet();
+
+            var rolesToRemove = currentTenantRoles
+                .Where(roleAssignment => !requestedRoleSet.Contains(roleAssignment.Role))
+                .ToList();
+            if (rolesToRemove.Count > 0)
+            {
+                _dbContext.UserTenantRoles.RemoveRange(rolesToRemove);
+            }
+
+            var rolesToAdd = requestedRoleSet
+                .Where(roleName => !existingRoleSet.Contains(roleName))
+                .Select(roleName => UserTenantRole.Create(id, tenantId, roleName))
+                .ToList();
+            if (rolesToAdd.Count > 0)
+            {
+                await _dbContext.UserTenantRoles.AddRangeAsync(rolesToAdd, ct);
+            }
         }
 
         var tenantTeams = await _dbContext.Teams
@@ -381,7 +506,45 @@ public class UsersController : ControllerBase
 
         await _dbContext.SaveChangesAsync(ct);
         await _teamMembershipRuleService.ApplyForUserAsync(tenantId, id, ct);
+        await _teamMembershipRuleService.ApplyCustomerAccessGroupsForUserAsync(id, ct);
         return NoContent();
+    }
+
+    private async Task<List<UserTenantAccessDto>> BuildTenantAccessAsync(
+        Guid userId,
+        IReadOnlyCollection<Guid>? visibleTenantIds,
+        CancellationToken ct)
+    {
+        var tenantAssignmentsQuery = _dbContext.UserTenantRoles.AsNoTracking()
+            .Where(roleAssignment => roleAssignment.UserId == userId);
+
+        if (visibleTenantIds is { Count: > 0 })
+        {
+            tenantAssignmentsQuery = tenantAssignmentsQuery
+                .Where(roleAssignment => visibleTenantIds.Contains(roleAssignment.TenantId));
+        }
+
+        var tenantAssignments = await tenantAssignmentsQuery
+            .Join(
+                _dbContext.Tenants.AsNoTracking(),
+                roleAssignment => roleAssignment.TenantId,
+                tenant => tenant.Id,
+                (roleAssignment, tenant) => new
+                {
+                    tenant.Id,
+                    tenant.Name,
+                    RoleName = roleAssignment.Role.ToString(),
+                })
+            .ToListAsync(ct);
+
+        return tenantAssignments
+            .GroupBy(item => new { item.Id, item.Name })
+            .OrderBy(group => group.Key.Name)
+            .Select(group => new UserTenantAccessDto(
+                group.Key.Id,
+                group.Key.Name,
+                group.Select(item => item.RoleName).Distinct().OrderBy(item => item).ToList()))
+            .ToList();
     }
 
     private async Task<List<UserAuditSummaryDto>> BuildUserAuditAsync(

@@ -10,7 +10,7 @@ type AdminArea = {
   title: string
   description: string
   to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/sources' | '/admin/security-profiles' | '/admin/asset-rules' | '/admin/workflows' | '/admin/integrations' | '/admin/maintenance'
-  roles: Array<'GlobalAdmin' | 'SecurityManager' | 'SecurityAnalyst' | 'AssetOwner' | 'TechnicalManager' | 'Auditor' | 'Stakeholder'>
+  roles: Array<'GlobalAdmin' | 'CustomerAdmin' | 'CustomerOperator' | 'CustomerViewer' | 'SecurityManager' | 'SecurityAnalyst' | 'AssetOwner' | 'TechnicalManager' | 'Auditor' | 'Stakeholder'>
   icon: typeof Users
 }
 
@@ -19,7 +19,7 @@ const adminAreas: AdminArea[] = [
     title: 'Users',
     description: 'Review access, role assignments, and who can operate across tenants.',
     to: '/admin/users',
-    roles: ['GlobalAdmin'],
+    roles: ['GlobalAdmin', 'CustomerAdmin'],
     icon: Users,
   },
   {
@@ -83,7 +83,7 @@ const adminAreas: AdminArea[] = [
 function AdminLandingPage() {
   const { user } = Route.useRouteContext()
   const accessibleAreas = adminAreas.filter((area) =>
-    [...(user.activeRoles ?? []), 'Stakeholder'].some((role) => area.roles.includes(role as 'GlobalAdmin' | 'SecurityManager' | 'SecurityAnalyst' | 'AssetOwner' | 'TechnicalManager' | 'Auditor' | 'Stakeholder')),
+    [...(user.activeRoles ?? []), 'Stakeholder'].some((role) => area.roles.includes(role as 'GlobalAdmin' | 'CustomerAdmin' | 'CustomerOperator' | 'CustomerViewer' | 'SecurityManager' | 'SecurityAnalyst' | 'AssetOwner' | 'TechnicalManager' | 'Auditor' | 'Stakeholder')),
   )
 
   return (

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Infrastructure.Services;
@@ -7,6 +8,9 @@ namespace PatchHound.Infrastructure.Services;
 public static class DefaultTeamHelper
 {
     public const string DefaultTeamName = "Default";
+    public const string CustomerAdminsTeamName = "Customer Admins";
+    public const string CustomerOperatorsTeamName = "Customer Operators";
+    public const string CustomerViewersTeamName = "Customer Viewers";
 
     public static async Task<Team> EnsureDefaultTeamAsync(
         PatchHoundDbContext dbContext,
@@ -67,5 +71,44 @@ public static class DefaultTeamHelper
         }
 
         return createdCount;
+    }
+
+    public static async Task<IReadOnlyDictionary<RoleName, Team>> EnsureCustomerAccessTeamsAsync(
+        PatchHoundDbContext dbContext,
+        Guid tenantId,
+        CancellationToken ct
+    )
+    {
+        var mapping = new Dictionary<RoleName, string>
+        {
+            [RoleName.CustomerAdmin] = CustomerAdminsTeamName,
+            [RoleName.CustomerOperator] = CustomerOperatorsTeamName,
+            [RoleName.CustomerViewer] = CustomerViewersTeamName,
+        };
+
+        var teams = await dbContext.Teams
+            .Where(team => team.TenantId == tenantId && mapping.Values.Contains(team.Name))
+            .ToListAsync(ct);
+
+        var result = new Dictionary<RoleName, Team>();
+        foreach (var entry in mapping)
+        {
+            var team = teams.FirstOrDefault(item => item.Name == entry.Value);
+            if (team is null)
+            {
+                team = Team.Create(tenantId, entry.Value);
+                team.SetDynamic(true);
+                await dbContext.Teams.AddAsync(team, ct);
+                teams.Add(team);
+            }
+            else if (!team.IsDynamic)
+            {
+                team.SetDynamic(true);
+            }
+
+            result[entry.Key] = team;
+        }
+
+        return result;
     }
 }

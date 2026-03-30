@@ -8,16 +8,22 @@ export const userTeamMembershipSchema = z.object({
   isDefault: z.boolean(),
 })
 
-export const userListItemSchema = z.object({
-  id: z.string().uuid(),
+export const userTenantAccessSchema = z.object({
   tenantId: z.string().uuid(),
   tenantName: z.string(),
+  roles: z.array(z.string()),
+})
+
+export const userListItemSchema = z.object({
+  id: z.string().uuid(),
   email: z.string().email(),
   displayName: z.string(),
   company: z.string().nullable(),
   isEnabled: z.boolean(),
+  accessScope: z.string(),
   roles: z.array(z.string()),
   teams: z.array(userTeamMembershipSchema),
+  tenantNames: z.array(z.string()),
 })
 
 export const userAuditItemSchema = z.object({
@@ -32,16 +38,18 @@ export const userAuditItemSchema = z.object({
 
 export const userDetailSchema = z.object({
   id: z.string().uuid(),
-  tenantId: z.string().uuid(),
-  tenantName: z.string(),
   email: z.string().email(),
   displayName: z.string(),
   company: z.string().nullable(),
   isEnabled: z.boolean(),
   entraObjectId: z.string(),
+  accessScope: z.string(),
+  currentTenantId: z.string().uuid().nullable(),
+  currentTenantName: z.string().nullable(),
   roles: z.array(z.string()),
   teams: z.array(userTeamMembershipSchema),
   recentAudit: z.array(userAuditItemSchema),
+  tenantAccess: z.array(userTenantAccessSchema),
 })
 
 export const pagedUsersSchema = pagedResponseMetaSchema.extend({

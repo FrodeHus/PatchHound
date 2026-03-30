@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { fetchAuditLog } from '@/api/audit-log.functions'
@@ -14,6 +14,12 @@ import { fetchEnrichmentSources } from '@/server/system.functions'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/_authed/admin/sources')({
+  beforeLoad: ({ context }) => {
+    const activeRoles = context.user?.activeRoles ?? []
+    if (!activeRoles.includes('GlobalAdmin') && !activeRoles.includes('SecurityManager')) {
+      throw redirect({ to: '/admin' })
+    }
+  },
   validateSearch: z.object({
     activeView: z.enum(['tenant', 'global-enrichment']).optional(),
     mode: z.enum(['edit', 'history']).optional(),
