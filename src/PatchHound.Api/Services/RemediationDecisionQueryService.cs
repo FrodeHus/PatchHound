@@ -68,6 +68,15 @@ public class RemediationDecisionQueryService(
         int TopFiveActiveAlertCount
     );
 
+    private sealed record RemediationAiDraftPayload(
+        string ExecutiveSummary,
+        string OwnerRecommendation,
+        string AnalystAssessment,
+        string ExceptionRecommendation,
+        string RecommendedOutcome,
+        string RecommendedPriority
+    );
+
     public async Task<RemediationDecisionListPageDto> ListAsync(
         Guid tenantId,
         RemediationDecisionFilterQuery filter,
@@ -275,6 +284,7 @@ public class RemediationDecisionQueryService(
                 decision?.Outcome.ToString(),
                 decision?.ApprovalStatus.ToString(),
                 decision?.DecidedAt,
+                decision?.MaintenanceWindowDate,
                 decision?.ExpiryDate,
                 activeVulnerabilityCount,
                 vulnCounts.GetValueOrDefault(software.Id)?.Critical ?? 0,
@@ -741,6 +751,7 @@ public class RemediationDecisionQueryService(
                 decision.DecidedAt,
                 decision.ApprovedBy,
                 decision.ApprovedAt,
+                decision.MaintenanceWindowDate,
                 decision.ExpiryDate,
                 decision.ReEvaluationDate,
                 latestRejectedApproval is not null
@@ -795,6 +806,7 @@ public class RemediationDecisionQueryService(
                 previousDecision.DecidedAt,
                 previousDecision.ApprovedBy,
                 previousDecision.ApprovedAt,
+                previousDecision.MaintenanceWindowDate,
                 previousDecision.ExpiryDate,
                 previousDecision.ReEvaluationDate,
                 null,
@@ -901,6 +913,22 @@ public class RemediationDecisionQueryService(
     )
     {
         return (await BuildByTenantSoftwareAsync(tenantId, tenantSoftwareId, true, ct))?.AiSummary;
+    }
+
+    public async Task<bool> GenerateAndStoreAiDraftsAsync(
+        Guid tenantId,
+        Guid tenantSoftwareId,
+        CancellationToken ct
+    )
+    {
+        var summary = await RefreshAiSummaryAsync(tenantId, tenantSoftwareId, ct);
+        return summary is not null
+            && (
+                !string.IsNullOrWhiteSpace(summary.Content)
+                || !string.IsNullOrWhiteSpace(summary.AnalystAssessment)
+                || !string.IsNullOrWhiteSpace(summary.OwnerRecommendation)
+                || !string.IsNullOrWhiteSpace(summary.ExceptionRecommendation)
+            );
     }
 
     private static DecisionWorkflowStateDto BuildWorkflowState(
@@ -1328,8 +1356,41 @@ public class RemediationDecisionQueryService(
             .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == tenantSoftwareId, ct);
         if (tenantSoftware is null)
         {
-            return new DecisionAiSummaryDto(null, null, null, null, null, false, MissingAiProfileMessage);
+            return new DecisionAiSummaryDto(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "Unavailable",
+                false,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                null,
+                MissingAiProfileMessage
+            );
         }
+
+        var latestJob = await dbContext.RemediationAiJobs.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId)
+            .OrderByDescending(item => item.RequestedAt)
+            .FirstOrDefaultAsync(ct);
+        var reviewedByDisplayName = tenantSoftware.RemediationAiReviewedBy is Guid reviewedByUserId
+            ? await dbContext.Users.AsNoTracking()
+                .Where(user => user.Id == reviewedByUserId)
+                .Select(user => user.DisplayName)
+                .FirstOrDefaultAsync(ct)
+            : null;
 
         var inputHash = HashAiSummaryInput(
             softwareName,
@@ -1343,25 +1404,23 @@ public class RemediationDecisionQueryService(
 
         var hasEnabledDefaultProfile = await dbContext.TenantAiProfiles.AsNoTracking()
             .AnyAsync(item => item.TenantId == tenantId && item.IsDefault && item.IsEnabled, ct);
+        var hasStoredGuidance = HasStoredAiGuidance(tenantSoftware);
+        var hasFreshGuidance = hasStoredGuidance
+            && string.Equals(tenantSoftware.RemediationAiSummaryInputHash, inputHash, StringComparison.Ordinal);
 
-        if (!forceRefresh
-            && !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiSummaryContent)
-            && string.Equals(tenantSoftware.RemediationAiSummaryInputHash, inputHash, StringComparison.Ordinal))
+        if (!forceRefresh && hasFreshGuidance)
         {
-            return new DecisionAiSummaryDto(
-                tenantSoftware.RemediationAiSummaryContent,
-                tenantSoftware.RemediationAiSummaryGeneratedAt,
-                NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryProviderType),
-                NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryProfileName),
-                NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryModel),
-                hasEnabledDefaultProfile,
-                hasEnabledDefaultProfile ? null : MissingAiProfileMessage
-            );
+            return BuildAiSummaryDto(tenantSoftware, latestJob, hasEnabledDefaultProfile, false, null, reviewedByDisplayName);
         }
 
         if (!hasEnabledDefaultProfile)
         {
-            return new DecisionAiSummaryDto(null, null, null, null, null, false, MissingAiProfileMessage);
+            return BuildAiSummaryDto(tenantSoftware, latestJob, false, hasStoredGuidance && !hasFreshGuidance, MissingAiProfileMessage, reviewedByDisplayName);
+        }
+
+        if (!forceRefresh)
+        {
+            return BuildAiSummaryDto(tenantSoftware, latestJob, true, hasStoredGuidance && !hasFreshGuidance, null, reviewedByDisplayName);
         }
 
         var generatedSummary = await GenerateAiNarrativeAsync(
@@ -1380,32 +1439,145 @@ public class RemediationDecisionQueryService(
                 null,
                 null,
                 null,
+                null,
+                "Failed",
+                false,
+                NullIfWhiteSpace(tenantSoftware.RemediationAiReviewStatus),
+                tenantSoftware.RemediationAiReviewedAt,
+                string.IsNullOrWhiteSpace(reviewedByDisplayName) ? null : reviewedByDisplayName,
+                null,
+                latestJob?.RequestedAt,
+                latestJob?.CompletedAt,
+                null,
+                null,
+                null,
                 true,
+                false,
+                generatedSummary.Error,
                 "AI input is available, but the summary could not be generated right now. Try Ask AI again."
             );
         }
 
         tenantSoftware.StoreRemediationAiSummary(
-            generatedSummary.Value.Content,
+            generatedSummary.Value.Value.ExecutiveSummary,
+            generatedSummary.Value.Value.OwnerRecommendation,
+            generatedSummary.Value.Value.AnalystAssessment,
+            generatedSummary.Value.Value.ExceptionRecommendation,
+            generatedSummary.Value.Value.RecommendedOutcome,
+            generatedSummary.Value.Value.RecommendedPriority,
             inputHash,
-            generatedSummary.Value.ProviderType,
-            generatedSummary.Value.ProfileName,
-            generatedSummary.Value.Model
+            generatedSummary.Value.Metadata.ProviderType,
+            generatedSummary.Value.Metadata.ProfileName,
+            generatedSummary.Value.Metadata.Model
         );
         await dbContext.SaveChangesAsync(ct);
 
         return new DecisionAiSummaryDto(
-            generatedSummary.Value.Content,
-            generatedSummary.Value.GeneratedAt,
-            generatedSummary.Value.ProviderType,
-            generatedSummary.Value.ProfileName,
-            generatedSummary.Value.Model,
+            generatedSummary.Value.Value.ExecutiveSummary,
+            generatedSummary.Value.Value.OwnerRecommendation,
+            generatedSummary.Value.Value.AnalystAssessment,
+            generatedSummary.Value.Value.ExceptionRecommendation,
+            generatedSummary.Value.Value.RecommendedOutcome,
+            generatedSummary.Value.Value.RecommendedPriority,
+            "Ready",
+            false,
+            null,
+            null,
+            null,
+            generatedSummary.Value.Metadata.GeneratedAt,
+            latestJob?.RequestedAt,
+            latestJob?.CompletedAt,
+            generatedSummary.Value.Metadata.ProviderType,
+            generatedSummary.Value.Metadata.ProfileName,
+            generatedSummary.Value.Metadata.Model,
             true,
+            false,
+            null,
             null
         );
     }
 
-    private async Task<Result<AiTextGenerationResult>> GenerateAiNarrativeAsync(
+    private DecisionAiSummaryDto BuildAiSummaryDto(
+        TenantSoftware tenantSoftware,
+        RemediationAiJob? latestJob,
+        bool canGenerate,
+        bool isStale,
+        string? unavailableMessage,
+        string? reviewedByDisplayName
+    )
+    {
+        var isGenerating = latestJob?.Status is RemediationAiJobStatus.Pending or RemediationAiJobStatus.Running;
+        var status = ResolveAiSummaryStatus(tenantSoftware, latestJob, canGenerate, isStale);
+
+        return new DecisionAiSummaryDto(
+            NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryContent),
+            NullIfWhiteSpace(tenantSoftware.RemediationAiOwnerRecommendationContent),
+            NullIfWhiteSpace(tenantSoftware.RemediationAiAnalystAssessmentContent),
+            NullIfWhiteSpace(tenantSoftware.RemediationAiExceptionRecommendationContent),
+            NullIfWhiteSpace(tenantSoftware.RemediationAiRecommendedOutcome),
+            NullIfWhiteSpace(tenantSoftware.RemediationAiRecommendedPriority),
+            status,
+            isStale,
+            NullIfWhiteSpace(tenantSoftware.RemediationAiReviewStatus),
+            tenantSoftware.RemediationAiReviewedAt,
+            string.IsNullOrWhiteSpace(reviewedByDisplayName) ? null : reviewedByDisplayName,
+            tenantSoftware.RemediationAiSummaryGeneratedAt,
+            latestJob?.RequestedAt,
+            latestJob?.CompletedAt,
+            NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryProviderType),
+            NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryProfileName),
+            NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryModel),
+            canGenerate,
+            isGenerating,
+            latestJob?.Status == RemediationAiJobStatus.Failed ? NullIfWhiteSpace(latestJob.Error) : null,
+            unavailableMessage
+        );
+    }
+
+    private static bool HasStoredAiGuidance(TenantSoftware tenantSoftware) =>
+        !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiSummaryContent)
+        || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiOwnerRecommendationContent)
+        || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiAnalystAssessmentContent)
+        || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiExceptionRecommendationContent)
+        || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiRecommendedOutcome)
+        || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiRecommendedPriority);
+
+    private static string ResolveAiSummaryStatus(
+        TenantSoftware tenantSoftware,
+        RemediationAiJob? latestJob,
+        bool canGenerate,
+        bool isStale
+    )
+    {
+        if (latestJob?.Status == RemediationAiJobStatus.Pending)
+        {
+            return "Queued";
+        }
+
+        if (latestJob?.Status == RemediationAiJobStatus.Running)
+        {
+            return "Generating";
+        }
+
+        if (latestJob?.Status == RemediationAiJobStatus.Failed)
+        {
+            return "Failed";
+        }
+
+        if (isStale)
+        {
+            return "Stale";
+        }
+
+        if (HasStoredAiGuidance(tenantSoftware))
+        {
+            return "Ready";
+        }
+
+        return canGenerate ? "Missing" : "Unavailable";
+    }
+
+    private async Task<Result<(RemediationAiDraftPayload Value, AiTextGenerationResult Metadata)>> GenerateAiNarrativeAsync(
         Guid tenantId,
         string softwareName,
         DecisionSummaryDto summary,
@@ -1426,7 +1598,7 @@ public class RemediationDecisionQueryService(
         }).ToList();
 
         var request = new AiTextGenerationRequest(
-            "You explain remediation risk to non-security readers. Write either one short paragraph or 3-5 short bullet points. Use plain language. Focus on business impact, what could happen, what systems are exposed, and why it matters now. Explicitly mention asset criticality, externally reachable exposure if present, server versus user-device scope, due-date pressure, and whether top risks are known exploited when those facts are provided. Avoid jargon, hype, CVSS talk, and markdown headings. Do not invent facts.",
+            "You produce concise remediation guidance for three audiences. Return only JSON with these string fields: executiveSummary, ownerRecommendation, analystAssessment, exceptionRecommendation, recommendedOutcome, recommendedPriority. executiveSummary must be plain language for non-security readers. ownerRecommendation must give practical next steps. analystAssessment should explain the triage view and include a recommended remediation posture. exceptionRecommendation should say whether an exception looks justified and under what conditions. recommendedOutcome must be one of ApprovedForPatching, RiskAcceptance, AlternateMitigation, or PatchingDeferred. recommendedPriority must be one of Critical, High, Medium, or Low. Avoid markdown and do not invent facts.",
             JsonSerializer.Serialize(
                 new
                 {
@@ -1486,7 +1658,84 @@ public class RemediationDecisionQueryService(
             UseProviderNativeWebResearch: false
         );
 
-        return await aiTextGenerationService.GenerateAsync(tenantId, null, request, ct);
+        var generated = await aiTextGenerationService.GenerateAsync(tenantId, null, request, ct);
+        if (!generated.IsSuccess)
+        {
+            return Result<(RemediationAiDraftPayload Value, AiTextGenerationResult Metadata)>.Failure(
+                generated.Error ?? "AI generation failed."
+            );
+        }
+
+        if (!TryParseAiDraftPayload(generated.Value.Content, out var payload))
+        {
+            return Result<(RemediationAiDraftPayload Value, AiTextGenerationResult Metadata)>.Failure(
+                "The AI response did not contain a valid remediation draft payload."
+            );
+        }
+
+        return Result<(RemediationAiDraftPayload Value, AiTextGenerationResult Metadata)>.Success((payload, generated.Value));
+    }
+
+    private static bool TryParseAiDraftPayload(
+        string content,
+        out RemediationAiDraftPayload payload
+    )
+    {
+        payload = new RemediationAiDraftPayload(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+
+        var trimmed = content.Trim();
+        if (trimmed.StartsWith("```", StringComparison.Ordinal))
+        {
+            var firstBrace = trimmed.IndexOf('{');
+            var lastBrace = trimmed.LastIndexOf('}');
+            if (firstBrace >= 0 && lastBrace > firstBrace)
+            {
+                trimmed = trimmed[firstBrace..(lastBrace + 1)];
+            }
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(trimmed);
+            var root = document.RootElement;
+            payload = new RemediationAiDraftPayload(
+                root.GetProperty("executiveSummary").GetString()?.Trim() ?? string.Empty,
+                root.GetProperty("ownerRecommendation").GetString()?.Trim() ?? string.Empty,
+                root.GetProperty("analystAssessment").GetString()?.Trim() ?? string.Empty,
+                root.GetProperty("exceptionRecommendation").GetString()?.Trim() ?? string.Empty,
+                NormalizeRecommendedOutcome(root.GetProperty("recommendedOutcome").GetString()),
+                NormalizeRecommendedPriority(root.GetProperty("recommendedPriority").GetString())
+            );
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string NormalizeRecommendedPriority(string? value)
+    {
+        return value?.Trim() switch
+        {
+            "Critical" => "Critical",
+            "High" => "High",
+            "Medium" => "Medium",
+            "Low" => "Low",
+            _ => string.Empty,
+        };
+    }
+
+    private static string NormalizeRecommendedOutcome(string? value)
+    {
+        return value?.Trim() switch
+        {
+            nameof(RemediationOutcome.ApprovedForPatching) => nameof(RemediationOutcome.ApprovedForPatching),
+            nameof(RemediationOutcome.RiskAcceptance) => nameof(RemediationOutcome.RiskAcceptance),
+            nameof(RemediationOutcome.AlternateMitigation) => nameof(RemediationOutcome.AlternateMitigation),
+            nameof(RemediationOutcome.PatchingDeferred) => nameof(RemediationOutcome.PatchingDeferred),
+            _ => string.Empty,
+        };
     }
 
     private static string HashAiSummaryInput(

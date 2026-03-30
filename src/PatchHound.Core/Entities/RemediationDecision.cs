@@ -16,6 +16,7 @@ public class RemediationDecision
     public DateTimeOffset DecidedAt { get; private set; }
     public Guid? ApprovedBy { get; private set; }
     public DateTimeOffset? ApprovedAt { get; private set; }
+    public DateTimeOffset? MaintenanceWindowDate { get; private set; }
     public DateTimeOffset? ExpiryDate { get; private set; }
     public DateTimeOffset? ReEvaluationDate { get; private set; }
     public DateTimeOffset? LastSlaNotifiedAt { get; private set; }
@@ -50,7 +51,8 @@ public class RemediationDecision
         Guid decidedBy,
         DecisionApprovalStatus? initialApprovalStatus = null,
         DateTimeOffset? expiryDate = null,
-        DateTimeOffset? reEvaluationDate = null
+        DateTimeOffset? reEvaluationDate = null,
+        DateTimeOffset? maintenanceWindowDate = null
     )
     {
         if (OutcomesRequiringJustification.Contains(outcome) && string.IsNullOrWhiteSpace(justification))
@@ -79,6 +81,7 @@ public class RemediationDecision
             DecidedAt = now,
             ApprovedBy = approvalStatus == DecisionApprovalStatus.Approved ? decidedBy : null,
             ApprovedAt = approvalStatus == DecisionApprovalStatus.Approved ? now : null,
+            MaintenanceWindowDate = maintenanceWindowDate,
             ExpiryDate = expiryDate,
             ReEvaluationDate = reEvaluationDate,
             CreatedAt = now,

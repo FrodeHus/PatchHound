@@ -953,6 +953,7 @@ public class DashboardController : ControllerBase
                 task.Status,
                 task.CreatedAt,
                 decision.ApprovedAt,
+                decision.MaintenanceWindowDate,
             }
         )
             .Take(10)
@@ -1017,6 +1018,7 @@ public class DashboardController : ControllerBase
                     stats?.AffectedDeviceCount ?? 0,
                     item.ApprovedAt ?? item.CreatedAt,
                     item.DueDate,
+                    item.MaintenanceWindowDate,
                     item.Status.ToString()
                 );
             }).ToList(),
@@ -1355,6 +1357,7 @@ public class DashboardController : ControllerBase
                 SoftwareName = normalizedSoftware.CanonicalName,
                 ApprovalType = task.Type.ToString(),
                 task.ExpiresAt,
+                decision.MaintenanceWindowDate,
                 task.CreatedAt,
             }
         )
@@ -1385,6 +1388,7 @@ public class DashboardController : ControllerBase
                 stats?.HighestSeverity ?? "Unknown",
                 stats?.VulnerabilityCount ?? 0,
                 item.ExpiresAt,
+                item.MaintenanceWindowDate,
                 item.CreatedAt,
                 attentionState
             );

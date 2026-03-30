@@ -155,7 +155,8 @@ public class EmailNotificationService(
                 item.Id,
                 item.Type,
                 item.Status,
-                item.RemediationDecision.TenantSoftwareId
+                item.RemediationDecision.TenantSoftwareId,
+                item.RemediationDecision.MaintenanceWindowDate
             })
             .FirstOrDefaultAsync(ct);
 
@@ -176,6 +177,10 @@ public class EmailNotificationService(
                 "Review the proposed patch deferral and decide whether it should replace immediate execution.",
             _ => "Review the proposed remediation stage and take the required action."
         };
+        if (task.MaintenanceWindowDate is DateTimeOffset maintenanceWindowDate)
+        {
+            requirementText += $" Planned maintenance window: {maintenanceWindowDate:yyyy-MM-dd}.";
+        }
 
         return new RemediationEmailContext(
             summary.SoftwareName,

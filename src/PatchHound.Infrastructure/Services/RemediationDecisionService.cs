@@ -24,7 +24,8 @@ public class RemediationDecisionService(
         Guid decidedBy,
         DateTimeOffset? expiryDate,
         DateTimeOffset? reEvaluationDate,
-        CancellationToken ct
+        CancellationToken ct,
+        DateTimeOffset? maintenanceWindowDate = null
     )
     {
         var remediationScope = await ResolveScopeAsync(tenantId, softwareAssetId, ct);
@@ -71,7 +72,8 @@ public class RemediationDecisionService(
             decidedBy,
             initialApprovalStatus,
             expiryDate,
-            reEvaluationDate
+            reEvaluationDate,
+            maintenanceWindowDate
         );
 
         await dbContext.RemediationDecisions.AddAsync(decision, ct);
@@ -103,7 +105,8 @@ public class RemediationDecisionService(
         Guid decidedBy,
         DateTimeOffset? expiryDate,
         DateTimeOffset? reEvaluationDate,
-        CancellationToken ct
+        CancellationToken ct,
+        DateTimeOffset? maintenanceWindowDate = null
     )
     {
         var remediationScope = await ResolveScopeByTenantSoftwareAsync(tenantId, tenantSoftwareId, ct);
@@ -118,7 +121,8 @@ public class RemediationDecisionService(
             decidedBy,
             expiryDate,
             reEvaluationDate,
-            ct
+            ct,
+            maintenanceWindowDate
         );
     }
 
@@ -156,6 +160,7 @@ public class RemediationDecisionService(
             previousDecision.Justification,
             actedBy,
             carriedApprovalStatus,
+            previousDecision.MaintenanceWindowDate,
             previousDecision.ExpiryDate,
             previousDecision.ReEvaluationDate
         );

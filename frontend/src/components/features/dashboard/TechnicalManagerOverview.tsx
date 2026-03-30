@@ -94,6 +94,9 @@ export function TechnicalManagerOverview({ summary, isLoading }: Props) {
                     </div>
                     <div className="text-right text-sm text-muted-foreground">
                       <div>Approved {formatDateTime(item.approvedAt)}</div>
+                      <div className="mt-1">
+                        Maintenance {item.maintenanceWindowDate ? formatDate(item.maintenanceWindowDate) : 'Not scheduled'}
+                      </div>
                       <div className="mt-1">Due {formatDate(item.dueDate)}</div>
                     </div>
                   </div>

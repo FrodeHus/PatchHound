@@ -197,6 +197,17 @@ export function ApprovalTaskDetail({
               </section>
             </div>
 
+            {data.maintenanceWindowDate ? (
+              <section className="rounded-2xl border border-border/70 bg-background/60 p-4">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  Planned maintenance window
+                </p>
+                <p className="mt-2 text-sm text-foreground">
+                  Patch execution is expected to be in place by {formatDate(data.maintenanceWindowDate)}.
+                </p>
+              </section>
+            ) : null}
+
             {isPending ? (
               <section className="rounded-2xl border border-primary/20 bg-background/80 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -264,6 +275,16 @@ export function ApprovalTaskDetail({
                 <ApprovalExpiryCountdown expiresAt={data.expiresAt} />
               </div>
             </div>
+            {data.maintenanceWindowDate ? (
+              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  Maintenance window
+                </p>
+                <p className="mt-2 min-h-[52px] text-sm">
+                  {formatDate(data.maintenanceWindowDate)}
+                </p>
+              </div>
+            ) : null}
             {data.riskBand ? (
               <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">

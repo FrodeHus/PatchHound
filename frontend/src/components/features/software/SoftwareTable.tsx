@@ -76,6 +76,7 @@ export function SoftwareTable({
   onPageSizeChange,
   onClearFilters,
 }: SoftwareTableProps) {
+  const [renderedAt] = useState(() => Date.now())
   const [searchInput, setSearchInput] = useState(searchValue)
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
   const [draftFilters, setDraftFilters] = useState({
@@ -149,6 +150,21 @@ export function SoftwareTable({
             <p className="text-xs text-muted-foreground">
               {row.original.canonicalVendor ? startCase(row.original.canonicalVendor) : 'Unknown vendor'}
             </p>
+            {(() => {
+              const maintenanceWindowDate = row.original.maintenanceWindowDate
+              const missedWindow = Boolean(
+                maintenanceWindowDate
+                  && row.original.activeVulnerabilityCount > 0
+                  && new Date(maintenanceWindowDate).getTime() < renderedAt
+              )
+              if (!maintenanceWindowDate) return null
+              return (
+                <p className={`text-xs ${missedWindow ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>
+                  Maintenance {formatDate(maintenanceWindowDate)}
+                  {missedWindow ? ' missed' : ''}
+                </p>
+              )
+            })()}
           </div>
         ),
       },
@@ -234,7 +250,7 @@ export function SoftwareTable({
           ),
         },
     ],
-    [onShowRiskDetail],
+    [onShowRiskDetail, renderedAt],
   )
 
   return (

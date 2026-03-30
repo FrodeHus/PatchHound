@@ -14,6 +14,15 @@ public class ApprovalTaskService(
     PatchingTaskService patchingTaskService
 )
 {
+    private static string BuildDecisionNotificationDetail(RemediationDecision decision)
+    {
+        var maintenanceWindowText = decision.MaintenanceWindowDate is DateTimeOffset maintenanceWindowDate
+            ? $" Maintenance window: {maintenanceWindowDate:yyyy-MM-dd}."
+            : string.Empty;
+
+        return $"A remediation decision ({decision.Outcome}) requires your attention.{maintenanceWindowText}";
+    }
+
     public async Task<ApprovalTask> CreateForDecisionAsync(
         RemediationDecision decision,
         int expiryHours,
@@ -48,7 +57,7 @@ public class ApprovalTaskService(
                 task.Status == ApprovalTaskStatus.AutoApproved
                     ? "Informational: Remediation decision created"
                     : "Approval required: Remediation decision",
-                $"A remediation decision ({decision.Outcome}) requires your attention.",
+                BuildDecisionNotificationDetail(decision),
                 "ApprovalTask",
                 task.Id,
                 ct
@@ -119,7 +128,7 @@ public class ApprovalTaskService(
             task.TenantId,
             NotificationType.ApprovalTaskDenied,
             "Remediation decision denied",
-            $"Your remediation decision ({task.RemediationDecision.Outcome}) was denied. Please cancel the decision and create a new one.",
+            $"Your remediation decision ({task.RemediationDecision.Outcome}) was denied. Please cancel the decision and create a new one.{(task.RemediationDecision.MaintenanceWindowDate is DateTimeOffset maintenanceWindowDate ? $" Maintenance window had been set to {maintenanceWindowDate:yyyy-MM-dd}." : string.Empty)}",
             "ApprovalTask",
             task.Id,
             ct
@@ -155,7 +164,7 @@ public class ApprovalTaskService(
                 task.TenantId,
                 NotificationType.ApprovalTaskAutoExpired,
                 "Approval task expired",
-                $"Your remediation decision ({task.RemediationDecision.Outcome}) was auto-denied because the approval task expired.",
+                $"Your remediation decision ({task.RemediationDecision.Outcome}) was auto-denied because the approval task expired.{(task.RemediationDecision.MaintenanceWindowDate is DateTimeOffset maintenanceWindowDate ? $" Maintenance window had been set to {maintenanceWindowDate:yyyy-MM-dd}." : string.Empty)}",
                 "ApprovalTask",
                 task.Id,
                 ct

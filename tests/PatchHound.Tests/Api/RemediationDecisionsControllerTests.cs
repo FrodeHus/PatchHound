@@ -82,6 +82,7 @@ public class RemediationDecisionsControllerTests : IDisposable
             recommendationService,
             authorizationService,
             _workflowService,
+            new RemediationAiJobService(_dbContext),
             _dbContext,
             _tenantContext
         );
@@ -107,7 +108,7 @@ public class RemediationDecisionsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GenerateAiSummary_WhenEnabledProfileExists_PersistsSummary()
+    public async Task GenerateAiSummary_WhenEnabledProfileExists_QueuesBackgroundGeneration()
     {
         var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
         var profile = TenantAiProfileFactory.Create(
@@ -138,42 +139,61 @@ public class RemediationDecisionsControllerTests : IDisposable
         await _dbContext.TenantAiProfiles.AddAsync(profile);
         await _dbContext.SaveChangesAsync();
 
-        _aiProvider.ProviderType.Returns(TenantAiProviderType.Ollama);
-        _aiProvider
-            .GenerateTextAsync(
-                Arg.Any<AiTextGenerationRequest>(),
-                Arg.Any<TenantAiProfileResolved>(),
-                Arg.Any<CancellationToken>()
-            )
-            .Returns("- Attackers could use these issues to compromise affected devices.\n- Prioritize this software because the highest-risk vulnerabilities are still open.");
-        _aiConfigResolver
-            .ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
-            .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, string.Empty)));
-
         var action = await _controller.GenerateAiSummary(graph.TenantSoftware.Id, CancellationToken.None);
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<DecisionAiSummaryDto>().Subject;
-        payload.Content.Should().Contain("Attackers could use these issues");
+        payload.Content.Should().BeNull();
         payload.CanGenerate.Should().BeTrue();
-        await _aiProvider.Received(1).GenerateTextAsync(
-            Arg.Is<AiTextGenerationRequest>(request =>
-                request.UserPrompt.Contains("HighestAssetCriticality")
-                && request.UserPrompt.Contains("ServerCount")
-                && request.UserPrompt.Contains("InternetReachableDeviceCount")
-                && request.UserPrompt.Contains("BusinessValueSummary")
-                && request.UserPrompt.Contains("TopFiveKnownExploitedCount")
-                && request.UserPrompt.Contains("SlaDueDate")
-            ),
-            Arg.Any<TenantAiProfileResolved>(),
-            Arg.Any<CancellationToken>()
+        payload.IsGenerating.Should().BeTrue();
+
+        var queuedJob = await _dbContext.RemediationAiJobs
+            .IgnoreQueryFilters()
+            .Where(item => item.TenantSoftwareId == graph.TenantSoftware.Id)
+            .OrderByDescending(item => item.RequestedAt)
+            .FirstOrDefaultAsync();
+        queuedJob.Should().NotBeNull();
+        queuedJob!.Status.Should().Be(RemediationAiJobStatus.Pending);
+    }
+
+    [Fact]
+    public async Task ReviewAiSummary_WhenRemediationExists_PersistsReviewStatus()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var tenantSoftware = await _dbContext.TenantSoftware
+            .FirstAsync(item => item.TenantId == _tenantId && item.Id == graph.TenantSoftware.Id);
+        tenantSoftware.StoreRemediationAiSummary(
+            "Executive summary",
+            "Owner recommendation",
+            "Analyst assessment",
+            "Exception recommendation",
+            nameof(RemediationOutcome.ApprovedForPatching),
+            "High",
+            "hash",
+            "OpenAI",
+            "Default AI",
+            "gpt-test"
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.ReviewAiSummary(
+            graph.TenantSoftware.Id,
+            new ReviewDecisionAiSummaryRequest("accept"),
+            CancellationToken.None
         );
 
-        var updatedTenantSoftware = await _dbContext.TenantSoftware
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<DecisionAiSummaryDto>().Subject;
+        payload.ReviewStatus.Should().Be("Accepted");
+        payload.ReviewedAt.Should().NotBeNull();
+        payload.ReviewedByDisplayName.Should().BeNull();
+
+        var persisted = await _dbContext.TenantSoftware
             .IgnoreQueryFilters()
-            .FirstAsync(item => item.Id == graph.TenantSoftware.Id);
-        updatedTenantSoftware.RemediationAiSummaryContent.Should().Contain("Attackers could use these issues");
-        updatedTenantSoftware.RemediationAiSummaryGeneratedAt.Should().NotBeNull();
+            .FirstAsync(item => item.TenantId == _tenantId && item.Id == graph.TenantSoftware.Id);
+        persisted.RemediationAiReviewStatus.Should().Be("Accepted");
+        persisted.RemediationAiReviewedBy.Should().Be(_userId);
+        persisted.RemediationAiReviewedAt.Should().NotBeNull();
     }
 
     [Fact]

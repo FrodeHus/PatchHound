@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { AnalystRecommendation } from '@/api/remediation.schemas'
 import { addRecommendation } from '@/api/remediation.functions'
@@ -19,8 +19,17 @@ type RecommendationPanelProps = {
   tenantSoftwareId: string
   workflowId?: string | null
   recommendations: AnalystRecommendation[]
+  aiAnalystAssessment?: string | null
+  aiRecommendedOutcome?: string | null
+  aiRecommendedPriority?: string | null
   queryKey: readonly unknown[]
   readOnly?: boolean
+  recommendationSeed?: {
+    token: number
+    outcome?: string | null
+    rationale?: string | null
+    priorityOverride?: string | null
+  } | null
 }
 
 const OUTCOMES = [
@@ -30,19 +39,37 @@ const OUTCOMES = [
   'PatchingDeferred',
 ] as const
 
+const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'] as const
+
 export function RecommendationPanel({
   tenantSoftwareId,
   workflowId,
   recommendations,
+  aiAnalystAssessment,
+  aiRecommendedOutcome,
+  aiRecommendedPriority,
   queryKey,
   readOnly = false,
+  recommendationSeed = null,
 }: RecommendationPanelProps) {
   const queryClient = useQueryClient()
   const currentRecommendation = recommendations[0] ?? null
   const [showForm, setShowForm] = useState(false)
   const [outcome, setOutcome] = useState(currentRecommendation?.recommendedOutcome ?? '')
   const [rationale, setRationale] = useState(currentRecommendation?.rationale ?? '')
+  const [priorityOverride, setPriorityOverride] = useState(currentRecommendation?.priorityOverride ?? '')
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!recommendationSeed) {
+      return
+    }
+
+    setOutcome(recommendationSeed.outcome ?? currentRecommendation?.recommendedOutcome ?? '')
+    setRationale(recommendationSeed.rationale ?? currentRecommendation?.rationale ?? '')
+    setPriorityOverride(recommendationSeed.priorityOverride ?? currentRecommendation?.priorityOverride ?? '')
+    setShowForm(true)
+  }, [recommendationSeed?.token, recommendationSeed, currentRecommendation?.priorityOverride, currentRecommendation?.rationale, currentRecommendation?.recommendedOutcome])
 
   async function handleSubmit() {
     if (!outcome || !rationale.trim()) return
@@ -54,11 +81,13 @@ export function RecommendationPanel({
           workflowId,
           recommendedOutcome: outcome,
           rationale: rationale.trim(),
+          priorityOverride: priorityOverride || undefined,
         },
       })
       await queryClient.invalidateQueries({ queryKey })
       setOutcome('')
       setRationale('')
+      setPriorityOverride('')
       setShowForm(false)
     } finally {
       setSubmitting(false)
@@ -88,6 +117,41 @@ export function RecommendationPanel({
         <p className="text-sm text-muted-foreground">No analyst recommendation has been recorded yet.</p>
       )}
 
+      {aiAnalystAssessment || aiRecommendedPriority ? (
+        <div className="rounded-lg border border-dashed border-border/70 bg-background/50 p-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              AI triage recommendation
+            </span>
+            {aiRecommendedPriority ? (
+              <span className="rounded-full border border-border/70 bg-background/70 px-2 py-0.5 text-xs text-muted-foreground">
+                {aiRecommendedPriority} priority
+              </span>
+            ) : null}
+          </div>
+          {aiAnalystAssessment ? (
+            <p className="text-sm text-muted-foreground">{aiAnalystAssessment}</p>
+          ) : null}
+          {readOnly ? null : (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPriorityOverride(aiRecommendedPriority ?? '')
+                  setOutcome((current) => current || aiRecommendedOutcome || '')
+                  setRationale((current) => current || aiAnalystAssessment || '')
+                  setShowForm(true)
+                }}
+              >
+                Use in analyst note
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : null}
+
       {readOnly ? null : showForm ? (
         <div className="space-y-3 rounded-lg border border-border/70 bg-background p-3">
           <div className="space-y-2">
@@ -114,6 +178,22 @@ export function RecommendationPanel({
               rows={3}
             />
           </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Final analyst priority</label>
+            <Select value={priorityOverride || "none"} onValueChange={(value) => setPriorityOverride(value === 'none' ? '' : value ?? '')}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="No priority recommendation" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No priority recommendation</SelectItem>
+                {PRIORITIES.map((priority) => (
+                  <SelectItem key={priority} value={priority}>
+                    {priority}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex gap-2">
             <Button
               onClick={handleSubmit}
@@ -129,6 +209,7 @@ export function RecommendationPanel({
                 setShowForm(false)
                 setOutcome(currentRecommendation?.recommendedOutcome ?? '')
                 setRationale(currentRecommendation?.rationale ?? '')
+                setPriorityOverride(currentRecommendation?.priorityOverride ?? '')
               }}
             >
               Cancel
@@ -142,6 +223,7 @@ export function RecommendationPanel({
           onClick={() => {
             setOutcome(currentRecommendation?.recommendedOutcome ?? '')
             setRationale(currentRecommendation?.rationale ?? '')
+            setPriorityOverride(currentRecommendation?.priorityOverride ?? '')
             setShowForm(true)
           }}
         >

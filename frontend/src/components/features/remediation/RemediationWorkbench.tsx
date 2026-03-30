@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { PagedDecisionList } from '@/api/remediation.schemas'
 import { Button } from '@/components/ui/button'
@@ -37,6 +37,7 @@ export function RemediationWorkbench({
   onFiltersChange,
   onPageChange,
 }: Props) {
+  const [renderedAt] = useState(() => Date.now())
   const quickFilterLabel = filters.approvalStatus === 'PendingApproval'
     ? 'Pending approval'
     : filters.decisionState === 'WithDecision'
@@ -285,6 +286,17 @@ export function RemediationWorkbench({
                           >
                             {item.criticality}
                           </span>
+                          {item.maintenanceWindowDate ? (
+                            <span
+                              className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                                new Date(item.maintenanceWindowDate).getTime() < renderedAt && item.totalVulnerabilities > 0
+                                  ? toneBadge('danger')
+                                  : toneBadge('neutral')
+                              }`}
+                            >
+                              Maintenance {formatDate(item.maintenanceWindowDate)}
+                            </span>
+                          ) : null}
                           {item.tenantSoftwareId ? (
                             <Link
                               to="/software/$id"
@@ -319,6 +331,20 @@ export function RemediationWorkbench({
                           {item.decidedAt ? (
                             <p className="text-[10px] text-muted-foreground">
                               {formatDate(item.decidedAt)}
+                            </p>
+                          ) : null}
+                          {item.maintenanceWindowDate ? (
+                            <p
+                              className={`text-[10px] ${
+                                new Date(item.maintenanceWindowDate).getTime() < renderedAt && item.totalVulnerabilities > 0
+                                  ? 'font-medium text-destructive'
+                                  : 'text-muted-foreground'
+                              }`}
+                            >
+                              Maintenance {formatDate(item.maintenanceWindowDate)}
+                              {new Date(item.maintenanceWindowDate).getTime() < renderedAt && item.totalVulnerabilities > 0
+                                ? ' missed'
+                                : ''}
                             </p>
                           ) : null}
                         </div>

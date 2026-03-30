@@ -22,6 +22,10 @@ function RemediationPage() {
     queryKey: softwareQueryKeys.remediation(selectedTenantId, id),
     queryFn: () => fetchDecisionContext({ data: { tenantSoftwareId: id } }),
     initialData: canUseInitialData ? initialData : undefined,
+    refetchInterval: (currentQuery) => {
+      const status = currentQuery.state.data?.aiSummary.status
+      return status === 'Queued' || status === 'Generating' ? 3000 : false
+    },
   })
 
   const data = query.data ?? (canUseInitialData ? initialData : undefined)

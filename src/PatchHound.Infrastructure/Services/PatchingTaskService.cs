@@ -128,12 +128,15 @@ public class PatchingTaskService(
         foreach (var task in tasks)
         {
             var affectedDeviceCount = teamGroups.GetValueOrDefault(task.OwnerTeamId);
+            var maintenanceWindowText = decision.MaintenanceWindowDate is DateTimeOffset maintenanceWindowDate
+                ? $" Maintenance window: {maintenanceWindowDate:yyyy-MM-dd}."
+                : string.Empty;
             await notificationService.SendToTeamAsync(
                 task.OwnerTeamId,
                 decision.TenantId,
                 NotificationType.TaskAssigned,
                 $"Remediation task assigned: {softwareName}",
-                $"Patch {softwareName}. Highest severity: {severityLabel}. Affected devices for your team: {affectedDeviceCount}.",
+                $"Patch {softwareName}. Highest severity: {severityLabel}. Affected devices for your team: {affectedDeviceCount}.{maintenanceWindowText}",
                 "PatchingTask",
                 task.Id,
                 ct

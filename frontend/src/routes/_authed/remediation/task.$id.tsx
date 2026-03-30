@@ -87,6 +87,7 @@ function RemediationTaskDetailRoute() {
               <Metric label="High or worse" value={String(task.highOrWorseDeviceCount)} />
               <Metric label="Critical links" value={String(task.criticalDeviceCount)} />
               <Metric label="Due" value={formatDate(task.dueDate)} />
+              <Metric label="Maintenance window" value={task.maintenanceWindowDate ? formatDate(task.maintenanceWindowDate) : 'Not scheduled'} />
             </div>
 
             <div className="space-y-2">

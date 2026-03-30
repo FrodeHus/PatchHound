@@ -18,11 +18,25 @@ public record DecisionContextDto(
 
 public record DecisionAiSummaryDto(
     string? Content,
+    string? OwnerRecommendation,
+    string? AnalystAssessment,
+    string? ExceptionRecommendation,
+    string? RecommendedOutcome,
+    string? RecommendedPriority,
+    string Status,
+    bool IsStale,
+    string? ReviewStatus,
+    DateTimeOffset? ReviewedAt,
+    string? ReviewedByDisplayName,
     DateTimeOffset? GeneratedAt,
+    DateTimeOffset? RequestedAt,
+    DateTimeOffset? CompletedAt,
     string? ProviderType,
     string? ProfileName,
     string? Model,
     bool CanGenerate,
+    bool IsGenerating,
+    string? LastError,
     string? UnavailableMessage
 );
 
@@ -77,6 +91,7 @@ public record RemediationDecisionDto(
     DateTimeOffset DecidedAt,
     Guid? ApprovedBy,
     DateTimeOffset? ApprovedAt,
+    DateTimeOffset? MaintenanceWindowDate,
     DateTimeOffset? ExpiryDate,
     DateTimeOffset? ReEvaluationDate,
     DecisionRejectionDto? LatestRejection,
@@ -143,6 +158,7 @@ public record DecisionSlaDto(
 public record CreateDecisionRequest(
     string Outcome,
     string? Justification,
+    DateTimeOffset? MaintenanceWindowDate,
     DateTimeOffset? ExpiryDate,
     DateTimeOffset? ReEvaluationDate
 );
@@ -166,4 +182,8 @@ public record VerifyRemediationRequest(
 
 public record EnsureRemediationWorkflowResponse(
     Guid WorkflowId
+);
+
+public record ReviewDecisionAiSummaryRequest(
+    string Action
 );

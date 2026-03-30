@@ -148,6 +148,7 @@ export function ApprovalInbox({
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Severity</th>
+                <th className="px-4 py-3">Maintenance window</th>
                 <th className="px-4 py-3">Expiry</th>
                 <th className="px-4 py-3">Created</th>
                 <th className="px-4 py-3" />
@@ -158,7 +159,7 @@ export function ApprovalInbox({
                 <tr>
                   <td
                     className="px-4 py-6 text-sm text-muted-foreground"
-                    colSpan={7}
+                    colSpan={8}
                   >
                     No approval tasks match the current filters.
                   </td>
@@ -202,6 +203,9 @@ export function ApprovalInbox({
                       >
                         {item.highestSeverity}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {item.maintenanceWindowDate ? formatDate(item.maintenanceWindowDate) : 'Not scheduled'}
                     </td>
                     <td className="px-4 py-3">
                       <ApprovalExpiryCountdown

@@ -99,12 +99,13 @@ export function RemediationTaskWorkbench({
                 <th className="px-4 py-3">Devices</th>
                 <th className="px-4 py-3">Pressure</th>
                 <th className="px-4 py-3">Due</th>
+                <th className="px-4 py-3">Maintenance window</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60 bg-background">
               {tasks.items.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>
+                  <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={7}>
                     No open remediation tasks match the current filters.
                   </td>
                 </tr>
@@ -158,6 +159,9 @@ export function RemediationTaskWorkbench({
                     <td className="px-4 py-3 text-muted-foreground">
                       <div>{formatDate(task.dueDate)}</div>
                       <div className="mt-1 text-xs">{task.status}</div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {task.maintenanceWindowDate ? formatDate(task.maintenanceWindowDate) : 'Not scheduled'}
                     </td>
                   </tr>
                 ))

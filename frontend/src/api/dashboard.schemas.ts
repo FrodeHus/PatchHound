@@ -190,6 +190,7 @@ export const approvalAttentionTaskSchema = z.object({
   highestSeverity: z.string(),
   vulnerabilityCount: z.number(),
   expiresAt: z.string().datetime({ offset: true }),
+  maintenanceWindowDate: z.string().datetime({ offset: true }).nullable(),
   createdAt: z.string().datetime({ offset: true }),
   attentionState: z.string(),
 })
@@ -221,6 +222,7 @@ export const approvedPatchingTaskSchema = z.object({
   affectedDeviceCount: z.number(),
   approvedAt: z.string().datetime({ offset: true }),
   dueDate: z.string().datetime({ offset: true }),
+  maintenanceWindowDate: z.string().datetime({ offset: true }).nullable(),
   status: z.string(),
 })
 

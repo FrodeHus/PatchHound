@@ -185,6 +185,9 @@ export function SecurityManagerOverview({ summary, managerSummary, isLoading }: 
                     </div>
                     <div className="text-right text-sm text-muted-foreground">
                       <div>Expires {formatDateTime(item.expiresAt)}</div>
+                      {item.maintenanceWindowDate ? (
+                        <div className="mt-1">Maintenance {formatDate(item.maintenanceWindowDate)}</div>
+                      ) : null}
                       <div className="mt-1">Created {formatDate(item.createdAt)}</div>
                     </div>
                   </div>

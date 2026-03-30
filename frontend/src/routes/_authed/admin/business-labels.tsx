@@ -103,9 +103,10 @@ function BusinessLabelsPage() {
     },
   })
 
-  const labels = useMemo<BusinessLabel[]>(() => labelsQuery.data ?? [], [labelsQuery.data])
-  const activeCount = labels.filter((label) => label.isActive).length
-  const inactiveCount = labels.length - activeCount
+  const labels = useMemo<BusinessLabel[]>(
+    () => labelsQuery.data ?? [],
+    [labelsQuery.data],
+  );
   const sortedLabels = useMemo(
     () => [...labels].sort((a, b) => Number(b.isActive) - Number(a.isActive) || a.name.localeCompare(b.name)),
     [labels],
@@ -124,27 +125,23 @@ function BusinessLabelsPage() {
                 Business Labels
               </h1>
               <p className="max-w-3xl text-sm text-muted-foreground">
-                Create recognizable business context for assets so remediation, dashboards, and AI summaries can describe impact in terms people understand.
+                Create recognizable business context for assets so remediation,
+                dashboards, and AI summaries can describe impact in terms people
+                understand.
               </p>
             </div>
             <Button
               type="button"
               className="rounded-full"
               onClick={() => {
-                setDraft(emptyDraft())
-                setEditorOpen(true)
+                setDraft(emptyDraft());
+                setEditorOpen(true);
               }}
             >
               <Plus className="mr-2 size-4" />
               New label
             </Button>
           </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <SummaryCard label="Total labels" value={String(labels.length)} />
-          <SummaryCard label="Active" value={String(activeCount)} />
-          <SummaryCard label="Inactive" value={String(inactiveCount)} />
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,0.6fr)]">
@@ -156,9 +153,12 @@ function BusinessLabelsPage() {
                     <Tags className="size-6" />
                   </span>
                   <div className="space-y-1">
-                    <p className="text-lg font-semibold">No business labels yet</p>
+                    <p className="text-lg font-semibold">
+                      No business labels yet
+                    </p>
                     <p className="max-w-md text-sm text-muted-foreground">
-                      Start with a few recognizable labels like Production, Finance, Executive, or Customer-facing.
+                      Start with a few recognizable labels like Production,
+                      Finance, Executive, or Customer-facing.
                     </p>
                   </div>
                 </CardContent>
@@ -170,15 +170,22 @@ function BusinessLabelsPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <BusinessLabelChip name={label.name} color={label.color} />
-                          <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
-                            {label.isActive ? 'Active' : 'Inactive'}
+                          <BusinessLabelChip
+                            name={label.name}
+                            color={label.color}
+                          />
+                          <Badge
+                            variant="outline"
+                            className="rounded-full border-border/70 bg-background/50"
+                          >
+                            {label.isActive ? "Active" : "Inactive"}
                           </Badge>
                         </div>
                         <div>
                           <CardTitle>{label.name}</CardTitle>
                           <CardDescription className="mt-2">
-                            {label.description?.trim() || 'No description provided yet.'}
+                            {label.description?.trim() ||
+                              "No description provided yet."}
                           </CardDescription>
                         </div>
                       </div>
@@ -195,8 +202,8 @@ function BusinessLabelsPage() {
                               description: label.description,
                               color: label.color,
                               isActive: label.isActive,
-                            })
-                            setEditorOpen(true)
+                            });
+                            setEditorOpen(true);
                           }}
                         >
                           <PenSquare className="mr-2 size-4" />
@@ -224,13 +231,23 @@ function BusinessLabelsPage() {
             <CardHeader>
               <CardTitle>Recommended label set</CardTitle>
               <CardDescription>
-                Keep labels recognizable and stable. Use them as business context, not as a substitute for criticality or tenant access.
+                Keep labels recognizable and stable. Use them as business
+                context, not as a substitute for criticality or tenant access.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>Good starting labels: Production, Finance, HR, Executive, Tier 0, Customer-facing, Shared Services.</p>
-              <p>Use a small set first so reporting stays understandable and assets do not accumulate overlapping labels.</p>
-              <p>Inactive labels stay visible on already-labeled assets but cannot be newly assigned.</p>
+              <p>
+                Good starting labels: Production, Finance, HR, Executive, Tier
+                0, Customer-facing, Shared Services.
+              </p>
+              <p>
+                Use a small set first so reporting stays understandable and
+                assets do not accumulate overlapping labels.
+              </p>
+              <p>
+                Inactive labels stay visible on already-labeled assets but
+                cannot be newly assigned.
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -239,9 +256,12 @@ function BusinessLabelsPage() {
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
         <DialogContent size="md">
           <DialogHeader>
-            <DialogTitle>{draft.id ? 'Edit business label' : 'Create business label'}</DialogTitle>
+            <DialogTitle>
+              {draft.id ? "Edit business label" : "Create business label"}
+            </DialogTitle>
             <DialogDescription>
-              Use names that a customer or executive would immediately recognize when reading dashboards or remediation summaries.
+              Use names that a customer or executive would immediately recognize
+              when reading dashboards or remediation summaries.
             </DialogDescription>
           </DialogHeader>
 
@@ -250,7 +270,12 @@ function BusinessLabelsPage() {
               <span className="text-sm font-medium">Name</span>
               <Input
                 value={draft.name}
-                onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
                 placeholder="Production"
               />
             </label>
@@ -258,8 +283,13 @@ function BusinessLabelsPage() {
             <label className="grid gap-2">
               <span className="text-sm font-medium">Description</span>
               <Input
-                value={draft.description ?? ''}
-                onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+                value={draft.description ?? ""}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
                 placeholder="Production-facing services and endpoints"
               />
             </label>
@@ -269,21 +299,33 @@ function BusinessLabelsPage() {
                 <span className="text-sm font-medium">Color</span>
                 <Input
                   type="color"
-                  value={draft.color ?? '#2563eb'}
-                  onChange={(event) => setDraft((current) => ({ ...current, color: event.target.value }))}
+                  value={draft.color ?? "#2563eb"}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      color: event.target.value,
+                    }))
+                  }
                   className="h-11 p-1"
                 />
               </label>
               <button
                 type="button"
                 className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-left"
-                onClick={() => setDraft((current) => ({ ...current, isActive: !current.isActive }))}
+                onClick={() =>
+                  setDraft((current) => ({
+                    ...current,
+                    isActive: !current.isActive,
+                  }))
+                }
               >
-                <p className="text-sm font-medium">{draft.isActive ? 'Active label' : 'Inactive label'}</p>
+                <p className="text-sm font-medium">
+                  {draft.isActive ? "Active label" : "Inactive label"}
+                </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {draft.isActive
-                    ? 'This label can be assigned to assets immediately.'
-                    : 'This label stays in history but cannot be assigned to new assets.'}
+                    ? "This label can be assigned to assets immediately."
+                    : "This label stays in history but cannot be assigned to new assets."}
                 </p>
               </button>
             </div>
@@ -293,26 +335,39 @@ function BusinessLabelsPage() {
             <Button
               type="button"
               onClick={() => saveMutation.mutate(draft)}
-              disabled={saveMutation.isPending || draft.name.trim().length === 0}
+              disabled={
+                saveMutation.isPending || draft.name.trim().length === 0
+              }
             >
-              {saveMutation.isPending ? 'Saving...' : draft.id ? 'Save changes' : 'Create label'}
+              {saveMutation.isPending
+                ? "Saving..."
+                : draft.id
+                  ? "Save changes"
+                  : "Create label"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
         <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle>Delete business label</DialogTitle>
             <DialogDescription>
               {deleteTarget
                 ? `Delete ${deleteTarget.name}? Assets using this label will lose that business context.`
-                : 'Delete this business label?'}
+                : "Delete this business label?"}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+            >
               Cancel
             </Button>
             <Button
@@ -321,28 +376,17 @@ function BusinessLabelsPage() {
               disabled={!deleteTarget || deleteMutation.isPending}
               onClick={() => {
                 if (deleteTarget) {
-                  deleteMutation.mutate(deleteTarget.id)
+                  deleteMutation.mutate(deleteTarget.id);
                 }
               }}
             >
-              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
-  )
-}
-
-function SummaryCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card className="rounded-3xl border-border/70">
-      <CardHeader className="space-y-2">
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-3xl tracking-[-0.04em]">{value}</CardTitle>
-      </CardHeader>
-    </Card>
-  )
+  );
 }
 
 function BusinessLabelChip({ name, color }: { name: string; color: string | null }) {

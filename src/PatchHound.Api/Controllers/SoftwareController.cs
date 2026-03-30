@@ -443,6 +443,15 @@ public class SoftwareController(
                     )
                     .Select(installation => (DateTimeOffset?)installation.LastSeenAt)
                     .Max(),
+                MaintenanceWindowDate = dbContext.RemediationDecisions
+                    .Where(decision =>
+                        decision.TenantId == currentTenantId
+                        && decision.TenantSoftwareId == item.Id
+                        && decision.ApprovalStatus != DecisionApprovalStatus.Rejected
+                        && decision.ApprovalStatus != DecisionApprovalStatus.Expired)
+                    .OrderByDescending(decision => decision.DecidedAt)
+                    .Select(decision => decision.MaintenanceWindowDate)
+                    .FirstOrDefault(),
                 ExposureImpactScore = dbContext
                     .NormalizedSoftwareInstallations
                     .Where(installation =>
@@ -479,7 +488,8 @@ public class SoftwareController(
                         item.ActiveVulnerabilityCount,
                         item.VersionCount,
                         item.ExposureImpactScore,
-                        item.LastSeenAt
+                        item.LastSeenAt,
+                        item.MaintenanceWindowDate
                     ))
                     .ToList(),
                 totalCount,

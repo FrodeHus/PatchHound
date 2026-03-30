@@ -21,6 +21,7 @@ public record RemediationTaskListItemDto(
     int HighOrWorseDeviceCount,
     string HighestDeviceCriticality,
     DateTimeOffset DueDate,
+    DateTimeOffset? MaintenanceWindowDate,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     string Status,
@@ -38,6 +39,7 @@ public record RemediationTaskTeamStatusDto(
     string OwnerTeamName,
     string Status,
     DateTimeOffset DueDate,
+    DateTimeOffset? MaintenanceWindowDate,
     DateTimeOffset UpdatedAt
 );
 

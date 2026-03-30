@@ -186,6 +186,7 @@ public record ApprovalAttentionTaskDto(
     string HighestSeverity,
     int VulnerabilityCount,
     DateTimeOffset ExpiresAt,
+    DateTimeOffset? MaintenanceWindowDate,
     DateTimeOffset CreatedAt,
     string AttentionState
 );
@@ -217,6 +218,7 @@ public record ApprovedPatchingTaskDto(
     int AffectedDeviceCount,
     DateTimeOffset ApprovedAt,
     DateTimeOffset DueDate,
+    DateTimeOffset? MaintenanceWindowDate,
     string Status
 );
 

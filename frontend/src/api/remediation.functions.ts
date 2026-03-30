@@ -36,6 +36,7 @@ export const createDecision = createServerFn({ method: 'POST' })
       workflowId: z.string().uuid().nullable().optional(),
       outcome: z.string(),
       justification: z.string().optional(),
+      maintenanceWindowDate: z.string().optional(),
       expiryDate: z.string().optional(),
       reEvaluationDate: z.string().optional(),
     })
@@ -130,6 +131,19 @@ export const generateRemediationAiSummary = createServerFn({ method: 'POST' })
   )
   .handler(async ({ context, data: { tenantSoftwareId } }) => {
     const data = await apiPost(`/software/${tenantSoftwareId}/remediation/ai-summary`, context, {})
+    return decisionAiSummarySchema.parse(data)
+  })
+
+export const reviewRemediationAiSummary = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      tenantSoftwareId: z.string().uuid(),
+      action: z.enum(['accept', 'edit', 'reject']),
+    })
+  )
+  .handler(async ({ context, data: { tenantSoftwareId, action } }) => {
+    const data = await apiPost(`/software/${tenantSoftwareId}/remediation/ai-summary/review`, context, { action })
     return decisionAiSummarySchema.parse(data)
   })
 

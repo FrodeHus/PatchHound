@@ -14,7 +14,8 @@ public record TenantSoftwareListItemDto(
     int ActiveVulnerabilityCount,
     int VersionCount,
     decimal? ExposureImpactScore,
-    DateTimeOffset? LastSeenAt
+    DateTimeOffset? LastSeenAt,
+    DateTimeOffset? MaintenanceWindowDate
 );
 
 public record TenantSoftwareFilterQuery(

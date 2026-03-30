@@ -21,6 +21,7 @@ export const remediationTaskListItemSchema = z.object({
   highOrWorseDeviceCount: z.number(),
   highestDeviceCriticality: z.string(),
   dueDate: isoDateTimeSchema,
+  maintenanceWindowDate: isoDateTimeSchema.nullable(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
   status: z.string(),
@@ -42,6 +43,7 @@ export const remediationTaskTeamStatusSchema = z.object({
   ownerTeamName: z.string(),
   status: z.string(),
   dueDate: isoDateTimeSchema,
+  maintenanceWindowDate: isoDateTimeSchema.nullable(),
   updatedAt: isoDateTimeSchema,
 })
 

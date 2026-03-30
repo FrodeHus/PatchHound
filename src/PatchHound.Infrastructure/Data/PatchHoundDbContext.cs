@@ -84,6 +84,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AIReport> AIReports => Set<AIReport>();
     public DbSet<SoftwareDescriptionJob> SoftwareDescriptionJobs => Set<SoftwareDescriptionJob>();
+    public DbSet<RemediationAiJob> RemediationAiJobs => Set<RemediationAiJob>();
     public DbSet<AssetTag> AssetTags => Set<AssetTag>();
     public DbSet<AssetRule> AssetRules => Set<AssetRule>();
     public DbSet<AssetRiskScore> AssetRiskScores => Set<AssetRiskScore>();
@@ -267,6 +268,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<SoftwareDescriptionJob>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<RemediationAiJob>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Team>()

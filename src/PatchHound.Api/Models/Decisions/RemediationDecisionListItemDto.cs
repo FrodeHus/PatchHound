@@ -7,6 +7,7 @@ public record RemediationDecisionListItemDto(
     string? Outcome,
     string? ApprovalStatus,
     DateTimeOffset? DecidedAt,
+    DateTimeOffset? MaintenanceWindowDate,
     DateTimeOffset? ExpiryDate,
     int TotalVulnerabilities,
     int CriticalCount,

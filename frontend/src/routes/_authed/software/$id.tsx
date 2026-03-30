@@ -102,6 +102,10 @@ function SoftwareDetailRoute() {
     queryKey: softwareQueryKeys.remediation(selectedTenantId, id),
     queryFn: () => fetchDecisionContext({ data: { tenantSoftwareId: id } }),
     enabled: canViewRemediation,
+    refetchInterval: (currentQuery) => {
+      const status = currentQuery.state.data?.aiSummary.status
+      return status === 'Queued' || status === 'Generating' ? 3000 : false
+    },
   })
 
   if (!detail || !installations || !vulnerabilities) {
@@ -142,7 +146,7 @@ function SoftwareDetailRoute() {
       }}
       canViewRemediation={canViewRemediation}
       remediationData={remediationQuery.data ?? null}
-      isRemediationLoading={remediationQuery.isLoading}
+      isRemediationLoading={remediationQuery.isLoading || remediationQuery.isFetching}
       remediationError={remediationQuery.isError}
       tenantSoftwareId={id}
     />

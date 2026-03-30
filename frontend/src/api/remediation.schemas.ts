@@ -17,6 +17,7 @@ export const remediationDecisionSchema = z.object({
   decidedAt: z.string(),
   approvedBy: z.string().uuid().nullable(),
   approvedAt: z.string().nullable(),
+  maintenanceWindowDate: z.string().nullable(),
   expiryDate: z.string().nullable(),
   reEvaluationDate: z.string().nullable(),
   latestRejection: z.object({
@@ -117,11 +118,25 @@ export const decisionSlaSchema = z.object({
 
 export const decisionAiSummarySchema = z.object({
   content: z.string().nullable(),
+  ownerRecommendation: z.string().nullable(),
+  analystAssessment: z.string().nullable(),
+  exceptionRecommendation: z.string().nullable(),
+  recommendedOutcome: z.string().nullable(),
+  recommendedPriority: z.string().nullable(),
+  status: z.string(),
+  isStale: z.boolean(),
+  reviewStatus: z.string().nullable(),
+  reviewedAt: z.string().nullable(),
+  reviewedByDisplayName: z.string().nullable(),
   generatedAt: z.string().nullable(),
+  requestedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
   providerType: z.string().nullable(),
   profileName: z.string().nullable(),
   model: z.string().nullable(),
   canGenerate: z.boolean(),
+  isGenerating: z.boolean(),
+  lastError: z.string().nullable(),
   unavailableMessage: z.string().nullable(),
 })
 
@@ -148,6 +163,7 @@ export const decisionListItemSchema = z.object({
   outcome: z.string().nullable(),
   approvalStatus: z.string().nullable(),
   decidedAt: z.string().nullable(),
+  maintenanceWindowDate: z.string().nullable(),
   expiryDate: z.string().nullable(),
   totalVulnerabilities: z.number(),
   criticalCount: z.number(),

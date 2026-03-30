@@ -94,6 +94,7 @@ export const tenantSoftwareListItemSchema = z.object({
   versionCount: z.number(),
   exposureImpactScore: z.number().nullable(),
   lastSeenAt: isoDateTimeSchema.nullable(),
+  maintenanceWindowDate: isoDateTimeSchema.nullable(),
 })
 
 export const tenantSoftwareInstallationSchema = z.object({

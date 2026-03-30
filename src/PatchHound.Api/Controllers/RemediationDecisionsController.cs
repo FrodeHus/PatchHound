@@ -23,6 +23,7 @@ public class RemediationDecisionsController(
     AnalystRecommendationService recommendationService,
     RemediationWorkflowAuthorizationService workflowAuthorizationService,
     RemediationWorkflowService workflowService,
+    RemediationAiJobService remediationAiJobService,
     PatchHoundDbContext dbContext,
     ITenantContext tenantContext
 ) : ControllerBase
@@ -60,7 +61,7 @@ public class RemediationDecisionsController(
             ct
         );
         await dbContext.SaveChangesAsync(ct);
-        await queryService.RefreshAiSummaryAsync(tenantId, tenantSoftwareId, ct);
+        await EnqueueAiDraftsAsync(tenantId, tenantSoftwareId, ct);
         return Ok(new EnsureRemediationWorkflowResponse(workflow.Id));
     }
 
@@ -73,6 +74,9 @@ public class RemediationDecisionsController(
         CancellationToken ct
     )
     {
+        if (tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
         if (!Enum.TryParse<RemediationOutcome>(request.Outcome, true, out var outcome))
             return BadRequest(new ProblemDetails { Title = "Invalid outcome value." });
 
@@ -88,6 +92,7 @@ public class RemediationDecisionsController(
             return BadRequest(new ProblemDetails { Title = result.Error });
 
         var vo = result.Value;
+        await EnqueueAiDraftsAsync(tenantId, tenantSoftwareId, ct);
         return Created("", new VulnerabilityOverrideDto(
             vo.Id, vo.TenantVulnerabilityId, vo.Outcome.ToString(), vo.Justification, vo.CreatedAt
         ));
@@ -154,7 +159,7 @@ public class RemediationDecisionsController(
             .FirstOrDefaultAsync(ct);
 
         var r = result.Value;
-        await queryService.RefreshAiSummaryAsync(tenantId, workflow.TenantSoftwareId, ct);
+        await EnqueueAiDraftsAsync(tenantId, workflow.TenantSoftwareId, ct);
         return Created("", new AnalystRecommendationDto(
             r.Id, r.TenantVulnerabilityId, r.RecommendedOutcome.ToString(),
             r.Rationale, r.PriorityOverride, r.AnalystId, analystDisplayName, r.CreatedAt
@@ -210,7 +215,7 @@ public class RemediationDecisionsController(
             if (!verificationResult.IsSuccess)
                 return BadRequest(new ProblemDetails { Title = verificationResult.Error });
 
-            await queryService.RefreshAiSummaryAsync(tenantId, workflow.TenantSoftwareId, ct);
+            await EnqueueAiDraftsAsync(tenantId, workflow.TenantSoftwareId, ct);
             return Ok();
         }
 
@@ -225,7 +230,7 @@ public class RemediationDecisionsController(
             if (!verificationResult.IsSuccess)
                 return BadRequest(new ProblemDetails { Title = verificationResult.Error });
 
-            await queryService.RefreshAiSummaryAsync(tenantId, workflow.TenantSoftwareId, ct);
+            await EnqueueAiDraftsAsync(tenantId, workflow.TenantSoftwareId, ct);
             return Ok();
         }
 
@@ -263,18 +268,19 @@ public class RemediationDecisionsController(
             tenantContext.CurrentUserId,
             request.ExpiryDate,
             request.ReEvaluationDate,
-            ct
+            ct,
+            request.MaintenanceWindowDate
         );
 
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
 
         var d = result.Value;
-        await queryService.RefreshAiSummaryAsync(tenantId, workflow.TenantSoftwareId, ct);
+        await EnqueueAiDraftsAsync(tenantId, workflow.TenantSoftwareId, ct);
         return Created("", new RemediationDecisionDto(
             d.Id, d.Outcome.ToString(), d.ApprovalStatus.ToString(),
             d.Justification, d.DecidedBy, d.DecidedAt,
-            d.ApprovedBy, d.ApprovedAt, d.ExpiryDate, d.ReEvaluationDate,
+            d.ApprovedBy, d.ApprovedAt, d.MaintenanceWindowDate, d.ExpiryDate, d.ReEvaluationDate,
             null,
             []
         ));
@@ -341,7 +347,7 @@ public class RemediationDecisionsController(
                 return BadRequest(new ProblemDetails { Title = "Action must be 'approve' or 'deny'." });
             }
 
-            await queryService.RefreshAiSummaryAsync(tenantId, workflow.TenantSoftwareId, ct);
+            await EnqueueAiDraftsAsync(tenantId, workflow.TenantSoftwareId, ct);
             return Ok();
         }
         catch (InvalidOperationException ex)
@@ -379,7 +385,7 @@ public class RemediationDecisionsController(
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
 
-        await queryService.RefreshAiSummaryAsync(tenantId, workflow.TenantSoftwareId, ct);
+        await EnqueueAiDraftsAsync(tenantId, workflow.TenantSoftwareId, ct);
         return Ok();
     }
 
@@ -393,19 +399,60 @@ public class RemediationDecisionsController(
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var result = await queryService.RefreshAiSummaryAsync(tenantId, tenantSoftwareId, ct);
-        if (result is null)
+        await EnqueueAiDraftsAsync(tenantId, tenantSoftwareId, ct);
+        var context = await queryService.BuildByTenantSoftwareAsync(tenantId, tenantSoftwareId, false, ct);
+        if (context is null)
             return NotFound(new ProblemDetails { Title = "Remediation context not found." });
 
-        if (!result.CanGenerate && string.IsNullOrWhiteSpace(result.Content))
+        if (!context.AiSummary.CanGenerate && string.IsNullOrWhiteSpace(context.AiSummary.Content))
         {
             return BadRequest(new ProblemDetails
             {
-                Title = result.UnavailableMessage ?? "No enabled default AI profile is configured for this tenant."
+                Title = context.AiSummary.UnavailableMessage ?? "No enabled default AI profile is configured for this tenant."
             });
         }
 
-        return Ok(result);
+        return Ok(context.AiSummary);
+    }
+
+    [HttpPost("ai-summary/review")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
+    public async Task<ActionResult<DecisionAiSummaryDto>> ReviewAiSummary(
+        Guid tenantSoftwareId,
+        [FromBody] ReviewDecisionAiSummaryRequest request,
+        CancellationToken ct
+    )
+    {
+        if (tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var tenantSoftware = await dbContext.TenantSoftware
+            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == tenantSoftwareId, ct);
+        if (tenantSoftware is null)
+            return NotFound(new ProblemDetails { Title = "Remediation context not found." });
+
+        var action = request.Action?.Trim();
+        if (string.IsNullOrWhiteSpace(action))
+            return BadRequest(new ProblemDetails { Title = "Review action is required." });
+
+        var reviewStatus = action.ToLowerInvariant() switch
+        {
+            "accept" => "Accepted",
+            "edit" => "Edited",
+            "reject" => "Rejected",
+            _ => null
+        };
+        if (reviewStatus is null)
+            return BadRequest(new ProblemDetails { Title = "Review action must be accept, edit, or reject." });
+
+        tenantSoftware.MarkRemediationAiReviewed(reviewStatus, tenantContext.CurrentUserId);
+        await dbContext.SaveChangesAsync(ct);
+
+        var context = await queryService.BuildByTenantSoftwareAsync(tenantId, tenantSoftwareId, false, ct);
+        if (context is null)
+            return NotFound(new ProblemDetails { Title = "Remediation context not found." });
+
+        return Ok(context.AiSummary);
     }
 
     [HttpGet("audit-trail")]
@@ -462,5 +509,10 @@ public class RemediationDecisionsController(
             .ToList();
 
         return Ok(dtos);
+    }
+
+    private async Task EnqueueAiDraftsAsync(Guid tenantId, Guid tenantSoftwareId, CancellationToken ct)
+    {
+        await remediationAiJobService.EnqueueAsync(tenantId, tenantSoftwareId, string.Empty, ct);
     }
 }

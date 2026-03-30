@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { Link } from "@tanstack/react-router";
 import { CircleQuestionMark, ShieldAlert, LayoutList, Sparkles } from 'lucide-react'
 import type {
@@ -68,6 +68,16 @@ export function SoftwareDetailPage({
     null;
 
   const pendingApproval = remediationData?.currentDecision?.approvalStatus === 'PendingApproval'
+  const [renderedAt] = useState(() => Date.now())
+  const maintenanceWindowDate = remediationData?.currentDecision?.maintenanceWindowDate ?? null
+  const maintenanceWindowHasPassed = maintenanceWindowDate
+    ? new Date(maintenanceWindowDate).getTime() < renderedAt
+    : false
+  const maintenanceWindowMissed = Boolean(
+    maintenanceWindowDate
+      && maintenanceWindowHasPassed
+      && detail.activeVulnerabilityCount > 0
+  )
 
   return (
     <section className="space-y-5">
@@ -135,6 +145,48 @@ export function SoftwareDetailPage({
                 value={String(detail.sourceAliases.length)}
               />
             </div>
+
+            {maintenanceWindowDate ? (
+              <section
+                className={`rounded-[1.15rem] border px-4 py-3 ${
+                  maintenanceWindowMissed
+                    ? 'border-destructive/35 bg-destructive/10'
+                    : 'border-border/70 bg-background/55'
+                }`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p
+                      className={`text-[11px] uppercase tracking-[0.18em] ${
+                        maintenanceWindowMissed
+                          ? 'text-destructive'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
+                      Maintenance window
+                    </p>
+                    <p
+                      className={`mt-2 text-sm ${
+                        maintenanceWindowMissed ? 'font-semibold text-destructive' : 'text-foreground'
+                      }`}
+                    >
+                      {formatDateTime(maintenanceWindowDate)}
+                    </p>
+                  </div>
+                  <div className="max-w-xl text-sm">
+                    {maintenanceWindowMissed ? (
+                      <p className="text-destructive">
+                        This date has passed, but {detail.activeVulnerabilityCount} open vulnerabilit{detail.activeVulnerabilityCount === 1 ? 'y remains' : 'ies remain'} in scope. That suggests the planned maintenance did not complete as expected.
+                      </p>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        Planned date for patch execution to be in place for this software scope.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </section>
+            ) : null}
 
           </div>
 

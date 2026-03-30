@@ -22,6 +22,7 @@ public class RemediationTaskQueryService(
         Guid OwnerTeamId,
         string OwnerTeamName,
         DateTimeOffset DueDate,
+        DateTimeOffset? MaintenanceWindowDate,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
         string Status,
@@ -40,6 +41,7 @@ public class RemediationTaskQueryService(
         Guid OwnerTeamId,
         string OwnerTeamName,
         DateTimeOffset DueDate,
+        DateTimeOffset? MaintenanceWindowDate,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
         string Status,
@@ -79,6 +81,7 @@ public class RemediationTaskQueryService(
                 row.OwnerTeamId,
                 row.OwnerTeamName,
                 row.DueDate,
+                row.MaintenanceWindowDate,
                 row.CreatedAt,
                 row.UpdatedAt,
                 row.Status,
@@ -101,6 +104,7 @@ public class RemediationTaskQueryService(
                 row.OwnerTeamId,
                 row.OwnerTeamName,
                 row.DueDate,
+                row.MaintenanceWindowDate,
                 row.CreatedAt,
                 row.UpdatedAt,
                 row.Status,
@@ -115,6 +119,7 @@ public class RemediationTaskQueryService(
                 group.Key.OwnerTeamId,
                 group.Key.OwnerTeamName,
                 group.Key.DueDate,
+                group.Key.MaintenanceWindowDate,
                 group.Key.CreatedAt,
                 group.Key.UpdatedAt,
                 group.Key.Status,
@@ -187,6 +192,7 @@ public class RemediationTaskQueryService(
                     item.HighOrWorseDeviceCount,
                     item.HighestDeviceCriticality.ToString(),
                     item.DueDate,
+                    item.MaintenanceWindowDate,
                     item.CreatedAt,
                     item.UpdatedAt,
                     item.Status,
@@ -264,7 +270,8 @@ public class RemediationTaskQueryService(
                     assignedBy,
                     expiryDate: null,
                     reEvaluationDate: null,
-                    ct
+                    ct,
+                    maintenanceWindowDate: null
                 );
 
                 if (createdDecision.IsSuccess)
@@ -292,13 +299,15 @@ public class RemediationTaskQueryService(
     )
     {
         var tasks = await dbContext.PatchingTasks.AsNoTracking()
+            .Include(task => task.RemediationDecision)
             .Where(task => task.TenantId == tenantId && task.TenantSoftwareId == tenantSoftwareId)
             .ToListAsync(ct);
 
         var latestTasksByTeamId = tasks
             .GroupBy(task => task.OwnerTeamId)
             .Select(group => group
-                .OrderByDescending(task => task.UpdatedAt)
+                .OrderByDescending(task => task.RemediationDecision.MaintenanceWindowDate)
+                .ThenByDescending(task => task.UpdatedAt)
                 .ThenByDescending(task => task.CreatedAt)
                 .First())
             .ToList();
@@ -319,6 +328,7 @@ public class RemediationTaskQueryService(
                 teamNamesById.GetValueOrDefault(task.OwnerTeamId) ?? "Unknown team",
                 task.Status.ToString(),
                 task.DueDate,
+                task.RemediationDecision.MaintenanceWindowDate,
                 task.UpdatedAt
             ))
             .OrderBy(item => item.OwnerTeamName)
@@ -337,6 +347,8 @@ public class RemediationTaskQueryService(
         var query =
             from task in dbContext.PatchingTasks.AsNoTracking()
             join team in dbContext.Teams.AsNoTracking() on task.OwnerTeamId equals team.Id
+            join decision in dbContext.RemediationDecisions.AsNoTracking()
+                on task.RemediationDecisionId equals decision.Id
             join installation in dbContext.NormalizedSoftwareInstallations.AsNoTracking()
                 on task.TenantSoftwareId equals installation.TenantSoftwareId
             join tenantSoftware in dbContext.TenantSoftware.AsNoTracking()
@@ -366,6 +378,7 @@ public class RemediationTaskQueryService(
                 task.OwnerTeamId,
                 team.Name,
                 task.DueDate,
+                decision.MaintenanceWindowDate,
                 task.CreatedAt,
                 task.UpdatedAt,
                 task.Status.ToString(),
