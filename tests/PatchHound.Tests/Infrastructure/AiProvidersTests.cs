@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Models;
@@ -133,7 +134,7 @@ public class AiProvidersTests
                 ),
             }
         );
-        var provider = new OpenAiProvider(new HttpClient(handler));
+        var provider = new OpenAiProvider(new HttpClient(handler), NullLogger<OpenAiProvider>.Instance);
         var request = BuildRequest(tenantId);
         var profile = TenantAiProfileFactory.Create(
             tenantId,
@@ -169,7 +170,7 @@ public class AiProvidersTests
                 ),
             }
         );
-        var provider = new OpenAiProvider(new HttpClient(handler));
+        var provider = new OpenAiProvider(new HttpClient(handler), NullLogger<OpenAiProvider>.Instance);
         var profile = TenantAiProfileFactory.Create(
             tenantId,
             providerType: TenantAiProviderType.OpenAi,

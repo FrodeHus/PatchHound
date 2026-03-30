@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using PatchHound.Core.Common;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
@@ -11,10 +12,12 @@ namespace PatchHound.Infrastructure.AiProviders;
 public class OpenAiProvider : IAiReportProvider
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<OpenAiProvider> _logger;
 
-    public OpenAiProvider(HttpClient httpClient)
+    public OpenAiProvider(HttpClient httpClient, ILogger<OpenAiProvider> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
     }
 
     public TenantAiProviderType ProviderType => TenantAiProviderType.OpenAi;
@@ -177,7 +180,7 @@ public class OpenAiProvider : IAiReportProvider
                 },
                 temperature = decimal.ToDouble(profile.Profile.Temperature),
                 top_p = profile.Profile.TopP is decimal topP ? decimal.ToDouble(topP) : (double?)null,
-                max_tokens = maxTokens,
+                max_completion_tokens = maxTokens,
             }
         );
 
@@ -185,6 +188,14 @@ public class OpenAiProvider : IAiReportProvider
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
         {
+            _logger.LogWarning(
+                "OpenAI chat completion failed for model {Model} against {BaseUrl}. Status {StatusCode} {ReasonPhrase}. Response: {ResponseBody}",
+                profile.Profile.Model,
+                profile.Profile.BaseUrl,
+                (int)response.StatusCode,
+                response.ReasonPhrase,
+                string.IsNullOrWhiteSpace(body) ? "<empty>" : body
+            );
             throw new HttpRequestException(
                 AiProviderErrorParser.FormatHttpError(
                     "OpenAI",
