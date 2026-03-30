@@ -212,6 +212,7 @@ export function RemediationWorkbench({
                   Pending approval
                 </SelectItem>
                 <SelectItem value="Approved">Approved</SelectItem>
+                <SelectItem value="Reopened">Reopened</SelectItem>
               </SelectContent>
             </Select>
           </LabeledFilter>

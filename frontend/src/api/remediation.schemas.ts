@@ -19,6 +19,8 @@ export const remediationDecisionSchema = z.object({
   approvedAt: z.string().nullable(),
   expiryDate: z.string().nullable(),
   reEvaluationDate: z.string().nullable(),
+  reopenCount: z.number(),
+  reopenedAt: z.string().nullable(),
   latestRejection: z.object({
     comment: z.string().nullable(),
     rejectedAt: z.string().nullable(),

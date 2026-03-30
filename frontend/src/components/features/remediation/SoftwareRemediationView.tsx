@@ -211,6 +211,13 @@ export function SoftwareRemediationView({
                     <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(approvalStatusTone(data.currentDecision.approvalStatus))}`}>
                       {approvalStatusLabel(data.currentDecision.approvalStatus)}
                     </span>
+                    {data.currentDecision.reopenCount > 0 ? (
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${toneBadge('warning')}`}>
+                        {data.currentDecision.reopenCount === 1
+                          ? 'Reopened'
+                          : `Reopened (${data.currentDecision.reopenCount}x)`}
+                      </span>
+                    ) : null}
                   </>
                 ) : null}
               </div>
@@ -390,6 +397,7 @@ export function SoftwareRemediationView({
 
       <RemediationVulnDrawer
         vuln={selectedVuln}
+        reopenCount={data.currentDecision?.reopenCount ?? 0}
         isOpen={selectedVuln !== null}
         onOpenChange={(open) => { if (!open) setSelectedVuln(null) }}
       />
@@ -763,8 +771,9 @@ function StageRemediationDecisionPanel({
 }) {
   const latestRecommendation = data.recommendations[0] ?? null
   const rejectedDecision = data.currentDecision?.approvalStatus === 'Rejected'
+  const reopenedDecision = data.currentDecision?.approvalStatus === 'Reopened'
 
-  if (!data.currentDecision || rejectedDecision) {
+  if (!data.currentDecision || rejectedDecision || reopenedDecision) {
     return (
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
         <div className="space-y-4">
@@ -794,6 +803,46 @@ function StageRemediationDecisionPanel({
               </div>
 
               <div className="rounded-2xl border border-destructive/30 bg-background/70 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(data.currentDecision.outcome))}`}>
+                    {outcomeLabel(data.currentDecision.outcome)}
+                  </span>
+                  <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(approvalStatusTone(data.currentDecision.approvalStatus))}`}>
+                    {approvalStatusLabel(data.currentDecision.approvalStatus)}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-foreground/90">
+                  {data.currentDecision.justification || 'No justification was provided for this decision.'}
+                </p>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Update this decision below or resubmit the same posture if it is still the correct remediation choice.
+                </p>
+              </div>
+            </>
+          ) : reopenedDecision && data.currentDecision ? (
+            <>
+              <div className="rounded-2xl border border-amber-500/40 bg-amber-500/6 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-full border border-amber-400/30 bg-amber-500/10 p-2 text-amber-700">
+                    <XCircle className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-amber-700">
+                      Decision reopened
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-foreground/90">
+                      Vulnerabilities have resurfaced for this software. Please re-evaluate the current outcome or approve to keep the existing decision.
+                    </p>
+                    {data.currentDecision.reopenedAt ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Reopened {formatDateTime(data.currentDecision.reopenedAt)}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-amber-400/30 bg-background/70 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(data.currentDecision.outcome))}`}>
                     {outcomeLabel(data.currentDecision.outcome)}
@@ -1526,6 +1575,8 @@ function buildDecisionTimelineTitle(action: string, userDisplayName: string | nu
       return `This remediation decision expired because approval was not completed in time.`
     case 'Expired':
       return `${actor} closed or expired this remediation decision.`
+    case 'Reopened':
+      return `This remediation decision was reopened because vulnerabilities resurfaced.`
     case 'Updated':
       return `${actor} updated this remediation decision.`
     default:

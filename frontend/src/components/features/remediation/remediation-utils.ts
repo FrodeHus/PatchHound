@@ -25,6 +25,7 @@ export function approvalStatusTone(status: string): Tone {
     case 'PendingApproval': return 'warning'
     case 'Rejected': return 'danger'
     case 'Expired': return 'neutral'
+    case 'Reopened': return 'warning'
     default: return 'neutral'
   }
 }
@@ -35,6 +36,7 @@ export function approvalStatusLabel(status: string): string {
     case 'Approved': return 'Approved'
     case 'Rejected': return 'Rejected'
     case 'Expired': return 'Expired'
+    case 'Reopened': return 'Reopened'
     default: return status
   }
 }

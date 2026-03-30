@@ -5,6 +5,7 @@ import { severityTone, outcomeLabel, outcomeTone } from './remediation-utils'
 
 type RemediationVulnDrawerProps = {
   vuln: DecisionVuln | null
+  reopenCount: number
   isOpen: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -18,7 +19,7 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
-export function RemediationVulnDrawer({ vuln, isOpen, onOpenChange }: RemediationVulnDrawerProps) {
+export function RemediationVulnDrawer({ vuln, reopenCount, isOpen, onOpenChange }: RemediationVulnDrawerProps) {
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent
@@ -32,6 +33,12 @@ export function RemediationVulnDrawer({ vuln, isOpen, onOpenChange }: Remediatio
 
         {vuln ? (
           <div className="space-y-5 p-4">
+            {reopenCount > 0 ? (
+              <div className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${toneBadge('warning')}`}>
+                {reopenCount === 1 ? 'Reopened' : `Reopened (${reopenCount}x)`}
+              </div>
+            ) : null}
+
             {/* Severity & Score */}
             <section className="space-y-1">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Severity</h4>
