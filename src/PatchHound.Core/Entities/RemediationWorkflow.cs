@@ -84,6 +84,17 @@ public class RemediationWorkflow
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    public void Reactivate(RemediationWorkflowStage stage)
+    {
+        if (Status != RemediationWorkflowStatus.Completed)
+            throw new InvalidOperationException(
+                $"Cannot reactivate a workflow with status '{Status}'.");
+
+        Status = RemediationWorkflowStatus.Active;
+        CompletedAt = null;
+        MoveToStage(stage);
+    }
+
     public void ReassignTenantSoftware(Guid newTenantSoftwareId)
     {
         TenantSoftwareId = newTenantSoftwareId;
