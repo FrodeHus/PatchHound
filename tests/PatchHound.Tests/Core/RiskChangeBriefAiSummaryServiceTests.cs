@@ -24,8 +24,6 @@ public class RiskChangeBriefAiSummaryServiceTests
         _researchService = Substitute.For<ITenantAiResearchService>();
         _provider = Substitute.For<IAiReportProvider>();
         _provider.ProviderType.Returns(TenantAiProviderType.OpenAi);
-        _provider.ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(AiProviderValidationResult.Success()));
         _textGenerationService = new TenantAiTextGenerationService([_provider], _resolver);
         _service = new RiskChangeBriefAiSummaryService(
             _resolver,

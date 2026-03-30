@@ -53,21 +53,6 @@ public class TenantAiTextGenerationService
             );
         }
 
-        AiProviderValidationResult validationResult;
-        try
-        {
-            validationResult = await provider.ValidateAsync(resolvedProfile, ct);
-        }
-        catch (Exception ex)
-        {
-            return Result<AiTextGenerationResult>.Failure($"AI provider validation failed: {ex.Message}");
-        }
-
-        if (!validationResult.IsSuccess)
-        {
-            return Result<AiTextGenerationResult>.Failure(validationResult.Error);
-        }
-
         string content;
         try
         {

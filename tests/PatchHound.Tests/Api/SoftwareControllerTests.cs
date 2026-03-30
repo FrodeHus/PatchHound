@@ -333,9 +333,6 @@ public class SoftwareControllerTests : IDisposable
             );
         _aiProvider.ProviderType.Returns(TenantAiProviderType.Ollama);
         _aiProvider
-            .ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
-            .Returns(AiProviderValidationResult.Success());
-        _aiProvider
             .GenerateTextAsync(Arg.Any<AiTextGenerationRequest>(), Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
             .Returns("# Software report");
 
@@ -386,9 +383,6 @@ public class SoftwareControllerTests : IDisposable
                 Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, string.Empty))
             );
         _aiProvider.ProviderType.Returns(TenantAiProviderType.Ollama);
-        _aiProvider
-            .ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
-            .Returns(AiProviderValidationResult.Success());
         _aiProvider
             .GenerateTextAsync(Arg.Any<AiTextGenerationRequest>(), Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
             .Returns("# Software report");

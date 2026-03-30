@@ -13,7 +13,17 @@ public record DecisionContextDto(
     List<DecisionVulnDto> TopVulnerabilities,
     DecisionRiskDto? RiskScore,
     DecisionSlaDto? Sla,
-    string? AiNarrative
+    DecisionAiSummaryDto AiSummary
+);
+
+public record DecisionAiSummaryDto(
+    string? Content,
+    DateTimeOffset? GeneratedAt,
+    string? ProviderType,
+    string? ProfileName,
+    string? Model,
+    bool CanGenerate,
+    string? UnavailableMessage
 );
 
 public record DecisionSummaryDto(

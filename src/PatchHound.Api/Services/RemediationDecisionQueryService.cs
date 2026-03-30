@@ -1,6 +1,9 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Decisions;
+using PatchHound.Core.Common;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
@@ -15,11 +18,13 @@ public class RemediationDecisionQueryService(
     PatchHoundDbContext dbContext,
     TenantSnapshotResolver snapshotResolver,
     SlaService slaService,
-    ITenantAiConfigurationResolver aiConfigResolver,
     TenantAiTextGenerationService aiTextGenerationService,
     ITenantContext tenantContext
 )
 {
+    private const string MissingAiProfileMessage =
+        "Set up and enable a default AI profile for this tenant to get a plain-language risk summary here.";
+
     private sealed record OpenEpisodeRow(
         Guid AssetId,
         Guid VulnerabilityDefinitionId,
@@ -626,17 +631,6 @@ public class RemediationDecisionQueryService(
             );
         }
 
-        // AI narrative (non-blocking, swallow errors)
-        string? aiNarrative = null;
-        try
-        {
-            aiNarrative = await GenerateAiNarrativeAsync(tenantId, softwareName, summary, topVulns.Take(5).ToList(), ct);
-        }
-        catch
-        {
-            // AI narrative is optional
-        }
-
         // Decision DTO
         RemediationDecisionDto? decisionDto = null;
         if (decision is not null)
@@ -766,6 +760,19 @@ public class RemediationDecisionQueryService(
             decision
         );
 
+        var aiSummary = await ResolveAiSummaryAsync(
+            tenantId,
+            tenantSoftwareId,
+            softwareName,
+            workflowState,
+            decisionDto,
+            recommendationDtos,
+            topVulns.Take(5).ToList(),
+            summary,
+            forceRefresh: false,
+            ct
+        );
+
         return new DecisionContextDto(
             tenantSoftwareId,
             softwareName,
@@ -785,7 +792,38 @@ public class RemediationDecisionQueryService(
             topVulns.Take(5).ToList(),
             riskDto,
             slaDto,
-            aiNarrative
+            aiSummary
+        );
+    }
+
+    public async Task<DecisionAiSummaryDto?> RefreshAiSummaryAsync(
+        Guid tenantId,
+        Guid tenantSoftwareId,
+        CancellationToken ct
+    )
+    {
+        var context = await BuildByTenantSoftwareAsync(tenantId, tenantSoftwareId, ct);
+        if (context is null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.AiSummary.Content))
+        {
+            return context.AiSummary;
+        }
+
+        return await ResolveAiSummaryAsync(
+            tenantId,
+            tenantSoftwareId,
+            context.SoftwareName,
+            context.WorkflowState,
+            context.CurrentDecision,
+            context.Recommendations,
+            context.TopVulnerabilities,
+            context.Summary,
+            forceRefresh: true,
+            ct
         );
     }
 
@@ -1196,7 +1234,93 @@ public class RemediationDecisionQueryService(
         return new DateTimeOffset(utc.Year, utc.Month, utc.Day, 0, 0, 0, TimeSpan.Zero);
     }
 
-    private async Task<string?> GenerateAiNarrativeAsync(
+    private async Task<DecisionAiSummaryDto> ResolveAiSummaryAsync(
+        Guid tenantId,
+        Guid tenantSoftwareId,
+        string softwareName,
+        DecisionWorkflowStateDto workflowState,
+        RemediationDecisionDto? decisionDto,
+        List<AnalystRecommendationDto> recommendations,
+        List<DecisionVulnDto> topVulns,
+        DecisionSummaryDto summary,
+        bool forceRefresh,
+        CancellationToken ct
+    )
+    {
+        var tenantSoftware = await dbContext.TenantSoftware
+            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == tenantSoftwareId, ct);
+        if (tenantSoftware is null)
+        {
+            return new DecisionAiSummaryDto(null, null, null, null, null, false, MissingAiProfileMessage);
+        }
+
+        var inputHash = HashAiSummaryInput(
+            softwareName,
+            workflowState,
+            decisionDto,
+            recommendations,
+            topVulns,
+            summary
+        );
+
+        var hasEnabledDefaultProfile = await dbContext.TenantAiProfiles.AsNoTracking()
+            .AnyAsync(item => item.TenantId == tenantId && item.IsDefault && item.IsEnabled, ct);
+
+        if (!forceRefresh
+            && !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiSummaryContent)
+            && string.Equals(tenantSoftware.RemediationAiSummaryInputHash, inputHash, StringComparison.Ordinal))
+        {
+            return new DecisionAiSummaryDto(
+                tenantSoftware.RemediationAiSummaryContent,
+                tenantSoftware.RemediationAiSummaryGeneratedAt,
+                NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryProviderType),
+                NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryProfileName),
+                NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryModel),
+                hasEnabledDefaultProfile,
+                hasEnabledDefaultProfile ? null : MissingAiProfileMessage
+            );
+        }
+
+        if (!hasEnabledDefaultProfile)
+        {
+            return new DecisionAiSummaryDto(null, null, null, null, null, false, MissingAiProfileMessage);
+        }
+
+        var generatedSummary = await GenerateAiNarrativeAsync(tenantId, softwareName, summary, topVulns, ct);
+        if (!generatedSummary.IsSuccess)
+        {
+            return new DecisionAiSummaryDto(
+                null,
+                null,
+                null,
+                null,
+                null,
+                true,
+                "AI input is available, but the summary could not be generated right now. Try Ask AI again."
+            );
+        }
+
+        tenantSoftware.StoreRemediationAiSummary(
+            generatedSummary.Value.Content,
+            inputHash,
+            generatedSummary.Value.ProviderType,
+            generatedSummary.Value.ProfileName,
+            generatedSummary.Value.Model
+        );
+        await dbContext.SaveChangesAsync(ct);
+
+        return new DecisionAiSummaryDto(
+            generatedSummary.Value.Content,
+            generatedSummary.Value.GeneratedAt,
+            generatedSummary.Value.ProviderType,
+            generatedSummary.Value.ProfileName,
+            generatedSummary.Value.Model,
+            true,
+            null
+        );
+    }
+
+    private async Task<Result<AiTextGenerationResult>> GenerateAiNarrativeAsync(
         Guid tenantId,
         string softwareName,
         DecisionSummaryDto summary,
@@ -1204,30 +1328,56 @@ public class RemediationDecisionQueryService(
         CancellationToken ct
     )
     {
-        var resolvedProfileResult = await aiConfigResolver.ResolveDefaultAsync(tenantId, ct);
-        if (!resolvedProfileResult.IsSuccess)
-            return null;
-
-        var resolvedProfile = resolvedProfileResult.Value;
-
         var topVulnSummary = string.Join("; ", topVulns.Select(v =>
-            $"{v.ExternalId} ({v.VendorSeverity}, score={v.EpisodeRiskScore?.ToString("F0") ?? "N/A"}, exploited={v.KnownExploited})"
+            $"{v.ExternalId} ({v.Title}, severity={v.EffectiveSeverity ?? v.VendorSeverity}, risk={v.EpisodeRiskScore?.ToString("F0") ?? v.EffectiveScore?.ToString("F1") ?? "N/A"}, knownExploited={v.KnownExploited}, publicExploit={v.PublicExploit}, activeAlert={v.ActiveAlert})"
         ));
 
         var request = new AiTextGenerationRequest(
-            "You are a PatchHound remediation analyst. Write one concise paragraph (2-3 sentences) summarizing the remediation context for a software title across its active versions. Focus on risk level, key vulnerabilities, and recommended action urgency. Do not use bullets, headings, or markdown.",
-            $"Software: {softwareName}. Total vulnerabilities: {summary.TotalVulnerabilities} (Critical: {summary.CriticalCount}, High: {summary.HighCount}, Medium: {summary.MediumCount}, Low: {summary.LowCount}). Known exploits: {summary.WithKnownExploit}. Active alerts: {summary.WithActiveAlert}. Top vulnerabilities: {topVulnSummary}.",
+            "You explain remediation risk to non-security readers. Write either one short paragraph or 3-5 short bullet points. Use plain language. Focus on what could happen, what is affected, and why it matters now. Avoid jargon, hype, CVSS talk, and markdown headings. Do not invent facts.",
+            $"Software: {softwareName}. Open vulnerabilities in scope: {summary.TotalVulnerabilities} (Critical: {summary.CriticalCount}, High: {summary.HighCount}, Medium: {summary.MediumCount}, Low: {summary.LowCount}). Known exploited vulnerabilities: {summary.WithKnownExploit}. Vulnerabilities with active alerts: {summary.WithActiveAlert}. Top risk drivers: {topVulnSummary}.",
             ExternalContext: null,
             UseProviderNativeWebResearch: false
         );
 
-        var result = await aiTextGenerationService.GenerateAsync(
-            tenantId,
-            resolvedProfile.Profile.Id,
-            request,
-            ct
+        return await aiTextGenerationService.GenerateAsync(tenantId, null, request, ct);
+    }
+
+    private static string HashAiSummaryInput(
+        string softwareName,
+        DecisionWorkflowStateDto workflowState,
+        RemediationDecisionDto? decisionDto,
+        List<AnalystRecommendationDto> recommendations,
+        List<DecisionVulnDto> topVulns,
+        DecisionSummaryDto summary
+    )
+    {
+        var serialized = string.Join(
+            "|",
+            softwareName.Trim(),
+            workflowState.CurrentStage,
+            workflowState.CurrentStageDescription,
+            decisionDto?.Outcome ?? string.Empty,
+            decisionDto?.ApprovalStatus ?? string.Empty,
+            decisionDto?.Justification ?? string.Empty,
+            string.Join(";", recommendations.Select(item =>
+                $"{item.Id}:{item.RecommendedOutcome}:{item.Rationale}:{item.PriorityOverride}:{item.CreatedAt:O}"
+            )),
+            string.Join(";", topVulns.Select(item =>
+                $"{item.TenantVulnerabilityId}:{item.ExternalId}:{item.EffectiveSeverity}:{item.EpisodeRiskScore}:{item.KnownExploited}:{item.PublicExploit}:{item.ActiveAlert}:{item.OverrideOutcome}"
+            )),
+            summary.TotalVulnerabilities,
+            summary.CriticalCount,
+            summary.HighCount,
+            summary.MediumCount,
+            summary.LowCount,
+            summary.WithKnownExploit,
+            summary.WithActiveAlert
         );
 
-        return result.IsSuccess ? result.Value.Content : null;
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(serialized));
+        return Convert.ToHexString(bytes);
     }
+
+    private static string? NullIfWhiteSpace(string value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
 }

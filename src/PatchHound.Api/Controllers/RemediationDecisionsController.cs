@@ -60,6 +60,7 @@ public class RemediationDecisionsController(
             ct
         );
         await dbContext.SaveChangesAsync(ct);
+        await queryService.RefreshAiSummaryAsync(tenantId, tenantSoftwareId, ct);
         return Ok(new EnsureRemediationWorkflowResponse(workflow.Id));
     }
 
@@ -153,6 +154,7 @@ public class RemediationDecisionsController(
             .FirstOrDefaultAsync(ct);
 
         var r = result.Value;
+        await queryService.RefreshAiSummaryAsync(tenantId, workflow.TenantSoftwareId, ct);
         return Created("", new AnalystRecommendationDto(
             r.Id, r.TenantVulnerabilityId, r.RecommendedOutcome.ToString(),
             r.Rationale, r.PriorityOverride, r.AnalystId, analystDisplayName, r.CreatedAt
@@ -208,6 +210,7 @@ public class RemediationDecisionsController(
             if (!verificationResult.IsSuccess)
                 return BadRequest(new ProblemDetails { Title = verificationResult.Error });
 
+            await queryService.RefreshAiSummaryAsync(tenantId, workflow.TenantSoftwareId, ct);
             return Ok();
         }
 
@@ -222,6 +225,7 @@ public class RemediationDecisionsController(
             if (!verificationResult.IsSuccess)
                 return BadRequest(new ProblemDetails { Title = verificationResult.Error });
 
+            await queryService.RefreshAiSummaryAsync(tenantId, workflow.TenantSoftwareId, ct);
             return Ok();
         }
 
@@ -266,6 +270,7 @@ public class RemediationDecisionsController(
             return BadRequest(new ProblemDetails { Title = result.Error });
 
         var d = result.Value;
+        await queryService.RefreshAiSummaryAsync(tenantId, workflow.TenantSoftwareId, ct);
         return Created("", new RemediationDecisionDto(
             d.Id, d.Outcome.ToString(), d.ApprovalStatus.ToString(),
             d.Justification, d.DecidedBy, d.DecidedAt,
@@ -336,6 +341,7 @@ public class RemediationDecisionsController(
                 return BadRequest(new ProblemDetails { Title = "Action must be 'approve' or 'deny'." });
             }
 
+            await queryService.RefreshAiSummaryAsync(tenantId, workflow.TenantSoftwareId, ct);
             return Ok();
         }
         catch (InvalidOperationException ex)
@@ -373,7 +379,33 @@ public class RemediationDecisionsController(
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
 
+        await queryService.RefreshAiSummaryAsync(tenantId, workflow.TenantSoftwareId, ct);
         return Ok();
+    }
+
+    [HttpPost("ai-summary")]
+    [Authorize(Policy = Policies.GenerateAiReports)]
+    public async Task<ActionResult<DecisionAiSummaryDto>> GenerateAiSummary(
+        Guid tenantSoftwareId,
+        CancellationToken ct
+    )
+    {
+        if (tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var result = await queryService.RefreshAiSummaryAsync(tenantId, tenantSoftwareId, ct);
+        if (result is null)
+            return NotFound(new ProblemDetails { Title = "Remediation context not found." });
+
+        if (!result.CanGenerate && string.IsNullOrWhiteSpace(result.Content))
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = result.UnavailableMessage ?? "No enabled default AI profile is configured for this tenant."
+            });
+        }
+
+        return Ok(result);
     }
 
     [HttpGet("audit-trail")]

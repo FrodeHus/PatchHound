@@ -24,6 +24,8 @@ public class RemediationDecisionsControllerTests : IDisposable
     private readonly Guid _userId = Guid.NewGuid();
     private readonly ITenantContext _tenantContext;
     private readonly PatchHoundDbContext _dbContext;
+    private readonly IAiReportProvider _aiProvider;
+    private readonly ITenantAiConfigurationResolver _aiConfigResolver;
     private readonly RemediationDecisionService _decisionService;
     private readonly RemediationWorkflowService _workflowService;
     private readonly RemediationDecisionsController _controller;
@@ -45,6 +47,8 @@ public class RemediationDecisionsControllerTests : IDisposable
             TestServiceProviderFactory.Create(_tenantContext)
         );
 
+        _aiProvider = Substitute.For<IAiReportProvider>();
+        _aiConfigResolver = Substitute.For<ITenantAiConfigurationResolver>();
         _workflowService = new RemediationWorkflowService(_dbContext);
         var notificationService = Substitute.For<INotificationService>();
         var patchingTaskService = new PatchingTaskService(_dbContext, new SlaService(), _workflowService, notificationService);
@@ -62,13 +66,11 @@ public class RemediationDecisionsControllerTests : IDisposable
             patchingTaskService
         );
         var recommendationService = new AnalystRecommendationService(_dbContext, _workflowService);
-        var aiConfigResolver = Substitute.For<ITenantAiConfigurationResolver>();
         var queryService = new RemediationDecisionQueryService(
             _dbContext,
             new TenantSnapshotResolver(_dbContext),
             new SlaService(),
-            aiConfigResolver,
-            new TenantAiTextGenerationService(Array.Empty<IAiReportProvider>(), aiConfigResolver),
+            new TenantAiTextGenerationService([_aiProvider], _aiConfigResolver),
             _tenantContext
         );
         var authorizationService = new RemediationWorkflowAuthorizationService(_dbContext, _tenantContext);
@@ -88,6 +90,60 @@ public class RemediationDecisionsControllerTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
+    }
+
+    [Fact]
+    public async Task GetDecisionContext_WhenAiProfileIsMissing_ReturnsSetupGuidance()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+
+        var action = await _controller.GetDecisionContext(graph.TenantSoftware.Id, CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<DecisionContextDto>().Subject;
+        payload.AiSummary.Content.Should().BeNull();
+        payload.AiSummary.CanGenerate.Should().BeFalse();
+        payload.AiSummary.UnavailableMessage.Should().Contain("Set up and enable a default AI profile");
+    }
+
+    [Fact]
+    public async Task GenerateAiSummary_WhenEnabledProfileExists_PersistsSummary()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var profile = TenantAiProfileFactory.Create(
+            _tenantId,
+            providerType: TenantAiProviderType.Ollama,
+            name: "Default AI",
+            model: "llama3",
+            systemPrompt: "system"
+        );
+        await _dbContext.TenantAiProfiles.AddAsync(profile);
+        await _dbContext.SaveChangesAsync();
+
+        _aiProvider.ProviderType.Returns(TenantAiProviderType.Ollama);
+        _aiProvider
+            .GenerateTextAsync(
+                Arg.Any<AiTextGenerationRequest>(),
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<CancellationToken>()
+            )
+            .Returns("- Attackers could use these issues to compromise affected devices.\n- Prioritize this software because the highest-risk vulnerabilities are still open.");
+        _aiConfigResolver
+            .ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, string.Empty)));
+
+        var action = await _controller.GenerateAiSummary(graph.TenantSoftware.Id, CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<DecisionAiSummaryDto>().Subject;
+        payload.Content.Should().Contain("Attackers could use these issues");
+        payload.CanGenerate.Should().BeTrue();
+
+        var updatedTenantSoftware = await _dbContext.TenantSoftware
+            .IgnoreQueryFilters()
+            .FirstAsync(item => item.Id == graph.TenantSoftware.Id);
+        updatedTenantSoftware.RemediationAiSummaryContent.Should().Contain("Attackers could use these issues");
+        updatedTenantSoftware.RemediationAiSummaryGeneratedAt.Should().NotBeNull();
     }
 
     [Fact]
@@ -303,7 +359,6 @@ public class RemediationDecisionsControllerTests : IDisposable
             _dbContext,
             new TenantSnapshotResolver(_dbContext),
             new SlaService(),
-            aiConfigResolver,
             new TenantAiTextGenerationService(Array.Empty<IAiReportProvider>(), aiConfigResolver),
             _tenantContext
         );

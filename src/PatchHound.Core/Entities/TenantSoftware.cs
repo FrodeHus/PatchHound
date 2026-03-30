@@ -8,6 +8,12 @@ public class TenantSoftware
     public Guid NormalizedSoftwareId { get; private set; }
     public DateTimeOffset FirstSeenAt { get; private set; }
     public DateTimeOffset LastSeenAt { get; private set; }
+    public string RemediationAiSummaryContent { get; private set; } = string.Empty;
+    public string RemediationAiSummaryInputHash { get; private set; } = string.Empty;
+    public string RemediationAiSummaryProviderType { get; private set; } = string.Empty;
+    public string RemediationAiSummaryProfileName { get; private set; } = string.Empty;
+    public string RemediationAiSummaryModel { get; private set; } = string.Empty;
+    public DateTimeOffset? RemediationAiSummaryGeneratedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -46,5 +52,33 @@ public class TenantSoftware
     public void AssignSnapshot(Guid? snapshotId)
     {
         SnapshotId = snapshotId;
+    }
+
+    public void StoreRemediationAiSummary(
+        string content,
+        string inputHash,
+        string providerType,
+        string profileName,
+        string model
+    )
+    {
+        RemediationAiSummaryContent = content.Trim();
+        RemediationAiSummaryInputHash = inputHash.Trim();
+        RemediationAiSummaryProviderType = providerType.Trim();
+        RemediationAiSummaryProfileName = profileName.Trim();
+        RemediationAiSummaryModel = model.Trim();
+        RemediationAiSummaryGeneratedAt = DateTimeOffset.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void ClearRemediationAiSummary()
+    {
+        RemediationAiSummaryContent = string.Empty;
+        RemediationAiSummaryInputHash = string.Empty;
+        RemediationAiSummaryProviderType = string.Empty;
+        RemediationAiSummaryProfileName = string.Empty;
+        RemediationAiSummaryModel = string.Empty;
+        RemediationAiSummaryGeneratedAt = null;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

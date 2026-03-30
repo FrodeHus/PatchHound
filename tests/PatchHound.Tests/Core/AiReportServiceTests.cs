@@ -64,9 +64,6 @@ public class AiReportServiceTests
             .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, "secret")));
 
         _azureProvider
-            .ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
-            .Returns(AiProviderValidationResult.Success());
-        _azureProvider
             .GenerateReportAsync(
                 Arg.Any<AiReportGenerationRequest>(),
                 Arg.Any<TenantAiProfileResolved>(),
@@ -128,7 +125,7 @@ public class AiReportServiceTests
     }
 
     [Fact]
-    public async Task GenerateReport_ValidationFails_ReturnsFailure()
+    public async Task GenerateReport_WhenProviderThrows_ReturnsFailure()
     {
         var vulnerability = VulnerabilityDefinition.Create(
             "CVE-2025-5678",
@@ -150,8 +147,12 @@ public class AiReportServiceTests
             .ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
             .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, string.Empty)));
         _azureProvider
-            .ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
-            .Returns(AiProviderValidationResult.Failure("API key is required for Azure OpenAI."));
+            .GenerateReportAsync(
+                Arg.Any<AiReportGenerationRequest>(),
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<CancellationToken>()
+            )
+            .Returns<Task<string>>(_ => throw new InvalidOperationException("API key is required for Azure OpenAI."));
 
         var result = await _service.GenerateReportAsync(
             vulnerability,
@@ -197,9 +198,6 @@ public class AiReportServiceTests
         _resolver
             .ResolveByIdAsync(_tenantId, _profileId, Arg.Any<CancellationToken>())
             .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, "secret")));
-        _azureProvider
-            .ValidateAsync(Arg.Any<TenantAiProfileResolved>(), Arg.Any<CancellationToken>())
-            .Returns(AiProviderValidationResult.Success());
         _azureProvider
             .GenerateReportAsync(
                 Arg.Any<AiReportGenerationRequest>(),

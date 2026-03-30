@@ -15,7 +15,11 @@ import {
 } from '@/api/remediation-tasks.functions'
 import type { RemediationTaskTeamStatus } from '@/api/remediation-tasks.schemas'
 import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
-import { approveOrRejectDecision, verifyRecurringRemediation } from '@/api/remediation.functions'
+import {
+  approveOrRejectDecision,
+  generateRemediationAiSummary,
+  verifyRecurringRemediation,
+} from '@/api/remediation.functions'
 import { fetchDecisionAuditTrail } from '@/api/approval-tasks.functions'
 import {
   AuditTimeline,
@@ -80,6 +84,7 @@ export function SoftwareRemediationView({
   const [deviceVersion, setDeviceVersion] = useState(initialDeviceVersion ?? '')
 
   const [approving, setApproving] = useState(false)
+  const [generatingAiSummary, setGeneratingAiSummary] = useState(false)
   const [stageError, setStageError] = useState<string | null>(null)
   const workflowId = data.workflowState.workflowId
   const currentStageId = data.workflowState.currentStage as RemediationStageId
@@ -173,6 +178,23 @@ export function SoftwareRemediationView({
       setStageError(getApiErrorMessage(error, 'Unable to update the recurrence verification.'))
     } finally {
       setApproving(false)
+    }
+  }
+
+  async function handleGenerateAiSummary() {
+    setGeneratingAiSummary(true)
+    setStageError(null)
+    try {
+      await generateRemediationAiSummary({
+        data: {
+          tenantSoftwareId,
+        },
+      })
+      await queryClient.invalidateQueries({ queryKey })
+    } catch (error) {
+      setStageError(getApiErrorMessage(error, 'Unable to generate the AI risk summary.'))
+    } finally {
+      setGeneratingAiSummary(false)
     }
   }
 
@@ -338,15 +360,51 @@ export function SoftwareRemediationView({
             </CardContent>
           </Card>
 
-          {data.aiNarrative ? (
+          {data.aiSummary.content || data.aiSummary.unavailableMessage || data.aiSummary.canGenerate ? (
             <Card className="rounded-[1.6rem] border-border/70">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">AI analysis</CardTitle>
+                <CardTitle className="text-sm">AI risk summary</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                  {data.aiNarrative}
-                </p>
+                {data.aiSummary.content ? (
+                  <>
+                    <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                      {data.aiSummary.content}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span>
+                        Generated {formatNullableDateTime(data.aiSummary.generatedAt)}
+                      </span>
+                      {data.aiSummary.profileName ? (
+                        <span>
+                          via {data.aiSummary.profileName}
+                          {data.aiSummary.model ? ` · ${data.aiSummary.model}` : ''}
+                        </span>
+                      ) : null}
+                    </div>
+                  </>
+                ) : data.aiSummary.canGenerate ? (
+                  <div className="rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-4">
+                    <p className="text-sm text-muted-foreground">
+                      Ask AI for a short plain-language explanation of the top remediation risks.
+                    </p>
+                    <div className="mt-3">
+                      <Button
+                        type="button"
+                        onClick={handleGenerateAiSummary}
+                        disabled={generatingAiSummary}
+                      >
+                        {generatingAiSummary ? 'Asking AI...' : 'Ask AI'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-4">
+                    <p className="text-sm text-muted-foreground">
+                      {data.aiSummary.unavailableMessage}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : null}

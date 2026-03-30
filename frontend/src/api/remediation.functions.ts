@@ -4,6 +4,7 @@ import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost, type ApiRequestContext } from '@/server/api'
 import {
   decisionContextSchema,
+  decisionAiSummarySchema,
   remediationDecisionSchema,
   analystRecommendationSchema,
   vulnerabilityOverrideSchema,
@@ -118,6 +119,18 @@ export const verifyRecurringRemediation = createServerFn({ method: 'POST' })
   )
   .handler(async ({ context, data: { workflowId, action } }) => {
     await apiPost(`/remediation/${workflowId}/verification`, context, { action })
+  })
+
+export const generateRemediationAiSummary = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      tenantSoftwareId: z.string().uuid(),
+    })
+  )
+  .handler(async ({ context, data: { tenantSoftwareId } }) => {
+    const data = await apiPost(`/software/${tenantSoftwareId}/remediation/ai-summary`, context, {})
+    return decisionAiSummarySchema.parse(data)
   })
 
 export const fetchDecisionList = createServerFn({ method: 'GET' })

@@ -2727,6 +2727,29 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("NormalizedSoftwareId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("RemediationAiSummaryContent")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("RemediationAiSummaryGeneratedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RemediationAiSummaryInputHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RemediationAiSummaryModel")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RemediationAiSummaryProfileName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RemediationAiSummaryProviderType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<Guid?>("SnapshotId")
                         .HasColumnType("uuid");
 
