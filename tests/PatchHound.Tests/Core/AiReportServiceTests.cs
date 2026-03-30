@@ -165,7 +165,7 @@ public class AiReportServiceTests
         );
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be("API key is required for Azure OpenAI.");
+        result.Error.Should().Be("AI report generation failed: API key is required for Azure OpenAI.");
     }
 
     [Fact]
