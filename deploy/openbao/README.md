@@ -52,8 +52,8 @@ Create a policy for PatchHound and issue a token for the API/worker:
 
 ```bash
 docker compose exec openbao sh -c 'cat >/tmp/patchhound-policy.hcl <<EOF
-path "patchhound/data/*" {
-  capabilities = ["create", "update", "read"]
+path "patchhound/*" {
+  capabilities = ["create", "update", "read", "delete"]
 }
 EOF
 bao policy write patchhound /tmp/patchhound-policy.hcl
