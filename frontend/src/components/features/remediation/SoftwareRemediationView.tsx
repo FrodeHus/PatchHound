@@ -336,39 +336,6 @@ export function SoftwareRemediationView({
         currentStageId={currentStageId}
       />
 
-      <Card className="rounded-[1.6rem] border-border/70">
-        <CardContent className="grid gap-3 pt-6 md:grid-cols-3">
-          <WorkflowFact
-            label="Exposure in scope"
-            value={`${data.summary.totalVulnerabilities.toLocaleString()} vulnerabilities`}
-            detail={`${data.workflow.affectedDeviceCount.toLocaleString()} devices across ${data.workflow.affectedOwnerTeamCount.toLocaleString()} owner teams`}
-            sparkline={data.workflow.openEpisodeTrend}
-          />
-          <WorkflowFact
-            label="Decision posture"
-            value={data.currentDecision ? outcomeLabel(data.currentDecision.outcome) : 'No decision yet'}
-            detail={
-              data.currentDecision
-                ? approvalStatusLabel(data.currentDecision.approvalStatus)
-                : data.recommendations.length > 0
-                  ? 'Security recommendation ready'
-                  : 'Review exposure and capture guidance'
-            }
-          />
-          <WorkflowFact
-            label="Execution status"
-            value={
-              data.workflow.openPatchingTaskCount > 0
-                ? `${data.workflow.openPatchingTaskCount.toLocaleString()} open patching tasks`
-                : data.workflow.completedPatchingTaskCount > 0
-                  ? `${data.workflow.completedPatchingTaskCount.toLocaleString()} completed patching tasks`
-                  : 'No patching tasks yet'
-            }
-            detail={data.workflowState.currentStageDescription}
-          />
-        </CardContent>
-      </Card>
-
       <StagePanel
         data={data}
         tenantSoftwareId={tenantSoftwareId}
@@ -378,15 +345,12 @@ export function SoftwareRemediationView({
         canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
         workflowState={data.workflowState}
         workflowId={workflowId}
-        recommendationSeed={recommendationSeed}
         decisionSeed={decisionSeed}
         approving={approving}
         stageError={stageError}
         onApproveReject={handleApproveReject}
         onVerify={handleVerification}
       />
-
-      <RemediationSummaryCards summary={data.summary} />
 
       {data.aiSummary.status === 'Queued' || data.aiSummary.status === 'Generating' ? (
         <div className="flex items-center gap-3 rounded-[1.35rem] border border-border/70 bg-background/65 px-4 py-3">
@@ -421,65 +385,156 @@ export function SoftwareRemediationView({
         </TabsList>
 
         <TabsContent value="decision" className="space-y-4 pt-1">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.95fr)]">
-            <Card className="rounded-[1.6rem] border-border/70">
-              <CardHeader className="space-y-2 pb-3">
-                <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="text-sm">Analyst triage</CardTitle>
-                  {data.aiSummary.recommendedPriority ? (
-                    <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                      AI priority: {data.aiSummary.recommendedPriority}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  Record the analyst recommendation, suggested priority, and rationale that will shape the owner decision.
-                </p>
-              </CardHeader>
-              <CardContent>
-                {data.recommendations.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-4">
-                    <p className="text-sm text-muted-foreground">
-                      No analyst recommendation has been recorded yet.
-                    </p>
-                    <div className="mt-3">
-                      <RecommendationPanel
-                        tenantSoftwareId={tenantSoftwareId}
-                        workflowId={workflowId}
-                        recommendations={data.recommendations}
-                      aiAnalystAssessment={data.aiSummary.analystAssessment}
-                      aiRecommendedOutcome={data.aiSummary.recommendedOutcome}
-                      aiRecommendedPriority={data.aiSummary.recommendedPriority}
-                      queryKey={queryKey}
-                      recommendationSeed={recommendationSeed}
-                    />
-                    </div>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+            <div className="space-y-4">
+              <Card className="rounded-[1.6rem] border-border/70">
+                <CardHeader className="space-y-2 pb-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="text-sm">Analyst recommendation</CardTitle>
+                    {data.aiSummary.recommendedPriority ? (
+                      <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                        AI priority: {data.aiSummary.recommendedPriority}
+                      </span>
+                    ) : null}
                   </div>
-                ) : (
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    Advisory input from security analysis. This helps frame the risk, but it does not decide the outcome.
+                  </p>
+                </CardHeader>
+                <CardContent>
                   <RecommendationPanel
                     tenantSoftwareId={tenantSoftwareId}
                     workflowId={workflowId}
                     recommendations={data.recommendations}
-                  aiAnalystAssessment={data.aiSummary.analystAssessment}
-                  aiRecommendedOutcome={data.aiSummary.recommendedOutcome}
-                  aiRecommendedPriority={data.aiSummary.recommendedPriority}
-                  queryKey={queryKey}
-                  recommendationSeed={recommendationSeed}
-                />
-                )}
-              </CardContent>
-            </Card>
+                    aiAnalystAssessment={data.aiSummary.analystAssessment}
+                    aiRecommendedOutcome={data.aiSummary.recommendedOutcome}
+                    aiRecommendedPriority={data.aiSummary.recommendedPriority}
+                    queryKey={queryKey}
+                    recommendationSeed={recommendationSeed}
+                  />
+                </CardContent>
+              </Card>
 
-            <AiDecisionBrief
-              aiSummary={data.aiSummary}
-              currentStageId={currentStageId}
-              canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
-              generatingAiSummary={generatingAiSummary}
-              onGenerateAiSummary={handleGenerateAiSummary}
-              onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
-              onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
-              onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
-            />
+              <Card className="rounded-[1.6rem] border-border/70">
+                <CardHeader className="space-y-2 pb-3">
+                  <CardTitle className="text-sm">Asset owner decision</CardTitle>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    This is the actual remediation decision. The asset owner chooses the posture, and approval happens afterward when required.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {data.currentDecision?.approvalStatus === 'Rejected' && data.currentDecision ? (
+                    <div className="rounded-2xl border border-destructive/40 bg-destructive/6 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 rounded-full border border-destructive/30 bg-destructive/10 p-2 text-destructive">
+                          <XCircle className="size-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-destructive">
+                            Approval was rejected
+                          </p>
+                          <p className="mt-1 text-sm leading-relaxed text-foreground/90">
+                            {data.currentDecision.latestRejection?.comment?.trim()
+                              ? data.currentDecision.latestRejection.comment
+                              : 'The approver rejected this remediation decision without leaving a written comment.'}
+                          </p>
+                          {data.currentDecision.latestRejection?.rejectedAt ? (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Rejected {formatDateTime(data.currentDecision.latestRejection.rejectedAt)}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {data.currentDecision ? (
+                    <div className="rounded-2xl border border-border/70 bg-background/50 p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(data.currentDecision.outcome))}`}>
+                          {outcomeLabel(data.currentDecision.outcome)}
+                        </span>
+                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(approvalStatusTone(data.currentDecision.approvalStatus))}`}>
+                          {approvalStatusLabel(data.currentDecision.approvalStatus)}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-sm leading-relaxed text-foreground/90">
+                        {data.currentDecision.justification || 'No justification was provided for this decision.'}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <DecisionForm
+                    tenantSoftwareId={tenantSoftwareId}
+                    workflowId={workflowId}
+                    queryKey={queryKey}
+                    readOnly={!data.workflowState.canActOnCurrentStage || currentStageId !== 'remediationDecision'}
+                    initialOutcome={data.currentDecision?.outcome}
+                    initialJustification={data.currentDecision?.justification}
+                    initialMaintenanceWindowDate={data.currentDecision?.maintenanceWindowDate}
+                    initialExpiryDate={data.currentDecision?.expiryDate}
+                    initialReEvaluationDate={data.currentDecision?.reEvaluationDate}
+                    submitLabel={data.currentDecision?.approvalStatus === 'Rejected' ? 'Update Decision' : 'Submit Decision'}
+                    decisionSeed={decisionSeed}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-4">
+              <AiDecisionBrief
+                aiSummary={data.aiSummary}
+                currentStageId={currentStageId}
+                canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
+                generatingAiSummary={generatingAiSummary}
+                onGenerateAiSummary={handleGenerateAiSummary}
+                onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
+                onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
+                onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
+              />
+
+              <Card className="rounded-[1.6rem] border-border/70">
+                <CardHeader className="space-y-2 pb-3">
+                  <CardTitle className="text-sm">Decision context</CardTitle>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    Supporting context for the analyst recommendation and the owner’s final decision.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-3">
+                    <WorkflowFact
+                      label="Exposure in scope"
+                      value={`${data.summary.totalVulnerabilities.toLocaleString()} vulnerabilities`}
+                      detail={`${data.workflow.affectedDeviceCount.toLocaleString()} devices across ${data.workflow.affectedOwnerTeamCount.toLocaleString()} owner teams`}
+                      sparkline={data.workflow.openEpisodeTrend}
+                    />
+                    <WorkflowFact
+                      label="Decision posture"
+                      value={data.currentDecision ? outcomeLabel(data.currentDecision.outcome) : 'No decision yet'}
+                      detail={
+                        data.currentDecision
+                          ? approvalStatusLabel(data.currentDecision.approvalStatus)
+                          : data.recommendations.length > 0
+                            ? 'Security recommendation ready'
+                            : 'Review exposure and capture guidance'
+                      }
+                    />
+                    <WorkflowFact
+                      label="Execution status"
+                      value={
+                        data.workflow.openPatchingTaskCount > 0
+                          ? `${data.workflow.openPatchingTaskCount.toLocaleString()} open patching tasks`
+                          : data.workflow.completedPatchingTaskCount > 0
+                            ? `${data.workflow.completedPatchingTaskCount.toLocaleString()} completed patching tasks`
+                            : 'No patching tasks yet'
+                      }
+                      detail={data.workflowState.currentStageDescription}
+                    />
+                  </div>
+                  <RemediationSummaryCards summary={data.summary} />
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </TabsContent>
 
@@ -600,11 +655,11 @@ function AiDecisionBrief({
     <Card className="rounded-[1.6rem] border-border/70">
       <CardHeader className="space-y-2 pb-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle className="text-sm">AI guidance</CardTitle>
+          <CardTitle className="text-sm">AI draft support</CardTitle>
           <AiStatusBadge aiSummary={aiSummary} />
         </div>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          PatchHound explains the business impact first, then shows the suggested owner and analyst guidance below. The final decision still stays with your team.
+          PatchHound drafts business and triage guidance to support the workflow below. The analyst and owner still make the final decision.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -758,7 +813,7 @@ function AiAudiencePanel({
   action?: ReactNode
 }) {
   return (
-    <div className="space-y-3 rounded-[1.35rem] border border-border/70 bg-background/80 px-4 py-4">
+    <div className="space-y-3 rounded-[1.15rem] border border-border/60 bg-background/45 px-4 py-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
@@ -852,7 +907,6 @@ function StagePanel({
   canActOnCurrentStage,
   workflowState,
   workflowId,
-  recommendationSeed,
   decisionSeed,
   approving,
   stageError,
@@ -867,12 +921,6 @@ function StagePanel({
   canActOnCurrentStage: boolean
   workflowState: DecisionContext['workflowState']
   workflowId: string | null
-  recommendationSeed: {
-    token: number
-    outcome?: string | null
-    rationale?: string | null
-    priorityOverride?: string | null
-  } | null
   decisionSeed: {
     token: number
     outcome?: string | null
@@ -910,23 +958,13 @@ function StagePanel({
         {currentStageId === 'securityAnalysis' ? (
           <StageSecurityAnalysisPanel
             data={data}
-            tenantSoftwareId={tenantSoftwareId}
-            workflowId={workflowId}
-            queryKey={queryKey}
             canActOnCurrentStage={canActOnCurrentStage}
-            recommendationSeed={recommendationSeed}
           />
         ) : null}
         {currentStageId === 'remediationDecision' ? (
           <StageRemediationDecisionPanel
             data={data}
-            tenantSoftwareId={tenantSoftwareId}
-            workflowId={workflowId}
-            queryKey={queryKey}
             canActOnCurrentStage={canActOnCurrentStage}
-            decisionSeed={decisionSeed}
-            approving={approving}
-            onApproveReject={onApproveReject}
           />
         ) : null}
         {currentStageId === 'approval' ? (
@@ -1128,45 +1166,55 @@ function formatRoleName(value: string) {
 
 function StageSecurityAnalysisPanel({
   data,
-  tenantSoftwareId,
-  workflowId,
-  queryKey,
   canActOnCurrentStage,
-  recommendationSeed,
 }: {
   data: DecisionContext
-  tenantSoftwareId: string
-  workflowId: string | null
-  queryKey: readonly unknown[]
   canActOnCurrentStage: boolean
-  recommendationSeed: {
-    token: number
-    outcome?: string | null
-    rationale?: string | null
-    priorityOverride?: string | null
-  } | null
 }) {
+  const latestRecommendation = data.recommendations[0] ?? null
+
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
       <div className="space-y-4">
         <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Security analysis uses the shared exposure view to recommend the next move. This scope currently carries{' '}
-            {data.summary.totalVulnerabilities.toLocaleString()} open vulnerabilities across{' '}
-            {data.workflow.affectedDeviceCount.toLocaleString()} affected devices.
+            Security analysis is the triage step for this workflow. Capture or update the analyst recommendation in the <span className="font-medium text-foreground">Decision</span> tab to guide the owner decision.
           </p>
         </div>
-        <RecommendationPanel
-          tenantSoftwareId={tenantSoftwareId}
-          workflowId={workflowId}
-          recommendations={data.recommendations}
-          aiRecommendedOutcome={data.aiSummary.recommendedOutcome}
-          aiAnalystAssessment={data.aiSummary.analystAssessment}
-          aiRecommendedPriority={data.aiSummary.recommendedPriority}
-          queryKey={queryKey}
-          readOnly={!canActOnCurrentStage}
-          recommendationSeed={recommendationSeed}
-        />
+        <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            Analyst status
+          </p>
+          {latestRecommendation ? (
+            <>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(latestRecommendation.recommendedOutcome))}`}>
+                  {outcomeLabel(latestRecommendation.recommendedOutcome)}
+                </span>
+                {latestRecommendation.priorityOverride ? (
+                  <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    {latestRecommendation.priorityOverride} priority
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-foreground/90">
+                {latestRecommendation.rationale}
+              </p>
+              <p className="mt-3 text-xs text-muted-foreground">
+                {latestRecommendation.analystDisplayName ? `${latestRecommendation.analystDisplayName} · ` : ''}{formatDateTime(latestRecommendation.createdAt)}
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              No analyst recommendation has been recorded yet.
+            </p>
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            {canActOnCurrentStage
+              ? 'Use the Decision tab to record the analyst recommendation.'
+              : 'This stage is read-only for you. The assigned analyst can update the recommendation from the Decision tab.'}
+          </p>
+        </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
         <StageMetricCard
@@ -1192,139 +1240,84 @@ function StageSecurityAnalysisPanel({
 
 function StageRemediationDecisionPanel({
   data,
-  tenantSoftwareId,
-  workflowId,
-  queryKey,
   canActOnCurrentStage,
-  decisionSeed,
-  approving,
-  onApproveReject,
 }: {
   data: DecisionContext
-  tenantSoftwareId: string
-  workflowId: string | null
-  queryKey: readonly unknown[]
   canActOnCurrentStage: boolean
-  decisionSeed: {
-    token: number
-    outcome?: string | null
-    justification?: string | null
-    maintenanceWindowDate?: string | null
-    expiryDate?: string | null
-    reEvaluationDate?: string | null
-  } | null
-  approving: boolean
-  onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string) => Promise<void>
 }) {
   const latestRecommendation = data.recommendations[0] ?? null
   const rejectedDecision = data.currentDecision?.approvalStatus === 'Rejected'
 
-  if (!data.currentDecision || rejectedDecision) {
-    return (
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-        <div className="space-y-4">
-          {rejectedDecision && data.currentDecision ? (
-            <>
-              <div className="rounded-2xl border border-destructive/40 bg-destructive/6 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-full border border-destructive/30 bg-destructive/10 p-2 text-destructive">
-                    <XCircle className="size-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-destructive">
-                      Approval was rejected
-                    </p>
-                    <p className="mt-1 text-sm leading-relaxed text-foreground/90">
-                      {data.currentDecision.latestRejection?.comment?.trim()
-                        ? data.currentDecision.latestRejection.comment
-                        : 'The approver rejected this remediation decision without leaving a written comment.'}
-                    </p>
-                    {data.currentDecision.latestRejection?.rejectedAt ? (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Rejected {formatDateTime(data.currentDecision.latestRejection.rejectedAt)}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+      <div className="space-y-4">
+        {rejectedDecision && data.currentDecision ? (
+          <div className="rounded-2xl border border-destructive/40 bg-destructive/6 p-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-full border border-destructive/30 bg-destructive/10 p-2 text-destructive">
+                <XCircle className="size-4" />
               </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-destructive">
+                  Approval was rejected
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-foreground/90">
+                  {data.currentDecision.latestRejection?.comment?.trim()
+                    ? data.currentDecision.latestRejection.comment
+                    : 'The approver rejected this remediation decision without leaving a written comment.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
-              <div className="rounded-2xl border border-destructive/30 bg-background/70 p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(data.currentDecision.outcome))}`}>
-                    {outcomeLabel(data.currentDecision.outcome)}
-                  </span>
-                  <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(approvalStatusTone(data.currentDecision.approvalStatus))}`}>
-                    {approvalStatusLabel(data.currentDecision.approvalStatus)}
-                  </span>
-                </div>
-                <p className="mt-3 text-sm leading-relaxed text-foreground/90">
-                  {data.currentDecision.justification || 'No justification was provided for this decision.'}
-                </p>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Update this decision below or resubmit the same posture if it is still the correct remediation choice.
-                </p>
+        <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            The software owner chooses the remediation posture in this stage. Use the <span className="font-medium text-foreground">Decision</span> tab to create or update that decision.
+          </p>
+          {data.currentDecision ? (
+            <>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(data.currentDecision.outcome))}`}>
+                  {outcomeLabel(data.currentDecision.outcome)}
+                </span>
+                <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(approvalStatusTone(data.currentDecision.approvalStatus))}`}>
+                  {approvalStatusLabel(data.currentDecision.approvalStatus)}
+                </span>
               </div>
+              <p className="mt-3 text-sm leading-relaxed text-foreground/90">
+                {data.currentDecision.justification || 'No justification was provided for this decision.'}
+              </p>
             </>
           ) : (
-            <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                No remediation decision has been recorded yet. The software owner team now chooses how the organization should handle this software-wide exposure.
-              </p>
-            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              No remediation decision has been recorded yet.
+            </p>
           )}
-          <DecisionForm
-            tenantSoftwareId={tenantSoftwareId}
-            workflowId={workflowId}
-            queryKey={queryKey}
-            readOnly={!canActOnCurrentStage}
-            initialOutcome={data.currentDecision?.outcome}
-            initialJustification={data.currentDecision?.justification}
-            initialMaintenanceWindowDate={data.currentDecision?.maintenanceWindowDate}
-            initialExpiryDate={data.currentDecision?.expiryDate}
-            initialReEvaluationDate={data.currentDecision?.reEvaluationDate}
-            submitLabel={rejectedDecision ? 'Update Decision' : 'Submit Decision'}
-            decisionSeed={decisionSeed}
-          />
-        </div>
-        <div className="space-y-3">
-          <RecommendationSnapshotCard
-            recommendation={latestRecommendation}
-          />
-          <StageMetricCard
-            label="Current pressure"
-            value={data.summary.totalVulnerabilities.toLocaleString()}
-            detail={`${(data.summary.criticalCount + data.summary.highCount).toLocaleString()} critical or high vulnerabilities`}
-          />
+          <p className="mt-3 text-xs text-muted-foreground">
+            {canActOnCurrentStage
+              ? 'Continue in the Decision tab below to submit or update the owner decision.'
+              : 'This stage is read-only for you. The assigned owner can update the decision from the Decision tab.'}
+          </p>
         </div>
       </div>
-    )
-  }
-
-  return (
-    <DecisionSummaryPanel
-      decision={data.currentDecision}
-      readOnly={!canActOnCurrentStage}
-      approving={approving}
-      onApproveReject={onApproveReject}
-      rightColumn={
-        <>
-          <RecommendationSnapshotCard
-            recommendation={latestRecommendation}
-          />
-          <StageMetricCard
-            label="Decision posture"
-            value={outcomeLabel(data.currentDecision.outcome)}
-            detail={approvalStatusLabel(data.currentDecision.approvalStatus)}
-          />
-          <StageMetricCard
-            label="Execution scope"
-            value={data.workflow.affectedOwnerTeamCount.toLocaleString()}
-            detail={`${data.workflow.affectedDeviceCount.toLocaleString()} devices could be affected`}
-            sparkline={data.workflow.openEpisodeTrend}
-          />
-        </>
-      }
-    />
+      <div className="space-y-3">
+        <RecommendationSnapshotCard
+          recommendation={latestRecommendation}
+        />
+        <StageMetricCard
+          label="Current pressure"
+          value={data.summary.totalVulnerabilities.toLocaleString()}
+          detail={`${(data.summary.criticalCount + data.summary.highCount).toLocaleString()} critical or high vulnerabilities`}
+        />
+        <StageMetricCard
+          label="Execution scope"
+          value={data.workflow.affectedOwnerTeamCount.toLocaleString()}
+          detail={`${data.workflow.affectedDeviceCount.toLocaleString()} devices could be affected`}
+          sparkline={data.workflow.openEpisodeTrend}
+        />
+      </div>
+    </div>
   )
 }
 

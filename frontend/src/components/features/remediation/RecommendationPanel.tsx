@@ -113,15 +113,13 @@ export function RecommendationPanel({
             {currentRecommendation.analystDisplayName ? `${currentRecommendation.analystDisplayName} · ` : ''}{formatDateTime(currentRecommendation.createdAt)}
           </p>
         </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">No analyst recommendation has been recorded yet.</p>
-      )}
+      ) : null}
 
       {aiAnalystAssessment || aiRecommendedPriority ? (
-        <div className="rounded-lg border border-dashed border-border/70 bg-background/50 p-3 space-y-2">
+        <div className="rounded-lg border border-dashed border-border/60 bg-background/35 p-3 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-              AI triage recommendation
+              AI draft for analyst review
             </span>
             {aiRecommendedPriority ? (
               <span className="rounded-full border border-border/70 bg-background/70 px-2 py-0.5 text-xs text-muted-foreground">
@@ -145,7 +143,7 @@ export function RecommendationPanel({
                   setShowForm(true)
                 }}
               >
-                Use in analyst note
+                Use draft
               </Button>
             </div>
           )}
@@ -227,7 +225,7 @@ export function RecommendationPanel({
             setShowForm(true)
           }}
         >
-          {currentRecommendation ? 'Update recommendation' : 'Add recommendation'}
+          {currentRecommendation ? 'Update recommendation' : 'Add analyst recommendation'}
         </Button>
       )}
     </div>
