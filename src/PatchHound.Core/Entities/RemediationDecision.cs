@@ -100,6 +100,12 @@ public class RemediationDecision
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    public void SetMaintenanceWindowDate(DateTimeOffset? maintenanceWindowDate)
+    {
+        MaintenanceWindowDate = maintenanceWindowDate;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
     public void Reject(Guid rejectedBy)
     {
         if (ApprovalStatus != DecisionApprovalStatus.PendingApproval)

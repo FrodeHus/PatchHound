@@ -65,21 +65,18 @@ export function DecisionForm({
   const queryClient = useQueryClient()
   const [outcome, setOutcome] = useState(initialOutcome ?? '')
   const [justification, setJustification] = useState(initialJustification ?? '')
-  const [maintenanceWindowDate, setMaintenanceWindowDate] = useState(toDateInputValue(initialMaintenanceWindowDate))
   const [expiryDate, setExpiryDate] = useState(toDateInputValue(initialExpiryDate))
   const [expiryMode, setExpiryMode] = useState<'permanent' | 'expires'>('permanent')
   const [reEvaluationDate, setReEvaluationDate] = useState(toDateInputValue(initialReEvaluationDate))
   const [submitting, setSubmitting] = useState(false)
 
   const needsJustification = REQUIRES_JUSTIFICATION.has(outcome)
-  const needsMaintenanceWindow = outcome === 'ApprovedForPatching'
   const needsExpiry = REQUIRES_EXPIRY.has(outcome)
   const needsReEvaluation = REQUIRES_REEVALUATION.has(outcome)
 
   useEffect(() => {
     setOutcome(initialOutcome ?? '')
     setJustification(initialJustification ?? '')
-    setMaintenanceWindowDate(toDateInputValue(initialMaintenanceWindowDate))
     setExpiryDate(toDateInputValue(initialExpiryDate))
     setReEvaluationDate(toDateInputValue(initialReEvaluationDate))
   }, [initialOutcome, initialJustification, initialMaintenanceWindowDate, initialExpiryDate, initialReEvaluationDate])
@@ -91,17 +88,10 @@ export function DecisionForm({
 
     setOutcome(decisionSeed.outcome ?? initialOutcome ?? '')
     setJustification(decisionSeed.justification ?? initialJustification ?? '')
-    setMaintenanceWindowDate(toDateInputValue(decisionSeed.maintenanceWindowDate ?? initialMaintenanceWindowDate))
     setExpiryDate(toDateInputValue(decisionSeed.expiryDate ?? initialExpiryDate))
     setReEvaluationDate(toDateInputValue(decisionSeed.reEvaluationDate ?? initialReEvaluationDate))
     setExpiryMode(decisionSeed.expiryDate || initialExpiryDate ? 'expires' : 'permanent')
   }, [decisionSeed?.token, decisionSeed, initialExpiryDate, initialJustification, initialMaintenanceWindowDate, initialOutcome, initialReEvaluationDate])
-
-  useEffect(() => {
-    if (!needsMaintenanceWindow) {
-      setMaintenanceWindowDate('')
-    }
-  }, [needsMaintenanceWindow])
 
   useEffect(() => {
     if (!needsExpiry) {
@@ -118,7 +108,6 @@ export function DecisionForm({
 
   const canSubmit =
     outcome !== '' &&
-    (!needsMaintenanceWindow || maintenanceWindowDate !== '') &&
     (!needsJustification || justification.trim().length > 0) &&
     (!needsReEvaluation || reEvaluationDate !== '')
 
@@ -132,7 +121,6 @@ export function DecisionForm({
           workflowId,
           outcome,
           justification: justification || undefined,
-          maintenanceWindowDate: needsMaintenanceWindow ? toIsoDateBoundary(maintenanceWindowDate) : undefined,
           expiryDate: needsExpiry && expiryMode === 'expires' ? toIsoDateBoundary(expiryDate) : undefined,
           reEvaluationDate: toIsoDateBoundary(reEvaluationDate),
         },
@@ -140,7 +128,6 @@ export function DecisionForm({
       await queryClient.invalidateQueries({ queryKey })
       setOutcome('')
       setJustification('')
-      setMaintenanceWindowDate('')
       setExpiryDate('')
       setExpiryMode('permanent')
       setReEvaluationDate('')
@@ -179,23 +166,6 @@ export function DecisionForm({
             rows={3}
             disabled={readOnly}
           />
-        </div>
-      ) : null}
-
-      {needsMaintenanceWindow ? (
-        <div className="space-y-2">
-          <label className="text-sm font-medium">
-            Maintenance window date <span className="text-tone-danger-foreground">*</span>
-          </label>
-          <Input
-            type="date"
-            value={maintenanceWindowDate}
-            onChange={(e) => setMaintenanceWindowDate(e.target.value)}
-            disabled={readOnly}
-          />
-          <p className="text-xs text-muted-foreground">
-            When the approved patch is expected to be in place.
-          </p>
         </div>
       ) : null}
 

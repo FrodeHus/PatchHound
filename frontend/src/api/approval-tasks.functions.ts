@@ -64,10 +64,11 @@ export const resolveApprovalTask = createServerFn({ method: 'POST' })
       id: z.string().uuid(),
       action: z.enum(['approve', 'deny']),
       justification: z.string().optional(),
+      maintenanceWindowDate: z.string().optional(),
     })
   )
-  .handler(async ({ context, data: { id, action, justification } }) => {
-    await apiPost(`/approval-tasks/${id}/resolve`, context, { action, justification })
+  .handler(async ({ context, data: { id, action, justification, maintenanceWindowDate } }) => {
+    await apiPost(`/approval-tasks/${id}/resolve`, context, { action, justification, maintenanceWindowDate })
   })
 
 export const markApprovalTaskRead = createServerFn({ method: 'POST' })

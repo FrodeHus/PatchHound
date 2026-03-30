@@ -100,7 +100,7 @@ public class ApprovalTasksController(
         {
             var result = request.Action?.ToLowerInvariant() switch
             {
-                "approve" => await approvalTaskService.ApproveAsync(id, userId, request.Justification, ct),
+                "approve" => await approvalTaskService.ApproveAsync(id, userId, request.Justification, request.MaintenanceWindowDate, ct),
                 "deny" => await approvalTaskService.DenyAsync(id, userId, request.Justification, ct),
                 _ => null,
             };

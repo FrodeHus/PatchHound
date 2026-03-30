@@ -73,6 +73,7 @@ public class ApprovalTaskService(
         Guid approvalTaskId,
         Guid userId,
         string? justification,
+        DateTimeOffset? maintenanceWindowDate,
         CancellationToken ct
     )
     {
@@ -80,6 +81,17 @@ public class ApprovalTaskService(
             .Include(at => at.RemediationDecision)
             .FirstOrDefaultAsync(at => at.Id == approvalTaskId, ct)
             ?? throw new InvalidOperationException("Approval task not found.");
+
+        if (task.RemediationDecision.Outcome == RemediationOutcome.ApprovedForPatching)
+        {
+            var effectiveMaintenanceWindowDate = maintenanceWindowDate ?? task.RemediationDecision.MaintenanceWindowDate;
+            if (!effectiveMaintenanceWindowDate.HasValue)
+            {
+                throw new ArgumentException("Maintenance window date is required before approving patching.");
+            }
+
+            task.RemediationDecision.SetMaintenanceWindowDate(effectiveMaintenanceWindowDate);
+        }
 
         task.Approve(userId, justification);
         task.RemediationDecision.Approve(userId);

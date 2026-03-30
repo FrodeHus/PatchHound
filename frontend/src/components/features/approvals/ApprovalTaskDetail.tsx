@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ApprovalTaskDetail as ApprovalTaskDetailType } from '@/api/approval-tasks.schemas'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -19,7 +20,7 @@ import { CheckCircle, XCircle, Eye, AlertTriangle, MessageSquare } from 'lucide-
 
 type Props = {
   data: ApprovalTaskDetailType
-  onResolve: (action: 'approve' | 'deny', justification?: string) => void
+  onResolve: (action: 'approve' | 'deny', justification?: string, maintenanceWindowDate?: string) => void
   onMarkRead: () => void
   onVulnPageChange: (page: number) => void
   onDevicePageChange: (page: number) => void
@@ -64,6 +65,16 @@ function formatVersion(version: string | null) {
   return version && version.trim().length > 0 ? version : 'Unknown version'
 }
 
+function toDateInputValue(value?: string | null) {
+  if (!value) return ''
+  return value.slice(0, 10)
+}
+
+function toIsoDateBoundary(value: string) {
+  if (!value) return undefined
+  return `${value}T00:00:00Z`
+}
+
 export function ApprovalTaskDetail({
   data,
   onResolve,
@@ -73,11 +84,13 @@ export function ApprovalTaskDetail({
   onDeviceVersionChange,
 }: Props) {
   const [justification, setJustification] = useState('')
+  const [maintenanceWindowDate, setMaintenanceWindowDate] = useState(toDateInputValue(data.maintenanceWindowDate))
   const [resolveAction, setResolveAction] = useState<'approve' | 'deny' | null>(
     null
   )
   const isPending = data.status === 'Pending'
   const justificationRequired = data.requiresJustification
+  const maintenanceWindowRequired = isPending && data.outcome === 'ApprovedForPatching'
   const vulnerabilityCount = data.vulnerabilities.totalCount
   const affectedDeviceCount =
     data.deviceVersionCohorts.reduce((sum, cohort) => sum + cohort.deviceCount, 0) ||
@@ -98,7 +111,11 @@ export function ApprovalTaskDetail({
       setResolveAction(action)
       return
     }
-    onResolve(action, justification.trim() || undefined)
+    if (action === 'approve' && maintenanceWindowRequired && !maintenanceWindowDate) {
+      setResolveAction(action)
+      return
+    }
+    onResolve(action, justification.trim() || undefined, action === 'approve' ? toIsoDateBoundary(maintenanceWindowDate) : undefined)
   }
 
   return (
@@ -230,7 +247,22 @@ export function ApprovalTaskDetail({
                   )}
                 </div>
                 <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                  <div className="space-y-2">
+                  <div className="space-y-3">
+                    {maintenanceWindowRequired ? (
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                          Maintenance window date
+                        </label>
+                        <Input
+                          type="date"
+                          value={maintenanceWindowDate}
+                          onChange={(e) => setMaintenanceWindowDate(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          The technical manager sets when the approved patch is expected to be in place.
+                        </p>
+                      </div>
+                    ) : null}
                     <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                       Approval justification
                     </label>
@@ -248,6 +280,12 @@ export function ApprovalTaskDetail({
                       <p className="flex items-center gap-1.5 text-sm text-tone-danger-foreground">
                         <AlertTriangle className="size-3.5" />
                         Justification is required to {resolveAction} this task.
+                      </p>
+                    ) : null}
+                    {resolveAction === 'approve' && maintenanceWindowRequired && !maintenanceWindowDate ? (
+                      <p className="flex items-center gap-1.5 text-sm text-tone-danger-foreground">
+                        <AlertTriangle className="size-3.5" />
+                        Maintenance window date is required to approve this patching request.
                       </p>
                     ) : null}
                   </div>

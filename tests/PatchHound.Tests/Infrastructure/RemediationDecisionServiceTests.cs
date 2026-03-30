@@ -438,6 +438,7 @@ public class RemediationDecisionServiceTests : IDisposable
             approvalTask.Id,
             _userId,
             "Approved for execution",
+            new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero),
             CancellationToken.None
         );
 
@@ -503,6 +504,7 @@ public class RemediationDecisionServiceTests : IDisposable
             approvalTask.Id,
             _userId,
             "Approved as active exception",
+            null,
             CancellationToken.None
         );
 
@@ -587,7 +589,7 @@ public class RemediationDecisionServiceTests : IDisposable
         var firstApprovalTask = await _dbContext.ApprovalTasks
             .OrderByDescending(item => item.CreatedAt)
             .FirstAsync();
-        await approvalTaskService.ApproveAsync(firstApprovalTask.Id, _userId, "Renewed exception approved.", CancellationToken.None);
+        await approvalTaskService.ApproveAsync(firstApprovalTask.Id, _userId, "Renewed exception approved.", null, CancellationToken.None);
         await _dbContext.SaveChangesAsync();
 
         var firstWorkflow = await _dbContext.RemediationWorkflows
@@ -676,7 +678,7 @@ public class RemediationDecisionServiceTests : IDisposable
         var firstApprovalTask = await _dbContext.ApprovalTasks
             .OrderByDescending(item => item.CreatedAt)
             .FirstAsync();
-        await approvalTaskService.ApproveAsync(firstApprovalTask.Id, _userId, "Patch again if it returns.", CancellationToken.None);
+        await approvalTaskService.ApproveAsync(firstApprovalTask.Id, _userId, "Patch again if it returns.", new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero), CancellationToken.None);
 
         var firstWorkflow = await _dbContext.RemediationWorkflows
             .OrderByDescending(item => item.CreatedAt)

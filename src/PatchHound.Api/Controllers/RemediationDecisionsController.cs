@@ -268,8 +268,7 @@ public class RemediationDecisionsController(
             tenantContext.CurrentUserId,
             request.ExpiryDate,
             request.ReEvaluationDate,
-            ct,
-            request.MaintenanceWindowDate
+            ct
         );
 
         if (!result.IsSuccess)
@@ -336,7 +335,7 @@ public class RemediationDecisionsController(
             var action = request.Action?.ToLowerInvariant();
             if (action == "approve")
             {
-                await approvalTaskService.ApproveAsync(approvalTask.Id, tenantContext.CurrentUserId, request.Justification, ct);
+                await approvalTaskService.ApproveAsync(approvalTask.Id, tenantContext.CurrentUserId, request.Justification, request.MaintenanceWindowDate, ct);
             }
             else if (action == "deny" || action == "reject")
             {

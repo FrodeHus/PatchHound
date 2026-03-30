@@ -16,7 +16,6 @@ import {
 import type { RemediationTaskTeamStatus } from '@/api/remediation-tasks.schemas'
 import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
 import {
-  addRecommendation,
   approveOrRejectDecision,
   generateRemediationAiSummary,
   reviewRemediationAiSummary,
@@ -29,6 +28,7 @@ import {
 } from '@/components/features/audit/AuditTimeline'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -87,7 +87,6 @@ export function SoftwareRemediationView({
 
   const [approving, setApproving] = useState(false)
   const [generatingAiSummary, setGeneratingAiSummary] = useState(false)
-  const [reviewingAiAction, setReviewingAiAction] = useState<'accept' | 'edit' | 'reject' | null>(null)
   const [recommendationSeed, setRecommendationSeed] = useState<{
     token: number
     outcome?: string | null
@@ -157,7 +156,7 @@ export function SoftwareRemediationView({
   })
   const teamStatuses = teamStatusesQuery.data ?? []
 
-  async function handleApproveReject(action: 'approve' | 'reject' | 'cancel', justification?: string) {
+  async function handleApproveReject(action: 'approve' | 'reject' | 'cancel', justification?: string, maintenanceWindowDate?: string) {
     if (!data.currentDecision) return
     setApproving(true)
     setStageError(null)
@@ -169,6 +168,7 @@ export function SoftwareRemediationView({
           decisionId: data.currentDecision.id,
           action,
           justification,
+          maintenanceWindowDate,
         },
       })
       await queryClient.invalidateQueries({ queryKey })
@@ -215,88 +215,60 @@ export function SoftwareRemediationView({
     }
   }
 
-  async function handleReviewAiSummary(action: 'accept' | 'edit' | 'reject') {
-    setReviewingAiAction(action)
+  async function handleUseAiForAnalystRecommendation() {
+    if (!data.aiSummary.analystAssessment && !data.aiSummary.recommendedOutcome && !data.aiSummary.recommendedPriority) {
+      return
+    }
+
+    setRecommendationSeed({
+      token: Date.now(),
+      outcome: data.aiSummary.recommendedOutcome || null,
+      rationale: data.aiSummary.analystAssessment || null,
+      priorityOverride: data.aiSummary.recommendedPriority || null,
+    })
     setStageError(null)
     try {
       await reviewRemediationAiSummary({
         data: {
           tenantSoftwareId,
-          action,
+          action: 'edit',
         },
       })
       await queryClient.invalidateQueries({ queryKey })
     } catch (error) {
-      setStageError(getApiErrorMessage(error, 'Unable to update the AI review status.'))
-    } finally {
-      setReviewingAiAction(null)
+      setStageError(getApiErrorMessage(error, 'Unable to prepare the AI analyst recommendation.'))
     }
   }
 
-  async function handleAiDraftAction(tab: AiBriefTab, action: 'accept' | 'edit' | 'reject') {
-    if (action === 'reject') {
-      await handleReviewAiSummary('reject')
+  async function handleUseAiForDecisionForm(source: 'owner' | 'exception') {
+    const justification = source === 'exception'
+      ? data.aiSummary.exceptionRecommendation || null
+      : data.aiSummary.ownerRecommendation || null
+
+    if (!justification && !data.aiSummary.recommendedOutcome) {
       return
     }
 
-    if (tab === 'analyst') {
-      if (action === 'accept'
-        && data.aiSummary.recommendedOutcome
-        && data.aiSummary.analystAssessment
-      ) {
-        setReviewingAiAction(action)
-        setStageError(null)
-        try {
-          await addRecommendation({
-            data: {
-              tenantSoftwareId,
-              workflowId,
-              recommendedOutcome: data.aiSummary.recommendedOutcome,
-              rationale: data.aiSummary.analystAssessment,
-              priorityOverride: data.aiSummary.recommendedPriority || undefined,
-            },
-          })
-          await reviewRemediationAiSummary({
-            data: {
-              tenantSoftwareId,
-              action,
-            },
-          })
-          await queryClient.invalidateQueries({ queryKey })
-        } catch (error) {
-          setStageError(getApiErrorMessage(error, 'Unable to apply the AI analyst recommendation.'))
-        } finally {
-          setReviewingAiAction(null)
-        }
-        return
-      }
-
-      setRecommendationSeed({
-        token: Date.now(),
-        outcome: data.aiSummary.recommendedOutcome || null,
-        rationale: data.aiSummary.analystAssessment || null,
-        priorityOverride: data.aiSummary.recommendedPriority || null,
+    setDecisionSeed({
+      token: Date.now(),
+      outcome: data.aiSummary.recommendedOutcome || data.currentDecision?.outcome || null,
+      justification,
+      maintenanceWindowDate: data.currentDecision?.maintenanceWindowDate ?? null,
+      expiryDate: data.currentDecision?.expiryDate ?? null,
+      reEvaluationDate: data.currentDecision?.reEvaluationDate ?? null,
+    })
+    setStageError(null)
+    try {
+      await reviewRemediationAiSummary({
+        data: {
+          tenantSoftwareId,
+          action: 'edit',
+        },
       })
-      await handleReviewAiSummary(action)
-      return
+      await queryClient.invalidateQueries({ queryKey })
+    } catch (error) {
+      setStageError(getApiErrorMessage(error, 'Unable to prepare the AI decision draft.'))
     }
-
-    if (tab === 'owner' || tab === 'exception') {
-      setDecisionSeed({
-        token: Date.now(),
-        outcome: data.aiSummary.recommendedOutcome || data.currentDecision?.outcome || null,
-        justification: tab === 'exception'
-          ? data.aiSummary.exceptionRecommendation || null
-          : data.aiSummary.ownerRecommendation || null,
-        maintenanceWindowDate: data.currentDecision?.maintenanceWindowDate ?? null,
-        expiryDate: data.currentDecision?.expiryDate ?? null,
-        reEvaluationDate: data.currentDecision?.reEvaluationDate ?? null,
-      })
-      await handleReviewAiSummary(action)
-      return
-    }
-
-    await handleReviewAiSummary(action)
   }
 
   return (
@@ -500,10 +472,13 @@ export function SoftwareRemediationView({
 
             <AiDecisionBrief
               aiSummary={data.aiSummary}
+              currentStageId={currentStageId}
+              canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
               generatingAiSummary={generatingAiSummary}
-              reviewingAiAction={reviewingAiAction}
               onGenerateAiSummary={handleGenerateAiSummary}
-              onReviewAiSummary={handleAiDraftAction}
+              onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
+              onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
+              onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
             />
           </div>
         </TabsContent>
@@ -582,23 +557,37 @@ function WorkflowFact({
   )
 }
 
+function toDateInputValue(value?: string | null) {
+  if (!value) return ''
+  return value.slice(0, 10)
+}
+
+function toIsoDateBoundary(value: string) {
+  if (!value) return undefined
+  return `${value}T00:00:00Z`
+}
+
 type DecisionAiSummary = DecisionContext['aiSummary']
 
 function AiDecisionBrief({
   aiSummary,
+  currentStageId,
+  canActOnCurrentStage,
   generatingAiSummary,
-  reviewingAiAction,
   onGenerateAiSummary,
-  onReviewAiSummary,
+  onUseAnalystRecommendation,
+  onUseOwnerDecision,
+  onUseExceptionDecision,
 }: {
   aiSummary: DecisionAiSummary
+  currentStageId: RemediationStageId
+  canActOnCurrentStage: boolean
   generatingAiSummary: boolean
-  reviewingAiAction: 'accept' | 'edit' | 'reject' | null
   onGenerateAiSummary: () => Promise<void>
-  onReviewAiSummary: (tab: AiBriefTab, action: 'accept' | 'edit' | 'reject') => Promise<void>
+  onUseAnalystRecommendation: () => Promise<void>
+  onUseOwnerDecision: () => Promise<void>
+  onUseExceptionDecision: () => Promise<void>
 }) {
-  const [selectedTab, setSelectedTab] = useState<AiBriefTab | null>(null)
-  const activeTab = selectedTab ?? resolveAiTab(aiSummary)
   const hasGuidance = Boolean(
     aiSummary.content
       || aiSummary.ownerRecommendation
@@ -611,11 +600,11 @@ function AiDecisionBrief({
     <Card className="rounded-[1.6rem] border-border/70">
       <CardHeader className="space-y-2 pb-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle className="text-sm">AI decision brief</CardTitle>
+          <CardTitle className="text-sm">AI guidance</CardTitle>
           <AiStatusBadge aiSummary={aiSummary} />
         </div>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          PatchHound drafts separate guidance for executives, owners, analysts, and exception reviewers. The final decision still stays with your team.
+          PatchHound explains the business impact first, then shows the suggested owner and analyst guidance below. The final decision still stays with your team.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -641,97 +630,86 @@ function AiDecisionBrief({
         ) : null}
         {hasGuidance ? (
           <>
-            <div className="rounded-2xl border border-border/70 bg-background/50 p-1.5">
-              <Tabs value={activeTab} onValueChange={(value) => setSelectedTab(value as AiBriefTab)} className="gap-4">
-                <TabsList className="grid h-auto w-full grid-cols-2 rounded-[1rem] bg-transparent p-0 md:grid-cols-4">
-                  <TabsTrigger value="executive" className="rounded-xl px-3 py-2 text-sm">
-                    Executive
-                  </TabsTrigger>
-                  <TabsTrigger value="owner" className="rounded-xl px-3 py-2 text-sm">
-                    Owner
-                  </TabsTrigger>
-                  <TabsTrigger value="analyst" className="rounded-xl px-3 py-2 text-sm">
-                    Analyst
-                  </TabsTrigger>
-                  <TabsTrigger value="exception" className="rounded-xl px-3 py-2 text-sm">
-                    Exception
-                  </TabsTrigger>
-                </TabsList>
+            <div className="space-y-3">
+              <AiAudiencePanel
+                eyebrow="Business brief"
+                title="What this means for the business"
+                content={aiSummary.content}
+                emptyState="No business summary has been generated yet."
+              />
 
-                <TabsContent value="executive" className="px-3 pb-3 pt-1">
-                  <AiAudiencePanel
-                    eyebrow="Business brief"
-                    title="What this means for the business"
-                    content={aiSummary.content}
-                    emptyState="No executive brief has been generated yet."
-                  />
-                </TabsContent>
+              {(aiSummary.ownerRecommendation || aiSummary.recommendedOutcome) ? (
+                <AiAudiencePanel
+                  eyebrow="Owner guidance"
+                  title="Suggested remediation path"
+                  content={aiSummary.ownerRecommendation}
+                  emptyState="No owner recommendation has been generated yet."
+                  callout={aiSummary.recommendedOutcome ? (
+                    <div className="rounded-2xl border border-border/70 bg-background/70 px-3 py-2">
+                      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                        Suggested outcome
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-foreground">
+                        {outcomeLabel(aiSummary.recommendedOutcome)}
+                      </p>
+                    </div>
+                  ) : null}
+                  action={currentStageId === 'remediationDecision' && canActOnCurrentStage ? (
+                    <Button type="button" variant="outline" size="sm" onClick={() => void onUseOwnerDecision()}>
+                      Use in decision form
+                    </Button>
+                  ) : null}
+                />
+              ) : null}
 
-                <TabsContent value="owner" className="px-3 pb-3 pt-1">
-                  <AiAudiencePanel
-                    eyebrow="Owner guidance"
-                    title="What the asset owner should do next"
-                    content={aiSummary.ownerRecommendation}
-                    emptyState="No owner recommendation has been generated yet."
-                  />
-                </TabsContent>
+              {(aiSummary.analystAssessment || aiSummary.recommendedPriority) ? (
+                <AiAudiencePanel
+                  eyebrow="Analyst guidance"
+                  title="Suggested triage and priority"
+                  content={aiSummary.analystAssessment}
+                  emptyState="No analyst assessment has been generated yet."
+                  callout={aiSummary.recommendedPriority ? (
+                    <div className="rounded-2xl border border-border/70 bg-background/70 px-3 py-2">
+                      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                        Recommended priority
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-foreground">
+                        {aiSummary.recommendedPriority}
+                      </p>
+                    </div>
+                  ) : null}
+                  action={currentStageId === 'securityAnalysis' && canActOnCurrentStage ? (
+                    <Button type="button" variant="outline" size="sm" onClick={() => void onUseAnalystRecommendation()}>
+                      Use in analyst recommendation
+                    </Button>
+                  ) : null}
+                />
+              ) : null}
 
-                <TabsContent value="analyst" className="px-3 pb-3 pt-1">
-                  <AiAudiencePanel
-                    eyebrow="Triage support"
-                    title="How the analyst should frame priority and handling"
-                    content={aiSummary.analystAssessment}
-                    emptyState="No analyst assessment has been generated yet."
-                    callout={aiSummary.recommendedPriority ? (
-                      <div className="rounded-2xl border border-border/70 bg-background/70 px-3 py-2">
-                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                          Recommended priority
-                        </p>
-                        <p className="mt-1 text-sm font-medium text-foreground">
-                          {aiSummary.recommendedPriority}
-                        </p>
-                      </div>
-                    ) : null}
-                  />
-                </TabsContent>
-
-                <TabsContent value="exception" className="px-3 pb-3 pt-1">
-                  <AiAudiencePanel
-                    eyebrow="Exception review"
-                    title="What to consider before accepting an exception"
-                    content={aiSummary.exceptionRecommendation}
-                    emptyState="No exception recommendation has been generated yet."
-                  />
-                </TabsContent>
-              </Tabs>
+              {aiSummary.exceptionRecommendation ? (
+                <AiAudiencePanel
+                  eyebrow="Exception review"
+                  title="If the team is considering deferral or acceptance"
+                  content={aiSummary.exceptionRecommendation}
+                  emptyState="No exception recommendation has been generated yet."
+                  action={currentStageId === 'remediationDecision' && canActOnCurrentStage ? (
+                    <Button type="button" variant="outline" size="sm" onClick={() => void onUseExceptionDecision()}>
+                      Use in decision form
+                    </Button>
+                  ) : null}
+                />
+              ) : null}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
-                size="sm"
-                onClick={() => void onReviewAiSummary(activeTab, 'accept')}
-                disabled={reviewingAiAction !== null}
-              >
-                {reviewingAiAction === 'accept' ? 'Accepting...' : 'Accept AI draft'}
-              </Button>
-              <Button
-                type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => void onReviewAiSummary(activeTab, 'edit')}
-                disabled={reviewingAiAction !== null}
+                onClick={onGenerateAiSummary}
+                disabled={generatingAiSummary}
               >
-                {reviewingAiAction === 'edit' ? 'Saving...' : `Edit ${activeTab} draft`}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => void onReviewAiSummary(activeTab, 'reject')}
-                disabled={reviewingAiAction !== null}
-              >
-                {reviewingAiAction === 'reject' ? 'Rejecting...' : 'Reject AI draft'}
+                {generatingAiSummary ? 'Refreshing...' : hasGuidance ? 'Refresh AI guidance' : 'Ask AI'}
               </Button>
             </div>
 
@@ -770,22 +748,27 @@ function AiAudiencePanel({
   content,
   emptyState,
   callout,
+  action,
 }: {
   eyebrow: string
   title: string
   content?: string | null
   emptyState: string
   callout?: ReactNode
+  action?: ReactNode
 }) {
   return (
     <div className="space-y-3 rounded-[1.35rem] border border-border/70 bg-background/80 px-4 py-4">
-      <div className="space-y-1">
-        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-          {eyebrow}
-        </p>
-        <h3 className="text-sm font-medium text-foreground">
-          {title}
-        </h3>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            {eyebrow}
+          </p>
+          <h3 className="text-sm font-medium text-foreground">
+            {title}
+          </h3>
+        </div>
+        {action}
       </div>
       {callout}
       {content ? (
@@ -837,24 +820,6 @@ function AiDecisionBriefFooter({ aiSummary }: { aiSummary: DecisionAiSummary }) 
     </>
   )
 }
-
-function resolveAiTab(aiSummary: DecisionAiSummary) {
-  if (aiSummary.content) {
-    return 'executive'
-  }
-
-  if (aiSummary.ownerRecommendation) {
-    return 'owner'
-  }
-
-  if (aiSummary.analystAssessment || aiSummary.recommendedPriority) {
-    return 'analyst'
-  }
-
-  return 'exception'
-}
-
-type AiBriefTab = 'executive' | 'owner' | 'analyst' | 'exception'
 
 function AiStatusBadge({ aiSummary }: { aiSummary: DecisionAiSummary }) {
   const tone = {
@@ -1326,15 +1291,6 @@ function StageRemediationDecisionPanel({
             recommendation={latestRecommendation}
           />
           <StageMetricCard
-            label={rejectedDecision ? 'Resubmission mode' : 'Analyst guidance'}
-            value={rejectedDecision ? 'Editable' : latestRecommendation ? 'Available' : 'Missing'}
-            detail={rejectedDecision
-              ? 'The owner team can revise the decision immediately after a rejected approval.'
-              : latestRecommendation
-                ? 'Security recommendation available to inform the decision'
-                : 'No security recommendation has been recorded yet'}
-          />
-          <StageMetricCard
             label="Current pressure"
             value={data.summary.totalVulnerabilities.toLocaleString()}
             detail={`${(data.summary.criticalCount + data.summary.highCount).toLocaleString()} critical or high vulnerabilities`}
@@ -1427,7 +1383,7 @@ function StageApprovalPanel({
   data: DecisionContext
   canActOnCurrentStage: boolean
   approving: boolean
-  onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string) => Promise<void>
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string, maintenanceWindowDate?: string) => Promise<void>
 }) {
   if (!data.currentDecision) {
     return null
@@ -1441,6 +1397,7 @@ function StageApprovalPanel({
       onApproveReject={onApproveReject}
       emphasizeApproval
       requireApprovalJustification
+      requireMaintenanceWindowOnApproval={data.currentDecision.outcome === 'ApprovedForPatching'}
       rightColumn={
         <>
           <StageMetricCard
@@ -1470,7 +1427,7 @@ function StageExecutionPanel({
   data: DecisionContext
   canActOnCurrentStage: boolean
   approving: boolean
-  onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string) => Promise<void>
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string, maintenanceWindowDate?: string) => Promise<void>
 }) {
   if (!data.currentDecision) {
     return null
@@ -1563,17 +1520,21 @@ function DecisionSummaryPanel({
   rightColumn,
   emphasizeApproval = false,
   requireApprovalJustification = false,
+  requireMaintenanceWindowOnApproval = false,
 }: {
   decision: NonNullable<DecisionContext['currentDecision']>
   readOnly: boolean
   approving: boolean
-  onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string) => Promise<void>
+  onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string, maintenanceWindowDate?: string) => Promise<void>
   rightColumn: ReactNode
   emphasizeApproval?: boolean
   requireApprovalJustification?: boolean
+  requireMaintenanceWindowOnApproval?: boolean
 }) {
   const [approvalJustification, setApprovalJustification] = useState('')
+  const [approvalMaintenanceWindowDate, setApprovalMaintenanceWindowDate] = useState(toDateInputValue(decision.maintenanceWindowDate))
   const isRejected = decision.approvalStatus === 'Rejected'
+  const needsMaintenanceWindowOnApproval = decision.approvalStatus === 'PendingApproval' && requireMaintenanceWindowOnApproval
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
@@ -1682,13 +1643,40 @@ function DecisionSummaryPanel({
           </div>
         ) : null}
 
+        {needsMaintenanceWindowOnApproval ? (
+          <div className="space-y-2 pt-1">
+            <label
+              className="text-xs font-medium text-muted-foreground"
+              htmlFor={`approval-maintenance-window-${decision.id}`}
+            >
+              Maintenance window date
+            </label>
+            <Input
+              id={`approval-maintenance-window-${decision.id}`}
+              type="date"
+              value={approvalMaintenanceWindowDate}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => setApprovalMaintenanceWindowDate(event.target.value)}
+              placeholder="Select maintenance window"
+              disabled={approving || readOnly}
+              className="bg-background/70"
+            />
+            <p className="text-xs text-muted-foreground">
+              The technical manager sets when the approved patch is expected to be in place.
+            </p>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-2 pt-1">
           {decision.approvalStatus === 'PendingApproval' ? (
             <>
               <Button
                 size="sm"
-                onClick={() => onApproveReject('approve', approvalJustification)}
-                disabled={approving || readOnly}
+                onClick={() => onApproveReject(
+                  'approve',
+                  approvalJustification,
+                  needsMaintenanceWindowOnApproval ? toIsoDateBoundary(approvalMaintenanceWindowDate) : undefined,
+                )}
+                disabled={approving || readOnly || (needsMaintenanceWindowOnApproval && approvalMaintenanceWindowDate === '')}
               >
                 <CheckCircle className="mr-1.5 size-3.5" />
                 Approve

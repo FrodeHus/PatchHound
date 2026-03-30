@@ -125,7 +125,7 @@ public class ApprovalTaskServiceTests : IDisposable
         var task = await _sut.CreateForDecisionAsync(decision, 24, CancellationToken.None);
         var approverId = Guid.NewGuid();
 
-        var result = await _sut.ApproveAsync(task.Id, approverId, "Looks good", CancellationToken.None);
+        var result = await _sut.ApproveAsync(task.Id, approverId, "Looks good", null, CancellationToken.None);
 
         result.Status.Should().Be(ApprovalTaskStatus.Approved);
         result.ResolvedBy.Should().Be(approverId);
@@ -174,6 +174,36 @@ public class ApprovalTaskServiceTests : IDisposable
             task.Id,
             Arg.Any<CancellationToken>()
         );
+    }
+
+    [Fact]
+    public async Task ApproveAsync_PatchingDecision_RequiresMaintenanceWindowDate()
+    {
+        var decision = CreateDecision(RemediationOutcome.ApprovedForPatching);
+        var task = await _sut.CreateForDecisionAsync(decision, 24, CancellationToken.None);
+
+        var act = () => _sut.ApproveAsync(task.Id, Guid.NewGuid(), "Approved", null, CancellationToken.None);
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*Maintenance window date is required*");
+    }
+
+    [Fact]
+    public async Task ApproveAsync_PatchingDecision_SetsMaintenanceWindowDateOnApproval()
+    {
+        var decision = CreateDecision(RemediationOutcome.ApprovedForPatching);
+        var task = await _sut.CreateForDecisionAsync(decision, 24, CancellationToken.None);
+        var maintenanceWindowDate = new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero);
+
+        var result = await _sut.ApproveAsync(task.Id, Guid.NewGuid(), "Approved", maintenanceWindowDate, CancellationToken.None);
+
+        result.Status.Should().Be(ApprovalTaskStatus.Approved);
+
+        var updatedDecision = await _dbContext.RemediationDecisions
+            .IgnoreQueryFilters()
+            .FirstAsync(d => d.Id == decision.Id);
+        updatedDecision.MaintenanceWindowDate.Should().Be(maintenanceWindowDate);
+        updatedDecision.ApprovalStatus.Should().Be(DecisionApprovalStatus.Approved);
     }
 
     [Fact]

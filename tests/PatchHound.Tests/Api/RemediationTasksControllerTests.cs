@@ -95,6 +95,7 @@ public class RemediationTasksControllerTests : IDisposable
             approvalTask.Id,
             _tenantContext.CurrentUserId,
             "Approved for execution",
+            new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero),
             CancellationToken.None
         );
 
@@ -156,6 +157,7 @@ public class RemediationTasksControllerTests : IDisposable
             approvalTask.Id,
             _tenantContext.CurrentUserId,
             "Approved for execution",
+            new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero),
             CancellationToken.None
         );
 

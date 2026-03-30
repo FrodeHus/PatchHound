@@ -50,8 +50,8 @@ function ApprovalTaskDetailRoute() {
   return (
     <ApprovalTaskDetail
       data={data}
-      onResolve={async (action, justification) => {
-        await resolveApprovalTask({ data: { id, action, justification } })
+      onResolve={async (action, justification, maintenanceWindowDate) => {
+        await resolveApprovalTask({ data: { id, action, justification, maintenanceWindowDate } })
         void queryClient.invalidateQueries({ queryKey: ['approval-task', id] })
         void queryClient.invalidateQueries({ queryKey: ['approval-tasks'] })
         void navigate({ to: '/approvals', search: { page: 1, pageSize: 25, status: '', type: '', search: '', showRead: false } })

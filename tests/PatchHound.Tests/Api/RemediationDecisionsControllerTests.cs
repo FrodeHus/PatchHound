@@ -240,7 +240,7 @@ public class RemediationDecisionsControllerTests : IDisposable
         var firstApprovalTask = await _dbContext.ApprovalTasks
             .OrderByDescending(item => item.CreatedAt)
             .FirstAsync();
-        await approvalTaskService.ApproveAsync(firstApprovalTask.Id, _userId, "Exception renewed.", CancellationToken.None);
+        await approvalTaskService.ApproveAsync(firstApprovalTask.Id, _userId, "Exception renewed.", null, CancellationToken.None);
         await _dbContext.SaveChangesAsync();
 
         var firstWorkflow = await _dbContext.RemediationWorkflows
@@ -313,7 +313,7 @@ public class RemediationDecisionsControllerTests : IDisposable
         var firstApprovalTask = await _dbContext.ApprovalTasks
             .OrderByDescending(item => item.CreatedAt)
             .FirstAsync();
-        await approvalTaskService.ApproveAsync(firstApprovalTask.Id, _userId, "Patch confirmed.", CancellationToken.None);
+        await approvalTaskService.ApproveAsync(firstApprovalTask.Id, _userId, "Patch confirmed.", new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero), CancellationToken.None);
 
         var firstWorkflow = await _dbContext.RemediationWorkflows
             .OrderByDescending(item => item.CreatedAt)

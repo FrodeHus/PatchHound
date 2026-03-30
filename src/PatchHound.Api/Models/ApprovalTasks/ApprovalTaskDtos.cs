@@ -106,7 +106,8 @@ public record ApprovalAuditEntryDto(
 
 public record ResolveApprovalTaskRequest(
     string Action,
-    string? Justification
+    string? Justification,
+    DateTimeOffset? MaintenanceWindowDate
 );
 
 public record ApprovalTaskFilterQuery(
