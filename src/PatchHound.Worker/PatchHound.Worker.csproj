@@ -9,7 +9,10 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\PatchHound.Api\PatchHound.Api.csproj" />
+    <ProjectReference Include="..\PatchHound.Api\PatchHound.Api.csproj">
+      <PrivateAssets>all</PrivateAssets>
+      <ExcludeAssets>contentFiles</ExcludeAssets>
+    </ProjectReference>
     <ProjectReference Include="..\PatchHound.Core\PatchHound.Core.csproj" />
     <ProjectReference Include="..\PatchHound.Infrastructure\PatchHound.Infrastructure.csproj" />
   </ItemGroup>
