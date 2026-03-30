@@ -117,6 +117,24 @@ public class RemediationDecisionsControllerTests : IDisposable
             model: "llama3",
             systemPrompt: "system"
         );
+        var deviceOne = await _dbContext.Assets.IgnoreQueryFilters()
+            .FirstAsync(item => item.TenantId == _tenantId && item.ExternalId == "device-1");
+        deviceOne.UpdateDeviceDetails(
+            deviceOne.DeviceComputerDnsName,
+            deviceOne.DeviceHealthStatus,
+            deviceOne.DeviceOsPlatform,
+            deviceOne.DeviceOsVersion,
+            deviceOne.DeviceRiskScore,
+            deviceOne.DeviceLastSeenAt,
+            deviceOne.DeviceLastIpAddress,
+            deviceOne.DeviceAadDeviceId,
+            deviceOne.DeviceGroupId,
+            deviceOne.DeviceGroupName,
+            deviceOne.DeviceExposureLevel,
+            deviceOne.DeviceIsAadJoined,
+            deviceOne.DeviceOnboardingStatus,
+            "Tier 0"
+        );
         await _dbContext.TenantAiProfiles.AddAsync(profile);
         await _dbContext.SaveChangesAsync();
 
@@ -138,6 +156,18 @@ public class RemediationDecisionsControllerTests : IDisposable
         var payload = result.Value.Should().BeOfType<DecisionAiSummaryDto>().Subject;
         payload.Content.Should().Contain("Attackers could use these issues");
         payload.CanGenerate.Should().BeTrue();
+        await _aiProvider.Received(1).GenerateTextAsync(
+            Arg.Is<AiTextGenerationRequest>(request =>
+                request.UserPrompt.Contains("HighestAssetCriticality")
+                && request.UserPrompt.Contains("ServerCount")
+                && request.UserPrompt.Contains("InternetReachableDeviceCount")
+                && request.UserPrompt.Contains("BusinessValueSummary")
+                && request.UserPrompt.Contains("TopFiveKnownExploitedCount")
+                && request.UserPrompt.Contains("SlaDueDate")
+            ),
+            Arg.Any<TenantAiProfileResolved>(),
+            Arg.Any<CancellationToken>()
+        );
 
         var updatedTenantSoftware = await _dbContext.TenantSoftware
             .IgnoreQueryFilters()
