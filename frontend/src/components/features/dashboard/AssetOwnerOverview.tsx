@@ -72,13 +72,16 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
                   </div>
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{summary.ownedAssetCount}</div>
                 </div>
-                <div className="rounded-[1.2rem] border border-destructive/20 bg-destructive/8 px-4 py-4">
+                <a
+                  href="/dashboard/my-assets/attention"
+                  className="block rounded-[1.2rem] border border-destructive/20 bg-destructive/8 px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
                   <div className="flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-destructive">
                     Need attention
                     <MetricInfoTooltip content="Need attention means the owned asset currently carries enough exposure or remediation pressure that it should be reviewed rather than left in routine monitoring." />
                   </div>
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{summary.assetsNeedingAttention}</div>
-                </div>
+                </a>
               </div>
             </div>
           </div>
@@ -209,7 +212,7 @@ export function AssetOwnerOverview({ summary, isLoading }: Props) {
           </CardContent>
         </Card>
 
-        <Card className="rounded-[1.6rem] border-border/70">
+        <Card id="owned-assets-needing-attention" className="rounded-[1.6rem] border-border/70">
           <CardHeader>
             <CardTitle>Assets under the most pressure</CardTitle>
             <CardDescription>

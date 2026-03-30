@@ -247,6 +247,16 @@ public class RemediationDecisionQueryService(
                 continue;
             }
 
+            if (filter.MissedMaintenanceWindow == true)
+            {
+                if (decision?.MaintenanceWindowDate is not DateTimeOffset maintenanceWindowDate
+                    || maintenanceWindowDate >= DateTimeOffset.UtcNow
+                    || activeVulnerabilityCount <= 0)
+                {
+                    continue;
+                }
+            }
+
             string? riskBand = null;
             double? riskScore = null;
             if (riskScoresByTsId.TryGetValue(software.Id, out var risk))

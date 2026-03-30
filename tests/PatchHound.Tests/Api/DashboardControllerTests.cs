@@ -238,6 +238,118 @@ public class DashboardControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetOwnerSummary_CountsAssetsNeedingAttentionAcrossAllOwnedAssets()
+    {
+        var currentUserId = _tenantContext.CurrentUserId;
+        var timestamp = DateTimeOffset.UtcNow;
+
+        var ownedAssets = Enumerable.Range(1, 8)
+            .Select(index =>
+            {
+                var asset = Asset.Create(
+                    _tenantId,
+                    $"device-owner-{index}",
+                    AssetType.Device,
+                    $"Owned Device {index}",
+                    index <= 7 ? Criticality.High : Criticality.Medium);
+                asset.AssignOwner(currentUserId);
+                return asset;
+            })
+            .ToList();
+
+        var riskScores = ownedAssets.Select((asset, index) =>
+            AssetRiskScore.Create(
+                _tenantId,
+                asset.Id,
+                index <= 6 ? 650m + index : 240m,
+                index <= 6 ? 780m + index : 220m,
+                index <= 6 ? 2 : 0,
+                index <= 6 ? 4 : 1,
+                index <= 6 ? 2 : 0,
+                index <= 6 ? 1 : 0,
+                index <= 6 ? 7 : 1,
+                "{}",
+                "test-v1"
+            ))
+            .ToList();
+
+        await _dbContext.AddRangeAsync(ownedAssets);
+        await _dbContext.AddRangeAsync(riskScores);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetOwnerSummary(CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<OwnerDashboardSummaryDto>().Subject;
+
+        payload.OwnedAssetCount.Should().Be(8);
+        payload.AssetsNeedingAttention.Should().Be(7);
+        payload.TopOwnedAssets.Should().HaveCount(6);
+    }
+
+    [Fact]
+    public async Task GetOwnerAssetsNeedingAttention_ReturnsOnlyOwnedAssetsAboveAttentionThreshold()
+    {
+        var currentUserId = _tenantContext.CurrentUserId;
+        var timestamp = DateTimeOffset.UtcNow;
+
+        var ownedCritical = Asset.Create(_tenantId, "device-critical", AssetType.Device, "Critical Device", Criticality.High);
+        ownedCritical.AssignOwner(currentUserId);
+        var ownedModerate = Asset.Create(_tenantId, "device-moderate", AssetType.Device, "Moderate Device", Criticality.Medium);
+        ownedModerate.AssignOwner(currentUserId);
+        var foreignAsset = Asset.Create(_tenantId, "device-foreign", AssetType.Device, "Foreign Device", Criticality.High);
+
+        var vulnerabilityDefinition = VulnerabilityDefinition.Create(
+            "CVE-2026-8700",
+            "Remote code execution risk",
+            "Attackers could run code remotely on the affected device.",
+            Severity.Critical,
+            "MicrosoftDefender",
+            9.8m
+        );
+        var tenantVulnerability = TenantVulnerability.Create(
+            _tenantId,
+            vulnerabilityDefinition.Id,
+            VulnerabilityStatus.Open,
+            timestamp.AddDays(-2)
+        );
+
+        await _dbContext.AddRangeAsync(
+            ownedCritical,
+            ownedModerate,
+            foreignAsset,
+            vulnerabilityDefinition,
+            tenantVulnerability,
+            AssetRiskScore.Create(_tenantId, ownedCritical.Id, 710m, 820m, 3, 2, 1, 0, 6, "{}", "test-v1"),
+            AssetRiskScore.Create(_tenantId, ownedModerate.Id, 420m, 500m, 0, 1, 1, 0, 2, "{}", "test-v1"),
+            AssetRiskScore.Create(_tenantId, foreignAsset.Id, 830m, 910m, 4, 2, 1, 0, 7, "{}", "test-v1"),
+            VulnerabilityEpisodeRiskAssessment.Create(
+                _tenantId,
+                Guid.NewGuid(),
+                tenantVulnerability.Id,
+                ownedCritical.Id,
+                null,
+                0.9m,
+                0.8m,
+                0.7m,
+                765m,
+                "Critical",
+                "[]",
+                "test-v1")
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetOwnerAssetsNeedingAttention(CancellationToken.None);
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeAssignableTo<List<OwnerAssetSummaryDto>>().Subject;
+
+        payload.Should().ContainSingle();
+        payload[0].AssetId.Should().Be(ownedCritical.Id);
+        payload[0].TopDriverTitle.Should().Be("Remote code execution risk");
+    }
+
+    [Fact]
     public async Task GetTechnicalManagerSummary_ReturnsApprovedPatchingTasks_AndDevicesWithAgedPublishedVulnerabilities()
     {
         var timestamp = DateTimeOffset.UtcNow;

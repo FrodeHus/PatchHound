@@ -14,6 +14,7 @@ const softwareSearchSchema = baseListSearchSchema.extend({
   confidence: searchStringSchema,
   vulnerableOnly: searchBooleanSchema,
   boundOnly: searchBooleanSchema,
+  missedMaintenanceWindow: searchBooleanSchema,
 })
 
 export const Route = createFileRoute('/_authed/software/')({
@@ -56,6 +57,7 @@ function SoftwareIndexPage() {
         confidenceFilter={search.confidence}
         vulnerableOnly={search.vulnerableOnly}
         boundOnly={search.boundOnly}
+        missedMaintenanceWindow={search.missedMaintenanceWindow}
         onSearchChange={(value) => {
           searchActions.updateField('search', value)
         }}
@@ -68,11 +70,15 @@ function SoftwareIndexPage() {
         onBoundOnlyChange={(value) => {
           searchActions.updateField('boundOnly', value)
         }}
+        onMissedMaintenanceWindowChange={(value) => {
+          searchActions.updateField('missedMaintenanceWindow', value)
+        }}
         onApplyStructuredFilters={(filters) => {
           searchActions.updateFields({
             confidence: filters.confidence,
             vulnerableOnly: filters.vulnerableOnly,
             boundOnly: filters.boundOnly,
+            missedMaintenanceWindow: filters.missedMaintenanceWindow,
           })
         }}
         onShowRiskDetail={setSelectedRiskSoftwareId}
@@ -88,6 +94,7 @@ function SoftwareIndexPage() {
             confidence: '',
             vulnerableOnly: false,
             boundOnly: false,
+            missedMaintenanceWindow: false,
           })
         }}
       />

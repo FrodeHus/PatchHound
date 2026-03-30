@@ -180,6 +180,7 @@ export const ownerDashboardSummarySchema = z.object({
 export type DashboardFilterOptions = z.infer<typeof dashboardFilterOptionsSchema>
 export type DeviceGroupVulnerability = z.infer<typeof dashboardSummarySchema>['vulnerabilitiesByDeviceGroup'][number]
 export type OwnerDashboardSummary = z.infer<typeof ownerDashboardSummarySchema>
+export type OwnerAssetSummary = z.infer<typeof ownerAssetSummarySchema>
 
 export const approvalAttentionTaskSchema = z.object({
   approvalTaskId: z.string().uuid(),
@@ -236,6 +237,7 @@ export const devicePatchDriftSchema = z.object({
 })
 
 export const technicalManagerDashboardSummarySchema = z.object({
+  missedMaintenanceWindowCount: z.number(),
   approvedPatchingTasks: z.array(approvedPatchingTaskSchema),
   devicesWithAgedVulnerabilities: z.array(devicePatchDriftSchema),
   approvalTasksRequiringAttention: z.array(approvalAttentionTaskSchema),

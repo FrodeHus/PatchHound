@@ -382,6 +382,25 @@ public class SoftwareController(
             );
         }
 
+        if (filter.MissedMaintenanceWindow == true)
+        {
+            var now = DateTimeOffset.UtcNow;
+            query = query.Where(item =>
+                dbContext.RemediationDecisions.Any(decision =>
+                    decision.TenantId == currentTenantId
+                    && decision.TenantSoftwareId == item.Id
+                    && decision.MaintenanceWindowDate != null
+                    && decision.MaintenanceWindowDate < now
+                    && decision.ApprovalStatus != DecisionApprovalStatus.Rejected
+                    && decision.ApprovalStatus != DecisionApprovalStatus.Expired)
+                && dbContext.NormalizedSoftwareVulnerabilityProjections.Any(projection =>
+                    projection.TenantSoftwareId == item.Id
+                    && projection.SnapshotId == activeSnapshotId
+                    && projection.ResolvedAt == null
+                )
+            );
+        }
+
         var totalCount = await query.CountAsync(ct);
         var rows = await query
             .Select(item => new

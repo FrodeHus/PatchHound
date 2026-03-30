@@ -4,7 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { fetchDecisionList } from '@/api/remediation.functions'
 import { RemediationWorkbench } from '@/components/features/remediation/RemediationWorkbench'
 import { useTenantScope } from '@/components/layout/tenant-scope'
-import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
+import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
 
 const remediationSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
@@ -12,6 +12,7 @@ const remediationSearchSchema = baseListSearchSchema.extend({
   outcome: searchStringSchema,
   approvalStatus: searchStringSchema,
   decisionState: searchStringSchema,
+  missedMaintenanceWindow: searchBooleanSchema,
 })
 
 export const Route = createFileRoute('/_authed/remediation/')({
@@ -63,6 +64,7 @@ function RemediationRoute() {
         outcome: search.outcome,
         approvalStatus: search.approvalStatus,
         decisionState: search.decisionState,
+        missedMaintenanceWindow: search.missedMaintenanceWindow,
       }}
       onFiltersChange={(filters) => {
         void navigate({
@@ -91,6 +93,7 @@ function normalizeFilters(search: {
   outcome: string
   approvalStatus: string
   decisionState: string
+  missedMaintenanceWindow: boolean
 }) {
   return {
     search: search.search || undefined,
@@ -98,5 +101,6 @@ function normalizeFilters(search: {
     outcome: search.outcome || undefined,
     approvalStatus: search.approvalStatus || undefined,
     decisionState: search.decisionState || undefined,
+    missedMaintenanceWindow: search.missedMaintenanceWindow || undefined,
   }
 }

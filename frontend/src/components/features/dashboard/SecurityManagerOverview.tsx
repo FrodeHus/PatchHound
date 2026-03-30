@@ -96,7 +96,7 @@ export function SecurityManagerOverview({ summary, managerSummary, isLoading }: 
             <Button
               size="sm"
               variant="outline"
-              render={<Link to="/remediation" search={{ page: 1, pageSize: 25, search: '', criticality: '', outcome: '', approvalStatus: 'Approved', decisionState: '' }} />}
+              render={<Link to="/remediation" search={{ page: 1, pageSize: 25, search: '', criticality: '', outcome: '', approvalStatus: 'Approved', decisionState: '', missedMaintenanceWindow: false }} />}
             >
               Full list
             </Button>

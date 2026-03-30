@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models.Dashboard;
 using PatchHound.Api.Services;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
@@ -628,64 +629,36 @@ public class DashboardController : ControllerBase
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<OwnerDashboardSummaryDto>> GetOwnerSummary(CancellationToken ct)
     {
-        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+        var ownerScope = await ResolveOwnerScopeAsync(ct);
+        if (ownerScope.Result is not null)
         {
-            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+            return ownerScope.Result;
         }
 
-        var currentUserId = _tenantContext.CurrentUserId;
-        if (currentUserId == Guid.Empty)
-        {
-            return Unauthorized();
-        }
-
-        var ownerTeamIds = await _dbContext.TeamMembers.AsNoTracking()
-            .Where(item => item.UserId == currentUserId)
-            .Select(item => item.TeamId)
-            .ToListAsync(ct);
-
-        var ownedAssetsQuery = _dbContext.Assets.AsNoTracking()
-            .Where(asset =>
-                asset.TenantId == tenantId
-                && (
-                    asset.OwnerUserId == currentUserId
-                    || (asset.OwnerTeamId != null && ownerTeamIds.Contains(asset.OwnerTeamId.Value))
-                    || (asset.FallbackTeamId != null && ownerTeamIds.Contains(asset.FallbackTeamId.Value))
-                )
-            );
+        var tenantId = ownerScope.TenantId;
+        var ownedAssetsQuery = ownerScope.OwnedAssetsQuery;
 
         var ownedAssetIds = await ownedAssetsQuery
             .Select(asset => asset.Id)
             .ToListAsync(ct);
 
-        var topOwnedAssets = ownedAssetIds.Count == 0
-            ? []
+        var assetsNeedingAttention = ownedAssetIds.Count == 0
+            ? 0
             : await (
                 from asset in ownedAssetsQuery
                 join score in _dbContext.AssetRiskScores.AsNoTracking()
-                    on asset.Id equals score.AssetId into scoreJoin
-                from score in scoreJoin.DefaultIfEmpty()
-                select new
-                {
-                    asset.Id,
-                    AssetName = asset.AssetType == AssetType.Device
-                        ? asset.DeviceComputerDnsName ?? asset.Name
-                        : asset.Name,
-                    asset.DeviceGroupName,
-                    Criticality = asset.Criticality.ToString(),
-                    CurrentRiskScore = score != null ? (decimal?)score.OverallScore : null,
-                    OpenEpisodeCount = score != null ? score.OpenEpisodeCount : 0,
-                    CriticalCount = score != null ? score.CriticalCount : 0,
-                    HighCount = score != null ? score.HighCount : 0
-                }
+                    on asset.Id equals score.AssetId
+                where score.OverallScore >= 500m
+                select asset.Id
             )
-                .OrderByDescending(item => item.CurrentRiskScore ?? 0m)
-                .ThenByDescending(item => item.CriticalCount)
-                .ThenByDescending(item => item.HighCount)
-                .Take(6)
-                .ToListAsync(ct);
+                .Distinct()
+                .CountAsync(ct);
 
-        var topAssetIds = topOwnedAssets.Select(item => item.Id).ToList();
+        var topOwnedAssets = ownedAssetIds.Count == 0
+            ? []
+            : await BuildOwnerAssetSummariesAsync(tenantId, ownedAssetsQuery, take: 6, attentionOnly: false, ct);
+
+        var topAssetIds = topOwnedAssets.Select(item => item.AssetId).ToList();
         var topDriverRows = await _dbContext.VulnerabilityEpisodeRiskAssessments.AsNoTracking()
             .Where(item => topAssetIds.Contains(item.AssetId) && item.ResolvedAt == null)
             .OrderByDescending(item => item.EpisodeRiskScore)
@@ -705,12 +678,12 @@ public class DashboardController : ControllerBase
             .Select(item =>
             {
                 var topDriver = topDriverRows
-                    .Where(driver => driver.AssetId == item.Id)
+                    .Where(driver => driver.AssetId == item.AssetId)
                     .OrderByDescending(driver => driver.EpisodeRiskScore)
                     .FirstOrDefault();
 
                 return new OwnerAssetSummaryDto(
-                    item.Id,
+                    item.AssetId,
                     item.AssetName,
                     item.DeviceGroupName,
                     item.Criticality,
@@ -740,7 +713,7 @@ public class DashboardController : ControllerBase
             join ownerTeam in _dbContext.Teams.AsNoTracking()
                 on pt.OwnerTeamId equals ownerTeam.Id
             where pt.TenantId == tenantId
-                  && ownerTeamIds.Contains(pt.OwnerTeamId)
+                  && ownerScope.OwnerTeamIds.Contains(pt.OwnerTeamId)
                   && pt.Status != PatchingTaskStatus.Completed
             select new
             {
@@ -845,13 +818,164 @@ public class DashboardController : ControllerBase
 
         return Ok(new OwnerDashboardSummaryDto(
             ownedAssetIds.Count,
-            ownerAssets.Count(item => (item.CurrentRiskScore ?? 0m) >= 500m),
+            assetsNeedingAttention,
             ownerActions.Count,
             ownerActions.Count(item => item.DueDate.HasValue && item.DueDate.Value < DateTimeOffset.UtcNow),
             ownerAssets,
             ownerActions
         ));
     }
+
+    [HttpGet("owner-assets-needing-attention")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
+    public async Task<ActionResult<List<OwnerAssetSummaryDto>>> GetOwnerAssetsNeedingAttention(CancellationToken ct)
+    {
+        var ownerScope = await ResolveOwnerScopeAsync(ct);
+        if (ownerScope.Result is not null)
+        {
+            return ownerScope.Result;
+        }
+
+        var assets = await BuildOwnerAssetSummariesAsync(
+            ownerScope.TenantId,
+            ownerScope.OwnedAssetsQuery,
+            take: null,
+            attentionOnly: true,
+            ct);
+        return Ok(assets);
+    }
+
+    private async Task<OwnerScopeResult> ResolveOwnerScopeAsync(CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+        {
+            return new OwnerScopeResult(
+                new BadRequestObjectResult(new ProblemDetails { Title = "No active tenant is selected." }),
+                Guid.Empty,
+                [],
+                _dbContext.Assets.AsNoTracking().Where(_ => false));
+        }
+
+        var currentUserId = _tenantContext.CurrentUserId;
+        if (currentUserId == Guid.Empty)
+        {
+            return new OwnerScopeResult(
+                new UnauthorizedResult(),
+                Guid.Empty,
+                [],
+                _dbContext.Assets.AsNoTracking().Where(_ => false));
+        }
+
+        var ownerTeamIds = await _dbContext.TeamMembers.AsNoTracking()
+            .Where(item => item.UserId == currentUserId)
+            .Select(item => item.TeamId)
+            .ToListAsync(ct);
+
+        var ownedAssetsQuery = _dbContext.Assets.AsNoTracking()
+            .Where(asset =>
+                asset.TenantId == tenantId
+                && (
+                    asset.OwnerUserId == currentUserId
+                    || (asset.OwnerTeamId != null && ownerTeamIds.Contains(asset.OwnerTeamId.Value))
+                    || (asset.FallbackTeamId != null && ownerTeamIds.Contains(asset.FallbackTeamId.Value))
+                )
+            );
+
+        return new OwnerScopeResult(null, tenantId, ownerTeamIds, ownedAssetsQuery);
+    }
+
+    private async Task<List<OwnerAssetSummaryDto>> BuildOwnerAssetSummariesAsync(
+        Guid tenantId,
+        IQueryable<Asset> ownedAssetsQuery,
+        int? take,
+        bool attentionOnly,
+        CancellationToken ct)
+    {
+        var query =
+            from asset in ownedAssetsQuery
+            join score in _dbContext.AssetRiskScores.AsNoTracking()
+                on asset.Id equals score.AssetId into scoreJoin
+            from score in scoreJoin.DefaultIfEmpty()
+            select new
+            {
+                asset.Id,
+                AssetName = asset.AssetType == AssetType.Device
+                    ? asset.DeviceComputerDnsName ?? asset.Name
+                    : asset.Name,
+                asset.DeviceGroupName,
+                Criticality = asset.Criticality.ToString(),
+                CurrentRiskScore = score != null ? (decimal?)score.OverallScore : null,
+                OpenEpisodeCount = score != null ? score.OpenEpisodeCount : 0,
+                CriticalCount = score != null ? score.CriticalCount : 0,
+                HighCount = score != null ? score.HighCount : 0
+            };
+
+        if (attentionOnly)
+        {
+            query = query.Where(item => (item.CurrentRiskScore ?? 0m) >= 500m);
+        }
+
+        query = query
+            .OrderByDescending(item => item.CurrentRiskScore ?? 0m)
+            .ThenByDescending(item => item.CriticalCount)
+            .ThenByDescending(item => item.HighCount);
+
+        var rows = take.HasValue
+            ? await query.Take(take.Value).ToListAsync(ct)
+            : await query.ToListAsync(ct);
+
+        var assetIds = rows.Select(item => item.Id).ToList();
+        var topDriverRows = assetIds.Count == 0
+            ? []
+            : await _dbContext.VulnerabilityEpisodeRiskAssessments.AsNoTracking()
+                .Where(item => assetIds.Contains(item.AssetId) && item.ResolvedAt == null)
+                .OrderByDescending(item => item.EpisodeRiskScore)
+                .Select(item => new
+                {
+                    item.AssetId,
+                    item.EpisodeRiskScore,
+                    item.RiskBand,
+                    Title = item.TenantVulnerability.VulnerabilityDefinition.Title,
+                    Description = item.TenantVulnerability.VulnerabilityDefinition.Description,
+                    Severity = item.TenantVulnerability.VulnerabilityDefinition.VendorSeverity
+                })
+                .ToListAsync(ct);
+
+        return rows
+            .Select(item =>
+            {
+                var topDriver = topDriverRows
+                    .Where(driver => driver.AssetId == item.Id)
+                    .OrderByDescending(driver => driver.EpisodeRiskScore)
+                    .FirstOrDefault();
+
+                return new OwnerAssetSummaryDto(
+                    item.Id,
+                    item.AssetName,
+                    item.DeviceGroupName,
+                    item.Criticality,
+                    item.CurrentRiskScore,
+                    topDriver?.RiskBand,
+                    item.OpenEpisodeCount,
+                    topDriver?.Title,
+                    topDriver is null
+                        ? null
+                        : OwnerFacingIssueSummaryFormatter.BuildIssueSummary(
+                            null,
+                            topDriver.Title,
+                            topDriver.Description,
+                            topDriver.Severity
+                        )
+                );
+            })
+            .ToList();
+    }
+
+    private sealed record OwnerScopeResult(
+        ActionResult? Result,
+        Guid TenantId,
+        List<Guid> OwnerTeamIds,
+        IQueryable<Asset> OwnedAssetsQuery);
 
     [HttpGet("security-manager-summary")]
     [Authorize(Policy = Policies.ConfigureTenant)]
@@ -964,6 +1088,23 @@ public class DashboardController : ControllerBase
             approvedPatchingTasks.Select(item => item.TenantSoftwareId).Distinct().ToList(),
             ct);
 
+        var now = DateTimeOffset.UtcNow;
+        var missedMaintenanceWindowCount = await (
+            from task in _dbContext.PatchingTasks.AsNoTracking()
+            join decision in _dbContext.RemediationDecisions.AsNoTracking()
+                on task.RemediationDecisionId equals decision.Id
+            where task.TenantId == tenantId
+                  && task.Status != PatchingTaskStatus.Completed
+                  && decision.Outcome == RemediationOutcome.ApprovedForPatching
+                  && decision.ApprovalStatus == DecisionApprovalStatus.Approved
+                  && decision.MaintenanceWindowDate != null
+                  && decision.MaintenanceWindowDate < now
+                  && _dbContext.NormalizedSoftwareVulnerabilityProjections.Any(projection =>
+                      projection.TenantSoftwareId == task.TenantSoftwareId
+                      && projection.ResolvedAt == null)
+            select task.Id
+        ).CountAsync(ct);
+
         var agedCutoff = DateTimeOffset.UtcNow.AddDays(-90);
         var devicesWithAgedVulnerabilities = await (
             from episode in _dbContext.VulnerabilityAssetEpisodes.AsNoTracking()
@@ -1005,6 +1146,7 @@ public class DashboardController : ControllerBase
             ct);
 
         return Ok(new TechnicalManagerDashboardSummaryDto(
+            missedMaintenanceWindowCount,
             approvedPatchingTasks.Select(item =>
             {
                 var stats = patchingSoftwareStats.GetValueOrDefault(item.TenantSoftwareId);

@@ -232,6 +232,7 @@ public record DevicePatchDriftDto(
 );
 
 public record TechnicalManagerDashboardSummaryDto(
+    int MissedMaintenanceWindowCount,
     List<ApprovedPatchingTaskDto> ApprovedPatchingTasks,
     List<DevicePatchDriftDto> DevicesWithAgedVulnerabilities,
     List<ApprovalAttentionTaskDto> ApprovalTasksRequiringAttention

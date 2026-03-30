@@ -22,6 +22,7 @@ type Filters = {
   outcome: string
   approvalStatus: string
   decisionState: string
+  missedMaintenanceWindow: boolean
 }
 
 type Props = {
@@ -40,6 +41,8 @@ export function RemediationWorkbench({
   const [renderedAt] = useState(() => Date.now())
   const quickFilterLabel = filters.approvalStatus === 'PendingApproval'
     ? 'Pending approval'
+    : filters.missedMaintenanceWindow
+      ? 'Missed maintenance window'
     : filters.decisionState === 'WithDecision'
       ? 'With decision'
       : filters.decisionState === 'NoDecision'
@@ -75,6 +78,7 @@ export function RemediationWorkbench({
                   ...filters,
                   decisionState: "",
                   approvalStatus: "",
+                  missedMaintenanceWindow: false,
                 })
               }
             />
@@ -90,6 +94,7 @@ export function RemediationWorkbench({
                       ? ""
                       : "WithDecision",
                   approvalStatus: "",
+                  missedMaintenanceWindow: false,
                 })
               }
             />
@@ -105,6 +110,7 @@ export function RemediationWorkbench({
                       ? ""
                       : "PendingApproval",
                   decisionState: "",
+                  missedMaintenanceWindow: false,
                 })
               }
             />
@@ -118,6 +124,24 @@ export function RemediationWorkbench({
                   decisionState:
                     filters.decisionState === "NoDecision" ? "" : "NoDecision",
                   approvalStatus: "",
+                  missedMaintenanceWindow: false,
+                })
+              }
+            />
+            <Metric
+              label="Missed maintenance"
+              value={String(data.items.filter((item) =>
+                item.maintenanceWindowDate
+                && new Date(item.maintenanceWindowDate).getTime() < renderedAt
+                && item.totalVulnerabilities > 0
+              ).length)}
+              active={filters.missedMaintenanceWindow}
+              onClick={() =>
+                onFiltersChange({
+                  ...filters,
+                  missedMaintenanceWindow: !filters.missedMaintenanceWindow,
+                  decisionState: "",
+                  approvalStatus: "",
                 })
               }
             />
@@ -126,7 +150,7 @@ export function RemediationWorkbench({
       </header>
 
       <section className="rounded-2xl border border-border/70 bg-card p-5">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(180px,1fr))]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(180px,1fr))]">
           <LabeledFilter label="Search software">
             <Input
               placeholder="Search software name"
@@ -216,6 +240,26 @@ export function RemediationWorkbench({
               </SelectContent>
             </Select>
           </LabeledFilter>
+
+          <LabeledFilter label="Missed maintenance">
+            <Select
+              value={filters.missedMaintenanceWindow ? "yes" : "all"}
+              onValueChange={(value) => {
+                onFiltersChange({
+                  ...filters,
+                  missedMaintenanceWindow: value === "yes",
+                });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All maintenance states" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All maintenance states</SelectItem>
+                <SelectItem value="yes">Missed maintenance window</SelectItem>
+              </SelectContent>
+            </Select>
+          </LabeledFilter>
         </div>
 
         {quickFilterLabel ? (
@@ -230,6 +274,7 @@ export function RemediationWorkbench({
                   ...filters,
                   decisionState: "",
                   approvalStatus: "",
+                  missedMaintenanceWindow: false,
                 })
               }
               className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-foreground transition hover:border-primary/40 hover:bg-primary/15"

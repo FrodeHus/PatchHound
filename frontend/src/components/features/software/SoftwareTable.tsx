@@ -39,14 +39,17 @@ type SoftwareTableProps = {
   confidenceFilter: string
   vulnerableOnly: boolean
   boundOnly: boolean
+  missedMaintenanceWindow: boolean
   onSearchChange: (value: string) => void
   onConfidenceFilterChange: (value: string) => void
   onVulnerableOnlyChange: (value: boolean) => void
   onBoundOnlyChange: (value: boolean) => void
+  onMissedMaintenanceWindowChange: (value: boolean) => void
   onApplyStructuredFilters: (filters: {
     confidence: string
     vulnerableOnly: boolean
     boundOnly: boolean
+    missedMaintenanceWindow: boolean
   }) => void
   onShowRiskDetail: (tenantSoftwareId: string) => void
   onPageChange: (page: number) => void
@@ -66,10 +69,12 @@ export function SoftwareTable({
   confidenceFilter,
   vulnerableOnly,
   boundOnly,
+  missedMaintenanceWindow,
   onSearchChange,
   onConfidenceFilterChange,
   onVulnerableOnlyChange,
   onBoundOnlyChange,
+  onMissedMaintenanceWindowChange,
   onApplyStructuredFilters,
   onShowRiskDetail,
   onPageChange,
@@ -79,10 +84,16 @@ export function SoftwareTable({
   const [renderedAt] = useState(() => Date.now())
   const [searchInput, setSearchInput] = useState(searchValue)
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
-  const [draftFilters, setDraftFilters] = useState({
+  const [draftFilters, setDraftFilters] = useState<{
+    confidence: string
+    vulnerableOnly: boolean
+    boundOnly: boolean
+    missedMaintenanceWindow: boolean
+  }>({
     confidence: confidenceFilter,
     vulnerableOnly,
     boundOnly,
+    missedMaintenanceWindow,
   })
 
   useEffect(() => {
@@ -107,9 +118,10 @@ export function SoftwareTable({
         confidence: confidenceFilter,
         vulnerableOnly,
         boundOnly,
+        missedMaintenanceWindow,
       })
     }
-  }, [boundOnly, confidenceFilter, isFilterDrawerOpen, vulnerableOnly])
+  }, [boundOnly, confidenceFilter, isFilterDrawerOpen, missedMaintenanceWindow, vulnerableOnly])
 
   const activeFilters = useMemo(
     () =>
@@ -118,8 +130,9 @@ export function SoftwareTable({
         confidenceFilter ? { key: 'confidence', label: `Confidence: ${confidenceFilter}`, onClear: () => onConfidenceFilterChange('') } : null,
         vulnerableOnly ? { key: 'vulnerable', label: 'Vulnerable only', onClear: () => onVulnerableOnlyChange(false) } : null,
         boundOnly ? { key: 'bound', label: 'CPE bound only', onClear: () => onBoundOnlyChange(false) } : null,
+        missedMaintenanceWindow ? { key: 'missedMaintenanceWindow', label: 'Missed maintenance window', onClear: () => onMissedMaintenanceWindowChange(false) } : null,
       ].filter((item): item is NonNullable<typeof item> => item !== null),
-    [boundOnly, confidenceFilter, onBoundOnlyChange, onConfidenceFilterChange, onSearchChange, onVulnerableOnlyChange, searchValue, vulnerableOnly],
+    [boundOnly, confidenceFilter, missedMaintenanceWindow, onBoundOnlyChange, onConfidenceFilterChange, onMissedMaintenanceWindowChange, onSearchChange, onVulnerableOnlyChange, searchValue, vulnerableOnly],
   )
 
   const activeStructuredFilterCount = useMemo(
@@ -128,8 +141,9 @@ export function SoftwareTable({
         confidenceFilter,
         vulnerableOnly ? 'vulnerable' : '',
         boundOnly ? 'bound' : '',
+        missedMaintenanceWindow ? 'missedMaintenanceWindow' : '',
       ].filter(Boolean).length,
-    [boundOnly, confidenceFilter, vulnerableOnly],
+    [boundOnly, confidenceFilter, missedMaintenanceWindow, vulnerableOnly],
   )
 
   const columns = useMemo<ColumnDef<TenantSoftwareListItem>[]>(
@@ -281,11 +295,20 @@ export function SoftwareTable({
                 confidence: confidenceFilter,
                 vulnerableOnly,
                 boundOnly,
+                missedMaintenanceWindow,
               })
               setIsFilterDrawerOpen(true)
             }}
           >
             {activeStructuredFilterCount > 0 ? `Filters (${activeStructuredFilterCount})` : 'Filters...'}
+          </Button>
+          <Button
+            type="button"
+            variant={missedMaintenanceWindow ? "default" : "outline"}
+            className="h-10 rounded-xl px-4"
+            onClick={() => onMissedMaintenanceWindowChange(!missedMaintenanceWindow)}
+          >
+            Missed maintenance
           </Button>
         </DataTableToolbarRow>
         <DataTableToolbarRow>
@@ -304,6 +327,7 @@ export function SoftwareTable({
             confidence: '',
             vulnerableOnly: false,
             boundOnly: false,
+            missedMaintenanceWindow: false,
           })
         }}
         onApply={() => {
@@ -369,6 +393,19 @@ export function SoftwareTable({
               }}
             />
             <span>CPE bound only</span>
+          </label>
+
+          <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-3 text-sm">
+            <Checkbox
+              checked={draftFilters.missedMaintenanceWindow}
+              onCheckedChange={(checked) => {
+                setDraftFilters((current) => ({
+                  ...current,
+                  missedMaintenanceWindow: checked === true,
+                }))
+              }}
+            />
+            <span>Missed maintenance window</span>
           </label>
         </WorkbenchFilterSection>
       </WorkbenchFilterDrawer>

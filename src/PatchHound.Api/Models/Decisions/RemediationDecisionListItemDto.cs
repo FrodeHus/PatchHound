@@ -46,5 +46,6 @@ public record RemediationDecisionFilterQuery(
     string? Criticality = null,
     string? Outcome = null,
     string? ApprovalStatus = null,
-    string? DecisionState = null
+    string? DecisionState = null,
+    bool? MissedMaintenanceWindow = null
 );

@@ -22,5 +22,6 @@ public record TenantSoftwareFilterQuery(
     string? Search = null,
     string? Confidence = null,
     bool? VulnerableOnly = null,
-    bool? BoundOnly = null
+    bool? BoundOnly = null,
+    bool? MissedMaintenanceWindow = null
 );

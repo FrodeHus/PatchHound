@@ -163,6 +163,7 @@ export function AssetDetailPageView({
                       outcome: "",
                       approvalStatus: "",
                       decisionState: "",
+                      missedMaintenanceWindow: false,
                     }}
                     className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/15"
                   >

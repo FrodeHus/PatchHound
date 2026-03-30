@@ -52,6 +52,26 @@ export function TechnicalManagerOverview({ summary, isLoading }: Props) {
             <div className="grid gap-3 rounded-[1.5rem] border border-border/70 bg-background/45 p-5 backdrop-blur-sm sm:grid-cols-2">
               <Metric icon={CheckCircle2} label="Approved patching tasks" tooltip="A patching task represents approved software remediation work that is ready for execution. It reflects work that should now move through normal technical delivery." value={summary.approvedPatchingTasks.length} tone="text-chart-3" />
               <Metric icon={Clock3} label="Past due" tooltip="Past due means approved patch work has outlived its expected completion window. This is a leading signal of patching routine breakdown." value={overdueApprovedTasks} tone="text-destructive" />
+              <Metric
+                icon={AlertTriangle}
+                label="Missed maintenance"
+                tooltip="Missed maintenance means the planned patch window date has passed but PatchHound still sees open vulnerabilities in scope for that approved patching work."
+                value={summary.missedMaintenanceWindowCount}
+                tone="text-destructive"
+                href={{
+                  to: '/remediation',
+                  search: {
+                    page: 1,
+                    pageSize: 25,
+                    search: '',
+                    criticality: '',
+                    outcome: '',
+                    approvalStatus: '',
+                    decisionState: '',
+                    missedMaintenanceWindow: true,
+                  },
+                }}
+              />
               <Metric icon={ShieldAlert} label="Devices with 90+ day vulns" tooltip="This highlights long-lived exposure. The 90-day threshold is meant to catch devices that appear to be falling outside normal patching cadence." value={summary.devicesWithAgedVulnerabilities.length} tone="text-primary" />
               <Metric icon={AlertTriangle} label="Pending approvals" tooltip="Pending approvals are unresolved governance steps that can block technical remediation from proceeding, even when engineering capacity exists." value={summary.approvalTasksRequiringAttention.length} tone="text-chart-4" />
             </div>
@@ -216,14 +236,28 @@ function Metric({
   tooltip,
   value,
   tone,
+  href,
 }: {
   icon: typeof ShieldAlert
   label: string
   tooltip: string
   value: number
   tone: string
+  href?: {
+    to: '/remediation'
+    search: {
+      page: number
+      pageSize: number
+      search: string
+      criticality: string
+      outcome: string
+      approvalStatus: string
+      decisionState: string
+      missedMaintenanceWindow: boolean
+    }
+  }
 }) {
-  return (
+  const content = (
     <div className="rounded-[1.2rem] border border-border/60 bg-card/70 px-4 py-4">
       <div className={`flex items-center gap-2 text-xs uppercase tracking-[0.18em] ${tone}`}>
         <Icon className="size-3.5" />
@@ -232,6 +266,20 @@ function Metric({
       </div>
       <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{value}</div>
     </div>
+  )
+
+  if (!href) {
+    return content
+  }
+
+  return (
+    <Link
+      to={href.to}
+      search={href.search}
+      className="block rounded-[1.2rem] transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {content}
+    </Link>
   )
 }
 

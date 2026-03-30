@@ -38,6 +38,7 @@ import { Route as AuthedRemediationTasksRouteImport } from './routes/_authed/rem
 import { Route as AuthedDashboardTechnicalRouteImport } from './routes/_authed/dashboard/technical'
 import { Route as AuthedDashboardSecurityRouteImport } from './routes/_authed/dashboard/security'
 import { Route as AuthedDashboardMyAssetsRouteImport } from './routes/_authed/dashboard/my-assets'
+import { Route as AuthedDashboardMyAssetsAttentionRouteImport } from './routes/_authed/dashboard/my-assets.attention'
 import { Route as AuthedDashboardExecutiveRouteImport } from './routes/_authed/dashboard/executive'
 import { Route as AuthedAssetsIdRouteImport } from './routes/_authed/assets/$id'
 import { Route as AuthedApprovalsIdRouteImport } from './routes/_authed/approvals/$id'
@@ -209,6 +210,12 @@ const AuthedDashboardMyAssetsRoute = AuthedDashboardMyAssetsRouteImport.update({
   path: '/dashboard/my-assets',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedDashboardMyAssetsAttentionRoute =
+  AuthedDashboardMyAssetsAttentionRouteImport.update({
+    id: '/dashboard/my-assets/attention',
+    path: '/dashboard/my-assets/attention',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedDashboardExecutiveRoute =
   AuthedDashboardExecutiveRouteImport.update({
     id: '/dashboard/executive',
@@ -346,6 +353,7 @@ export interface FileRoutesByFullPath {
   '/assets/$id': typeof AuthedAssetsIdRoute
   '/dashboard/executive': typeof AuthedDashboardExecutiveRoute
   '/dashboard/my-assets': typeof AuthedDashboardMyAssetsRoute
+  '/dashboard/my-assets/attention': typeof AuthedDashboardMyAssetsAttentionRoute
   '/dashboard/security': typeof AuthedDashboardSecurityRoute
   '/dashboard/technical': typeof AuthedDashboardTechnicalRoute
   '/remediation/tasks': typeof AuthedRemediationTasksRoute
@@ -398,6 +406,7 @@ export interface FileRoutesByTo {
   '/assets/$id': typeof AuthedAssetsIdRoute
   '/dashboard/executive': typeof AuthedDashboardExecutiveRoute
   '/dashboard/my-assets': typeof AuthedDashboardMyAssetsRoute
+  '/dashboard/my-assets/attention': typeof AuthedDashboardMyAssetsAttentionRoute
   '/dashboard/security': typeof AuthedDashboardSecurityRoute
   '/dashboard/technical': typeof AuthedDashboardTechnicalRoute
   '/remediation/tasks': typeof AuthedRemediationTasksRoute
@@ -452,6 +461,7 @@ export interface FileRoutesById {
   '/_authed/assets/$id': typeof AuthedAssetsIdRoute
   '/_authed/dashboard/executive': typeof AuthedDashboardExecutiveRoute
   '/_authed/dashboard/my-assets': typeof AuthedDashboardMyAssetsRoute
+  '/_authed/dashboard/my-assets/attention': typeof AuthedDashboardMyAssetsAttentionRoute
   '/_authed/dashboard/security': typeof AuthedDashboardSecurityRoute
   '/_authed/dashboard/technical': typeof AuthedDashboardTechnicalRoute
   '/_authed/remediation/tasks': typeof AuthedRemediationTasksRoute
@@ -864,6 +874,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedDashboardMyAssetsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/dashboard/my-assets/attention': {
+      id: '/_authed/dashboard/my-assets/attention'
+      path: '/dashboard/my-assets/attention'
+      fullPath: '/dashboard/my-assets/attention'
+      preLoaderRoute: typeof AuthedDashboardMyAssetsAttentionRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/dashboard/executive': {
       id: '/_authed/dashboard/executive'
       path: '/dashboard/executive'
@@ -1031,6 +1048,7 @@ interface AuthedRouteChildren {
   AuthedAssetsIdRoute: typeof AuthedAssetsIdRoute
   AuthedDashboardExecutiveRoute: typeof AuthedDashboardExecutiveRoute
   AuthedDashboardMyAssetsRoute: typeof AuthedDashboardMyAssetsRoute
+  AuthedDashboardMyAssetsAttentionRoute: typeof AuthedDashboardMyAssetsAttentionRoute
   AuthedDashboardSecurityRoute: typeof AuthedDashboardSecurityRoute
   AuthedDashboardTechnicalRoute: typeof AuthedDashboardTechnicalRoute
   AuthedRemediationTasksRoute: typeof AuthedRemediationTasksRoute
@@ -1076,6 +1094,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAssetsIdRoute: AuthedAssetsIdRoute,
   AuthedDashboardExecutiveRoute: AuthedDashboardExecutiveRoute,
   AuthedDashboardMyAssetsRoute: AuthedDashboardMyAssetsRoute,
+  AuthedDashboardMyAssetsAttentionRoute: AuthedDashboardMyAssetsAttentionRoute,
   AuthedDashboardSecurityRoute: AuthedDashboardSecurityRoute,
   AuthedDashboardTechnicalRoute: AuthedDashboardTechnicalRoute,
   AuthedRemediationTasksRoute: AuthedRemediationTasksRoute,
