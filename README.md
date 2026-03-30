@@ -99,7 +99,7 @@ PatchHound expects a KV v2 mount named `patchhound` and an application token wit
 
 ```hcl
 path "patchhound/*" {
-  capabilities = ["create", "update", "read"]
+  capabilities = ["create", "update", "read", "delete"]
 }
 ```
 
