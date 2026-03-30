@@ -98,7 +98,7 @@ To set up the Sentinel integration, first deploy the PatchHound data connector. 
 PatchHound expects a KV v2 mount named `patchhound` and an application token with access to the full application data path:
 
 ```hcl
-path "patchhound/data/*" {
+path "patchhound/*" {
   capabilities = ["create", "update", "read"]
 }
 ```
