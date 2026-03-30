@@ -102,6 +102,7 @@ internal static class AuditTimelineMapper
                 nameof(DecisionApprovalStatus.Approved) => "Approved",
                 nameof(DecisionApprovalStatus.Rejected) => "Denied",
                 nameof(DecisionApprovalStatus.Expired) => "Expired",
+                nameof(DecisionApprovalStatus.Reopened) => "Reopened",
                 _ => "Updated",
             };
         }

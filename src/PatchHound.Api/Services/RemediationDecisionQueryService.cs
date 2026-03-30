@@ -652,6 +652,8 @@ public class RemediationDecisionQueryService(
                 decision.ApprovedAt,
                 decision.ExpiryDate,
                 decision.ReEvaluationDate,
+                decision.ReopenCount,
+                decision.ReopenedAt,
                 latestRejectedApproval is not null
                     ? new DecisionRejectionDto(
                         latestRejectedApproval.ResolutionJustification,
@@ -706,6 +708,8 @@ public class RemediationDecisionQueryService(
                 previousDecision.ApprovedAt,
                 previousDecision.ExpiryDate,
                 previousDecision.ReEvaluationDate,
+                previousDecision.ReopenCount,
+                previousDecision.ReopenedAt,
                 null,
                 previousDecision.VulnerabilityOverrides.Select(vo => new VulnerabilityOverrideDto(
                     vo.Id,

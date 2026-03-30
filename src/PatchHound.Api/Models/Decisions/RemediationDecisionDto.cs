@@ -69,6 +69,8 @@ public record RemediationDecisionDto(
     DateTimeOffset? ApprovedAt,
     DateTimeOffset? ExpiryDate,
     DateTimeOffset? ReEvaluationDate,
+    int ReopenCount,
+    DateTimeOffset? ReopenedAt,
     DecisionRejectionDto? LatestRejection,
     List<VulnerabilityOverrideDto> Overrides
 );

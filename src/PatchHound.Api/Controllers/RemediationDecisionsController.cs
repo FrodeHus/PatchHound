@@ -270,8 +270,7 @@ public class RemediationDecisionsController(
             d.Id, d.Outcome.ToString(), d.ApprovalStatus.ToString(),
             d.Justification, d.DecidedBy, d.DecidedAt,
             d.ApprovedBy, d.ApprovedAt, d.ExpiryDate, d.ReEvaluationDate,
-            null,
-            []
+            d.ReopenCount, d.ReopenedAt, null, []
         ));
     }
 
@@ -295,7 +294,7 @@ public class RemediationDecisionsController(
             .Where(item =>
                 item.TenantId == tenantId
                 && item.RemediationWorkflowId == workflowId
-                && item.ApprovalStatus == DecisionApprovalStatus.PendingApproval)
+                && (item.ApprovalStatus == DecisionApprovalStatus.PendingApproval || item.ApprovalStatus == DecisionApprovalStatus.Reopened))
             .OrderByDescending(item => item.CreatedAt)
             .FirstOrDefaultAsync(ct);
         if (currentDecision is null)
