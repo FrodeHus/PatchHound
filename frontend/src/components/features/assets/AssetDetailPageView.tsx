@@ -2,6 +2,8 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from "@tanstack/react-router";
 import { CircleQuestionMark, Loader2, RotateCcw } from 'lucide-react'
 import type { AssetDetail } from '@/api/assets.schemas'
+import type { BusinessLabel } from '@/api/business-labels.schemas'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -21,12 +23,15 @@ import { toneDot, toneText, type Tone } from '@/lib/tone-classes'
 type AssetDetailPageViewProps = {
   asset: AssetDetail
   securityProfiles: SecurityProfile[]
+  availableBusinessLabels: BusinessLabel[]
   isAssigningSecurityProfile: boolean
   isSettingCriticality: boolean
   isResettingCriticality: boolean
+  isAssigningBusinessLabels: boolean
   onAssignSecurityProfile: (assetId: string, securityProfileId: string | null) => void
   onSetCriticality: (criticality: string) => void
   onResetCriticality: () => void
+  onAssignBusinessLabels: (businessLabelIds: string[]) => void
 }
 
 type DetailTab = 'overview' | 'vulnerabilities' | 'software' | 'timeline'
@@ -34,21 +39,29 @@ type DetailTab = 'overview' | 'vulnerabilities' | 'software' | 'timeline'
 export function AssetDetailPageView({
   asset,
   securityProfiles,
+  availableBusinessLabels,
   isAssigningSecurityProfile,
   isSettingCriticality,
   isResettingCriticality,
+  isAssigningBusinessLabels,
   onAssignSecurityProfile,
   onSetCriticality,
   onResetCriticality,
+  onAssignBusinessLabels,
 }: AssetDetailPageViewProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
   const [securityProfileSheetOpen, setSecurityProfileSheetOpen] = useState(false)
   const [criticalitySheetOpen, setCriticalitySheetOpen] = useState(false)
+  const [businessLabelsSheetOpen, setBusinessLabelsSheetOpen] = useState(false)
   const metadata = useMemo(
     () => parseMetadata(asset.metadata),
     [asset.metadata],
   );
   const timelineItems = useMemo(() => buildTimelineItems(asset), [asset]);
+  const selectedBusinessLabelIds = useMemo(
+    () => new Set(asset.businessLabels.map((label) => label.id)),
+    [asset.businessLabels],
+  )
   const displayTitle =
     asset.assetType === "Device"
       ? asset.deviceComputerDnsName ?? asset.name
@@ -74,6 +87,12 @@ export function AssetDetailPageView({
                 ) : null}
                 {asset.securityProfile ? (
                   <Pill>{asset.securityProfile.name}</Pill>
+                ) : null}
+                {asset.businessLabels.slice(0, 3).map((label) => (
+                  <BusinessLabelBadge key={label.id} name={label.name} color={label.color} />
+                ))}
+                {asset.businessLabels.length > 3 ? (
+                  <Pill>+{asset.businessLabels.length - 3} labels</Pill>
                 ) : null}
               </div>
               <div className="space-y-2">
@@ -337,6 +356,34 @@ export function AssetDetailPageView({
                         <p className="text-sm text-muted-foreground">
                           {asset.criticalityDetail?.reason ??
                             "Used directly by PatchHound risk scoring and prioritization."}
+                        </p>
+                      </div>
+                      <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                        Manage
+                      </span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full rounded-2xl border border-border/70 bg-background p-4 text-left transition hover:border-foreground/20 hover:bg-muted/20"
+                    onClick={() => setBusinessLabelsSheetOpen(true)}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-2">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                          Business labels
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {asset.businessLabels.length > 0 ? (
+                            asset.businessLabels.map((label) => (
+                              <BusinessLabelBadge key={label.id} name={label.name} color={label.color} />
+                            ))
+                          ) : (
+                            <Pill>No labels</Pill>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Add recognizable business context such as Production, Finance, Executive, or Customer-facing.
                         </p>
                       </div>
                       <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
@@ -914,8 +961,95 @@ export function AssetDetailPageView({
           </div>
         </SheetContent>
       </Sheet>
+      <Sheet
+        open={businessLabelsSheetOpen}
+        onOpenChange={setBusinessLabelsSheetOpen}
+      >
+        <SheetContent
+          side="right"
+          className="w-full border-l border-border/80 bg-card p-0 sm:max-w-md"
+        >
+          <SheetHeader className="border-b border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_96%,black),var(--card))]">
+            <SheetTitle>Business labels</SheetTitle>
+            <SheetDescription>
+              Add tenant-defined labels that make assets more recognizable in dashboards, remediation summaries, and ownership reviews.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 p-4">
+            <section className="rounded-2xl border border-border/70 bg-background p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                Assigned labels
+              </p>
+              {asset.businessLabels.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {asset.businessLabels.map((label) => (
+                    <BusinessLabelBadge key={label.id} name={label.name} color={label.color} />
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  No business labels are currently assigned to this asset.
+                </p>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-border/70 bg-background p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                Available labels
+              </p>
+              {availableBusinessLabels.length === 0 ? (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  No business labels exist for this tenant yet. Create them from the admin console first.
+                </p>
+              ) : (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {availableBusinessLabels.map((label) => {
+                    const isSelected = selectedBusinessLabelIds.has(label.id)
+                    return (
+                      <Button
+                        key={label.id}
+                        type="button"
+                        variant={isSelected ? "default" : "outline"}
+                        className="h-auto rounded-full px-3 py-1.5"
+                        disabled={isAssigningBusinessLabels || !label.isActive}
+                        onClick={() => {
+                          const nextIds = isSelected
+                            ? asset.businessLabels
+                                .filter((item) => item.id !== label.id)
+                                .map((item) => item.id)
+                            : [...asset.businessLabels.map((item) => item.id), label.id]
+                          onAssignBusinessLabels(nextIds)
+                        }}
+                      >
+                        <span
+                          className="mr-2 inline-flex size-2.5 rounded-full border border-black/10"
+                          style={{ backgroundColor: label.color ?? 'var(--muted-foreground)' }}
+                        />
+                        {label.name}
+                        {!label.isActive ? ' (inactive)' : ''}
+                      </Button>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
+}
+
+function BusinessLabelBadge({ name, color }: { name: string; color: string | null }) {
+  return (
+    <Badge variant="outline" className="rounded-full border-border/70 bg-background/60 px-2.5 py-0.5 text-xs text-foreground">
+      <span
+        className="mr-1.5 inline-flex size-2 rounded-full border border-black/10"
+        style={{ backgroundColor: color ?? 'var(--muted-foreground)' }}
+      />
+      {name}
+    </Badge>
+  )
 }
 
 function AssetRiskExplanationPopover({ asset }: { asset: AssetDetail }) {

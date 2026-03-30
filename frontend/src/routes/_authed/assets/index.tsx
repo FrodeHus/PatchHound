@@ -9,6 +9,7 @@ export const Route = createFileRoute('/_authed/assets/')({
         pageSize: 25,
         search: '',
         criticality: '',
+        businessLabelId: '',
         ownerType: '',
         deviceGroup: '',
         healthStatus: '',

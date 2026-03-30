@@ -11,6 +11,7 @@ export const fetchAssets = createServerFn({ method: 'GET' })
     z.object({
       assetType: z.string().optional(),
       criticality: z.string().optional(),
+      businessLabelId: z.string().uuid().optional(),
       ownerType: z.string().optional(),
       deviceGroup: z.string().optional(),
       unassignedOnly: z.boolean().optional(),
@@ -88,6 +89,18 @@ export const assignSoftwareCpeBinding = createServerFn({ method: 'POST' })
   )
   .handler(async ({ context, data: { assetId, cpe23Uri } }) => {
     await apiPut(`/assets/${assetId}/software-cpe-binding`, context, { cpe23Uri })
+  })
+
+export const assignAssetBusinessLabels = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      assetId: z.string(),
+      businessLabelIds: z.array(z.string().uuid()),
+    }),
+  )
+  .handler(async ({ context, data: { assetId, businessLabelIds } }) => {
+    await apiPut(`/assets/${assetId}/business-labels`, context, { businessLabelIds })
   })
 
 export const bulkAssignAssets = createServerFn({ method: 'POST' })

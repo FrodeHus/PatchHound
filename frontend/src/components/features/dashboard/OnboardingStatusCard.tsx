@@ -54,6 +54,7 @@ export function OnboardingStatusCard({ onboardingBreakdown, isLoading }: Onboard
                       search={{
                         search: '',
                         criticality: '',
+                        businessLabelId: '',
                         ownerType: '',
                         deviceGroup: '',
                         healthStatus: '',

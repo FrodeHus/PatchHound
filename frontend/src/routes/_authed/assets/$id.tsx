@@ -2,7 +2,14 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { assignAssetSecurityProfile, fetchAssetDetail, resetAssetCriticalityOverride, setAssetCriticality } from '@/api/assets.functions'
+import {
+  assignAssetBusinessLabels,
+  assignAssetSecurityProfile,
+  fetchAssetDetail,
+  resetAssetCriticalityOverride,
+  setAssetCriticality,
+} from '@/api/assets.functions'
+import { fetchBusinessLabels } from '@/api/business-labels.functions'
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { AssetDetailPageView } from '@/components/features/assets/AssetDetailPageView'
 import { useTenantScope } from '@/components/layout/tenant-scope'
@@ -30,6 +37,10 @@ function AssetDetailPage() {
   const securityProfilesQuery = useQuery({
     queryKey: ['security-profiles', selectedTenantId],
     queryFn: () => fetchSecurityProfiles({ data: {} }),
+  })
+  const businessLabelsQuery = useQuery({
+    queryKey: ['business-labels', selectedTenantId],
+    queryFn: () => fetchBusinessLabels({ data: {} }),
   })
   const securityProfileMutation = useMutation({
     mutationFn: async (securityProfileId: string | null) => {
@@ -70,6 +81,20 @@ function AssetDetailPage() {
       toast.error('Failed to remove manual criticality override')
     },
   })
+  const businessLabelsMutation = useMutation({
+    mutationFn: async (businessLabelIds: string[]) => {
+      await assignAssetBusinessLabels({ data: { assetId: id, businessLabelIds } })
+    },
+    onSuccess: async () => {
+      toast.success('Business labels updated')
+      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, id) })
+      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+      await queryClient.invalidateQueries({ queryKey: ['business-labels', selectedTenantId] })
+    },
+    onError: () => {
+      toast.error('Failed to update business labels')
+    },
+  })
   if (!asset) {
     return null
   }
@@ -78,9 +103,11 @@ function AssetDetailPage() {
     <AssetDetailPageView
       asset={asset}
       securityProfiles={securityProfilesQuery.data?.items ?? []}
+      availableBusinessLabels={businessLabelsQuery.data ?? []}
       isAssigningSecurityProfile={securityProfileMutation.isPending}
       isSettingCriticality={setCriticalityMutation.isPending}
       isResettingCriticality={resetCriticalityMutation.isPending}
+      isAssigningBusinessLabels={businessLabelsMutation.isPending}
       onAssignSecurityProfile={(_, securityProfileId) => {
         securityProfileMutation.mutate(securityProfileId)
       }}
@@ -89,6 +116,9 @@ function AssetDetailPage() {
       }}
       onResetCriticality={() => {
         resetCriticalityMutation.mutate()
+      }}
+      onAssignBusinessLabels={(businessLabelIds) => {
+        businessLabelsMutation.mutate(businessLabelIds)
       }}
     />
   )

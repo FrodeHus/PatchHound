@@ -1,23 +1,25 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchAssetRule } from '@/api/asset-rules.functions'
+import { fetchBusinessLabels } from '@/api/business-labels.functions'
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { fetchTeams } from '@/api/teams.functions'
 import { AssetRuleWizard } from '@/components/features/admin/asset-rules/AssetRuleWizard'
 
 export const Route = createFileRoute('/_authed/admin/asset-rules/$id')({
   loader: async ({ params }) => {
-    const [rule, profiles, teams] = await Promise.all([
+    const [rule, profiles, businessLabels, teams] = await Promise.all([
       fetchAssetRule({ data: { id: params.id } }),
       fetchSecurityProfiles({ data: { pageSize: 100 } }),
+      fetchBusinessLabels({ data: {} }),
       fetchTeams({ data: { pageSize: 100 } }),
     ])
-    return { rule, profiles, teams }
+    return { rule, profiles, businessLabels, teams }
   },
   component: EditAssetRulePage,
 })
 
 function EditAssetRulePage() {
-  const { rule, profiles, teams } = Route.useLoaderData()
+  const { rule, profiles, businessLabels, teams } = Route.useLoaderData()
 
   return (
     <section className="space-y-5">
@@ -29,6 +31,7 @@ function EditAssetRulePage() {
         mode="edit"
         initialData={rule}
         securityProfiles={profiles.items}
+        businessLabels={businessLabels}
         teams={teams.items}
       />
     </section>

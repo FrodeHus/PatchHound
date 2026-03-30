@@ -440,6 +440,18 @@ public class RemediationDecisionQueryService(
                 .Select(team => team.Name)
                 .Take(5)
                 .ToListAsync(ct);
+        var businessLabelSummary = scopedDeviceAssetIds.Count == 0
+            ? []
+            : await dbContext.AssetBusinessLabels.AsNoTracking()
+                .Where(link => scopedDeviceAssetIds.Contains(link.AssetId))
+                .Select(link => new { link.AssetId, link.BusinessLabel.Name })
+                .Distinct()
+                .GroupBy(item => item.Name)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key)
+                .Select(group => $"{group.Key} ({group.Count()})")
+                .Take(3)
+                .ToListAsync(ct);
         var patchingTaskCounts = await dbContext.PatchingTasks.AsNoTracking()
             .Where(task => task.TenantId == tenantId && task.TenantSoftwareId == tenantSoftwareId)
             .GroupBy(_ => 1)
@@ -707,6 +719,7 @@ public class RemediationDecisionQueryService(
             assetCriticality,
             affectedOwnerTeamCount,
             affectedOwnerTeamNames,
+            businessLabelSummary,
             decision,
             patchingTaskCounts?.Open ?? 0,
             patchingTaskCounts?.Completed ?? 0,
@@ -1544,6 +1557,7 @@ public class RemediationDecisionQueryService(
         Criticality assetCriticality,
         int affectedOwnerTeamCount,
         IReadOnlyList<string> affectedOwnerTeamNames,
+        IReadOnlyList<string> businessLabelSummary,
         RemediationDecision? decision,
         int openPatchingTaskCount,
         int completedPatchingTaskCount,
@@ -1561,6 +1575,15 @@ public class RemediationDecisionQueryService(
             .Select(group => $"{group.Key} ({group.Count()})")
             .Take(3)
             .ToList();
+        var businessContextSummary = new List<string>();
+        if (businessLabelSummary.Count > 0)
+        {
+            businessContextSummary.Add($"Business labels: {string.Join(", ", businessLabelSummary)}");
+        }
+        if (businessValueSummary.Count > 0)
+        {
+            businessContextSummary.Add($"Asset values: {string.Join(", ", businessValueSummary)}");
+        }
 
         var serverCount = details.Count(item => item.EnvironmentClass == EnvironmentClass.Server);
         var workstationCount = details.Count(item => item.EnvironmentClass == EnvironmentClass.Workstation);
@@ -1585,7 +1608,7 @@ public class RemediationDecisionQueryService(
             details.Count(item => item.Criticality == Criticality.Medium),
             details.Count(item => item.Criticality == Criticality.Low),
             assetCriticality.ToString(),
-            businessValueSummary.Count > 0 ? string.Join(", ", businessValueSummary) : null,
+            businessContextSummary.Count > 0 ? string.Join("; ", businessContextSummary) : null,
             decision?.Outcome == RemediationOutcome.ApprovedForPatching || openPatchingTaskCount > 0 || completedPatchingTaskCount > 0,
             openPatchingTaskCount,
             completedPatchingTaskCount,

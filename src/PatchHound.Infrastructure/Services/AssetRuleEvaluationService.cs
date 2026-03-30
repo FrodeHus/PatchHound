@@ -32,10 +32,14 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
             .ToListAsync(ct);
 
         var criticalityRuleMatchedAssetIds = new HashSet<Guid>();
+        var securityProfileRuleMatchedAssetIds = new HashSet<Guid>();
+        var fallbackTeamRuleMatchedAssetIds = new HashSet<Guid>();
 
         if (rules.Count == 0)
         {
             await ReconcileCriticalityAsync(tenantId, criticalityRuleMatchedAssetIds, ct);
+            await ReconcileSecurityProfilesAsync(tenantId, securityProfileRuleMatchedAssetIds, ct);
+            await ReconcileFallbackTeamsAsync(tenantId, fallbackTeamRuleMatchedAssetIds, ct);
             _logger.LogDebug("No enabled asset rules for tenant {TenantId}", tenantId);
             return;
         }
@@ -71,6 +75,8 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
                             unclaimedIds,
                             op,
                             criticalityRuleMatchedAssetIds,
+                            securityProfileRuleMatchedAssetIds,
+                            fallbackTeamRuleMatchedAssetIds,
                             ct
                         );
                     }
@@ -95,6 +101,8 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
         }
 
         await ReconcileCriticalityAsync(tenantId, criticalityRuleMatchedAssetIds, ct);
+        await ReconcileSecurityProfilesAsync(tenantId, securityProfileRuleMatchedAssetIds, ct);
+        await ReconcileFallbackTeamsAsync(tenantId, fallbackTeamRuleMatchedAssetIds, ct);
     }
 
     public async Task EvaluateCriticalityForAssetAsync(Guid tenantId, Guid assetId, CancellationToken ct)
@@ -183,6 +191,8 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
         List<Guid> assetIds,
         AssetRuleOperation op,
         ISet<Guid> criticalityRuleMatchedAssetIds,
+        ISet<Guid> securityProfileRuleMatchedAssetIds,
+        ISet<Guid> fallbackTeamRuleMatchedAssetIds,
         CancellationToken ct)
     {
         switch (op.Type)
@@ -191,9 +201,15 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
                 if (op.Parameters.TryGetValue("securityProfileId", out var profileIdStr)
                     && Guid.TryParse(profileIdStr, out var profileId))
                 {
-                    await _dbContext.Assets
+                    var assets = await _dbContext.Assets
                         .Where(a => a.TenantId == tenantId && assetIds.Contains(a.Id))
-                        .ExecuteUpdateAsync(s => s.SetProperty(a => a.SecurityProfileId, profileId), ct);
+                        .ToListAsync(ct);
+
+                    foreach (var asset in assets)
+                    {
+                        asset.AssignSecurityProfileFromRule(profileId, rule.Id);
+                        securityProfileRuleMatchedAssetIds.Add(asset.Id);
+                    }
                 }
                 break;
 
@@ -201,9 +217,15 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
                 if (op.Parameters.TryGetValue("teamId", out var teamIdStr)
                     && Guid.TryParse(teamIdStr, out var teamId))
                 {
-                    await _dbContext.Assets
+                    var assets = await _dbContext.Assets
                         .Where(a => a.TenantId == tenantId && assetIds.Contains(a.Id))
-                        .ExecuteUpdateAsync(s => s.SetProperty(a => a.FallbackTeamId, teamId), ct);
+                        .ToListAsync(ct);
+
+                    foreach (var asset in assets)
+                    {
+                        asset.SetFallbackTeamFromRule(teamId, rule.Id);
+                        fallbackTeamRuleMatchedAssetIds.Add(asset.Id);
+                    }
                 }
                 break;
 
@@ -233,9 +255,115 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
                 }
                 break;
 
+            case "AssignBusinessLabel":
+                if (op.Parameters.TryGetValue("businessLabelId", out var businessLabelIdStr)
+                    && Guid.TryParse(businessLabelIdStr, out var businessLabelId))
+                {
+                    var labelExists = await _dbContext.BusinessLabels
+                        .AnyAsync(label =>
+                            label.TenantId == tenantId
+                            && label.IsActive
+                            && label.Id == businessLabelId,
+                            ct);
+                    if (!labelExists)
+                    {
+                        _logger.LogWarning(
+                            "Asset rule '{RuleName}' ({RuleId}) references missing or inactive business label {BusinessLabelId} for tenant {TenantId}",
+                            rule.Name,
+                            rule.Id,
+                            businessLabelId,
+                            tenantId);
+                        break;
+                    }
+
+                    var sourceKey = AssetBusinessLabel.BuildRuleSourceKey(rule.Id);
+                    var existingAssignments = await _dbContext.AssetBusinessLabels
+                        .Where(link =>
+                            link.BusinessLabelId == businessLabelId
+                            && link.SourceType == AssetBusinessLabel.RuleSourceType
+                            && link.SourceKey == sourceKey)
+                        .ToListAsync(ct);
+
+                    var assignmentsToRemove = existingAssignments
+                        .Where(link => !assetIds.Contains(link.AssetId))
+                        .ToList();
+                    if (assignmentsToRemove.Count > 0)
+                    {
+                        _dbContext.AssetBusinessLabels.RemoveRange(assignmentsToRemove);
+                    }
+
+                    var existingAssetIds = existingAssignments
+                        .Where(link => assetIds.Contains(link.AssetId))
+                        .Select(link => link.AssetId)
+                        .ToList();
+                    var existingSet = existingAssetIds.ToHashSet();
+                    var newAssignments = assetIds
+                        .Where(assetId => !existingSet.Contains(assetId))
+                        .Select(assetId => AssetBusinessLabel.CreateRule(assetId, businessLabelId, rule.Id))
+                        .ToList();
+
+                    if (newAssignments.Count > 0)
+                    {
+                        await _dbContext.AssetBusinessLabels.AddRangeAsync(newAssignments, ct);
+                    }
+                }
+                break;
+
             default:
                 _logger.LogWarning("Unknown asset rule operation type: {OperationType}", op.Type);
                 break;
+        }
+    }
+
+    private async Task ReconcileSecurityProfilesAsync(
+        Guid tenantId,
+        ISet<Guid> securityProfileRuleMatchedAssetIds,
+        CancellationToken ct)
+    {
+        var ruleDerivedAssets = await _dbContext.Assets
+            .Where(a =>
+                a.TenantId == tenantId
+                && a.SecurityProfileRuleId != null
+                && !securityProfileRuleMatchedAssetIds.Contains(a.Id))
+            .ToListAsync(ct);
+
+        foreach (var asset in ruleDerivedAssets)
+        {
+            if (asset.SecurityProfileRuleId is Guid ruleId)
+            {
+                asset.ClearRuleAssignedSecurityProfile(ruleId);
+            }
+        }
+
+        if (ruleDerivedAssets.Count > 0)
+        {
+            await _dbContext.SaveChangesAsync(ct);
+        }
+    }
+
+    private async Task ReconcileFallbackTeamsAsync(
+        Guid tenantId,
+        ISet<Guid> fallbackTeamRuleMatchedAssetIds,
+        CancellationToken ct)
+    {
+        var ruleDerivedAssets = await _dbContext.Assets
+            .Where(a =>
+                a.TenantId == tenantId
+                && a.FallbackTeamRuleId != null
+                && !fallbackTeamRuleMatchedAssetIds.Contains(a.Id))
+            .ToListAsync(ct);
+
+        foreach (var asset in ruleDerivedAssets)
+        {
+            if (asset.FallbackTeamRuleId is Guid ruleId)
+            {
+                asset.ClearRuleAssignedFallbackTeam(ruleId);
+            }
+        }
+
+        if (ruleDerivedAssets.Count > 0)
+        {
+            await _dbContext.SaveChangesAsync(ct);
         }
     }
 

@@ -2,6 +2,7 @@ export type AssetsListSearch = {
   search: string
   assetType: string
   criticality: string
+  businessLabelId: string
   ownerType: string
   deviceGroup: string
   healthStatus: string
@@ -19,6 +20,7 @@ export function buildAssetsListRequest(search: AssetsListSearch) {
     ...(search.search ? { search: search.search } : {}),
     ...(search.assetType ? { assetType: search.assetType } : {}),
     ...(search.criticality ? { criticality: search.criticality } : {}),
+    ...(search.businessLabelId ? { businessLabelId: search.businessLabelId } : {}),
     ...(search.ownerType ? { ownerType: search.ownerType } : {}),
     ...(search.deviceGroup ? { deviceGroup: search.deviceGroup } : {}),
     ...(search.healthStatus ? { healthStatus: search.healthStatus } : {}),
@@ -41,6 +43,7 @@ export const assetQueryKeys = {
     search.search,
     search.assetType,
     search.criticality,
+    search.businessLabelId,
     search.ownerType,
     search.deviceGroup,
     search.healthStatus,

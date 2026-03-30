@@ -45,6 +45,7 @@ import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/use
 import { Route as AuthedAdminSourcesRouteImport } from './routes/_authed/admin/sources'
 import { Route as AuthedAdminSecurityProfilesRouteImport } from './routes/_authed/admin/security-profiles'
 import { Route as AuthedAdminMaintenanceRouteImport } from './routes/_authed/admin/maintenance'
+import { Route as AuthedAdminBusinessLabelsRouteImport } from './routes/_authed/admin/business-labels'
 import { Route as AuthedAdminWorkflowsIndexRouteImport } from './routes/_authed/admin/workflows/index'
 import { Route as AuthedAdminTenantsIndexRouteImport } from './routes/_authed/admin/tenants/index'
 import { Route as AuthedAdminTeamsIndexRouteImport } from './routes/_authed/admin/teams/index'
@@ -245,6 +246,12 @@ const AuthedAdminMaintenanceRoute = AuthedAdminMaintenanceRouteImport.update({
   path: '/admin/maintenance',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAdminBusinessLabelsRoute =
+  AuthedAdminBusinessLabelsRouteImport.update({
+    id: '/admin/business-labels',
+    path: '/admin/business-labels',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAdminWorkflowsIndexRoute =
   AuthedAdminWorkflowsIndexRouteImport.update({
     id: '/admin/workflows/',
@@ -330,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
   '/setup/': typeof SetupIndexRoute
+  '/admin/business-labels': typeof AuthedAdminBusinessLabelsRoute
   '/admin/maintenance': typeof AuthedAdminMaintenanceRoute
   '/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
   '/admin/sources': typeof AuthedAdminSourcesRoute
@@ -381,6 +389,7 @@ export interface FileRoutesByTo {
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
   '/setup': typeof SetupIndexRoute
+  '/admin/business-labels': typeof AuthedAdminBusinessLabelsRoute
   '/admin/maintenance': typeof AuthedAdminMaintenanceRoute
   '/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
   '/admin/sources': typeof AuthedAdminSourcesRoute
@@ -434,6 +443,7 @@ export interface FileRoutesById {
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
   '/setup/': typeof SetupIndexRoute
+  '/_authed/admin/business-labels': typeof AuthedAdminBusinessLabelsRoute
   '/_authed/admin/maintenance': typeof AuthedAdminMaintenanceRoute
   '/_authed/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
   '/_authed/admin/sources': typeof AuthedAdminSourcesRoute
@@ -487,6 +497,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/logout'
     | '/setup/'
+    | '/admin/business-labels'
     | '/admin/maintenance'
     | '/admin/security-profiles'
     | '/admin/sources'
@@ -538,6 +549,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/logout'
     | '/setup'
+    | '/admin/business-labels'
     | '/admin/maintenance'
     | '/admin/security-profiles'
     | '/admin/sources'
@@ -590,6 +602,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/logout'
     | '/setup/'
+    | '/_authed/admin/business-labels'
     | '/_authed/admin/maintenance'
     | '/_authed/admin/security-profiles'
     | '/_authed/admin/sources'
@@ -900,6 +913,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminMaintenanceRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/business-labels': {
+      id: '/_authed/admin/business-labels'
+      path: '/admin/business-labels'
+      fullPath: '/admin/business-labels'
+      preLoaderRoute: typeof AuthedAdminBusinessLabelsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/admin/workflows/': {
       id: '/_authed/admin/workflows/'
       path: '/admin/workflows'
@@ -1002,6 +1022,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthedRouteChildren {
+  AuthedAdminBusinessLabelsRoute: typeof AuthedAdminBusinessLabelsRoute
   AuthedAdminMaintenanceRoute: typeof AuthedAdminMaintenanceRoute
   AuthedAdminSecurityProfilesRoute: typeof AuthedAdminSecurityProfilesRoute
   AuthedAdminSourcesRoute: typeof AuthedAdminSourcesRoute
@@ -1046,6 +1067,7 @@ interface AuthedRouteChildren {
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedAdminBusinessLabelsRoute: AuthedAdminBusinessLabelsRoute,
   AuthedAdminMaintenanceRoute: AuthedAdminMaintenanceRoute,
   AuthedAdminSecurityProfilesRoute: AuthedAdminSecurityProfilesRoute,
   AuthedAdminSourcesRoute: AuthedAdminSourcesRoute,

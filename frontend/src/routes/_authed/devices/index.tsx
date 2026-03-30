@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { assignAssetOwner, assignAssetSecurityProfile, fetchAssetDetail, fetchAssets, setAssetCriticality } from '@/api/assets.functions'
+import { fetchBusinessLabels } from '@/api/business-labels.functions'
 import { AssetDetailPane } from '@/components/features/assets/AssetDetailPane'
 import { AssetManagementTable } from '@/components/features/assets/AssetManagementTable'
 import { useTenantScope } from '@/components/layout/tenant-scope'
@@ -13,6 +14,7 @@ import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 const devicesSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
   criticality: searchStringSchema,
+  businessLabelId: searchStringSchema,
   ownerType: searchStringSchema,
   deviceGroup: searchStringSchema,
   healthStatus: searchStringSchema,
@@ -26,6 +28,7 @@ const devicesSearchSchema = baseListSearchSchema.extend({
 type DevicesSearch = {
   search: string
   criticality: string
+  businessLabelId: string
   ownerType: string
   deviceGroup: string
   healthStatus: string
@@ -52,7 +55,13 @@ function buildDeviceListRequest(search: DevicesSearch) {
 export const Route = createFileRoute('/_authed/devices/')({
   validateSearch: devicesSearchSchema,
   loaderDeps: ({ search }) => search,
-  loader: ({ deps }) => fetchAssets({ data: buildDeviceListRequest(deps) }),
+  loader: async ({ deps }) => {
+    const [assets, businessLabels] = await Promise.all([
+      fetchAssets({ data: buildDeviceListRequest(deps) }),
+      fetchBusinessLabels({ data: {} }),
+    ])
+    return { assets, businessLabels }
+  },
   component: DevicesPage,
 })
 
@@ -70,9 +79,15 @@ function DevicesPage() {
   const assetsQuery = useQuery({
     queryKey: assetQueryKeys.list(selectedTenantId, toDeviceAssetSearch(deviceSearch)),
     queryFn: () => fetchAssets({ data: buildDeviceListRequest(deviceSearch) }),
-    initialData: canUseInitialData ? initialData : undefined,
+    initialData: canUseInitialData ? initialData.assets : undefined,
   })
-  const assets = assetsQuery.data ?? (canUseInitialData ? initialData : undefined)
+  const businessLabelsQuery = useQuery({
+    queryKey: ['business-labels', selectedTenantId],
+    queryFn: () => fetchBusinessLabels({ data: {} }),
+    initialData: canUseInitialData ? initialData.businessLabels : undefined,
+  })
+  const assets = assetsQuery.data ?? (canUseInitialData ? initialData.assets : undefined)
+  const businessLabels = businessLabelsQuery.data ?? (canUseInitialData ? initialData.businessLabels : [])
   const ownerMutation = useMutation({
     mutationFn: async (payload: { assetId: string; ownerType: 'User' | 'Team'; ownerId: string }) => {
       await assignAssetOwner({
@@ -148,6 +163,8 @@ function DevicesPage() {
         searchValue={deviceSearch.search}
         assetTypeFilter="Device"
         criticalityFilter={deviceSearch.criticality}
+        businessLabelIdFilter={deviceSearch.businessLabelId}
+        availableBusinessLabels={businessLabels}
         ownerTypeFilter={deviceSearch.ownerType}
         deviceGroupFilter={deviceSearch.deviceGroup}
         healthStatusFilter={deviceSearch.healthStatus}
@@ -170,6 +187,10 @@ function DevicesPage() {
         }}
         onOwnerTypeFilterChange={(ownerType) => {
           searchActions.updateField('ownerType', ownerType)
+          setSelectedAssetId(null)
+        }}
+        onBusinessLabelFilterChange={(businessLabelId) => {
+          searchActions.updateField('businessLabelId', businessLabelId)
           setSelectedAssetId(null)
         }}
         onDeviceGroupFilterChange={(deviceGroup) => {
@@ -203,6 +224,7 @@ function DevicesPage() {
         onApplyStructuredFilters={(filters) => {
           searchActions.updateFields({
             criticality: filters.criticality,
+            businessLabelId: filters.businessLabelId,
             ownerType: filters.ownerType,
             deviceGroup: filters.deviceGroup,
             healthStatus: filters.healthStatus,
@@ -225,6 +247,7 @@ function DevicesPage() {
           searchActions.updateFields({
             search: '',
             criticality: '',
+            businessLabelId: '',
             ownerType: '',
             deviceGroup: '',
             healthStatus: '',

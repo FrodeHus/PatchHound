@@ -20,7 +20,9 @@ public class Asset
     public Guid? OwnerUserId { get; private set; }
     public Guid? OwnerTeamId { get; private set; }
     public Guid? FallbackTeamId { get; private set; }
+    public Guid? FallbackTeamRuleId { get; private set; }
     public Guid? SecurityProfileId { get; private set; }
+    public Guid? SecurityProfileRuleId { get; private set; }
     public string? DeviceComputerDnsName { get; private set; }
     public string? DeviceHealthStatus { get; private set; }
     public string? DeviceOsPlatform { get; private set; }
@@ -81,6 +83,23 @@ public class Asset
         OwnerUserId = null;
     }
 
+    public void SetFallbackTeamFromRule(Guid? teamId, Guid ruleId)
+    {
+        FallbackTeamId = teamId;
+        FallbackTeamRuleId = teamId.HasValue ? ruleId : null;
+    }
+
+    public void ClearRuleAssignedFallbackTeam(Guid ruleId)
+    {
+        if (FallbackTeamRuleId != ruleId)
+        {
+            return;
+        }
+
+        FallbackTeamId = null;
+        FallbackTeamRuleId = null;
+    }
+
     public void SetCriticality(Criticality criticality)
     {
         Criticality = criticality;
@@ -124,6 +143,24 @@ public class Asset
     public void AssignSecurityProfile(Guid? securityProfileId)
     {
         SecurityProfileId = securityProfileId;
+        SecurityProfileRuleId = null;
+    }
+
+    public void AssignSecurityProfileFromRule(Guid? securityProfileId, Guid ruleId)
+    {
+        SecurityProfileId = securityProfileId;
+        SecurityProfileRuleId = securityProfileId.HasValue ? ruleId : null;
+    }
+
+    public void ClearRuleAssignedSecurityProfile(Guid ruleId)
+    {
+        if (SecurityProfileRuleId != ruleId)
+        {
+            return;
+        }
+
+        SecurityProfileId = null;
+        SecurityProfileRuleId = null;
     }
 
     public void UpdateDetails(string name, string? description = null)

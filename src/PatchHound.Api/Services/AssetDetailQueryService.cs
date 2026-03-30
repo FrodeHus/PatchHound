@@ -51,6 +51,21 @@ public class AssetDetailQueryService(
                 ))
                 .FirstOrDefaultAsync(ct)
             : null;
+        var businessLabels = await dbContext.AssetBusinessLabels.AsNoTracking()
+            .Where(link => link.AssetId == assetId)
+            .OrderBy(link => link.BusinessLabel.Name)
+            .Select(link => new BusinessLabelSummaryDto(
+                link.BusinessLabel.Id,
+                link.BusinessLabel.Name,
+                link.BusinessLabel.Description,
+                link.BusinessLabel.Color
+            ))
+            .ToListAsync(ct);
+        businessLabels = businessLabels
+            .GroupBy(label => label.Id)
+            .Select(group => group.First())
+            .OrderBy(label => label.Name)
+            .ToList();
 
         var ownerUserName = asset.OwnerUserId is Guid ownerUserId
             ? await dbContext.Users.AsNoTracking()
@@ -469,6 +484,7 @@ public class AssetDetailQueryService(
             asset.DeviceIsAadJoined,
             asset.DeviceOnboardingStatus,
             asset.DeviceValue,
+            businessLabels,
             risk,
             remediation,
             tags,

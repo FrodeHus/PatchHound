@@ -54,6 +54,7 @@ export function DeviceHealthCard({ healthBreakdown, isLoading }: DeviceHealthCar
                       search={{
                         search: '',
                         criticality: '',
+                        businessLabelId: '',
                         ownerType: '',
                         deviceGroup: '',
                         healthStatus: status,

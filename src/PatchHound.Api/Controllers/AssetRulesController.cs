@@ -98,6 +98,10 @@ public class AssetRulesController : ControllerBase
         if (validationError is not null)
             return BadRequest(new ProblemDetails { Title = validationError });
 
+        var referenceValidationError = await ValidateOperationReferencesAsync(tenantId, operations, ct);
+        if (referenceValidationError is not null)
+            return BadRequest(new ProblemDetails { Title = referenceValidationError });
+
         var maxPriority = await _dbContext.AssetRules
             .Where(r => r.TenantId == tenantId)
             .MaxAsync(r => (int?)r.Priority, ct) ?? 0;
@@ -133,6 +137,10 @@ public class AssetRulesController : ControllerBase
         var validationError = ValidateOperations(operations);
         if (validationError is not null)
             return BadRequest(new ProblemDetails { Title = validationError });
+
+        var referenceValidationError = await ValidateOperationReferencesAsync(tenantId, operations, ct);
+        if (referenceValidationError is not null)
+            return BadRequest(new ProblemDetails { Title = referenceValidationError });
 
         rule.Update(request.Name, request.Description, request.Enabled, filter, operations);
         await _dbContext.SaveChangesAsync(ct);
@@ -295,6 +303,14 @@ public class AssetRulesController : ControllerBase
                     }
                     break;
 
+                case "AssignBusinessLabel":
+                    if (!operation.Parameters.TryGetValue("businessLabelId", out var businessLabelId)
+                        || !Guid.TryParse(businessLabelId, out _))
+                    {
+                        return "AssignBusinessLabel requires a valid businessLabelId.";
+                    }
+                    break;
+
                 case "SetCriticality":
                     if (!operation.Parameters.TryGetValue("criticality", out var criticality)
                         || !Enum.TryParse<Criticality>(criticality, true, out _))
@@ -305,6 +321,53 @@ public class AssetRulesController : ControllerBase
 
                 default:
                     return $"Unknown asset rule operation type: {operation.Type}.";
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<string?> ValidateOperationReferencesAsync(
+        Guid tenantId,
+        IReadOnlyList<AssetRuleOperation> operations,
+        CancellationToken ct)
+    {
+        foreach (var operation in operations)
+        {
+            switch (operation.Type)
+            {
+                case "AssignSecurityProfile":
+                    if (operation.Parameters.TryGetValue("securityProfileId", out var securityProfileId)
+                        && Guid.TryParse(securityProfileId, out var parsedSecurityProfileId))
+                    {
+                        var exists = await _dbContext.AssetSecurityProfiles
+                            .AnyAsync(profile => profile.TenantId == tenantId && profile.Id == parsedSecurityProfileId, ct);
+                        if (!exists)
+                            return "AssignSecurityProfile references a security profile that does not belong to the active tenant.";
+                    }
+                    break;
+
+                case "AssignTeam":
+                    if (operation.Parameters.TryGetValue("teamId", out var teamId)
+                        && Guid.TryParse(teamId, out var parsedTeamId))
+                    {
+                        var exists = await _dbContext.Teams
+                            .AnyAsync(team => team.TenantId == tenantId && team.Id == parsedTeamId, ct);
+                        if (!exists)
+                            return "AssignTeam references a team that does not belong to the active tenant.";
+                    }
+                    break;
+
+                case "AssignBusinessLabel":
+                    if (operation.Parameters.TryGetValue("businessLabelId", out var businessLabelId)
+                        && Guid.TryParse(businessLabelId, out var parsedBusinessLabelId))
+                    {
+                        var exists = await _dbContext.BusinessLabels
+                            .AnyAsync(label => label.TenantId == tenantId && label.IsActive && label.Id == parsedBusinessLabelId, ct);
+                        if (!exists)
+                            return "AssignBusinessLabel references an active business label that does not belong to the active tenant.";
+                    }
+                    break;
             }
         }
 
@@ -347,18 +410,17 @@ public class AssetRulesController : ControllerBase
             switch (operation.Type)
             {
                 case "AssignSecurityProfile":
-                    if (operation.Parameters.TryGetValue("securityProfileId", out var securityProfileIdValue)
-                        && Guid.TryParse(securityProfileIdValue, out var securityProfileId))
+                    if (operation.Parameters.TryGetValue("securityProfileId", out _))
                     {
                         var assets = await _dbContext.Assets
                             .Where(asset =>
                                 asset.TenantId == tenantId
                                 && assetIds.Contains(asset.Id)
-                                && asset.SecurityProfileId == securityProfileId)
+                                && asset.SecurityProfileRuleId == deletedRuleId)
                             .ToListAsync(ct);
 
                         foreach (var asset in assets)
-                            asset.AssignSecurityProfile(null);
+                            asset.ClearRuleAssignedSecurityProfile(deletedRuleId);
 
                         if (assets.Count > 0)
                             await _dbContext.SaveChangesAsync(ct);
@@ -366,18 +428,17 @@ public class AssetRulesController : ControllerBase
                     break;
 
                 case "AssignTeam":
-                    if (operation.Parameters.TryGetValue("teamId", out var teamIdValue)
-                        && Guid.TryParse(teamIdValue, out var teamId))
+                    if (operation.Parameters.TryGetValue("teamId", out _))
                     {
                         var assets = await _dbContext.Assets
                             .Where(asset =>
                                 asset.TenantId == tenantId
                                 && assetIds.Contains(asset.Id)
-                                && asset.FallbackTeamId == teamId)
+                                && asset.FallbackTeamRuleId == deletedRuleId)
                             .ToListAsync(ct);
 
                         foreach (var asset in assets)
-                            _dbContext.Entry(asset).Property(nameof(Asset.FallbackTeamId)).CurrentValue = null;
+                            asset.ClearRuleAssignedFallbackTeam(deletedRuleId);
 
                         if (assets.Count > 0)
                             await _dbContext.SaveChangesAsync(ct);
@@ -402,6 +463,23 @@ public class AssetRulesController : ControllerBase
 
                     break;
                 }
+
+                case "AssignBusinessLabel":
+                    if (operation.Parameters.TryGetValue("businessLabelId", out _))
+                    {
+                        var existingAssignments = await _dbContext.AssetBusinessLabels
+                            .Where(link =>
+                                link.AssignedByRuleId == deletedRuleId
+                                && link.SourceType == AssetBusinessLabel.RuleSourceType)
+                            .ToListAsync(ct);
+
+                        if (existingAssignments.Count > 0)
+                        {
+                            _dbContext.AssetBusinessLabels.RemoveRange(existingAssignments);
+                            await _dbContext.SaveChangesAsync(ct);
+                        }
+                    }
+                    break;
             }
         }
     }

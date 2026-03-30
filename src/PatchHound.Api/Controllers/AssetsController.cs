@@ -123,6 +123,11 @@ public class AssetsController : ControllerBase
             query = query.Where(a =>
                 _dbContext.AssetTags.Any(t => t.AssetId == a.Id && t.Tag.Contains(filter.Tag))
             );
+        if (filter.BusinessLabelId.HasValue)
+            query = query.Where(a =>
+                _dbContext.AssetBusinessLabels.Any(link =>
+                    link.AssetId == a.Id && link.BusinessLabelId == filter.BusinessLabelId.Value)
+            );
         if (!string.IsNullOrEmpty(filter.OnboardingStatus))
             query = query.Where(a => a.DeviceOnboardingStatus == filter.OnboardingStatus);
 
@@ -214,6 +219,34 @@ public class AssetsController : ControllerBase
             .GroupBy(t => t.AssetId)
             .Select(g => new { AssetId = g.Key, Tags = g.Select(t => t.Tag).ToArray() })
             .ToDictionaryAsync(g => g.AssetId, g => g.Tags, ct);
+        var businessLabelsByAssetId = await _dbContext.AssetBusinessLabels
+            .AsNoTracking()
+            .Where(link => assetIds.Contains(link.AssetId))
+            .Select(link => new
+            {
+                link.AssetId,
+                link.BusinessLabel.Id,
+                link.BusinessLabel.Name,
+                link.BusinessLabel.Description,
+                link.BusinessLabel.Color,
+            })
+            .ToListAsync(ct);
+        var businessLabelLookup = businessLabelsByAssetId
+            .GroupBy(item => item.AssetId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .GroupBy(item => item.Id)
+                    .Select(itemGroup => itemGroup.First())
+                    .OrderBy(item => item.Name)
+                    .Select(item => new BusinessLabelSummaryDto(
+                        item.Id,
+                        item.Name,
+                        item.Description,
+                        item.Color
+                    ))
+                    .ToList() as IReadOnlyList<BusinessLabelSummaryDto>
+            );
 
         var items = itemRows
             .Select(a => new AssetDto(
@@ -236,6 +269,7 @@ public class AssetsController : ControllerBase
                 a.DeviceRiskScore,
                 a.DeviceExposureLevel,
                 assetTagsByAssetId.TryGetValue(a.Id, out var tags) ? tags : Array.Empty<string>(),
+                businessLabelLookup.TryGetValue(a.Id, out var businessLabels) ? businessLabels : [],
                 a.DeviceOnboardingStatus,
                 a.DeviceValue
             ))
@@ -263,6 +297,61 @@ public class AssetsController : ControllerBase
             return NotFound();
 
         return Ok(detail);
+    }
+
+    [HttpPut("{id:guid}/business-labels")]
+    [Authorize(Policy = Policies.ConfigureTenant)]
+    public async Task<IActionResult> AssignBusinessLabels(
+        Guid id,
+        [FromBody] UpdateAssetBusinessLabelsRequest request,
+        CancellationToken ct
+    )
+    {
+        if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var asset = await _dbContext.Assets
+            .FirstOrDefaultAsync(item => item.Id == id && item.TenantId == currentTenantId, ct);
+        if (asset is null)
+            return NotFound(new ProblemDetails { Title = "Asset not found." });
+
+        var labelIds = (request.BusinessLabelIds ?? [])
+            .Distinct()
+            .ToList();
+
+        var validLabelIds = labelIds.Count == 0
+            ? []
+            : await _dbContext.BusinessLabels
+                .Where(item => item.TenantId == currentTenantId && item.IsActive && labelIds.Contains(item.Id))
+                .Select(item => item.Id)
+                .ToListAsync(ct);
+
+        if (validLabelIds.Count != labelIds.Count)
+            return BadRequest(new ProblemDetails { Title = "One or more business labels are invalid for this tenant." });
+
+        var existingLinks = await _dbContext.AssetBusinessLabels
+            .Where(item =>
+                item.AssetId == id
+                && item.SourceType == AssetBusinessLabel.ManualSourceType
+                && item.SourceKey == AssetBusinessLabel.ManualSourceKey)
+            .ToListAsync(ct);
+        var existingLabelIds = existingLinks.Select(item => item.BusinessLabelId).ToHashSet();
+
+        _dbContext.AssetBusinessLabels.RemoveRange(
+            existingLinks.Where(item => !validLabelIds.Contains(item.BusinessLabelId))
+        );
+
+        var userId = _tenantContext.CurrentUserId;
+        foreach (var labelId in validLabelIds.Where(labelId => !existingLabelIds.Contains(labelId)))
+        {
+            await _dbContext.AssetBusinessLabels.AddAsync(
+                AssetBusinessLabel.CreateManual(id, labelId, userId),
+                ct
+            );
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
+        return NoContent();
     }
 
     [HttpPut("{id:guid}/owner")]

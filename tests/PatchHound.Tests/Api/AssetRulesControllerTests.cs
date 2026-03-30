@@ -250,14 +250,16 @@ public class AssetRulesControllerTests : IDisposable
         await dbContext.AddRangeAsync(team, profile, asset, rule);
         await dbContext.SaveChangesAsync();
 
-        asset.AssignSecurityProfile(profile.Id);
-        dbContext.Entry(asset).Property(nameof(Asset.FallbackTeamId)).CurrentValue = team.Id;
+        asset.AssignSecurityProfileFromRule(profile.Id, rule.Id);
+        asset.SetFallbackTeamFromRule(team.Id, rule.Id);
         asset.SetCriticalityFromRule(Criticality.Critical, rule.Id, "Matched asset rule.");
         await dbContext.SaveChangesAsync();
 
         var beforeDelete = await dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
         beforeDelete.SecurityProfileId.Should().Be(profile.Id);
+        beforeDelete.SecurityProfileRuleId.Should().Be(rule.Id);
         beforeDelete.FallbackTeamId.Should().Be(team.Id);
+        beforeDelete.FallbackTeamRuleId.Should().Be(rule.Id);
         beforeDelete.Criticality.Should().Be(Criticality.Critical);
         beforeDelete.CriticalitySource.Should().Be("Rule");
 
@@ -267,9 +269,92 @@ public class AssetRulesControllerTests : IDisposable
 
         var refreshed = await dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
         refreshed.SecurityProfileId.Should().BeNull();
+        refreshed.SecurityProfileRuleId.Should().BeNull();
         refreshed.FallbackTeamId.Should().BeNull();
+        refreshed.FallbackTeamRuleId.Should().BeNull();
         refreshed.Criticality.Should().Be(Criticality.High);
         refreshed.CriticalitySource.Should().Be("Default");
+    }
+
+    [Fact]
+    public async Task Delete_PreservesManualAssignmentsThatMatchDeletedRuleValues()
+    {
+        var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var dbContext = new PatchHoundDbContext(options, TestServiceProviderFactory.Create(_tenantContext));
+        var snapshotResolver = new TenantSnapshotResolver(dbContext);
+        var assessmentService = new VulnerabilityAssessmentService(
+            dbContext,
+            new EnvironmentalSeverityCalculator(),
+            snapshotResolver
+        );
+        var evaluationService = new AssetRuleEvaluationService(
+            dbContext,
+            new AssetRuleFilterBuilder(dbContext),
+            Substitute.For<ILogger<AssetRuleEvaluationService>>()
+        );
+        var riskRefreshService = new RiskRefreshService(
+            dbContext,
+            snapshotResolver,
+            assessmentService,
+            new VulnerabilityEpisodeRiskAssessmentService(dbContext),
+            new RiskScoreService(dbContext, Substitute.For<ILogger<RiskScoreService>>())
+        );
+        var controller = new AssetRulesController(
+            dbContext,
+            _tenantContext,
+            evaluationService,
+            riskRefreshService
+        );
+
+        var team = Team.Create(_tenantId, "Fallback team");
+        var profile = AssetSecurityProfile.Create(
+            _tenantId,
+            "Production",
+            null,
+            EnvironmentClass.Server,
+            InternetReachability.Internet,
+            SecurityRequirementLevel.High,
+            SecurityRequirementLevel.High,
+            SecurityRequirementLevel.High
+        );
+        var asset = Asset.Create(_tenantId, "asset-2", AssetType.Device, "Prod Server 02", Criticality.High);
+        asset.AssignSecurityProfile(profile.Id);
+        var rule = AssetRule.Create(
+            _tenantId,
+            "Prod server defaults",
+            null,
+            1,
+            new FilterCondition("Name", "Contains", "Prod"),
+            [
+                new AssetRuleOperation("AssignSecurityProfile", new Dictionary<string, string>
+                {
+                    ["securityProfileId"] = profile.Id.ToString()
+                }),
+                new AssetRuleOperation("AssignTeam", new Dictionary<string, string>
+                {
+                    ["teamId"] = team.Id.ToString()
+                })
+            ]
+        );
+
+        await dbContext.AddRangeAsync(team, profile, asset, rule);
+        await dbContext.SaveChangesAsync();
+
+        asset.SetFallbackTeamFromRule(team.Id, rule.Id);
+        await dbContext.SaveChangesAsync();
+
+        var action = await controller.Delete(rule.Id, CancellationToken.None);
+
+        action.Should().BeOfType<NoContentResult>();
+
+        var refreshed = await dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        refreshed.SecurityProfileId.Should().Be(profile.Id);
+        refreshed.SecurityProfileRuleId.Should().BeNull();
+        refreshed.FallbackTeamId.Should().BeNull();
+        refreshed.FallbackTeamRuleId.Should().BeNull();
     }
 
     public void Dispose()
@@ -296,7 +381,7 @@ public class AssetRulesControllerTests : IDisposable
                 ct
             );
             await dbContext.Teams.AnyAsync(item => item.Id == _teamId && item.TenantId == tenantId, ct);
-            dbContext.Entry(asset).Property(nameof(Asset.FallbackTeamId)).CurrentValue = _teamId;
+            asset.SetFallbackTeamFromRule(_teamId, Guid.NewGuid());
             await dbContext.SaveChangesAsync(ct);
         }
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { Asset } from '@/api/assets.schemas'
+import type { BusinessLabel } from '@/api/business-labels.schemas'
 import {
   DataTableActiveFilters,
   DataTableEmptyState,
@@ -44,6 +45,8 @@ type AssetManagementTableProps = {
   searchValue: string;
   assetTypeFilter: string;
   criticalityFilter: string;
+  businessLabelIdFilter: string;
+  availableBusinessLabels: BusinessLabel[];
   ownerTypeFilter: string;
   deviceGroupFilter: string;
   healthStatusFilter: string;
@@ -55,6 +58,7 @@ type AssetManagementTableProps = {
   onSearchChange: (search: string) => void;
   onAssetTypeFilterChange: (assetType: string) => void;
   onCriticalityFilterChange: (criticality: string) => void;
+  onBusinessLabelFilterChange: (businessLabelId: string) => void;
   onOwnerTypeFilterChange: (ownerType: string) => void;
   onDeviceGroupFilterChange: (deviceGroup: string) => void;
   onHealthStatusFilterChange: (healthStatus: string) => void;
@@ -66,6 +70,7 @@ type AssetManagementTableProps = {
   onApplyStructuredFilters: (filters: {
     assetType: string;
     criticality: string;
+    businessLabelId: string;
     ownerType: string;
     deviceGroup: string;
     healthStatus: string;
@@ -115,6 +120,8 @@ export function AssetManagementTable({
   showRemediationLink = false,
   assetTypeFilter,
   criticalityFilter,
+  businessLabelIdFilter,
+  availableBusinessLabels,
   ownerTypeFilter,
   deviceGroupFilter,
   healthStatusFilter,
@@ -126,6 +133,7 @@ export function AssetManagementTable({
   onSearchChange,
   onAssetTypeFilterChange,
   onCriticalityFilterChange,
+  onBusinessLabelFilterChange,
   onOwnerTypeFilterChange,
   onDeviceGroupFilterChange,
   onHealthStatusFilterChange,
@@ -149,6 +157,7 @@ export function AssetManagementTable({
   const [draftFilters, setDraftFilters] = useState({
     assetType: assetTypeFilter,
     criticality: criticalityFilter,
+    businessLabelId: businessLabelIdFilter,
     ownerType: ownerTypeFilter,
     deviceGroup: deviceGroupFilter,
     healthStatus: healthStatusFilter,
@@ -180,6 +189,7 @@ export function AssetManagementTable({
       setDraftFilters({
         assetType: assetTypeFilter,
         criticality: criticalityFilter,
+        businessLabelId: businessLabelIdFilter,
         ownerType: ownerTypeFilter,
         deviceGroup: deviceGroupFilter,
         healthStatus: healthStatusFilter,
@@ -192,6 +202,7 @@ export function AssetManagementTable({
     }
   }, [
     assetTypeFilter,
+    businessLabelIdFilter,
     criticalityFilter,
     deviceGroupFilter,
     exposureLevelFilter,
@@ -203,6 +214,13 @@ export function AssetManagementTable({
     tagFilter,
     unassignedOnly,
   ]);
+
+  const selectedBusinessLabelName = useMemo(
+    () =>
+      availableBusinessLabels.find((label) => label.id === businessLabelIdFilter)?.name
+      ?? businessLabelIdFilter,
+    [availableBusinessLabels, businessLabelIdFilter],
+  )
 
   const activeFilters = useMemo(
     () =>
@@ -231,6 +249,15 @@ export function AssetManagementTable({
               label: `Criticality: ${criticalityFilter}`,
               onClear: () => {
                 onCriticalityFilterChange("");
+              },
+            }
+          : null,
+        businessLabelIdFilter
+          ? {
+              key: "businessLabel",
+              label: `Business label: ${selectedBusinessLabelName}`,
+              onClear: () => {
+                onBusinessLabelFilterChange("");
               },
             }
           : null,
@@ -312,11 +339,13 @@ export function AssetManagementTable({
       ].filter((value): value is NonNullable<typeof value> => value !== null),
     [
       assetTypeFilter,
+      businessLabelIdFilter,
       criticalityFilter,
       deviceGroupFilter,
       exposureLevelFilter,
       healthStatusFilter,
       onAssetTypeFilterChange,
+      onBusinessLabelFilterChange,
       onCriticalityFilterChange,
       onDeviceGroupFilterChange,
       onExposureLevelFilterChange,
@@ -331,6 +360,7 @@ export function AssetManagementTable({
       ownerTypeFilter,
       riskScoreFilter,
       searchValue,
+      selectedBusinessLabelName,
       showAssetTypeFilter,
       tagFilter,
       unassignedOnly,
@@ -342,6 +372,7 @@ export function AssetManagementTable({
       [
         showAssetTypeFilter ? assetTypeFilter : "",
         criticalityFilter,
+        businessLabelIdFilter,
         ownerTypeFilter,
         deviceGroupFilter,
         healthStatusFilter,
@@ -353,6 +384,7 @@ export function AssetManagementTable({
       ].filter(Boolean).length,
     [
       assetTypeFilter,
+      businessLabelIdFilter,
       criticalityFilter,
       deviceGroupFilter,
       exposureLevelFilter,
@@ -407,6 +439,27 @@ export function AssetManagementTable({
             <p className="font-mono text-[11px] text-muted-foreground">
               {row.original.externalId}
             </p>
+            {row.original.businessLabels.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {row.original.businessLabels.slice(0, 2).map((label) => (
+                  <Badge
+                    key={label.id}
+                    variant="outline"
+                    className="rounded-full border-border/70 bg-background/70 text-[10px]"
+                  >
+                    {label.name}
+                  </Badge>
+                ))}
+                {row.original.businessLabels.length > 2 ? (
+                  <Badge
+                    variant="outline"
+                    className="rounded-full border-border/70 bg-background/70 text-[10px]"
+                  >
+                    +{row.original.businessLabels.length - 2}
+                  </Badge>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ),
       },
@@ -704,6 +757,7 @@ export function AssetManagementTable({
               setDraftFilters({
                 assetType: assetTypeFilter,
                 criticality: criticalityFilter,
+                businessLabelId: businessLabelIdFilter,
                 ownerType: ownerTypeFilter,
                 deviceGroup: deviceGroupFilter,
                 healthStatus: healthStatusFilter,
@@ -771,6 +825,7 @@ export function AssetManagementTable({
           setDraftFilters({
             assetType: "",
             criticality: "",
+                businessLabelId: "",
             ownerType: "",
             deviceGroup: "",
             healthStatus: "",
@@ -818,6 +873,36 @@ export function AssetManagementTable({
               </Select>
             </DataTableField>
           ) : null}
+
+          <DataTableField
+            label="Business Label"
+            hint="Filter by an exact tenant business label."
+          >
+            <Select
+              value={draftFilters.businessLabelId || "all"}
+              onValueChange={(value) => {
+                const nextValue = value ?? "all";
+                setDraftFilters((current) => ({
+                  ...current,
+                  businessLabelId: nextValue === "all" ? "" : nextValue,
+                }));
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any business label" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any business label</SelectItem>
+                {availableBusinessLabels
+                  .filter((label) => label.isActive)
+                  .map((label) => (
+                    <SelectItem key={label.id} value={label.id}>
+                      {label.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
 
           <DataTableField
             label="Device Group"

@@ -20,6 +20,12 @@ export const assetSchema = z.object({
   riskScore: z.string().nullable(),
   exposureLevel: z.string().nullable(),
   tags: z.array(z.string()),
+  businessLabels: z.array(z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    description: z.string().nullable(),
+    color: z.string().nullable(),
+  })),
   onboardingStatus: z.string().nullable(),
   deviceValue: z.string().nullable(),
 });
@@ -96,6 +102,12 @@ export const assetDetailSchema = z.object({
   deviceIsAadJoined: z.boolean().nullable(),
   deviceOnboardingStatus: z.string().nullable(),
   deviceValue: z.string().nullable(),
+  businessLabels: z.array(z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    description: z.string().nullable(),
+    color: z.string().nullable(),
+  })),
   risk: z.object({
     overallScore: z.number(),
     maxEpisodeRiskScore: z.number(),

@@ -43,6 +43,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<TeamMembershipRule> TeamMembershipRules => Set<TeamMembershipRule>();
     public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<BusinessLabel> BusinessLabels => Set<BusinessLabel>();
+    public DbSet<AssetBusinessLabel> AssetBusinessLabels => Set<AssetBusinessLabel>();
     public DbSet<AssetSecurityProfile> AssetSecurityProfiles => Set<AssetSecurityProfile>();
     public DbSet<SoftwareCpeBinding> SoftwareCpeBindings => Set<SoftwareCpeBinding>();
     public DbSet<SoftwareVulnerabilityMatch> SoftwareVulnerabilityMatches =>
@@ -159,6 +161,18 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         modelBuilder
             .Entity<AssetSecurityProfile>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<BusinessLabel>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<AssetBusinessLabel>()
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || (
+                    AccessibleTenantIds.Contains(e.Asset.TenantId)
+                    && AccessibleTenantIds.Contains(e.BusinessLabel.TenantId)
+                )
+            );
         modelBuilder
             .Entity<TeamMembershipRule>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));

@@ -20,6 +20,7 @@ public record AssetDto(
     string? RiskScore,
     string? ExposureLevel,
     string[] Tags,
+    IReadOnlyList<BusinessLabelSummaryDto> BusinessLabels,
     string? OnboardingStatus,
     string? DeviceValue
 );
@@ -55,6 +56,7 @@ public record AssetDetailDto(
     bool? DeviceIsAadJoined,
     string? DeviceOnboardingStatus,
     string? DeviceValue,
+    IReadOnlyList<BusinessLabelSummaryDto> BusinessLabels,
     AssetRiskDetailDto? Risk,
     RemediationTaskSummaryDto? Remediation,
     string[] Tags,
@@ -70,6 +72,17 @@ public record AssetCriticalityDetailDto(
     string? Reason,
     Guid? RuleId,
     DateTimeOffset? UpdatedAt
+);
+
+public record BusinessLabelSummaryDto(
+    Guid Id,
+    string Name,
+    string? Description,
+    string? Color
+);
+
+public record UpdateAssetBusinessLabelsRequest(
+    IReadOnlyList<Guid> BusinessLabelIds
 );
 
 public record AssetRiskDetailDto(
@@ -217,5 +230,6 @@ public record AssetFilterQuery(
     string? RiskScore = null,
     string? ExposureLevel = null,
     string? Tag = null,
+    Guid? BusinessLabelId = null,
     string? OnboardingStatus = null
 );

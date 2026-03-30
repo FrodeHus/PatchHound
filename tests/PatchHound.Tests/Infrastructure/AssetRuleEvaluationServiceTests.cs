@@ -203,6 +203,115 @@ public class AssetRuleEvaluationServiceTests : IDisposable
         refreshed.CriticalityRuleId.Should().Be(rule.Id);
     }
 
+    [Fact]
+    public async Task EvaluateRulesAsync_AssignSecurityProfileOperation_TracksAndReconcilesRuleOwnership()
+    {
+        var profile = AssetSecurityProfile.Create(
+            _tenantId,
+            "Production",
+            null,
+            EnvironmentClass.Server,
+            InternetReachability.Internet,
+            SecurityRequirementLevel.High,
+            SecurityRequirementLevel.High,
+            SecurityRequirementLevel.High
+        );
+        var asset = Asset.Create(
+            _tenantId,
+            "asset-5",
+            AssetType.Device,
+            "Prod-Server-01",
+            Criticality.High
+        );
+        var rule = AssetRule.Create(
+            _tenantId,
+            "Assign production profile",
+            null,
+            1,
+            new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Prod-"),
+            [
+                new PatchHound.Core.Models.AssetRuleOperation(
+                    "AssignSecurityProfile",
+                    new Dictionary<string, string> { ["securityProfileId"] = profile.Id.ToString() }
+                )
+            ]
+        );
+
+        await _dbContext.AddRangeAsync(profile, asset, rule);
+        await _dbContext.SaveChangesAsync();
+
+        var service = new AssetRuleEvaluationService(
+            _dbContext,
+            new AssetRuleFilterBuilder(_dbContext),
+            Substitute.For<ILogger<AssetRuleEvaluationService>>()
+        );
+
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var assigned = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        assigned.SecurityProfileId.Should().Be(profile.Id);
+        assigned.SecurityProfileRuleId.Should().Be(rule.Id);
+
+        assigned.UpdateDetails("Office-Server-01");
+        await _dbContext.SaveChangesAsync();
+
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var reconciled = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        reconciled.SecurityProfileId.Should().BeNull();
+        reconciled.SecurityProfileRuleId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task EvaluateRulesAsync_AssignTeamOperation_TracksAndReconcilesRuleOwnership()
+    {
+        var team = Team.Create(_tenantId, "Customer Operators");
+        var asset = Asset.Create(
+            _tenantId,
+            "asset-6",
+            AssetType.Device,
+            "Ops-Workstation-01",
+            Criticality.Medium
+        );
+        var rule = AssetRule.Create(
+            _tenantId,
+            "Assign default team",
+            null,
+            1,
+            new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Ops-"),
+            [
+                new PatchHound.Core.Models.AssetRuleOperation(
+                    "AssignTeam",
+                    new Dictionary<string, string> { ["teamId"] = team.Id.ToString() }
+                )
+            ]
+        );
+
+        await _dbContext.AddRangeAsync(team, asset, rule);
+        await _dbContext.SaveChangesAsync();
+
+        var service = new AssetRuleEvaluationService(
+            _dbContext,
+            new AssetRuleFilterBuilder(_dbContext),
+            Substitute.For<ILogger<AssetRuleEvaluationService>>()
+        );
+
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var assigned = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        assigned.FallbackTeamId.Should().Be(team.Id);
+        assigned.FallbackTeamRuleId.Should().Be(rule.Id);
+
+        assigned.UpdateDetails("Laptop-01");
+        await _dbContext.SaveChangesAsync();
+
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var reconciled = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        reconciled.FallbackTeamId.Should().BeNull();
+        reconciled.FallbackTeamRuleId.Should().BeNull();
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

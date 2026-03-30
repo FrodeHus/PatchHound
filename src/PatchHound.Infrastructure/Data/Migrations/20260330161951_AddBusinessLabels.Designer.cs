@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PatchHound.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PatchHound.Infrastructure.Data;
 namespace PatchHound.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(PatchHoundDbContext))]
-    partial class PatchHoundDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260330161951_AddBusinessLabels")]
+    partial class AddBusinessLabels
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -386,9 +389,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("BusinessLabelId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("SourceKey")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                    b.Property<Guid?>("AssignedByRuleId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("AssignedAt")
                         .HasColumnType("timestamp with time zone");
@@ -396,8 +398,10 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid?>("AssignedBy")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AssignedByRuleId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("SourceType")
                         .IsRequired()
@@ -407,7 +411,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.HasKey("AssetId", "BusinessLabelId", "SourceKey");
 
                     b.HasIndex("AssignedByRuleId");
-
                     b.HasIndex("BusinessLabelId");
 
                     b.ToTable("AssetBusinessLabels");

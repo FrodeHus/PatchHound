@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Building2, ChevronRight, DatabaseZap, GitBranchPlus, Plug, ShieldCheck, ShieldEllipsis, Users, Workflow, Wrench } from 'lucide-react'
+import { Building2, ChevronRight, DatabaseZap, GitBranchPlus, Plug, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({
@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_authed/admin/')({
 type AdminArea = {
   title: string
   description: string
-  to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/sources' | '/admin/security-profiles' | '/admin/asset-rules' | '/admin/workflows' | '/admin/integrations' | '/admin/maintenance'
+  to: '/admin/users' | '/admin/teams' | '/admin/tenants' | '/admin/sources' | '/admin/security-profiles' | '/admin/business-labels' | '/admin/asset-rules' | '/admin/workflows' | '/admin/integrations' | '/admin/maintenance'
   roles: Array<'GlobalAdmin' | 'CustomerAdmin' | 'CustomerOperator' | 'CustomerViewer' | 'SecurityManager' | 'SecurityAnalyst' | 'AssetOwner' | 'TechnicalManager' | 'Auditor' | 'Stakeholder'>
   icon: typeof Users
 }
@@ -49,6 +49,13 @@ const adminAreas: AdminArea[] = [
     to: '/admin/security-profiles',
     roles: ['GlobalAdmin', 'SecurityManager'],
     icon: ShieldEllipsis,
+  },
+  {
+    title: 'Business Labels',
+    description: 'Define tenant business labels like Production, Finance, or Customer-facing and reuse them on assets.',
+    to: '/admin/business-labels',
+    roles: ['GlobalAdmin', 'SecurityManager', 'CustomerAdmin'],
+    icon: Tags,
   },
   {
     title: 'Asset Rules',

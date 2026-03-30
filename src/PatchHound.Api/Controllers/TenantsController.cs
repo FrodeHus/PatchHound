@@ -451,6 +451,11 @@ public class TenantsController : ControllerBase
         await DeleteEntitiesAsync(_dbContext.AIReports.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.SoftwareDescriptionJobs.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.AssetTags.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(
+            _dbContext.AssetBusinessLabels.IgnoreQueryFilters().Where(item => item.BusinessLabel.TenantId == id),
+            ct
+        );
+        await DeleteEntitiesAsync(_dbContext.BusinessLabels.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.AssetRules.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.AssetRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.DeviceGroupRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
