@@ -16,4 +16,15 @@
     <ProjectReference Include="..\PatchHound.Core\PatchHound.Core.csproj" />
     <ProjectReference Include="..\PatchHound.Infrastructure\PatchHound.Infrastructure.csproj" />
   </ItemGroup>
+
+  <Target Name="RemoveApiAppSettingsFromPublish" BeforeTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(ResolvedFileToPublish.RelativePath)' == 'appsettings.json'
+                               and $([System.String]::Copy('%(ResolvedFileToPublish.Identity)').Contains('PatchHound.Api'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(ResolvedFileToPublish.RelativePath)' == 'appsettings.Development.json'
+                               and $([System.String]::Copy('%(ResolvedFileToPublish.Identity)').Contains('PatchHound.Api'))" />
+    </ItemGroup>
+  </Target>
 </Project>
