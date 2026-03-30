@@ -1,0 +1,6 @@
+{
+    "chat.tools.terminal.autoApprove": {
+      "npx eslint": true,
+      "npm run typecheck": true
+    }
+}

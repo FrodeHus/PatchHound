@@ -104,6 +104,17 @@ public class RemediationDecisionTests
         act.Should().Throw<InvalidOperationException>();
     }
 
+    [Fact]
+    public void UpdateDecision_throws_when_justification_required_but_empty()
+    {
+        var decision = CreateApprovedDecision(RemediationOutcome.ApprovedForPatching);
+        decision.Reopen();
+
+        var act = () => decision.UpdateDecision(RemediationOutcome.RiskAcceptance, "");
+
+        act.Should().Throw<ArgumentException>();
+    }
+
     [Theory]
     [InlineData(RemediationOutcome.RiskAcceptance)]
     [InlineData(RemediationOutcome.AlternateMitigation)]

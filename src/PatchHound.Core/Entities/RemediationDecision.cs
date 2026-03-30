@@ -140,6 +140,9 @@ public class RemediationDecision
             throw new InvalidOperationException(
                 $"Cannot update a decision with status '{ApprovalStatus}'. Only reopened decisions can be updated.");
 
+        if (OutcomesRequiringJustification.Contains(outcome) && string.IsNullOrWhiteSpace(justification))
+            throw new ArgumentException($"Justification is required for {outcome}.");
+
         Outcome = outcome;
         Justification = justification;
         UpdatedAt = DateTimeOffset.UtcNow;
