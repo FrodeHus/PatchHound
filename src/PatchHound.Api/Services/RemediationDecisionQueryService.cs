@@ -44,6 +44,8 @@ public class RemediationDecisionQueryService(
 
     private sealed record RemediationAiContext(
         int AffectedDeviceCount,
+        int AffectedOwnerTeamCount,
+        IReadOnlyList<string> AffectedOwnerTeamNames,
         int ServerCount,
         int WorkstationCount,
         int OtherEnvironmentCount,
@@ -420,14 +422,24 @@ public class RemediationDecisionQueryService(
                     item.profile != null ? item.profile.InternetReachability : null
                 ))
                 .ToListAsync(ct);
-        var affectedOwnerTeamCount = scopedDeviceAssetIds.Count > 0
+        var affectedOwnerTeamIds = scopedDeviceAssetIds.Count > 0
             ? await dbContext.Assets.AsNoTracking()
                 .Where(asset => asset.TenantId == tenantId && scopedDeviceAssetIds.Contains(asset.Id))
                 .Select(asset => asset.OwnerTeamId ?? asset.FallbackTeamId)
                 .Where(teamId => teamId != null)
                 .Distinct()
-                .CountAsync(ct)
-            : 0;
+                .Select(teamId => teamId!.Value)
+                .ToListAsync(ct)
+            : [];
+        var affectedOwnerTeamCount = affectedOwnerTeamIds.Count;
+        var affectedOwnerTeamNames = affectedOwnerTeamIds.Count == 0
+            ? []
+            : await dbContext.Teams.AsNoTracking()
+                .Where(team => affectedOwnerTeamIds.Contains(team.Id))
+                .OrderBy(team => team.Name)
+                .Select(team => team.Name)
+                .Take(5)
+                .ToListAsync(ct);
         var patchingTaskCounts = await dbContext.PatchingTasks.AsNoTracking()
             .Where(task => task.TenantId == tenantId && task.TenantSoftwareId == tenantSoftwareId)
             .GroupBy(_ => 1)
@@ -693,6 +705,8 @@ public class RemediationDecisionQueryService(
         var remediationAiContext = BuildRemediationAiContext(
             scopedDeviceDetails,
             assetCriticality,
+            affectedOwnerTeamCount,
+            affectedOwnerTeamNames,
             decision,
             patchingTaskCounts?.Open ?? 0,
             patchingTaskCounts?.Completed ?? 0,
@@ -1417,6 +1431,8 @@ public class RemediationDecisionQueryService(
                     remediationContext = new
                     {
                         remediationAiContext.AffectedDeviceCount,
+                        remediationAiContext.AffectedOwnerTeamCount,
+                        remediationAiContext.AffectedOwnerTeamNames,
                         remediationAiContext.ServerCount,
                         remediationAiContext.WorkstationCount,
                         remediationAiContext.OtherEnvironmentCount,
@@ -1492,6 +1508,8 @@ public class RemediationDecisionQueryService(
             summary.WithKnownExploit,
             summary.WithActiveAlert,
             remediationAiContext.AffectedDeviceCount,
+            remediationAiContext.AffectedOwnerTeamCount,
+            string.Join(",", remediationAiContext.AffectedOwnerTeamNames),
             remediationAiContext.ServerCount,
             remediationAiContext.WorkstationCount,
             remediationAiContext.OtherEnvironmentCount,
@@ -1524,6 +1542,8 @@ public class RemediationDecisionQueryService(
     private static RemediationAiContext BuildRemediationAiContext(
         IReadOnlyList<RemediationDeviceContextRow> scopedDeviceDetails,
         Criticality assetCriticality,
+        int affectedOwnerTeamCount,
+        IReadOnlyList<string> affectedOwnerTeamNames,
         RemediationDecision? decision,
         int openPatchingTaskCount,
         int completedPatchingTaskCount,
@@ -1553,6 +1573,8 @@ public class RemediationDecisionQueryService(
 
         return new RemediationAiContext(
             details.Count,
+            affectedOwnerTeamCount,
+            affectedOwnerTeamNames,
             serverCount,
             workstationCount,
             otherEnvironmentCount,
