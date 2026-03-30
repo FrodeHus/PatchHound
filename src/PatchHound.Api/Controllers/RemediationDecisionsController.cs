@@ -72,10 +72,14 @@ public class RemediationDecisionsController(
         CancellationToken ct
     )
     {
+        if (tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
         if (!Enum.TryParse<RemediationOutcome>(request.Outcome, true, out var outcome))
             return BadRequest(new ProblemDetails { Title = "Invalid outcome value." });
 
         var result = await decisionService.AddVulnerabilityOverrideAsync(
+            tenantId,
             decisionId,
             request.TenantVulnerabilityId,
             outcome,

@@ -101,8 +101,7 @@ public class RemediationDecisionQueryService(
         var decisionsLookup = await dbContext.RemediationDecisions.AsNoTracking()
             .Where(d => d.TenantId == tenantId
                 && tenantSoftwareIds.Contains(d.TenantSoftwareId)
-                && d.ApprovalStatus != DecisionApprovalStatus.Rejected
-                && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                && !d.ApprovalStatus.IsTerminal())
             .GroupBy(d => d.TenantSoftwareId)
             .Select(g => g.OrderByDescending(d => d.CreatedAt).First())
             .ToDictionaryAsync(d => d.TenantSoftwareId, ct);
@@ -251,7 +250,9 @@ public class RemediationDecisionQueryService(
         var summary = new RemediationDecisionListSummaryDto(
             totalCount,
             items.Count(item => item.Outcome is not null),
-            items.Count(item => string.Equals(item.ApprovalStatus, DecisionApprovalStatus.PendingApproval.ToString(), StringComparison.OrdinalIgnoreCase)),
+            items.Count(item =>
+                string.Equals(item.ApprovalStatus, DecisionApprovalStatus.PendingApproval.ToString(), StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.ApprovalStatus, DecisionApprovalStatus.Reopened.ToString(), StringComparison.OrdinalIgnoreCase)),
             items.Count(item => item.Outcome is null)
         );
         var paged = items
@@ -466,9 +467,7 @@ public class RemediationDecisionQueryService(
                 .OrderByDescending(d => d.CreatedAt)
                 .FirstOrDefaultAsync(ct)
             : await decisionQuery
-                .Where(d =>
-                    d.ApprovalStatus != DecisionApprovalStatus.Rejected
-                    && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                .Where(d => !d.ApprovalStatus.IsTerminal())
                 .OrderByDescending(d => d.CreatedAt)
                 .FirstOrDefaultAsync(ct);
 

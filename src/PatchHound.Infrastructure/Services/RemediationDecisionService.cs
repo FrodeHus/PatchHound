@@ -35,8 +35,7 @@ public class RemediationDecisionService(
             .Where(d =>
                 d.TenantId == tenantId
                 && d.TenantSoftwareId == remediationScope.TenantSoftwareId
-                && d.ApprovalStatus != DecisionApprovalStatus.Rejected
-                && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                && !d.ApprovalStatus.IsTerminal())
             .AnyAsync(
                 d => !d.RemediationWorkflowId.HasValue
                     || dbContext.RemediationWorkflows.Any(workflow =>
@@ -318,8 +317,7 @@ public class RemediationDecisionService(
                 d.TenantId == tenantId
                 && d.RemediationWorkflowId.HasValue
                 && workflowIds.Contains(d.RemediationWorkflowId.Value)
-                && d.ApprovalStatus != DecisionApprovalStatus.Rejected
-                && d.ApprovalStatus != DecisionApprovalStatus.Expired)
+                && !d.ApprovalStatus.IsTerminal())
             .ToListAsync(ct);
         var decisionIds = decisionsToClose.Select(d => d.Id).ToList();
         var openTasks = await dbContext.PatchingTasks
@@ -363,6 +361,7 @@ public class RemediationDecisionService(
     }
 
     public async Task<Result<RemediationDecisionVulnerabilityOverride>> AddVulnerabilityOverrideAsync(
+        Guid tenantId,
         Guid decisionId,
         Guid tenantVulnerabilityId,
         RemediationOutcome outcome,
@@ -371,7 +370,7 @@ public class RemediationDecisionService(
     )
     {
         var decision = await dbContext.RemediationDecisions
-            .FirstOrDefaultAsync(d => d.Id == decisionId, ct);
+            .FirstOrDefaultAsync(d => d.Id == decisionId && d.TenantId == tenantId, ct);
 
         if (decision is null)
             return Result<RemediationDecisionVulnerabilityOverride>.Failure("Decision not found.");

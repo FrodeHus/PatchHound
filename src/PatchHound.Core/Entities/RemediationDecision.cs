@@ -131,6 +131,8 @@ public class RemediationDecision
         ReopenedAt = DateTimeOffset.UtcNow;
         ApprovedBy = null;
         ApprovedAt = null;
+        ExpiryDate = null;
+        ReEvaluationDate = null;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 

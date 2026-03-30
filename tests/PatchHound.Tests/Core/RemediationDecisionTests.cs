@@ -31,6 +31,8 @@ public class RemediationDecisionTests
         decision.ReopenedAt.Should().NotBeNull();
         decision.ApprovedBy.Should().BeNull();
         decision.ApprovedAt.Should().BeNull();
+        decision.ExpiryDate.Should().BeNull();
+        decision.ReEvaluationDate.Should().BeNull();
     }
 
     [Fact]
@@ -113,6 +115,29 @@ public class RemediationDecisionTests
         var act = () => decision.UpdateDecision(RemediationOutcome.RiskAcceptance, "");
 
         act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Reopen_clears_stale_expiry_and_reevaluation_dates()
+    {
+        var decision = RemediationDecision.Create(
+            tenantId: Guid.NewGuid(),
+            tenantSoftwareId: Guid.NewGuid(),
+            softwareAssetId: Guid.NewGuid(),
+            outcome: RemediationOutcome.RiskAcceptance,
+            justification: "Test",
+            decidedBy: Guid.NewGuid(),
+            initialApprovalStatus: DecisionApprovalStatus.Approved,
+            expiryDate: DateTimeOffset.UtcNow.AddDays(-5),
+            reEvaluationDate: DateTimeOffset.UtcNow.AddDays(-3)
+        );
+        decision.ExpiryDate.Should().NotBeNull();
+        decision.ReEvaluationDate.Should().NotBeNull();
+
+        decision.Reopen();
+
+        decision.ExpiryDate.Should().BeNull();
+        decision.ReEvaluationDate.Should().BeNull();
     }
 
     [Theory]

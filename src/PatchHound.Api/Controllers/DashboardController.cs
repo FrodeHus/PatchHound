@@ -289,8 +289,7 @@ public class DashboardController : ControllerBase
                     && _dbContext.RemediationDecisions.Any(rd =>
                         rd.SoftwareAssetId == svm.SoftwareAssetId
                         && rd.TenantId == tenantId
-                        && rd.ApprovalStatus != DecisionApprovalStatus.Rejected
-                        && rd.ApprovalStatus != DecisionApprovalStatus.Expired
+                        && !rd.ApprovalStatus.IsTerminal()
                     )
                 )
             );
