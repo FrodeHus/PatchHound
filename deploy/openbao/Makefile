@@ -72,16 +72,8 @@ enable-kv: login
 policy: enable-kv $(OUTPUT_DIR)
 	@echo "Writing patchhound policy..."
 	@printf '%s\n' \
-		'path "$(KV_MOUNT)/data/tenants/*" {' \
-		'  capabilities = ["create", "update", "read"]' \
-		'}' \
-		'' \
-		'path "$(KV_MOUNT)/data/system/enrichment-sources/*" {' \
-		'  capabilities = ["create", "update", "read"]' \
-		'}' \
-		'' \
-		'path "$(KV_MOUNT)/data/system/notification-services/*" {' \
-		'  capabilities = ["create", "update", "read"]' \
+		'path "$(KV_MOUNT)/*" {' \
+		'  capabilities = ["create", "update", "read", "delete"]' \
 		'}' > $(POLICY_FILE)
 	@$(COMPOSE) cp $(POLICY_FILE) openbao:/tmp/patchhound-policy.hcl
 	@$(BAO) policy write patchhound /tmp/patchhound-policy.hcl
