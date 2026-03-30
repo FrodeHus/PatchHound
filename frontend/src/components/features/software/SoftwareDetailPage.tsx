@@ -78,6 +78,7 @@ export function SoftwareDetailPage({
       && maintenanceWindowHasPassed
       && detail.activeVulnerabilityCount > 0
   )
+  const supplyChainInsight = detail.supplyChainInsight
 
   return (
     <section className="space-y-5">
@@ -183,6 +184,56 @@ export function SoftwareDetailPage({
                         Planned date for patch execution to be in place for this software scope.
                       </p>
                     )}
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            {supplyChainInsight ? (
+              <section className="rounded-[1.15rem] border border-amber-500/25 bg-amber-500/10 px-4 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="max-w-3xl">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
+                      Supply-chain guidance
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">
+                      {startCase(supplyChainInsight.remediationPath.replace(/([A-Z])/g, ' $1').trim())}
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {supplyChainInsight.summary}
+                    </p>
+                  </div>
+                  <div className="grid min-w-[220px] gap-1 text-sm text-muted-foreground">
+                    <span>
+                      Confidence: <span className="font-medium text-foreground">{startCase(supplyChainInsight.confidence)}</span>
+                    </span>
+                    {supplyChainInsight.primaryComponentName ? (
+                      <span>
+                        Component:{' '}
+                        <span className="font-medium text-foreground">
+                          {supplyChainInsight.primaryComponentVersion
+                            ? `${supplyChainInsight.primaryComponentName} ${supplyChainInsight.primaryComponentVersion}`
+                            : supplyChainInsight.primaryComponentName}
+                        </span>
+                      </span>
+                    ) : null}
+                    {supplyChainInsight.fixedVersion ? (
+                      <span>
+                        Suggested fixed version:{' '}
+                        <span className="font-medium text-foreground">{supplyChainInsight.fixedVersion}</span>
+                      </span>
+                    ) : null}
+                    {supplyChainInsight.affectedVulnerabilityCount != null ? (
+                      <span>
+                        Vulnerabilities in scope:{' '}
+                        <span className="font-medium text-foreground">{supplyChainInsight.affectedVulnerabilityCount}</span>
+                      </span>
+                    ) : null}
+                    {supplyChainInsight.sourceFormat ? (
+                      <span>
+                        Source: <span className="font-medium text-foreground">{supplyChainInsight.sourceFormat}</span>
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               </section>

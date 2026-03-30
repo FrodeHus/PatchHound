@@ -77,6 +77,17 @@ export const tenantSoftwareDetailSchema = z.object({
     enrichedAt: isoDateTimeSchema.nullable(),
     productSlug: z.string().nullable(),
   }).nullable(),
+  supplyChainInsight: z.object({
+    remediationPath: z.string(),
+    confidence: z.string(),
+    sourceFormat: z.string().nullable(),
+    primaryComponentName: z.string().nullable(),
+    primaryComponentVersion: z.string().nullable(),
+    fixedVersion: z.string().nullable(),
+    affectedVulnerabilityCount: z.number().nullable(),
+    summary: z.string(),
+    enrichedAt: isoDateTimeSchema.nullable(),
+  }).nullable(),
 })
 
 export const tenantSoftwareListItemSchema = z.object({

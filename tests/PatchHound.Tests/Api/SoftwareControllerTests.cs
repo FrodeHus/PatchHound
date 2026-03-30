@@ -27,6 +27,7 @@ public class SoftwareControllerTests : IDisposable
     private readonly TenantAiTextGenerationService _tenantAiTextGenerationService;
     private readonly ITenantAiResearchService _tenantAiResearchService;
     private readonly SoftwareDescriptionJobService _softwareDescriptionJobService;
+    private readonly CycloneDxSupplyChainImportService _cycloneDxSupplyChainImportService;
     private readonly SoftwareController _controller;
 
     public SoftwareControllerTests()
@@ -61,6 +62,7 @@ public class SoftwareControllerTests : IDisposable
             _dbContext,
             remediationDecisionService
         );
+        _cycloneDxSupplyChainImportService = new CycloneDxSupplyChainImportService(_dbContext);
         _softwareDescriptionJobService = new SoftwareDescriptionJobService(_dbContext);
         _controller = new SoftwareController(
             _dbContext,
@@ -69,6 +71,7 @@ public class SoftwareControllerTests : IDisposable
             _tenantAiConfigurationResolver,
             _tenantAiResearchService,
             remediationTaskQueryService,
+            _cycloneDxSupplyChainImportService,
             _tenantContext
         );
     }
@@ -313,6 +316,59 @@ public class SoftwareControllerTests : IDisposable
         payload.Items[0].CurrentRiskScore.Should().Be(880m);
         payload.Items[1].Id.Should().Be(lowRiskTenantSoftware.Id);
         payload.Items[1].CurrentRiskScore.Should().Be(240m);
+    }
+
+    [Fact]
+    public async Task ImportCycloneDxEvidence_UpdatesSupplyChainInsight()
+    {
+        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+
+        var action = await _controller.ImportCycloneDxEvidence(
+            graph.TenantSoftware.Id,
+            new ImportTenantSoftwareSupplyChainRequest(
+                """
+                {
+                  "bomFormat": "CycloneDX",
+                  "specVersion": "1.6",
+                  "metadata": {
+                    "component": {
+                      "bom-ref": "product",
+                      "name": "agent",
+                      "version": "2.0"
+                    }
+                  },
+                  "components": [
+                    {
+                      "bom-ref": "pkg:maven/org.apache.commons/commons-text@1.3.0",
+                      "name": "commons-text",
+                      "version": "1.3.0"
+                    }
+                  ],
+                  "vulnerabilities": [
+                    {
+                      "id": "CVE-2026-1000",
+                      "analysis": { "state": "affected" },
+                      "affects": [
+                        { "ref": "pkg:maven/org.apache.commons/commons-text@1.3.0" }
+                      ]
+                    }
+                  ]
+                }
+                """
+            ),
+            CancellationToken.None
+        );
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<SupplyChainInsightDto>().Subject;
+        payload.RemediationPath.Should().Be("VendorUpdateRequired");
+        payload.PrimaryComponentName.Should().Be("commons-text");
+
+        var detailAction = await _controller.Get(graph.TenantSoftware.Id, CancellationToken.None);
+        var detailResult = detailAction.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var detailPayload = detailResult.Value.Should().BeOfType<TenantSoftwareDetailDto>().Subject;
+        detailPayload.SupplyChainInsight.Should().NotBeNull();
+        detailPayload.SupplyChainInsight!.RemediationPath.Should().Be("VendorUpdateRequired");
     }
 
     [Fact]

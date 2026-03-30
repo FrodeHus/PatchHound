@@ -100,6 +100,7 @@ public static class DependencyInjection
         services.AddScoped<SoftwareVulnerabilityMatchService>();
         services.AddScoped<NormalizedSoftwareResolver>();
         services.AddScoped<NormalizedSoftwareProjectionService>();
+        services.AddScoped<CycloneDxSupplyChainImportService>();
         services.AddScoped<EnrichmentJobEnqueuer>();
         services.AddScoped<StagedVulnerabilityMergeService>();
         services.AddScoped<StagedAssetMergeService>();
@@ -108,6 +109,7 @@ public static class DependencyInjection
         services.AddScoped<IEnrichmentSourceRunner, NvdVulnerabilityEnrichmentRunner>();
         services.AddScoped<IEnrichmentSourceRunner, DefenderVulnerabilityEnrichmentRunner>();
         services.AddScoped<IEnrichmentSourceRunner, EndOfLifeSoftwareEnrichmentRunner>();
+        services.AddScoped<IEnrichmentSourceRunner, SupplyChainEvidenceEnrichmentRunner>();
         services.AddScoped<AiReportService>();
         services.AddScoped<TenantAiTextGenerationService>();
         services.AddScoped<SoftwareDescriptionGenerationService>();
@@ -159,6 +161,7 @@ public static class DependencyInjection
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services.AddHttpClient<NvdApiClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 1);
         services.AddHttpClient<EndOfLifeApiClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 2);
+        services.AddHttpClient<SupplyChainCatalogClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services
             .AddHttpClient<ISecretStore, OpenBaoSecretStore>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 4);

@@ -282,4 +282,45 @@ public class EnrichmentJobEnqueuerTests : IDisposable
         jobs.Should().ContainSingle();
         jobs[0].SourceKey.Should().Be(EnrichmentSourceCatalog.DefenderSourceKey);
     }
+
+    [Fact]
+    public async Task EnqueueSoftwareSupplyChainJobsAsync_WhenEnabled_QueuesSoftwareJob()
+    {
+        var tenantId = Guid.NewGuid();
+        var timestamp = new DateTimeOffset(2026, 3, 30, 12, 0, 0, TimeSpan.Zero);
+        var software = NormalizedSoftware.Create(
+            "contoso app",
+            "contoso",
+            "contoso|app",
+            null,
+            SoftwareNormalizationMethod.Heuristic,
+            SoftwareNormalizationConfidence.High,
+            timestamp
+        );
+
+        var source = EnrichmentSourceConfiguration.Create(
+            EnrichmentSourceCatalog.SupplyChainSourceKey,
+            "Supply Chain Evidence",
+            true,
+            apiBaseUrl: "https://example.test/catalog.json",
+            refreshTtlHours: 24
+        );
+
+        await _dbContext.NormalizedSoftware.AddAsync(software);
+        await _dbContext.EnrichmentSourceConfigurations.AddAsync(source);
+        await _dbContext.SaveChangesAsync();
+
+        var enqueuer = new EnrichmentJobEnqueuer(
+            _dbContext,
+            Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
+        );
+
+        await enqueuer.EnqueueSoftwareSupplyChainJobsAsync(tenantId, [software.Id], CancellationToken.None);
+
+        var jobs = await _dbContext.EnrichmentJobs.IgnoreQueryFilters().ToListAsync();
+        jobs.Should().ContainSingle();
+        jobs[0].SourceKey.Should().Be(EnrichmentSourceCatalog.SupplyChainSourceKey);
+        jobs[0].TargetModel.Should().Be(EnrichmentTargetModel.SoftwareAsset);
+        jobs[0].TargetId.Should().Be(software.Id);
+    }
 }

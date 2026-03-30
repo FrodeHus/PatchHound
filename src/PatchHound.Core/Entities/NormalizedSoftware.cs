@@ -28,6 +28,15 @@ public class NormalizedSoftware
     public DateTimeOffset? EolSupportEndDate { get; private set; }
     public bool? EolIsDiscontinued { get; private set; }
     public DateTimeOffset? EolEnrichedAt { get; private set; }
+    public SupplyChainRemediationPath SupplyChainRemediationPath { get; private set; }
+    public SupplyChainInsightConfidence SupplyChainInsightConfidence { get; private set; }
+    public string? SupplyChainSourceFormat { get; private set; }
+    public string? SupplyChainPrimaryComponentName { get; private set; }
+    public string? SupplyChainPrimaryComponentVersion { get; private set; }
+    public string? SupplyChainFixedVersion { get; private set; }
+    public int? SupplyChainAffectedVulnerabilityCount { get; private set; }
+    public string? SupplyChainSummary { get; private set; }
+    public DateTimeOffset? SupplyChainEnrichedAt { get; private set; }
 
     private NormalizedSoftware() { }
 
@@ -110,5 +119,47 @@ public class NormalizedSoftware
         EolIsDiscontinued = isDiscontinued;
         EolEnrichedAt = enrichedAt;
         UpdatedAt = enrichedAt;
+    }
+
+    public void UpdateSupplyChainInsight(
+        SupplyChainRemediationPath remediationPath,
+        SupplyChainInsightConfidence confidence,
+        string sourceFormat,
+        string? primaryComponentName,
+        string? primaryComponentVersion,
+        string? fixedVersion,
+        int? affectedVulnerabilityCount,
+        string summary,
+        DateTimeOffset enrichedAt
+    )
+    {
+        SupplyChainRemediationPath = remediationPath;
+        SupplyChainInsightConfidence = confidence;
+        SupplyChainSourceFormat = sourceFormat.Trim();
+        SupplyChainPrimaryComponentName = string.IsNullOrWhiteSpace(primaryComponentName)
+            ? null
+            : primaryComponentName.Trim();
+        SupplyChainPrimaryComponentVersion = string.IsNullOrWhiteSpace(primaryComponentVersion)
+            ? null
+            : primaryComponentVersion.Trim();
+        SupplyChainFixedVersion = string.IsNullOrWhiteSpace(fixedVersion) ? null : fixedVersion.Trim();
+        SupplyChainAffectedVulnerabilityCount = affectedVulnerabilityCount;
+        SupplyChainSummary = summary.Trim();
+        SupplyChainEnrichedAt = enrichedAt;
+        UpdatedAt = enrichedAt;
+    }
+
+    public void ClearSupplyChainInsight()
+    {
+        SupplyChainRemediationPath = SupplyChainRemediationPath.Unknown;
+        SupplyChainInsightConfidence = SupplyChainInsightConfidence.Unknown;
+        SupplyChainSourceFormat = null;
+        SupplyChainPrimaryComponentName = null;
+        SupplyChainPrimaryComponentVersion = null;
+        SupplyChainFixedVersion = null;
+        SupplyChainAffectedVulnerabilityCount = null;
+        SupplyChainSummary = null;
+        SupplyChainEnrichedAt = null;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

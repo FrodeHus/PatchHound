@@ -601,6 +601,7 @@ public class TenantsController : ControllerBase
 
         var enqueuer = HttpContext.RequestServices.GetRequiredService<EnrichmentJobEnqueuer>();
         await enqueuer.EnqueueSoftwareEndOfLifeJobsAsync(id, normalizedSoftwareIds, ct);
+        await enqueuer.EnqueueSoftwareSupplyChainJobsAsync(id, normalizedSoftwareIds, ct);
 
         return Accepted(new { enqueuedCount = normalizedSoftwareIds.Count });
     }

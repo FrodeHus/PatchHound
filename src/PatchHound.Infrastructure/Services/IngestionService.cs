@@ -1964,6 +1964,11 @@ public class IngestionService
                 normalizedSoftwareIds,
                 ct
             );
+            await _enrichmentJobEnqueuer.EnqueueSoftwareSupplyChainJobsAsync(
+                tenantId,
+                normalizedSoftwareIds,
+                ct
+            );
         }
     }
 

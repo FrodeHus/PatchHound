@@ -344,4 +344,118 @@ public class EnrichmentJobEnqueuer(
             refreshedCount
         );
     }
+
+    public async Task EnqueueSoftwareSupplyChainJobsAsync(
+        Guid tenantId,
+        IReadOnlyList<Guid> normalizedSoftwareIds,
+        CancellationToken ct
+    )
+    {
+        if (normalizedSoftwareIds.Count == 0)
+        {
+            return;
+        }
+
+        var sourceConfig = await dbContext
+            .EnrichmentSourceConfigurations.IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                source =>
+                    source.SourceKey == EnrichmentSourceCatalog.SupplyChainSourceKey
+                    && source.Enabled,
+                ct
+            );
+
+        if (sourceConfig is null || string.IsNullOrWhiteSpace(sourceConfig.ApiBaseUrl))
+        {
+            return;
+        }
+
+        var refreshTtl = sourceConfig.RefreshTtlHours.GetValueOrDefault(
+            EnrichmentSourceCatalog.DefaultSupplyChainRefreshTtlHours
+        );
+        var refreshWindow = TimeSpan.FromHours(refreshTtl <= 0
+            ? EnrichmentSourceCatalog.DefaultSupplyChainRefreshTtlHours
+            : refreshTtl);
+
+        var softwareItems = await dbContext
+            .NormalizedSoftware.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(software => normalizedSoftwareIds.Contains(software.Id))
+            .Select(software => new
+            {
+                software.Id,
+                software.CanonicalProductKey,
+                software.SupplyChainEnrichedAt,
+            })
+            .ToListAsync(ct);
+
+        if (softwareItems.Count == 0)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var existingJobs = await dbContext
+            .EnrichmentJobs.IgnoreQueryFilters()
+            .Where(job =>
+                job.SourceKey == EnrichmentSourceCatalog.SupplyChainSourceKey
+                && job.TargetModel == EnrichmentTargetModel.SoftwareAsset
+                && normalizedSoftwareIds.Contains(job.TargetId)
+            )
+            .ToDictionaryAsync(job => job.TargetId, ct);
+
+        var createdCount = 0;
+        var refreshedCount = 0;
+
+        foreach (var software in softwareItems)
+        {
+            if (
+                software.SupplyChainEnrichedAt.HasValue
+                && now - software.SupplyChainEnrichedAt.Value < refreshWindow
+            )
+            {
+                continue;
+            }
+
+            if (existingJobs.TryGetValue(software.Id, out var existingJob))
+            {
+                if (existingJob.Status == EnrichmentJobStatus.Running)
+                {
+                    continue;
+                }
+
+                existingJob.Refresh(priority: 45, nextAttemptAt: now);
+                refreshedCount++;
+                continue;
+            }
+
+            var job = EnrichmentJob.Create(
+                tenantId,
+                EnrichmentSourceCatalog.SupplyChainSourceKey,
+                EnrichmentTargetModel.SoftwareAsset,
+                software.Id,
+                software.CanonicalProductKey,
+                priority: 45,
+                queuedAt: now
+            );
+            await dbContext.EnrichmentJobs.AddAsync(job, ct);
+            existingJobs[software.Id] = job;
+            createdCount++;
+        }
+
+        if (createdCount == 0 && refreshedCount == 0)
+        {
+            return;
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "Queued supply-chain enrichment jobs for tenant {TenantId}: created={CreatedCount} refreshed={RefreshedCount}.",
+            tenantId,
+            createdCount,
+            refreshedCount
+        );
+    }
 }

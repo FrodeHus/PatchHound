@@ -26,6 +26,7 @@ public class SoftwareController(
     ITenantAiConfigurationResolver tenantAiConfigurationResolver,
     ITenantAiResearchService tenantAiResearchService,
     RemediationTaskQueryService remediationTaskQueryService,
+    CycloneDxSupplyChainImportService cycloneDxSupplyChainImportService,
     ITenantContext tenantContext
 ) : ControllerBase
 {
@@ -89,6 +90,15 @@ public class SoftwareController(
                 item.NormalizedSoftware.EolSupportEndDate,
                 item.NormalizedSoftware.EolIsDiscontinued,
                 item.NormalizedSoftware.EolEnrichedAt,
+                item.NormalizedSoftware.SupplyChainRemediationPath,
+                item.NormalizedSoftware.SupplyChainInsightConfidence,
+                item.NormalizedSoftware.SupplyChainSourceFormat,
+                item.NormalizedSoftware.SupplyChainPrimaryComponentName,
+                item.NormalizedSoftware.SupplyChainPrimaryComponentVersion,
+                item.NormalizedSoftware.SupplyChainFixedVersion,
+                item.NormalizedSoftware.SupplyChainAffectedVulnerabilityCount,
+                item.NormalizedSoftware.SupplyChainSummary,
+                item.NormalizedSoftware.SupplyChainEnrichedAt,
             })
             .FirstOrDefaultAsync(ct);
         if (tenantSoftware is null)
@@ -236,7 +246,63 @@ public class SoftwareController(
                         tenantSoftware.EolEnrichedAt,
                         tenantSoftware.EolProductSlug
                     )
+                    : null,
+                tenantSoftware.SupplyChainEnrichedAt.HasValue
+                    ? new SupplyChainInsightDto(
+                        tenantSoftware.SupplyChainRemediationPath.ToString(),
+                        tenantSoftware.SupplyChainInsightConfidence.ToString(),
+                        tenantSoftware.SupplyChainSourceFormat,
+                        tenantSoftware.SupplyChainPrimaryComponentName,
+                        tenantSoftware.SupplyChainPrimaryComponentVersion,
+                        tenantSoftware.SupplyChainFixedVersion,
+                        tenantSoftware.SupplyChainAffectedVulnerabilityCount,
+                        tenantSoftware.SupplyChainSummary ?? string.Empty,
+                        tenantSoftware.SupplyChainEnrichedAt
+                    )
                     : null
+            )
+        );
+    }
+
+    [HttpPost("{id:guid}/supply-chain/cyclonedx")]
+    [Authorize(Policy = Policies.ModifyVulnerabilities)]
+    public async Task<ActionResult<SupplyChainInsightDto>> ImportCycloneDxEvidence(
+        Guid id,
+        [FromBody] ImportTenantSoftwareSupplyChainRequest request,
+        CancellationToken ct
+    )
+    {
+        if (tenantContext.CurrentTenantId is not Guid currentTenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var tenantSoftware = await dbContext.TenantSoftware.FirstOrDefaultAsync(
+            item => item.Id == id && item.TenantId == currentTenantId,
+            ct
+        );
+        if (tenantSoftware is null)
+        {
+            return NotFound();
+        }
+
+        var result = await cycloneDxSupplyChainImportService.ImportAsync(
+            tenantSoftware.Id,
+            request.DocumentJson,
+            ct
+        );
+
+        return Ok(
+            new SupplyChainInsightDto(
+                result.RemediationPath.ToString(),
+                result.Confidence.ToString(),
+                result.SourceFormat,
+                result.PrimaryComponentName,
+                result.PrimaryComponentVersion,
+                result.FixedVersion,
+                result.AffectedVulnerabilityCount,
+                result.Summary,
+                DateTimeOffset.UtcNow
             )
         );
     }

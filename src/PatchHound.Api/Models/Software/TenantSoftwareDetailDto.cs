@@ -28,7 +28,20 @@ public record TenantSoftwareDetailDto(
     RemediationTaskSummaryDto Remediation,
     IReadOnlyList<TenantSoftwareVersionCohortDto> VersionCohorts,
     IReadOnlyList<TenantSoftwareSourceAliasDto> SourceAliases,
-    SoftwareLifecycleDto? Lifecycle
+    SoftwareLifecycleDto? Lifecycle,
+    SupplyChainInsightDto? SupplyChainInsight
+);
+
+public record SupplyChainInsightDto(
+    string RemediationPath,
+    string Confidence,
+    string? SourceFormat,
+    string? PrimaryComponentName,
+    string? PrimaryComponentVersion,
+    string? FixedVersion,
+    int? AffectedVulnerabilityCount,
+    string Summary,
+    DateTimeOffset? EnrichedAt
 );
 
 public record ExposureImpactExplanationDto(
