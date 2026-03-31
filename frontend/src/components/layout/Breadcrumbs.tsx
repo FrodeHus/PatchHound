@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Link, useMatches, useRouterState } from '@tanstack/react-router'
+import { useMatches, useRouterState } from '@tanstack/react-router'
 import { ChevronRight, Home } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -31,6 +31,36 @@ function isUuid(segment: string) {
 
 /** Module-level cache of search params per pathname (survives re-renders, does not trigger them). */
 const searchParamsCache = new Map<string, Record<string, unknown>>()
+
+function isSearchParamPrimitive(value: unknown): value is string | number | boolean {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+}
+
+function buildHref(pathname: string, search: Record<string, unknown>) {
+  const params = new URLSearchParams()
+
+  for (const [key, value] of Object.entries(search)) {
+    if (value === undefined || value === null || value === '') {
+      continue
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item !== undefined && item !== null && item !== '' && isSearchParamPrimitive(item)) {
+          params.append(key, String(item))
+        }
+      }
+      continue
+    }
+
+    if (isSearchParamPrimitive(value)) {
+      params.set(key, String(value))
+    }
+  }
+
+  const query = params.toString()
+  return query ? `${pathname}?${query}` : pathname
+}
 
 export function Breadcrumbs() {
   const matches = useMatches()
@@ -82,10 +112,9 @@ export function Breadcrumbs() {
 
   return (
     <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm">
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */}
-      <Link to={'/' as any} search={{} as any} className="text-muted-foreground/70 transition hover:text-foreground">
+      <a href="/" className="text-muted-foreground/70 transition hover:text-foreground">
         <Home className="size-3.5" />
-      </Link>
+      </a>
       {crumbs.map((crumb, index) => {
         const isLast = index === crumbs.length - 1
         return (
@@ -99,10 +128,9 @@ export function Breadcrumbs() {
                 <TooltipContent>{crumb.label}</TooltipContent>
               </Tooltip>
             ) : (
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-              <Link to={crumb.to as any} search={crumb.search as any} className="text-muted-foreground/70 transition hover:text-foreground">
+              <a href={buildHref(crumb.to, crumb.search)} className="text-muted-foreground/70 transition hover:text-foreground">
                 {crumb.label}
-              </Link>
+              </a>
             )}
           </span>
         )

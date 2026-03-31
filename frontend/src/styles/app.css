@@ -526,3 +526,107 @@
     @apply font-sans;
     }
 }
+
+.ph-markdown-editor {
+    --accentBase: color-mix(in oklab, var(--primary) 10%, var(--card));
+    --accentBgSubtle: color-mix(in oklab, var(--primary) 14%, var(--card));
+    --accentBg: color-mix(in oklab, var(--primary) 18%, var(--card));
+    --accentBgHover: color-mix(in oklab, var(--primary) 24%, var(--card));
+    --accentBgActive: color-mix(in oklab, var(--primary) 28%, var(--card));
+    --accentLine: color-mix(in oklab, var(--primary) 26%, var(--border));
+    --accentBorder: color-mix(in oklab, var(--primary) 38%, var(--border));
+    --accentBorderHover: color-mix(in oklab, var(--primary) 52%, var(--border));
+    --accentSolid: var(--primary);
+    --accentSolidHover: color-mix(in oklab, var(--primary) 84%, white);
+    --accentText: var(--primary);
+    --accentTextContrast: var(--foreground);
+    --basePageBg: var(--popover);
+    --baseBase: color-mix(in oklab, var(--card) 86%, transparent);
+    --baseBgSubtle: color-mix(in oklab, var(--card) 72%, var(--background));
+    --baseBg: color-mix(in oklab, var(--card) 68%, var(--background));
+    --baseBgHover: color-mix(in oklab, var(--card) 58%, var(--accent));
+    --baseBgActive: color-mix(in oklab, var(--card) 50%, var(--accent));
+    --baseLine: var(--border);
+    --baseBorder: var(--border);
+    --baseBorderHover: color-mix(in oklab, var(--foreground) 18%, var(--border));
+    --baseSolid: color-mix(in oklab, var(--muted-foreground) 80%, var(--card));
+    --baseSolidHover: color-mix(in oklab, var(--muted-foreground) 92%, var(--card));
+    --baseText: var(--muted-foreground);
+    --baseTextContrast: var(--foreground);
+    color: var(--foreground);
+}
+
+.ph-markdown-editor[class*="_editorRoot_"] {
+    background: transparent;
+}
+
+.ph-markdown-editor [class*="_toolbarRoot_"] {
+    background: color-mix(in oklab, var(--card) 78%, var(--background));
+    border-bottom: 1px solid var(--border);
+    border-radius: calc(var(--radius) - 2px) calc(var(--radius) - 2px) 0 0;
+    backdrop-filter: blur(8px);
+}
+
+.ph-markdown-editor [class*="_toolbarRoot_"] svg,
+.ph-markdown-editor [class*="_toolbarButton_"],
+.ph-markdown-editor [class*="_toolbarToggleItem_"],
+.ph-markdown-editor [class*="_toggleGroupRoot_"] button,
+.ph-markdown-editor [class*="_tableColumnEditorToolbar_"] > button,
+.ph-markdown-editor [class*="_tableColumnEditorTrigger_"] {
+    color: var(--foreground);
+}
+
+.ph-markdown-editor [class*="_toolbarButton_"]:hover,
+.ph-markdown-editor [class*="_toolbarToggleItem_"]:hover,
+.ph-markdown-editor [class*="_toggleGroupRoot_"] button:hover,
+.ph-markdown-editor [class*="_tableColumnEditorToolbar_"] > button:hover,
+.ph-markdown-editor [class*="_tableColumnEditorTrigger_"]:hover {
+    background: color-mix(in oklab, var(--accent) 64%, transparent);
+}
+
+.ph-markdown-editor [class*="_toolbarButton_"][data-state='on'],
+.ph-markdown-editor [class*="_toolbarToggleItem_"][data-state='on'],
+.ph-markdown-editor [class*="_toggleGroupRoot_"] button[data-state='on'],
+.ph-markdown-editor [class*="_tableColumnEditorToolbar_"] > button[data-state='on'] {
+    background: color-mix(in oklab, var(--primary) 22%, transparent);
+    color: var(--foreground);
+}
+
+.ph-markdown-editor [class*="_toolbarNodeKindSelectTrigger_"],
+.ph-markdown-editor [class*="_toolbarButtonSelectTrigger_"],
+.ph-markdown-editor [class*="_selectTrigger_"] {
+    background: color-mix(in oklab, var(--card) 80%, var(--background));
+    color: var(--foreground);
+    border: 1px solid var(--border);
+}
+
+.ph-markdown-editor [class*="_toolbarNodeKindSelectContainer_"],
+.ph-markdown-editor [class*="_toolbarButtonDropdownContainer_"],
+.ph-markdown-editor [class*="_toolbarCodeBlockLanguageSelectContent_"],
+.ph-markdown-editor [class*="_selectContainer_"] {
+    background: var(--popover);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+}
+
+.ph-markdown-editor [class*="_toolbarNodeKindSelectItem_"],
+.ph-markdown-editor [class*="_selectItem_"] {
+    color: var(--foreground);
+}
+
+.ph-markdown-editor [class*="_toolbarNodeKindSelectItem_"][data-highlighted],
+.ph-markdown-editor [class*="_selectItem_"][data-highlighted],
+.ph-markdown-editor [class*="_toolbarNodeKindSelectItem_"][data-state='checked'],
+.ph-markdown-editor [class*="_selectItem_"][data-state='checked'] {
+    background: color-mix(in oklab, var(--accent) 72%, transparent);
+}
+
+.ph-markdown-editor [class*="_contentEditable_"] {
+    color: var(--foreground);
+    caret-color: var(--primary);
+    background: transparent;
+}
+
+.ph-markdown-editor [class*="_contentEditable_"]::placeholder {
+    color: var(--muted-foreground);
+}
