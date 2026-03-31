@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import { authMiddleware } from '@/server/middleware'
 import { getSession } from '@/server/session'
 import { apiPost } from '@/server/api'
 
@@ -7,8 +8,9 @@ type ActivateRolesResponse = {
 }
 
 export const activateRoles = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
   .inputValidator((data: { roles: string[] }) => data)
-  .handler(async ({ data }) => {
+  .handler(async ({ context, data }) => {
     const session = await getSession()
 
     if (!session.accessToken || !session.userId) {
@@ -18,9 +20,9 @@ export const activateRoles = createServerFn({ method: 'POST' })
     const response = await apiPost<ActivateRolesResponse>(
       '/roles/activate',
       {
-        token: session.accessToken,
-        tenantId: session.tenantId,
-        activeRoles: session.activeRoles ?? [],
+        token: context.token,
+        tenantId: context.tenantId,
+        activeRoles: context.activeRoles ?? [],
       },
       { roles: data.roles },
     )

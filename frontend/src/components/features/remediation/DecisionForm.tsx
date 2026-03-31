@@ -59,7 +59,7 @@ export function DecisionForm({
   initialMaintenanceWindowDate = null,
   initialExpiryDate = null,
   initialReEvaluationDate = null,
-  submitLabel = 'Submit Decision',
+  submitLabel = 'Submit owner decision',
   decisionSeed = null,
 }: DecisionFormProps) {
   const queryClient = useQueryClient()
@@ -139,7 +139,7 @@ export function DecisionForm({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <label className="text-sm font-medium">Outcome</label>
+        <label className="text-sm font-medium">Decision posture</label>
         <Select value={outcome} onValueChange={(v) => setOutcome(v ?? '')} disabled={readOnly}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Select remediation outcome..." />
@@ -157,12 +157,12 @@ export function DecisionForm({
       {needsJustification ? (
         <div className="space-y-2">
           <label className="text-sm font-medium">
-            Justification <span className="text-tone-danger-foreground">*</span>
+            Decision rationale <span className="text-tone-danger-foreground">*</span>
           </label>
           <Textarea
             value={justification}
             onChange={(e) => setJustification(e.target.value)}
-            placeholder="Provide justification for this decision..."
+            placeholder="Explain why this is the right posture for the affected assets..."
             rows={3}
             disabled={readOnly}
           />
@@ -171,7 +171,7 @@ export function DecisionForm({
 
       {needsExpiry ? (
         <div className="space-y-2">
-          <label className="text-sm font-medium">Expiry Date</label>
+          <label className="text-sm font-medium">Exception expiry</label>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -204,7 +204,7 @@ export function DecisionForm({
             />
           ) : null}
           <p className="text-xs text-muted-foreground">
-            Risk acceptance and alternate mitigation can be permanent, or set to expire on a specific date.
+            Risk acceptance and alternate mitigation can be permanent or time-bound.
           </p>
         </div>
       ) : null}
@@ -212,7 +212,7 @@ export function DecisionForm({
       {needsReEvaluation ? (
         <div className="space-y-2">
           <label className="text-sm font-medium">
-            Re-evaluation Date <span className="text-tone-danger-foreground">*</span>
+            Deferral review date <span className="text-tone-danger-foreground">*</span>
           </label>
           <Input
             type="date"
@@ -221,7 +221,7 @@ export function DecisionForm({
             disabled={readOnly}
           />
           <p className="text-xs text-muted-foreground">
-            When this deferral should be reassessed.
+            When this deferred patch decision must be revisited.
           </p>
         </div>
       ) : null}
@@ -231,7 +231,7 @@ export function DecisionForm({
         disabled={readOnly || !canSubmit || submitting}
         className="w-full sm:w-auto"
       >
-        {submitting ? 'Submitting...' : submitLabel}
+        {submitting ? 'Saving decision...' : submitLabel}
       </Button>
     </div>
   )

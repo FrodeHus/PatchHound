@@ -143,7 +143,7 @@ export function RecommendationPanel({
                   setShowForm(true)
                 }}
               >
-                Use draft
+                Use AI draft
               </Button>
             </div>
           )}
@@ -153,7 +153,7 @@ export function RecommendationPanel({
       {readOnly ? null : showForm ? (
         <div className="space-y-3 rounded-lg border border-border/70 bg-background p-3">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Recommended Outcome</label>
+            <label className="text-sm font-medium">Recommended posture</label>
             <Select value={outcome} onValueChange={(v) => setOutcome(v ?? '')}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select outcome..." />
@@ -168,16 +168,16 @@ export function RecommendationPanel({
             </Select>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Rationale</label>
+            <label className="text-sm font-medium">Analyst rationale</label>
             <Textarea
               value={rationale}
               onChange={(e) => setRationale(e.target.value)}
-              placeholder="Explain your recommendation..."
+              placeholder="Explain what matters most and why this should guide the owner..."
               rows={3}
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Final analyst priority</label>
+            <label className="text-sm font-medium">Suggested priority for the owner</label>
             <Select value={priorityOverride || "none"} onValueChange={(value) => setPriorityOverride(value === 'none' ? '' : value ?? '')}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="No priority recommendation" />
@@ -198,7 +198,7 @@ export function RecommendationPanel({
               disabled={!outcome || !rationale.trim() || submitting}
               size="sm"
             >
-              {submitting ? (currentRecommendation ? 'Updating...' : 'Submitting...') : (currentRecommendation ? 'Update recommendation' : 'Save recommendation')}
+              {submitting ? (currentRecommendation ? 'Updating...' : 'Saving...') : (currentRecommendation ? 'Update analyst recommendation' : 'Save analyst recommendation')}
             </Button>
             <Button
               variant="ghost"
@@ -225,7 +225,7 @@ export function RecommendationPanel({
             setShowForm(true)
           }}
         >
-          {currentRecommendation ? 'Update recommendation' : 'Add analyst recommendation'}
+          {currentRecommendation ? 'Edit analyst recommendation' : 'Add analyst recommendation'}
         </Button>
       )}
     </div>
