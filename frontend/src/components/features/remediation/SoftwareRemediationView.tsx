@@ -363,11 +363,98 @@ export function SoftwareRemediationView({
         </div>
       ) : null}
 
-      <Tabs defaultValue="decision" className="gap-4">
+      <div className="space-y-4">
+        <CurrentActionSection
+          data={data}
+          tenantSoftwareId={tenantSoftwareId}
+          workflowId={workflowId}
+          queryKey={queryKey}
+          currentStageId={currentStageId}
+          recommendationSeed={recommendationSeed}
+          decisionSeed={decisionSeed}
+          approving={approving}
+          generatingAiSummary={generatingAiSummary}
+          onApproveReject={handleApproveReject}
+          onVerify={handleVerification}
+          onGenerateAiSummary={handleGenerateAiSummary}
+          onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
+          onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
+          onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
+        />
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <Card className="rounded-[1.45rem] border-border/50 bg-background/35 shadow-none">
+            <CardHeader className="space-y-1.5 pb-2">
+              <CardTitle className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Recommendations and context</CardTitle>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Advisory guidance that helps the current actor respond in this stage.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {(currentStageId === 'remediationDecision' || currentStageId === 'approval') ? (
+                <RecommendationSnapshotCard
+                  recommendation={data.recommendations[0] ?? null}
+                />
+              ) : null}
+              <AiDecisionBrief
+                aiSummary={data.aiSummary}
+                currentStageId={currentStageId}
+                canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
+                generatingAiSummary={generatingAiSummary}
+                onGenerateAiSummary={handleGenerateAiSummary}
+                onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
+                onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
+                onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[1.45rem] border-border/50 bg-background/35 shadow-none">
+            <CardHeader className="space-y-1.5 pb-2">
+              <CardTitle className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Pressure and exposure</CardTitle>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Operating context for this remediation, kept secondary to the current action.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3">
+                <WorkflowFact
+                  label="Exposure in scope"
+                  value={`${data.summary.totalVulnerabilities.toLocaleString()} vulnerabilities`}
+                  detail={`${data.workflow.affectedDeviceCount.toLocaleString()} devices across ${data.workflow.affectedOwnerTeamCount.toLocaleString()} owner teams`}
+                  sparkline={data.workflow.openEpisodeTrend}
+                />
+                <WorkflowFact
+                  label="Decision posture"
+                  value={data.currentDecision ? outcomeLabel(data.currentDecision.outcome) : 'No decision yet'}
+                  detail={
+                    data.currentDecision
+                      ? approvalStatusLabel(data.currentDecision.approvalStatus)
+                      : data.recommendations.length > 0
+                        ? 'Security recommendation ready'
+                        : 'Review exposure and capture guidance'
+                  }
+                />
+                <WorkflowFact
+                  label="Execution status"
+                  value={
+                    data.workflow.openPatchingTaskCount > 0
+                      ? `${data.workflow.openPatchingTaskCount.toLocaleString()} open patching tasks`
+                      : data.workflow.completedPatchingTaskCount > 0
+                        ? `${data.workflow.completedPatchingTaskCount.toLocaleString()} completed patching tasks`
+                        : 'No patching tasks yet'
+                  }
+                  detail={data.workflowState.currentStageDescription}
+                />
+              </div>
+              <RemediationSummaryCards summary={data.summary} />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <Tabs defaultValue="vulnerabilities" className="gap-4">
         <TabsList className="h-10 w-full justify-start rounded-xl bg-muted/50 p-1">
-          <TabsTrigger value="decision" className="rounded-lg px-4 text-sm">
-            Decision
-          </TabsTrigger>
           <TabsTrigger value="vulnerabilities" className="rounded-lg px-4 text-sm">
             Vulnerabilities ({data.topVulnerabilities.length})
           </TabsTrigger>
@@ -378,96 +465,6 @@ export function SoftwareRemediationView({
             History {data.currentDecision || data.recommendations.length > 0 ? `(${(data.currentDecision ? 1 : 0) + data.recommendations.length})` : ''}
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="decision" className="space-y-4 pt-1">
-          <CurrentActionSection
-            data={data}
-            tenantSoftwareId={tenantSoftwareId}
-            workflowId={workflowId}
-            queryKey={queryKey}
-            currentStageId={currentStageId}
-            recommendationSeed={recommendationSeed}
-            decisionSeed={decisionSeed}
-            approving={approving}
-            generatingAiSummary={generatingAiSummary}
-            onApproveReject={handleApproveReject}
-            onVerify={handleVerification}
-            onGenerateAiSummary={handleGenerateAiSummary}
-            onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
-            onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
-            onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
-          />
-
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <Card className="rounded-[1.45rem] border-border/50 bg-background/35 shadow-none">
-              <CardHeader className="space-y-1.5 pb-2">
-                <CardTitle className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Recommendations and context</CardTitle>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Advisory guidance that helps the current actor respond in this stage.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {(currentStageId === 'remediationDecision' || currentStageId === 'approval') ? (
-                  <RecommendationSnapshotCard
-                    recommendation={data.recommendations[0] ?? null}
-                  />
-                ) : null}
-                <AiDecisionBrief
-                  aiSummary={data.aiSummary}
-                  currentStageId={currentStageId}
-                  canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
-                  generatingAiSummary={generatingAiSummary}
-                  onGenerateAiSummary={handleGenerateAiSummary}
-                  onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
-                  onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
-                  onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
-                />
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-[1.45rem] border-border/50 bg-background/35 shadow-none">
-              <CardHeader className="space-y-1.5 pb-2">
-                <CardTitle className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Pressure and exposure</CardTitle>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Operating context for this remediation, kept secondary to the current action.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-3">
-                  <WorkflowFact
-                    label="Exposure in scope"
-                    value={`${data.summary.totalVulnerabilities.toLocaleString()} vulnerabilities`}
-                    detail={`${data.workflow.affectedDeviceCount.toLocaleString()} devices across ${data.workflow.affectedOwnerTeamCount.toLocaleString()} owner teams`}
-                    sparkline={data.workflow.openEpisodeTrend}
-                  />
-                  <WorkflowFact
-                    label="Decision posture"
-                    value={data.currentDecision ? outcomeLabel(data.currentDecision.outcome) : 'No decision yet'}
-                    detail={
-                      data.currentDecision
-                        ? approvalStatusLabel(data.currentDecision.approvalStatus)
-                        : data.recommendations.length > 0
-                          ? 'Security recommendation ready'
-                          : 'Review exposure and capture guidance'
-                    }
-                  />
-                  <WorkflowFact
-                    label="Execution status"
-                    value={
-                      data.workflow.openPatchingTaskCount > 0
-                        ? `${data.workflow.openPatchingTaskCount.toLocaleString()} open patching tasks`
-                        : data.workflow.completedPatchingTaskCount > 0
-                          ? `${data.workflow.completedPatchingTaskCount.toLocaleString()} completed patching tasks`
-                          : 'No patching tasks yet'
-                    }
-                    detail={data.workflowState.currentStageDescription}
-                  />
-                </div>
-                <RemediationSummaryCards summary={data.summary} />
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
 
         <TabsContent value="vulnerabilities" className="space-y-4 pt-1">
           <div>
