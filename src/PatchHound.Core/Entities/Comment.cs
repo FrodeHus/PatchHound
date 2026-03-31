@@ -10,6 +10,7 @@ public class Comment
     public string Content { get; private set; } = null!;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
+    public DateTimeOffset? DeletedAt { get; private set; }
 
     private Comment() { }
 
@@ -37,5 +38,10 @@ public class Comment
     {
         Content = content;
         UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void Delete()
+    {
+        DeletedAt = DateTimeOffset.UtcNow;
     }
 }

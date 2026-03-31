@@ -14,6 +14,7 @@
     "@azure/msal-node": "^3.8.0",
     "@base-ui/react": "^1.2.0",
     "@fontsource-variable/geist": "^5.2.8",
+    "@mdxeditor/editor": "^3.53.1",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-router": "^1.166.2",
     "@tanstack/react-start": "^1.166.2",

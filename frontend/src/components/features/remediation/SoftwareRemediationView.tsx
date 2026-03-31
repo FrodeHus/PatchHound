@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { ArrowLeft, Ban, CheckCircle, ClipboardCheck, LoaderCircle, Lock, SearchCheck, ShieldAlert, Wrench, XCircle } from 'lucide-react'
+import { ArrowLeft, Ban, CheckCircle, ClipboardCheck, LoaderCircle, SearchCheck, ShieldAlert, Wrench, XCircle } from 'lucide-react'
 import {
   fetchTenantSoftwareDetail,
   fetchTenantSoftwareInstallations,
@@ -31,11 +31,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { toneBadge } from '@/lib/tone-classes'
 import { formatDate, formatDateTime, formatNullableDateTime, startCase } from '@/lib/formatting'
@@ -47,6 +42,7 @@ import { RemediationVulnDrawer } from './RemediationVulnDrawer'
 import { DecisionForm } from './DecisionForm'
 import { RecommendationPanel } from './RecommendationPanel'
 import { SlaIndicator } from './SlaIndicator'
+import { WorkNotesSheet } from '@/components/features/work-notes/WorkNotesSheet'
 import {
   RemediationStageRail,
   type RemediationStage,
@@ -336,14 +332,14 @@ export function SoftwareRemediationView({
         currentStageId={currentStageId}
       />
 
-      <StagePanel
-        data={data}
-        currentStageId={currentStageId}
-        currentActorSummary={data.workflowState.currentActorSummary}
-        canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
-        workflowState={data.workflowState}
-        stageError={stageError}
-      />
+      <div className="flex justify-end">
+        <WorkNotesSheet
+          entityType="remediations"
+          entityId={tenantSoftwareId}
+          title="Remediation work notes"
+          description="Capture tenant-local notes for this remediation workflow."
+        />
+      </div>
 
       {data.aiSummary.status === 'Queued' || data.aiSummary.status === 'Generating' ? (
         <div className="flex items-center gap-3 rounded-[1.35rem] border border-border/70 bg-background/65 px-4 py-3">
@@ -358,6 +354,12 @@ export function SoftwareRemediationView({
               The remediation page is ready to use now. Executive, owner, and analyst guidance will appear automatically when the job finishes.
             </p>
           </div>
+        </div>
+      ) : null}
+
+      {stageError ? (
+        <div className="rounded-[1.1rem] border border-destructive/35 bg-destructive/8 px-4 py-3 text-sm text-destructive">
+          {stageError}
         </div>
       ) : null}
 
@@ -827,65 +829,7 @@ function AiStatusBadge({ aiSummary }: { aiSummary: DecisionAiSummary }) {
   )
 }
 
-function StagePanel({
-  data,
-  currentStageId,
-  currentActorSummary,
-  canActOnCurrentStage,
-  workflowState,
-  stageError,
-}: {
-  data: DecisionContext
-  currentStageId: RemediationStageId
-  currentActorSummary: string
-  canActOnCurrentStage: boolean
-  workflowState: DecisionContext['workflowState']
-  stageError: string | null
-}) {
-  const stageTitle = {
-    verification: 'Recurrence verification',
-    securityAnalysis: 'Security analysis',
-    remediationDecision: 'Remediation decision',
-    approval: 'Approval',
-    execution: 'Execution',
-    closure: 'Closure',
-  }[currentStageId]
 
-  return (
-    <Card className="rounded-[1.8rem] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_58%),var(--color-card)]">
-      <CardContent className="space-y-4 pt-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-              Current stage
-            </p>
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold text-foreground">
-                {stageTitle}
-              </h2>
-              <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
-                {data.workflowState.currentStageDescription}
-              </p>
-              <p className="text-sm text-foreground/90">
-                {currentActorSummary}
-              </p>
-            </div>
-          </div>
-          {!canActOnCurrentStage ? (
-            <div className="flex justify-end">
-              <StageReadOnlyIndicator workflowState={workflowState} currentActorSummary={currentActorSummary} />
-            </div>
-          ) : null}
-        </div>
-        {stageError ? (
-          <div className="rounded-2xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            {stageError}
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
-  )
-}
 
 function CurrentActionSection({
   data,
@@ -1205,94 +1149,6 @@ function StageVerificationPanel({
       </div>
     </div>
   )
-}
-
-function StageReadOnlyIndicator({
-  workflowState,
-  currentActorSummary,
-}: {
-  workflowState: DecisionContext['workflowState']
-  currentActorSummary: string
-}) {
-  const currentRoles = workflowState.currentUserRoles.length > 0
-    ? workflowState.currentUserRoles.map(formatRoleName).join(', ')
-    : 'No remediation role in this tenant'
-  const currentTeams = workflowState.currentUserTeams.length > 0
-    ? workflowState.currentUserTeams.join(', ')
-    : 'No team membership'
-  const expectedRoles = workflowState.expectedRoles.length > 0
-    ? workflowState.expectedRoles.map(formatRoleName).join(', ')
-    : null
-
-  return (
-    <Popover>
-      <PopoverTrigger className="inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-amber-500/6 px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-amber-500/10">
-        <Lock className="size-3.5 text-amber-700" />
-        Read-only
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-[320px] rounded-2xl border-border/70 p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          Read-only access
-        </p>
-        <p className="mt-2 text-sm leading-relaxed text-foreground/90">
-          {currentActorSummary}
-        </p>
-        <div className="mt-3 space-y-2 text-sm">
-          <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-              Your roles
-            </p>
-            <p className="mt-1 text-foreground">
-              {currentRoles}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-              Your teams
-            </p>
-            <p className="mt-1 text-foreground">
-              {currentTeams}
-            </p>
-          </div>
-          {expectedRoles ? (
-            <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                Expected roles
-              </p>
-              <p className="mt-1 text-foreground">
-                {expectedRoles}
-              </p>
-            </div>
-          ) : null}
-          {workflowState.expectedTeamName ? (
-            <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                  Expected team
-                </p>
-                {workflowState.isInExpectedTeam !== null ? (
-                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-                    workflowState.isInExpectedTeam
-                      ? 'border-emerald-300/70 bg-emerald-500/8 text-emerald-800'
-                      : 'border-border/70 bg-background text-muted-foreground'
-                  }`}>
-                    {workflowState.isInExpectedTeam ? 'You are in this team' : 'You are not in this team'}
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-1 text-foreground">
-                {workflowState.expectedTeamName}
-              </p>
-            </div>
-          ) : null}
-        </div>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-function formatRoleName(value: string) {
-  return value.replace(/([a-z])([A-Z])/g, '$1 $2')
 }
 
 function RecommendationSnapshotCard({

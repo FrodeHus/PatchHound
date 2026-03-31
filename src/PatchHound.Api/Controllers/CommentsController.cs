@@ -44,7 +44,7 @@ public class CommentsController : ControllerBase
 
         var comments = await _dbContext
             .Comments.AsNoTracking()
-            .Where(c => c.EntityType == internalEntityType && c.EntityId == entityId)
+            .Where(c => c.EntityType == internalEntityType && c.EntityId == entityId && c.DeletedAt == null)
             .OrderBy(c => c.CreatedAt)
             .Select(c => new CommentDto(
                 c.Id,

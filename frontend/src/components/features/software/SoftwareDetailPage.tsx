@@ -11,6 +11,7 @@ import { SoftwareAiReportTab } from '@/components/features/software/SoftwareAiRe
 import { SoftwareDescriptionPanel } from '@/components/features/software/SoftwareDescriptionPanel'
 import { VersionCohortChooser } from '@/components/features/software/VersionCohortChooser'
 import { SoftwareRemediationView } from '@/components/features/remediation/SoftwareRemediationView'
+import { WorkNotesSheet } from '@/components/features/work-notes/WorkNotesSheet'
 import {
   Popover,
   PopoverContent,
@@ -144,6 +145,15 @@ export function SoftwareDetailPage({
               <HeaderMetaChip
                 label="Source aliases"
                 value={String(detail.sourceAliases.length)}
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <WorkNotesSheet
+                entityType="software"
+                entityId={tenantSoftwareId}
+                title="Software work notes"
+                description="Capture tenant-local notes for this software record."
               />
             </div>
 

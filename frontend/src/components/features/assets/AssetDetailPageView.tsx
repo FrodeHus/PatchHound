@@ -16,6 +16,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { WorkNotesSheet } from '@/components/features/work-notes/WorkNotesSheet'
 import { formatDateTime, formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import { toneDot, toneText, type Tone } from '@/lib/tone-classes'
@@ -128,6 +129,12 @@ export function AssetDetailPageView({
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
+                <WorkNotesSheet
+                  entityType="assets"
+                  entityId={asset.id}
+                  title="Asset work notes"
+                  description="Capture tenant-local notes for this device or asset."
+                />
                 {asset.assetType === "Software" && asset.tenantSoftwareId ? (
                   <Link
                     to="/software/$id"
