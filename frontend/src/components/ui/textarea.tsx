@@ -86,7 +86,7 @@ function Textarea({ className, value, defaultValue, onChange, onBlur, placeholde
         }}
         className="ph-markdown-editor text-sm"
         contentEditableClassName={cn(
-          'prose prose-sm dark:prose-invert max-w-none min-h-20 px-3 py-2 text-foreground outline-none prose-p:my-2 prose-p:leading-6 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-blockquote:border-l-2 prose-blockquote:border-border prose-blockquote:pl-3 prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/60',
+          'prose prose-sm dark:prose-invert max-w-none min-h-20 px-3 py-2 text-foreground outline-none prose-p:my-2 prose-p:leading-6 prose-ul:my-2 prose-ul:list-disc prose-ul:pl-6 prose-ol:my-2 prose-ol:list-decimal prose-ol:pl-6 prose-li:my-1 prose-li:pl-1 prose-li:marker:text-muted-foreground prose-blockquote:border-l-2 prose-blockquote:border-border prose-blockquote:pl-3 prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/60',
           rows && rows > 5 ? 'min-h-44' : rows && rows > 3 ? 'min-h-32' : 'min-h-24',
         )}
         plugins={[
