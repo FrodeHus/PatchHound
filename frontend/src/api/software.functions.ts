@@ -27,7 +27,6 @@ export const fetchTenantSoftware = createServerFn({ method: 'GET' })
       search: z.string().optional(),
       category: z.string().optional(),
       vulnerableOnly: z.boolean().optional(),
-      boundOnly: z.boolean().optional(),
       missedMaintenanceWindow: z.boolean().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),

@@ -76,7 +76,6 @@ public class SoftwareController(
                 item.NormalizedSoftware.CanonicalName,
                 item.NormalizedSoftware.CanonicalVendor,
                 item.NormalizedSoftware.Category,
-                item.NormalizedSoftware.PrimaryCpe23Uri,
                 item.NormalizedSoftware.Description,
                 item.NormalizedSoftware.DescriptionGeneratedAt,
                 item.NormalizedSoftware.DescriptionProviderType,
@@ -193,7 +192,6 @@ public class SoftwareController(
                 tenantSoftware.CanonicalName,
                 tenantSoftware.CanonicalVendor,
                 tenantSoftware.Category,
-                tenantSoftware.PrimaryCpe23Uri,
                 tenantSoftware.Description,
                 tenantSoftware.DescriptionGeneratedAt,
                 tenantSoftware.DescriptionProviderType,
@@ -409,14 +407,6 @@ public class SoftwareController(
             );
         }
 
-        if (filter.BoundOnly == true)
-        {
-            query = query.Where(item =>
-                item.NormalizedSoftware.PrimaryCpe23Uri != null
-                && item.NormalizedSoftware.PrimaryCpe23Uri != ""
-            );
-        }
-
         if (filter.VulnerableOnly == true)
         {
             query = query.Where(item =>
@@ -462,7 +452,6 @@ public class SoftwareController(
                     )
                     .Select(score => (decimal?)score.OverallScore)
                     .FirstOrDefault(),
-                PrimaryCpe23Uri = item.NormalizedSoftware.PrimaryCpe23Uri,
                 ActiveInstallCount = dbContext
                     .NormalizedSoftwareInstallations
                     .Where(installation =>
@@ -545,7 +534,6 @@ public class SoftwareController(
                     item.CanonicalVendor,
                     item.Category,
                     item.CurrentRiskScore,
-                    item.PrimaryCpe23Uri,
                     item.ActiveInstallCount,
                         item.UniqueDeviceCount,
                         item.ActiveVulnerabilityCount,

@@ -13,7 +13,6 @@ const softwareSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
   category: searchStringSchema,
   vulnerableOnly: searchBooleanSchema,
-  boundOnly: searchBooleanSchema,
   missedMaintenanceWindow: searchBooleanSchema,
 })
 
@@ -56,7 +55,6 @@ function SoftwareIndexPage() {
         searchValue={search.search}
         categoryFilter={search.category}
         vulnerableOnly={search.vulnerableOnly}
-        boundOnly={search.boundOnly}
         missedMaintenanceWindow={search.missedMaintenanceWindow}
         onSearchChange={(value) => {
           searchActions.updateField('search', value)
@@ -67,9 +65,6 @@ function SoftwareIndexPage() {
         onVulnerableOnlyChange={(value) => {
           searchActions.updateField('vulnerableOnly', value)
         }}
-        onBoundOnlyChange={(value) => {
-          searchActions.updateField('boundOnly', value)
-        }}
         onMissedMaintenanceWindowChange={(value) => {
           searchActions.updateField('missedMaintenanceWindow', value)
         }}
@@ -77,7 +72,6 @@ function SoftwareIndexPage() {
           searchActions.updateFields({
             category: filters.category,
             vulnerableOnly: filters.vulnerableOnly,
-            boundOnly: filters.boundOnly,
             missedMaintenanceWindow: filters.missedMaintenanceWindow,
           })
         }}
@@ -93,7 +87,6 @@ function SoftwareIndexPage() {
             search: '',
             category: '',
             vulnerableOnly: false,
-            boundOnly: false,
             missedMaintenanceWindow: false,
           })
         }}

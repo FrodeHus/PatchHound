@@ -37,17 +37,14 @@ type SoftwareTableProps = {
   searchValue: string
   categoryFilter: string
   vulnerableOnly: boolean
-  boundOnly: boolean
   missedMaintenanceWindow: boolean
   onSearchChange: (value: string) => void
   onCategoryFilterChange: (value: string) => void
   onVulnerableOnlyChange: (value: boolean) => void
-  onBoundOnlyChange: (value: boolean) => void
   onMissedMaintenanceWindowChange: (value: boolean) => void
   onApplyStructuredFilters: (filters: {
     category: string
     vulnerableOnly: boolean
-    boundOnly: boolean
     missedMaintenanceWindow: boolean
   }) => void
   onShowRiskDetail: (tenantSoftwareId: string) => void
@@ -67,12 +64,10 @@ export function SoftwareTable({
   searchValue,
   categoryFilter,
   vulnerableOnly,
-  boundOnly,
   missedMaintenanceWindow,
   onSearchChange,
   onCategoryFilterChange,
   onVulnerableOnlyChange,
-  onBoundOnlyChange,
   onMissedMaintenanceWindowChange,
   onApplyStructuredFilters,
   onShowRiskDetail,
@@ -86,12 +81,10 @@ export function SoftwareTable({
   const [draftFilters, setDraftFilters] = useState<{
     category: string
     vulnerableOnly: boolean
-    boundOnly: boolean
     missedMaintenanceWindow: boolean
   }>({
     category: categoryFilter,
     vulnerableOnly,
-    boundOnly,
     missedMaintenanceWindow,
   })
 
@@ -116,11 +109,10 @@ export function SoftwareTable({
       setDraftFilters({
         category: categoryFilter,
         vulnerableOnly,
-        boundOnly,
         missedMaintenanceWindow,
       })
     }
-  }, [boundOnly, categoryFilter, isFilterDrawerOpen, missedMaintenanceWindow, vulnerableOnly])
+  }, [categoryFilter, isFilterDrawerOpen, missedMaintenanceWindow, vulnerableOnly])
 
   const activeFilters = useMemo(
     () =>
@@ -128,10 +120,9 @@ export function SoftwareTable({
         searchValue ? { key: 'search', label: `Search: ${searchValue}`, onClear: () => onSearchChange('') } : null,
         categoryFilter ? { key: 'category', label: `Category: ${categoryFilter}`, onClear: () => onCategoryFilterChange('') } : null,
         vulnerableOnly ? { key: 'vulnerable', label: 'Vulnerable only', onClear: () => onVulnerableOnlyChange(false) } : null,
-        boundOnly ? { key: 'bound', label: 'CPE bound only', onClear: () => onBoundOnlyChange(false) } : null,
         missedMaintenanceWindow ? { key: 'missedMaintenanceWindow', label: 'Missed maintenance window', onClear: () => onMissedMaintenanceWindowChange(false) } : null,
       ].filter((item): item is NonNullable<typeof item> => item !== null),
-    [boundOnly, categoryFilter, missedMaintenanceWindow, onBoundOnlyChange, onCategoryFilterChange, onMissedMaintenanceWindowChange, onSearchChange, onVulnerableOnlyChange, searchValue, vulnerableOnly],
+    [categoryFilter, missedMaintenanceWindow, onCategoryFilterChange, onMissedMaintenanceWindowChange, onSearchChange, onVulnerableOnlyChange, searchValue, vulnerableOnly],
   )
 
   const activeStructuredFilterCount = useMemo(
@@ -139,10 +130,9 @@ export function SoftwareTable({
       [
         categoryFilter,
         vulnerableOnly ? 'vulnerable' : '',
-        boundOnly ? 'bound' : '',
         missedMaintenanceWindow ? 'missedMaintenanceWindow' : '',
       ].filter(Boolean).length,
-    [boundOnly, categoryFilter, missedMaintenanceWindow, vulnerableOnly],
+    [categoryFilter, missedMaintenanceWindow, vulnerableOnly],
   )
 
   const columns = useMemo<ColumnDef<TenantSoftwareListItem>[]>(
@@ -200,15 +190,6 @@ export function SoftwareTable({
         },
       },
       {
-        accessorKey: 'primaryCpe23Uri',
-        header: ({ column }) => <SortableColumnHeader column={column} title="CPE" />,
-        cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground">
-            {row.original.primaryCpe23Uri ? 'Bound' : 'Unbound'}
-          </span>
-        ),
-      },
-      {
         accessorKey: 'activeInstallCount',
         header: ({ column }) => <SortableColumnHeader column={column} title="Installs" />,
       },
@@ -254,8 +235,8 @@ export function SoftwareTable({
 
   return (
     <DataTableWorkbench
-      title="Normalized software"
-      description="Browse tenant-scoped normalized products, their prevalence, and current exposure."
+      title="Software"
+      description="Browse software prevalence, exposure, and remediation pressure."
       totalCount={totalCount}
     >
       <DataTableToolbar>
@@ -279,7 +260,6 @@ export function SoftwareTable({
               setDraftFilters({
                 category: categoryFilter,
                 vulnerableOnly,
-                boundOnly,
                 missedMaintenanceWindow,
               })
               setIsFilterDrawerOpen(true)
@@ -311,7 +291,6 @@ export function SoftwareTable({
           setDraftFilters({
             category: '',
             vulnerableOnly: false,
-            boundOnly: false,
             missedMaintenanceWindow: false,
           })
         }}
@@ -352,7 +331,7 @@ export function SoftwareTable({
 
         <WorkbenchFilterSection
           title="Exposure"
-          description="Limit the catalog to software with current exposure or existing CPE coverage."
+          description="Limit the catalog to software with current exposure."
         >
           <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-3 text-sm">
             <Checkbox
@@ -365,19 +344,6 @@ export function SoftwareTable({
               }}
             />
             <span>Vulnerable only</span>
-          </label>
-
-          <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-3 text-sm">
-            <Checkbox
-              checked={draftFilters.boundOnly}
-              onCheckedChange={(checked) => {
-                setDraftFilters((current) => ({
-                  ...current,
-                  boundOnly: checked === true,
-                }))
-              }}
-            />
-            <span>CPE bound only</span>
           </label>
 
           <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-3 text-sm">

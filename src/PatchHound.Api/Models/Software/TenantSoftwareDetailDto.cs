@@ -9,7 +9,6 @@ public record TenantSoftwareDetailDto(
     string CanonicalName,
     string? CanonicalVendor,
     string? Category,
-    string? PrimaryCpe23Uri,
     string? Description,
     DateTimeOffset? DescriptionGeneratedAt,
     string? DescriptionProviderType,

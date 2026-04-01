@@ -137,10 +137,6 @@ export function SoftwareDetailPage({
                 label="Last seen"
                 value={detail.lastSeenAt ? formatDate(detail.lastSeenAt) : 'Unknown'}
               />
-              <HeaderMetaChip
-                label="Primary CPE"
-                value={detail.primaryCpe23Uri ? 'Bound' : 'Not bound'}
-              />
             </div>
 
             <div className="flex flex-wrap gap-2">

@@ -7,7 +7,6 @@ public record TenantSoftwareListItemDto(
     string? CanonicalVendor,
     string? Category,
     decimal? CurrentRiskScore,
-    string? PrimaryCpe23Uri,
     int ActiveInstallCount,
     int UniqueDeviceCount,
     int ActiveVulnerabilityCount,
@@ -21,6 +20,5 @@ public record TenantSoftwareFilterQuery(
     string? Search = null,
     string? Category = null,
     bool? VulnerableOnly = null,
-    bool? BoundOnly = null,
     bool? MissedMaintenanceWindow = null
 );
