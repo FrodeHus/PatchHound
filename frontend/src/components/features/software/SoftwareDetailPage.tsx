@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react'
 import { Link } from "@tanstack/react-router";
-import { CircleQuestionMark, ShieldAlert, LayoutList, Sparkles } from 'lucide-react'
+import { CircleQuestionMark, ShieldAlert, LayoutList, Sparkles, ChevronDown } from 'lucide-react'
 import type {
   TenantSoftwareDetail,
   TenantSoftwareVulnerability,
@@ -573,21 +573,20 @@ function OverviewTab({
             ) : (
               <div className="mt-5 space-y-3">
                 {vulnerabilities.map((item) => (
-                  <Link
+                  <details
                     key={item.tenantVulnerabilityId}
-                    to="/vulnerabilities/$id"
-                    params={{ id: item.tenantVulnerabilityId }}
-                    className="block rounded-xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
+                    className="group overflow-hidden rounded-xl border border-border/70 bg-background"
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{item.title}</p>
-                          <Pill>{item.vendorSeverity}</Pill>
-                          {item.bestConfidence ? (
-                            <Pill>{item.bestConfidence}</Pill>
-                          ) : null}
-                        </div>
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/20">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                        <p className="truncate font-medium">{item.externalId}</p>
+                      </div>
+                      <Pill>{item.vendorSeverity}</Pill>
+                    </summary>
+
+                    <div className="border-t border-border/60 px-4 py-4">
+                      <div className="space-y-3">
                         <p className="text-xs text-muted-foreground">
                           {item.externalId} • {item.source}
                           {item.cvssScore !== null
@@ -617,7 +616,7 @@ function OverviewTab({
                           const summary = item.description?.trim()
                           if (summary) {
                             return (
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-sm text-muted-foreground">
                                 {summary}
                               </p>
                             )
@@ -625,7 +624,7 @@ function OverviewTab({
 
                           if (item.evidence[0]?.evidence) {
                             return (
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-sm text-muted-foreground">
                                 {item.evidence[0].evidence}
                               </p>
                             )
@@ -633,15 +632,22 @@ function OverviewTab({
 
                           return null
                         })()}
-                      </div>
-                      <div className="text-right text-xs text-muted-foreground">
-                        <p>{item.bestMatchMethod}</p>
-                        <p className="mt-1">
-                          Seen {formatDate(item.lastSeenAt)}
-                        </p>
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs text-muted-foreground">
+                          <div className="flex flex-wrap gap-3">
+                            <span>{item.bestMatchMethod}</span>
+                            <span>Seen {formatDate(item.lastSeenAt)}</span>
+                          </div>
+                          <Link
+                            to="/vulnerabilities/$id"
+                            params={{ id: item.tenantVulnerabilityId }}
+                            className="font-medium text-primary hover:underline"
+                          >
+                            Open vulnerability
+                          </Link>
+                        </div>
                       </div>
                     </div>
-                  </Link>
+                  </details>
                 ))}
               </div>
             )}
