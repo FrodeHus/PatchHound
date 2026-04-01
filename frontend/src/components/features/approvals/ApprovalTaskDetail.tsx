@@ -14,7 +14,7 @@ import {
 } from '@/components/features/remediation/remediation-utils'
 import { toneBadge } from '@/lib/tone-classes'
 import { formatDate, startCase } from '@/lib/formatting'
-import { ApprovalTypeBadge, ApprovalStatusBadge } from './ApprovalBadge'
+import { ApprovalStatusBadge } from './ApprovalBadge'
 import { ApprovalExpiryCountdown } from './ApprovalExpiryCountdown'
 import { CheckCircle, XCircle, Eye, AlertTriangle, MessageSquare } from 'lucide-react'
 
@@ -122,192 +122,38 @@ export function ApprovalTaskDetail({
     <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
       <section className="min-w-0 space-y-5">
       <header className="rounded-[28px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%),var(--color-card)] p-5">
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0 space-y-3">
-              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                Approval task
-              </p>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-semibold tracking-[-0.04em]">
-                  {startCase(data.softwareName)}
-                </h1>
-                {!isPending && !data.readAt ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onMarkRead}
-                    title="Mark as read"
-                    aria-label="Mark as read"
-                    className="size-8 rounded-full border border-border/70"
-                  >
-                    <Eye className="size-4" />
-                  </Button>
-                ) : null}
-              </div>
-              <p className="max-w-4xl text-lg font-medium tracking-[-0.02em] text-foreground">
-                {isPending
-                  ? `Review the owner decision to ${outcomeLabel(data.outcome).toLowerCase()} for this software scope.`
-                  : `This approval ${data.status === 'Approved' ? 'approved' : 'rejected'} the owner decision to ${outcomeLabel(data.outcome).toLowerCase()}.`}
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <ApprovalStatusBadge status={data.status} />
-                <ApprovalTypeBadge type={data.type} />
-                <span
-                  className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneBadge(severityTone(data.criticality))}`}
-                >
-                  Severity {data.criticality}
-                </span>
-              </div>
-            </div>
-
-            <div className="min-w-[220px] rounded-2xl border border-border/60 bg-background/45 px-4 py-3">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                {isPending ? 'Approval metadata' : 'Resolved summary'}
-              </p>
-              <div className="mt-3 space-y-2.5 text-sm">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-muted-foreground">
-                    {isPending ? 'Expires' : 'Resolved'}
-                  </span>
-                  <span className="font-medium text-foreground">
-                    {isPending ? <ApprovalExpiryCountdown expiresAt={data.expiresAt} /> : formatDate(data.createdAt)}
-                  </span>
-                </div>
-                {data.riskBand ? (
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">Risk</span>
-                    <span
-                      className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${toneBadge(riskBandTone(data.riskBand))}`}
-                    >
-                      {data.riskBand} ({data.riskScore?.toFixed(0)})
-                    </span>
-                  </div>
-                ) : null}
-                {!isPending ? (
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">Reviewed by</span>
-                    <span className="font-medium text-foreground">{data.decidedByName}</span>
-                  </div>
-                ) : null}
-                {data.maintenanceWindowDate ? (
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">Maintenance</span>
-                    <span className="font-medium text-foreground">{formatDate(data.maintenanceWindowDate)}</span>
-                  </div>
-                ) : null}
-              </div>
-            </div>
+        <div className="space-y-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Approval task
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-semibold tracking-[-0.04em]">
+              Remediation Approval: {startCase(data.softwareName)}
+            </h1>
+            {!isPending && !data.readAt ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onMarkRead}
+                title="Mark as read"
+                aria-label="Mark as read"
+                className="size-8 rounded-full border border-border/70"
+              >
+                <Eye className="size-4" />
+              </Button>
+            ) : null}
           </div>
-
-          <section className="rounded-2xl border border-primary/15 bg-background/65 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="min-w-0 space-y-3">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                  Requested decision
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${toneBadge(outcomeTone(data.outcome))}`}
-                  >
-                    {outcomeLabel(data.outcome)}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    for this software scope
-                  </span>
-                </div>
-                <p className="max-w-3xl text-sm leading-relaxed text-foreground/90">
-                  {data.justification || 'No justification was provided for this decision.'}
-                </p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-background/55 px-4 py-3 text-sm">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                  Exposure in scope
-                </p>
-                <p className="mt-2 font-medium text-foreground">
-                  {vulnerabilityCount.toLocaleString()} vulnerabilities across {affectedDeviceCount.toLocaleString()} affected devices
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {isPending ? (
-            <section className="rounded-2xl border border-primary/20 bg-background/80 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <h2 className="text-sm font-semibold tracking-[-0.02em]">
-                      Approve or deny this request
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Record the reasoning for accepting this request or sending it back.
-                    </p>
-                  </div>
-                  {justificationRequired ? (
-                    <span className="inline-flex rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] text-muted-foreground">
-                      Justification required
-                    </span>
-                  ) : (
-                    <span className="inline-flex rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] text-muted-foreground">
-                      Justification optional
-                    </span>
-                  )}
-                </div>
-                <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                  <div className="space-y-3">
-                    {maintenanceWindowRequired ? (
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                          Maintenance window date
-                        </label>
-                        <Input
-                          type="date"
-                          value={maintenanceWindowDate}
-                          onChange={(e) => setMaintenanceWindowDate(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          The technical manager sets when the approved patch is expected to be in place.
-                        </p>
-                      </div>
-                    ) : null}
-                    <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                      Approval justification
-                    </label>
-                    <Textarea
-                      placeholder={
-                        justificationRequired
-                          ? 'Explain why you approve or deny this risk exception.'
-                          : 'Add context for your approval or denial.'
-                      }
-                      value={justification}
-                      onChange={(e) => setJustification(e.target.value)}
-                      rows={4}
-                    />
-                    {resolveAction && justificationRequired && !justification.trim() ? (
-                      <p className="flex items-center gap-1.5 text-sm text-tone-danger-foreground">
-                        <AlertTriangle className="size-3.5" />
-                        Justification is required to {resolveAction} this task.
-                      </p>
-                    ) : null}
-                    {resolveAction === 'approve' && maintenanceWindowRequired && !maintenanceWindowDate ? (
-                      <p className="flex items-center gap-1.5 text-sm text-tone-danger-foreground">
-                        <AlertTriangle className="size-3.5" />
-                        Maintenance window date is required to approve this patching request.
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap gap-3 lg:flex-col">
-                    <Button onClick={() => handleResolve('approve')} className="min-w-[140px]">
-                      <CheckCircle className="mr-1.5 size-4" />
-                      Approve
-                    </Button>
-                    <Button variant="destructive" onClick={() => handleResolve('deny')} className="min-w-[140px]">
-                      <XCircle className="mr-1.5 size-4" />
-                      Deny
-                    </Button>
-                  </div>
-                </div>
-            </section>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneBadge(severityTone(data.criticality))}`}
+            >
+              Severity: {data.criticality}
+            </span>
+            <ApprovalStatusBadge status={data.status} />
+            {isPending ? (
+              <ApprovalExpiryCountdown expiresAt={data.expiresAt} compact />
+            ) : null}
+          </div>
         </div>
       </header>
 
