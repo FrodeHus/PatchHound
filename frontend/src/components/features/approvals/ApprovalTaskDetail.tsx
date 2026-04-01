@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { RadialBarChart, RadialBar, PolarAngleAxis } from 'recharts'
 import type { ApprovalTaskDetail as ApprovalTaskDetailType } from '@/api/approval-tasks.schemas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,8 +12,9 @@ import {
 import {
   outcomeLabel,
   outcomeTone,
+  riskBandTone,
 } from '@/components/features/remediation/remediation-utils'
-import { toneBadge } from '@/lib/tone-classes'
+import { toneBadge, toneText, type Tone } from '@/lib/tone-classes'
 import { formatDate, startCase } from '@/lib/formatting'
 import { ApprovalStatusBadge } from './ApprovalBadge'
 import { ApprovalExpiryCountdown } from './ApprovalExpiryCountdown'
@@ -42,21 +44,6 @@ function severityTone(severity: string) {
   }
 }
 
-function riskBandTone(band: string) {
-  switch (band) {
-    case 'Critical':
-      return 'danger' as const
-    case 'High':
-      return 'warning' as const
-    case 'Medium':
-      return 'neutral' as const
-    case 'Low':
-      return 'info' as const
-    default:
-      return 'neutral' as const
-  }
-}
-
 function normalizeVersion(version: string | null) {
   return version?.trim() ?? ''
 }
@@ -73,6 +60,55 @@ function toDateInputValue(value?: string | null) {
 function toIsoDateBoundary(value: string) {
   if (!value) return undefined
   return `${value}T00:00:00Z`
+}
+
+const toneColorVar: Record<string, string> = {
+  danger: '--color-tone-danger-foreground',
+  warning: '--color-tone-warning-foreground',
+  success: '--color-tone-success-foreground',
+  info: '--color-tone-info-foreground',
+  neutral: '--color-foreground',
+}
+
+function useToneCssColor(tone: string): string {
+  if (typeof window === 'undefined') return 'currentColor'
+  const varName = toneColorVar[tone] ?? toneColorVar.neutral
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || 'currentColor'
+}
+
+function RiskGauge({ score, tone }: { score: number; tone: Tone }) {
+  const color = useToneCssColor(tone)
+  const gaugeData = [{ value: score, fill: color }]
+
+  return (
+    <div className="size-[100px]">
+      <RadialBarChart
+        width={100}
+        height={60}
+        cx={50}
+        cy={55}
+        innerRadius={35}
+        outerRadius={50}
+        startAngle={180}
+        endAngle={0}
+        data={gaugeData}
+        barSize={10}
+      >
+        <PolarAngleAxis
+          type="number"
+          domain={[0, 10]}
+          angleAxisId={0}
+          tick={false}
+        />
+        <RadialBar
+          dataKey="value"
+          cornerRadius={5}
+          background={{ fill: 'var(--color-muted)' }}
+          angleAxisId={0}
+        />
+      </RadialBarChart>
+    </div>
+  )
 }
 
 export function ApprovalTaskDetail({
@@ -629,6 +665,42 @@ export function ApprovalTaskDetail({
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">No vulnerable versions</p>
+          )}
+        </section>
+        <section className="rounded-2xl border border-border/70 bg-background/60 p-5 space-y-4">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            Risk context
+          </p>
+          {data.riskScore != null && data.riskBand ? (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-4xl font-bold tabular-nums tracking-tight">
+                    {data.riskScore.toFixed(1)}
+                  </p>
+                  <p className={`text-xs font-semibold uppercase tracking-[0.1em] ${toneText(riskBandTone(data.riskBand))}`}>
+                    {data.riskBand} risk score
+                  </p>
+                </div>
+                <RiskGauge score={data.riskScore} tone={riskBandTone(data.riskBand)} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-border/60 bg-background/45 p-3 text-center">
+                  <p className="text-2xl font-bold tabular-nums">{vulnerabilityCount}</p>
+                  <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+                    Open<br />vulnerability
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-background/45 p-3 text-center">
+                  <p className="text-2xl font-bold tabular-nums">{affectedDeviceCount}</p>
+                  <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+                    Affected<br />device
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">No risk data available</p>
           )}
         </section>
       </aside>
