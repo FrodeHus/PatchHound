@@ -703,6 +703,14 @@ export function ApprovalTaskDetail({
             <p className="text-sm text-muted-foreground">No risk data available</p>
           )}
         </section>
+        <section className="rounded-2xl border border-border/70 bg-background/40 p-5 space-y-3">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            Threat intelligence
+          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground italic">
+            Threat intelligence summary will appear here when available.
+          </p>
+        </section>
       </aside>
     </div>
   )
