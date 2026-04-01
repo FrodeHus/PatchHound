@@ -833,6 +833,9 @@ public class SoftwareController(
                 })
                 .Where(item => item is not null)
                 .Cast<TenantSoftwareVulnerabilityDto>()
+                .OrderByDescending(item => item.CvssScore ?? decimal.MinusOne)
+                .ThenByDescending(item => item.PublishedDate)
+                .ThenBy(item => item.ExternalId, StringComparer.OrdinalIgnoreCase)
                 .ToList()
         );
     }
