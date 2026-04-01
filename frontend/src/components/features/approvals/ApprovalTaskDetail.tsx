@@ -16,7 +16,7 @@ import { toneBadge } from '@/lib/tone-classes'
 import { formatDate, startCase } from '@/lib/formatting'
 import { ApprovalStatusBadge } from './ApprovalBadge'
 import { ApprovalExpiryCountdown } from './ApprovalExpiryCountdown'
-import { CheckCircle, XCircle, Eye, AlertTriangle, MessageSquare, ShieldCheck } from 'lucide-react'
+import { CheckCircle, XCircle, Eye, AlertTriangle, MessageSquare, ShieldCheck, Package, Info } from 'lucide-react'
 
 type Props = {
   data: ApprovalTaskDetailType
@@ -96,6 +96,9 @@ export function ApprovalTaskDetail({
     data.deviceVersionCohorts.reduce((sum, cohort) => sum + cohort.deviceCount, 0) ||
     data.devices?.totalCount ||
     0
+  const vulnerableCohorts = data.deviceVersionCohorts.filter(
+    (c) => c.activeVulnerabilityCount > 0
+  )
   const auditEvents: AuditTimelineEvent[] = data.auditTrail.map((entry, index) => ({
     id: `${entry.timestamp}-${entry.action}-${index}`,
     action: entry.action,
@@ -589,7 +592,45 @@ export function ApprovalTaskDetail({
       </section>
       </section>
       <aside className="space-y-5">
-        {/* Sidebar cards added in later tasks */}
+        <section className="rounded-2xl border border-border/70 bg-background/60 p-5 space-y-4">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            Requested action
+          </p>
+          <p className="text-lg font-semibold tracking-[-0.02em]">
+            {outcomeLabel(data.outcome)} for this software scope
+          </p>
+          <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-lg border border-border/60 bg-muted/30">
+                <Package className="size-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{startCase(data.softwareName)}</p>
+                <p className="text-xs text-muted-foreground">Software Library</p>
+              </div>
+              <Info className="size-4 shrink-0 text-muted-foreground" />
+            </div>
+          </div>
+          {vulnerableCohorts.length > 0 ? (
+            <div className="space-y-1.5">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Vulnerable versions
+              </p>
+              <ul className="space-y-1 text-sm">
+                {vulnerableCohorts.map((cohort) => (
+                  <li key={normalizeVersion(cohort.version) || '__unknown__'} className="flex items-center justify-between text-foreground/90">
+                    <span className="font-mono text-xs">{formatVersion(cohort.version)}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {cohort.activeVulnerabilityCount} vuln{cohort.activeVulnerabilityCount === 1 ? '' : 's'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">No vulnerable versions</p>
+          )}
+        </section>
       </aside>
     </div>
   )
