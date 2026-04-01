@@ -15,7 +15,7 @@ import {
   riskBandTone,
 } from '@/components/features/remediation/remediation-utils'
 import { toneBadge, toneText, type Tone } from '@/lib/tone-classes'
-import { formatDate, startCase } from '@/lib/formatting'
+import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 import { ApprovalStatusBadge } from './ApprovalBadge'
 import { ApprovalExpiryCountdown } from './ApprovalExpiryCountdown'
 import { CheckCircle, XCircle, Eye, AlertTriangle, MessageSquare, ShieldCheck, Package, Info } from 'lucide-react'
@@ -144,6 +144,9 @@ export function ApprovalTaskDetail({
       : undefined,
     timestamp: entry.timestamp,
   }))
+  const requesterName =
+    data.auditTrail.find((e) => e.action === 'Created')?.userDisplayName ??
+    data.decidedByName
 
   function handleResolve(action: 'approve' | 'deny') {
     if (justificationRequired && !justification.trim()) {
@@ -343,6 +346,23 @@ export function ApprovalTaskDetail({
                 </div>
               </section>
             ) : null}
+
+            <section className="rounded-2xl border border-border/70 bg-background/60 p-5">
+              <div className="flex flex-wrap items-center gap-6">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    Requested by
+                  </p>
+                  <p className="mt-1 text-sm font-medium">{requesterName}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    Request date
+                  </p>
+                  <p className="mt-1 text-sm font-medium">{formatDateTime(data.createdAt)}</p>
+                </div>
+              </div>
+            </section>
           </TabsContent>
 
           <TabsContent value="vulnerabilities" className="space-y-4 pt-1">
