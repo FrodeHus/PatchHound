@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from "@tanstack/react-router";
-import { CircleQuestionMark, Loader2, RotateCcw } from 'lucide-react'
+import { ChevronDown, CircleQuestionMark, Loader2, RotateCcw } from 'lucide-react'
 import type { AssetDetail } from '@/api/assets.schemas'
 import type { BusinessLabel } from '@/api/business-labels.schemas'
 import { Badge } from '@/components/ui/badge'
@@ -493,97 +493,111 @@ export function AssetDetailPageView({
                   [...asset.vulnerabilities]
                     .sort(
                       (a, b) =>
-                        (b.effectiveScore ?? b.vendorScore ?? 0) -
-                        (a.effectiveScore ?? a.vendorScore ?? 0),
+                        getSeverityRank(b.effectiveSeverity) - getSeverityRank(a.effectiveSeverity)
+                        || (b.effectiveScore ?? b.vendorScore ?? 0) - (a.effectiveScore ?? a.vendorScore ?? 0)
+                        || new Date(b.detectedDate).getTime() - new Date(a.detectedDate).getTime()
+                        || a.externalId.localeCompare(b.externalId),
                     )
                     .map((vulnerability) => (
-                      <Link
+                      <details
                         key={vulnerability.vulnerabilityId}
-                        to="/vulnerabilities/$id"
-                        params={{ id: vulnerability.vulnerabilityId }}
-                        className="block rounded-2xl border border-border/70 bg-background p-4 hover:border-foreground/20 hover:bg-muted/20"
+                        className="group rounded-2xl border border-border/70 bg-background transition hover:border-foreground/20"
                       >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-medium">
-                                {vulnerability.title}
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-3 marker:content-none">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <p className="truncate font-medium">
+                              {vulnerability.externalId}
+                            </p>
+                            <Pill>
+                              {vulnerability.effectiveSeverity}
+                            </Pill>
+                          </div>
+                          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                        </summary>
+
+                        <div className="space-y-4 border-t border-border/60 px-4 py-4">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-medium">{vulnerability.title}</p>
+                                {vulnerability.episodeCount > 1 ? (
+                                  <Pill>
+                                    Recurred {vulnerability.episodeCount - 1}x
+                                  </Pill>
+                                ) : null}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {vulnerability.externalId} • {vulnerability.status}
                               </p>
-                              {vulnerability.episodeCount > 1 ? (
-                                <Pill>
-                                  Recurred {vulnerability.episodeCount - 1}x
-                                </Pill>
-                              ) : null}
                             </div>
                             <p className="text-xs text-muted-foreground">
-                              {vulnerability.externalId} •{" "}
-                              {vulnerability.status}
+                              Detected {new Date(vulnerability.detectedDate).toLocaleDateString()}
                             </p>
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              <MetricCard
-                                label="Vendor Severity"
-                                value={
-                                  vulnerability.vendorScore
-                                    ? `${vulnerability.vendorSeverity} (${vulnerability.vendorScore.toFixed(1)})`
-                                    : vulnerability.vendorSeverity
-                                }
-                              />
-                              {asset.securityProfile &&
-                              vulnerability.effectiveSeverity !==
-                                vulnerability.vendorSeverity ? (
-                                <MetricCard
-                                  label={`Adjusted Severity (${asset.securityProfile.name})`}
-                                  value={
-                                    vulnerability.effectiveScore
-                                      ? `${vulnerability.effectiveSeverity} (${vulnerability.effectiveScore.toFixed(1)})`
-                                      : vulnerability.effectiveSeverity
-                                  }
-                                />
-                              ) : null}
-                              <MetricCard
-                                label="CVSS Vector"
-                                value={
-                                  vulnerability.cvssVector ?? "Not available"
-                                }
-                                mono
-                              />
-                              <MetricCard
-                                label="Published"
-                                value={
-                                  vulnerability.publishedDate
-                                    ? new Date(
-                                        vulnerability.publishedDate,
-                                      ).toLocaleDateString()
-                                    : "Unknown"
-                                }
-                              />
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {vulnerability.description}
-                            </p>
-                            {vulnerability.assessmentReasonSummary ? (
-                              <p className={`text-xs ${toneText("info")}`}>
-                                {vulnerability.assessmentReasonSummary}
-                              </p>
-                            ) : null}
-                            <div className="flex flex-wrap gap-1">
-                              {vulnerability.episodes.map((episode) => (
-                                <Pill key={episode.episodeNumber}>
-                                  #{episode.episodeNumber}{" "}
-                                  {episode.status === "Open"
-                                    ? "open"
-                                    : "resolved"}
-                                </Pill>
-                              ))}
-                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(
-                              vulnerability.detectedDate,
-                            ).toLocaleDateString()}
+
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <MetricCard
+                              label="Vendor Severity"
+                              value={
+                                vulnerability.vendorScore
+                                  ? `${vulnerability.vendorSeverity} (${vulnerability.vendorScore.toFixed(1)})`
+                                  : vulnerability.vendorSeverity
+                              }
+                            />
+                            {asset.securityProfile &&
+                            vulnerability.effectiveSeverity !== vulnerability.vendorSeverity ? (
+                              <MetricCard
+                                label={`Adjusted Severity (${asset.securityProfile.name})`}
+                                value={
+                                  vulnerability.effectiveScore
+                                    ? `${vulnerability.effectiveSeverity} (${vulnerability.effectiveScore.toFixed(1)})`
+                                    : vulnerability.effectiveSeverity
+                                }
+                              />
+                            ) : null}
+                            <MetricCard
+                              label="CVSS Vector"
+                              value={vulnerability.cvssVector ?? "Not available"}
+                              mono
+                            />
+                            <MetricCard
+                              label="Published"
+                              value={
+                                vulnerability.publishedDate
+                                  ? new Date(vulnerability.publishedDate).toLocaleDateString()
+                                  : "Unknown"
+                              }
+                            />
+                          </div>
+
+                          <p className="text-sm text-muted-foreground">
+                            {vulnerability.description}
                           </p>
+
+                          {vulnerability.assessmentReasonSummary ? (
+                            <p className={`text-xs ${toneText("info")}`}>
+                              {vulnerability.assessmentReasonSummary}
+                            </p>
+                          ) : null}
+
+                          <div className="flex flex-wrap gap-1">
+                            {vulnerability.episodes.map((episode) => (
+                              <Pill key={episode.episodeNumber}>
+                                #{episode.episodeNumber}{" "}
+                                {episode.status === "Open" ? "open" : "resolved"}
+                              </Pill>
+                            ))}
+                          </div>
+
+                          <Link
+                            to="/vulnerabilities/$id"
+                            params={{ id: vulnerability.vulnerabilityId }}
+                            className="inline-flex text-sm font-medium text-primary hover:underline"
+                          >
+                            Open vulnerability detail
+                          </Link>
                         </div>
-                      </Link>
+                      </details>
                     ))
                 )}
               </section>
@@ -1046,6 +1060,21 @@ export function AssetDetailPageView({
       </Sheet>
     </>
   );
+}
+
+function getSeverityRank(severity: string) {
+  switch (severity.toLowerCase()) {
+    case 'critical':
+      return 4
+    case 'high':
+      return 3
+    case 'medium':
+      return 2
+    case 'low':
+      return 1
+    default:
+      return 0
+  }
 }
 
 function BusinessLabelBadge({ name, color }: { name: string; color: string | null }) {
