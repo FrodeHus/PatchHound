@@ -16,7 +16,7 @@ import { toneBadge } from '@/lib/tone-classes'
 import { formatDate, startCase } from '@/lib/formatting'
 import { ApprovalStatusBadge } from './ApprovalBadge'
 import { ApprovalExpiryCountdown } from './ApprovalExpiryCountdown'
-import { CheckCircle, XCircle, Eye, AlertTriangle, MessageSquare } from 'lucide-react'
+import { CheckCircle, XCircle, Eye, AlertTriangle, MessageSquare, ShieldCheck } from 'lucide-react'
 
 type Props = {
   data: ApprovalTaskDetailType
@@ -156,6 +156,80 @@ export function ApprovalTaskDetail({
           </div>
         </div>
       </header>
+
+      {isPending ? (
+        <section className="rounded-2xl border border-border/70 bg-card p-5">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-5 text-muted-foreground" />
+              <h2 className="text-lg font-semibold tracking-[-0.02em]">
+                Reviewer Verdict
+              </h2>
+            </div>
+            <CheckCircle className="size-10 text-muted-foreground/30" />
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                Approval justification
+              </label>
+              {justificationRequired ? (
+                <span className="inline-flex rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] text-muted-foreground">
+                  Required
+                </span>
+              ) : null}
+            </div>
+
+            {maintenanceWindowRequired ? (
+              <div className="space-y-2">
+                <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  Maintenance window date
+                </label>
+                <Input
+                  type="date"
+                  value={maintenanceWindowDate}
+                  onChange={(e) => setMaintenanceWindowDate(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The technical manager sets when the approved patch is expected to be in place.
+                </p>
+              </div>
+            ) : null}
+
+            <Textarea
+              placeholder="Provide technical rationale for this decision..."
+              value={justification}
+              onChange={(e) => setJustification(e.target.value)}
+              rows={4}
+            />
+
+            {resolveAction && justificationRequired && !justification.trim() ? (
+              <p className="flex items-center gap-1.5 text-sm text-tone-danger-foreground">
+                <AlertTriangle className="size-3.5" />
+                Justification is required to {resolveAction} this task.
+              </p>
+            ) : null}
+            {resolveAction === 'approve' && maintenanceWindowRequired && !maintenanceWindowDate ? (
+              <p className="flex items-center gap-1.5 text-sm text-tone-danger-foreground">
+                <AlertTriangle className="size-3.5" />
+                Maintenance window date is required to approve this patching request.
+              </p>
+            ) : null}
+
+            <div className="flex flex-wrap gap-3 pt-1">
+              <Button onClick={() => handleResolve('approve')} className="min-w-[180px]">
+                <CheckCircle className="mr-1.5 size-4" />
+                Approve Remediation
+              </Button>
+              <Button variant="destructive" onClick={() => handleResolve('deny')} className="min-w-[180px]">
+                <XCircle className="mr-1.5 size-4" />
+                Deny Request
+              </Button>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-[28px] border border-border/70 bg-card p-4">
         <Tabs defaultValue="justification" className="gap-4">
