@@ -387,23 +387,12 @@ export function SoftwareRemediationView({
               <CardHeader className="space-y-1.5 pb-2">
                 <CardTitle className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Security recommendation</CardTitle>
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Security analysis to help the asset owner decide. This is advisory and does not override the owner decision.
+                  Security analysis to help the asset owner decide. Advisory only.
                 </p>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <RecommendationSnapshotCard
+              <CardContent>
+                <SecurityRecommendationSidecar
                   recommendation={data.recommendations[0] ?? null}
-                  emphasized
-                />
-                <AiDecisionBrief
-                  aiSummary={data.aiSummary}
-                  currentStageId={currentStageId}
-                  canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
-                  generatingAiSummary={generatingAiSummary}
-                  onGenerateAiSummary={handleGenerateAiSummary}
-                  onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
-                  onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
-                  onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
                 />
               </CardContent>
             </Card>
@@ -429,20 +418,31 @@ export function SoftwareRemediationView({
         )}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <Card className="rounded-[1.45rem] border-border/50 bg-background/35 shadow-none">
-            <CardHeader className="space-y-1.5 pb-2">
-              <CardTitle className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Recommendations and context</CardTitle>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Advisory guidance that helps the current actor respond in this stage.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {currentStageId === 'approval' ? (
-                <RecommendationSnapshotCard
-                  recommendation={data.recommendations[0] ?? null}
-                />
-              ) : null}
-              {currentStageId !== 'remediationDecision' ? (
+          {currentStageId === 'remediationDecision' ? (
+            <AiDecisionBrief
+              aiSummary={data.aiSummary}
+              currentStageId={currentStageId}
+              canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
+              generatingAiSummary={generatingAiSummary}
+              onGenerateAiSummary={handleGenerateAiSummary}
+              onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
+              onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
+              onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
+            />
+          ) : (
+            <Card className="rounded-[1.45rem] border-border/50 bg-background/35 shadow-none">
+              <CardHeader className="space-y-1.5 pb-2">
+                <CardTitle className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Recommendations and context</CardTitle>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Advisory guidance that helps the current actor respond in this stage.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {currentStageId === 'approval' ? (
+                  <RecommendationSnapshotCard
+                    recommendation={data.recommendations[0] ?? null}
+                  />
+                ) : null}
                 <AiDecisionBrief
                   aiSummary={data.aiSummary}
                   currentStageId={currentStageId}
@@ -453,9 +453,9 @@ export function SoftwareRemediationView({
                   onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
                   onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
                 />
-              ) : null}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="rounded-[1.45rem] border-border/50 bg-background/35 shadow-none">
             <CardHeader className="space-y-1.5 pb-2">
@@ -986,7 +986,7 @@ function CurrentActionSection({
   const StageIcon = stagePresentation.icon
 
   return (
-    <Card className={`rounded-[1.8rem] ${stagePresentation.shell}`}>
+    <Card className={`rounded-[1.8rem] ${stagePresentation.shell} ${currentStageId === 'remediationDecision' ? 'min-h-[24rem]' : ''}`}>
       <CardHeader className="space-y-2 pb-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-3">
@@ -1008,7 +1008,7 @@ function CurrentActionSection({
           </span>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className={currentStageId === 'remediationDecision' ? 'flex flex-col justify-between pb-5' : undefined}>
         {currentStageId === 'verification' ? (
           <StageVerificationPanel
             data={data}
@@ -1030,7 +1030,7 @@ function CurrentActionSection({
           />
         ) : null}
         {currentStageId === 'remediationDecision' ? (
-          <div className="space-y-4">
+          <div className="min-h-[15rem] space-y-5">
             {data.currentDecision?.approvalStatus === 'Rejected' && data.currentDecision ? (
               <div className="rounded-2xl border border-destructive/40 bg-destructive/6 p-4">
                 <div className="flex items-start gap-3">
@@ -1242,6 +1242,46 @@ function RecommendationSnapshotCard({
         {recommendation.rationale}
       </p>
       <p className="mt-3 text-xs text-muted-foreground">
+        {recommendation.analystDisplayName ? `${recommendation.analystDisplayName} · ` : ''}{formatDateTime(recommendation.createdAt)}
+      </p>
+    </div>
+  )
+}
+
+function SecurityRecommendationSidecar({
+  recommendation,
+}: {
+  recommendation: DecisionContext['recommendations'][number] | null
+}) {
+  if (!recommendation) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-foreground">
+          No analyst recommendation recorded yet
+        </p>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          The asset owner can still decide, but there is no security-analysis recommendation to reference yet.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${toneBadge(outcomeTone(recommendation.recommendedOutcome))}`}>
+          {outcomeLabel(recommendation.recommendedOutcome)}
+        </span>
+        {recommendation.priorityOverride ? (
+          <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+            {recommendation.priorityOverride} priority
+          </span>
+        ) : null}
+      </div>
+      <p className="text-sm leading-relaxed text-foreground/90">
+        {recommendation.rationale}
+      </p>
+      <p className="text-xs text-muted-foreground">
         {recommendation.analystDisplayName ? `${recommendation.analystDisplayName} · ` : ''}{formatDateTime(recommendation.createdAt)}
       </p>
     </div>

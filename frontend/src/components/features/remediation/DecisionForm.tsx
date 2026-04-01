@@ -137,7 +137,7 @@ export function DecisionForm({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5 pt-1">
       <div className="space-y-2">
         <label className="text-sm font-medium">Decision posture</label>
         <Select value={outcome} onValueChange={(v) => setOutcome(v ?? '')} disabled={readOnly}>
@@ -226,13 +226,15 @@ export function DecisionForm({
         </div>
       ) : null}
 
-      <Button
-        onClick={handleSubmit}
-        disabled={readOnly || !canSubmit || submitting}
-        className="w-full sm:w-auto"
-      >
-        {submitting ? 'Saving decision...' : submitLabel}
-      </Button>
+      <div className="pt-1">
+        <Button
+          onClick={handleSubmit}
+          disabled={readOnly || !canSubmit || submitting}
+          className="w-full sm:w-auto"
+        >
+          {submitting ? 'Saving decision...' : submitLabel}
+        </Button>
+      </div>
     </div>
   )
 }
