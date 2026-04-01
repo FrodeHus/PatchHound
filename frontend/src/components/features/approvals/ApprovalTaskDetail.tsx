@@ -121,60 +121,91 @@ export function ApprovalTaskDetail({
   return (
     <section className="space-y-5">
       <header className="rounded-[28px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%),var(--color-card)] p-5">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
-          <div className="space-y-4">
-            <div className="space-y-2">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 space-y-3">
               <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                 Approval task
               </p>
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h1 className="text-3xl font-semibold tracking-[-0.04em]">
-                      {startCase(data.softwareName)}
-                    </h1>
-                    {!isPending && !data.readAt ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onMarkRead}
-                        title="Mark as read"
-                        aria-label="Mark as read"
-                        className="size-8 rounded-full border border-border/70"
-                      >
-                        <Eye className="size-4" />
-                      </Button>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(outcomeTone(data.outcome))}`}
-                    >
-                      {outcomeLabel(data.outcome)}
-                    </span>
-                    <ApprovalTypeBadge type={data.type} />
-                    <ApprovalStatusBadge status={data.status} />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] text-muted-foreground">
-                      Decision by: <span className="ml-1 font-medium text-foreground">{data.decidedByName}</span>
-                    </span>
-                    <span
-                      className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneBadge(severityTone(data.criticality))}`}
-                    >
-                      Severity: {data.criticality}
-                    </span>
-                  </div>
-                </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-semibold tracking-[-0.04em]">
+                  {startCase(data.softwareName)}
+                </h1>
+                {!isPending && !data.readAt ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onMarkRead}
+                    title="Mark as read"
+                    aria-label="Mark as read"
+                    className="size-8 rounded-full border border-border/70"
+                  >
+                    <Eye className="size-4" />
+                  </Button>
+                ) : null}
+              </div>
+              <p className="max-w-4xl text-lg font-medium tracking-[-0.02em] text-foreground">
+                {isPending
+                  ? `Review the owner decision to ${outcomeLabel(data.outcome).toLowerCase()} for this software scope.`
+                  : `This approval ${data.status === 'Approved' ? 'approved' : 'rejected'} the owner decision to ${outcomeLabel(data.outcome).toLowerCase()}.`}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <ApprovalStatusBadge status={data.status} />
+                <ApprovalTypeBadge type={data.type} />
+                <span
+                  className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneBadge(severityTone(data.criticality))}`}
+                >
+                  Severity {data.criticality}
+                </span>
               </div>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-              <section className="rounded-2xl border border-primary/15 bg-background/70 p-4">
+            <div className="min-w-[220px] rounded-2xl border border-border/60 bg-background/45 px-4 py-3">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                {isPending ? 'Approval metadata' : 'Resolved summary'}
+              </p>
+              <div className="mt-3 space-y-2.5 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">
+                    {isPending ? 'Expires' : 'Resolved'}
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {isPending ? <ApprovalExpiryCountdown expiresAt={data.expiresAt} /> : formatDate(data.createdAt)}
+                  </span>
+                </div>
+                {data.riskBand ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Risk</span>
+                    <span
+                      className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${toneBadge(riskBandTone(data.riskBand))}`}
+                    >
+                      {data.riskBand} ({data.riskScore?.toFixed(0)})
+                    </span>
+                  </div>
+                ) : null}
+                {!isPending ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Reviewed by</span>
+                    <span className="font-medium text-foreground">{data.decidedByName}</span>
+                  </div>
+                ) : null}
+                {data.maintenanceWindowDate ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Maintenance</span>
+                    <span className="font-medium text-foreground">{formatDate(data.maintenanceWindowDate)}</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <section className="rounded-2xl border border-primary/15 bg-background/65 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 space-y-3">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                  Requested action
+                  Requested decision
                 </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${toneBadge(outcomeTone(data.outcome))}`}
                   >
@@ -184,49 +215,23 @@ export function ApprovalTaskDetail({
                     for this software scope
                   </span>
                 </div>
-                <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-foreground/90">
+                <p className="max-w-3xl text-sm leading-relaxed text-foreground/90">
                   {data.justification || 'No justification was provided for this decision.'}
                 </p>
-              </section>
-
-              <section className="rounded-2xl border border-border/70 bg-background/60 px-4 py-4">
+              </div>
+              <div className="rounded-xl border border-border/60 bg-background/55 px-4 py-3 text-sm">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   Exposure in scope
                 </p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <p className="text-2xl font-semibold tracking-[-0.03em]">
-                      {vulnerabilityCount}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      open vulnerabilities
-                    </p>
-                  </div>
-                  <div className="border-border/60 sm:border-l sm:pl-4">
-                    <p className="text-2xl font-semibold tracking-[-0.03em]">
-                      {affectedDeviceCount}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      affected devices
-                    </p>
-                  </div>
-                </div>
-              </section>
+                <p className="mt-2 font-medium text-foreground">
+                  {vulnerabilityCount.toLocaleString()} vulnerabilities across {affectedDeviceCount.toLocaleString()} affected devices
+                </p>
+              </div>
             </div>
+          </section>
 
-            {data.maintenanceWindowDate ? (
-              <section className="rounded-2xl border border-border/70 bg-background/60 p-4">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                  Planned maintenance window
-                </p>
-                <p className="mt-2 text-sm text-foreground">
-                  Patch execution is expected to be in place by {formatDate(data.maintenanceWindowDate)}.
-                </p>
-              </section>
-            ) : null}
-
-            {isPending ? (
-              <section className="rounded-2xl border border-primary/20 bg-background/80 p-4">
+          {isPending ? (
+            <section className="rounded-2xl border border-primary/20 bg-background/80 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
                     <h2 className="text-sm font-semibold tracking-[-0.02em]">
@@ -300,59 +305,8 @@ export function ApprovalTaskDetail({
                     </Button>
                   </div>
                 </div>
-              </section>
-            ) : null}
-          </div>
-
-          <aside className="grid auto-rows-fr gap-3 content-start">
-            <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                Expiry
-              </p>
-              <div className="mt-2 min-h-[52px]">
-                <ApprovalExpiryCountdown expiresAt={data.expiresAt} />
-              </div>
-            </div>
-            {data.maintenanceWindowDate ? (
-              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                  Maintenance window
-                </p>
-                <p className="mt-2 min-h-[52px] text-sm">
-                  {formatDate(data.maintenanceWindowDate)}
-                </p>
-              </div>
-            ) : null}
-            {data.riskBand ? (
-              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                  Risk
-                </p>
-                <p className="mt-2 min-h-[52px]">
-                  <span
-                    className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${toneBadge(riskBandTone(data.riskBand))}`}
-                  >
-                    {data.riskBand} ({data.riskScore?.toFixed(0)})
-                  </span>
-                </p>
-              </div>
-            ) : null}
-            {data.slaStatus ? (
-              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                  SLA
-                </p>
-                <p className="mt-2 min-h-[52px] text-sm">
-                  {data.slaStatus}
-                  {data.slaDueDate ? (
-                    <span className="ml-1 text-muted-foreground">
-                      (due {formatDate(data.slaDueDate)})
-                    </span>
-                  ) : null}
-                </p>
-              </div>
-            ) : null}
-          </aside>
+            </section>
+          ) : null}
         </div>
       </header>
 
