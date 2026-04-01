@@ -12,16 +12,6 @@ export const tenantSoftwareVersionCohortSchema = z.object({
   lastSeenAt: isoDateTimeSchema,
 })
 
-export const tenantSoftwareSourceAliasSchema = z.object({
-  sourceSystem: z.string(),
-  externalSoftwareId: z.string(),
-  rawName: z.string(),
-  rawVendor: z.string().nullable(),
-  rawVersion: z.string().nullable(),
-  aliasConfidence: z.string(),
-  matchReason: z.string(),
-})
-
 export const tenantSoftwareDetailSchema = z.object({
   id: z.string().uuid(),
   normalizedSoftwareId: z.string().uuid(),
@@ -35,8 +25,6 @@ export const tenantSoftwareDetailSchema = z.object({
   descriptionProviderType: z.string().nullable(),
   descriptionProfileName: z.string().nullable(),
   descriptionModel: z.string().nullable(),
-  normalizationMethod: z.string(),
-  confidence: z.string(),
   firstSeenAt: isoDateTimeSchema.nullable(),
   lastSeenAt: isoDateTimeSchema.nullable(),
   activeInstallCount: z.number(),
@@ -68,7 +56,6 @@ export const tenantSoftwareDetailSchema = z.object({
   }).nullable(),
   remediation: remediationTaskSummarySchema,
   versionCohorts: z.array(tenantSoftwareVersionCohortSchema),
-  sourceAliases: z.array(tenantSoftwareSourceAliasSchema),
   lifecycle: z.object({
     eolDate: isoDateTimeSchema.nullable(),
     latestVersion: z.string().nullable(),
@@ -96,9 +83,8 @@ export const tenantSoftwareListItemSchema = z.object({
   normalizedSoftwareId: z.string().uuid(),
   canonicalName: z.string(),
   canonicalVendor: z.string().nullable(),
+  category: z.string().nullable().optional(),
   currentRiskScore: z.number().nullable(),
-  confidence: z.string(),
-  normalizationMethod: z.string(),
   primaryCpe23Uri: z.string().nullable(),
   activeInstallCount: z.number(),
   uniqueDeviceCount: z.number(),

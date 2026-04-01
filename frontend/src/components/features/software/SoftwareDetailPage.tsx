@@ -88,13 +88,6 @@ export function SoftwareDetailPage({
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] xl:items-start">
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
-              <Pill>{detail.normalizationMethod}</Pill>
-              <Pill>{detail.confidence} confidence</Pill>
-              {detail.primaryCpe23Uri ? (
-                <Pill>CPE bound</Pill>
-              ) : (
-                <Pill>Heuristic identity</Pill>
-              )}
               {canViewRemediation && remediationData?.currentDecision ? (
                 <span className={`rounded-full border px-3 py-1 text-xs ${
                   pendingApproval
@@ -147,10 +140,6 @@ export function SoftwareDetailPage({
               <HeaderMetaChip
                 label="Primary CPE"
                 value={detail.primaryCpe23Uri ? 'Bound' : 'Not bound'}
-              />
-              <HeaderMetaChip
-                label="Source aliases"
-                value={String(detail.sourceAliases.length)}
               />
             </div>
 
@@ -650,73 +639,10 @@ function OverviewTab({
 
         {/* Right aside */}
         <aside className="space-y-4">
-          <section className="rounded-2xl border border-border/70 bg-card p-5">
-            <h2 className="text-lg font-semibold">Identity rail</h2>
-            <div className="mt-4 grid gap-3">
-              <Metric
-                label="Canonical vendor"
-                value={
-                  detail.canonicalVendor
-                    ? startCase(detail.canonicalVendor)
-                    : "Unknown"
-                }
-              />
-              <Metric
-                label="First seen"
-                value={
-                  detail.firstSeenAt
-                    ? formatDate(detail.firstSeenAt)
-                    : "Unknown"
-                }
-              />
-              <Metric
-                label="Last seen"
-                value={
-                  detail.lastSeenAt ? formatDate(detail.lastSeenAt) : "Unknown"
-                }
-              />
-              <Metric
-                label="Primary CPE"
-                value={detail.primaryCpe23Uri ?? "Not bound"}
-                mono
-              />
-            </div>
-          </section>
-
           {detail.lifecycle ? (
             <SoftwareLifecycleSection lifecycle={detail.lifecycle} />
           ) : null}
 
-          <section className="rounded-2xl border border-border/70 bg-card p-5">
-            <h2 className="text-lg font-semibold">Source identities</h2>
-            <div className="mt-4 space-y-3">
-              {detail.sourceAliases.map((alias) => (
-                <div
-                  key={`${alias.sourceSystem}-${alias.externalSoftwareId}`}
-                  className="rounded-2xl border border-border/70 bg-background p-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium">{alias.rawName}</p>
-                    <Pill>{alias.sourceSystem}</Pill>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {alias.externalSoftwareId}
-                  </p>
-                  <div className="mt-3 grid gap-2">
-                    <Metric
-                      label="Vendor"
-                      value={alias.rawVendor ?? "Unknown"}
-                    />
-                    <Metric
-                      label="Version"
-                      value={alias.rawVersion ?? "Unknown"}
-                    />
-                    <Metric label="Match" value={alias.matchReason} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
         </aside>
       </div>
     </>

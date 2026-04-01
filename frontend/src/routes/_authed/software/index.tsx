@@ -11,7 +11,7 @@ import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 
 const softwareSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
-  confidence: searchStringSchema,
+  category: searchStringSchema,
   vulnerableOnly: searchBooleanSchema,
   boundOnly: searchBooleanSchema,
   missedMaintenanceWindow: searchBooleanSchema,
@@ -54,15 +54,15 @@ function SoftwareIndexPage() {
         pageSize={data.pageSize}
         totalPages={data.totalPages}
         searchValue={search.search}
-        confidenceFilter={search.confidence}
+        categoryFilter={search.category}
         vulnerableOnly={search.vulnerableOnly}
         boundOnly={search.boundOnly}
         missedMaintenanceWindow={search.missedMaintenanceWindow}
         onSearchChange={(value) => {
           searchActions.updateField('search', value)
         }}
-        onConfidenceFilterChange={(value) => {
-          searchActions.updateField('confidence', value)
+        onCategoryFilterChange={(value) => {
+          searchActions.updateField('category', value)
         }}
         onVulnerableOnlyChange={(value) => {
           searchActions.updateField('vulnerableOnly', value)
@@ -75,7 +75,7 @@ function SoftwareIndexPage() {
         }}
         onApplyStructuredFilters={(filters) => {
           searchActions.updateFields({
-            confidence: filters.confidence,
+            category: filters.category,
             vulnerableOnly: filters.vulnerableOnly,
             boundOnly: filters.boundOnly,
             missedMaintenanceWindow: filters.missedMaintenanceWindow,
@@ -91,7 +91,7 @@ function SoftwareIndexPage() {
         onClearFilters={() => {
           searchActions.updateFields({
             search: '',
-            confidence: '',
+            category: '',
             vulnerableOnly: false,
             boundOnly: false,
             missedMaintenanceWindow: false,

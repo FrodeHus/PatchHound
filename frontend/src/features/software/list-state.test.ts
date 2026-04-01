@@ -6,7 +6,7 @@ describe('buildSoftwareListRequest', () => {
     expect(
       buildSoftwareListRequest({
         search: 'contoso',
-        confidence: 'High',
+        category: 'Component',
         vulnerableOnly: true,
         boundOnly: false,
         missedMaintenanceWindow: false,
@@ -15,7 +15,7 @@ describe('buildSoftwareListRequest', () => {
       }),
     ).toEqual({
       search: 'contoso',
-      confidence: 'High',
+      category: 'Component',
       vulnerableOnly: true,
       page: 3,
       pageSize: 50,
@@ -28,7 +28,7 @@ describe('softwareQueryKeys', () => {
     expect(
       softwareQueryKeys.list('tenant-1', {
         search: 'contoso',
-        confidence: 'High',
+        category: 'Component',
         vulnerableOnly: true,
         boundOnly: false,
         missedMaintenanceWindow: false,
@@ -40,7 +40,7 @@ describe('softwareQueryKeys', () => {
       'list',
       'tenant-1',
       'contoso',
-      'High',
+      'Component',
       true,
       false,
       false,

@@ -15,8 +15,6 @@ public record TenantSoftwareDetailDto(
     string? DescriptionProviderType,
     string? DescriptionProfileName,
     string? DescriptionModel,
-    string NormalizationMethod,
-    string Confidence,
     DateTimeOffset? FirstSeenAt,
     DateTimeOffset? LastSeenAt,
     int ActiveInstallCount,
@@ -28,7 +26,6 @@ public record TenantSoftwareDetailDto(
     ExposureImpactExplanationDto? ExposureImpactExplanation,
     RemediationTaskSummaryDto Remediation,
     IReadOnlyList<TenantSoftwareVersionCohortDto> VersionCohorts,
-    IReadOnlyList<TenantSoftwareSourceAliasDto> SourceAliases,
     SoftwareLifecycleDto? Lifecycle,
     SupplyChainInsightDto? SupplyChainInsight
 );
@@ -76,16 +73,6 @@ public record TenantSoftwareVersionCohortDto(
     int ActiveVulnerabilityCount,
     DateTimeOffset FirstSeenAt,
     DateTimeOffset LastSeenAt
-);
-
-public record TenantSoftwareSourceAliasDto(
-    string SourceSystem,
-    string ExternalSoftwareId,
-    string RawName,
-    string? RawVendor,
-    string? RawVersion,
-    string AliasConfidence,
-    string MatchReason
 );
 
 public record SoftwareLifecycleDto(

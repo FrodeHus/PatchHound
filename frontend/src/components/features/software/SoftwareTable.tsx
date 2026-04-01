@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/data-table-workbench'
 import { Input } from '@/components/ui/input'
 import { PaginationControls } from '@/components/ui/pagination-controls'
-import { Badge } from '@/components/ui/badge'
 import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -36,17 +35,17 @@ type SoftwareTableProps = {
   pageSize: number
   totalPages: number
   searchValue: string
-  confidenceFilter: string
+  categoryFilter: string
   vulnerableOnly: boolean
   boundOnly: boolean
   missedMaintenanceWindow: boolean
   onSearchChange: (value: string) => void
-  onConfidenceFilterChange: (value: string) => void
+  onCategoryFilterChange: (value: string) => void
   onVulnerableOnlyChange: (value: boolean) => void
   onBoundOnlyChange: (value: boolean) => void
   onMissedMaintenanceWindowChange: (value: boolean) => void
   onApplyStructuredFilters: (filters: {
-    confidence: string
+    category: string
     vulnerableOnly: boolean
     boundOnly: boolean
     missedMaintenanceWindow: boolean
@@ -57,7 +56,7 @@ type SoftwareTableProps = {
   onClearFilters: () => void
 }
 
-const confidenceOptions = ['All', 'High', 'Medium', 'Low']
+const categoryOptions = ['All', 'Component']
 
 export function SoftwareTable({
   items,
@@ -66,12 +65,12 @@ export function SoftwareTable({
   pageSize,
   totalPages,
   searchValue,
-  confidenceFilter,
+  categoryFilter,
   vulnerableOnly,
   boundOnly,
   missedMaintenanceWindow,
   onSearchChange,
-  onConfidenceFilterChange,
+  onCategoryFilterChange,
   onVulnerableOnlyChange,
   onBoundOnlyChange,
   onMissedMaintenanceWindowChange,
@@ -85,12 +84,12 @@ export function SoftwareTable({
   const [searchInput, setSearchInput] = useState(searchValue)
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
   const [draftFilters, setDraftFilters] = useState<{
-    confidence: string
+    category: string
     vulnerableOnly: boolean
     boundOnly: boolean
     missedMaintenanceWindow: boolean
   }>({
-    confidence: confidenceFilter,
+    category: categoryFilter,
     vulnerableOnly,
     boundOnly,
     missedMaintenanceWindow,
@@ -115,35 +114,35 @@ export function SoftwareTable({
   useEffect(() => {
     if (!isFilterDrawerOpen) {
       setDraftFilters({
-        confidence: confidenceFilter,
+        category: categoryFilter,
         vulnerableOnly,
         boundOnly,
         missedMaintenanceWindow,
       })
     }
-  }, [boundOnly, confidenceFilter, isFilterDrawerOpen, missedMaintenanceWindow, vulnerableOnly])
+  }, [boundOnly, categoryFilter, isFilterDrawerOpen, missedMaintenanceWindow, vulnerableOnly])
 
   const activeFilters = useMemo(
     () =>
       [
         searchValue ? { key: 'search', label: `Search: ${searchValue}`, onClear: () => onSearchChange('') } : null,
-        confidenceFilter ? { key: 'confidence', label: `Confidence: ${confidenceFilter}`, onClear: () => onConfidenceFilterChange('') } : null,
+        categoryFilter ? { key: 'category', label: `Category: ${categoryFilter}`, onClear: () => onCategoryFilterChange('') } : null,
         vulnerableOnly ? { key: 'vulnerable', label: 'Vulnerable only', onClear: () => onVulnerableOnlyChange(false) } : null,
         boundOnly ? { key: 'bound', label: 'CPE bound only', onClear: () => onBoundOnlyChange(false) } : null,
         missedMaintenanceWindow ? { key: 'missedMaintenanceWindow', label: 'Missed maintenance window', onClear: () => onMissedMaintenanceWindowChange(false) } : null,
       ].filter((item): item is NonNullable<typeof item> => item !== null),
-    [boundOnly, confidenceFilter, missedMaintenanceWindow, onBoundOnlyChange, onConfidenceFilterChange, onMissedMaintenanceWindowChange, onSearchChange, onVulnerableOnlyChange, searchValue, vulnerableOnly],
+    [boundOnly, categoryFilter, missedMaintenanceWindow, onBoundOnlyChange, onCategoryFilterChange, onMissedMaintenanceWindowChange, onSearchChange, onVulnerableOnlyChange, searchValue, vulnerableOnly],
   )
 
   const activeStructuredFilterCount = useMemo(
     () =>
       [
-        confidenceFilter,
+        categoryFilter,
         vulnerableOnly ? 'vulnerable' : '',
         boundOnly ? 'bound' : '',
         missedMaintenanceWindow ? 'missedMaintenanceWindow' : '',
       ].filter(Boolean).length,
-    [boundOnly, confidenceFilter, missedMaintenanceWindow, vulnerableOnly],
+    [boundOnly, categoryFilter, missedMaintenanceWindow, vulnerableOnly],
   )
 
   const columns = useMemo<ColumnDef<TenantSoftwareListItem>[]>(
@@ -179,20 +178,6 @@ export function SoftwareTable({
                 </p>
               )
             })()}
-          </div>
-        ),
-      },
-      {
-        accessorKey: 'confidence',
-        header: ({ column }) => <SortableColumnHeader column={column} title="Identity" />,
-        cell: ({ row }) => (
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
-              {row.original.confidence}
-            </Badge>
-            <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
-              {row.original.normalizationMethod}
-            </Badge>
           </div>
         ),
       },
@@ -292,7 +277,7 @@ export function SoftwareTable({
             className="h-10 rounded-xl border-border/70 bg-background/80 px-4"
             onClick={() => {
               setDraftFilters({
-                confidence: confidenceFilter,
+                category: categoryFilter,
                 vulnerableOnly,
                 boundOnly,
                 missedMaintenanceWindow,
@@ -320,11 +305,11 @@ export function SoftwareTable({
         open={isFilterDrawerOpen}
         onOpenChange={setIsFilterDrawerOpen}
         title="Software Filters"
-        description="Refine the normalized catalog by identity confidence and exposure state."
+        description="Refine the software catalog by category and exposure state."
         activeCount={activeStructuredFilterCount}
         onResetDraft={() => {
           setDraftFilters({
-            confidence: '',
+            category: '',
             vulnerableOnly: false,
             boundOnly: false,
             missedMaintenanceWindow: false,
@@ -336,26 +321,26 @@ export function SoftwareTable({
         }}
       >
         <WorkbenchFilterSection
-          title="Identity"
-          description="Focus on the confidence level of the normalized software identity."
+          title="Category"
+          description="Limit the catalog to a specific software category."
         >
-          <DataTableField label="Confidence">
+          <DataTableField label="Category">
             <Select
-              value={draftFilters.confidence || 'all'}
+              value={draftFilters.category || 'all'}
               onValueChange={(value) => {
                 const nextValue = value ?? 'all'
                 setDraftFilters((current) => ({
                   ...current,
-                  confidence: nextValue === 'all' ? '' : nextValue,
+                  category: nextValue === 'all' ? '' : nextValue,
                 }))
               }}
             >
               <SelectTrigger className="h-10 rounded-xl border-border/70 bg-background/80 px-3">
-                <SelectValue placeholder="Any confidence" />
+                <SelectValue placeholder="Any category" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                <SelectItem value="all">Any confidence</SelectItem>
-                {confidenceOptions.filter((option) => option !== 'All').map((option) => (
+                <SelectItem value="all">Any category</SelectItem>
+                {categoryOptions.filter((option) => option !== 'All').map((option) => (
                   <SelectItem key={option} value={option}>
                     {option}
                   </SelectItem>

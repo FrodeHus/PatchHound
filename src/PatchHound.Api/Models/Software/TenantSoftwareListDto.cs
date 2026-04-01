@@ -5,9 +5,8 @@ public record TenantSoftwareListItemDto(
     Guid NormalizedSoftwareId,
     string CanonicalName,
     string? CanonicalVendor,
+    string? Category,
     decimal? CurrentRiskScore,
-    string Confidence,
-    string NormalizationMethod,
     string? PrimaryCpe23Uri,
     int ActiveInstallCount,
     int UniqueDeviceCount,
@@ -20,7 +19,7 @@ public record TenantSoftwareListItemDto(
 
 public record TenantSoftwareFilterQuery(
     string? Search = null,
-    string? Confidence = null,
+    string? Category = null,
     bool? VulnerableOnly = null,
     bool? BoundOnly = null,
     bool? MissedMaintenanceWindow = null

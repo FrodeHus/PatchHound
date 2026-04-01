@@ -25,7 +25,7 @@ export const fetchTenantSoftware = createServerFn({ method: 'GET' })
   .inputValidator(
     z.object({
       search: z.string().optional(),
-      confidence: z.string().optional(),
+      category: z.string().optional(),
       vulnerableOnly: z.boolean().optional(),
       boundOnly: z.boolean().optional(),
       missedMaintenanceWindow: z.boolean().optional(),

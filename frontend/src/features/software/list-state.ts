@@ -1,6 +1,6 @@
 type SoftwareListSearch = {
   search: string
-  confidence: string
+  category: string
   vulnerableOnly: boolean
   boundOnly: boolean
   missedMaintenanceWindow: boolean
@@ -11,7 +11,7 @@ type SoftwareListSearch = {
 export function buildSoftwareListRequest(search: SoftwareListSearch) {
   return {
     ...(search.search ? { search: search.search } : {}),
-    ...(search.confidence ? { confidence: search.confidence } : {}),
+    ...(search.category ? { category: search.category } : {}),
     ...(search.vulnerableOnly ? { vulnerableOnly: true } : {}),
     ...(search.boundOnly ? { boundOnly: true } : {}),
     ...(search.missedMaintenanceWindow ? { missedMaintenanceWindow: true } : {}),
@@ -27,7 +27,7 @@ export const softwareQueryKeys = {
     'list',
     tenantId,
     search.search,
-    search.confidence,
+    search.category,
     search.vulnerableOnly,
     search.boundOnly,
     search.missedMaintenanceWindow,

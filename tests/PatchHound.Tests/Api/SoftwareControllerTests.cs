@@ -102,7 +102,6 @@ public class SoftwareControllerTests : IDisposable
         payload.ExposureImpactExplanation.VulnerabilityFactors[0].ExternalId.Should().Be("CVE-2026-1000");
         payload.VersionCohorts.Should().HaveCount(2);
         payload.VersionCohorts.Select(item => item.Version).Should().BeEquivalentTo("1.0", "2.0");
-        payload.SourceAliases.Should().HaveCount(2);
         payload.Description.Should().BeNull();
     }
 

@@ -82,8 +82,6 @@ public class SoftwareController(
                 item.NormalizedSoftware.DescriptionProviderType,
                 item.NormalizedSoftware.DescriptionProfileName,
                 item.NormalizedSoftware.DescriptionModel,
-                NormalizationMethod = item.NormalizedSoftware.NormalizationMethod.ToString(),
-                Confidence = item.NormalizedSoftware.Confidence.ToString(),
                 item.NormalizedSoftware.EolProductSlug,
                 item.NormalizedSoftware.EolDate,
                 item.NormalizedSoftware.EolLatestVersion,
@@ -106,13 +104,6 @@ public class SoftwareController(
         {
             return NotFound();
         }
-
-        var aliases = await dbContext
-            .NormalizedSoftwareAliases.AsNoTracking()
-            .Where(item => item.NormalizedSoftwareId == tenantSoftware.NormalizedSoftwareId)
-            .OrderBy(item => item.SourceSystem)
-            .ThenBy(item => item.ExternalSoftwareId)
-            .ToListAsync(ct);
 
         var installations = await dbContext
             .NormalizedSoftwareInstallations.AsNoTracking()
@@ -208,8 +199,6 @@ public class SoftwareController(
                 tenantSoftware.DescriptionProviderType,
                 tenantSoftware.DescriptionProfileName,
                 tenantSoftware.DescriptionModel,
-                tenantSoftware.NormalizationMethod,
-                tenantSoftware.Confidence,
                 installations.Count == 0 ? tenantSoftware.FirstSeenAt : installations.Min(item => item.FirstSeenAt),
                 installations.Count == 0 ? tenantSoftware.LastSeenAt : installations.Max(item => item.LastSeenAt),
                 activeInstallations.Count,
@@ -227,17 +216,6 @@ public class SoftwareController(
                 ),
                 remediationSummary,
                 versionCohorts,
-                aliases
-                    .Select(item => new TenantSoftwareSourceAliasDto(
-                        item.SourceSystem.ToString(),
-                        item.ExternalSoftwareId,
-                        item.RawName,
-                        item.RawVendor,
-                        item.RawVersion,
-                        item.AliasConfidence.ToString(),
-                        item.MatchReason
-                    ))
-                    .ToList(),
                 tenantSoftware.EolEnrichedAt.HasValue
                     ? new SoftwareLifecycleDto(
                         tenantSoftware.EolDate,
@@ -424,10 +402,10 @@ public class SoftwareController(
             );
         }
 
-        if (!string.IsNullOrWhiteSpace(filter.Confidence))
+        if (!string.IsNullOrWhiteSpace(filter.Category))
         {
             query = query.Where(item =>
-                item.NormalizedSoftware.Confidence.ToString() == filter.Confidence
+                item.NormalizedSoftware.Category == filter.Category
             );
         }
 
@@ -477,14 +455,13 @@ public class SoftwareController(
                 item.NormalizedSoftwareId,
                 CanonicalName = item.NormalizedSoftware.CanonicalName,
                 CanonicalVendor = item.NormalizedSoftware.CanonicalVendor,
+                Category = item.NormalizedSoftware.Category,
                 CurrentRiskScore = dbContext.TenantSoftwareRiskScores
                     .Where(score =>
                         score.TenantSoftwareId == item.Id && score.SnapshotId == activeSnapshotId
                     )
                     .Select(score => (decimal?)score.OverallScore)
                     .FirstOrDefault(),
-                Confidence = item.NormalizedSoftware.Confidence.ToString(),
-                NormalizationMethod = item.NormalizedSoftware.NormalizationMethod.ToString(),
                 PrimaryCpe23Uri = item.NormalizedSoftware.PrimaryCpe23Uri,
                 ActiveInstallCount = dbContext
                     .NormalizedSoftwareInstallations
@@ -562,15 +539,14 @@ public class SoftwareController(
             new PagedResponse<TenantSoftwareListItemDto>(
                 rows
                     .Select(item => new TenantSoftwareListItemDto(
-                        item.Id,
-                        item.NormalizedSoftwareId,
-                        item.CanonicalName,
-                        item.CanonicalVendor,
-                        item.CurrentRiskScore,
-                        item.Confidence,
-                        item.NormalizationMethod,
-                        item.PrimaryCpe23Uri,
-                        item.ActiveInstallCount,
+                    item.Id,
+                    item.NormalizedSoftwareId,
+                    item.CanonicalName,
+                    item.CanonicalVendor,
+                    item.Category,
+                    item.CurrentRiskScore,
+                    item.PrimaryCpe23Uri,
+                    item.ActiveInstallCount,
                         item.UniqueDeviceCount,
                         item.ActiveVulnerabilityCount,
                         item.VersionCount,
