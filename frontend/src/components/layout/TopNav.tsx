@@ -105,8 +105,8 @@ export function TopNav({
         WebkitBackdropFilter: "blur(16px) saturate(1.3)",
       }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-3">
+      <div className="relative flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
           <Button
             type="button"
             variant="ghost"
@@ -194,7 +194,26 @@ export function TopNav({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="pointer-events-none absolute inset-x-0 hidden justify-center px-20 md:flex">
+          <div className="pointer-events-auto">
+            <TenantSelector
+              tenants={tenants}
+              selectedTenantId={selectedTenantId}
+              onSelectTenant={(tenantId) => {
+                if (tenantId === selectedTenantId) {
+                  return;
+                }
+
+                setSelectedTenantId(tenantId);
+                void clearActiveRoles();
+                void queryClient.invalidateQueries();
+                void router.invalidate();
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-center px-2 md:hidden">
           <TenantSelector
             tenants={tenants}
             selectedTenantId={selectedTenantId}
@@ -209,6 +228,9 @@ export function TopNav({
               void router.invalidate();
             }}
           />
+        </div>
+
+        <div className="flex items-center justify-end gap-2">
           <NotificationBell />
           <DropdownMenu>
             <DropdownMenuTrigger

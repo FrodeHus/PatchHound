@@ -364,23 +364,69 @@ export function SoftwareRemediationView({
       ) : null}
 
       <div className="space-y-4">
-        <CurrentActionSection
-          data={data}
-          tenantSoftwareId={tenantSoftwareId}
-          workflowId={workflowId}
-          queryKey={queryKey}
-          currentStageId={currentStageId}
-          recommendationSeed={recommendationSeed}
-          decisionSeed={decisionSeed}
-          approving={approving}
-          generatingAiSummary={generatingAiSummary}
-          onApproveReject={handleApproveReject}
-          onVerify={handleVerification}
-          onGenerateAiSummary={handleGenerateAiSummary}
-          onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
-          onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
-          onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
-        />
+        {currentStageId === 'remediationDecision' ? (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.85fr)]">
+            <CurrentActionSection
+              data={data}
+              tenantSoftwareId={tenantSoftwareId}
+              workflowId={workflowId}
+              queryKey={queryKey}
+              currentStageId={currentStageId}
+              recommendationSeed={recommendationSeed}
+              decisionSeed={decisionSeed}
+              approving={approving}
+              generatingAiSummary={generatingAiSummary}
+              onApproveReject={handleApproveReject}
+              onVerify={handleVerification}
+              onGenerateAiSummary={handleGenerateAiSummary}
+              onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
+              onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
+              onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
+            />
+            <Card className="rounded-[1.8rem] border-border/55 bg-background/40 shadow-none">
+              <CardHeader className="space-y-1.5 pb-2">
+                <CardTitle className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Security recommendation</CardTitle>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Security analysis to help the asset owner decide. This is advisory and does not override the owner decision.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <RecommendationSnapshotCard
+                  recommendation={data.recommendations[0] ?? null}
+                  emphasized
+                />
+                <AiDecisionBrief
+                  aiSummary={data.aiSummary}
+                  currentStageId={currentStageId}
+                  canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
+                  generatingAiSummary={generatingAiSummary}
+                  onGenerateAiSummary={handleGenerateAiSummary}
+                  onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
+                  onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
+                  onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <CurrentActionSection
+            data={data}
+            tenantSoftwareId={tenantSoftwareId}
+            workflowId={workflowId}
+            queryKey={queryKey}
+            currentStageId={currentStageId}
+            recommendationSeed={recommendationSeed}
+            decisionSeed={decisionSeed}
+            approving={approving}
+            generatingAiSummary={generatingAiSummary}
+            onApproveReject={handleApproveReject}
+            onVerify={handleVerification}
+            onGenerateAiSummary={handleGenerateAiSummary}
+            onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
+            onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
+            onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
+          />
+        )}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <Card className="rounded-[1.45rem] border-border/50 bg-background/35 shadow-none">
@@ -391,21 +437,23 @@ export function SoftwareRemediationView({
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(currentStageId === 'remediationDecision' || currentStageId === 'approval') ? (
+              {currentStageId === 'approval' ? (
                 <RecommendationSnapshotCard
                   recommendation={data.recommendations[0] ?? null}
                 />
               ) : null}
-              <AiDecisionBrief
-                aiSummary={data.aiSummary}
-                currentStageId={currentStageId}
-                canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
-                generatingAiSummary={generatingAiSummary}
-                onGenerateAiSummary={handleGenerateAiSummary}
-                onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
-                onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
-                onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
-              />
+              {currentStageId !== 'remediationDecision' ? (
+                <AiDecisionBrief
+                  aiSummary={data.aiSummary}
+                  currentStageId={currentStageId}
+                  canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
+                  generatingAiSummary={generatingAiSummary}
+                  onGenerateAiSummary={handleGenerateAiSummary}
+                  onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
+                  onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
+                  onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
+                />
+              ) : null}
             </CardContent>
           </Card>
 
@@ -1150,12 +1198,16 @@ function StageVerificationPanel({
 
 function RecommendationSnapshotCard({
   recommendation,
+  emphasized = false,
 }: {
   recommendation: DecisionContext['recommendations'][number] | null
+  emphasized?: boolean
 }) {
   if (!recommendation) {
     return (
-      <div className="rounded-[1.15rem] border border-dashed border-border/45 bg-background/35 p-3.5">
+      <div className={emphasized
+        ? 'rounded-[1.15rem] border border-violet-300/25 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--color-violet-500)_10%,transparent),transparent_55%),var(--color-card)] p-3.5'
+        : 'rounded-[1.15rem] border border-dashed border-border/45 bg-background/35 p-3.5'}>
         <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
           Security recommendation
         </p>
@@ -1170,7 +1222,9 @@ function RecommendationSnapshotCard({
   }
 
   return (
-    <div className="rounded-[1.15rem] border border-border/45 bg-background/45 p-3.5">
+    <div className={emphasized
+      ? 'rounded-[1.15rem] border border-violet-300/25 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--color-violet-500)_10%,transparent),transparent_55%),var(--color-card)] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'
+      : 'rounded-[1.15rem] border border-border/45 bg-background/45 p-3.5'}>
       <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
         Security recommendation
       </p>

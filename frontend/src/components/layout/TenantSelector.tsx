@@ -1,4 +1,4 @@
-import { Building2 } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 type TenantSelectorProps = {
@@ -20,15 +20,13 @@ export function TenantSelector({
   const isSingleTenant = tenants.length === 1
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-border/70 bg-card/85 px-2 py-2 backdrop-blur-xl">
-      <div className="hidden items-center gap-2 rounded-full bg-background/50 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground lg:flex">
-        <Building2 className="size-3.5 text-primary" />
-        Operating scope
-      </div>
+    <div className="flex min-w-[200px] flex-col items-center justify-center text-center">
+      <span className="text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground/85">
+        Current tenant
+      </span>
       {isSingleTenant ? (
-        <div className="flex h-11 min-w-52 flex-col justify-center rounded-full border border-border/70 bg-background/70 px-4 backdrop-blur">
-          <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tenant</span>
-          <span className="truncate text-sm font-medium text-foreground">{selectedTenantName}</span>
+        <div className="mt-0.5 max-w-[240px] truncate text-xl font-semibold tracking-[-0.03em] text-foreground">
+          {selectedTenantName}
         </div>
       ) : (
         <Select
@@ -39,11 +37,11 @@ export function TenantSelector({
             }
           }}
         >
-          <SelectTrigger className="h-11 min-w-52 rounded-full border-border/70 bg-background/70 px-4 backdrop-blur">
+          <SelectTrigger className="mt-0.5 h-auto min-w-0 border-0 bg-transparent px-0 py-0 text-center shadow-none hover:bg-transparent focus:ring-0 focus:ring-offset-0">
             <SelectValue>
-              <span className="flex min-w-0 flex-col">
-                <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tenant</span>
-                <span className="truncate text-sm font-medium text-foreground">{selectedTenantName}</span>
+              <span className="inline-flex items-center gap-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground">
+                <span className="max-w-[240px] truncate">{selectedTenantName}</span>
+                <ChevronDown className="size-4 text-muted-foreground" />
               </span>
             </SelectValue>
           </SelectTrigger>
