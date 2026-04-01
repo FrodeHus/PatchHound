@@ -44,44 +44,10 @@ export function RemediationStageRail({
     stages.findIndex((stage) => stage.id === currentStageId),
     0,
   )
-  const completedCount = stages.filter((stage) =>
-    stage.state === 'complete' || stage.state === 'closed'
-  ).length
-  const progressPercent = stages.length <= 1
-    ? 100
-    : Math.round((currentIndex / (stages.length - 1)) * 100)
   const endpointInsetPercent = stages.length > 0 ? 50 / stages.length : 0
 
   return (
-    <section className="overflow-hidden rounded-[1.9rem] border border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_68%,var(--primary)_8%),var(--color-card))] p-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            Remediation workflow
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-base font-semibold text-foreground">
-              {stages[currentIndex]?.label ?? 'Exposure'}
-            </h2>
-            <span className="inline-flex rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-              {progressPercent}% progressed
-            </span>
-          </div>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            {stages[currentIndex]?.description ?? 'Follow the remediation from exposure review to closure.'}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-3">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-            Workflow status
-          </p>
-          <p className="mt-1 text-sm font-semibold text-foreground">
-            {completedCount.toLocaleString()} of {stages.length.toLocaleString()} stages cleared
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-6 overflow-x-auto pb-1">
+    <nav aria-label="Remediation workflow" className="overflow-x-auto pb-1">
         <ol
           className="relative grid min-w-[860px] gap-4 px-2"
           style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(0, 1fr))` }}
@@ -171,8 +137,7 @@ export function RemediationStageRail({
             </li>
           ))}
         </ol>
-      </div>
-    </section>
+    </nav>
   )
 }
 
