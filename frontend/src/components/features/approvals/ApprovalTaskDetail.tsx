@@ -56,18 +56,18 @@ const toneColorVar: Record<string, string> = {
   neutral: '--color-foreground',
 }
 
-function useToneCssColor(tone: string): string {
+function getToneCssColor(tone: string): string {
   if (typeof window === 'undefined') return 'currentColor'
   const varName = toneColorVar[tone] ?? toneColorVar.neutral
   return getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || 'currentColor'
 }
 
 function RiskGauge({ score, tone }: { score: number; tone: Tone }) {
-  const color = useToneCssColor(tone)
+  const color = getToneCssColor(tone)
   const gaugeData = [{ value: score, fill: color }]
 
   return (
-    <div className="size-[100px]">
+    <div className="h-[60px] w-[100px]">
       <RadialBarChart
         width={100}
         height={60}
@@ -694,13 +694,13 @@ export function ApprovalTaskDetail({
                 <div className="rounded-xl border border-border/60 bg-background/45 p-3 text-center">
                   <p className="text-2xl font-bold tabular-nums">{vulnerabilityCount}</p>
                   <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-                    Open<br />vulnerability
+                    Open<br />{vulnerabilityCount === 1 ? 'vulnerability' : 'vulnerabilities'}
                   </p>
                 </div>
                 <div className="rounded-xl border border-border/60 bg-background/45 p-3 text-center">
                   <p className="text-2xl font-bold tabular-nums">{affectedDeviceCount}</p>
                   <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-                    Affected<br />device
+                    Affected<br />{affectedDeviceCount === 1 ? 'device' : 'devices'}
                   </p>
                 </div>
               </div>
