@@ -317,6 +317,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 
         var staleSummary = await ReconcileMissingDeviceSoftwareLinksAsync(
             tenantId,
+            sourceKey,
             touchedDeviceExternalIds,
             touchedSoftwareExternalIds,
             stagedPairKeys,
@@ -505,6 +506,7 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 
     private async Task<StagedAssetStaleLinkSummary> ReconcileMissingDeviceSoftwareLinksAsync(
         Guid tenantId,
+        string sourceKey,
         IReadOnlySet<string> touchedDeviceExternalIds,
         IReadOnlySet<string> touchedSoftwareExternalIds,
         IReadOnlySet<string> stagedPairKeys,
@@ -516,6 +518,12 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
             return new StagedAssetStaleLinkSummary(0, 0);
         }
 
+        var isDefenderSource = string.Equals(
+            sourceKey,
+            "microsoft-defender",
+            StringComparison.OrdinalIgnoreCase
+        );
+
         var touchedAssets = await dbContext
             .Assets.IgnoreQueryFilters()
             .Where(asset =>
@@ -523,6 +531,11 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                 && (
                     touchedDeviceExternalIds.Contains(asset.ExternalId)
                     || touchedSoftwareExternalIds.Contains(asset.ExternalId)
+                    || (
+                        isDefenderSource
+                        && asset.AssetType == AssetType.Software
+                        && EF.Functions.Like(asset.ExternalId, "defender-sw::%")
+                    )
                 )
             )
             .Select(asset => new { asset.Id, asset.ExternalId })
@@ -584,6 +597,11 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
 
         var staleDeviceAssetIds = staleInstallations.Select(item => item.DeviceAssetId).Distinct().ToList();
         var staleSoftwareAssetIds = staleInstallations.Select(item => item.SoftwareAssetId).Distinct().ToList();
+        var staleSoftwareMetadataById = await dbContext
+            .Assets.IgnoreQueryFilters()
+            .Where(asset => staleSoftwareAssetIds.Contains(asset.Id))
+            .Select(asset => new { asset.Id, asset.Metadata })
+            .ToDictionaryAsync(asset => asset.Id, asset => asset.Metadata, ct);
 
         var staleOpenEpisodes = await dbContext
             .DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters()
@@ -602,6 +620,10 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
         var installationsRemoved = 0;
         foreach (var staleInstallation in staleInstallations)
         {
+            var removeImmediately = isDefenderSource
+                && staleSoftwareMetadataById.TryGetValue(staleInstallation.SoftwareAssetId, out var metadataJson)
+                && IsLegacyDefenderDerivedSoftware(metadataJson);
+
             staleInstallation.MarkMissing();
             var pairKey = BuildPairKey(
                 staleInstallation.DeviceAssetId,
@@ -610,13 +632,13 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
             if (staleOpenEpisodeByPair.TryGetValue(pairKey, out var openEpisode))
             {
                 openEpisode.MarkMissing();
-                if (openEpisode.MissingSyncCount >= 2)
+                if (removeImmediately || openEpisode.MissingSyncCount >= 2)
                 {
                     openEpisode.Remove(now);
                 }
             }
 
-            if (staleInstallation.MissingSyncCount >= 2)
+            if (removeImmediately || staleInstallation.MissingSyncCount >= 2)
             {
                 dbContext.DeviceSoftwareInstallations.Remove(staleInstallation);
                 installationsRemoved++;
@@ -660,6 +682,20 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
     private static string BuildPairKey(Guid leftId, Guid rightId)
     {
         return $"{leftId:N}:{rightId:N}";
+    }
+
+    private static bool IsLegacyDefenderDerivedSoftware(string metadataJson)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(metadataJson);
+            return document.RootElement.TryGetProperty("derivedFromMachineVulnerability", out var flag)
+                && flag.ValueKind == JsonValueKind.True;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }
 
