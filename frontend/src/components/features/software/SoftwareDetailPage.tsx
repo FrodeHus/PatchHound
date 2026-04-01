@@ -501,7 +501,7 @@ function OverviewTab({
                       <th className="px-4 py-3">Criticality</th>
                       <th className="px-4 py-3">Profile</th>
                       <th className="px-4 py-3">Open vulns</th>
-                      <th className="px-4 py-3">Last seen</th>
+                      <th className="px-4 py-3">Detected since</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60 bg-background">

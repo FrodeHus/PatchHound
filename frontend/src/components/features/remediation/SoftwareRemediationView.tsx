@@ -1776,7 +1776,7 @@ function DevicesTab({
                     <th className="px-4 py-3 font-medium">Task status</th>
                     <th className="px-4 py-3 font-medium">Criticality</th>
                     <th className="px-4 py-3 font-medium">Open vulns</th>
-                    <th className="px-4 py-3 font-medium">Last seen</th>
+                    <th className="px-4 py-3 font-medium">Detected since</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60 bg-card">

@@ -117,7 +117,7 @@ export function VersionCohortChooser({
               </span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              {selectedCohort.activeInstallCount} installs on {selectedCohort.deviceCount} devices · last seen {formatDate(selectedCohort.lastSeenAt)}
+              {selectedCohort.activeInstallCount} installs on {selectedCohort.deviceCount} devices · detected since {formatDate(selectedCohort.lastSeenAt)}
             </p>
             </div>
           ) : null}
@@ -154,7 +154,7 @@ export function VersionCohortChooser({
                 {cohort.activeInstallCount} installs · {cohort.deviceCount} devices
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Last seen {formatDate(cohort.lastSeenAt)}
+                Detected since {formatDate(cohort.lastSeenAt)}
               </p>
             </button>
           )
