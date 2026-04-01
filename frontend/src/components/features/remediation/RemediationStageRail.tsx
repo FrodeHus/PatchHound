@@ -1,4 +1,5 @@
 import { Check, CircleDot, CircleOff, Clock3, X } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 export type RemediationStageId =
@@ -47,7 +48,8 @@ export function RemediationStageRail({
   const endpointInsetPercent = stages.length > 0 ? 50 / stages.length : 0
 
   return (
-    <nav aria-label="Remediation workflow" className="overflow-x-auto pb-1">
+    <TooltipProvider>
+      <nav aria-label="Remediation workflow" className="overflow-x-auto pb-1">
         <ol
           className="relative grid min-w-[860px] gap-4 px-2"
           style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(0, 1fr))` }}
@@ -86,27 +88,37 @@ export function RemediationStageRail({
 
           {stages.map((stage) => (
             <li key={stage.id} className="relative flex flex-col items-center text-center">
-              <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-background/95 shadow-sm ring-4 ring-background/90">
-                {stage.state === 'current' ? (
-                  <span className="pointer-events-none absolute inset-[-7px] rounded-full border border-primary/20 bg-primary/10 animate-pulse" />
-                ) : null}
-                <div
-                  className={cn(
-                    'relative flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300',
-                    stage.state === 'complete' && 'border-emerald-500 bg-emerald-500 text-white',
-                    stage.state === 'closed' && 'border-teal-500 bg-teal-500 text-white',
-                    stage.state === 'current' && 'border-primary bg-background text-primary shadow-[0_0_0_6px_color-mix(in_oklab,var(--primary)_18%,transparent)]',
-                    stage.state === 'pending' && 'border-border/70 bg-background text-muted-foreground',
-                    stage.state === 'skipped' && 'border-sky-300 bg-sky-500/8 text-sky-700 dark:text-sky-300',
-                    stage.state === 'rejected' && 'border-destructive bg-destructive text-destructive-foreground',
-                  )}
-                >
+              <Tooltip>
+                <TooltipTrigger className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-background/95 shadow-sm ring-4 ring-background/90 outline-none">
                   {stage.state === 'current' ? (
-                    <span className="pointer-events-none absolute inset-[5px] rounded-full bg-primary/8" />
+                    <span className="pointer-events-none absolute inset-[-7px] rounded-full border border-primary/20 bg-primary/10 animate-pulse" />
                   ) : null}
-                  <StageIcon state={stage.state} />
-                </div>
-              </div>
+                  <div
+                    className={cn(
+                      'relative flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300',
+                      stage.state === 'complete' && 'border-emerald-500 bg-emerald-500 text-white',
+                      stage.state === 'closed' && 'border-teal-500 bg-teal-500 text-white',
+                      stage.state === 'current' && 'border-primary bg-background text-primary shadow-[0_0_0_6px_color-mix(in_oklab,var(--primary)_18%,transparent)]',
+                      stage.state === 'pending' && 'border-border/70 bg-background text-muted-foreground',
+                      stage.state === 'skipped' && 'border-sky-300 bg-sky-500/8 text-sky-700 dark:text-sky-300',
+                      stage.state === 'rejected' && 'border-destructive bg-destructive text-destructive-foreground',
+                    )}
+                  >
+                    {stage.state === 'current' ? (
+                      <span className="pointer-events-none absolute inset-[5px] rounded-full bg-primary/8" />
+                    ) : null}
+                    <StageIcon state={stage.state} />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[220px] text-left">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                    {stage.label}
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-muted">
+                    {stage.description}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
 
               <div
                 className={cn(
@@ -130,14 +142,12 @@ export function RemediationStageRail({
                     {stageStateCopy[stage.state]}
                   </span>
                 </div>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  {stage.description}
-                </p>
               </div>
             </li>
           ))}
         </ol>
-    </nav>
+      </nav>
+    </TooltipProvider>
   )
 }
 
