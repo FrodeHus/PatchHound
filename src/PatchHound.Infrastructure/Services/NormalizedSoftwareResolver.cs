@@ -216,26 +216,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             );
         }
 
-        var externalIdentity = TryBuildIdentityFromExternalId(externalSoftwareId);
-        if (externalIdentity is null)
-        {
-            return null;
-        }
-
-        return new SoftwareIdentitySnapshot(
-            softwareAssetId,
-            externalSoftwareId,
-            SoftwareIdentitySourceSystem.Defender,
-            externalIdentity.Value.Product,
-            externalIdentity.Value.Vendor,
-            string.IsNullOrWhiteSpace(rawCategory) ? null : rawCategory.Trim(),
-            BuildCanonicalProductKey(externalIdentity.Value.Vendor, externalIdentity.Value.Product, null),
-            null,
-            externalIdentity.Value.Version,
-            SoftwareNormalizationMethod.Heuristic,
-            SoftwareNormalizationConfidence.Low,
-            "Resolved from Defender software identifier."
-        );
+        return null;
     }
 
     private static Dictionary<string, string?> ParseMetadata(string metadataJson)
@@ -268,25 +249,6 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
         return metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
             ? value
             : null;
-    }
-
-    private static (string? Vendor, string Product, string? Version)? TryBuildIdentityFromExternalId(
-        string externalId
-    )
-    {
-        var parts = externalId.Split(
-            "-_-",
-            StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries
-        );
-        if (parts.Length < 2)
-        {
-            return null;
-        }
-
-        var vendor = string.IsNullOrWhiteSpace(parts[0]) ? null : parts[0].Trim();
-        var product = parts[1].Trim();
-        var version = parts.Length >= 3 && !string.IsNullOrWhiteSpace(parts[2]) ? parts[2].Trim() : null;
-        return string.IsNullOrWhiteSpace(product) ? null : (vendor, product, version);
     }
 
     private static string BuildCanonicalProductKey(
