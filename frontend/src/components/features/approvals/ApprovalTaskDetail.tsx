@@ -119,7 +119,8 @@ export function ApprovalTaskDetail({
   }
 
   return (
-    <section className="space-y-5">
+    <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+      <section className="min-w-0 space-y-5">
       <header className="rounded-[28px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%),var(--color-card)] p-5">
         <div className="space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -666,7 +667,11 @@ export function ApprovalTaskDetail({
           </TabsContent>
         </Tabs>
       </section>
-    </section>
+      </section>
+      <aside className="space-y-5">
+        {/* Sidebar cards added in later tasks */}
+      </aside>
+    </div>
   )
 }
 
