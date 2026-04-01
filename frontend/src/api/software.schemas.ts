@@ -28,6 +28,7 @@ export const tenantSoftwareDetailSchema = z.object({
   primarySoftwareAssetId: z.string().uuid().nullable(),
   canonicalName: z.string(),
   canonicalVendor: z.string().nullable(),
+  category: z.string().nullable().optional(),
   primaryCpe23Uri: z.string().nullable(),
   description: z.string().nullable(),
   descriptionGeneratedAt: isoDateTimeSchema.nullable(),

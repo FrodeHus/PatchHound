@@ -80,6 +80,7 @@ export function SoftwareDetailPage({
       && detail.activeVulnerabilityCount > 0
   )
   const supplyChainInsight = detail.supplyChainInsight
+  const isComponent = detail.category === 'Component'
 
   return (
     <section className="space-y-5">
@@ -115,6 +116,11 @@ export function SoftwareDetailPage({
                 {detail.canonicalVendor ? (
                   <span className="text-sm font-medium text-muted-foreground">
                     {startCase(detail.canonicalVendor)}
+                  </span>
+                ) : null}
+                {isComponent ? (
+                  <span className="rounded-full border border-amber-500/30 bg-amber-500/12 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                    Component
                   </span>
                 ) : null}
               </div>
@@ -194,6 +200,24 @@ export function SoftwareDetailPage({
                         Planned date for patch execution to be in place for this software scope.
                       </p>
                     )}
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            {isComponent ? (
+              <section className="rounded-[1.15rem] border border-amber-500/25 bg-amber-500/10 px-4 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="max-w-3xl">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
+                      Component software
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">
+                      This software is used inside other software suites and usually cannot be patched individually.
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Remediation typically requires the implementing product to ship or receive an updated version rather than patching this component directly on its own.
+                    </p>
                   </div>
                 </div>
               </section>

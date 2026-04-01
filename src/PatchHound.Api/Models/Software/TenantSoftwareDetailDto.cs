@@ -8,6 +8,7 @@ public record TenantSoftwareDetailDto(
     Guid? PrimarySoftwareAssetId,
     string CanonicalName,
     string? CanonicalVendor,
+    string? Category,
     string? PrimaryCpe23Uri,
     string? Description,
     DateTimeOffset? DescriptionGeneratedAt,

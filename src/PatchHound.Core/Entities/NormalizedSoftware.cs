@@ -7,6 +7,7 @@ public class NormalizedSoftware
     public Guid Id { get; private set; }
     public string CanonicalName { get; private set; } = null!;
     public string? CanonicalVendor { get; private set; }
+    public string? Category { get; private set; }
     public string CanonicalProductKey { get; private set; } = null!;
     public string? PrimaryCpe23Uri { get; private set; }
     public string? Description { get; private set; }
@@ -50,11 +51,35 @@ public class NormalizedSoftware
         DateTimeOffset timestamp
     )
     {
+        return Create(
+            canonicalName,
+            canonicalVendor,
+            null,
+            canonicalProductKey,
+            primaryCpe23Uri,
+            normalizationMethod,
+            confidence,
+            timestamp
+        );
+    }
+
+    public static NormalizedSoftware Create(
+        string canonicalName,
+        string? canonicalVendor,
+        string? category,
+        string canonicalProductKey,
+        string? primaryCpe23Uri,
+        SoftwareNormalizationMethod normalizationMethod,
+        SoftwareNormalizationConfidence confidence,
+        DateTimeOffset timestamp
+    )
+    {
         return new NormalizedSoftware
         {
             Id = Guid.NewGuid(),
             CanonicalName = canonicalName.Trim(),
             CanonicalVendor = string.IsNullOrWhiteSpace(canonicalVendor) ? null : canonicalVendor.Trim(),
+            Category = string.IsNullOrWhiteSpace(category) ? null : category.Trim(),
             CanonicalProductKey = canonicalProductKey.Trim(),
             PrimaryCpe23Uri = string.IsNullOrWhiteSpace(primaryCpe23Uri) ? null : primaryCpe23Uri.Trim(),
             NormalizationMethod = normalizationMethod,
@@ -75,8 +100,32 @@ public class NormalizedSoftware
         DateTimeOffset evaluatedAt
     )
     {
+        UpdateIdentity(
+            canonicalName,
+            canonicalVendor,
+            null,
+            canonicalProductKey,
+            primaryCpe23Uri,
+            normalizationMethod,
+            confidence,
+            evaluatedAt
+        );
+    }
+
+    public void UpdateIdentity(
+        string canonicalName,
+        string? canonicalVendor,
+        string? category,
+        string canonicalProductKey,
+        string? primaryCpe23Uri,
+        SoftwareNormalizationMethod normalizationMethod,
+        SoftwareNormalizationConfidence confidence,
+        DateTimeOffset evaluatedAt
+    )
+    {
         CanonicalName = canonicalName.Trim();
         CanonicalVendor = string.IsNullOrWhiteSpace(canonicalVendor) ? null : canonicalVendor.Trim();
+        Category = string.IsNullOrWhiteSpace(category) ? null : category.Trim();
         CanonicalProductKey = canonicalProductKey.Trim();
         PrimaryCpe23Uri = string.IsNullOrWhiteSpace(primaryCpe23Uri) ? null : primaryCpe23Uri.Trim();
         NormalizationMethod = normalizationMethod;

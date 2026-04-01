@@ -564,6 +564,7 @@ public class AssetsController : ControllerBase
                 normalizedSoftware.UpdateIdentity(
                     normalizedSoftware.CanonicalName,
                     normalizedSoftware.CanonicalVendor,
+                    normalizedSoftware.Category,
                     BuildCanonicalProductKey(
                         normalizedSoftware.CanonicalVendor,
                         normalizedSoftware.CanonicalName,
@@ -619,6 +620,7 @@ public class AssetsController : ControllerBase
         normalizedSoftware.UpdateIdentity(
             cpe.Product,
             cpe.Vendor,
+            normalizedSoftware.Category,
             BuildCanonicalProductKey(cpe.Vendor, cpe.Product, request.Cpe23Uri.Trim()),
             request.Cpe23Uri.Trim(),
             SoftwareNormalizationMethod.ExplicitCpe,

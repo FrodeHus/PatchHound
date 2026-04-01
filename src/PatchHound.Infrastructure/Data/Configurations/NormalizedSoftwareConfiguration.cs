@@ -14,6 +14,7 @@ public class NormalizedSoftwareConfiguration : IEntityTypeConfiguration<Normaliz
 
         builder.Property(item => item.CanonicalName).HasMaxLength(512).IsRequired();
         builder.Property(item => item.CanonicalVendor).HasMaxLength(256);
+        builder.Property(item => item.Category).HasMaxLength(128);
         builder.Property(item => item.CanonicalProductKey).HasMaxLength(512).IsRequired();
         builder.Property(item => item.PrimaryCpe23Uri).HasMaxLength(2048);
         builder.Property(item => item.Description).HasColumnType("text");

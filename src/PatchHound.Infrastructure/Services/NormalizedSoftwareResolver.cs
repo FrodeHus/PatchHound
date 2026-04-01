@@ -14,6 +14,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
         SoftwareIdentitySourceSystem SourceSystem,
         string CanonicalName,
         string? CanonicalVendor,
+        string? Category,
         string CanonicalProductKey,
         string? PrimaryCpe23Uri,
         string? DetectedVersion,
@@ -106,6 +107,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
                 normalized = NormalizedSoftware.Create(
                     identity.CanonicalName,
                     identity.CanonicalVendor,
+                    identity.Category,
                     identity.CanonicalProductKey,
                     identity.PrimaryCpe23Uri,
                     identity.NormalizationMethod,
@@ -121,6 +123,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
                 normalized.UpdateIdentity(
                     normalized.PrimaryCpe23Uri is null ? identity.CanonicalName : normalized.CanonicalName,
                     normalized.PrimaryCpe23Uri is null ? identity.CanonicalVendor : normalized.CanonicalVendor,
+                    normalized.PrimaryCpe23Uri is null ? identity.Category : normalized.Category,
                     normalized.PrimaryCpe23Uri is null ? identity.CanonicalProductKey : normalized.CanonicalProductKey,
                     normalized.PrimaryCpe23Uri ?? identity.PrimaryCpe23Uri,
                     normalized.PrimaryCpe23Uri is null ? identity.NormalizationMethod : SoftwareNormalizationMethod.ExplicitCpe,
@@ -193,6 +196,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
         var rawName = ReadMetadataValue(metadata, "name") ?? assetName;
         var rawVendor = ReadMetadataValue(metadata, "vendor");
         var rawVersion = ReadMetadataValue(metadata, "version");
+        var rawCategory = ReadMetadataValue(metadata, "category");
 
         if (!string.IsNullOrWhiteSpace(rawName))
         {
@@ -202,6 +206,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
                 SoftwareIdentitySourceSystem.Defender,
                 rawName.Trim(),
                 string.IsNullOrWhiteSpace(rawVendor) ? null : rawVendor.Trim(),
+                string.IsNullOrWhiteSpace(rawCategory) ? null : rawCategory.Trim(),
                 BuildCanonicalProductKey(rawVendor, rawName, null),
                 null,
                 string.IsNullOrWhiteSpace(rawVersion) ? null : rawVersion.Trim(),
@@ -223,6 +228,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             SoftwareIdentitySourceSystem.Defender,
             externalIdentity.Value.Product,
             externalIdentity.Value.Vendor,
+            string.IsNullOrWhiteSpace(rawCategory) ? null : rawCategory.Trim(),
             BuildCanonicalProductKey(externalIdentity.Value.Vendor, externalIdentity.Value.Product, null),
             null,
             externalIdentity.Value.Version,

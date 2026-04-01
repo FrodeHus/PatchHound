@@ -114,6 +114,7 @@ export function SoftwareRemediationView({
   })
 
   const softwareDetail = softwareDetailQuery.data ?? initialSoftwareDetail
+  const isComponentSoftware = softwareDetail?.category === 'Component'
   const normalizedDeviceVersion = deviceVersion || normalizeVersion(softwareDetail?.versionCohorts[0]?.version ?? null)
 
   useEffect(() => {
@@ -340,6 +341,24 @@ export function SoftwareRemediationView({
           description="Capture tenant-local notes for this remediation workflow."
         />
       </div>
+
+      {isComponentSoftware ? (
+        <div className="rounded-[1.25rem] border border-amber-500/25 bg-amber-500/10 px-4 py-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="max-w-4xl">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
+                Component software
+              </p>
+              <p className="mt-2 text-sm font-semibold text-foreground">
+                This record is categorized as a component, so it usually cannot be patched on its own.
+              </p>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                The practical remediation path is normally to update the parent software suite or wait for the product maintainer to ship a version that includes the fixed component.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {data.aiSummary.status === 'Queued' || data.aiSummary.status === 'Generating' ? (
         <div className="flex items-center gap-3 rounded-[1.35rem] border border-border/70 bg-background/65 px-4 py-3">
