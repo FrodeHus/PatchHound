@@ -136,6 +136,7 @@ export const tenantSoftwareVulnerabilitySchema = z.object({
   vulnerabilityDefinitionId: z.string().uuid(),
   externalId: z.string(),
   title: z.string(),
+  description: z.string(),
   vendorSeverity: z.string(),
   cvssScore: z.number().nullable(),
   publishedDate: isoDateTimeSchema.nullable(),

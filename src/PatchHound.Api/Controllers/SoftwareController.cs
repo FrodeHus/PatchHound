@@ -794,6 +794,7 @@ public class SoftwareController(
                         vulnerability.Id,
                         vulnerability.ExternalId,
                         vulnerability.Title,
+                        vulnerability.Description,
                         vulnerability.VendorSeverity.ToString(),
                         vulnerability.CvssScore,
                         vulnerability.PublishedDate,

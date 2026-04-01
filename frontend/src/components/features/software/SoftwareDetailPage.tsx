@@ -613,11 +613,26 @@ function OverviewTab({
                             </span>
                           ))}
                         </div>
-                        {item.evidence[0] ? (
-                          <p className="text-xs text-muted-foreground">
-                            {item.evidence[0].evidence}
-                          </p>
-                        ) : null}
+                        {(() => {
+                          const summary = item.description?.trim()
+                          if (summary) {
+                            return (
+                              <p className="text-xs text-muted-foreground">
+                                {summary}
+                              </p>
+                            )
+                          }
+
+                          if (item.evidence[0]?.evidence) {
+                            return (
+                              <p className="text-xs text-muted-foreground">
+                                {item.evidence[0].evidence}
+                              </p>
+                            )
+                          }
+
+                          return null
+                        })()}
                       </div>
                       <div className="text-right text-xs text-muted-foreground">
                         <p>{item.bestMatchMethod}</p>

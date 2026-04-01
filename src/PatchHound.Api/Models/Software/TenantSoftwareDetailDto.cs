@@ -110,6 +110,7 @@ public record TenantSoftwareVulnerabilityDto(
     Guid VulnerabilityDefinitionId,
     string ExternalId,
     string Title,
+    string Description,
     string VendorSeverity,
     decimal? CvssScore,
     DateTimeOffset? PublishedDate,
