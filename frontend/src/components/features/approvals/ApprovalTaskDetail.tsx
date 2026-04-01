@@ -11,8 +11,8 @@ import {
 } from '@/components/features/audit/AuditTimeline'
 import {
   outcomeLabel,
-  outcomeTone,
   riskBandTone,
+  severityTone,
 } from '@/components/features/remediation/remediation-utils'
 import { toneBadge, toneText, type Tone } from '@/lib/tone-classes'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
@@ -29,20 +29,6 @@ type Props = {
   onDeviceVersionChange: (version: string) => void
 }
 
-function severityTone(severity: string) {
-  switch (severity) {
-    case 'Critical':
-      return 'danger' as const
-    case 'High':
-      return 'warning' as const
-    case 'Medium':
-      return 'neutral' as const
-    case 'Low':
-      return 'info' as const
-    default:
-      return 'neutral' as const
-  }
-}
 
 function normalizeVersion(version: string | null) {
   return version?.trim() ?? ''
