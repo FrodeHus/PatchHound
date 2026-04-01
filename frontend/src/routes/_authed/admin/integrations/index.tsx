@@ -16,7 +16,7 @@ function IntegrationsPage() {
       <div className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            Administration
+            Integrations and automation
           </p>
           <h1 className="text-3xl font-semibold tracking-[-0.04em]">
             Integrations

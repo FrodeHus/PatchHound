@@ -119,7 +119,7 @@ function BusinessLabelsPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                Administration
+                Tenant operations
               </p>
               <h1 className="text-3xl font-semibold tracking-[-0.04em]">
                 Business Labels

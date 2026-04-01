@@ -204,7 +204,7 @@ export function TenantAdministrationDetail({
                 Source configuration now lives in the dedicated admin sources view.
               </p>
               <Link to="/admin/sources" className="mt-3 inline-flex text-sm font-medium text-primary hover:underline">
-                Open sources administration
+                Open sources console
               </Link>
             </InsetPanel>
             {saveState === 'saved' ? <p className="text-sm text-tone-success-foreground">Tenant configuration saved.</p> : null}

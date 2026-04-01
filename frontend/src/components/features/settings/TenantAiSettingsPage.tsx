@@ -24,7 +24,7 @@ import {
 } from '@/api/ai-settings.functions'
 import type { SaveTenantAiProfile, TenantAiProfile } from '@/api/ai-settings.schemas'
 import { useTenantScope } from '@/components/layout/tenant-scope'
-import { Route } from '@/routes/_authed/settings/ai'
+import { Route } from '@/routes/_authed/admin/platform/ai'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -211,7 +211,7 @@ export function TenantAiSettingsPage() {
       setSaveBanner('Profile saved successfully.')
       setDraft(toDraft(savedProfile))
       await navigate({
-        to: '/settings/ai',
+        to: '/admin/platform/ai',
         search: {
           mode: 'edit',
           profileId: savedProfile.id,
@@ -260,7 +260,7 @@ export function TenantAiSettingsPage() {
     setDraft(createEmptyProfile())
     setSaveBanner(null)
     void navigate({
-      to: '/settings/ai',
+      to: '/admin/platform/ai',
       search: {
         mode: 'new',
       },
@@ -271,7 +271,7 @@ export function TenantAiSettingsPage() {
     setDraft(toDraft(profile))
     setSaveBanner(null)
     void navigate({
-      to: '/settings/ai',
+      to: '/admin/platform/ai',
       search: {
         mode: 'edit',
         profileId: profile.id,
@@ -282,7 +282,7 @@ export function TenantAiSettingsPage() {
   function closeEditor() {
     setSaveBanner(null)
     void navigate({
-      to: '/settings/ai',
+      to: '/admin/platform/ai',
       search: {},
     })
   }
@@ -513,7 +513,7 @@ function AiProfileEditorPage({
     <div className="space-y-5">
       <div className="space-y-3">
         <Link
-          to="/settings/ai"
+          to="/admin/platform/ai"
           search={{}}
           className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >

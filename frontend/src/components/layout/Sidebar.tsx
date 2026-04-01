@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   ScrollText,
   Server,
-  Settings2,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -79,12 +78,6 @@ const navItems: NavItem[] = [
     label: "Audit Trail",
     icon: ScrollText,
     roles: ["Auditor", "GlobalAdmin", "CustomerAdmin"],
-  },
-  {
-    to: "/settings",
-    label: "Settings",
-    icon: Settings2,
-    roles: ["GlobalAdmin", "SecurityManager"],
   },
   {
     to: "/admin",

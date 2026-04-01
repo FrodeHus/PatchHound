@@ -104,7 +104,7 @@ export function SoftwareAiReportTab({ tenantSoftwareId }: SoftwareAiReportTabPro
                   </p>
                 </div>
                 <Link
-                  to="/settings/ai"
+                  to="/admin/platform/ai"
                   className="inline-flex h-9 items-center rounded-lg border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted"
                 >
                   Open AI settings

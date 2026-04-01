@@ -112,10 +112,10 @@ export function TenantAdministrationList({
       <div className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Administration</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Tenant operations</p>
             <h1 className="text-3xl font-semibold tracking-[-0.04em]">Tenants</h1>
             <p className="max-w-2xl text-sm text-muted-foreground">
-              Manage tenant identity, review source configuration, and SLA policy.
+              Manage tenant identity, lifecycle, and core operating context.
             </p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setName(''); setEntraTenantId('') } }}>
