@@ -51,10 +51,9 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
   const tools = toolsQuery.data?.tools ?? []
   const selectedTool = tools.find((tool) => tool.id === selectedToolId) ?? null
   const needsVulnerabilityContext = /\{\{\s*vuln\./.test(selectedTool?.kqlQuery ?? '')
-  const openVulnerabilities = useMemo(
+  const selectableVulnerabilities = useMemo(
     () =>
       [...asset.vulnerabilities]
-        .filter((vulnerability) => vulnerability.status !== 'Resolved')
         .sort((left, right) => {
           const severityDelta
             = severityRank(right.effectiveSeverity) - severityRank(left.effectiveSeverity)
@@ -94,7 +93,7 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
               </div>
             </div>
             <CardDescription>
-              Investigate where vulnerable components show up on this device and why Defender thinks they are installed.
+              Run investigation tools using Defender advanced hunting.
             </CardDescription>
           </div>
           <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
@@ -127,21 +126,36 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
             ) : null}
           </div>
           <div className="flex items-end">
-            <Button
-              type="button"
-              className="rounded-full"
-              disabled={
-                !selectedToolId
-                || runMutation.isPending
-                || (needsVulnerabilityContext
-                  && !useAllOpenVulnerabilities
-                  && selectedVulnerabilityIds.length === 0)
-              }
-              onClick={() => runMutation.mutate()}
-            >
-              <Play className="mr-2 size-4" />
-              Run tool
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {runMutation.data ? (
+                <>
+                  <Button type="button" variant="outline" className="rounded-full" onClick={() => setRawResultsOpen(true)}>
+                    View raw results
+                  </Button>
+                  {runMutation.data.report ? (
+                    <Button type="button" variant="outline" className="rounded-full" onClick={() => setReportOpen(true)}>
+                      <Expand className="mr-2 size-4" />
+                      Open report
+                    </Button>
+                  ) : null}
+                </>
+              ) : null}
+              <Button
+                type="button"
+                className="rounded-full"
+                disabled={
+                  !selectedToolId
+                  || runMutation.isPending
+                  || (needsVulnerabilityContext
+                    && !useAllOpenVulnerabilities
+                    && selectedVulnerabilityIds.length === 0)
+                }
+                onClick={() => runMutation.mutate()}
+              >
+                <Play className="mr-2 size-4" />
+                Run tool
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -169,14 +183,15 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
               <span>Use all open vulnerabilities</span>
             </label>
             {!useAllOpenVulnerabilities ? (
-              <div className="space-y-2">
-                {openVulnerabilities.map((vulnerability) => (
+              <div className="max-h-[24rem] space-y-2 overflow-auto pr-1">
+                {selectableVulnerabilities.map((vulnerability) => (
                   <div
                     key={vulnerability.vulnerabilityId}
                     className="rounded-2xl border border-border/70 bg-card/80"
                   >
                     <div className="flex items-center gap-3 px-3 py-3 text-sm">
                       <Checkbox
+                        className="size-5 rounded-md border-2 border-border bg-background shadow-xs"
                         checked={selectedVulnerabilityIds.includes(vulnerability.vulnerabilityId)}
                         onCheckedChange={(checked) => {
                           setSelectedVulnerabilityIds((current) =>
@@ -189,9 +204,6 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium">{vulnerability.externalId}</span>
-                          <span className="text-muted-foreground">
-                            {primaryProductName(vulnerability.possibleCorrelatedSoftware)}
-                          </span>
                           <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
                             {vulnerability.effectiveSeverity}
                           </Badge>
@@ -232,7 +244,7 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
         ) : null}
 
         {runMutation.data ? (
-          <AdvancedToolReportResult
+          <AdvancedToolRunSummary
             result={runMutation.data}
             onOpenRawResults={() => setRawResultsOpen(true)}
             onOpenReport={() => setReportOpen(true)}
@@ -286,11 +298,7 @@ function severityRank(severity: string) {
   }
 }
 
-function primaryProductName(possibleCorrelatedSoftware: string[]) {
-  return possibleCorrelatedSoftware[0] ?? 'Affected product'
-}
-
-function AdvancedToolReportResult({
+function AdvancedToolRunSummary({
   result,
   onOpenRawResults,
   onOpenReport,
@@ -304,30 +312,34 @@ function AdvancedToolReportResult({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            Investigation report
+            Tool run ready
           </p>
           <p className="text-sm text-muted-foreground">
             {result.rawResults.rowCount} merged rows from the selected tool run.
           </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="rounded-full"
-          onClick={onOpenRawResults}
-        >
-          View raw results
-        </Button>
-      </div>
-      <AdvancedToolReportBody result={result} maxHeightClassName="max-h-[36rem]" />
-      {result.report ? (
-        <div className="flex justify-end">
-          <Button type="button" variant="ghost" className="rounded-full" onClick={onOpenReport}>
-            <Expand className="mr-2 size-4" />
-            Open large view
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-full"
+            onClick={onOpenRawResults}
+          >
+            View raw results
           </Button>
+          {result.report ? (
+            <Button type="button" variant="outline" className="rounded-full" onClick={onOpenReport}>
+              <Expand className="mr-2 size-4" />
+              Open report
+            </Button>
+          ) : null}
         </div>
-      ) : null}
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {result.report
+          ? 'The AI investigation report is ready. Open it in the larger reading view.'
+          : result.aiUnavailableMessage ?? 'AI report is not available for this tool run.'}
+      </p>
     </div>
   )
 }
