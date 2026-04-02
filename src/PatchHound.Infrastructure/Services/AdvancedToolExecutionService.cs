@@ -109,6 +109,7 @@ public class AdvancedToolExecutionService(
                 query,
                 new Dictionary<string, string?>(StringComparer.Ordinal)
                 {
+                    ["deviceId"] = context.DeviceExternalId,
                     ["deviceName"] = context.DeviceName,
                 }
             );
@@ -136,6 +137,7 @@ public class AdvancedToolExecutionService(
                 query,
                 new Dictionary<string, string?>(StringComparer.Ordinal)
                 {
+                    ["deviceId"] = context.DeviceExternalId,
                     ["deviceName"] = context.DeviceName,
                     ["vuln.name"] = vulnerability.ExternalId,
                     ["vuln.vendor"] = vulnerability.Vendor,
@@ -268,6 +270,7 @@ public class AdvancedToolExecutionService(
             tenantId,
             assetId,
             asset.AssetType.ToString(),
+            asset.ExternalId,
             deviceName,
             vulnerabilities
         );

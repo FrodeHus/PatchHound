@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { z } from 'zod'
 import { toast } from 'sonner'
 import { Pencil, Plus, Play, Trash2 } from 'lucide-react'
 import {
@@ -12,7 +13,12 @@ import {
   updateAdvancedTool,
 } from '@/api/advanced-tools.functions'
 import { fetchTenantAiProfiles } from '@/api/ai-settings.functions'
-import type { AdvancedTool, AdvancedToolAiSummaryResult, AdvancedToolCatalog, AdvancedToolExecutionResult } from '@/api/advanced-tools.schemas'
+import type {
+  AdvancedTool,
+  AdvancedToolAiSummaryResult,
+  AdvancedToolCatalog,
+  AdvancedToolExecutionResult,
+} from '@/api/advanced-tools.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,6 +46,10 @@ export const Route = createFileRoute('/_authed/admin/advanced-tools')({
     }
   },
   loader: () => fetchAdvancedTools({ data: {} }),
+  validateSearch: z.object({
+    toolId: z.string().uuid().optional(),
+    mode: z.enum(['new']).optional(),
+  }),
   component: AdvancedToolsPage,
 })
 
@@ -64,11 +74,11 @@ const emptyDraft: ToolDraft = {
 
 function AdvancedToolsPage() {
   const initialCatalog = Route.useLoaderData()
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
   const queryClient = useQueryClient()
-  const [editorOpen, setEditorOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<AdvancedTool | null>(null)
-  const [draft, setDraft] = useState<ToolDraft>(emptyDraft)
-  const [sampleParameters, setSampleParameters] = useState<Record<string, string>>({})
+
   const profilesQuery = useQuery({
     queryKey: ['tenant-ai-profiles'],
     queryFn: () => fetchTenantAiProfiles(),
@@ -96,9 +106,10 @@ function AdvancedToolsPage() {
             enabled: value.enabled,
           },
         })
-        return
+        return value.id
       }
-      await createAdvancedTool({
+
+      const created = await createAdvancedTool({
         data: {
           name: value.name,
           description: value.description,
@@ -108,12 +119,11 @@ function AdvancedToolsPage() {
           enabled: value.enabled,
         },
       })
+
+      return created.id
     },
-    onSuccess: async () => {
-      toast.success(draft.id ? 'Advanced tool updated' : 'Advanced tool created')
-      setEditorOpen(false)
-      setDraft(emptyDraft)
-      setSampleParameters({})
+    onSuccess: async (_, value) => {
+      toast.success(value.id ? 'Advanced tool updated' : 'Advanced tool created')
       await queryClient.invalidateQueries({ queryKey: ['advanced-tools'] })
     },
     onError: (error: Error) => {
@@ -127,6 +137,9 @@ function AdvancedToolsPage() {
     },
     onSuccess: async () => {
       toast.success('Advanced tool deleted')
+      if (deleteTarget && search.toolId === deleteTarget.id) {
+        await navigate({ search: {} })
+      }
       setDeleteTarget(null)
       await queryClient.invalidateQueries({ queryKey: ['advanced-tools'] })
     },
@@ -136,65 +149,31 @@ function AdvancedToolsPage() {
     },
   })
 
-  const testMutation = useMutation<AdvancedToolExecutionResult, Error>({
-    mutationFn: async () =>
-      testAdvancedToolQuery({
-        data: {
-          kqlQuery: draft.kqlQuery,
-          sampleParameters: requiredParameters.reduce<Record<string, string | null>>((acc, key) => {
-            acc[key] = sampleParameters[key] ?? ''
-            return acc
-          }, {}),
-        },
-      }),
-    onError: (error: Error) => {
-      toast.error(error.message || 'Failed to run test query')
-    },
-  })
-  const aiSummaryMutation = useMutation<AdvancedToolAiSummaryResult, Error>({
-    mutationFn: async () =>
-      testAdvancedToolAiSummary({
-        data: {
-          kqlQuery: draft.kqlQuery,
-          aiPrompt: draft.aiPrompt,
-          sampleParameters: requiredParameters.reduce<Record<string, string | null>>((acc, key) => {
-            acc[key] = sampleParameters[key] ?? ''
-            return acc
-          }, {}),
-        },
-      }),
-    onError: (error: Error) => {
-      toast.error(error.message || 'Failed to generate AI summary')
-    },
-  })
-
-  const requiredParameters = (draft.kqlQuery.match(/\{\{\s*([a-zA-Z0-9._-]+)\s*\}\}/g) ?? [])
-    .map((match) => match.replace(/[{}]/g, '').trim())
-    .filter((value, index, values) => values.indexOf(value) === index)
-    .sort((left, right) => left.localeCompare(right))
-
-  const canTest = draft.kqlQuery.trim().length > 0
-    && requiredParameters.every((parameter) => (sampleParameters[parameter] ?? '').trim().length > 0)
   const defaultAiProfile = (profilesQuery.data ?? []).find((profile) => profile.isDefault && profile.isEnabled) ?? null
-  const canTestAiSummary = canTest && !!defaultAiProfile
   const aiUnavailableReason = defaultAiProfile
     ? null
     : 'No enabled default AI profile is configured for this tenant.'
 
-  const columns = useMemo(() => {
-    const schema = testMutation.data?.schema ?? []
-    return schema.map((column) => ({
-      accessorKey: column.name,
-      header: column.name,
-        cell: ({ row }: { row: { original: Record<string, unknown> } }) => {
-          const value = row.original[column.name]
-          return <span className="text-xs">{formatCellValue(value)}</span>
-        },
-      }))
-  }, [testMutation.data?.schema])
-
   const tools = toolsQuery.data?.tools ?? []
   const parameters = toolsQuery.data?.availableParameters ?? []
+  const selectedTool = useMemo(
+    () => tools.find((tool) => tool.id === search.toolId) ?? null,
+    [search.toolId, tools],
+  )
+  const workbenchKey = search.mode === 'new' ? 'new' : selectedTool?.id ?? 'blank'
+  const workbenchSeed = search.mode === 'new'
+    ? emptyDraft
+    : selectedTool
+      ? {
+          id: selectedTool.id,
+          name: selectedTool.name,
+          description: selectedTool.description,
+          supportedAssetTypes: selectedTool.supportedAssetTypes,
+          kqlQuery: selectedTool.kqlQuery,
+          aiPrompt: selectedTool.aiPrompt,
+          enabled: selectedTool.enabled,
+        }
+      : emptyDraft
 
   return (
     <>
@@ -209,17 +188,13 @@ function AdvancedToolsPage() {
                 Advanced Tools
               </h1>
               <p className="max-w-3xl text-sm text-muted-foreground">
-                Manage reusable Defender KQL tools that operators can run from asset detail to investigate vulnerable components and installation evidence.
+                Create and test reusable Defender KQL tools in a dedicated workbench instead of a cramped modal editor.
               </p>
             </div>
             <Button
               type="button"
               className="rounded-full"
-              onClick={() => {
-                setDraft(emptyDraft)
-                setSampleParameters({})
-                setEditorOpen(true)
-              }}
+              onClick={() => void navigate({ search: { mode: 'new' } })}
             >
               <Plus className="mr-2 size-4" />
               New tool
@@ -227,290 +202,111 @@ function AdvancedToolsPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.65fr)]">
-          <section className="space-y-4">
-                {tools.map((tool: AdvancedTool) => (
-              <Card key={tool.id} className="rounded-3xl border-border/70">
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge className="rounded-full border-primary/30 bg-primary/10 text-primary">
-                          {tool.enabled ? 'Enabled' : 'Disabled'}
-                        </Badge>
-                        {tool.supportedAssetTypes.map((assetType: string) => (
-                          <Badge
-                            key={assetType}
-                            variant="outline"
-                            className="rounded-full border-border/70 bg-background/50"
-                          >
-                            {assetType}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div>
-                        <CardTitle>{tool.name}</CardTitle>
-                        <CardDescription className="mt-2">
-                          {tool.description}
-                        </CardDescription>
-                      </div>
-                      <div className="rounded-2xl border border-border/70 bg-background/60 p-3">
-                        <pre className="overflow-x-auto text-xs text-muted-foreground">
-                          <code>{tool.kqlQuery}</code>
-                        </pre>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() => {
-                          setDraft(tool)
-                          setSampleParameters({})
-                          setEditorOpen(true)
-                        }}
-                      >
-                        <Pencil className="mr-2 size-4" />
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full text-destructive hover:text-destructive"
-                        onClick={() => setDeleteTarget(tool)}
-                      >
-                        <Trash2 className="mr-2 size-4" />
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-            ))}
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(22rem,0.75fr)]">
+          <section className="space-y-5">
+            <AdvancedToolWorkbench
+              key={workbenchKey}
+              initialDraft={workbenchSeed}
+              parameters={parameters}
+              defaultAiProfile={defaultAiProfile}
+              aiUnavailableReason={aiUnavailableReason}
+              onClearDraft={() => void navigate({ search: {} })}
+              onSave={async (value) => {
+                const toolId = await saveMutation.mutateAsync(value)
+                await navigate({ search: toolId ? { toolId } : {} })
+              }}
+              isSaving={saveMutation.isPending}
+            />
           </section>
 
-          <Card className="rounded-3xl border-border/70">
-            <CardHeader>
-              <CardTitle>Allowed parameters</CardTitle>
-              <CardDescription>
-                Use double-brace placeholders inside the KQL query. PatchHound resolves them from the selected asset and vulnerability context before running the tool.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              {parameters.map((parameter) => (
-                <div key={parameter.name} className="rounded-2xl border border-border/70 bg-background/60 p-3">
-                  <p className="font-medium text-foreground">{`{{${parameter.name}}}`}</p>
-                  <p className="mt-1">{parameter.description}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <section className="space-y-4">
+            <Card className="rounded-3xl border-border/70">
+              <CardHeader>
+                <CardTitle>Tool catalog</CardTitle>
+                <CardDescription>
+                  Switch between saved tools while keeping the editor and test surface stable.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {tools.map((tool: AdvancedTool) => (
+                  <Card key={tool.id} className="rounded-3xl border-border/70">
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className="rounded-full border-primary/30 bg-primary/10 text-primary">
+                              {tool.enabled ? 'Enabled' : 'Disabled'}
+                            </Badge>
+                            {tool.supportedAssetTypes.map((assetType: string) => (
+                              <Badge
+                                key={assetType}
+                                variant="outline"
+                                className="rounded-full border-border/70 bg-background/50"
+                              >
+                                {assetType}
+                              </Badge>
+                            ))}
+                          </div>
+                          <div>
+                            <CardTitle>{tool.name}</CardTitle>
+                            <CardDescription className="mt-2">
+                              {tool.description}
+                            </CardDescription>
+                          </div>
+                          <div className="rounded-2xl border border-border/70 bg-background/60 p-3">
+                            <pre className="overflow-x-auto text-xs text-muted-foreground">
+                              <code>{tool.kqlQuery}</code>
+                            </pre>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full"
+                            onClick={() => void navigate({ search: { toolId: tool.id } })}
+                          >
+                            <Pencil className="mr-2 size-4" />
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full text-destructive hover:text-destructive"
+                            onClick={() => setDeleteTarget(tool)}
+                          >
+                            <Trash2 className="mr-2 size-4" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-3xl border-border/70">
+              <CardHeader>
+                <CardTitle>Allowed parameters</CardTitle>
+                <CardDescription>
+                  Use double-brace placeholders inside the KQL query. PatchHound resolves them from the selected asset and vulnerability context before running the tool.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                {parameters.map((parameter) => (
+                  <div key={parameter.name} className="rounded-2xl border border-border/70 bg-background/60 p-3">
+                    <p className="font-medium text-foreground">{`{{${parameter.name}}}`}</p>
+                    <p className="mt-1">{parameter.description}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </section>
         </div>
       </section>
-
-      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
-        <DialogContent size="lg" className="max-h-[90vh] overflow-y-auto sm:max-w-[70vw]">
-          <DialogHeader>
-            <DialogTitle>
-              {draft.id ? 'Edit advanced tool' : 'Create advanced tool'}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input
-                  value={draft.name}
-                  onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-                  placeholder="Component evidence lookup"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Input
-                  value={draft.description}
-                  onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
-                  placeholder="Explain what the tool is for"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <Label>Supported asset types</Label>
-              <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/60 p-3 text-sm">
-                <Checkbox
-                  checked={draft.supportedAssetTypes.includes('Device')}
-                  onCheckedChange={(checked) => {
-                    setDraft((current) => ({
-                      ...current,
-                      supportedAssetTypes: checked ? ['Device'] : [],
-                    }))
-                  }}
-                />
-                <span>Device</span>
-              </label>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <Label>KQL query</Label>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Checkbox
-                    checked={draft.enabled}
-                    onCheckedChange={(checked) =>
-                      setDraft((current) => ({ ...current, enabled: Boolean(checked) }))
-                    }
-                  />
-                  Enabled
-                </label>
-              </div>
-              <KqlEditor
-                value={draft.kqlQuery}
-                onChange={(value) => setDraft((current) => ({ ...current, kqlQuery: value }))}
-                parameters={parameters.map((parameter) => parameter.name)}
-                minHeight={280}
-              />
-            </div>
-
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label>Optional AI prompt</Label>
-                <p className="text-sm text-muted-foreground">
-                  Guides the AI summary after the KQL query runs. Leave it blank to use the default operational summary prompt.
-                </p>
-              </div>
-              <Textarea
-                value={draft.aiPrompt}
-                onChange={(event) => setDraft((current) => ({ ...current, aiPrompt: event.target.value }))}
-                placeholder="Summarize what the KQL results prove, call out the strongest evidence of installation or bundled-component presence, and explain the next operational conclusion."
-              />
-            </div>
-
-            {requiredParameters.length > 0 ? (
-              <div className="space-y-3 rounded-3xl border border-border/70 bg-muted/20 p-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium">Sample parameters</h3>
-                  <p className="text-sm text-muted-foreground">
-                    This query uses placeholders. Provide sample values before testing it against Defender.
-                  </p>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {requiredParameters.map((parameter) => (
-                    <div key={parameter} className="space-y-2">
-                      <Label>{`{{${parameter}}}`}</Label>
-                      <Input
-                        value={sampleParameters[parameter] ?? ''}
-                        onChange={(event) =>
-                          setSampleParameters((current) => ({
-                            ...current,
-                            [parameter]: event.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            <div className="space-y-3 rounded-3xl border border-border/70 bg-background/60 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-medium">Test query</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Run the rendered query against the current tenant’s Defender advanced hunting endpoint.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-full"
-                  onClick={() => testMutation.mutate()}
-                  disabled={!canTest || testMutation.isPending}
-                >
-                  {testMutation.isPending ? <Play className="mr-2 size-4 animate-pulse" /> : <Play className="mr-2 size-4" />}
-                  Test query
-                </Button>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="rounded-full"
-                        onClick={() => aiSummaryMutation.mutate()}
-                        disabled={!canTestAiSummary || aiSummaryMutation.isPending}
-                      >
-                        {aiSummaryMutation.isPending ? <Play className="mr-2 size-4 animate-pulse" /> : <Play className="mr-2 size-4" />}
-                        Test AI summary
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {!canTestAiSummary && aiUnavailableReason ? (
-                    <TooltipContent>{aiUnavailableReason}</TooltipContent>
-                  ) : null}
-                </Tooltip>
-              </div>
-
-              {testMutation.data ? (
-                <div className="space-y-4">
-                  <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/70">
-                    <div className="max-h-[24rem] overflow-auto">
-                      <DataTable
-                        columns={columns}
-                        data={testMutation.data?.results ?? []}
-                        className="min-w-max"
-                        emptyState={<span className="text-sm text-muted-foreground">The query returned no rows.</span>}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {aiSummaryMutation.data ? (
-                <div className="space-y-4 rounded-2xl border border-border/70 bg-card/70 p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge>{aiSummaryMutation.data.profileName}</Badge>
-                    <Badge variant="outline">{aiSummaryMutation.data.providerType}</Badge>
-                    <Badge variant="outline">{aiSummaryMutation.data.model}</Badge>
-                  </div>
-                  <div className="rounded-2xl border border-border/70 bg-background/60 p-3">
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      Rendered query
-                    </p>
-                    <pre className="mt-2 overflow-x-auto text-xs text-muted-foreground">
-                      <code>{aiSummaryMutation.data.renderedQuery}</code>
-                    </pre>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      AI summary
-                    </p>
-                    <MarkdownViewer content={aiSummaryMutation.data.content} className="mt-3" />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setEditorOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => saveMutation.mutate(draft)}
-              disabled={saveMutation.isPending || draft.name.trim().length === 0 || draft.kqlQuery.trim().length === 0 || draft.supportedAssetTypes.length === 0}
-            >
-              {draft.id ? 'Save changes' : 'Create tool'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent size="sm">
@@ -549,4 +345,314 @@ function formatCellValue(value: unknown) {
   }
 
   return JSON.stringify(value)
+}
+
+type AdvancedToolWorkbenchProps = {
+  initialDraft: ToolDraft
+  parameters: Array<{ name: string; description: string }>
+  defaultAiProfile: { isDefault: boolean; isEnabled: boolean } | null
+  aiUnavailableReason: string | null
+  isSaving: boolean
+  onSave: (value: ToolDraft) => Promise<void>
+  onClearDraft: () => void
+}
+
+function AdvancedToolWorkbench({
+  initialDraft,
+  parameters,
+  defaultAiProfile,
+  aiUnavailableReason,
+  isSaving,
+  onSave,
+  onClearDraft,
+}: AdvancedToolWorkbenchProps) {
+  const [draft, setDraft] = useState<ToolDraft>(initialDraft)
+  const [sampleParameters, setSampleParameters] = useState<Record<string, string>>({})
+
+  const requiredParameters = (draft.kqlQuery.match(/\{\{\s*([a-zA-Z0-9._-]+)\s*\}\}/g) ?? [])
+    .map((match) => match.replace(/[{}]/g, '').trim())
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .sort((left, right) => left.localeCompare(right))
+
+  const canTest = draft.kqlQuery.trim().length > 0
+    && requiredParameters.every((parameter) => (sampleParameters[parameter] ?? '').trim().length > 0)
+  const canTestAiSummary = canTest && !!defaultAiProfile
+
+  const testMutation = useMutation<AdvancedToolExecutionResult, Error>({
+    mutationFn: async () =>
+      testAdvancedToolQuery({
+        data: {
+          kqlQuery: draft.kqlQuery,
+          sampleParameters: requiredParameters.reduce<Record<string, string | null>>((acc, key) => {
+            acc[key] = sampleParameters[key] ?? ''
+            return acc
+          }, {}),
+        },
+      }),
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to run test query')
+    },
+  })
+
+  const aiSummaryMutation = useMutation<AdvancedToolAiSummaryResult, Error>({
+    mutationFn: async () =>
+      testAdvancedToolAiSummary({
+        data: {
+          kqlQuery: draft.kqlQuery,
+          aiPrompt: draft.aiPrompt,
+          sampleParameters: requiredParameters.reduce<Record<string, string | null>>((acc, key) => {
+            acc[key] = sampleParameters[key] ?? ''
+            return acc
+          }, {}),
+        },
+      }),
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to generate AI summary')
+    },
+  })
+
+  const columns = useMemo(() => {
+    const schema = testMutation.data?.schema ?? []
+    return schema.map((column) => ({
+      accessorKey: column.name,
+      header: column.name,
+      cell: ({ row }: { row: { original: Record<string, unknown> } }) => {
+        const value = row.original[column.name]
+        return <span className="text-xs">{formatCellValue(value)}</span>
+      },
+    }))
+  }, [testMutation.data?.schema])
+
+  return (
+    <Card className="rounded-[32px] border-border/70">
+      <CardHeader className="space-y-2">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              Tool workbench
+            </p>
+            <CardTitle className="text-2xl tracking-[-0.03em]">
+              {draft.id ? 'Edit advanced tool' : 'Create advanced tool'}
+            </CardTitle>
+            <CardDescription className="max-w-3xl">
+              Define the KQL query, optional AI prompt, and test both raw query results and AI interpretation directly in this workspace.
+            </CardDescription>
+          </div>
+          {draft.id ? (
+            <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
+              Editing saved tool
+            </Badge>
+          ) : (
+            <Badge className="rounded-full border-primary/30 bg-primary/10 text-primary">
+              Unsaved draft
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-5">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Name</Label>
+            <Input
+              value={draft.name}
+              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+              placeholder="Component evidence lookup"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Input
+              value={draft.description}
+              onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+              placeholder="Explain what the tool is for"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <Label>Supported asset types</Label>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Checkbox
+                checked={draft.enabled}
+                onCheckedChange={(checked) =>
+                  setDraft((current) => ({ ...current, enabled: Boolean(checked) }))
+                }
+              />
+              Enabled
+            </label>
+          </div>
+          <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/60 p-3 text-sm">
+            <Checkbox
+              checked={draft.supportedAssetTypes.includes('Device')}
+              onCheckedChange={(checked) => {
+                setDraft((current) => ({
+                  ...current,
+                  supportedAssetTypes: checked ? ['Device'] : [],
+                }))
+              }}
+            />
+            <span>Device</span>
+          </label>
+        </div>
+
+        <div className="space-y-3">
+          <Label>KQL query</Label>
+          <KqlEditor
+            value={draft.kqlQuery}
+            onChange={(value) => setDraft((current) => ({ ...current, kqlQuery: value }))}
+            parameters={parameters.map((parameter) => parameter.name)}
+            minHeight={340}
+          />
+        </div>
+
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>Optional AI prompt</Label>
+            <p className="text-sm text-muted-foreground">
+              Guides the AI summary after the KQL query runs. Leave it blank to use the default operational summary prompt.
+            </p>
+          </div>
+          <Textarea
+            value={draft.aiPrompt}
+            onChange={(event) => setDraft((current) => ({ ...current, aiPrompt: event.target.value }))}
+            placeholder="Summarize what the KQL results prove, call out the strongest evidence of installation or bundled-component presence, and explain the next operational conclusion."
+          />
+        </div>
+
+        {requiredParameters.length > 0 ? (
+          <div className="space-y-3 rounded-3xl border border-border/70 bg-muted/20 p-4">
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium">Sample parameters</h3>
+              <p className="text-sm text-muted-foreground">
+                This query uses placeholders. Provide sample values before testing it against Defender.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {requiredParameters.map((parameter) => (
+                <div key={parameter} className="space-y-2">
+                  <Label>{`{{${parameter}}}`}</Label>
+                  <Input
+                    value={sampleParameters[parameter] ?? ''}
+                    onChange={(event) =>
+                      setSampleParameters((current) => ({
+                        ...current,
+                        [parameter]: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="space-y-4 rounded-3xl border border-border/70 bg-background/60 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium">Test workbench</h3>
+              <p className="text-sm text-muted-foreground">
+                Run the query against Defender and inspect both the raw result grid and the AI summary without leaving the page.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                onClick={() => testMutation.mutate()}
+                disabled={!canTest || testMutation.isPending}
+              >
+                {testMutation.isPending ? <Play className="mr-2 size-4 animate-pulse" /> : <Play className="mr-2 size-4" />}
+                Test query
+              </Button>
+              <Tooltip>
+                <TooltipTrigger>
+                  <span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-full"
+                      onClick={() => aiSummaryMutation.mutate()}
+                      disabled={!canTestAiSummary || aiSummaryMutation.isPending}
+                    >
+                      {aiSummaryMutation.isPending ? <Play className="mr-2 size-4 animate-pulse" /> : <Play className="mr-2 size-4" />}
+                      Test AI summary
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!canTestAiSummary && aiUnavailableReason ? (
+                  <TooltipContent>{aiUnavailableReason}</TooltipContent>
+                ) : null}
+              </Tooltip>
+            </div>
+          </div>
+
+          {testMutation.data ? (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Query results
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {testMutation.data.results.length} rows returned from Defender advanced hunting.
+                </p>
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/70">
+                <div className="max-h-[28rem] overflow-auto">
+                  <DataTable
+                    columns={columns}
+                    data={testMutation.data.results}
+                    className="min-w-max"
+                    emptyState={<span className="text-sm text-muted-foreground">The query returned no rows.</span>}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {aiSummaryMutation.data ? (
+            <div className="space-y-4 rounded-2xl border border-border/70 bg-card/70 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge>{aiSummaryMutation.data.profileName}</Badge>
+                <Badge variant="outline">{aiSummaryMutation.data.providerType}</Badge>
+                <Badge variant="outline">{aiSummaryMutation.data.model}</Badge>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  AI summary
+                </p>
+                <div className="max-h-[20rem] overflow-auto rounded-2xl border border-border/70 bg-background/60 p-4">
+                  <MarkdownViewer content={aiSummaryMutation.data.content} />
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap justify-end gap-2 border-t border-border/70 pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClearDraft}
+          >
+            Clear draft
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void onSave(draft)}
+            disabled={
+              isSaving
+              || draft.name.trim().length === 0
+              || draft.kqlQuery.trim().length === 0
+              || draft.supportedAssetTypes.length === 0
+            }
+          >
+            {draft.id ? 'Save changes' : 'Create tool'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }

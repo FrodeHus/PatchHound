@@ -47,6 +47,15 @@ const kqlTables = [
   'AlertInfo',
 ]
 
+const parameterDetails: Record<string, string> = {
+  deviceName: 'Device name',
+  deviceId: 'Defender device id',
+  'vuln.name': 'Vulnerability external id / CVE',
+  'vuln.vendor': 'Software vendor from vulnerability context',
+  'vuln.product': 'Software product from vulnerability context',
+  'vuln.version': 'Software version from vulnerability context',
+}
+
 const kqlLanguage = StreamLanguage.define({
   startState: () => ({}),
   token: (stream) => {
@@ -101,7 +110,7 @@ export function KqlEditor({
     const parameterCompletions = parameters.map((parameter) => ({
       label: `{{${parameter}}}`,
       type: 'variable' as const,
-      detail: 'Asset parameter',
+      detail: parameterDetails[parameter] ?? 'Asset parameter',
     }))
     const keywordCompletions = kqlKeywords.map((keyword) => ({
       label: keyword,

@@ -8,6 +8,7 @@ public static partial class AdvancedToolTemplateRenderer
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["deviceName"] = "Device name",
+            ["deviceId"] = "Defender device id / external asset id",
             ["vuln.name"] = "Vulnerability external id / CVE",
             ["vuln.vendor"] = "Software vendor from vulnerability context",
             ["vuln.product"] = "Software product from vulnerability context",
@@ -50,7 +51,7 @@ public static partial class AdvancedToolTemplateRenderer
                     );
                 }
 
-                return value ?? string.Empty;
+                return QuoteKqlString(value ?? string.Empty);
             }
         );
     }
@@ -69,5 +70,10 @@ public static partial class AdvancedToolTemplateRenderer
         throw new InvalidOperationException(
             $"Unsupported placeholders: {string.Join(", ", invalid)}."
         );
+    }
+
+    private static string QuoteKqlString(string value)
+    {
+        return $"'{value.Replace("'", "''")}'";
     }
 }

@@ -22,6 +22,7 @@ public record AdvancedToolExecutionContext(
     Guid TenantId,
     Guid AssetId,
     string AssetType,
+    string? DeviceExternalId,
     string? DeviceName,
     IReadOnlyList<AdvancedToolVulnerabilityContext> Vulnerabilities
 );
