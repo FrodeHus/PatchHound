@@ -1,6 +1,7 @@
 import CodeMirror from '@uiw/react-codemirror'
 import { autocompletion, completeFromList, type Completion } from '@codemirror/autocomplete'
-import { LanguageSupport, StreamLanguage } from '@codemirror/language'
+import { HighlightStyle, LanguageSupport, StreamLanguage, syntaxHighlighting } from '@codemirror/language'
+import { tags } from '@lezer/highlight'
 import { EditorView } from '@codemirror/view'
 import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
@@ -56,6 +57,16 @@ const parameterDetails: Record<string, string> = {
   'vuln.version': 'Software version from vulnerability context',
 }
 
+const kqlHighlightStyle = HighlightStyle.define([
+  { tag: tags.keyword, color: 'var(--primary)', fontWeight: '600' },
+  { tag: [tags.string, tags.special(tags.string)], color: 'oklch(0.82 0.08 155)' },
+  { tag: tags.number, color: 'oklch(0.82 0.1 85)' },
+  { tag: tags.comment, color: 'var(--muted-foreground)', fontStyle: 'italic' },
+  { tag: [tags.operator, tags.punctuation], color: 'var(--foreground)' },
+  { tag: [tags.variableName, tags.name], color: 'var(--foreground)' },
+  { tag: [tags.special(tags.variableName), tags.atom], color: 'oklch(0.8 0.1 210)', fontWeight: '600' },
+])
+
 const kqlLanguage = StreamLanguage.define({
   startState: () => ({}),
   token: (stream) => {
@@ -73,7 +84,7 @@ const kqlLanguage = StreamLanguage.define({
       return 'string'
     }
     if (stream.match(/\{\{\s*[a-zA-Z0-9._-]+\s*\}\}/)) {
-      return 'special'
+      return 'atom'
     }
     if (stream.match(/\d+(\.\d+)?/)) {
       return 'number'
@@ -82,7 +93,8 @@ const kqlLanguage = StreamLanguage.define({
       return 'operator'
     }
     if (stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
-      return 'variableName'
+      const value = stream.current().toLowerCase()
+      return kqlKeywords.includes(value) ? 'keyword' : 'variableName'
     }
     stream.next()
     return null
@@ -131,34 +143,75 @@ export function KqlEditor({
         override: [completeFromList(completions)],
         activateOnTyping: true,
       }),
+      syntaxHighlighting(kqlHighlightStyle),
       EditorView.lineWrapping,
       EditorView.theme({
         '&': {
           fontSize: '0.925rem',
           minHeight: `${minHeight}px`,
+          color: 'var(--foreground)',
           backgroundColor: 'transparent',
         },
         '.cm-editor': {
           minHeight: `${minHeight}px`,
+          backgroundColor: 'transparent',
         },
         '.cm-scroller': {
           minHeight: `${minHeight}px`,
           fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, monospace)',
         },
+        '.cm-focused': {
+          outline: 'none',
+        },
         '.cm-gutters': {
-          backgroundColor: 'transparent',
+          color: 'var(--muted-foreground)',
+          backgroundColor: 'color-mix(in oklab, var(--muted) 45%, transparent)',
           borderRight: '1px solid color-mix(in oklab, var(--border) 70%, transparent)',
+        },
+        '.cm-lineNumbers .cm-gutterElement': {
+          padding: '0 0.5rem 0 0.25rem',
         },
         '.cm-activeLineGutter, .cm-activeLine': {
           backgroundColor: 'color-mix(in oklab, var(--accent) 24%, transparent)',
+        },
+        '.cm-selectionBackground, .cm-content ::selection': {
+          backgroundColor: 'color-mix(in oklab, var(--primary) 24%, transparent) !important',
+        },
+        '.cm-cursor, .cm-dropCursor': {
+          borderLeftColor: 'var(--primary)',
+        },
+        '.cm-placeholder': {
+          color: 'var(--muted-foreground)',
         },
         '.cm-tooltip': {
           backgroundColor: 'var(--popover)',
           color: 'var(--popover-foreground)',
           border: '1px solid color-mix(in oklab, var(--border) 80%, transparent)',
+          borderRadius: '1rem',
+          boxShadow: '0 18px 45px color-mix(in oklab, var(--background) 72%, transparent)',
+        },
+        '.cm-tooltip-autocomplete > ul': {
+          fontFamily: 'var(--font-sans, sans-serif)',
+          padding: '0.35rem',
+        },
+        '.cm-tooltip-autocomplete ul li': {
+          borderRadius: '0.75rem',
+          padding: '0.4rem 0.65rem',
+        },
+        '.cm-tooltip-autocomplete ul li[aria-selected]': {
+          backgroundColor: 'color-mix(in oklab, var(--accent) 55%, transparent)',
+          color: 'var(--accent-foreground)',
+        },
+        '.cm-tooltip-autocomplete ul li .cm-completionDetail': {
+          color: 'var(--muted-foreground)',
         },
         '.cm-content': {
           padding: '0.75rem',
+        },
+        '.cm-panels': {
+          backgroundColor: 'color-mix(in oklab, var(--muted) 45%, transparent)',
+          color: 'var(--foreground)',
+          borderBottom: '1px solid color-mix(in oklab, var(--border) 70%, transparent)',
         },
       }),
     ],
@@ -166,7 +219,7 @@ export function KqlEditor({
   )
 
   return (
-    <div className={cn('overflow-hidden rounded-2xl border border-border/70 bg-background/70', className)}>
+    <div className={cn('overflow-hidden rounded-2xl border border-border/70 bg-card/65 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--foreground)_4%,transparent)]', className)}>
       <CodeMirror
         value={value}
         onChange={onChange}

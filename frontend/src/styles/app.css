@@ -627,6 +627,29 @@
     background: transparent;
 }
 
+.ph-markdown-editor [class*="_contentEditable_"] ul,
+.ph-markdown-editor [class*="_contentEditable_"] ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+}
+
+.ph-markdown-editor [class*="_contentEditable_"] ul {
+    list-style: disc outside;
+}
+
+.ph-markdown-editor [class*="_contentEditable_"] ol {
+    list-style: decimal outside;
+}
+
+.ph-markdown-editor [class*="_contentEditable_"] li {
+    display: list-item;
+    padding-left: 0.25rem;
+}
+
+.ph-markdown-editor [class*="_contentEditable_"] li::marker {
+    color: var(--muted-foreground);
+}
+
 .ph-markdown-editor [class*="_contentEditable_"]::placeholder {
     color: var(--muted-foreground);
 }
