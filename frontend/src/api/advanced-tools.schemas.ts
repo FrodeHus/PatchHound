@@ -1,0 +1,51 @@
+import { z } from 'zod'
+
+export const advancedToolSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  description: z.string(),
+  supportedAssetTypes: z.array(z.string()),
+  kqlQuery: z.string(),
+  enabled: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const advancedToolParameterSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+})
+
+export const advancedToolCatalogSchema = z.object({
+  tools: z.array(advancedToolSchema),
+  availableParameters: z.array(advancedToolParameterSchema),
+})
+
+export const advancedToolSchemaColumnSchema = z.object({
+  name: z.string(),
+  type: z.string(),
+})
+
+export const advancedToolExecutionResultSchema = z.object({
+  schema: z.array(advancedToolSchemaColumnSchema),
+  results: z.array(z.record(z.string(), z.any())),
+  renderedQuery: z.string(),
+})
+
+export const advancedToolRenderedQuerySchema = z.object({
+  label: z.string(),
+  vulnerabilityId: z.string().uuid().nullable(),
+  vulnerabilityExternalId: z.string().nullable(),
+  query: z.string(),
+  schema: z.array(advancedToolSchemaColumnSchema),
+  results: z.array(z.record(z.string(), z.any())),
+})
+
+export const advancedToolAssetExecutionResultSchema = z.object({
+  queries: z.array(advancedToolRenderedQuerySchema),
+})
+
+export type AdvancedTool = z.infer<typeof advancedToolSchema>
+export type AdvancedToolCatalog = z.infer<typeof advancedToolCatalogSchema>
+export type AdvancedToolExecutionResult = z.infer<typeof advancedToolExecutionResultSchema>
+export type AdvancedToolAssetExecutionResult = z.infer<typeof advancedToolAssetExecutionResultSchema>

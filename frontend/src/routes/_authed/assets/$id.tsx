@@ -22,6 +22,7 @@ export const Route = createFileRoute('/_authed/assets/$id')({
 
 function AssetDetailPage() {
   const initialAsset = Route.useLoaderData()
+  const { user } = Route.useRouteContext()
   const { id } = Route.useParams()
   const { selectedTenantId } = useTenantScope()
   const [initialTenantId] = useState(selectedTenantId)
@@ -102,6 +103,10 @@ function AssetDetailPage() {
   return (
     <AssetDetailPageView
       asset={asset}
+      canUseAdvancedTools={
+        (user.activeRoles ?? []).includes('GlobalAdmin')
+        || (user.activeRoles ?? []).includes('SecurityManager')
+      }
       securityProfiles={securityProfilesQuery.data?.items ?? []}
       availableBusinessLabels={businessLabelsQuery.data ?? []}
       isAssigningSecurityProfile={securityProfileMutation.isPending}

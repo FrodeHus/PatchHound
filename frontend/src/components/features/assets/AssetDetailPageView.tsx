@@ -17,12 +17,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { WorkNotesSheet } from '@/components/features/work-notes/WorkNotesSheet'
+import { AssetAdvancedToolsPanel } from '@/components/features/assets/AssetAdvancedToolsPanel'
 import { formatDateTime, formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import { toneDot, toneText, type Tone } from '@/lib/tone-classes'
 
 type AssetDetailPageViewProps = {
   asset: AssetDetail
+  canUseAdvancedTools: boolean
   securityProfiles: SecurityProfile[]
   availableBusinessLabels: BusinessLabel[]
   isAssigningSecurityProfile: boolean
@@ -39,6 +41,7 @@ type DetailTab = 'overview' | 'vulnerabilities' | 'software' | 'timeline'
 
 export function AssetDetailPageView({
   asset,
+  canUseAdvancedTools,
   securityProfiles,
   availableBusinessLabels,
   isAssigningSecurityProfile,
@@ -311,6 +314,9 @@ export function AssetDetailPageView({
                       />
                     </div>
                   </section>
+                ) : null}
+                {canUseAdvancedTools ? (
+                  <AssetAdvancedToolsPanel asset={asset} />
                 ) : null}
                 <section className="grid gap-4 lg:grid-cols-2">
                   <button

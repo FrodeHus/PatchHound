@@ -43,6 +43,7 @@ import { Route as AuthedAdminSourcesRouteImport } from './routes/_authed/admin/s
 import { Route as AuthedAdminSecurityProfilesRouteImport } from './routes/_authed/admin/security-profiles'
 import { Route as AuthedAdminMaintenanceRouteImport } from './routes/_authed/admin/maintenance'
 import { Route as AuthedAdminBusinessLabelsRouteImport } from './routes/_authed/admin/business-labels'
+import { Route as AuthedAdminAdvancedToolsRouteImport } from './routes/_authed/admin/advanced-tools'
 import { Route as AuthedAdminWorkflowsIndexRouteImport } from './routes/_authed/admin/workflows/index'
 import { Route as AuthedAdminTenantsIndexRouteImport } from './routes/_authed/admin/tenants/index'
 import { Route as AuthedAdminTeamsIndexRouteImport } from './routes/_authed/admin/teams/index'
@@ -236,6 +237,12 @@ const AuthedAdminBusinessLabelsRoute =
     path: '/admin/business-labels',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedAdminAdvancedToolsRoute =
+  AuthedAdminAdvancedToolsRouteImport.update({
+    id: '/admin/advanced-tools',
+    path: '/admin/advanced-tools',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAdminWorkflowsIndexRoute =
   AuthedAdminWorkflowsIndexRouteImport.update({
     id: '/admin/workflows/',
@@ -338,6 +345,7 @@ export interface FileRoutesByFullPath {
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
   '/setup/': typeof SetupIndexRoute
+  '/admin/advanced-tools': typeof AuthedAdminAdvancedToolsRoute
   '/admin/business-labels': typeof AuthedAdminBusinessLabelsRoute
   '/admin/maintenance': typeof AuthedAdminMaintenanceRoute
   '/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
@@ -390,6 +398,7 @@ export interface FileRoutesByTo {
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
   '/setup': typeof SetupIndexRoute
+  '/admin/advanced-tools': typeof AuthedAdminAdvancedToolsRoute
   '/admin/business-labels': typeof AuthedAdminBusinessLabelsRoute
   '/admin/maintenance': typeof AuthedAdminMaintenanceRoute
   '/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
@@ -444,6 +453,7 @@ export interface FileRoutesById {
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
   '/setup/': typeof SetupIndexRoute
+  '/_authed/admin/advanced-tools': typeof AuthedAdminAdvancedToolsRoute
   '/_authed/admin/business-labels': typeof AuthedAdminBusinessLabelsRoute
   '/_authed/admin/maintenance': typeof AuthedAdminMaintenanceRoute
   '/_authed/admin/security-profiles': typeof AuthedAdminSecurityProfilesRoute
@@ -498,6 +508,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/logout'
     | '/setup/'
+    | '/admin/advanced-tools'
     | '/admin/business-labels'
     | '/admin/maintenance'
     | '/admin/security-profiles'
@@ -550,6 +561,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/logout'
     | '/setup'
+    | '/admin/advanced-tools'
     | '/admin/business-labels'
     | '/admin/maintenance'
     | '/admin/security-profiles'
@@ -603,6 +615,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/logout'
     | '/setup/'
+    | '/_authed/admin/advanced-tools'
     | '/_authed/admin/business-labels'
     | '/_authed/admin/maintenance'
     | '/_authed/admin/security-profiles'
@@ -900,6 +913,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminBusinessLabelsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/advanced-tools': {
+      id: '/_authed/admin/advanced-tools'
+      path: '/admin/advanced-tools'
+      fullPath: '/admin/advanced-tools'
+      preLoaderRoute: typeof AuthedAdminAdvancedToolsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/admin/workflows/': {
       id: '/_authed/admin/workflows/'
       path: '/admin/workflows'
@@ -1038,6 +1058,7 @@ const AuthedDashboardMyAssetsRouteWithChildren =
   )
 
 interface AuthedRouteChildren {
+  AuthedAdminAdvancedToolsRoute: typeof AuthedAdminAdvancedToolsRoute
   AuthedAdminBusinessLabelsRoute: typeof AuthedAdminBusinessLabelsRoute
   AuthedAdminMaintenanceRoute: typeof AuthedAdminMaintenanceRoute
   AuthedAdminSecurityProfilesRoute: typeof AuthedAdminSecurityProfilesRoute
@@ -1082,6 +1103,7 @@ interface AuthedRouteChildren {
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedAdminAdvancedToolsRoute: AuthedAdminAdvancedToolsRoute,
   AuthedAdminBusinessLabelsRoute: AuthedAdminBusinessLabelsRoute,
   AuthedAdminMaintenanceRoute: AuthedAdminMaintenanceRoute,
   AuthedAdminSecurityProfilesRoute: AuthedAdminSecurityProfilesRoute,

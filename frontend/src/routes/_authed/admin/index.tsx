@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Bell, Bot, Building2, ChevronRight, DatabaseZap, GitBranchPlus, Plug, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
+import { Bell, Bot, Braces, Building2, ChevronRight, DatabaseZap, GitBranchPlus, Plug, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({
@@ -31,6 +31,7 @@ type AdminArea = {
     | '/admin/asset-rules'
     | '/admin/workflows'
     | '/admin/integrations'
+    | '/admin/advanced-tools'
     | '/admin/maintenance'
     | '/admin/platform/ai'
     | '/admin/platform/notifications'
@@ -136,6 +137,13 @@ const adminSections: AdminSection[] = [
         to: '/admin/integrations',
         roles: ['GlobalAdmin'],
         icon: Plug,
+      },
+      {
+        title: 'Advanced tools',
+        description: 'Create reusable Defender KQL tools that operators can run from supported asset detail views.',
+        to: '/admin/advanced-tools',
+        roles: ['GlobalAdmin', 'SecurityManager'],
+        icon: Braces,
       },
     ],
   },

@@ -79,6 +79,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         Set<VulnerabilityEpisodeRiskAssessment>();
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
     public DbSet<Comment> Comments => Set<Comment>();
+    public DbSet<AdvancedTool> AdvancedTools => Set<AdvancedTool>();
     public DbSet<RiskAcceptance> RiskAcceptances => Set<RiskAcceptance>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<Notification> Notifications => Set<Notification>();
