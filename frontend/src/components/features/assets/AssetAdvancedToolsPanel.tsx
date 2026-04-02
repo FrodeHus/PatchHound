@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
-import { Braces, Play } from 'lucide-react'
+import { Braces, ChevronDown, ChevronUp, Play } from 'lucide-react'
 import { fetchAdvancedTools, runAdvancedToolForAsset } from '@/api/advanced-tools.functions'
 import type { AdvancedToolAssetExecutionResult, AdvancedToolCatalog } from '@/api/advanced-tools.schemas'
 import type { AssetDetail } from '@/api/assets.schemas'
@@ -23,6 +23,7 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
   const [selectedToolId, setSelectedToolId] = useState<string>('')
   const [useAllOpenVulnerabilities, setUseAllOpenVulnerabilities] = useState(true)
   const [selectedVulnerabilityIds, setSelectedVulnerabilityIds] = useState<string[]>([])
+  const [expandedVulnerabilityIds, setExpandedVulnerabilityIds] = useState<string[]>([])
   const [rawResultsOpen, setRawResultsOpen] = useState(false)
 
   const toolsQuery = useQuery({
@@ -50,7 +51,24 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
   const selectedTool = tools.find((tool) => tool.id === selectedToolId) ?? null
   const needsVulnerabilityContext = /\{\{\s*vuln\./.test(selectedTool?.kqlQuery ?? '')
   const openVulnerabilities = useMemo(
-    () => asset.vulnerabilities.filter((vulnerability) => vulnerability.status !== 'Resolved'),
+    () =>
+      [...asset.vulnerabilities]
+        .filter((vulnerability) => vulnerability.status !== 'Resolved')
+        .sort((left, right) => {
+          const severityDelta
+            = severityRank(right.effectiveSeverity) - severityRank(left.effectiveSeverity)
+          if (severityDelta !== 0) {
+            return severityDelta
+          }
+
+          const scoreDelta = (right.effectiveScore ?? right.vendorScore ?? 0)
+            - (left.effectiveScore ?? left.vendorScore ?? 0)
+          if (scoreDelta !== 0) {
+            return scoreDelta
+          }
+
+          return left.externalId.localeCompare(right.externalId)
+        }),
     [asset.vulnerabilities],
   )
 
@@ -139,37 +157,73 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
             <label className="flex items-center gap-3 text-sm">
               <Checkbox
                 checked={useAllOpenVulnerabilities}
-                onCheckedChange={(checked) => setUseAllOpenVulnerabilities(Boolean(checked))}
+                onCheckedChange={(checked) => {
+                  const nextValue = Boolean(checked)
+                  setUseAllOpenVulnerabilities(nextValue)
+                  if (nextValue) {
+                    setSelectedVulnerabilityIds([])
+                  }
+                }}
               />
               <span>Use all open vulnerabilities</span>
             </label>
             {!useAllOpenVulnerabilities ? (
-              <div className="grid gap-2 md:grid-cols-2">
+              <div className="space-y-2">
                 {openVulnerabilities.map((vulnerability) => (
-                  <label
+                  <div
                     key={vulnerability.vulnerabilityId}
-                    className="flex items-start gap-3 rounded-2xl border border-border/70 bg-card/80 p-3 text-sm"
+                    className="rounded-2xl border border-border/70 bg-card/80"
                   >
-                    <Checkbox
-                      checked={selectedVulnerabilityIds.includes(vulnerability.vulnerabilityId)}
-                      onCheckedChange={(checked) => {
-                        setSelectedVulnerabilityIds((current) =>
-                          checked
-                            ? [...current, vulnerability.vulnerabilityId]
-                            : current.filter((id) => id !== vulnerability.vulnerabilityId),
-                        )
-                      }}
-                    />
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{vulnerability.externalId}</span>
-                        <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
-                          {vulnerability.effectiveSeverity}
-                        </Badge>
+                    <div className="flex items-center gap-3 px-3 py-3 text-sm">
+                      <Checkbox
+                        checked={selectedVulnerabilityIds.includes(vulnerability.vulnerabilityId)}
+                        onCheckedChange={(checked) => {
+                          setSelectedVulnerabilityIds((current) =>
+                            checked
+                              ? [...current, vulnerability.vulnerabilityId]
+                              : current.filter((id) => id !== vulnerability.vulnerabilityId),
+                          )
+                        }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{vulnerability.externalId}</span>
+                          <span className="text-muted-foreground">
+                            {primaryProductName(vulnerability.possibleCorrelatedSoftware)}
+                          </span>
+                          <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
+                            {vulnerability.effectiveSeverity}
+                          </Badge>
+                        </div>
                       </div>
-                      <p className="text-muted-foreground">{vulnerability.title}</p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 rounded-full px-2"
+                        aria-expanded={expandedVulnerabilityIds.includes(vulnerability.vulnerabilityId)}
+                        onClick={() => {
+                          setExpandedVulnerabilityIds((current) =>
+                            current.includes(vulnerability.vulnerabilityId)
+                              ? current.filter((id) => id !== vulnerability.vulnerabilityId)
+                              : [...current, vulnerability.vulnerabilityId],
+                          )
+                        }}
+                      >
+                        {expandedVulnerabilityIds.includes(vulnerability.vulnerabilityId) ? (
+                          <ChevronUp className="size-4" />
+                        ) : (
+                          <ChevronDown className="size-4" />
+                        )}
+                      </Button>
                     </div>
-                  </label>
+                    {expandedVulnerabilityIds.includes(vulnerability.vulnerabilityId) ? (
+                      <div className="space-y-2 border-t border-border/60 px-4 py-3 text-sm">
+                        <p className="font-medium">{vulnerability.title}</p>
+                        <p className="text-muted-foreground">{vulnerability.description}</p>
+                      </div>
+                    ) : null}
+                  </div>
                 ))}
               </div>
             ) : null}
@@ -196,6 +250,25 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
       </Dialog>
     </Card>
   )
+}
+
+function severityRank(severity: string) {
+  switch (severity.toLowerCase()) {
+    case 'critical':
+      return 4
+    case 'high':
+      return 3
+    case 'medium':
+      return 2
+    case 'low':
+      return 1
+    default:
+      return 0
+  }
+}
+
+function primaryProductName(possibleCorrelatedSoftware: string[]) {
+  return possibleCorrelatedSoftware[0] ?? 'Affected product'
 }
 
 function AdvancedToolReportResult({
