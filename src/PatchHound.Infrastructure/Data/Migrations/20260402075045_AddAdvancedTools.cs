@@ -20,6 +20,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     Description = table.Column<string>(type: "text", nullable: false),
                     SupportedAssetTypesJson = table.Column<string>(type: "text", nullable: false),
                     KqlQuery = table.Column<string>(type: "text", nullable: false),
+                    AiPrompt = table.Column<string>(type: "text", nullable: false),
                     Enabled = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)

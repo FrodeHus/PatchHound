@@ -12,7 +12,7 @@ using PatchHound.Infrastructure.Data;
 namespace PatchHound.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(PatchHoundDbContext))]
-    [Migration("20260402073652_AddAdvancedTools")]
+    [Migration("20260402075045_AddAdvancedTools")]
     partial class AddAdvancedTools
     {
         /// <inheritdoc />
@@ -93,6 +93,10 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("AiPrompt")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
