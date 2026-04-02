@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { toneBadge } from '@/lib/tone-classes'
+import type { Tone } from '@/lib/tone-classes'
 import { formatDate, formatDateTime, formatNullableDateTime, startCase } from '@/lib/formatting'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { softwareQueryKeys } from '@/features/software/list-state'
@@ -1362,9 +1363,19 @@ function StageExecutionPanel({
   approving: boolean
   onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string, maintenanceWindowDate?: string) => Promise<void>
 }) {
+  const auditQuery = useQuery({
+    queryKey: ['decision-audit-trail', data.tenantSoftwareId, 'execution-stage'],
+    queryFn: () => fetchDecisionAuditTrail({ data: { tenantSoftwareId: data.tenantSoftwareId } }),
+    enabled: Boolean(data.currentDecision),
+  })
+
   if (!data.currentDecision) {
     return null
   }
+
+  const latestApproverEvent = (auditQuery.data ?? [])
+    .filter((entry) => entry.action === 'Approved' || entry.action === 'Denied')
+    .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())[0] ?? null
 
   return (
     <DecisionSummaryPanel
@@ -1372,6 +1383,13 @@ function StageExecutionPanel({
       readOnly={!canActOnCurrentStage}
       approving={approving}
       onApproveReject={onApproveReject}
+      narrativeContent={(
+        <DecisionNarrativeTimeline
+          recommendation={data.recommendations[0] ?? null}
+          decision={data.currentDecision}
+          approverEvent={latestApproverEvent}
+        />
+      )}
       rightColumn={
         <>
           <StageMetricCard
@@ -1450,6 +1468,7 @@ function DecisionSummaryPanel({
   readOnly,
   approving,
   onApproveReject,
+  narrativeContent,
   rightColumn,
   emphasizeApproval = false,
   requireApprovalJustification = false,
@@ -1459,6 +1478,7 @@ function DecisionSummaryPanel({
   readOnly: boolean
   approving: boolean
   onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string, maintenanceWindowDate?: string) => Promise<void>
+  narrativeContent?: ReactNode
   rightColumn: ReactNode
   emphasizeApproval?: boolean
   requireApprovalJustification?: boolean
@@ -1512,9 +1532,13 @@ function DecisionSummaryPanel({
               {approvalStatusLabel(decision.approvalStatus)}
             </span>
           </div>
-          <p className="mt-3 text-sm leading-relaxed text-foreground/90">
-            {decision.justification || 'No justification was provided for this decision.'}
-          </p>
+          <div className="mt-3">
+            {narrativeContent ?? (
+              <p className="text-sm leading-relaxed text-foreground/90">
+                {decision.justification || 'No justification was provided for this decision.'}
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground sm:grid-cols-4">
@@ -1664,6 +1688,101 @@ function DecisionSummaryPanel({
         {rightColumn}
       </div>
     </div>
+  )
+}
+
+function DecisionNarrativeTimeline({
+  recommendation,
+  decision,
+  approverEvent,
+}: {
+  recommendation: DecisionContext['recommendations'][number] | null
+  decision: NonNullable<DecisionContext['currentDecision']>
+  approverEvent: { action: string; userDisplayName: string | null; justification: string | null; timestamp: string } | null
+}) {
+  const items: Array<{
+    label: string
+    actor: string
+    timestamp: string | null
+    tone: Tone
+    badge: string | null
+    text: string
+  }> = [
+    {
+      label: 'Security recommendation',
+      actor: recommendation?.analystDisplayName ?? 'Analyst',
+      timestamp: recommendation?.createdAt ?? null,
+      tone: recommendation ? outcomeTone(recommendation.recommendedOutcome) : 'neutral',
+      badge: recommendation ? outcomeLabel(recommendation.recommendedOutcome) : null,
+      text: recommendation?.rationale?.trim() || 'No analyst recommendation was recorded for this remediation.',
+    },
+    {
+      label: 'Asset owner',
+      actor: 'Decision maker',
+      timestamp: decision.decidedAt,
+      tone: outcomeTone(decision.outcome),
+      badge: outcomeLabel(decision.outcome),
+      text: decision.justification?.trim() || 'No written rationale was provided by the asset owner.',
+    },
+    {
+      label: 'Approver',
+      actor: approverEvent?.userDisplayName ?? (decision.approvalStatus === 'PendingApproval' ? 'Pending review' : 'Approver'),
+      timestamp: approverEvent?.timestamp ?? decision.approvedAt ?? decision.latestRejection?.rejectedAt ?? null,
+      tone:
+        decision.approvalStatus === 'Approved'
+          ? 'success'
+          : decision.approvalStatus === 'Rejected'
+            ? 'danger'
+            : 'warning',
+      badge:
+        decision.approvalStatus === 'Approved'
+          ? 'Approved'
+          : decision.approvalStatus === 'Rejected'
+            ? 'Rejected'
+            : 'Pending',
+      text:
+        approverEvent?.justification?.trim()
+        || decision.latestRejection?.comment?.trim()
+        || (
+          decision.approvalStatus === 'PendingApproval'
+            ? 'Approval is still pending. No approver note has been recorded yet.'
+            : 'No written approval note was recorded.'
+        ),
+    },
+  ]
+
+  return (
+    <ol className="space-y-3">
+      {items.map((item, index) => (
+        <li key={item.label} className="relative pl-6">
+          {index < items.length - 1 ? (
+            <span
+              aria-hidden="true"
+              className="absolute left-[0.42rem] top-6 bottom-[-1rem] w-px bg-border/70"
+            />
+          ) : null}
+          <span
+            aria-hidden="true"
+            className={`absolute left-0 top-1.5 inline-flex size-3 rounded-full border ${toneBadge(item.tone)}`}
+          />
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">{item.label}</span>
+              {item.badge ? (
+                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(item.tone)}`}>
+                  {item.badge}
+                </span>
+              ) : null}
+              <span className="text-xs text-muted-foreground">
+                {item.actor}
+                {item.timestamp ? ` · ${formatDateTime(item.timestamp)}` : ''}
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed text-foreground/90">{item.text}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
   )
 }
 

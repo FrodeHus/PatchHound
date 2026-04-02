@@ -2,7 +2,7 @@ import CodeMirror from '@uiw/react-codemirror'
 import { autocompletion, completeFromList, type Completion } from '@codemirror/autocomplete'
 import { HighlightStyle, LanguageSupport, StreamLanguage, syntaxHighlighting } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
-import { EditorView } from '@codemirror/view'
+import { EditorView, keymap } from '@codemirror/view'
 import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -108,6 +108,7 @@ type KqlEditorProps = {
   className?: string
   minHeight?: number
   readOnly?: boolean
+  onShiftEnter?: () => void
 }
 
 export function KqlEditor({
@@ -117,6 +118,7 @@ export function KqlEditor({
   className,
   minHeight = 220,
   readOnly = false,
+  onShiftEnter,
 }: KqlEditorProps) {
   const editorTheme = useMemo(
     () =>
@@ -226,8 +228,20 @@ export function KqlEditor({
       }),
       syntaxHighlighting(kqlHighlightStyle),
       EditorView.lineWrapping,
+      keymap.of([
+        {
+          key: 'Shift-Enter',
+          run: () => {
+            if (readOnly || !onShiftEnter) {
+              return false
+            }
+            onShiftEnter()
+            return true
+          },
+        },
+      ]),
     ],
-    [completions],
+    [completions, onShiftEnter, readOnly],
   )
 
   return (

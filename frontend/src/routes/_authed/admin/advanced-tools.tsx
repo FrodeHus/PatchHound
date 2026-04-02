@@ -343,6 +343,7 @@ function AdvancedToolWorkbench({
 }: AdvancedToolWorkbenchProps) {
   const [draft, setDraft] = useState<ToolDraft>(initialDraft)
   const [sampleParameters, setSampleParameters] = useState<Record<string, string>>({})
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1)
 
   const requiredParameters = (draft.kqlQuery.match(/\{\{\s*([a-zA-Z0-9._-]+)\s*\}\}/g) ?? [])
     .map((match) => match.replace(/[{}]/g, '').trim())
@@ -398,6 +399,15 @@ function AdvancedToolWorkbench({
     }))
   }, [testMutation.data?.schema])
 
+  const canSave = !isSaving
+    && draft.name.trim().length > 0
+    && draft.kqlQuery.trim().length > 0
+    && draft.supportedAssetTypes.length > 0
+
+  async function handleSaveCurrentStage() {
+    await onSave(draft)
+  }
+
   return (
     <Card className="rounded-[32px] border-border/70">
       <CardHeader className="space-y-2">
@@ -426,93 +436,137 @@ function AdvancedToolWorkbench({
       </CardHeader>
 
       <CardContent className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Name</Label>
-            <Input
-              value={draft.name}
-              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Component evidence lookup"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Description</Label>
-            <Input
-              value={draft.description}
-              onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
-              placeholder="Explain what the tool is for"
-            />
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={`rounded-full border px-3 py-1.5 text-sm transition ${currentStep === 1 ? 'border-primary/35 bg-primary/10 text-foreground' : 'border-border/70 bg-background/50 text-muted-foreground hover:text-foreground'}`}
+            onClick={() => setCurrentStep(1)}
+          >
+            1. Query
+          </button>
+          <button
+            type="button"
+            className={`rounded-full border px-3 py-1.5 text-sm transition ${currentStep === 2 ? 'border-primary/35 bg-primary/10 text-foreground' : 'border-border/70 bg-background/50 text-muted-foreground hover:text-foreground'}`}
+            onClick={() => setCurrentStep(2)}
+          >
+            2. AI prompt
+          </button>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <Label>Supported asset types</Label>
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Checkbox
-                checked={draft.enabled}
-                onCheckedChange={(checked) =>
-                  setDraft((current) => ({ ...current, enabled: Boolean(checked) }))
-                }
-              />
-              Enabled
-            </label>
-          </div>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/60 p-3 text-sm">
+        {currentStep === 1 ? (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input
+                  value={draft.name}
+                  onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+                  placeholder="Component evidence lookup"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input
+                  value={draft.description}
+                  onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+                  placeholder="Explain what the tool is for"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <Label>Supported asset types</Label>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Checkbox
-                    checked={draft.supportedAssetTypes.includes('Device')}
-                    onCheckedChange={(checked) => {
-                      setDraft((current) => ({
-                        ...current,
-                        supportedAssetTypes: checked ? ['Device'] : [],
-                      }))
-                    }}
+                    checked={draft.enabled}
+                    onCheckedChange={(checked) =>
+                      setDraft((current) => ({ ...current, enabled: Boolean(checked) }))
+                    }
                   />
-                  <span>Device</span>
+                  Enabled
                 </label>
-              }
+              </div>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/60 p-3 text-sm">
+                      <Checkbox
+                        checked={draft.supportedAssetTypes.includes('Device')}
+                        onCheckedChange={(checked) => {
+                          setDraft((current) => ({
+                            ...current,
+                            supportedAssetTypes: checked ? ['Device'] : [],
+                          }))
+                        }}
+                      />
+                      <span>Device</span>
+                    </label>
+                  }
+                />
+                <TooltipContent side="top" className="max-w-sm space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em]">Allowed parameters</p>
+                  <ul className="space-y-1 text-sm">
+                    {parameters.map((parameter) => (
+                      <li key={parameter.name}>
+                        <span className="font-medium">{`{{${parameter.name}}}`}</span>
+                        {' '}
+                        {parameter.description}
+                      </li>
+                    ))}
+                  </ul>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <Label>KQL query</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Define and test the Defender query first. Press <span className="font-medium text-foreground">Shift+Enter</span> to run it from the editor.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => testMutation.mutate()}
+                  disabled={!canTest || testMutation.isPending}
+                >
+                  {testMutation.isPending ? <Play className="mr-2 size-4 animate-pulse" /> : <Play className="mr-2 size-4" />}
+                  Test query
+                </Button>
+              </div>
+              <KqlEditor
+                value={draft.kqlQuery}
+                onChange={(value) => setDraft((current) => ({ ...current, kqlQuery: value }))}
+                parameters={parameters.map((parameter) => parameter.name)}
+                minHeight={340}
+                onShiftEnter={() => {
+                  if (canTest && !testMutation.isPending) {
+                    testMutation.mutate()
+                  }
+                }}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Optional AI prompt</Label>
+              <p className="text-sm text-muted-foreground">
+                Add an optional prompt to shape the AI summary after the KQL query runs. This step is optional.
+              </p>
+            </div>
+            <Textarea
+              value={draft.aiPrompt}
+              onChange={(event) => setDraft((current) => ({ ...current, aiPrompt: event.target.value }))}
+              placeholder="Summarize what the KQL results prove, call out the strongest evidence of installation or bundled-component presence, and explain the next operational conclusion."
             />
-            <TooltipContent side="top" className="max-w-sm space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em]">Allowed parameters</p>
-              <ul className="space-y-1 text-sm">
-                {parameters.map((parameter) => (
-                  <li key={parameter.name}>
-                    <span className="font-medium">{`{{${parameter.name}}}`}</span>
-                    {' '}
-                    {parameter.description}
-                  </li>
-                ))}
-              </ul>
-            </TooltipContent>
-          </Tooltip>
-        </div>
-
-        <div className="space-y-3">
-          <Label>KQL query</Label>
-          <KqlEditor
-            value={draft.kqlQuery}
-            onChange={(value) => setDraft((current) => ({ ...current, kqlQuery: value }))}
-            parameters={parameters.map((parameter) => parameter.name)}
-            minHeight={340}
-          />
-        </div>
-
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <Label>Optional AI prompt</Label>
-            <p className="text-sm text-muted-foreground">
-              Guides the AI summary after the KQL query runs. Leave it blank to use the default operational summary prompt.
-            </p>
           </div>
-          <Textarea
-            value={draft.aiPrompt}
-            onChange={(event) => setDraft((current) => ({ ...current, aiPrompt: event.target.value }))}
-            placeholder="Summarize what the KQL results prove, call out the strongest evidence of installation or bundled-component presence, and explain the next operational conclusion."
-          />
-        </div>
+        )}
 
         {requiredParameters.length > 0 ? (
           <div className="space-y-3 rounded-3xl border border-border/70 bg-muted/20 p-4">
@@ -544,45 +598,41 @@ function AdvancedToolWorkbench({
         <div className="space-y-4 rounded-3xl border border-border/70 bg-background/60 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
-              <h3 className="text-sm font-medium">Test workbench</h3>
+              <h3 className="text-sm font-medium">
+                {currentStep === 1 ? 'Query test workbench' : 'AI test workbench'}
+              </h3>
               <p className="text-sm text-muted-foreground">
-                Run the query against Defender and inspect both the raw result grid and the AI summary without leaving the page.
+                {currentStep === 1
+                  ? 'Run the query against Defender and inspect the raw result grid before saving this stage.'
+                  : 'Test the optional AI prompt against the current query results before saving the AI stage.'}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-full"
-                onClick={() => testMutation.mutate()}
-                disabled={!canTest || testMutation.isPending}
-              >
-                {testMutation.isPending ? <Play className="mr-2 size-4 animate-pulse" /> : <Play className="mr-2 size-4" />}
-                Test query
-              </Button>
-              <Tooltip>
-                <TooltipTrigger>
-                  <span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-full"
-                      onClick={() => aiSummaryMutation.mutate()}
-                      disabled={!canTestAiSummary || aiSummaryMutation.isPending}
-                    >
-                      {aiSummaryMutation.isPending ? <Play className="mr-2 size-4 animate-pulse" /> : <Play className="mr-2 size-4" />}
-                      Test AI summary
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {!canTestAiSummary && aiUnavailableReason ? (
-                  <TooltipContent>{aiUnavailableReason}</TooltipContent>
-                ) : null}
-              </Tooltip>
-            </div>
+            {currentStep === 2 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Tooltip>
+                  <TooltipTrigger>
+                    <span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={() => aiSummaryMutation.mutate()}
+                        disabled={!canTestAiSummary || aiSummaryMutation.isPending}
+                      >
+                        {aiSummaryMutation.isPending ? <Play className="mr-2 size-4 animate-pulse" /> : <Play className="mr-2 size-4" />}
+                        Test AI summary
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!canTestAiSummary && aiUnavailableReason ? (
+                    <TooltipContent>{aiUnavailableReason}</TooltipContent>
+                  ) : null}
+                </Tooltip>
+              </div>
+            ) : null}
           </div>
 
-          {testMutation.data ? (
+          {testMutation.data && currentStep === 1 ? (
             <div className="space-y-3">
               <div className="space-y-1">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -605,7 +655,7 @@ function AdvancedToolWorkbench({
             </div>
           ) : null}
 
-          {aiSummaryMutation.data ? (
+          {aiSummaryMutation.data && currentStep === 2 ? (
             <div className="space-y-4 rounded-2xl border border-border/70 bg-card/70 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge>{aiSummaryMutation.data.profileName}</Badge>
@@ -632,17 +682,35 @@ function AdvancedToolWorkbench({
           >
             Clear draft
           </Button>
+          {currentStep === 2 ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCurrentStep(1)}
+            >
+              Back to query
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCurrentStep(2)}
+            >
+              Next: AI prompt
+            </Button>
+          )}
           <Button
             type="button"
-            onClick={() => void onSave(draft)}
-            disabled={
-              isSaving
-              || draft.name.trim().length === 0
-              || draft.kqlQuery.trim().length === 0
-              || draft.supportedAssetTypes.length === 0
-            }
+            onClick={() => void handleSaveCurrentStage()}
+            disabled={!canSave}
           >
-            {draft.id ? 'Save changes' : 'Create tool'}
+            {currentStep === 1
+              ? draft.id
+                ? 'Save query stage'
+                : 'Save and continue'
+              : draft.id
+                ? 'Save AI stage'
+                : 'Create tool'}
           </Button>
         </div>
       </CardContent>
