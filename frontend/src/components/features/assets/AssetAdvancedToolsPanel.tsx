@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
-import { Braces, ChevronDown, ChevronUp, Play } from 'lucide-react'
+import { Braces, ChevronDown, ChevronUp, Expand, Play } from 'lucide-react'
 import { fetchAdvancedTools, runAdvancedToolForAsset } from '@/api/advanced-tools.functions'
 import type { AdvancedToolAssetExecutionResult, AdvancedToolCatalog } from '@/api/advanced-tools.schemas'
 import type { AssetDetail } from '@/api/assets.schemas'
@@ -25,6 +25,7 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
   const [selectedVulnerabilityIds, setSelectedVulnerabilityIds] = useState<string[]>([])
   const [expandedVulnerabilityIds, setExpandedVulnerabilityIds] = useState<string[]>([])
   const [rawResultsOpen, setRawResultsOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
 
   const toolsQuery = useQuery({
     queryKey: ['advanced-tools', 'asset', asset.id],
@@ -234,17 +235,35 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
           <AdvancedToolReportResult
             result={runMutation.data}
             onOpenRawResults={() => setRawResultsOpen(true)}
+            onOpenReport={() => setReportOpen(true)}
           />
         ) : null}
       </CardContent>
 
       <Dialog open={rawResultsOpen} onOpenChange={setRawResultsOpen}>
-        <DialogContent size="lg" className="max-h-[90vh] sm:max-w-[80vw]">
+        <DialogContent
+          size="lg"
+          className="max-h-[90vh] overflow-hidden sm:h-[80vh] sm:max-w-[80vw] sm:w-[80vw]"
+        >
           <DialogHeader>
             <DialogTitle>Raw results</DialogTitle>
           </DialogHeader>
           {runMutation.data ? (
             <RawResultsDialogContent result={runMutation.data} />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reportOpen} onOpenChange={setReportOpen}>
+        <DialogContent
+          size="lg"
+          className="max-h-[90vh] overflow-hidden sm:h-[80vh] sm:max-w-[80vw] sm:w-[80vw]"
+        >
+          <DialogHeader>
+            <DialogTitle>Investigation report</DialogTitle>
+          </DialogHeader>
+          {runMutation.data ? (
+            <AdvancedToolReportDialogContent result={runMutation.data} />
           ) : null}
         </DialogContent>
       </Dialog>
@@ -274,12 +293,12 @@ function primaryProductName(possibleCorrelatedSoftware: string[]) {
 function AdvancedToolReportResult({
   result,
   onOpenRawResults,
+  onOpenReport,
 }: {
   result: AdvancedToolAssetExecutionResult
   onOpenRawResults: () => void
+  onOpenReport: () => void
 }) {
-  const report = result.report
-
   return (
     <div className="space-y-4 rounded-2xl border border-border/70 bg-background/60 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -300,23 +319,56 @@ function AdvancedToolReportResult({
           View raw results
         </Button>
       </div>
+      <AdvancedToolReportBody result={result} maxHeightClassName="max-h-[36rem]" />
+      {result.report ? (
+        <div className="flex justify-end">
+          <Button type="button" variant="ghost" className="rounded-full" onClick={onOpenReport}>
+            <Expand className="mr-2 size-4" />
+            Open large view
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
-      {report ? (
-        <div className="space-y-4 rounded-2xl border border-border/70 bg-card/80 p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge>{report.profileName}</Badge>
-            <Badge variant="outline">{report.providerType}</Badge>
-            <Badge variant="outline">{report.model}</Badge>
-          </div>
-          <MarkdownViewer content={report.content} />
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-border/70 bg-card/80 p-4">
-          <p className="text-sm text-muted-foreground">
-            {result.aiUnavailableMessage ?? 'AI report is not available for this tool run.'}
-          </p>
-        </div>
-      )}
+function AdvancedToolReportDialogContent({ result }: { result: AdvancedToolAssetExecutionResult }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <AdvancedToolReportBody result={result} maxHeightClassName="max-h-none" />
+    </div>
+  )
+}
+
+function AdvancedToolReportBody({
+  result,
+  maxHeightClassName,
+}: {
+  result: AdvancedToolAssetExecutionResult
+  maxHeightClassName: string
+}) {
+  const report = result.report
+
+  if (!report) {
+    return (
+      <div className="py-1">
+        <p className="text-sm text-muted-foreground">
+          {result.aiUnavailableMessage ?? 'AI report is not available for this tool run.'}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge>{report.profileName}</Badge>
+        <Badge variant="outline">{report.providerType}</Badge>
+        <Badge variant="outline">{report.model}</Badge>
+      </div>
+      <div className={`min-h-0 overflow-auto pr-2 ${maxHeightClassName}`}>
+        <MarkdownViewer content={report.content} className="prose-headings:mt-0 prose-p:mt-3" />
+      </div>
     </div>
   )
 }
@@ -329,12 +381,12 @@ function RawResultsDialogContent({ result }: { result: AdvancedToolAssetExecutio
   }))
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
       <p className="text-sm text-muted-foreground">
         {result.rawResults.rowCount} merged rows returned from the tool run.
       </p>
-      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/70">
-        <div className="max-h-[32rem] overflow-auto">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-border/70 bg-card/70">
+        <div className="h-full overflow-auto">
           <DataTable
             columns={columns}
             data={result.rawResults.rows as Record<string, unknown>[]}

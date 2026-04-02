@@ -218,11 +218,11 @@ function AdvancedToolsPage() {
                   return (
                     <div
                       key={tool.id}
-                      className="flex items-center gap-2"
+                      className="flex min-w-0 items-center gap-2"
                     >
                       <button
                         type="button"
-                        className={`flex-1 rounded-2xl border px-3 py-2 text-left text-sm transition ${
+                        className={`min-w-0 flex-1 rounded-2xl border px-3 py-2 text-left text-sm transition ${
                           active
                             ? 'border-primary/40 bg-primary/10 text-foreground'
                             : 'border-border/70 bg-background/60 text-foreground hover:border-foreground/20 hover:bg-muted/20'
@@ -247,22 +247,6 @@ function AdvancedToolsPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-3xl border-border/70">
-              <CardHeader>
-                <CardTitle>Allowed parameters</CardTitle>
-                <CardDescription>
-                  Supported placeholders for device-context tools.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                {parameters.map((parameter) => (
-                  <div key={parameter.name} className="rounded-2xl border border-border/70 bg-background/60 p-3">
-                    <p className="font-medium text-foreground">{`{{${parameter.name}}}`}</p>
-                    <p className="mt-1">{parameter.description}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
           </aside>
 
           <section className="space-y-5">
@@ -458,18 +442,36 @@ function AdvancedToolWorkbench({
               Enabled
             </label>
           </div>
-          <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/60 p-3 text-sm">
-            <Checkbox
-              checked={draft.supportedAssetTypes.includes('Device')}
-              onCheckedChange={(checked) => {
-                setDraft((current) => ({
-                  ...current,
-                  supportedAssetTypes: checked ? ['Device'] : [],
-                }))
-              }}
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/60 p-3 text-sm">
+                  <Checkbox
+                    checked={draft.supportedAssetTypes.includes('Device')}
+                    onCheckedChange={(checked) => {
+                      setDraft((current) => ({
+                        ...current,
+                        supportedAssetTypes: checked ? ['Device'] : [],
+                      }))
+                    }}
+                  />
+                  <span>Device</span>
+                </label>
+              }
             />
-            <span>Device</span>
-          </label>
+            <TooltipContent side="top" className="max-w-sm space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em]">Allowed parameters</p>
+              <ul className="space-y-1 text-sm">
+                {parameters.map((parameter) => (
+                  <li key={parameter.name}>
+                    <span className="font-medium">{`{{${parameter.name}}}`}</span>
+                    {' '}
+                    {parameter.description}
+                  </li>
+                ))}
+              </ul>
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         <div className="space-y-3">
