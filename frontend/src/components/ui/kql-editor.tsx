@@ -118,6 +118,87 @@ export function KqlEditor({
   minHeight = 220,
   readOnly = false,
 }: KqlEditorProps) {
+  const editorTheme = useMemo(
+    () =>
+      EditorView.theme(
+        {
+          '&': {
+            fontSize: '0.925rem',
+            minHeight: `${minHeight}px`,
+            color: 'var(--foreground)',
+            backgroundColor: 'transparent',
+          },
+          '.cm-editor': {
+            minHeight: `${minHeight}px`,
+            backgroundColor: 'transparent',
+          },
+          '.cm-scroller': {
+            minHeight: `${minHeight}px`,
+            fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, monospace)',
+            backgroundColor: 'transparent',
+          },
+          '.cm-sizer, .cm-content, .cm-line': {
+            backgroundColor: 'transparent',
+          },
+          '.cm-focused': {
+            outline: 'none',
+          },
+          '.cm-gutters': {
+            color: 'var(--muted-foreground)',
+            backgroundColor: 'color-mix(in oklab, var(--muted) 45%, transparent)',
+            borderRight: '1px solid color-mix(in oklab, var(--border) 70%, transparent)',
+          },
+          '.cm-lineNumbers .cm-gutterElement': {
+            padding: '0 0.5rem 0 0.25rem',
+          },
+          '.cm-activeLineGutter, .cm-activeLine': {
+            backgroundColor: 'color-mix(in oklab, var(--accent) 24%, transparent)',
+          },
+          '.cm-selectionBackground, .cm-content ::selection': {
+            backgroundColor: 'color-mix(in oklab, var(--primary) 24%, transparent) !important',
+          },
+          '.cm-cursor, .cm-dropCursor': {
+            borderLeftColor: 'var(--primary)',
+          },
+          '.cm-placeholder': {
+            color: 'var(--muted-foreground)',
+          },
+          '.cm-tooltip': {
+            backgroundColor: 'var(--popover)',
+            color: 'var(--popover-foreground)',
+            border: '1px solid color-mix(in oklab, var(--border) 80%, transparent)',
+            borderRadius: '1rem',
+            boxShadow: '0 18px 45px color-mix(in oklab, var(--background) 72%, transparent)',
+          },
+          '.cm-tooltip-autocomplete > ul': {
+            fontFamily: 'var(--font-sans, sans-serif)',
+            padding: '0.35rem',
+          },
+          '.cm-tooltip-autocomplete ul li': {
+            borderRadius: '0.75rem',
+            padding: '0.4rem 0.65rem',
+          },
+          '.cm-tooltip-autocomplete ul li[aria-selected]': {
+            backgroundColor: 'color-mix(in oklab, var(--accent) 55%, transparent)',
+            color: 'var(--accent-foreground)',
+          },
+          '.cm-tooltip-autocomplete ul li .cm-completionDetail': {
+            color: 'var(--muted-foreground)',
+          },
+          '.cm-content': {
+            padding: '0.75rem',
+          },
+          '.cm-panels': {
+            backgroundColor: 'color-mix(in oklab, var(--muted) 45%, transparent)',
+            color: 'var(--foreground)',
+            borderBottom: '1px solid color-mix(in oklab, var(--border) 70%, transparent)',
+          },
+        },
+        { dark: true },
+      ),
+    [minHeight],
+  )
+
   const completions = useMemo<Completion[]>(() => {
     const parameterCompletions = parameters.map((parameter) => ({
       label: `{{${parameter}}}`,
@@ -145,77 +226,8 @@ export function KqlEditor({
       }),
       syntaxHighlighting(kqlHighlightStyle),
       EditorView.lineWrapping,
-      EditorView.theme({
-        '&': {
-          fontSize: '0.925rem',
-          minHeight: `${minHeight}px`,
-          color: 'var(--foreground)',
-          backgroundColor: 'transparent',
-        },
-        '.cm-editor': {
-          minHeight: `${minHeight}px`,
-          backgroundColor: 'transparent',
-        },
-        '.cm-scroller': {
-          minHeight: `${minHeight}px`,
-          fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, monospace)',
-        },
-        '.cm-focused': {
-          outline: 'none',
-        },
-        '.cm-gutters': {
-          color: 'var(--muted-foreground)',
-          backgroundColor: 'color-mix(in oklab, var(--muted) 45%, transparent)',
-          borderRight: '1px solid color-mix(in oklab, var(--border) 70%, transparent)',
-        },
-        '.cm-lineNumbers .cm-gutterElement': {
-          padding: '0 0.5rem 0 0.25rem',
-        },
-        '.cm-activeLineGutter, .cm-activeLine': {
-          backgroundColor: 'color-mix(in oklab, var(--accent) 24%, transparent)',
-        },
-        '.cm-selectionBackground, .cm-content ::selection': {
-          backgroundColor: 'color-mix(in oklab, var(--primary) 24%, transparent) !important',
-        },
-        '.cm-cursor, .cm-dropCursor': {
-          borderLeftColor: 'var(--primary)',
-        },
-        '.cm-placeholder': {
-          color: 'var(--muted-foreground)',
-        },
-        '.cm-tooltip': {
-          backgroundColor: 'var(--popover)',
-          color: 'var(--popover-foreground)',
-          border: '1px solid color-mix(in oklab, var(--border) 80%, transparent)',
-          borderRadius: '1rem',
-          boxShadow: '0 18px 45px color-mix(in oklab, var(--background) 72%, transparent)',
-        },
-        '.cm-tooltip-autocomplete > ul': {
-          fontFamily: 'var(--font-sans, sans-serif)',
-          padding: '0.35rem',
-        },
-        '.cm-tooltip-autocomplete ul li': {
-          borderRadius: '0.75rem',
-          padding: '0.4rem 0.65rem',
-        },
-        '.cm-tooltip-autocomplete ul li[aria-selected]': {
-          backgroundColor: 'color-mix(in oklab, var(--accent) 55%, transparent)',
-          color: 'var(--accent-foreground)',
-        },
-        '.cm-tooltip-autocomplete ul li .cm-completionDetail': {
-          color: 'var(--muted-foreground)',
-        },
-        '.cm-content': {
-          padding: '0.75rem',
-        },
-        '.cm-panels': {
-          backgroundColor: 'color-mix(in oklab, var(--muted) 45%, transparent)',
-          color: 'var(--foreground)',
-          borderBottom: '1px solid color-mix(in oklab, var(--border) 70%, transparent)',
-        },
-      }),
     ],
-    [completions, minHeight],
+    [completions],
   )
 
   return (
@@ -223,6 +235,7 @@ export function KqlEditor({
       <CodeMirror
         value={value}
         onChange={onChange}
+        theme={editorTheme}
         editable={!readOnly}
         basicSetup={{
           lineNumbers: true,

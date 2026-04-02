@@ -187,7 +187,11 @@ function AdvancedToolsPage() {
               Advanced Tools
             </h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              Create and test reusable Defender KQL tools in a dedicated workbench instead of a cramped modal editor.
+              Create and test reusable Defender KQL tools that can be surfaced
+              in asset details views and used to power AI-assisted
+              investigations. Define the KQL query, specify required parameters,
+              and optionally add an AI prompt to guide natural language
+              summaries of the results.
             </p>
           </div>
         </div>
@@ -205,7 +209,7 @@ function AdvancedToolsPage() {
                 <Button
                   type="button"
                   className="w-full rounded-full"
-                  onClick={() => void navigate({ search: { mode: 'new' } })}
+                  onClick={() => void navigate({ search: { mode: "new" } })}
                 >
                   <Plus className="mr-2 size-4" />
                   New tool
@@ -213,7 +217,8 @@ function AdvancedToolsPage() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {tools.map((tool: AdvancedTool) => {
-                  const active = search.toolId === tool.id && search.mode !== 'new'
+                  const active =
+                    search.toolId === tool.id && search.mode !== "new";
 
                   return (
                     <div
@@ -224,10 +229,12 @@ function AdvancedToolsPage() {
                         type="button"
                         className={`min-w-0 flex-1 rounded-2xl border px-3 py-2 text-left text-sm transition ${
                           active
-                            ? 'border-primary/40 bg-primary/10 text-foreground'
-                            : 'border-border/70 bg-background/60 text-foreground hover:border-foreground/20 hover:bg-muted/20'
+                            ? "border-primary/40 bg-primary/10 text-foreground"
+                            : "border-border/70 bg-background/60 text-foreground hover:border-foreground/20 hover:bg-muted/20"
                         }`}
-                        onClick={() => void navigate({ search: { toolId: tool.id } })}
+                        onClick={() =>
+                          void navigate({ search: { toolId: tool.id } })
+                        }
                       >
                         <div className="truncate font-medium">{tool.name}</div>
                       </button>
@@ -242,11 +249,10 @@ function AdvancedToolsPage() {
                         <span className="sr-only">Delete {tool.name}</span>
                       </Button>
                     </div>
-                  )
+                  );
                 })}
               </CardContent>
             </Card>
-
           </aside>
 
           <section className="space-y-5">
@@ -258,8 +264,8 @@ function AdvancedToolsPage() {
               aiUnavailableReason={aiUnavailableReason}
               onClearDraft={() => void navigate({ search: {} })}
               onSave={async (value) => {
-                const toolId = await saveMutation.mutateAsync(value)
-                await navigate({ search: toolId ? { toolId } : {} })
+                const toolId = await saveMutation.mutateAsync(value);
+                await navigate({ search: toolId ? { toolId } : {} });
               }}
               isSaving={saveMutation.isPending}
             />
@@ -267,22 +273,32 @@ function AdvancedToolsPage() {
         </div>
       </section>
 
-      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
         <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle>Delete advanced tool</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Delete {deleteTarget?.name}? This removes it from the admin catalog and from Defender-backed asset detail views.
+            Delete {deleteTarget?.name}? This removes it from the admin catalog
+            and from Defender-backed asset detail views.
           </p>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+            >
               Cancel
             </Button>
             <Button
               type="button"
               variant="destructive"
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              onClick={() =>
+                deleteTarget && deleteMutation.mutate(deleteTarget.id)
+              }
               disabled={deleteMutation.isPending}
             >
               Delete
@@ -291,7 +307,7 @@ function AdvancedToolsPage() {
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }
 
 function formatCellValue(value: unknown) {
