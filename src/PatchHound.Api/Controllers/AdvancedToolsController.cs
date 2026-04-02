@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models.AdvancedTools;
 using PatchHound.Core.Entities;
@@ -207,6 +208,17 @@ public class AdvancedToolsController : ControllerBase
         {
             return BadRequest(new ProblemDetails { Title = ex.Message });
         }
+        catch (HttpRequestException ex)
+        {
+            return StatusCode(
+                (int)HttpStatusCode.BadGateway,
+                new ProblemDetails
+                {
+                    Status = (int)HttpStatusCode.BadGateway,
+                    Title = ex.Message,
+                }
+            );
+        }
     }
 
     [HttpPost("test-ai-summary")]
@@ -250,6 +262,17 @@ public class AdvancedToolsController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(new ProblemDetails { Title = ex.Message });
+        }
+        catch (HttpRequestException ex)
+        {
+            return StatusCode(
+                (int)HttpStatusCode.BadGateway,
+                new ProblemDetails
+                {
+                    Status = (int)HttpStatusCode.BadGateway,
+                    Title = ex.Message,
+                }
+            );
         }
     }
 
@@ -312,6 +335,17 @@ public class AdvancedToolsController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(new ProblemDetails { Title = ex.Message });
+        }
+        catch (HttpRequestException ex)
+        {
+            return StatusCode(
+                (int)HttpStatusCode.BadGateway,
+                new ProblemDetails
+                {
+                    Status = (int)HttpStatusCode.BadGateway,
+                    Title = ex.Message,
+                }
+            );
         }
     }
 

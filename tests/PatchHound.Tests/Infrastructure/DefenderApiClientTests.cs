@@ -298,6 +298,38 @@ public class DefenderApiClientTests
             );
     }
 
+    [Fact]
+    public async Task RunAdvancedQueryAsync_WhenDefenderReturnsBadRequest_ThrowsReadableValidationError()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = new StringContent(
+                    """
+                    {
+                      "error": {
+                        "code": "BadRequest",
+                        "message": "Query could not be parsed at line 1."
+                      }
+                    }
+                    """,
+                    Encoding.UTF8,
+                    "application/json"
+                ),
+            }
+        );
+        var client = new TestDefenderApiClient(new HttpClient(handler));
+
+        var act = () => client.RunAdvancedQueryAsync(
+            Configuration,
+            "DeviceInfo | bad syntax",
+            CancellationToken.None
+        );
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Microsoft Defender rejected the advanced hunting query: Query could not be parsed at line 1.");
+    }
+
     private static HttpResponseMessage CreateJsonResponse(string json)
     {
         return new HttpResponseMessage(HttpStatusCode.OK)
