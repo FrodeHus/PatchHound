@@ -312,7 +312,7 @@ function AdvancedToolsPage() {
       </section>
 
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
-        <DialogContent size="lg">
+        <DialogContent size="lg" className="sm:max-w-[70vw]">
           <DialogHeader>
             <DialogTitle>
               {draft.id ? 'Edit advanced tool' : 'Create advanced tool'}
