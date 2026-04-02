@@ -51,15 +51,6 @@ public record AdvancedToolSchemaColumnDto(
     string Type
 );
 
-public record AdvancedToolRenderedQueryDto(
-    string Label,
-    Guid? VulnerabilityId,
-    string? VulnerabilityExternalId,
-    string Query,
-    IReadOnlyList<AdvancedToolSchemaColumnDto> Schema,
-    IReadOnlyList<IReadOnlyDictionary<string, object?>> Results
-);
-
 public record AdvancedToolExecutionResultDto(
     IReadOnlyList<AdvancedToolSchemaColumnDto> Schema,
     IReadOnlyList<IReadOnlyDictionary<string, object?>> Results,
@@ -75,8 +66,24 @@ public record AdvancedToolAiSummaryResultDto(
     DateTimeOffset GeneratedAt
 );
 
+public record AdvancedToolAssetAiReportDto(
+    string Content,
+    string ProfileName,
+    string ProviderType,
+    string Model,
+    DateTimeOffset GeneratedAt
+);
+
+public record AdvancedToolMergedResultDto(
+    IReadOnlyList<AdvancedToolSchemaColumnDto> Schema,
+    IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows,
+    int RowCount
+);
+
 public record AdvancedToolAssetExecutionResultDto(
-    IReadOnlyList<AdvancedToolRenderedQueryDto> Queries
+    AdvancedToolMergedResultDto RawResults,
+    AdvancedToolAssetAiReportDto? Report,
+    string? AiUnavailableMessage
 );
 
 public record AdvancedToolCatalogDto(

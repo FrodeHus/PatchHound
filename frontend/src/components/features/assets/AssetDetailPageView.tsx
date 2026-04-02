@@ -37,7 +37,7 @@ type AssetDetailPageViewProps = {
   onAssignBusinessLabels: (businessLabelIds: string[]) => void
 }
 
-type DetailTab = 'overview' | 'vulnerabilities' | 'software' | 'timeline'
+type DetailTab = 'overview' | 'vulnerabilities' | 'software' | 'timeline' | 'advanced'
 
 export function AssetDetailPageView({
   asset,
@@ -232,6 +232,13 @@ export function AssetDetailPageView({
                 active={activeTab === "timeline"}
                 onClick={() => setActiveTab("timeline")}
               />
+              {canUseAdvancedTools ? (
+                <TabButton
+                  label="Advanced"
+                  active={activeTab === "advanced"}
+                  onClick={() => setActiveTab("advanced")}
+                />
+              ) : null}
             </div>
 
             {activeTab === "overview" ? (
@@ -314,9 +321,6 @@ export function AssetDetailPageView({
                       />
                     </div>
                   </section>
-                ) : null}
-                {canUseAdvancedTools ? (
-                  <AssetAdvancedToolsPanel asset={asset} />
                 ) : null}
                 <section className="grid gap-4 lg:grid-cols-2">
                   <button
@@ -486,6 +490,12 @@ export function AssetDetailPageView({
                     )}
                   </div>
                 </section>
+              </div>
+            ) : null}
+
+            {activeTab === "advanced" && canUseAdvancedTools ? (
+              <div className="space-y-5">
+                <AssetAdvancedToolsPanel asset={asset} />
               </div>
             ) : null}
 

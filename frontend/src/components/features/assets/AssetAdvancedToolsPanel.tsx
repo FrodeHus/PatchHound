@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DataTable } from '@/components/ui/data-table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { MarkdownViewer } from '@/components/ui/markdown-viewer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 type Props = {
@@ -21,6 +23,7 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
   const [selectedToolId, setSelectedToolId] = useState<string>('')
   const [useAllOpenVulnerabilities, setUseAllOpenVulnerabilities] = useState(true)
   const [selectedVulnerabilityIds, setSelectedVulnerabilityIds] = useState<string[]>([])
+  const [rawResultsOpen, setRawResultsOpen] = useState(false)
 
   const toolsQuery = useQuery({
     queryKey: ['advanced-tools', 'asset', asset.id],
@@ -88,7 +91,9 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
             </p>
             <Select value={selectedToolId} onValueChange={(value) => setSelectedToolId(value ?? '')}>
               <SelectTrigger className="h-11 w-full rounded-2xl px-3">
-                <SelectValue placeholder="Select an advanced tool" />
+                <SelectValue placeholder="Select an advanced tool">
+                  {selectedTool?.name ?? 'Select an advanced tool'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {tools.map((tool) => (
@@ -171,61 +176,100 @@ export function AssetAdvancedToolsPanel({ asset }: Props) {
           </div>
         ) : null}
 
-        {runMutation.data ? <AdvancedToolResultGroups result={runMutation.data} /> : null}
+        {runMutation.data ? (
+          <AdvancedToolReportResult
+            result={runMutation.data}
+            onOpenRawResults={() => setRawResultsOpen(true)}
+          />
+        ) : null}
       </CardContent>
+
+      <Dialog open={rawResultsOpen} onOpenChange={setRawResultsOpen}>
+        <DialogContent size="lg" className="max-h-[90vh] sm:max-w-[80vw]">
+          <DialogHeader>
+            <DialogTitle>Raw results</DialogTitle>
+          </DialogHeader>
+          {runMutation.data ? (
+            <RawResultsDialogContent result={runMutation.data} />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
 
-function AdvancedToolResultGroups({ result }: { result: AdvancedToolAssetExecutionResult }) {
+function AdvancedToolReportResult({
+  result,
+  onOpenRawResults,
+}: {
+  result: AdvancedToolAssetExecutionResult
+  onOpenRawResults: () => void
+}) {
+  const report = result.report
+
+  return (
+    <div className="space-y-4 rounded-2xl border border-border/70 bg-background/60 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Investigation report
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {result.rawResults.rowCount} merged rows from the selected tool run.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="rounded-full"
+          onClick={onOpenRawResults}
+        >
+          View raw results
+        </Button>
+      </div>
+
+      {report ? (
+        <div className="space-y-4 rounded-2xl border border-border/70 bg-card/80 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>{report.profileName}</Badge>
+            <Badge variant="outline">{report.providerType}</Badge>
+            <Badge variant="outline">{report.model}</Badge>
+          </div>
+          <MarkdownViewer content={report.content} />
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-border/70 bg-card/80 p-4">
+          <p className="text-sm text-muted-foreground">
+            {result.aiUnavailableMessage ?? 'AI report is not available for this tool run.'}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RawResultsDialogContent({ result }: { result: AdvancedToolAssetExecutionResult }) {
+  const columns: ColumnDef<Record<string, unknown>>[] = result.rawResults.schema.map((column) => ({
+    accessorKey: column.name,
+    header: column.name,
+    cell: ({ row }) => <span className="text-xs">{formatCellValue(row.original[column.name])}</span>,
+  }))
+
   return (
     <div className="space-y-4">
-      {result.queries.map((queryResult, index) => {
-        const columns: ColumnDef<Record<string, unknown>>[] = queryResult.schema.map((column) => ({
-          accessorKey: column.name,
-          header: column.name,
-          cell: ({ row }) => <span className="text-xs">{formatCellValue(row.original[column.name])}</span>,
-        }))
-
-        return (
-          <details
-            key={`${queryResult.label}-${index}`}
-            className="rounded-2xl border border-border/70 bg-background/60"
-            open={index === 0}
-          >
-            <summary className="cursor-pointer list-none px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{queryResult.label}</span>
-                    {queryResult.vulnerabilityExternalId ? (
-                      <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
-                        {queryResult.vulnerabilityExternalId}
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <p className="text-sm text-muted-foreground">{queryResult.results.length} rows returned</p>
-                </div>
-              </div>
-            </summary>
-            <div className="space-y-4 border-t border-border/70 px-4 py-4">
-              <div className="rounded-2xl border border-border/70 bg-card/80 p-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                  Rendered query
-                </p>
-                <pre className="mt-2 overflow-x-auto text-xs text-muted-foreground">
-                  <code>{queryResult.query}</code>
-                </pre>
-              </div>
-              <DataTable
-                columns={columns}
-                data={queryResult.results as Record<string, unknown>[]}
-                emptyState={<span className="text-sm text-muted-foreground">The query returned no rows.</span>}
-              />
-            </div>
-          </details>
-        )
-      })}
+      <p className="text-sm text-muted-foreground">
+        {result.rawResults.rowCount} merged rows returned from the tool run.
+      </p>
+      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/70">
+        <div className="max-h-[32rem] overflow-auto">
+          <DataTable
+            columns={columns}
+            data={result.rawResults.rows as Record<string, unknown>[]}
+            className="min-w-max"
+            emptyState={<span className="text-sm text-muted-foreground">The query returned no rows.</span>}
+          />
+        </div>
+      </div>
     </div>
   )
 }

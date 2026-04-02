@@ -3,7 +3,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Pencil, Plus, Play, Trash2 } from 'lucide-react'
+import { Plus, Play, Trash2 } from 'lucide-react'
 import {
   createAdvancedTool,
   deleteAdvancedTool,
@@ -179,30 +179,92 @@ function AdvancedToolsPage() {
     <>
       <section className="space-y-5">
         <div className="rounded-[32px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_55%),var(--color-card)] p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="space-y-2">
-              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                Integrations and automation
-              </p>
-              <h1 className="text-3xl font-semibold tracking-[-0.04em]">
-                Advanced Tools
-              </h1>
-              <p className="max-w-3xl text-sm text-muted-foreground">
-                Create and test reusable Defender KQL tools in a dedicated workbench instead of a cramped modal editor.
-              </p>
-            </div>
-            <Button
-              type="button"
-              className="rounded-full"
-              onClick={() => void navigate({ search: { mode: 'new' } })}
-            >
-              <Plus className="mr-2 size-4" />
-              New tool
-            </Button>
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              Integrations and automation
+            </p>
+            <h1 className="text-3xl font-semibold tracking-[-0.04em]">
+              Advanced Tools
+            </h1>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              Create and test reusable Defender KQL tools in a dedicated workbench instead of a cramped modal editor.
+            </p>
           </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(22rem,0.75fr)]">
+        <div className="grid gap-5 xl:grid-cols-[18rem_minmax(0,1fr)]">
+          <aside className="space-y-4">
+            <Card className="rounded-3xl border-border/70">
+              <CardHeader className="space-y-3">
+                <div>
+                  <CardTitle>Tool catalog</CardTitle>
+                  <CardDescription>
+                    Choose a saved tool or start a new draft.
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  className="w-full rounded-full"
+                  onClick={() => void navigate({ search: { mode: 'new' } })}
+                >
+                  <Plus className="mr-2 size-4" />
+                  New tool
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {tools.map((tool: AdvancedTool) => {
+                  const active = search.toolId === tool.id && search.mode !== 'new'
+
+                  return (
+                    <div
+                      key={tool.id}
+                      className="flex items-center gap-2"
+                    >
+                      <button
+                        type="button"
+                        className={`flex-1 rounded-2xl border px-3 py-2 text-left text-sm transition ${
+                          active
+                            ? 'border-primary/40 bg-primary/10 text-foreground'
+                            : 'border-border/70 bg-background/60 text-foreground hover:border-foreground/20 hover:bg-muted/20'
+                        }`}
+                        onClick={() => void navigate({ search: { toolId: tool.id } })}
+                      >
+                        <div className="truncate font-medium">{tool.name}</div>
+                      </button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="rounded-full text-destructive hover:text-destructive"
+                        onClick={() => setDeleteTarget(tool)}
+                      >
+                        <Trash2 className="size-4" />
+                        <span className="sr-only">Delete {tool.name}</span>
+                      </Button>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-3xl border-border/70">
+              <CardHeader>
+                <CardTitle>Allowed parameters</CardTitle>
+                <CardDescription>
+                  Supported placeholders for device-context tools.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                {parameters.map((parameter) => (
+                  <div key={parameter.name} className="rounded-2xl border border-border/70 bg-background/60 p-3">
+                    <p className="font-medium text-foreground">{`{{${parameter.name}}}`}</p>
+                    <p className="mt-1">{parameter.description}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </aside>
+
           <section className="space-y-5">
             <AdvancedToolWorkbench
               key={workbenchKey}
@@ -217,93 +279,6 @@ function AdvancedToolsPage() {
               }}
               isSaving={saveMutation.isPending}
             />
-          </section>
-
-          <section className="space-y-4">
-            <Card className="rounded-3xl border-border/70">
-              <CardHeader>
-                <CardTitle>Tool catalog</CardTitle>
-                <CardDescription>
-                  Switch between saved tools while keeping the editor and test surface stable.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {tools.map((tool: AdvancedTool) => (
-                  <Card key={tool.id} className="rounded-3xl border-border/70">
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge className="rounded-full border-primary/30 bg-primary/10 text-primary">
-                              {tool.enabled ? 'Enabled' : 'Disabled'}
-                            </Badge>
-                            {tool.supportedAssetTypes.map((assetType: string) => (
-                              <Badge
-                                key={assetType}
-                                variant="outline"
-                                className="rounded-full border-border/70 bg-background/50"
-                              >
-                                {assetType}
-                              </Badge>
-                            ))}
-                          </div>
-                          <div>
-                            <CardTitle>{tool.name}</CardTitle>
-                            <CardDescription className="mt-2">
-                              {tool.description}
-                            </CardDescription>
-                          </div>
-                          <div className="rounded-2xl border border-border/70 bg-background/60 p-3">
-                            <pre className="overflow-x-auto text-xs text-muted-foreground">
-                              <code>{tool.kqlQuery}</code>
-                            </pre>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="rounded-full"
-                            onClick={() => void navigate({ search: { toolId: tool.id } })}
-                          >
-                            <Pencil className="mr-2 size-4" />
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="rounded-full text-destructive hover:text-destructive"
-                            onClick={() => setDeleteTarget(tool)}
-                          >
-                            <Trash2 className="mr-2 size-4" />
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </Card>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-3xl border-border/70">
-              <CardHeader>
-                <CardTitle>Allowed parameters</CardTitle>
-                <CardDescription>
-                  Use double-brace placeholders inside the KQL query. PatchHound resolves them from the selected asset and vulnerability context before running the tool.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                {parameters.map((parameter) => (
-                  <div key={parameter.name} className="rounded-2xl border border-border/70 bg-background/60 p-3">
-                    <p className="font-medium text-foreground">{`{{${parameter.name}}}`}</p>
-                    <p className="mt-1">{parameter.description}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
           </section>
         </div>
       </section>

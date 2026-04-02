@@ -290,6 +290,7 @@ public class AdvancedToolsController : ControllerBase
         }
 
         var query = request.KqlQuery;
+        string? aiPrompt = null;
         if (string.IsNullOrWhiteSpace(query))
         {
             if (request.ToolId is not Guid toolId)
@@ -297,23 +298,31 @@ public class AdvancedToolsController : ControllerBase
                 return BadRequest(new ProblemDetails { Title = "A tool or query is required." });
             }
 
-            query = await _dbContext.AdvancedTools.AsNoTracking()
+            var tool = await _dbContext.AdvancedTools.AsNoTracking()
                 .Where(tool => tool.Id == toolId && tool.Enabled)
-                .Select(tool => tool.KqlQuery)
+                .Select(tool => new
+                {
+                    tool.KqlQuery,
+                    tool.AiPrompt,
+                })
                 .FirstOrDefaultAsync(ct);
 
-            if (string.IsNullOrWhiteSpace(query))
+            if (tool is null || string.IsNullOrWhiteSpace(tool.KqlQuery))
             {
                 return NotFound(new ProblemDetails { Title = "Advanced tool was not found." });
             }
+
+            query = tool.KqlQuery;
+            aiPrompt = tool.AiPrompt;
         }
 
         try
         {
-            var results = await _executionService.RunForAssetAsync(
+            var result = await _executionService.RunForAssetReportAsync(
                 tenantId,
                 assetId,
                 query,
+                aiPrompt,
                 request.UseAllOpenVulnerabilities,
                 request.VulnerabilityIds,
                 ct
@@ -321,14 +330,21 @@ public class AdvancedToolsController : ControllerBase
 
             return Ok(
                 new AdvancedToolAssetExecutionResultDto(
-                    results.Select(result => new AdvancedToolRenderedQueryDto(
-                        result.Label,
-                        result.VulnerabilityId,
-                        result.VulnerabilityExternalId,
-                        result.Query,
-                        result.Result.Schema.Select(column => new AdvancedToolSchemaColumnDto(column.Name, column.Type)).ToList(),
-                        result.Result.Results
-                    )).ToList()
+                    new AdvancedToolMergedResultDto(
+                        result.Schema.Select(column => new AdvancedToolSchemaColumnDto(column.Name, column.Type)).ToList(),
+                        result.Rows,
+                        result.Rows.Count
+                    ),
+                    result.Report is null
+                        ? null
+                        : new AdvancedToolAssetAiReportDto(
+                            result.Report.Content,
+                            result.Report.ProfileName,
+                            result.Report.ProviderType,
+                            result.Report.Model,
+                            result.Report.GeneratedAt
+                        ),
+                    result.AiUnavailableMessage
                 )
             );
         }

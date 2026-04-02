@@ -51,8 +51,24 @@ export const advancedToolRenderedQuerySchema = z.object({
   results: z.array(z.record(z.string(), z.any())),
 })
 
+export const advancedToolAssetAiReportSchema = z.object({
+  content: z.string(),
+  profileName: z.string(),
+  providerType: z.string(),
+  model: z.string(),
+  generatedAt: z.string(),
+})
+
+export const advancedToolMergedResultSchema = z.object({
+  schema: z.array(advancedToolSchemaColumnSchema),
+  rows: z.array(z.record(z.string(), z.any())),
+  rowCount: z.number(),
+})
+
 export const advancedToolAssetExecutionResultSchema = z.object({
-  queries: z.array(advancedToolRenderedQuerySchema),
+  rawResults: advancedToolMergedResultSchema,
+  report: advancedToolAssetAiReportSchema.nullable(),
+  aiUnavailableMessage: z.string().nullable(),
 })
 
 export type AdvancedTool = z.infer<typeof advancedToolSchema>

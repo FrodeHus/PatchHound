@@ -21,6 +21,13 @@ public class AdvancedToolExecutionService(
         string? Version
     );
 
+    public sealed record AssetExecutionReportResult(
+        IReadOnlyList<DefenderAdvancedQuerySchemaColumn> Schema,
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows,
+        AiTextGenerationResult? Report,
+        string? AiUnavailableMessage
+    );
+
     public async Task<DefenderAdvancedQueryResult> TestQueryAsync(
         Guid tenantId,
         string query,
@@ -150,6 +157,51 @@ public class AdvancedToolExecutionService(
         }
 
         return responses;
+    }
+
+    public async Task<AssetExecutionReportResult> RunForAssetReportAsync(
+        Guid tenantId,
+        Guid assetId,
+        string query,
+        string? aiPrompt,
+        bool useAllOpenVulnerabilities,
+        IReadOnlyList<Guid>? vulnerabilityIds,
+        CancellationToken ct
+    )
+    {
+        var queryResults = await RunForAssetAsync(
+            tenantId,
+            assetId,
+            query,
+            useAllOpenVulnerabilities,
+            vulnerabilityIds,
+            ct
+        );
+
+        var merged = MergeQueryResults(queryResults);
+        var serializedResults = JsonSerializer.Serialize(
+            new
+            {
+                Schema = merged.Schema,
+                Results = merged.Rows.Take(200).ToList(),
+                RowCount = merged.Rows.Count,
+            }
+        );
+
+        var request = new AiTextGenerationRequest(
+            SystemPrompt:
+                "You summarize Microsoft Defender advanced hunting results for security operators. Be concise, factual, and focus on installation evidence, scope, and the most useful next conclusion.",
+            UserPrompt: string.IsNullOrWhiteSpace(aiPrompt)
+                ? "Summarize what these merged advanced hunting results show about the device, highlight the strongest evidence, and explain the operational conclusion."
+                : aiPrompt.Trim(),
+            ExternalContext: serializedResults,
+            IncludeCitations: false
+        );
+
+        var aiResult = await aiTextGenerationService.GenerateAsync(tenantId, null, request, ct);
+        return aiResult.IsSuccess
+            ? new AssetExecutionReportResult(merged.Schema, merged.Rows, aiResult.Value, null)
+            : new AssetExecutionReportResult(merged.Schema, merged.Rows, null, aiResult.Error);
     }
 
     private async Task<DefenderAdvancedQueryResult> RunAgainstDefenderAsync(
@@ -297,5 +349,55 @@ public class AdvancedToolExecutionService(
         {
             return null;
         }
+    }
+
+    private static (IReadOnlyList<DefenderAdvancedQuerySchemaColumn> Schema, IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows) MergeQueryResults(
+        IReadOnlyList<(string Label, Guid? VulnerabilityId, string? VulnerabilityExternalId, string Query, DefenderAdvancedQueryResult Result)> queryResults
+    )
+    {
+        var schemaByName = new Dictionary<string, DefenderAdvancedQuerySchemaColumn>(StringComparer.Ordinal);
+        schemaByName["Context"] = new DefenderAdvancedQuerySchemaColumn("Context", "String");
+
+        foreach (var queryResult in queryResults)
+        {
+            if (!string.IsNullOrWhiteSpace(queryResult.VulnerabilityExternalId))
+            {
+                schemaByName["Vulnerability"] = new DefenderAdvancedQuerySchemaColumn("Vulnerability", "String");
+            }
+
+            foreach (var column in queryResult.Result.Schema)
+            {
+                if (!schemaByName.ContainsKey(column.Name))
+                {
+                    schemaByName[column.Name] = column;
+                }
+            }
+        }
+
+        var rows = new List<IReadOnlyDictionary<string, object?>>();
+        foreach (var queryResult in queryResults)
+        {
+            foreach (var row in queryResult.Result.Results)
+            {
+                var mergedRow = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["Context"] = queryResult.Label,
+                };
+
+                if (!string.IsNullOrWhiteSpace(queryResult.VulnerabilityExternalId))
+                {
+                    mergedRow["Vulnerability"] = queryResult.VulnerabilityExternalId;
+                }
+
+                foreach (var entry in row)
+                {
+                    mergedRow[entry.Key] = entry.Value;
+                }
+
+                rows.Add(mergedRow);
+            }
+        }
+
+        return (schemaByName.Values.ToList(), rows);
     }
 }
