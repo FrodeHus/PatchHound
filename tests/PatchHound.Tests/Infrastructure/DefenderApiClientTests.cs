@@ -330,6 +330,36 @@ public class DefenderApiClientTests
             .WithMessage("Microsoft Defender rejected the advanced hunting query: Query could not be parsed at line 1.");
     }
 
+    [Fact]
+    public async Task RunAdvancedQueryAsync_SendsQueryPropertyWithExactCasing()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            CreateJsonResponse(
+                """
+                {
+                  "Schema": [
+                    { "Name": "DeviceName", "Type": "String" }
+                  ],
+                  "Results": [
+                    { "DeviceName": "fenris" }
+                  ]
+                }
+                """
+            )
+        );
+        var client = new TestDefenderApiClient(new HttpClient(handler));
+
+        var result = await client.RunAdvancedQueryAsync(
+            Configuration,
+            "DeviceInfo | take 1",
+            CancellationToken.None
+        );
+
+        result.Schema.Should().ContainSingle(column => column.Name == "DeviceName");
+        handler.RequestBodies.Should().ContainSingle()
+            .Which.Should().Contain("\"Query\":\"DeviceInfo | take 1\"");
+    }
+
     private static HttpResponseMessage CreateJsonResponse(string json)
     {
         return new HttpResponseMessage(HttpStatusCode.OK)
@@ -357,6 +387,7 @@ public class DefenderApiClientTests
 
         public List<string> RequestUris { get; } = [];
         public List<string?> AuthorizationHeaders { get; } = [];
+        public List<string> RequestBodies { get; } = [];
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -370,6 +401,7 @@ public class DefenderApiClientTests
 
             RequestUris.Add(request.RequestUri?.ToString() ?? string.Empty);
             AuthorizationHeaders.Add(request.Headers.Authorization?.ToString());
+            RequestBodies.Add(request.Content?.ReadAsStringAsync(cancellationToken).GetAwaiter().GetResult() ?? string.Empty);
 
             return Task.FromResult(_responses.Dequeue());
         }
