@@ -7,10 +7,12 @@ import {
   createAdvancedTool,
   deleteAdvancedTool,
   fetchAdvancedTools,
+  testAdvancedToolAiSummary,
   testAdvancedToolQuery,
   updateAdvancedTool,
 } from '@/api/advanced-tools.functions'
-import type { AdvancedTool, AdvancedToolCatalog, AdvancedToolExecutionResult } from '@/api/advanced-tools.schemas'
+import { fetchTenantAiProfiles } from '@/api/ai-settings.functions'
+import type { AdvancedTool, AdvancedToolAiSummaryResult, AdvancedToolCatalog, AdvancedToolExecutionResult } from '@/api/advanced-tools.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,6 +28,9 @@ import {
 import { Input } from '@/components/ui/input'
 import { KqlEditor } from '@/components/ui/kql-editor'
 import { Label } from '@/components/ui/label'
+import { MarkdownViewer } from '@/components/ui/markdown-viewer'
+import { Textarea } from '@/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export const Route = createFileRoute('/_authed/admin/advanced-tools')({
   beforeLoad: ({ context }) => {
@@ -44,6 +49,7 @@ type ToolDraft = {
   description: string
   supportedAssetTypes: string[]
   kqlQuery: string
+  aiPrompt: string
   enabled: boolean
 }
 
@@ -52,6 +58,7 @@ const emptyDraft: ToolDraft = {
   description: '',
   supportedAssetTypes: ['Device'],
   kqlQuery: '',
+  aiPrompt: '',
   enabled: true,
 }
 
@@ -62,6 +69,11 @@ function AdvancedToolsPage() {
   const [deleteTarget, setDeleteTarget] = useState<AdvancedTool | null>(null)
   const [draft, setDraft] = useState<ToolDraft>(emptyDraft)
   const [sampleParameters, setSampleParameters] = useState<Record<string, string>>({})
+  const profilesQuery = useQuery({
+    queryKey: ['tenant-ai-profiles'],
+    queryFn: () => fetchTenantAiProfiles(),
+    staleTime: 30_000,
+  })
 
   const toolsQuery = useQuery({
     queryKey: ['advanced-tools'],
@@ -80,6 +92,7 @@ function AdvancedToolsPage() {
             description: value.description,
             supportedAssetTypes: value.supportedAssetTypes,
             kqlQuery: value.kqlQuery,
+            aiPrompt: value.aiPrompt,
             enabled: value.enabled,
           },
         })
@@ -91,6 +104,7 @@ function AdvancedToolsPage() {
           description: value.description,
           supportedAssetTypes: value.supportedAssetTypes,
           kqlQuery: value.kqlQuery,
+          aiPrompt: value.aiPrompt,
           enabled: value.enabled,
         },
       })
@@ -137,6 +151,22 @@ function AdvancedToolsPage() {
       toast.error(error.message || 'Failed to run test query')
     },
   })
+  const aiSummaryMutation = useMutation<AdvancedToolAiSummaryResult, Error>({
+    mutationFn: async () =>
+      testAdvancedToolAiSummary({
+        data: {
+          kqlQuery: draft.kqlQuery,
+          aiPrompt: draft.aiPrompt,
+          sampleParameters: requiredParameters.reduce<Record<string, string | null>>((acc, key) => {
+            acc[key] = sampleParameters[key] ?? ''
+            return acc
+          }, {}),
+        },
+      }),
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to generate AI summary')
+    },
+  })
 
   const requiredParameters = (draft.kqlQuery.match(/\{\{\s*([a-zA-Z0-9._-]+)\s*\}\}/g) ?? [])
     .map((match) => match.replace(/[{}]/g, '').trim())
@@ -145,6 +175,11 @@ function AdvancedToolsPage() {
 
   const canTest = draft.kqlQuery.trim().length > 0
     && requiredParameters.every((parameter) => (sampleParameters[parameter] ?? '').trim().length > 0)
+  const defaultAiProfile = (profilesQuery.data ?? []).find((profile) => profile.isDefault && profile.isEnabled) ?? null
+  const canTestAiSummary = canTest && !!defaultAiProfile
+  const aiUnavailableReason = defaultAiProfile
+    ? null
+    : 'No enabled default AI profile is configured for this tenant.'
 
   const columns = useMemo(() => {
     const schema = testMutation.data?.schema ?? []
@@ -341,6 +376,20 @@ function AdvancedToolsPage() {
               />
             </div>
 
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Optional AI prompt</Label>
+                <p className="text-sm text-muted-foreground">
+                  Guides the AI summary after the KQL query runs. Leave it blank to use the default operational summary prompt.
+                </p>
+              </div>
+              <Textarea
+                value={draft.aiPrompt}
+                onChange={(event) => setDraft((current) => ({ ...current, aiPrompt: event.target.value }))}
+                placeholder="Summarize what the KQL results prove, call out the strongest evidence of installation or bundled-component presence, and explain the next operational conclusion."
+              />
+            </div>
+
             {requiredParameters.length > 0 ? (
               <div className="space-y-3 rounded-3xl border border-border/70 bg-muted/20 p-4">
                 <div className="space-y-1">
@@ -386,6 +435,25 @@ function AdvancedToolsPage() {
                   {testMutation.isPending ? <Play className="mr-2 size-4 animate-pulse" /> : <Play className="mr-2 size-4" />}
                   Test query
                 </Button>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={() => aiSummaryMutation.mutate()}
+                        disabled={!canTestAiSummary || aiSummaryMutation.isPending}
+                      >
+                        {aiSummaryMutation.isPending ? <Play className="mr-2 size-4 animate-pulse" /> : <Play className="mr-2 size-4" />}
+                        Test AI summary
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!canTestAiSummary && aiUnavailableReason ? (
+                    <TooltipContent>{aiUnavailableReason}</TooltipContent>
+                  ) : null}
+                </Tooltip>
               </div>
 
               {testMutation.data ? (
@@ -403,6 +471,30 @@ function AdvancedToolsPage() {
                     data={testMutation.data?.results ?? []}
                     emptyState={<span className="text-sm text-muted-foreground">The query returned no rows.</span>}
                   />
+                </div>
+              ) : null}
+
+              {aiSummaryMutation.data ? (
+                <div className="space-y-4 rounded-2xl border border-border/70 bg-card/70 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>{aiSummaryMutation.data.profileName}</Badge>
+                    <Badge variant="outline">{aiSummaryMutation.data.providerType}</Badge>
+                    <Badge variant="outline">{aiSummaryMutation.data.model}</Badge>
+                  </div>
+                  <div className="rounded-2xl border border-border/70 bg-background/60 p-3">
+                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                      Rendered query
+                    </p>
+                    <pre className="mt-2 overflow-x-auto text-xs text-muted-foreground">
+                      <code>{aiSummaryMutation.data.renderedQuery}</code>
+                    </pre>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                      AI summary
+                    </p>
+                    <MarkdownViewer content={aiSummaryMutation.data.content} className="mt-3" />
+                  </div>
                 </div>
               ) : null}
             </div>

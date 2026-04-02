@@ -14,6 +14,7 @@ public class AdvancedToolConfiguration : IEntityTypeConfiguration<AdvancedTool>
         builder.Property(tool => tool.Description).HasColumnType("text").IsRequired();
         builder.Property(tool => tool.SupportedAssetTypesJson).HasColumnType("text").IsRequired();
         builder.Property(tool => tool.KqlQuery).HasColumnType("text").IsRequired();
+        builder.Property(tool => tool.AiPrompt).HasColumnType("text").IsRequired();
 
         builder.HasIndex(tool => tool.Name).IsUnique();
     }

@@ -12,6 +12,7 @@ public class AdvancedTool
     public string Description { get; private set; } = string.Empty;
     public string SupportedAssetTypesJson { get; private set; } = "[]";
     public string KqlQuery { get; private set; } = string.Empty;
+    public string AiPrompt { get; private set; } = string.Empty;
     public bool Enabled { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -23,6 +24,7 @@ public class AdvancedTool
         string description,
         IReadOnlyList<AdvancedToolAssetType> supportedAssetTypes,
         string kqlQuery,
+        string? aiPrompt,
         bool enabled
     )
     {
@@ -34,6 +36,7 @@ public class AdvancedTool
             Description = description.Trim(),
             SupportedAssetTypesJson = JsonSerializer.Serialize(supportedAssetTypes, JsonOptions),
             KqlQuery = kqlQuery.Trim(),
+            AiPrompt = aiPrompt?.Trim() ?? string.Empty,
             Enabled = enabled,
             CreatedAt = now,
             UpdatedAt = now,
@@ -45,6 +48,7 @@ public class AdvancedTool
         string description,
         IReadOnlyList<AdvancedToolAssetType> supportedAssetTypes,
         string kqlQuery,
+        string? aiPrompt,
         bool enabled
     )
     {
@@ -52,6 +56,7 @@ public class AdvancedTool
         Description = description.Trim();
         SupportedAssetTypesJson = JsonSerializer.Serialize(supportedAssetTypes, JsonOptions);
         KqlQuery = kqlQuery.Trim();
+        AiPrompt = aiPrompt?.Trim() ?? string.Empty;
         Enabled = enabled;
         UpdatedAt = DateTimeOffset.UtcNow;
     }

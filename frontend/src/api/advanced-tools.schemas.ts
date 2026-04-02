@@ -6,6 +6,7 @@ export const advancedToolSchema = z.object({
   description: z.string(),
   supportedAssetTypes: z.array(z.string()),
   kqlQuery: z.string(),
+  aiPrompt: z.string(),
   enabled: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -32,6 +33,15 @@ export const advancedToolExecutionResultSchema = z.object({
   renderedQuery: z.string(),
 })
 
+export const advancedToolAiSummaryResultSchema = z.object({
+  renderedQuery: z.string(),
+  content: z.string(),
+  profileName: z.string(),
+  providerType: z.string(),
+  model: z.string(),
+  generatedAt: z.string(),
+})
+
 export const advancedToolRenderedQuerySchema = z.object({
   label: z.string(),
   vulnerabilityId: z.string().uuid().nullable(),
@@ -49,3 +59,4 @@ export type AdvancedTool = z.infer<typeof advancedToolSchema>
 export type AdvancedToolCatalog = z.infer<typeof advancedToolCatalogSchema>
 export type AdvancedToolExecutionResult = z.infer<typeof advancedToolExecutionResultSchema>
 export type AdvancedToolAssetExecutionResult = z.infer<typeof advancedToolAssetExecutionResultSchema>
+export type AdvancedToolAiSummaryResult = z.infer<typeof advancedToolAiSummaryResultSchema>

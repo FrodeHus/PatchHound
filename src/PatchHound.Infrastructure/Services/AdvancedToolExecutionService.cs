@@ -1,4 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using PatchHound.Core.Common;
+using PatchHound.Core.Models;
+using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.VulnerabilitySources;
 using System.Text.Json;
@@ -8,7 +11,8 @@ namespace PatchHound.Infrastructure.Services;
 public class AdvancedToolExecutionService(
     PatchHoundDbContext dbContext,
     DefenderTenantConfigurationProvider defenderConfigurationProvider,
-    DefenderApiClient defenderApiClient
+    DefenderApiClient defenderApiClient,
+    TenantAiTextGenerationService aiTextGenerationService
 )
 {
     private sealed record SoftwareEvidenceMetadata(
@@ -27,6 +31,50 @@ public class AdvancedToolExecutionService(
         AdvancedToolTemplateRenderer.ValidateAllowedParameters(query);
         var renderedQuery = AdvancedToolTemplateRenderer.Render(query, sampleParameters);
         return await RunAgainstDefenderAsync(tenantId, renderedQuery, ct);
+    }
+
+    public async Task<Result<(string RenderedQuery, AiTextGenerationResult AiResult)>> TestAiSummaryAsync(
+        Guid tenantId,
+        string query,
+        string? aiPrompt,
+        IReadOnlyDictionary<string, string?> sampleParameters,
+        CancellationToken ct
+    )
+    {
+        AdvancedToolTemplateRenderer.ValidateAllowedParameters(query);
+        var renderedQuery = AdvancedToolTemplateRenderer.Render(query, sampleParameters);
+        var queryResult = await RunAgainstDefenderAsync(tenantId, renderedQuery, ct);
+        var serializedResults = JsonSerializer.Serialize(
+            new
+            {
+                Query = renderedQuery,
+                Schema = queryResult.Schema,
+                Results = queryResult.Results.Take(100).ToList(),
+                ResultCount = queryResult.Results.Count,
+            }
+        );
+
+        var request = new AiTextGenerationRequest(
+            SystemPrompt:
+                "You summarize Microsoft Defender advanced hunting query results for security operators. Be concise, factual, and avoid speculation.",
+            UserPrompt: string.IsNullOrWhiteSpace(aiPrompt)
+                ? "Summarize what the advanced hunting results show, call out the most important evidence, and explain what the operator should conclude next."
+                : aiPrompt.Trim(),
+            ExternalContext: serializedResults,
+            IncludeCitations: false
+        );
+
+        var aiResult = await aiTextGenerationService.GenerateAsync(tenantId, null, request, ct);
+        if (!aiResult.IsSuccess)
+        {
+            return Result<(string RenderedQuery, AiTextGenerationResult AiResult)>.Failure(
+                aiResult.Error ?? "Failed to generate AI summary."
+            );
+        }
+
+        return Result<(string RenderedQuery, AiTextGenerationResult AiResult)>.Success(
+            (renderedQuery, aiResult.Value)
+        );
     }
 
     public async Task<IReadOnlyList<(string Label, Guid? VulnerabilityId, string? VulnerabilityExternalId, string Query, DefenderAdvancedQueryResult Result)>> RunForAssetAsync(

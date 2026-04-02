@@ -82,6 +82,7 @@ public class AdvancedToolsController : ControllerBase
             request.Description,
             supportedAssetTypes,
             request.KqlQuery,
+            request.AiPrompt,
             request.Enabled
         );
 
@@ -98,6 +99,7 @@ public class AdvancedToolsController : ControllerBase
                 tool.Description,
                 SupportedAssetTypes = supportedAssetTypes.Select(value => value.ToString()).ToArray(),
                 tool.KqlQuery,
+                tool.AiPrompt,
                 tool.Enabled,
             },
             ct
@@ -130,6 +132,7 @@ public class AdvancedToolsController : ControllerBase
             request.Description,
             supportedAssetTypes,
             request.KqlQuery,
+            request.AiPrompt,
             request.Enabled
         );
 
@@ -197,6 +200,50 @@ public class AdvancedToolsController : ControllerBase
                     result.Schema.Select(column => new AdvancedToolSchemaColumnDto(column.Name, column.Type)).ToList(),
                     result.Results,
                     AdvancedToolTemplateRenderer.Render(request.KqlQuery, request.SampleParameters)
+                )
+            );
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetails { Title = ex.Message });
+        }
+    }
+
+    [HttpPost("test-ai-summary")]
+    [Authorize(Policy = Policies.ConfigureTenant)]
+    public async Task<ActionResult<AdvancedToolAiSummaryResultDto>> TestAiSummary(
+        [FromBody] AdvancedToolAiSummaryTestRequest request,
+        CancellationToken ct
+    )
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        try
+        {
+            var result = await _executionService.TestAiSummaryAsync(
+                tenantId,
+                request.KqlQuery,
+                request.AiPrompt,
+                request.SampleParameters,
+                ct
+            );
+
+            if (!result.IsSuccess)
+            {
+                return BadRequest(new ProblemDetails { Title = result.Error ?? "Failed to generate AI summary." });
+            }
+
+            return Ok(
+                new AdvancedToolAiSummaryResultDto(
+                    result.Value.RenderedQuery,
+                    result.Value.AiResult.Content,
+                    result.Value.AiResult.ProfileName,
+                    result.Value.AiResult.ProviderType,
+                    result.Value.AiResult.Model,
+                    result.Value.AiResult.GeneratedAt
                 )
             );
         }
@@ -275,6 +322,7 @@ public class AdvancedToolsController : ControllerBase
             tool.Description,
             tool.GetSupportedAssetTypes().Select(type => type.ToString()).ToList(),
             tool.KqlQuery,
+            tool.AiPrompt,
             tool.Enabled,
             tool.CreatedAt,
             tool.UpdatedAt

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { authMiddleware } from '@/server/middleware'
 import { apiDelete, apiGet, apiPost, apiPut } from '@/server/api'
 import {
+  advancedToolAiSummaryResultSchema,
   advancedToolAssetExecutionResultSchema,
   advancedToolCatalogSchema,
   advancedToolExecutionResultSchema,
@@ -30,6 +31,7 @@ export const createAdvancedTool = createServerFn({ method: 'POST' })
       description: z.string(),
       supportedAssetTypes: z.array(z.string()).min(1),
       kqlQuery: z.string().min(1),
+      aiPrompt: z.string().optional().nullable(),
       enabled: z.boolean(),
     }),
   )
@@ -47,6 +49,7 @@ export const updateAdvancedTool = createServerFn({ method: 'POST' })
       description: z.string(),
       supportedAssetTypes: z.array(z.string()).min(1),
       kqlQuery: z.string().min(1),
+      aiPrompt: z.string().optional().nullable(),
       enabled: z.boolean(),
     }),
   )
@@ -73,6 +76,20 @@ export const testAdvancedToolQuery = createServerFn({ method: 'POST' })
   .handler(async ({ context, data }) => {
     const response = await apiPost('/advanced-tools/test', context, data)
     return advancedToolExecutionResultSchema.parse(response)
+  })
+
+export const testAdvancedToolAiSummary = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      kqlQuery: z.string().min(1),
+      aiPrompt: z.string().optional().nullable(),
+      sampleParameters: z.record(z.string(), z.string().nullable()),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const response = await apiPost('/advanced-tools/test-ai-summary', context, data)
+    return advancedToolAiSummaryResultSchema.parse(response)
   })
 
 export const runAdvancedToolForAsset = createServerFn({ method: 'POST' })

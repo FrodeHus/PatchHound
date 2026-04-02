@@ -8,6 +8,7 @@ public record AdvancedToolDto(
     string Description,
     IReadOnlyList<string> SupportedAssetTypes,
     string KqlQuery,
+    string AiPrompt,
     bool Enabled,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt
@@ -18,11 +19,18 @@ public record SaveAdvancedToolRequest(
     string Description,
     IReadOnlyList<string> SupportedAssetTypes,
     string KqlQuery,
+    string? AiPrompt,
     bool Enabled
 );
 
 public record AdvancedToolTestRequest(
     string KqlQuery,
+    IReadOnlyDictionary<string, string?> SampleParameters
+);
+
+public record AdvancedToolAiSummaryTestRequest(
+    string KqlQuery,
+    string? AiPrompt,
     IReadOnlyDictionary<string, string?> SampleParameters
 );
 
@@ -56,6 +64,15 @@ public record AdvancedToolExecutionResultDto(
     IReadOnlyList<AdvancedToolSchemaColumnDto> Schema,
     IReadOnlyList<IReadOnlyDictionary<string, object?>> Results,
     string RenderedQuery
+);
+
+public record AdvancedToolAiSummaryResultDto(
+    string RenderedQuery,
+    string Content,
+    string ProfileName,
+    string ProviderType,
+    string Model,
+    DateTimeOffset GeneratedAt
 );
 
 public record AdvancedToolAssetExecutionResultDto(
