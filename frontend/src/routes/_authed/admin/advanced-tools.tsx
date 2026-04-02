@@ -312,7 +312,7 @@ function AdvancedToolsPage() {
       </section>
 
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
-        <DialogContent size="lg" className="sm:max-w-[70vw]">
+        <DialogContent size="lg" className="max-h-[90vh] overflow-y-auto sm:max-w-[70vw]">
           <DialogHeader>
             <DialogTitle>
               {draft.id ? 'Edit advanced tool' : 'Create advanced tool'}
@@ -458,19 +458,16 @@ function AdvancedToolsPage() {
 
               {testMutation.data ? (
                 <div className="space-y-4">
-                  <div className="rounded-2xl border border-border/70 bg-card/70 p-3">
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      Rendered query
-                    </p>
-                    <pre className="mt-2 overflow-x-auto text-xs text-muted-foreground">
-                      <code>{testMutation.data?.renderedQuery ?? ''}</code>
-                    </pre>
+                  <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/70">
+                    <div className="max-h-[24rem] overflow-auto">
+                      <DataTable
+                        columns={columns}
+                        data={testMutation.data?.results ?? []}
+                        className="min-w-max"
+                        emptyState={<span className="text-sm text-muted-foreground">The query returned no rows.</span>}
+                      />
+                    </div>
                   </div>
-                  <DataTable
-                    columns={columns}
-                    data={testMutation.data?.results ?? []}
-                    emptyState={<span className="text-sm text-muted-foreground">The query returned no rows.</span>}
-                  />
                 </div>
               ) : null}
 
