@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Entities.AuthenticatedScans;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 
@@ -80,6 +81,18 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<AdvancedTool> AdvancedTools => Set<AdvancedTool>();
+    public DbSet<ConnectionProfile> ConnectionProfiles => Set<ConnectionProfile>();
+    public DbSet<ScanRunner> ScanRunners => Set<ScanRunner>();
+    public DbSet<ScanningTool> ScanningTools => Set<ScanningTool>();
+    public DbSet<ScanningToolVersion> ScanningToolVersions => Set<ScanningToolVersion>();
+    public DbSet<ScanProfile> ScanProfiles => Set<ScanProfile>();
+    public DbSet<ScanProfileTool> ScanProfileTools => Set<ScanProfileTool>();
+    public DbSet<AssetScanProfileAssignment> AssetScanProfileAssignments => Set<AssetScanProfileAssignment>();
+    public DbSet<AuthenticatedScanRun> AuthenticatedScanRuns => Set<AuthenticatedScanRun>();
+    public DbSet<ScanJob> ScanJobs => Set<ScanJob>();
+    public DbSet<ScanJobResult> ScanJobResults => Set<ScanJobResult>();
+    public DbSet<ScanJobValidationIssue> ScanJobValidationIssues => Set<ScanJobValidationIssue>();
+    public DbSet<StagedAuthenticatedScanSoftware> StagedAuthenticatedScanSoftware => Set<StagedAuthenticatedScanSoftware>();
     public DbSet<RiskAcceptance> RiskAcceptances => Set<RiskAcceptance>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<Notification> Notifications => Set<Notification>();
