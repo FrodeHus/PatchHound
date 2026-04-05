@@ -129,6 +129,7 @@ public static class DependencyInjection
         services.AddScoped<RiskRefreshService>();
         services.AddScoped<AuditLogWriter>();
         services.AddScoped<AdvancedToolExecutionService>();
+        services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ConnectionProfileSecretWriter>();
         services.AddScoped<NotificationEmailConfigurationResolver>();
         services.AddHostedService<DefaultTeamSeedHostedService>();
 
