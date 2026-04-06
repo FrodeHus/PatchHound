@@ -3,6 +3,7 @@
     <UserSecretsId>dotnet-PatchHound.Worker-e581a381-1285-4971-b5b5-e747fa87d883</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Cronos" Version="0.11.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
     <PackageReference Include="Microsoft.Identity.Web" Version="4.5.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
@@ -19,12 +20,8 @@
 
   <Target Name="RemoveApiAppSettingsFromPublish" BeforeTargets="ComputeFilesToPublish">
     <ItemGroup>
-      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
-                             Condition="'%(ResolvedFileToPublish.RelativePath)' == 'appsettings.json'
-                               and $([System.String]::Copy('%(ResolvedFileToPublish.Identity)').Contains('PatchHound.Api'))" />
-      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
-                             Condition="'%(ResolvedFileToPublish.RelativePath)' == 'appsettings.Development.json'
-                               and $([System.String]::Copy('%(ResolvedFileToPublish.Identity)').Contains('PatchHound.Api'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.RelativePath)' == 'appsettings.json'&#xA;                               and $([System.String]::Copy('%(ResolvedFileToPublish.Identity)').Contains('PatchHound.Api'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.RelativePath)' == 'appsettings.Development.json'&#xA;                               and $([System.String]::Copy('%(ResolvedFileToPublish.Identity)').Contains('PatchHound.Api'))" />
     </ItemGroup>
   </Target>
 </Project>
