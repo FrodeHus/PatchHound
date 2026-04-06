@@ -1,4 +1,4 @@
-using PatchHound.ScanRunner;
+using PatchHound.Puppy;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -24,7 +24,7 @@ builder.Services.AddSingleton(options);
 
 var host = builder.Build();
 
-Console.WriteLine($"[startup] PatchHound.ScanRunner configured — central: {options.CentralUrl}, concurrency: {options.MaxConcurrentJobs}");
+Console.WriteLine($"[startup] PatchHound.Puppy configured — central: {options.CentralUrl}, concurrency: {options.MaxConcurrentJobs}");
 await host.RunAsync();
 return 0;
 

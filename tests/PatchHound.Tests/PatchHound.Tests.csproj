@@ -20,6 +20,6 @@
     <ProjectReference Include="..\..\src\PatchHound.Core\PatchHound.Core.csproj" />
     <ProjectReference Include="..\..\src\PatchHound.Infrastructure\PatchHound.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\PatchHound.Api\PatchHound.Api.csproj" />
-    <ProjectReference Include="..\..\src\PatchHound.ScanRunner\PatchHound.ScanRunner.csproj" />
+    <ProjectReference Include="..\..\src\PatchHound.Puppy\PatchHound.Puppy.csproj" />
   </ItemGroup>
 </Project>

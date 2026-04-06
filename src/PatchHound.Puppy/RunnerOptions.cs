@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace PatchHound.ScanRunner;
+namespace PatchHound.Puppy;
 
 public class RunnerOptions
 {
