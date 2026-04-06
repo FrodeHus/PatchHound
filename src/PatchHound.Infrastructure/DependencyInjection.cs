@@ -134,6 +134,7 @@ public static class DependencyInjection
         services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.AuthenticatedScanIngestionService>();
         services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ScanJobDispatcher>();
         services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ScanRunCompletionService>();
+        services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ScanSchedulerTickHandler>();
         services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ScanningToolVersionStore>();
         services.AddScoped<NotificationEmailConfigurationResolver>();
         services.AddHostedService<DefaultTeamSeedHostedService>();

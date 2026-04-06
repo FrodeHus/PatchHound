@@ -23,6 +23,7 @@ builder.Services.AddHostedService<RemediationAiWorker>();
 builder.Services.AddHostedService<SlaCheckWorker>();
 builder.Services.AddHostedService<WorkflowWorker>();
 builder.Services.AddHostedService<ApprovalExpiryWorker>();
+builder.Services.AddHostedService<ScanSchedulerWorker>();
 
 var host = builder.Build();
 
