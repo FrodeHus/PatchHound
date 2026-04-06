@@ -16,6 +16,7 @@ public class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.HasIndex(a => new { a.TenantId, a.AssetType, a.DeviceActiveInTenant });
 
         builder.Property(a => a.ExternalId).HasMaxLength(256).IsRequired();
+        builder.Property(a => a.SourceKey).HasMaxLength(64).IsRequired().HasDefaultValue("defender");
         builder.Property(a => a.Name).HasMaxLength(256).IsRequired();
         builder.Property(a => a.Description).HasMaxLength(2048);
         builder.Property(a => a.DeviceComputerDnsName).HasMaxLength(256);

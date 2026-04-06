@@ -7,6 +7,7 @@ public class Asset
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public string ExternalId { get; private set; } = null!;
+    public string SourceKey { get; private set; } = null!;
     public AssetType AssetType { get; private set; }
     public string Name { get; private set; } = null!;
     public string? Description { get; private set; }
@@ -49,7 +50,8 @@ public class Asset
         AssetType assetType,
         string name,
         Criticality criticality,
-        string? description = null
+        string? description = null,
+        string sourceKey = "defender"
     )
     {
         return new Asset
@@ -57,6 +59,7 @@ public class Asset
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             ExternalId = externalId,
+            SourceKey = sourceKey,
             AssetType = assetType,
             Name = name,
             BaselineCriticality = criticality,

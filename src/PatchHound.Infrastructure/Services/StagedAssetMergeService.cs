@@ -114,7 +114,8 @@ public class StagedAssetMergeService(PatchHoundDbContext dbContext)
                         asset.AssetType,
                         asset.Name,
                         Criticality.Medium,
-                        asset.Description
+                        asset.Description,
+                        normalizedSourceKey
                     );
                     if (asset.AssetType == AssetType.Device)
                     {

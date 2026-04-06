@@ -26,7 +26,8 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
     public sealed record ResolutionResult(
         Guid NormalizedSoftwareId,
         Guid SoftwareAssetId,
-        string? DetectedVersion
+        string? DetectedVersion,
+        SoftwareIdentitySourceSystem SourceSystem
     );
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -46,6 +47,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
                 asset.ExternalId,
                 asset.Name,
                 asset.Metadata,
+                asset.SourceKey,
             })
             .ToListAsync(ct);
 
@@ -68,10 +70,13 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
 
         var resolutions = new Dictionary<Guid, ResolutionResult>();
         var activeAliasKeys = new HashSet<string>(StringComparer.Ordinal);
+        var activeSourceSystems = new HashSet<SoftwareIdentitySourceSystem>();
 
         foreach (var asset in softwareAssets)
         {
-            var identity = BuildIdentity(asset.Id, asset.ExternalId, asset.Name, asset.Metadata);
+            var sourceSystem = MapSourceSystem(asset.SourceKey);
+            activeSourceSystems.Add(sourceSystem);
+            var identity = BuildIdentity(asset.Id, asset.ExternalId, asset.Name, asset.Metadata, sourceSystem);
             if (identity is null)
             {
                 continue;
@@ -165,13 +170,14 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             resolutions[asset.Id] = new ResolutionResult(
                 normalized.Id,
                 asset.Id,
-                identity.DetectedVersion
+                identity.DetectedVersion,
+                identity.SourceSystem
             );
         }
 
         var staleAliases = aliases
             .Where(alias =>
-                alias.SourceSystem == SoftwareIdentitySourceSystem.Defender
+                activeSourceSystems.Contains(alias.SourceSystem)
                 && !activeAliasKeys.Contains(BuildAliasKey(alias.SourceSystem, alias.ExternalSoftwareId))
             )
             .ToList();
@@ -184,11 +190,22 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
         return resolutions;
     }
 
+    private static SoftwareIdentitySourceSystem MapSourceSystem(string? sourceKey)
+    {
+        var normalized = sourceKey?.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "authenticated-scan" => SoftwareIdentitySourceSystem.AuthenticatedScan,
+            _ => SoftwareIdentitySourceSystem.Defender,
+        };
+    }
+
     private static SoftwareIdentitySnapshot? BuildIdentity(
         Guid softwareAssetId,
         string externalSoftwareId,
         string assetName,
-        string metadataJson
+        string metadataJson,
+        SoftwareIdentitySourceSystem sourceSystem
     )
     {
         var metadata = ParseMetadata(metadataJson);
@@ -203,7 +220,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             return new SoftwareIdentitySnapshot(
                 softwareAssetId,
                 externalSoftwareId,
-                SoftwareIdentitySourceSystem.Defender,
+                sourceSystem,
                 rawName.Trim(),
                 string.IsNullOrWhiteSpace(rawVendor) ? null : rawVendor.Trim(),
                 string.IsNullOrWhiteSpace(rawCategory) ? null : rawCategory.Trim(),

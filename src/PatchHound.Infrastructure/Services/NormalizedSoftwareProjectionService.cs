@@ -91,7 +91,7 @@ public class NormalizedSoftwareProjectionService(
                     tenantSoftware.Id,
                     episode.SoftwareAssetId,
                     episode.DeviceAssetId,
-                    SoftwareIdentitySourceSystem.Defender,
+                    resolution.SourceSystem,
                     resolution.DetectedVersion,
                     episode.FirstSeenAt,
                     currentInstallation?.LastSeenAt ?? episode.LastSeenAt,
