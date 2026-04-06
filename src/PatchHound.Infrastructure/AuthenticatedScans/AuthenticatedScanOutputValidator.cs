@@ -3,12 +3,10 @@ using System.Text.Json;
 namespace PatchHound.Infrastructure.AuthenticatedScans;
 
 public record ValidatedSoftwareEntry(
-    string CanonicalName,
-    string CanonicalProductKey,
-    string? CanonicalVendor,
-    string? Category,
-    string? PrimaryCpe23Uri,
-    string? DetectedVersion);
+    string Name,
+    string? Vendor,
+    string? Version,
+    string? InstallPath);
 
 public record ValidationIssueRecord(int EntryIndex, string FieldPath, string Message);
 
@@ -67,15 +65,12 @@ public class AuthenticatedScanOutputValidator
             return false;
         }
 
-        var name = ReadRequiredString(el, "canonicalName", index, issues);
+        var name = ReadRequiredString(el, "name", index, issues);
         if (name is null) return false;
-        var key = ReadRequiredString(el, "canonicalProductKey", index, issues);
-        if (key is null) return false;
-        var vendor = ReadOptionalString(el, "canonicalVendor", index, issues);
-        var category = ReadOptionalString(el, "category", index, issues);
-        var cpe = ReadOptionalString(el, "primaryCpe23Uri", index, issues);
-        var version = ReadOptionalString(el, "detectedVersion", index, issues);
-        entry = new ValidatedSoftwareEntry(name, key, vendor, category, cpe, version);
+        var vendor = ReadOptionalString(el, "vendor", index, issues);
+        var version = ReadOptionalString(el, "version", index, issues);
+        var installPath = ReadOptionalString(el, "installPath", index, issues);
+        entry = new ValidatedSoftwareEntry(name, vendor, version, installPath);
         return true;
     }
 
