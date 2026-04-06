@@ -3,6 +3,7 @@
     <Project Path="src/PatchHound.Api/PatchHound.Api.csproj" />
     <Project Path="src/PatchHound.Core/PatchHound.Core.csproj" />
     <Project Path="src/PatchHound.Infrastructure/PatchHound.Infrastructure.csproj" />
+    <Project Path="src/PatchHound.ScanRunner/PatchHound.ScanRunner.csproj" />
     <Project Path="src/PatchHound.Worker/PatchHound.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
