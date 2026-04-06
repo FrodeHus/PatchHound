@@ -1,0 +1,9 @@
+# PatchHound ScanRunner configuration
+# Copy this file and fill in the values from the admin UI.
+
+centralUrl: "https://patchhound.example.com"
+bearerToken: "paste-your-bearer-token-here"
+maxConcurrentJobs: 10
+pollIntervalSeconds: 10
+heartbeatIntervalSeconds: 30
+# hostname: "override-hostname"  # defaults to machine name
