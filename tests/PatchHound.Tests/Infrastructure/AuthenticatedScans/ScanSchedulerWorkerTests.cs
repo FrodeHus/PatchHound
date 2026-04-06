@@ -76,10 +76,10 @@ public class ScanSchedulerWorkerTests : IAsyncLifetime
     [Fact]
     public async Task TickAsync_skips_not_yet_due_profile()
     {
-        // Profile with hourly cron, last run 30 minutes ago
+        // Profile with hourly cron, last run just now — next occurrence ~60min away
         var profile = ScanProfile.Create(_tenantId, "p2", "", "0 * * * *", _conn.Id, _runner.Id, true);
         _db.ScanProfiles.Add(profile);
-        profile.RecordRunStarted(DateTimeOffset.UtcNow.AddMinutes(-30));
+        profile.RecordRunStarted(DateTimeOffset.UtcNow);
         await _db.SaveChangesAsync();
 
         var dispatcher = new ScanJobDispatcher(_db);
