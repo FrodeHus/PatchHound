@@ -21,6 +21,9 @@ var deserializer = new DeserializerBuilder()
 var options = deserializer.Deserialize<RunnerOptions>(yaml);
 
 builder.Services.AddSingleton(options);
+builder.Services.AddSingleton<ISshExecutor, SshJobExecutor>();
+builder.Services.AddHttpClient<IRunnerApiClient, ApiClient>();
+builder.Services.AddHostedService<RunnerWorker>();
 
 var host = builder.Build();
 
