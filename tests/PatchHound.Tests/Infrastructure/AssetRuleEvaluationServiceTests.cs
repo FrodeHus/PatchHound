@@ -312,6 +312,78 @@ public class AssetRuleEvaluationServiceTests : IDisposable
         reconciled.FallbackTeamRuleId.Should().BeNull();
     }
 
+    [Fact]
+    public async Task EvaluateRulesAsync_AssignScanProfile_CreatesAssignment()
+    {
+        var asset = Asset.Create(_tenantId, "device-1", AssetType.Device, "Server-01", Criticality.Medium);
+        var scanProfileId = Guid.NewGuid();
+        var profile = PatchHound.Core.Entities.AuthenticatedScans.ScanProfile.Create(
+            _tenantId, "profile", "", "", Guid.NewGuid(), Guid.NewGuid(), true);
+        // Force a known Id so we can reference it in the operation
+        var profileIdProp = typeof(PatchHound.Core.Entities.AuthenticatedScans.ScanProfile).GetProperty("Id")!;
+        profileIdProp.SetValue(profile, scanProfileId);
+
+        var rule = AssetRule.Create(
+            _tenantId, "Assign scan profile", null, 1,
+            new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Server-"),
+            [
+                new PatchHound.Core.Models.AssetRuleOperation(
+                    "AssignScanProfile",
+                    new Dictionary<string, string> { ["scanProfileId"] = scanProfileId.ToString() }
+                )
+            ]);
+
+        await _dbContext.AddRangeAsync(asset, profile, rule);
+        await _dbContext.SaveChangesAsync();
+
+        var service = new AssetRuleEvaluationService(
+            _dbContext,
+            new AssetRuleFilterBuilder(_dbContext),
+            Substitute.For<ILogger<AssetRuleEvaluationService>>());
+
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var assignment = await _dbContext.AssetScanProfileAssignments.SingleAsync();
+        assignment.AssetId.Should().Be(asset.Id);
+        assignment.ScanProfileId.Should().Be(scanProfileId);
+        assignment.AssignedByRuleId.Should().Be(rule.Id);
+    }
+
+    [Fact]
+    public async Task EvaluateRulesAsync_AssignScanProfile_IdempotentOnSecondRun()
+    {
+        var asset = Asset.Create(_tenantId, "device-2", AssetType.Device, "Server-02", Criticality.Medium);
+        var scanProfileId = Guid.NewGuid();
+        var profile = PatchHound.Core.Entities.AuthenticatedScans.ScanProfile.Create(
+            _tenantId, "profile2", "", "", Guid.NewGuid(), Guid.NewGuid(), true);
+        typeof(PatchHound.Core.Entities.AuthenticatedScans.ScanProfile).GetProperty("Id")!
+            .SetValue(profile, scanProfileId);
+
+        var rule = AssetRule.Create(
+            _tenantId, "Assign scan", null, 1,
+            new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Server-"),
+            [
+                new PatchHound.Core.Models.AssetRuleOperation(
+                    "AssignScanProfile",
+                    new Dictionary<string, string> { ["scanProfileId"] = scanProfileId.ToString() }
+                )
+            ]);
+
+        await _dbContext.AddRangeAsync(asset, profile, rule);
+        await _dbContext.SaveChangesAsync();
+
+        var service = new AssetRuleEvaluationService(
+            _dbContext,
+            new AssetRuleFilterBuilder(_dbContext),
+            Substitute.For<ILogger<AssetRuleEvaluationService>>());
+
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var count = await _dbContext.AssetScanProfileAssignments.CountAsync();
+        count.Should().Be(1);
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

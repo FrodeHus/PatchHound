@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Entities.AuthenticatedScans;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
@@ -305,6 +306,36 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
                     if (newAssignments.Count > 0)
                     {
                         await _dbContext.AssetBusinessLabels.AddRangeAsync(newAssignments, ct);
+                    }
+                }
+                break;
+
+            case "AssignScanProfile":
+                if (op.Parameters.TryGetValue("scanProfileId", out var scanProfileIdStr)
+                    && Guid.TryParse(scanProfileIdStr, out var scanProfileId))
+                {
+                    var existingAssignments = await _dbContext.AssetScanProfileAssignments
+                        .Where(a => a.ScanProfileId == scanProfileId && a.AssignedByRuleId == rule.Id)
+                        .ToListAsync(ct);
+
+                    var assignmentsToRemove = existingAssignments
+                        .Where(a => !assetIds.Contains(a.AssetId))
+                        .ToList();
+                    if (assignmentsToRemove.Count > 0)
+                    {
+                        _dbContext.AssetScanProfileAssignments.RemoveRange(assignmentsToRemove);
+                    }
+
+                    var existingAssetIds = existingAssignments
+                        .Select(a => a.AssetId)
+                        .ToHashSet();
+                    var newAssignments = assetIds
+                        .Where(assetId => !existingAssetIds.Contains(assetId))
+                        .Select(assetId => AssetScanProfileAssignment.Create(tenantId, assetId, scanProfileId, rule.Id))
+                        .ToList();
+                    if (newAssignments.Count > 0)
+                    {
+                        await _dbContext.AssetScanProfileAssignments.AddRangeAsync(newAssignments, ct);
                     }
                 }
                 break;
