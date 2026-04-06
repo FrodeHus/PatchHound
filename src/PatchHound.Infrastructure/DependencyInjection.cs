@@ -130,6 +130,10 @@ public static class DependencyInjection
         services.AddScoped<AuditLogWriter>();
         services.AddScoped<AdvancedToolExecutionService>();
         services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ConnectionProfileSecretWriter>();
+        services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.AuthenticatedScanOutputValidator>();
+        services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.AuthenticatedScanIngestionService>();
+        services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ScanJobDispatcher>();
+        services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ScanningToolVersionStore>();
         services.AddScoped<NotificationEmailConfigurationResolver>();
         services.AddHostedService<DefaultTeamSeedHostedService>();
 
