@@ -14,6 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import cronstrue from 'cronstrue'
+import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { GripVertical } from 'lucide-react'
 import type { ConnectionProfile, ScanProfile, ScanRunner, ScanningTool } from '@/api/authenticated-scans.schemas'
 
 type Props = {
@@ -33,6 +37,34 @@ type Props = {
     toolIds: string[]
   }) => void
   isPending: boolean
+}
+
+function SortableToolItem({
+  tool,
+  checked,
+  onToggle,
+}: {
+  tool: ScanningTool
+  checked: boolean
+  onToggle: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: tool.id })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-2 text-sm">
+      {checked && (
+        <button type="button" className="cursor-grab touch-none text-muted-foreground" {...attributes} {...listeners}>
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+      )}
+      <label className="flex items-center gap-2 cursor-pointer flex-1">
+        <input type="checkbox" checked={checked} onChange={onToggle} />
+        {tool.name}
+        <span className="text-muted-foreground">({tool.scriptType})</span>
+      </label>
+    </div>
+  )
 }
 
 export function ScanProfileDialog({
@@ -141,22 +173,40 @@ export function ScanProfileDialog({
             </Select>
           </div>
           <div>
-            <Label>Tools</Label>
+            <Label>Tools (drag to reorder)</Label>
             <div className="mt-1 space-y-2 rounded border p-2">
               {tools.length === 0 && (
                 <p className="text-muted-foreground text-sm">No tools created yet.</p>
               )}
-              {tools.map((tool) => (
-                <label key={tool.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedToolIds.includes(tool.id)}
-                    onChange={() => toggleTool(tool.id)}
-                  />
-                  {tool.name}
-                  <span className="text-muted-foreground">({tool.scriptType})</span>
-                </label>
-              ))}
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragEnd={(event: DragEndEvent) => {
+                  const { active, over } = event
+                  if (over && active.id !== over.id) {
+                    setSelectedToolIds((prev) => {
+                      const oldIndex = prev.indexOf(String(active.id))
+                      const newIndex = prev.indexOf(String(over.id))
+                      return arrayMove(prev, oldIndex, newIndex)
+                    })
+                  }
+                }}
+              >
+                <SortableContext items={selectedToolIds} strategy={verticalListSortingStrategy}>
+                  {/* Show selected tools first (sortable), then unselected */}
+                  {[
+                    ...tools.filter((t) => selectedToolIds.includes(t.id))
+                      .sort((a, b) => selectedToolIds.indexOf(a.id) - selectedToolIds.indexOf(b.id)),
+                    ...tools.filter((t) => !selectedToolIds.includes(t.id)),
+                  ].map((tool) => (
+                    <SortableToolItem
+                      key={tool.id}
+                      tool={tool}
+                      checked={selectedToolIds.includes(tool.id)}
+                      onToggle={() => toggleTool(tool.id)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             </div>
           </div>
           <div className="flex items-center gap-2">
