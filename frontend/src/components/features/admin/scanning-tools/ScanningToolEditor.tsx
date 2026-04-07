@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, FileJson, Save } from 'lucide-react'
 import { publishToolVersion, updateScanningTool } from '@/api/authenticated-scans.functions'
 import type { ScanningTool, ScanningToolVersion } from '@/api/authenticated-scans.schemas'
 import { ScriptEditor } from '@/components/ui/script-editor'
+import { ExpectedOutputPanel } from './ExpectedOutputPanel'
 import { VersionHistoryPanel } from './VersionHistoryPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,6 +30,8 @@ type Props = {
 
 export function ScanningToolEditor({ tool, initialScript, onBack }: Props) {
   const queryClient = useQueryClient()
+
+  const [showExpectedOutput, setShowExpectedOutput] = useState(false)
 
   // Metadata state
   const [name, setName] = useState(tool.name)
@@ -81,6 +84,14 @@ export function ScanningToolEditor({ tool, initialScript, onBack }: Props) {
         </Button>
         <h2 className="text-lg font-semibold">{tool.name}</h2>
         <Badge variant="outline">{tool.scriptType}</Badge>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowExpectedOutput(!showExpectedOutput)}
+        >
+          <FileJson className="mr-1 h-4 w-4" />
+          {showExpectedOutput ? 'Hide' : 'Show'} Expected Output
+        </Button>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
@@ -199,6 +210,8 @@ export function ScanningToolEditor({ tool, initialScript, onBack }: Props) {
           />
         </div>
       </div>
+
+      {showExpectedOutput && <ExpectedOutputPanel />}
     </div>
   )
 }
