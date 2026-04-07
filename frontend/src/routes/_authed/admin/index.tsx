@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Bell, Bot, Braces, Building2, ChevronRight, DatabaseZap, GitBranchPlus, Plug, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
+import { Bell, Bot, Braces, Building2, ChevronRight, DatabaseZap, GitBranchPlus, Plug, ScanSearch, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({
@@ -33,6 +33,7 @@ type AdminArea = {
     | '/admin/integrations'
     | '/admin/advanced-tools'
     | '/admin/maintenance'
+    | '/admin/authenticated-scans'
     | '/admin/platform/ai'
     | '/admin/platform/notifications'
   roles: AdminRole[]
@@ -144,6 +145,13 @@ const adminSections: AdminSection[] = [
         to: '/admin/advanced-tools',
         roles: ['GlobalAdmin', 'SecurityManager'],
         icon: Braces,
+      },
+      {
+        title: 'Authenticated scans',
+        description: 'Configure on-prem scan runners, tools, connections, and profiles for host scanning.',
+        to: '/admin/authenticated-scans',
+        roles: ['GlobalAdmin', 'CustomerAdmin'],
+        icon: ScanSearch,
       },
     ],
   },
