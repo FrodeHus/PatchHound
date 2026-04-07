@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import cronstrue from 'cronstrue'
 import type { ConnectionProfile, ScanProfile, ScanRunner, ScanningTool } from '@/api/authenticated-scans.schemas'
 
 type Props = {
@@ -99,11 +100,21 @@ export function ScanProfileDialog({
           <div>
             <Label>Cron Schedule (empty = manual only)</Label>
             <Input value={cronSchedule} onChange={(e) => setCronSchedule(e.target.value)} placeholder="0 2 * * 0" />
-            {cronSchedule && (
-              <p className="text-muted-foreground text-xs mt-1">
-                Cron: {cronSchedule || 'manual only'}
-              </p>
-            )}
+            {cronSchedule && (() => {
+              try {
+                return (
+                  <p className="text-muted-foreground text-xs mt-1">
+                    {cronstrue.toString(cronSchedule)}
+                  </p>
+                )
+              } catch {
+                return (
+                  <p className="text-destructive text-xs mt-1">
+                    Invalid cron expression
+                  </p>
+                )
+              }
+            })()}
           </div>
           <div>
             <Label>Runner</Label>
