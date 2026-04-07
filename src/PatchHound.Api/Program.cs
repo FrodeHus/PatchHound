@@ -368,6 +368,7 @@ builder.Services.AddAuthorization(options =>
                     RoleName.SecurityManager
                 )
             ));
+});
 
 builder.Services.AddScoped<IAuthorizationHandler, RoleRequirementHandler>();
 
