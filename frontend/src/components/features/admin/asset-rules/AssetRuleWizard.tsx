@@ -14,6 +14,7 @@ import type {
   FilterGroup,
   FilterPreview,
 } from '@/api/asset-rules.schemas'
+import type { ScanProfile } from '@/api/authenticated-scans.schemas'
 import type { BusinessLabel } from '@/api/business-labels.schemas'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import type { TeamItem } from '@/api/teams.schemas'
@@ -33,6 +34,7 @@ type AssetRuleWizardProps = {
   securityProfiles: SecurityProfile[]
   businessLabels: BusinessLabel[]
   teams: TeamItem[]
+  scanProfiles: ScanProfile[]
 }
 
 const steps = ['Basic Info', 'Filters', 'Operations', 'Summary'] as const
@@ -45,7 +47,7 @@ const criticalityOptions = [
 
 const emptyFilter: FilterGroup = { type: 'group', operator: 'AND', conditions: [] }
 
-export function AssetRuleWizard({ mode, initialData, securityProfiles, businessLabels, teams }: AssetRuleWizardProps) {
+export function AssetRuleWizard({ mode, initialData, securityProfiles, businessLabels, teams, scanProfiles }: AssetRuleWizardProps) {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [name, setName] = useState(initialData?.name ?? '')
@@ -203,11 +205,11 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
                 {preview && (
                   <InsetPanel className="space-y-2 px-4 py-3">
                     <p className="text-sm font-medium">
-                      {buildPreviewHeadline(preview.count, operations, securityProfiles, businessLabels, teams)}
+                      {buildPreviewHeadline(preview.count, operations, securityProfiles, businessLabels, teams, scanProfiles)}
                     </p>
                     {operations.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
-                        {buildOperationImpactLines(operations, securityProfiles, businessLabels, teams).map((line) => (
+                        {buildOperationImpactLines(operations, securityProfiles, businessLabels, teams, scanProfiles).map((line) => (
                           <Badge key={line} variant="outline" className="rounded-full bg-background/80">
                             {line}
                           </Badge>
@@ -296,6 +298,18 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
               operations={operations}
               onChange={setOperations}
             />
+            <OperationEditor
+              type="AssignScanProfile"
+              label="Assign Scan Profile"
+              description="Assign an authenticated scan profile to matching assets for on-prem host scanning."
+              options={scanProfiles.map((p) => ({
+                value: p.id,
+                label: p.name,
+              }))}
+              paramKey="scanProfileId"
+              operations={operations}
+              onChange={setOperations}
+            />
           </CardContent>
         </Card>
       )}
@@ -343,13 +357,13 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
                             : "Criticality"}
                     </Badge>
                     <span>
-                      {describeOperationTarget(op, securityProfiles, businessLabels, teams)}
+                      {describeOperationTarget(op, securityProfiles, businessLabels, teams, scanProfiles)}
                     </span>
                   </div>
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                {buildPreviewHeadline(preview?.count ?? 0, operations, securityProfiles, businessLabels, teams)}
+                {buildPreviewHeadline(preview?.count ?? 0, operations, securityProfiles, businessLabels, teams, scanProfiles)}
               </p>
             </InsetPanel>
 
@@ -420,12 +434,13 @@ function buildPreviewHeadline(
   securityProfiles: SecurityProfile[],
   businessLabels: BusinessLabel[],
   teams: TeamItem[],
+  scanProfiles: ScanProfile[],
 ) {
   if (operations.length === 0) {
     return `${count} asset${count !== 1 ? 's' : ''} match`
   }
 
-  const operationDescriptions = buildOperationImpactLines(operations, securityProfiles, businessLabels, teams)
+  const operationDescriptions = buildOperationImpactLines(operations, securityProfiles, businessLabels, teams, scanProfiles)
   if (operationDescriptions.length === 1) {
     return `This rule will ${operationDescriptions[0]} for ${count} asset${count !== 1 ? 's' : ''}.`
   }
@@ -438,17 +453,20 @@ function buildOperationImpactLines(
   securityProfiles: SecurityProfile[],
   businessLabels: BusinessLabel[],
   teams: TeamItem[],
+  scanProfiles: ScanProfile[],
 ) {
   return operations.map((operation) => {
     switch (operation.type) {
       case 'AssignSecurityProfile':
-        return `set security profile to ${describeOperationTarget(operation, securityProfiles, businessLabels, teams)}`
+        return `set security profile to ${describeOperationTarget(operation, securityProfiles, businessLabels, teams, scanProfiles)}`
       case 'AssignTeam':
-        return `assign fallback team ${describeOperationTarget(operation, securityProfiles, businessLabels, teams)}`
+        return `assign fallback team ${describeOperationTarget(operation, securityProfiles, businessLabels, teams, scanProfiles)}`
       case 'AssignBusinessLabel':
-        return `apply business label ${describeOperationTarget(operation, securityProfiles, businessLabels, teams)}`
+        return `apply business label ${describeOperationTarget(operation, securityProfiles, businessLabels, teams, scanProfiles)}`
+      case 'AssignScanProfile':
+        return `assign scan profile ${describeOperationTarget(operation, securityProfiles, businessLabels, teams, scanProfiles)}`
       case 'SetCriticality':
-        return `set criticality to ${describeOperationTarget(operation, securityProfiles, businessLabels, teams)}`
+        return `set criticality to ${describeOperationTarget(operation, securityProfiles, businessLabels, teams, scanProfiles)}`
       default:
         return `apply ${operation.type}`
     }
@@ -460,6 +478,7 @@ function describeOperationTarget(
   securityProfiles: SecurityProfile[],
   businessLabels: BusinessLabel[],
   teams: TeamItem[],
+  scanProfiles: ScanProfile[],
 ) {
   if (operation.type === 'AssignSecurityProfile') {
     return securityProfiles.find((profile) => profile.id === operation.parameters.securityProfileId)?.name
@@ -478,6 +497,11 @@ function describeOperationTarget(
 
   if (operation.type === 'SetCriticality') {
     return operation.parameters.criticality
+  }
+
+  if (operation.type === 'AssignScanProfile') {
+    return scanProfiles.find((p) => p.id === operation.parameters.scanProfileId)?.name
+      ?? operation.parameters.scanProfileId
   }
 
   return operation.type
