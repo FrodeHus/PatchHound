@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScanRunnersTab } from '@/components/features/admin/scan-runners/ScanRunnersTab'
 import { ConnectionProfilesTab } from '@/components/features/admin/connection-profiles/ConnectionProfilesTab'
+import { ScanningToolsTab } from '@/components/features/admin/scanning-tools/ScanningToolsTab'
 import {
   fetchConnectionProfiles,
   fetchScanProfiles,
@@ -82,7 +83,14 @@ function AuthenticatedScansWorkbench() {
         </TabsContent>
 
         <TabsContent value="tools" className="space-y-4 pt-1">
-          <p className="text-muted-foreground text-sm">Scanning tools tab — loaded in next task.</p>
+          {'tools' in loaderData && loaderData.tools && (
+            <ScanningToolsTab
+              initialData={loaderData.tools}
+              page={search.page}
+              pageSize={search.pageSize}
+              onPageChange={(p) => navigate({ search: { ...search, page: p } })}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="connections" className="space-y-4 pt-1">
