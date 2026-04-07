@@ -8,9 +8,11 @@ import {
   pagedConnectionProfilesSchema,
   pagedScanProfilesSchema,
   pagedScanRunnersSchema,
+  pagedScanRunsSchema,
   pagedScanningToolsSchema,
   rotateSecretResponseSchema,
   scanProfileSchema,
+  scanRunDetailSchema,
   scanningToolSchema,
   scanningToolVersionListSchema,
   triggerRunResponseSchema,
@@ -250,4 +252,27 @@ export const deleteScanRunner = createServerFn({ method: 'POST' })
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ context, data: { id } }) => {
     await apiDelete(`/scan-runners/${id}`, context)
+  })
+
+// ─── Scan Runs ───
+
+export const fetchScanRuns = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      profileId: z.string().uuid().optional(),
+      page: z.number().optional(),
+      pageSize: z.number().optional(),
+    }),
+  )
+  .handler(async ({ context, data: filters }) => {
+    const params = buildFilterParams(filters)
+    return pagedScanRunsSchema.parse(await apiGet(`/authenticated-scan-runs?${params}`, context))
+  })
+
+export const fetchScanRunDetail = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ context, data: { id } }) => {
+    return scanRunDetailSchema.parse(await apiGet(`/authenticated-scan-runs/${id}`, context))
   })
