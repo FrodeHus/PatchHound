@@ -354,7 +354,9 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
                           ? "Team"
                           : op.type === "AssignBusinessLabel"
                             ? "Business Label"
-                            : "Criticality"}
+                            : op.type === "AssignScanProfile"
+                              ? "Scan Profile"
+                              : "Criticality"}
                     </Badge>
                     <span>
                       {describeOperationTarget(op, securityProfiles, businessLabels, teams, scanProfiles)}

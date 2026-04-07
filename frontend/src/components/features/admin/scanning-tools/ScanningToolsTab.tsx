@@ -48,6 +48,21 @@ const defaultInterpreters: Record<string, string> = {
 }
 
 export function ScanningToolsTab({ initialData, toolDetail, currentScript, page, pageSize, onPageChange, onPageSizeChange, onSelectTool, onDeselectTool }: Props) {
+  const queryClient = useQueryClient()
+  const [createOpen, setCreateOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [scriptType, setScriptType] = useState<(typeof scriptTypes)[number]>('python')
+  const [interpreterPath, setInterpreterPath] = useState(defaultInterpreters.python)
+  const [timeoutSeconds, setTimeoutSeconds] = useState(300)
+  const [newToolScript, setNewToolScript] = useState('')
+
+  const query = useQuery({
+    queryKey: ['scanning-tools', page, pageSize],
+    queryFn: () => fetchScanningTools({ data: { page, pageSize } }),
+    initialData,
+  })
+
   if (toolDetail) {
     return (
       <ScanningToolEditor
@@ -57,21 +72,6 @@ export function ScanningToolsTab({ initialData, toolDetail, currentScript, page,
       />
     )
   }
-
-  const queryClient = useQueryClient()
-  const [createOpen, setCreateOpen] = useState(false)
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [scriptType, setScriptType] = useState<(typeof scriptTypes)[number]>('python')
-  const [interpreterPath, setInterpreterPath] = useState(defaultInterpreters.python)
-  const [timeoutSeconds, setTimeoutSeconds] = useState(300)
-  const [initialScript, setInitialScript] = useState('')
-
-  const query = useQuery({
-    queryKey: ['scanning-tools', page, pageSize],
-    queryFn: () => fetchScanningTools({ data: { page, pageSize } }),
-    initialData,
-  })
 
   const createMutation = useMutation({
     mutationFn: createScanningTool,
@@ -99,7 +99,7 @@ export function ScanningToolsTab({ initialData, toolDetail, currentScript, page,
     setScriptType('python')
     setInterpreterPath(defaultInterpreters.python)
     setTimeoutSeconds(300)
-    setInitialScript('')
+    setNewToolScript('')
   }
 
   const columns: ColumnDef<ScanningTool>[] = [
@@ -219,8 +219,8 @@ export function ScanningToolsTab({ initialData, toolDetail, currentScript, page,
             <div>
               <Label>Initial Script</Label>
               <Textarea
-                value={initialScript}
-                onChange={(e) => setInitialScript(e.target.value)}
+                value={newToolScript}
+                onChange={(e) => setNewToolScript(e.target.value)}
                 rows={8}
                 className="font-mono text-xs"
                 placeholder="# Your script here..."
@@ -232,10 +232,10 @@ export function ScanningToolsTab({ initialData, toolDetail, currentScript, page,
             <Button
               onClick={() =>
                 createMutation.mutate({
-                  data: { name, description, scriptType, interpreterPath, timeoutSeconds, initialScript },
+                  data: { name, description, scriptType, interpreterPath, timeoutSeconds, initialScript: newToolScript },
                 })
               }
-              disabled={!name || !interpreterPath || !initialScript || createMutation.isPending}
+              disabled={!name || !interpreterPath || !newToolScript || createMutation.isPending}
             >
               Create Tool
             </Button>
