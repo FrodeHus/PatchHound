@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Eye, Play } from 'lucide-react'
 import { toast } from 'sonner'
-import { useMutation } from '@tanstack/react-query'
 import { fetchScanRuns, triggerScanRun } from '@/api/authenticated-scans.functions'
 import type { PagedScanRuns, ScanRun } from '@/api/authenticated-scans.schemas'
 import { formatDateTime } from '@/lib/formatting'
@@ -23,6 +22,7 @@ type Props = {
 }
 
 export function ScanRunHistoryTab({ initialData, page, pageSize, onPageChange, onPageSizeChange }: Props) {
+  const queryClient = useQueryClient()
   const [reportRunId, setReportRunId] = useState<string | null>(null)
 
   const query = useQuery({
@@ -33,7 +33,10 @@ export function ScanRunHistoryTab({ initialData, page, pageSize, onPageChange, o
 
   const triggerMutation = useMutation({
     mutationFn: triggerScanRun,
-    onSuccess: () => toast.success('Scan run triggered'),
+    onSuccess: () => {
+      toast.success('Scan run triggered')
+      queryClient.invalidateQueries({ queryKey: ['scan-runs'] })
+    },
     onError: () => toast.error('Failed to trigger scan run'),
   })
 

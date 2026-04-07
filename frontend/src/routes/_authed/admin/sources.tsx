@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 export const Route = createFileRoute('/_authed/admin/sources')({
   beforeLoad: ({ context }) => {
     const activeRoles = context.user?.activeRoles ?? []
-    if (!activeRoles.includes('GlobalAdmin') && !activeRoles.includes('SecurityManager')) {
+    if (!activeRoles.includes('GlobalAdmin') && !activeRoles.includes('SecurityManager') && !activeRoles.includes('CustomerAdmin')) {
       throw redirect({ to: '/admin' })
     }
   },

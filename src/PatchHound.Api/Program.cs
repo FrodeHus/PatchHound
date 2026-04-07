@@ -26,7 +26,8 @@ if (jwtLogPii)
 }
 
 // Authentication - Entra ID multi-tenant
-builder.Services.AddAuthentication().AddMicrosoftIdentityWebApi(azureAdConfig);
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApi(azureAdConfig);
 
 // Authentication - Scan runner bearer token (SHA-256 hashed)
 builder.Services.AddAuthentication()
