@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ScanRunnersTab } from '@/components/features/admin/scan-runners/ScanRunnersTab'
 import {
   fetchConnectionProfiles,
   fetchScanProfiles,
@@ -88,7 +89,14 @@ function AuthenticatedScansWorkbench() {
         </TabsContent>
 
         <TabsContent value="runners" className="space-y-4 pt-1">
-          <p className="text-muted-foreground text-sm">Scan runners tab — loaded in next task.</p>
+          {'runners' in loaderData && loaderData.runners && (
+            <ScanRunnersTab
+              initialData={loaderData.runners}
+              page={search.page}
+              pageSize={search.pageSize}
+              onPageChange={(p) => navigate({ search: { ...search, page: p } })}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>
