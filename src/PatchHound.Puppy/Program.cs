@@ -20,6 +20,12 @@ var deserializer = new DeserializerBuilder()
 
 var options = deserializer.Deserialize<RunnerOptions>(yaml);
 
+if (string.IsNullOrWhiteSpace(options.CentralUrl) || string.IsNullOrWhiteSpace(options.BearerToken))
+{
+    Console.Error.WriteLine("ERROR: centralUrl and bearerToken are required in runner.yaml");
+    return 1;
+}
+
 builder.Services.AddSingleton(options);
 builder.Services.AddSingleton<ISshExecutor, SshJobExecutor>();
 builder.Services.AddHttpClient<IRunnerApiClient, ApiClient>();

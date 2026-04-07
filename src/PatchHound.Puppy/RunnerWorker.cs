@@ -8,7 +8,6 @@ public class RunnerWorker(
     ISshExecutor sshExecutor,
     ILogger<RunnerWorker> logger) : BackgroundService
 {
-    private readonly SemaphoreSlim _concurrency = new(options.MaxConcurrentJobs);
     private DateTimeOffset _lastHeartbeat = DateTimeOffset.MinValue;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
