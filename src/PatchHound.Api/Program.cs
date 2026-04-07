@@ -357,7 +357,17 @@ builder.Services.AddAuthorization(options =>
         Policies.ManageGlobalSettings,
         policy => policy.AddRequirements(new RoleRequirement(RoleName.GlobalAdmin))
     );
-});
+
+    options.AddPolicy(
+        Policies.ManageAuthenticatedScans,
+        policy =>
+            policy.AddRequirements(
+                new RoleRequirement(
+                    RoleName.GlobalAdmin,
+                    RoleName.CustomerAdmin,
+                    RoleName.SecurityManager
+                )
+            ));
 
 builder.Services.AddScoped<IAuthorizationHandler, RoleRequirementHandler>();
 
