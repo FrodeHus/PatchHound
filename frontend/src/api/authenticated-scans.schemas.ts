@@ -121,3 +121,53 @@ export type ScanRunner = z.infer<typeof scanRunnerSchema>
 export type PagedScanRunners = z.infer<typeof pagedScanRunnersSchema>
 export type CreateScanRunnerResponse = z.infer<typeof createScanRunnerResponseSchema>
 export type RotateSecretResponse = z.infer<typeof rotateSecretResponseSchema>
+
+// --- Scan Runs ---
+
+export const scanRunSchema = z.object({
+  id: z.string().uuid(),
+  scanProfileId: z.string().uuid(),
+  profileName: z.string(),
+  triggerKind: z.string(),
+  triggeredByUserId: z.string().uuid().nullable(),
+  startedAt: isoDateTimeSchema,
+  completedAt: nullableIsoDateTimeSchema,
+  status: z.string(),
+  totalDevices: z.number(),
+  succeededCount: z.number(),
+  failedCount: z.number(),
+  entriesIngested: z.number(),
+})
+
+export const pagedScanRunsSchema = pagedResponseMetaSchema.extend({
+  items: z.array(scanRunSchema),
+})
+
+export const validationIssueSchema = z.object({
+  fieldPath: z.string(),
+  message: z.string(),
+  entryIndex: z.number(),
+})
+
+export const scanJobSummarySchema = z.object({
+  id: z.string().uuid(),
+  assetId: z.string().uuid(),
+  assetName: z.string(),
+  status: z.string(),
+  attemptCount: z.number(),
+  startedAt: nullableIsoDateTimeSchema,
+  completedAt: nullableIsoDateTimeSchema,
+  errorMessage: z.string(),
+  entriesIngested: z.number(),
+  validationIssues: z.array(validationIssueSchema),
+})
+
+export const scanRunDetailSchema = scanRunSchema.extend({
+  jobs: z.array(scanJobSummarySchema),
+})
+
+export type ScanRun = z.infer<typeof scanRunSchema>
+export type PagedScanRuns = z.infer<typeof pagedScanRunsSchema>
+export type ScanJobSummary = z.infer<typeof scanJobSummarySchema>
+export type ScanRunDetail = z.infer<typeof scanRunDetailSchema>
+export type ValidationIssue = z.infer<typeof validationIssueSchema>
