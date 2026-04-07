@@ -38,6 +38,7 @@ type AdminArea = {
     | '/admin/platform/notifications'
   roles: AdminRole[]
   icon: typeof Users
+  featureFlag?: 'workflows' | 'authenticatedScans'
 }
 
 type AdminSection = {
@@ -111,6 +112,7 @@ const adminSections: AdminSection[] = [
         to: '/admin/workflows',
         roles: ['GlobalAdmin', 'SecurityManager'],
         icon: Workflow,
+        featureFlag: 'workflows',
       },
       {
         title: 'Security profiles',
@@ -152,6 +154,7 @@ const adminSections: AdminSection[] = [
         to: '/admin/authenticated-scans',
         roles: ['GlobalAdmin', 'CustomerAdmin'],
         icon: ScanSearch,
+        featureFlag: 'authenticatedScans',
       },
     ],
   },
@@ -187,7 +190,10 @@ function AdminLandingPage() {
   const accessibleSections = adminSections
     .map((section) => ({
       ...section,
-      areas: section.areas.filter((area) => canAccess(area.roles, activeRoles)),
+      areas: section.areas.filter((area) =>
+        canAccess(area.roles, activeRoles)
+        && (!area.featureFlag || user.featureFlags[area.featureFlag])
+      ),
     }))
     .filter((section) => section.areas.length > 0)
 

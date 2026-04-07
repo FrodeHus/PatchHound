@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createWorkflowDefinition } from '@/api/workflows.functions'
@@ -16,6 +16,11 @@ import {
 } from '@/components/ui/select'
 
 export const Route = createFileRoute('/_authed/admin/workflows/new')({
+  beforeLoad: ({ context }) => {
+    if (!context.user?.featureFlags.workflows) {
+      throw redirect({ to: '/admin' })
+    }
+  },
   loader: async () => {
     const teams = await fetchTeams({ data: { pageSize: 200 } })
     return { teams }

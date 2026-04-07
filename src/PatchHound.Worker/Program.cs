@@ -1,3 +1,4 @@
+using Microsoft.FeatureManagement;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Core.Enums;
@@ -8,6 +9,7 @@ using PatchHound.Worker;
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddPatchHoundInfrastructure(builder.Configuration);
+builder.Services.AddFeatureManagement(builder.Configuration.GetSection("FeatureManagement"));
 
 // Tenant context for worker (system-level, all tenants accessible)
 builder.Services.AddScoped<ITenantContext, WorkerTenantContext>();

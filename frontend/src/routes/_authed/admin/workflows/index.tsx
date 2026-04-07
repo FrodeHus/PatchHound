@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, Play, Archive, ChevronRight, Trash2 } from 'lucide-react'
@@ -18,6 +18,11 @@ import {
 } from '@/components/ui/table'
 
 export const Route = createFileRoute('/_authed/admin/workflows/')({
+  beforeLoad: ({ context }) => {
+    if (!context.user?.featureFlags.workflows) {
+      throw redirect({ to: '/admin' })
+    }
+  },
   validateSearch: baseListSearchSchema,
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {

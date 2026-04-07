@@ -4,6 +4,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.FeatureManagement;
 using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Logging;
 using Npgsql;
@@ -374,6 +375,7 @@ builder.Services.AddScoped<IAuthorizationHandler, RoleRequirementHandler>();
 
 // Infrastructure services (database, repositories, email, AI providers, vulnerability sources)
 builder.Services.AddPatchHoundInfrastructure(builder.Configuration);
+builder.Services.AddFeatureManagement(builder.Configuration.GetSection("FeatureManagement"));
 
 // Tenant context (scoped - one per request)
 builder.Services.AddScoped<ITenantContext, TenantContext>();

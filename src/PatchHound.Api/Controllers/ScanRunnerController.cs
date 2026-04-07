@@ -3,7 +3,9 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.FeatureManagement.Mvc;
 using PatchHound.Api.Auth;
+using PatchHound.Core.Common;
 using PatchHound.Core.Entities.AuthenticatedScans;
 using PatchHound.Infrastructure.AuthenticatedScans;
 using PatchHound.Infrastructure.Data;
@@ -14,6 +16,7 @@ namespace PatchHound.Api.Controllers;
 [ApiController]
 [Route("api/scan-runner")]
 [Authorize(AuthenticationSchemes = ScanRunnerBearerHandler.SchemeName)]
+[FeatureGate(FeatureFlags.AuthenticatedScans)]
 public class ScanRunnerController(
     PatchHoundDbContext db,
     ISecretStore secretStore,

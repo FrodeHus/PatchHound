@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.FeatureManagement.Mvc;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
+using PatchHound.Core.Common;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.AuthenticatedScans;
 using PatchHound.Infrastructure.Data;
@@ -12,6 +14,7 @@ namespace PatchHound.Api.Controllers;
 [ApiController]
 [Route("api/scanning-tools")]
 [Authorize(Policy = Policies.ManageAuthenticatedScans)]
+[FeatureGate(FeatureFlags.AuthenticatedScans)]
 public class ScanningToolsController(
     PatchHoundDbContext db,
     ITenantContext tenantContext,

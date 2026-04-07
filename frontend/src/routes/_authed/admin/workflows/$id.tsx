@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, Play, Archive, Trash2, X, Ban } from 'lucide-react'
@@ -34,6 +34,11 @@ import {
 } from '@/components/ui/table'
 
 export const Route = createFileRoute('/_authed/admin/workflows/$id')({
+  beforeLoad: ({ context }) => {
+    if (!context.user?.featureFlags.workflows) {
+      throw redirect({ to: '/admin' })
+    }
+  },
   loader: async ({ params }) => {
     const [definition, instances, teams] = await Promise.all([
       fetchWorkflowDefinition({ data: { id: params.id } }),

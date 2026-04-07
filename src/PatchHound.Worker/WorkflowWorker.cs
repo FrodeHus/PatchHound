@@ -1,12 +1,17 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.FeatureManagement;
 using Microsoft.Extensions.DependencyInjection;
+using PatchHound.Core.Common;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Worker;
 
-public class WorkflowWorker(IServiceScopeFactory scopeFactory, ILogger<WorkflowWorker> logger)
+public class WorkflowWorker(
+    IServiceScopeFactory scopeFactory,
+    IFeatureManager featureManager,
+    ILogger<WorkflowWorker> logger)
     : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(1);
@@ -19,8 +24,11 @@ public class WorkflowWorker(IServiceScopeFactory scopeFactory, ILogger<WorkflowW
         {
             try
             {
-                await ProcessTimeoutsAsync(stoppingToken);
-                await ResumeReadyMergeNodesAsync(stoppingToken);
+                if (await featureManager.IsEnabledAsync(FeatureFlags.Workflows))
+                {
+                    await ProcessTimeoutsAsync(stoppingToken);
+                    await ResumeReadyMergeNodesAsync(stoppingToken);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

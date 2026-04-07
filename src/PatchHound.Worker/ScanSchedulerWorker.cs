@@ -1,9 +1,12 @@
+using Microsoft.FeatureManagement;
+using PatchHound.Core.Common;
 using PatchHound.Infrastructure.AuthenticatedScans;
 
 namespace PatchHound.Worker;
 
 public class ScanSchedulerWorker(
     IServiceScopeFactory scopeFactory,
+    IFeatureManager featureManager,
     ILogger<ScanSchedulerWorker> logger)
     : BackgroundService
 {
@@ -17,9 +20,12 @@ public class ScanSchedulerWorker(
         {
             try
             {
-                using var scope = scopeFactory.CreateScope();
-                var handler = scope.ServiceProvider.GetRequiredService<ScanSchedulerTickHandler>();
-                await handler.TickAsync(stoppingToken);
+                if (await featureManager.IsEnabledAsync(FeatureFlags.AuthenticatedScans))
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var handler = scope.ServiceProvider.GetRequiredService<ScanSchedulerTickHandler>();
+                    await handler.TickAsync(stoppingToken);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

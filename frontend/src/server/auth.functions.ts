@@ -22,6 +22,11 @@ type AssignedRolesResponse = {
   roles: string[]
 }
 
+type FeatureFlagsResponse = {
+  workflows: boolean
+  authenticatedScans: boolean
+}
+
 export const getCurrentUser = createServerFn({ method: 'GET' })
   .handler(async () => {
     const session = await getSession()
@@ -47,6 +52,10 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
 
     let systemStatus: SystemStatus | null = null
     let setupStatus: SetupStatus | null = null
+    let featureFlags: FeatureFlagsResponse = {
+      workflows: true,
+      authenticatedScans: true,
+    }
     let roles = session.roles ?? []
     let tenantIds = session.tenantIds ?? (session.tenantId ? [session.tenantId] : [])
     try {
@@ -82,6 +91,16 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
     }
 
     try {
+      featureFlags = await apiGet<FeatureFlagsResponse>('/features', {
+        token: session.accessToken,
+        tenantId: session.tenantId,
+        activeRoles: session.activeRoles,
+      })
+    } catch {
+      // Keep optional features visible if the feature endpoint is unavailable.
+    }
+
+    try {
       const tenantResponse = await apiGet<TenantListResponse>('/tenants?page=1&pageSize=100', {
         token: session.accessToken,
         tenantId: session.tenantId,
@@ -106,6 +125,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       tenantIds,
       requiresSetup: setupStatus?.requiresSetup ?? false,
       systemStatus,
+      featureFlags,
     }
   })
 

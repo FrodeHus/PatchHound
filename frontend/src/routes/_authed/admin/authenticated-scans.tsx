@@ -13,12 +13,17 @@ import {
   fetchScanningTools,
   fetchToolVersions,
 } from '@/api/authenticated-scans.functions'
+import type { ScanningToolVersion } from '@/api/authenticated-scans.schemas'
 import { baseListSearchSchema } from '@/routes/-list-search'
 
 const tabValues = ['profiles', 'tools', 'connections', 'runners'] as const
 
 export const Route = createFileRoute('/_authed/admin/authenticated-scans')({
   beforeLoad: ({ context }) => {
+    if (!context.user?.featureFlags.authenticatedScans) {
+      throw redirect({ to: '/admin' })
+    }
+
     const activeRoles = context.user?.activeRoles ?? []
     if (!activeRoles.includes('CustomerAdmin') && !activeRoles.includes('GlobalAdmin')) {
       throw redirect({ to: '/admin' })
@@ -50,7 +55,9 @@ export const Route = createFileRoute('/_authed/admin/authenticated-scans')({
           fetchScanningTool({ data: { id: deps.toolId } }),
           fetchToolVersions({ data: { toolId: deps.toolId } }),
         ])
-        const currentScript = versions.find((v: any) => v.id === tool.currentVersionId)?.scriptContent ?? ''
+        const currentScript = versions.find((version: ScanningToolVersion) =>
+          version.id === tool.currentVersionId
+        )?.scriptContent ?? ''
         return { tools, toolDetail: tool, toolVersions: versions, currentScript, tab }
       }
       return { tools, tab }

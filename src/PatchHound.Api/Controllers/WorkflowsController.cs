@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.FeatureManagement.Mvc;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Workflows;
+using PatchHound.Core.Common;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
@@ -14,6 +16,7 @@ namespace PatchHound.Api.Controllers;
 [ApiController]
 [Route("api/workflows")]
 [Authorize]
+[FeatureGate(FeatureFlags.Workflows)]
 public class WorkflowsController(
     PatchHoundDbContext dbContext,
     IWorkflowEngine workflowEngine,
