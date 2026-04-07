@@ -22,6 +22,23 @@ public class AuthenticatedScanRunsController(
         string Status, int TotalDevices,
         int SucceededCount, int FailedCount, int EntriesIngested);
 
+    public record ScanRunDetailDto(
+        Guid Id, Guid ScanProfileId, string ProfileName,
+        string TriggerKind, Guid? TriggeredByUserId,
+        DateTimeOffset StartedAt, DateTimeOffset? CompletedAt,
+        string Status, int TotalDevices,
+        int SucceededCount, int FailedCount, int EntriesIngested,
+        List<ScanJobSummaryDto> Jobs);
+
+    public record ScanJobSummaryDto(
+        Guid Id, Guid AssetId, string AssetName,
+        string Status, int AttemptCount,
+        DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt,
+        string ErrorMessage, int EntriesIngested,
+        List<ValidationIssueDto> ValidationIssues);
+
+    public record ValidationIssueDto(string FieldPath, string Message, int EntryIndex);
+
     [HttpGet]
     public async Task<ActionResult<PagedResponse<ScanRunListDto>>> List(
         [FromQuery] Guid tenantId,
@@ -59,5 +76,53 @@ public class AuthenticatedScanRunsController(
             r.EntriesIngested)).ToList();
 
         return new PagedResponse<ScanRunListDto>(items, total, pagination.Page, pagination.BoundedPageSize);
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<ScanRunDetailDto>> GetDetail(Guid id, CancellationToken ct)
+    {
+        var run = await db.AuthenticatedScanRuns.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (run is null) return NotFound();
+        if (!tenantContext.HasAccessToTenant(run.TenantId)) return Forbid();
+
+        var profileName = await db.ScanProfiles.AsNoTracking()
+            .Where(p => p.Id == run.ScanProfileId)
+            .Select(p => p.Name)
+            .FirstOrDefaultAsync(ct) ?? "\u2014";
+
+        var jobs = await db.ScanJobs.AsNoTracking()
+            .Where(j => j.RunId == id)
+            .OrderBy(j => j.StartedAt)
+            .ToListAsync(ct);
+
+        var assetIds = jobs.Select(j => j.AssetId).Distinct().ToList();
+        var assetNames = await db.Assets.AsNoTracking()
+            .Where(a => assetIds.Contains(a.Id))
+            .ToDictionaryAsync(a => a.Id, a => a.Name, ct);
+
+        var jobIds = jobs.Select(j => j.Id).ToList();
+        var issues = await db.ScanJobValidationIssues.AsNoTracking()
+            .Where(v => jobIds.Contains(v.ScanJobId))
+            .ToListAsync(ct);
+        var issuesByJob = issues
+            .GroupBy(v => v.ScanJobId)
+            .ToDictionary(g => g.Key, g => g.Select(v =>
+                new ValidationIssueDto(v.FieldPath, v.Message, v.EntryIndex)).ToList());
+
+        var jobDtos = jobs.Select(j => new ScanJobSummaryDto(
+            j.Id, j.AssetId,
+            assetNames.GetValueOrDefault(j.AssetId, "\u2014"),
+            j.Status, j.AttemptCount,
+            j.StartedAt, j.CompletedAt,
+            j.ErrorMessage, j.EntriesIngested,
+            issuesByJob.GetValueOrDefault(j.Id, []))).ToList();
+
+        return new ScanRunDetailDto(
+            run.Id, run.ScanProfileId, profileName,
+            run.TriggerKind, run.TriggeredByUserId,
+            run.StartedAt, run.CompletedAt, run.Status,
+            run.TotalDevices, run.SucceededCount, run.FailedCount,
+            run.EntriesIngested, jobDtos);
     }
 }

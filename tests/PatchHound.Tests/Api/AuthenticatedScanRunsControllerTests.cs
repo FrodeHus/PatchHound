@@ -109,4 +109,56 @@ public class AuthenticatedScanRunsControllerTests : IAsyncLifetime
 
         Assert.IsType<ForbidResult>(result.Result);
     }
+
+    [Fact]
+    public async Task GetDetail_returns_run_with_job_summaries()
+    {
+        var result = await _sut.GetDetail(_completedRun.Id, CancellationToken.None);
+
+        var okResult = Assert.IsType<ActionResult<AuthenticatedScanRunsController.ScanRunDetailDto>>(result);
+        var detail = okResult.Value!;
+        Assert.Equal(_completedRun.Id, detail.Id);
+        Assert.Equal("profile-1", detail.ProfileName);
+        Assert.Equal(2, detail.Jobs.Count);
+
+        var succeeded = detail.Jobs.Single(j => j.Status == "Succeeded");
+        Assert.Equal("server-1", succeeded.AssetName);
+        Assert.Equal(5, succeeded.EntriesIngested);
+
+        var failed = detail.Jobs.Single(j => j.Status == "Failed");
+        Assert.Equal("server-2", failed.AssetName);
+        Assert.Equal("Connection refused", failed.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task GetDetail_includes_validation_issues()
+    {
+        var result = await _sut.GetDetail(_completedRun.Id, CancellationToken.None);
+
+        var detail = result.Value!;
+        var jobWithIssues = detail.Jobs.Single(j => j.ValidationIssues.Count > 0);
+        Assert.Single(jobWithIssues.ValidationIssues);
+        Assert.Equal("software[0].version", jobWithIssues.ValidationIssues[0].FieldPath);
+    }
+
+    [Fact]
+    public async Task GetDetail_returns_404_for_missing_run()
+    {
+        var result = await _sut.GetDetail(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task GetDetail_forbids_other_tenant_run()
+    {
+        // Create a run in another tenant
+        var otherRun = AuthenticatedScanRun.Start(_otherTenantId, Guid.NewGuid(), "manual", null, DateTimeOffset.UtcNow);
+        _db.AuthenticatedScanRuns.Add(otherRun);
+        await _db.SaveChangesAsync();
+
+        var result = await _sut.GetDetail(otherRun.Id, CancellationToken.None);
+
+        Assert.IsType<ForbidResult>(result.Result);
+    }
 }
