@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { fetchEnrichmentSources } from '@/server/system.functions'
+import { ScanRunHistoryTab } from '@/components/features/admin/scan-runs/ScanRunHistoryTab'
+import { fetchScanRuns } from '@/api/authenticated-scans.functions'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/_authed/admin/sources')({
@@ -21,9 +23,11 @@ export const Route = createFileRoute('/_authed/admin/sources')({
     }
   },
   validateSearch: z.object({
-    activeView: z.enum(['tenant', 'global-enrichment']).optional(),
+    activeView: z.enum(['tenant', 'global-enrichment', 'authenticated-scans']).optional(),
     mode: z.enum(['edit', 'history']).optional(),
     sourceKey: z.string().optional(),
+    page: z.coerce.number().optional().default(1),
+    pageSize: z.coerce.number().optional().default(25),
   }),
   component: SourcesAdministrationPage,
 })
@@ -52,6 +56,14 @@ function SourcesAdministrationPage() {
     queryKey: ['enrichment-sources'],
     queryFn: () => fetchEnrichmentSources(),
     enabled: canManageEnrichment,
+  })
+  const canManageScans = (user.activeRoles ?? []).some((r) =>
+    r === 'GlobalAdmin' || r === 'CustomerAdmin'
+  )
+  const scanRunsQuery = useQuery({
+    queryKey: ['scan-runs', search.page, search.pageSize],
+    queryFn: () => fetchScanRuns({ data: { page: search.page, pageSize: search.pageSize } }),
+    enabled: activeView === 'authenticated-scans',
   })
   const canViewAudit = (user.activeRoles ?? []).includes('GlobalAdmin') || (user.activeRoles ?? []).includes('Auditor')
   const tenantAuditQuery = useQuery({
@@ -94,7 +106,7 @@ function SourcesAdministrationPage() {
         </p>
       </div>
 
-      {canManageEnrichment ? (
+      {(canManageEnrichment || canManageScans) ? (
         <div className="inline-flex rounded-xl border border-border/70 bg-card/70 p-1">
           <button
             type="button"
@@ -110,20 +122,40 @@ function SourcesAdministrationPage() {
           >
             Tenant Sources
           </button>
-          <button
-            type="button"
-            className={viewToggleClassName(activeView === "global-enrichment")}
-            onClick={() => {
-              void navigate({
-                to: '/admin/sources',
-                search: {
-                  activeView: 'global-enrichment',
-                },
-              })
-            }}
-          >
-            Global Enrichment
-          </button>
+          {canManageEnrichment && (
+            <button
+              type="button"
+              className={viewToggleClassName(activeView === "global-enrichment")}
+              onClick={() => {
+                void navigate({
+                  to: '/admin/sources',
+                  search: {
+                    activeView: 'global-enrichment',
+                  },
+                })
+              }}
+            >
+              Global Enrichment
+            </button>
+          )}
+          {canManageScans && (
+            <button
+              type="button"
+              className={viewToggleClassName(activeView === "authenticated-scans")}
+              onClick={() => {
+                void navigate({
+                  to: '/admin/sources',
+                  search: {
+                    activeView: 'authenticated-scans',
+                    page: 1,
+                    pageSize: search.pageSize,
+                  },
+                })
+              }}
+            >
+              Authenticated Scans
+            </button>
+          )}
         </div>
       ) : null}
 
@@ -297,6 +329,22 @@ function SourcesAdministrationPage() {
             </CardContent>
           </Card>
         )
+      ) : null}
+
+      {activeView === "authenticated-scans" && canManageScans && scanRunsQuery.data ? (
+        <ScanRunHistoryTab
+          initialData={scanRunsQuery.data}
+          page={search.page}
+          pageSize={search.pageSize}
+          onPageChange={(p) => navigate({ search: { ...search, page: p } })}
+          onPageSizeChange={(ps) => navigate({ search: { ...search, page: 1, pageSize: ps } })}
+        />
+      ) : activeView === "authenticated-scans" && canManageScans ? (
+        <Card className="rounded-2xl">
+          <CardContent className="py-8 text-sm text-muted-foreground">
+            Loading scan run history...
+          </CardContent>
+        </Card>
       ) : null}
     </section>
   );
