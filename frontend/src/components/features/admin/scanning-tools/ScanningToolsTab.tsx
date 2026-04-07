@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ScanningToolEditor } from './ScanningToolEditor'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
@@ -29,10 +30,14 @@ import { Textarea } from '@/components/ui/textarea'
 
 type Props = {
   initialData: PagedScanningTools
+  toolDetail?: ScanningTool
+  currentScript?: string
   page: number
   pageSize: number
   onPageChange: (page: number) => void
   onPageSizeChange?: (pageSize: number) => void
+  onSelectTool: (id: string) => void
+  onDeselectTool: () => void
 }
 
 const scriptTypes = ['python', 'bash', 'powershell'] as const
@@ -42,7 +47,17 @@ const defaultInterpreters: Record<string, string> = {
   powershell: '/usr/bin/pwsh',
 }
 
-export function ScanningToolsTab({ initialData, page, pageSize, onPageChange, onPageSizeChange }: Props) {
+export function ScanningToolsTab({ initialData, toolDetail, currentScript, page, pageSize, onPageChange, onPageSizeChange, onSelectTool, onDeselectTool }: Props) {
+  if (toolDetail) {
+    return (
+      <ScanningToolEditor
+        tool={toolDetail}
+        initialScript={currentScript ?? ''}
+        onBack={onDeselectTool}
+      />
+    )
+  }
+
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
@@ -88,7 +103,19 @@ export function ScanningToolsTab({ initialData, page, pageSize, onPageChange, on
   }
 
   const columns: ColumnDef<ScanningTool>[] = [
-    { accessorKey: 'name', header: 'Name' },
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => (
+        <button
+          type="button"
+          className="text-primary underline text-left"
+          onClick={() => onSelectTool(row.original.id)}
+        >
+          {row.original.name}
+        </button>
+      ),
+    },
     {
       accessorKey: 'scriptType',
       header: 'Type',

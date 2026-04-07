@@ -9,7 +9,9 @@ import {
   fetchConnectionProfiles,
   fetchScanProfiles,
   fetchScanRunners,
+  fetchScanningTool,
   fetchScanningTools,
+  fetchToolVersions,
 } from '@/api/authenticated-scans.functions'
 import { baseListSearchSchema } from '@/routes/-list-search'
 
@@ -24,6 +26,7 @@ export const Route = createFileRoute('/_authed/admin/authenticated-scans')({
   },
   validateSearch: baseListSearchSchema.extend({
     tab: z.enum(tabValues).optional(),
+    toolId: z.string().uuid().optional(),
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
@@ -41,7 +44,16 @@ export const Route = createFileRoute('/_authed/admin/authenticated-scans')({
       return { profiles, tools, connections, runners, tab }
     }
     if (tab === 'tools') {
-      return { tools: await fetchScanningTools({ data: paging }), tab }
+      const tools = await fetchScanningTools({ data: paging })
+      if (deps.toolId) {
+        const [tool, versions] = await Promise.all([
+          fetchScanningTool({ data: { id: deps.toolId } }),
+          fetchToolVersions({ data: { toolId: deps.toolId } }),
+        ])
+        const currentScript = versions.find((v: any) => v.id === tool.currentVersionId)?.scriptContent ?? ''
+        return { tools, toolDetail: tool, toolVersions: versions, currentScript, tab }
+      }
+      return { tools, tab }
     }
     if (tab === 'connections') {
       return { connections: await fetchConnectionProfiles({ data: paging }), tab }
@@ -98,10 +110,14 @@ function AuthenticatedScansWorkbench() {
           {'tools' in loaderData && loaderData.tools && (
             <ScanningToolsTab
               initialData={loaderData.tools}
+              toolDetail={'toolDetail' in loaderData ? loaderData.toolDetail : undefined}
+              currentScript={'currentScript' in loaderData ? (loaderData.currentScript as string) : undefined}
               page={search.page}
               pageSize={search.pageSize}
               onPageChange={(p) => navigate({ search: { ...search, page: p } })}
               onPageSizeChange={(ps) => navigate({ search: { ...search, page: 1, pageSize: ps } })}
+              onSelectTool={(id) => navigate({ search: { ...search, toolId: id } })}
+              onDeselectTool={() => navigate({ search: { ...search, toolId: undefined } })}
             />
           )}
         </TabsContent>
