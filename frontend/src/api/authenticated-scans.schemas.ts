@@ -61,6 +61,8 @@ export const scanningToolVersionSchema = z.object({
 
 export type ScanningToolVersion = z.infer<typeof scanningToolVersionSchema>
 
+export const scanningToolVersionListSchema = z.array(scanningToolVersionSchema)
+
 // --- Connection Profiles ---
 
 export const connectionProfileSchema = z.object({

@@ -11,6 +11,8 @@ import {
   pagedScanningToolsSchema,
   rotateSecretResponseSchema,
   scanProfileSchema,
+  scanningToolSchema,
+  scanningToolVersionListSchema,
   triggerRunResponseSchema,
 } from './authenticated-scans.schemas'
 
@@ -122,6 +124,29 @@ export const deleteScanningTool = createServerFn({ method: 'POST' })
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ context, data: { id } }) => {
     await apiDelete(`/scanning-tools/${id}`, context)
+  })
+
+export const fetchScanningTool = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ context, data: { id } }) => {
+    return scanningToolSchema.parse(await apiGet(`/scanning-tools/${id}`, context))
+  })
+
+export const fetchToolVersions = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ toolId: z.string().uuid() }))
+  .handler(async ({ context, data: { toolId } }) => {
+    return scanningToolVersionListSchema.parse(
+      await apiGet(`/scanning-tools/${toolId}/versions`, context),
+    )
+  })
+
+export const publishToolVersion = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ toolId: z.string().uuid(), scriptContent: z.string().min(1) }))
+  .handler(async ({ context, data: { toolId, scriptContent } }) => {
+    await apiPost(`/scanning-tools/${toolId}/versions`, context, { scriptContent })
   })
 
 // ─── Connection Profiles ───
