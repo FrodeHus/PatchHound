@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScanRunnersTab } from '@/components/features/admin/scan-runners/ScanRunnersTab'
 import { ConnectionProfilesTab } from '@/components/features/admin/connection-profiles/ConnectionProfilesTab'
 import { ScanningToolsTab } from '@/components/features/admin/scanning-tools/ScanningToolsTab'
+import { ScanProfilesTab } from '@/components/features/admin/scan-profiles/ScanProfilesTab'
 import {
   fetchConnectionProfiles,
   fetchScanProfiles,
@@ -79,7 +80,17 @@ function AuthenticatedScansWorkbench() {
         </TabsList>
 
         <TabsContent value="profiles" className="space-y-4 pt-1">
-          <p className="text-muted-foreground text-sm">Scan profiles tab — loaded in next task.</p>
+          {'profiles' in loaderData && loaderData.profiles && (
+            <ScanProfilesTab
+              initialData={loaderData.profiles}
+              runners={loaderData.runners?.items ?? []}
+              connections={loaderData.connections?.items ?? []}
+              tools={loaderData.tools?.items ?? []}
+              page={search.page}
+              pageSize={search.pageSize}
+              onPageChange={(p) => navigate({ search: { ...search, page: p } })}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="tools" className="space-y-4 pt-1">
