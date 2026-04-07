@@ -135,7 +135,11 @@ export function ScanRunnersTab({ initialData, page, pageSize, onPageChange, onPa
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => rotateMutation.mutate({ data: { id: row.original.id } })}
+            onClick={() => {
+              if (confirm(`Rotate secret for "${row.original.name}"? The current token will be invalidated immediately.`)) {
+                rotateMutation.mutate({ data: { id: row.original.id } })
+              }
+            }}
             disabled={rotateMutation.isPending}
           >
             <RotateCw className="mr-1 h-3 w-3" />

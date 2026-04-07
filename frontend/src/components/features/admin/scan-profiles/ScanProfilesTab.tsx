@@ -32,9 +32,10 @@ type Props = {
   page: number
   pageSize: number
   onPageChange: (page: number) => void
+  onPageSizeChange?: (pageSize: number) => void
 }
 
-export function ScanProfilesTab({ initialData, runners, connections, tools, page, pageSize, onPageChange }: Props) {
+export function ScanProfilesTab({ initialData, runners, connections, tools, page, pageSize, onPageChange, onPageSizeChange }: Props) {
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<ScanProfile | null>(null)
@@ -180,7 +181,7 @@ export function ScanProfilesTab({ initialData, runners, connections, tools, page
             totalCount={query.data?.totalCount ?? 0}
             totalPages={query.data?.totalPages ?? 0}
             onPageChange={onPageChange}
-            onPageSizeChange={() => {}}
+            onPageSizeChange={onPageSizeChange ?? (() => {})}
           />
         </CardContent>
       </Card>

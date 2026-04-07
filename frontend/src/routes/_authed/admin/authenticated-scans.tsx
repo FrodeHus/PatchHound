@@ -89,6 +89,7 @@ function AuthenticatedScansWorkbench() {
               page={search.page}
               pageSize={search.pageSize}
               onPageChange={(p) => navigate({ search: { ...search, page: p } })}
+              onPageSizeChange={(ps) => navigate({ search: { ...search, page: 1, pageSize: ps } })}
             />
           )}
         </TabsContent>
@@ -100,6 +101,7 @@ function AuthenticatedScansWorkbench() {
               page={search.page}
               pageSize={search.pageSize}
               onPageChange={(p) => navigate({ search: { ...search, page: p } })}
+              onPageSizeChange={(ps) => navigate({ search: { ...search, page: 1, pageSize: ps } })}
             />
           )}
         </TabsContent>
@@ -111,6 +113,7 @@ function AuthenticatedScansWorkbench() {
               page={search.page}
               pageSize={search.pageSize}
               onPageChange={(p) => navigate({ search: { ...search, page: p } })}
+              onPageSizeChange={(ps) => navigate({ search: { ...search, page: 1, pageSize: ps } })}
             />
           )}
         </TabsContent>
@@ -122,6 +125,7 @@ function AuthenticatedScansWorkbench() {
               page={search.page}
               pageSize={search.pageSize}
               onPageChange={(p) => navigate({ search: { ...search, page: p } })}
+              onPageSizeChange={(ps) => navigate({ search: { ...search, page: 1, pageSize: ps } })}
             />
           )}
         </TabsContent>
