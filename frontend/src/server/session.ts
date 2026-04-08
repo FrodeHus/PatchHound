@@ -8,7 +8,12 @@ const AUTH_TAG_LENGTH = 16
 
 function getEncryptionKey(): Buffer | null {
   const hex = process.env.SESSION_ENCRYPTION_KEY
-  if (!hex) return null
+  if (!hex) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SESSION_ENCRYPTION_KEY must be set in production to encrypt session data')
+    }
+    return null
+  }
   const buf = Buffer.from(hex, 'hex')
   if (buf.length !== 32) {
     throw new Error('SESSION_ENCRYPTION_KEY must be exactly 32 bytes (64 hex characters)')

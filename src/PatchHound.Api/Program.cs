@@ -368,6 +368,39 @@ builder.Services.AddAuthorization(options =>
                     RoleName.SecurityManager
                 )
             ));
+
+    options.AddPolicy(
+        Policies.CreateDecision,
+        policy =>
+            policy.AddRequirements(
+                new RoleRequirement(
+                    RoleName.GlobalAdmin,
+                    RoleName.SecurityManager,
+                    RoleName.TechnicalManager
+                )
+            ));
+
+    options.AddPolicy(
+        Policies.ApproveDecision,
+        policy =>
+            policy.AddRequirements(
+                new RoleRequirement(
+                    RoleName.GlobalAdmin,
+                    RoleName.SecurityManager,
+                    RoleName.TechnicalManager
+                )
+            ));
+
+    options.AddPolicy(
+        Policies.AddRecommendation,
+        policy =>
+            policy.AddRequirements(
+                new RoleRequirement(
+                    RoleName.GlobalAdmin,
+                    RoleName.SecurityManager,
+                    RoleName.SecurityAnalyst
+                )
+            ));
 });
 
 builder.Services.AddScoped<IAuthorizationHandler, RoleRequirementHandler>();
@@ -396,17 +429,21 @@ builder.Services.AddScoped<IRealTimeNotifier, SignalRNotifier<NotificationHub>>(
 builder.Services.AddRateLimiter(options =>
 {
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.User.Identity?.Name
-                ?? context.Connection.RemoteIpAddress?.ToString()
-                ?? "anonymous",
+    {
+        var partitionKey = context.User.Identity?.Name
+            ?? context.User.FindFirst("runner_id")?.Value
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey,
             _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 100,
                 Window = TimeSpan.FromMinutes(1),
             }
-        )
-    );
+        );
+    });
     options.RejectionStatusCode = 429;
 });
 

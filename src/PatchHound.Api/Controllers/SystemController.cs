@@ -408,7 +408,7 @@ public class SystemController : ControllerBase
     }
 
     [HttpPut("enrichment-sources")]
-    [Authorize(Policy = Policies.ManageUsers)]
+    [Authorize(Policy = Policies.ManageGlobalSettings)]
     public async Task<IActionResult> UpdateEnrichmentSources(
         [FromBody] List<UpdateEnrichmentSourceRequest> request,
         CancellationToken ct
