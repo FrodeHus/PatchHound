@@ -72,7 +72,7 @@ export function ConnectionProfileDialog({ open, onOpenChange, profile, onSubmit,
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit' : 'New'} Connection Profile</DialogTitle>
           <DialogDescription>SSH connection details for target hosts.</DialogDescription>

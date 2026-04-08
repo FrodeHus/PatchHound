@@ -30,7 +30,7 @@ heartbeatIntervalSeconds: 30`
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Runner Created: {runnerName}</DialogTitle>
           <DialogDescription>

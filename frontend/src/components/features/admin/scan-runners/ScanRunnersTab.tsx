@@ -187,7 +187,7 @@ export function ScanRunnersTab({ initialData, page, pageSize, onPageChange, onPa
 
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>New Scan Runner</DialogTitle>
             <DialogDescription>

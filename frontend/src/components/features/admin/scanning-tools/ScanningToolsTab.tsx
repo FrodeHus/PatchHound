@@ -174,7 +174,7 @@ export function ScanningToolsTab({ initialData, toolDetail, currentScript, page,
       </Card>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>New Scanning Tool</DialogTitle>
             <DialogDescription>Define a script that runs on target hosts and produces structured output.</DialogDescription>
