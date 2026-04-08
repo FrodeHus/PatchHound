@@ -7,18 +7,24 @@ const IV_LENGTH = 12
 const AUTH_TAG_LENGTH = 16
 
 function getEncryptionKey(): Buffer | null {
-  const hex = process.env.SESSION_ENCRYPTION_KEY
-  if (!hex) {
+  // Accept either a raw 64-hex-char key or a freeform secret (derived via HKDF)
+  const raw = process.env.SESSION_ENCRYPTION_KEY ?? process.env.SESSION_SECRET
+  if (!raw) {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error('SESSION_ENCRYPTION_KEY must be set in production to encrypt session data')
+      throw new Error('SESSION_SECRET (or SESSION_ENCRYPTION_KEY) must be set in production to encrypt session data')
     }
     return null
   }
-  const buf = Buffer.from(hex, 'hex')
-  if (buf.length !== 32) {
-    throw new Error('SESSION_ENCRYPTION_KEY must be exactly 32 bytes (64 hex characters)')
+
+  // If it looks like a 64-char hex string, use it directly as a 32-byte key
+  if (/^[0-9a-fA-F]{64}$/.test(raw)) {
+    return Buffer.from(raw, 'hex')
   }
-  return buf
+
+  // Otherwise derive a 32-byte key from the freeform secret via HKDF
+  return Buffer.from(
+    crypto.hkdfSync('sha256', raw, '', 'patchhound-session-encryption', 32),
+  )
 }
 
 function encryptPayload(plaintext: string): string {
@@ -39,7 +45,7 @@ function decryptPayload(stored: string): string {
 
   const key = getEncryptionKey()
   if (!key) {
-    throw new Error('SESSION_ENCRYPTION_KEY is required to decrypt session data')
+    throw new Error('SESSION_SECRET (or SESSION_ENCRYPTION_KEY) is required to decrypt session data')
   }
 
   const raw = Buffer.from(stored.slice(4), 'base64')
