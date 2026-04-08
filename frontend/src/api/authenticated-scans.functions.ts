@@ -16,6 +16,7 @@ import {
   scanningToolSchema,
   scanningToolVersionListSchema,
   triggerRunResponseSchema,
+  profileAssignedDeviceSchema,
 } from './authenticated-scans.schemas'
 
 // ─── Scan Profiles ───
@@ -275,4 +276,15 @@ export const fetchScanRunDetail = createServerFn({ method: 'GET' })
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ context, data: { id } }) => {
     return scanRunDetailSchema.parse(await apiGet(`/authenticated-scan-runs/${id}`, context))
+  })
+
+// ─── Profile Assigned Devices ───
+
+export const fetchProfileAssignedDevices = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ profileId: z.string().uuid() }))
+  .handler(async ({ context, data: { profileId } }) => {
+    return z.array(profileAssignedDeviceSchema).parse(
+      await apiGet(`/scan-profiles/${profileId}/assigned-devices`, context),
+    )
   })

@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
-import { PenSquare, Play, Plus, Trash2 } from 'lucide-react'
+import { Eye, PenSquare, Play, Plus, Trash2 } from 'lucide-react'
 import {
   createScanProfile,
   deleteScanProfile,
+  fetchProfileAssignedDevices,
   fetchScanProfiles,
   triggerScanRun,
   updateScanProfile,
@@ -23,6 +24,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
 import { PaginationControls } from '@/components/ui/pagination-controls'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 
 type Props = {
   initialData: PagedScanProfiles
@@ -39,11 +47,18 @@ export function ScanProfilesTab({ initialData, runners, connections, tools, page
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<ScanProfile | null>(null)
+  const [viewingProfileId, setViewingProfileId] = useState<string | null>(null)
 
   const query = useQuery({
     queryKey: ['scan-profiles', page, pageSize],
     queryFn: () => fetchScanProfiles({ data: { page, pageSize } }),
     initialData,
+  })
+
+  const devicesQuery = useQuery({
+    queryKey: ['profile-assigned-devices', viewingProfileId],
+    queryFn: () => fetchProfileAssignedDevices({ data: { profileId: viewingProfileId! } }),
+    enabled: Boolean(viewingProfileId),
   })
 
   const createMutation = useMutation({
@@ -133,6 +148,14 @@ export function ScanProfilesTab({ initialData, runners, connections, tools, page
           <Button
             size="sm"
             variant="ghost"
+            onClick={() => setViewingProfileId(row.original.id)}
+            title="View assigned devices"
+          >
+            <Eye className="h-3 w-3" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
             onClick={() => {
               setEditing(row.original)
               setDialogOpen(true)
@@ -205,6 +228,33 @@ export function ScanProfilesTab({ initialData, runners, connections, tools, page
           }
         }}
       />
+
+      <Sheet open={Boolean(viewingProfileId)} onOpenChange={(open) => { if (!open) setViewingProfileId(null) }}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Assigned Devices</SheetTitle>
+            <SheetDescription>
+              Devices assigned to this profile via asset rules.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-2">
+            {devicesQuery.isLoading && (
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            )}
+            {devicesQuery.data?.length === 0 && (
+              <p className="text-sm text-muted-foreground">No devices assigned yet.</p>
+            )}
+            {devicesQuery.data?.map((device) => (
+              <div key={device.assetId} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+                <span className="font-mono">{device.assetName}</span>
+                {device.assignedByRuleId && (
+                  <Badge variant="outline" className="text-[10px]">rule</Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   )
 }

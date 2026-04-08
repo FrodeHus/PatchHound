@@ -171,3 +171,14 @@ export type PagedScanRuns = z.infer<typeof pagedScanRunsSchema>
 export type ScanJobSummary = z.infer<typeof scanJobSummarySchema>
 export type ScanRunDetail = z.infer<typeof scanRunDetailSchema>
 export type ValidationIssue = z.infer<typeof validationIssueSchema>
+
+// --- Scan Profile Assignments ---
+
+export const profileAssignedDeviceSchema = z.object({
+  assetId: z.string().uuid(),
+  assetName: z.string(),
+  assignedByRuleId: z.string().uuid().nullable(),
+  assignedAt: isoDateTimeSchema,
+})
+
+export type ProfileAssignedDevice = z.infer<typeof profileAssignedDeviceSchema>

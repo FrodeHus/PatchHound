@@ -161,6 +161,31 @@ public class ScanProfilesController(
         return NoContent();
     }
 
+    public record AssignedDeviceDto(Guid AssetId, string AssetName, Guid? AssignedByRuleId, DateTimeOffset AssignedAt);
+
+    [HttpGet("{id:guid}/assigned-devices")]
+    public async Task<ActionResult<List<AssignedDeviceDto>>> GetAssignedDevices(Guid id, CancellationToken ct)
+    {
+        var profile = await db.ScanProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (profile is null) return NotFound();
+        if (!tenantContext.HasAccessToTenant(profile.TenantId)) return Forbid();
+
+        var assignments = await db.AssetScanProfileAssignments.AsNoTracking()
+            .Where(a => a.ScanProfileId == id)
+            .ToListAsync(ct);
+
+        var assetIds = assignments.Select(a => a.AssetId).Distinct().ToList();
+        var assetNames = await db.Assets.AsNoTracking()
+            .Where(a => assetIds.Contains(a.Id))
+            .ToDictionaryAsync(a => a.Id, a => a.Name, ct);
+
+        return assignments.Select(a => new AssignedDeviceDto(
+            a.AssetId,
+            assetNames.GetValueOrDefault(a.AssetId, "—"),
+            a.AssignedByRuleId,
+            a.AssignedAt)).ToList();
+    }
+
     private async Task<List<Guid>> SyncToolAssignments(Guid profileId, List<Guid>? toolIds, CancellationToken ct)
     {
         if (toolIds is null) return [];
