@@ -41,15 +41,16 @@ public class AuthenticatedScanRunsController(
 
     [HttpGet]
     public async Task<ActionResult<PagedResponse<ScanRunListDto>>> List(
-        [FromQuery] Guid tenantId,
+        [FromQuery] Guid? tenantId,
         [FromQuery] Guid? profileId,
         [FromQuery] PaginationQuery pagination,
         CancellationToken ct)
     {
-        if (!tenantContext.HasAccessToTenant(tenantId)) return Forbid();
+        var effectiveTenantId = tenantId ?? tenantContext.CurrentTenantId;
+        if (effectiveTenantId is null || !tenantContext.HasAccessToTenant(effectiveTenantId.Value)) return Forbid();
 
         var query = db.AuthenticatedScanRuns.AsNoTracking()
-            .Where(r => r.TenantId == tenantId);
+            .Where(r => r.TenantId == effectiveTenantId.Value);
 
         if (profileId.HasValue)
             query = query.Where(r => r.ScanProfileId == profileId.Value);

@@ -42,11 +42,12 @@ public class ScanProfilesController(
 
     [HttpGet]
     public async Task<ActionResult<PagedResponse<ScanProfileDto>>> List(
-        [FromQuery] Guid tenantId, [FromQuery] PaginationQuery pagination, CancellationToken ct)
+        [FromQuery] Guid? tenantId, [FromQuery] PaginationQuery pagination, CancellationToken ct)
     {
-        if (!tenantContext.HasAccessToTenant(tenantId)) return Forbid();
+        var effectiveTenantId = tenantId ?? tenantContext.CurrentTenantId;
+        if (effectiveTenantId is null || !tenantContext.HasAccessToTenant(effectiveTenantId.Value)) return Forbid();
 
-        var query = db.ScanProfiles.AsNoTracking().Where(p => p.TenantId == tenantId);
+        var query = db.ScanProfiles.AsNoTracking().Where(p => p.TenantId == effectiveTenantId.Value);
         var total = await query.CountAsync(ct);
         var profiles = await query
             .OrderBy(p => p.Name)
@@ -96,10 +97,11 @@ public class ScanProfilesController(
     public async Task<ActionResult<ScanProfileDto>> Create(
         [FromBody] CreateScanProfileRequest req, CancellationToken ct)
     {
-        if (!tenantContext.HasAccessToTenant(req.TenantId)) return Forbid();
+        var effectiveTenantId = req.TenantId != Guid.Empty ? req.TenantId : tenantContext.CurrentTenantId;
+        if (effectiveTenantId is null || !tenantContext.HasAccessToTenant(effectiveTenantId.Value)) return Forbid();
 
         var profile = ScanProfile.Create(
-            req.TenantId, req.Name, req.Description,
+            effectiveTenantId.Value, req.Name, req.Description,
             req.CronSchedule, req.ConnectionProfileId, req.ScanRunnerId, req.Enabled);
         db.ScanProfiles.Add(profile);
 

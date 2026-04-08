@@ -40,11 +40,12 @@ public class ScanningToolsController(
 
     [HttpGet]
     public async Task<ActionResult<PagedResponse<ScanningToolDto>>> List(
-        [FromQuery] Guid tenantId, [FromQuery] PaginationQuery pagination, CancellationToken ct)
+        [FromQuery] Guid? tenantId, [FromQuery] PaginationQuery pagination, CancellationToken ct)
     {
-        if (!tenantContext.HasAccessToTenant(tenantId)) return Forbid();
+        var effectiveTenantId = tenantId ?? tenantContext.CurrentTenantId;
+        if (effectiveTenantId is null || !tenantContext.HasAccessToTenant(effectiveTenantId.Value)) return Forbid();
 
-        var query = db.ScanningTools.AsNoTracking().Where(t => t.TenantId == tenantId);
+        var query = db.ScanningTools.AsNoTracking().Where(t => t.TenantId == effectiveTenantId.Value);
         var total = await query.CountAsync(ct);
         var items = await query
             .OrderBy(t => t.Name)
@@ -74,10 +75,11 @@ public class ScanningToolsController(
     public async Task<ActionResult<ScanningToolDto>> Create(
         [FromBody] CreateScanningToolRequest req, CancellationToken ct)
     {
-        if (!tenantContext.HasAccessToTenant(req.TenantId)) return Forbid();
+        var effectiveTenantId = req.TenantId != Guid.Empty ? req.TenantId : tenantContext.CurrentTenantId;
+        if (effectiveTenantId is null || !tenantContext.HasAccessToTenant(effectiveTenantId.Value)) return Forbid();
 
         var tool = Core.Entities.AuthenticatedScans.ScanningTool.Create(
-            req.TenantId, req.Name, req.Description,
+            effectiveTenantId.Value, req.Name, req.Description,
             req.ScriptType, req.InterpreterPath, req.TimeoutSeconds,
             "NormalizedSoftware");
         db.ScanningTools.Add(tool);

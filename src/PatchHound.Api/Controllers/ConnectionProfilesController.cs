@@ -37,12 +37,13 @@ public class ConnectionProfilesController(
 
     [HttpGet]
     public async Task<ActionResult<PagedResponse<ConnectionProfileDto>>> List(
-        [FromQuery] Guid tenantId, [FromQuery] PaginationQuery pagination, CancellationToken ct)
+        [FromQuery] Guid? tenantId, [FromQuery] PaginationQuery pagination, CancellationToken ct)
     {
-        if (!tenantContext.HasAccessToTenant(tenantId)) return Forbid();
+        var effectiveTenantId = tenantId ?? tenantContext.CurrentTenantId;
+        if (effectiveTenantId is null || !tenantContext.HasAccessToTenant(effectiveTenantId.Value)) return Forbid();
 
         var query = db.ConnectionProfiles.AsNoTracking()
-            .Where(p => p.TenantId == tenantId);
+            .Where(p => p.TenantId == effectiveTenantId.Value);
         var total = await query.CountAsync(ct);
         var items = await query
             .OrderBy(p => p.Name)
@@ -75,17 +76,18 @@ public class ConnectionProfilesController(
     public async Task<ActionResult<ConnectionProfileDto>> Create(
         [FromBody] CreateConnectionProfileRequest req, CancellationToken ct)
     {
-        if (!tenantContext.HasAccessToTenant(req.TenantId)) return Forbid();
+        var effectiveTenantId = req.TenantId != Guid.Empty ? req.TenantId : tenantContext.CurrentTenantId;
+        if (effectiveTenantId is null || !tenantContext.HasAccessToTenant(effectiveTenantId.Value)) return Forbid();
 
         var profile = Core.Entities.AuthenticatedScans.ConnectionProfile.Create(
-            req.TenantId, req.Name, req.Description,
+            effectiveTenantId.Value, req.Name, req.Description,
             req.SshHost, req.SshPort, req.SshUsername,
             req.AuthMethod, "", req.HostKeyFingerprint);
 
         db.ConnectionProfiles.Add(profile);
         await db.SaveChangesAsync(ct);
 
-        var secretRef = await WriteSecretAsync(req.TenantId, profile.Id, req.AuthMethod,
+        var secretRef = await WriteSecretAsync(effectiveTenantId.Value, profile.Id, req.AuthMethod,
             req.Password, req.PrivateKey, req.Passphrase, ct);
         profile.SetSecretRef(secretRef);
         await db.SaveChangesAsync(ct);

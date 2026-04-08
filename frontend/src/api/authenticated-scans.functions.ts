@@ -25,7 +25,7 @@ export const fetchScanProfiles = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ page: z.number().optional(), pageSize: z.number().optional() }))
   .handler(async ({ context, data: filters }) => {
-    const params = buildFilterParams(filters)
+    const params = buildFilterParams({ ...filters, tenantId: context.tenantId })
     return pagedScanProfilesSchema.parse(await apiGet(`/scan-profiles?${params}`, context))
   })
 
@@ -43,7 +43,7 @@ export const createScanProfile = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ context, data }) => {
-    return scanProfileSchema.parse(await apiPost('/scan-profiles', context, data))
+    return scanProfileSchema.parse(await apiPost('/scan-profiles', context, { ...data, tenantId: context.tenantId }))
   })
 
 export const updateScanProfile = createServerFn({ method: 'POST' })
@@ -86,7 +86,7 @@ export const fetchScanningTools = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ page: z.number().optional(), pageSize: z.number().optional() }))
   .handler(async ({ context, data: filters }) => {
-    const params = buildFilterParams(filters)
+    const params = buildFilterParams({ ...filters, tenantId: context.tenantId })
     return pagedScanningToolsSchema.parse(await apiGet(`/scanning-tools?${params}`, context))
   })
 
@@ -103,7 +103,7 @@ export const createScanningTool = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ context, data }) => {
-    await apiPost('/scanning-tools', context, data)
+    await apiPost('/scanning-tools', context, { ...data, tenantId: context.tenantId })
   })
 
 export const updateScanningTool = createServerFn({ method: 'POST' })
@@ -158,7 +158,7 @@ export const fetchConnectionProfiles = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ page: z.number().optional(), pageSize: z.number().optional() }))
   .handler(async ({ context, data: filters }) => {
-    const params = buildFilterParams(filters)
+    const params = buildFilterParams({ ...filters, tenantId: context.tenantId })
     return pagedConnectionProfilesSchema.parse(await apiGet(`/connection-profiles?${params}`, context))
   })
 
@@ -179,7 +179,7 @@ export const createConnectionProfile = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ context, data }) => {
-    await apiPost('/connection-profiles', context, data)
+    await apiPost('/connection-profiles', context, { ...data, tenantId: context.tenantId })
   })
 
 export const updateConnectionProfile = createServerFn({ method: 'POST' })
@@ -216,7 +216,7 @@ export const fetchScanRunners = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ page: z.number().optional(), pageSize: z.number().optional() }))
   .handler(async ({ context, data: filters }) => {
-    const params = buildFilterParams(filters)
+    const params = buildFilterParams({ ...filters, tenantId: context.tenantId })
     return pagedScanRunnersSchema.parse(await apiGet(`/scan-runners?${params}`, context))
   })
 
@@ -224,7 +224,7 @@ export const createScanRunner = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ name: z.string().min(1), description: z.string() }))
   .handler(async ({ context, data }) => {
-    return createScanRunnerResponseSchema.parse(await apiPost('/scan-runners', context, data))
+    return createScanRunnerResponseSchema.parse(await apiPost('/scan-runners', context, { ...data, tenantId: context.tenantId }))
   })
 
 export const updateScanRunner = createServerFn({ method: 'POST' })
@@ -267,7 +267,7 @@ export const fetchScanRuns = createServerFn({ method: 'GET' })
     }),
   )
   .handler(async ({ context, data: filters }) => {
-    const params = buildFilterParams(filters)
+    const params = buildFilterParams({ ...filters, tenantId: context.tenantId })
     return pagedScanRunsSchema.parse(await apiGet(`/authenticated-scan-runs?${params}`, context))
   })
 
