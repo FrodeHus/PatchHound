@@ -8,15 +8,11 @@ public class DeviceBusinessLabelConfiguration : IEntityTypeConfiguration<DeviceB
 {
     public void Configure(EntityTypeBuilder<DeviceBusinessLabel> builder)
     {
-        builder.HasKey(item => new { item.DeviceId, item.BusinessLabelId, item.SourceKey });
+        builder.HasKey(item => item.Id);
 
         builder.HasIndex(item => item.TenantId);
         builder.HasIndex(item => item.BusinessLabelId);
-        builder.HasIndex(item => item.AssignedByRuleId);
         builder.HasIndex(item => new { item.DeviceId, item.BusinessLabelId }).IsUnique();
-
-        builder.Property(item => item.SourceType).HasMaxLength(16);
-        builder.Property(item => item.SourceKey).HasMaxLength(64);
 
         builder
             .HasOne<Device>()

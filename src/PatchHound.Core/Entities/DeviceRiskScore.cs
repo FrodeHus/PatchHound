@@ -42,24 +42,9 @@ public class DeviceRiskScore
         {
             throw new ArgumentException("DeviceId is required.", nameof(deviceId));
         }
-        if (string.IsNullOrWhiteSpace(factorsJson))
-        {
-            throw new ArgumentException("FactorsJson is required.", nameof(factorsJson));
-        }
-        if (string.IsNullOrWhiteSpace(calculationVersion))
-        {
-            throw new ArgumentException("CalculationVersion is required.", nameof(calculationVersion));
-        }
 
-        var normalizedFactorsJson = factorsJson.Trim();
-        var normalizedCalculationVersion = calculationVersion.Trim();
-
-        if (normalizedCalculationVersion.Length > CalculationVersionMaxLength)
-        {
-            throw new ArgumentException(
-                $"CalculationVersion must be {CalculationVersionMaxLength} characters or fewer.",
-                nameof(calculationVersion));
-        }
+        var (normalizedFactorsJson, normalizedCalculationVersion) =
+            NormalizeAndValidate(factorsJson, calculationVersion);
 
         return new DeviceRiskScore
         {
@@ -91,6 +76,9 @@ public class DeviceRiskScore
         string calculationVersion
     )
     {
+        var (normalizedFactorsJson, normalizedCalculationVersion) =
+            NormalizeAndValidate(factorsJson, calculationVersion);
+
         OverallScore = overallScore;
         MaxEpisodeRiskScore = maxEpisodeRiskScore;
         CriticalCount = criticalCount;
@@ -98,8 +86,34 @@ public class DeviceRiskScore
         MediumCount = mediumCount;
         LowCount = lowCount;
         OpenEpisodeCount = openEpisodeCount;
-        FactorsJson = factorsJson;
-        CalculationVersion = calculationVersion;
+        FactorsJson = normalizedFactorsJson;
+        CalculationVersion = normalizedCalculationVersion;
         CalculatedAt = DateTimeOffset.UtcNow;
+    }
+
+    private static (string factorsJson, string calculationVersion) NormalizeAndValidate(
+        string factorsJson,
+        string calculationVersion)
+    {
+        if (string.IsNullOrWhiteSpace(factorsJson))
+        {
+            throw new ArgumentException("FactorsJson is required.", nameof(factorsJson));
+        }
+        if (string.IsNullOrWhiteSpace(calculationVersion))
+        {
+            throw new ArgumentException("CalculationVersion is required.", nameof(calculationVersion));
+        }
+
+        var normalizedFactorsJson = factorsJson.Trim();
+        var normalizedCalculationVersion = calculationVersion.Trim();
+
+        if (normalizedCalculationVersion.Length > CalculationVersionMaxLength)
+        {
+            throw new ArgumentException(
+                $"CalculationVersion must be {CalculationVersionMaxLength} characters or fewer.",
+                nameof(calculationVersion));
+        }
+
+        return (normalizedFactorsJson, normalizedCalculationVersion);
     }
 }

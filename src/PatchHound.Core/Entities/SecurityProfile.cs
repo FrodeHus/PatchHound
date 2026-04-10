@@ -52,26 +52,8 @@ public class SecurityProfile
         {
             throw new ArgumentException("TenantId is required.", nameof(tenantId));
         }
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException("Name is required.", nameof(name));
-        }
 
-        var normalizedName = name.Trim();
-        var normalizedDescription = description?.Trim();
-
-        if (normalizedName.Length > NameMaxLength)
-        {
-            throw new ArgumentException(
-                $"Name must be {NameMaxLength} characters or fewer.",
-                nameof(name));
-        }
-        if (normalizedDescription is not null && normalizedDescription.Length > DescriptionMaxLength)
-        {
-            throw new ArgumentException(
-                $"Description must be {DescriptionMaxLength} characters or fewer.",
-                nameof(description));
-        }
+        var (normalizedName, normalizedDescription) = NormalizeAndValidate(name, description);
 
         var now = DateTimeOffset.UtcNow;
 
@@ -117,8 +99,10 @@ public class SecurityProfile
         CvssModifiedImpact modifiedAvailabilityImpact = CvssModifiedImpact.NotDefined
     )
     {
-        Name = name;
-        Description = description;
+        var (normalizedName, normalizedDescription) = NormalizeAndValidate(name, description);
+
+        Name = normalizedName;
+        Description = normalizedDescription;
         EnvironmentClass = environmentClass;
         InternetReachability = internetReachability;
         ConfidentialityRequirement = confidentialityRequirement;
@@ -133,6 +117,32 @@ public class SecurityProfile
         ModifiedIntegrityImpact = modifiedIntegrityImpact;
         ModifiedAvailabilityImpact = modifiedAvailabilityImpact;
         UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    private static (string name, string? description) NormalizeAndValidate(string name, string? description)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Name is required.", nameof(name));
+        }
+
+        var normalizedName = name.Trim();
+        var normalizedDescription = description?.Trim();
+
+        if (normalizedName.Length > NameMaxLength)
+        {
+            throw new ArgumentException(
+                $"Name must be {NameMaxLength} characters or fewer.",
+                nameof(name));
+        }
+        if (normalizedDescription is not null && normalizedDescription.Length > DescriptionMaxLength)
+        {
+            throw new ArgumentException(
+                $"Description must be {DescriptionMaxLength} characters or fewer.",
+                nameof(description));
+        }
+
+        return (normalizedName, normalizedDescription);
     }
 
     private static CvssModifiedAttackVector MapInternetReachabilityToModifiedAttackVector(

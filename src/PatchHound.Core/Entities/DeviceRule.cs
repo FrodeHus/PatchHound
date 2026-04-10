@@ -40,6 +40,45 @@ public class DeviceRule
         {
             throw new ArgumentException("TenantId is required.", nameof(tenantId));
         }
+
+        var (normalizedName, normalizedDescription, filterDefinition, operationsJson) =
+            NormalizeAndValidate(name, description, filter, operations);
+
+        var now = DateTimeOffset.UtcNow;
+        return new DeviceRule
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = normalizedName,
+            Description = normalizedDescription,
+            Priority = priority,
+            Enabled = true,
+            FilterDefinition = filterDefinition,
+            Operations = operationsJson,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+    }
+
+    public void Update(string name, string? description, bool enabled, FilterNode filter, List<AssetRuleOperation> operations)
+    {
+        var (normalizedName, normalizedDescription, filterDefinition, operationsJson) =
+            NormalizeAndValidate(name, description, filter, operations);
+
+        Name = normalizedName;
+        Description = normalizedDescription;
+        Enabled = enabled;
+        FilterDefinition = filterDefinition;
+        Operations = operationsJson;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    private static (string name, string? description, string filterDefinition, string operationsJson) NormalizeAndValidate(
+        string name,
+        string? description,
+        FilterNode filter,
+        List<AssetRuleOperation> operations)
+    {
         if (string.IsNullOrWhiteSpace(name))
         {
             throw new ArgumentException("Name is required.", nameof(name));
@@ -63,30 +102,11 @@ public class DeviceRule
                 nameof(description));
         }
 
-        var now = DateTimeOffset.UtcNow;
-        return new DeviceRule
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Name = normalizedName,
-            Description = normalizedDescription,
-            Priority = priority,
-            Enabled = true,
-            FilterDefinition = JsonSerializer.Serialize(filter, JsonOptions),
-            Operations = JsonSerializer.Serialize(operations, JsonOptions),
-            CreatedAt = now,
-            UpdatedAt = now,
-        };
-    }
-
-    public void Update(string name, string? description, bool enabled, FilterNode filter, List<AssetRuleOperation> operations)
-    {
-        Name = name;
-        Description = description;
-        Enabled = enabled;
-        FilterDefinition = JsonSerializer.Serialize(filter, JsonOptions);
-        Operations = JsonSerializer.Serialize(operations, JsonOptions);
-        UpdatedAt = DateTimeOffset.UtcNow;
+        return (
+            normalizedName,
+            normalizedDescription,
+            JsonSerializer.Serialize(filter, JsonOptions),
+            JsonSerializer.Serialize(operations, JsonOptions));
     }
 
     public void SetPriority(int priority)
