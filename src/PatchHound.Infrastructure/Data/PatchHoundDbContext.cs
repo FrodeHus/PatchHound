@@ -27,6 +27,11 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<InstalledSoftware> InstalledSoftware => Set<InstalledSoftware>();
     public DbSet<TenantSoftwareProductInsight> TenantSoftwareProductInsights => Set<TenantSoftwareProductInsight>();
+    public DbSet<DeviceBusinessLabel> DeviceBusinessLabels => Set<DeviceBusinessLabel>();
+    public DbSet<DeviceTag> DeviceTags => Set<DeviceTag>();
+    public DbSet<DeviceRule> DeviceRules => Set<DeviceRule>();
+    public DbSet<DeviceRiskScore> DeviceRiskScores => Set<DeviceRiskScore>();
+    public DbSet<SecurityProfile> SecurityProfiles => Set<SecurityProfile>();
     public DbSet<TenantSourceConfiguration> TenantSourceConfigurations =>
         Set<TenantSourceConfiguration>();
     public DbSet<IngestionRun> IngestionRuns => Set<IngestionRun>();
@@ -189,6 +194,21 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantSoftwareProductInsight>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<DeviceBusinessLabel>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<DeviceTag>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<DeviceRule>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<DeviceRiskScore>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<SecurityProfile>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<AssetSecurityProfile>()
