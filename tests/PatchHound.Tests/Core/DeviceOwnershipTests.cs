@@ -46,6 +46,38 @@ public class DeviceOwnershipTests
         Assert.Equal("ruleId", ex.ParamName);
     }
 
+    [Fact]
+    public void DeviceBusinessLabel_CreateManual_rejects_empty_businessLabelId()
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            DeviceBusinessLabel.CreateManual(Guid.NewGuid(), Guid.NewGuid(), Guid.Empty, assignedBy: null));
+        Assert.Equal("businessLabelId", ex.ParamName);
+    }
+
+    [Fact]
+    public void DeviceBusinessLabel_CreateRule_rejects_empty_tenantId()
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            DeviceBusinessLabel.CreateRule(Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()));
+        Assert.Equal("tenantId", ex.ParamName);
+    }
+
+    [Fact]
+    public void DeviceBusinessLabel_CreateRule_rejects_empty_deviceId()
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            DeviceBusinessLabel.CreateRule(Guid.NewGuid(), Guid.Empty, Guid.NewGuid(), Guid.NewGuid()));
+        Assert.Equal("deviceId", ex.ParamName);
+    }
+
+    [Fact]
+    public void DeviceBusinessLabel_CreateRule_rejects_empty_businessLabelId()
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            DeviceBusinessLabel.CreateRule(Guid.NewGuid(), Guid.NewGuid(), Guid.Empty, Guid.NewGuid()));
+        Assert.Equal("businessLabelId", ex.ParamName);
+    }
+
     // --- DeviceTag ---
 
     [Fact]
@@ -97,6 +129,23 @@ public class DeviceOwnershipTests
         Assert.Equal("key", ex.ParamName);
     }
 
+    [Fact]
+    public void DeviceTag_Create_rejects_whitespace_value()
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            DeviceTag.Create(Guid.NewGuid(), Guid.NewGuid(), "env", "   "));
+        Assert.Equal("value", ex.ParamName);
+    }
+
+    [Fact]
+    public void DeviceTag_Create_rejects_value_longer_than_max()
+    {
+        var longValue = new string('v', DeviceTag.ValueMaxLength + 1);
+        var ex = Assert.Throws<ArgumentException>(() =>
+            DeviceTag.Create(Guid.NewGuid(), Guid.NewGuid(), "env", longValue));
+        Assert.Equal("value", ex.ParamName);
+    }
+
     // --- DeviceRule ---
 
     private static FilterNode SampleFilter() =>
@@ -140,6 +189,53 @@ public class DeviceOwnershipTests
         var ex = Assert.Throws<ArgumentException>(() =>
             DeviceRule.Create(Guid.NewGuid(), longName, null, 1, SampleFilter(), SampleOperations()));
         Assert.Equal("name", ex.ParamName);
+    }
+
+    [Fact]
+    public void DeviceRule_Create_rejects_description_longer_than_max()
+    {
+        var longDescription = new string('d', DeviceRule.DescriptionMaxLength + 1);
+        var ex = Assert.Throws<ArgumentException>(() =>
+            DeviceRule.Create(Guid.NewGuid(), "name", longDescription, 1, SampleFilter(), SampleOperations()));
+        Assert.Equal("description", ex.ParamName);
+    }
+
+    [Fact]
+    public void DeviceRule_Create_trims_name_and_description()
+    {
+        var rule = DeviceRule.Create(Guid.NewGuid(), "  Name  ", "  desc  ", 1, SampleFilter(), SampleOperations());
+        Assert.Equal("Name", rule.Name);
+        Assert.Equal("desc", rule.Description);
+    }
+
+    [Fact]
+    public void DeviceRule_Update_refreshes_UpdatedAt()
+    {
+        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, SampleFilter(), SampleOperations());
+        var originalUpdatedAt = rule.UpdatedAt;
+        Thread.Sleep(10);
+        rule.Update("name2", "desc2", enabled: false, SampleFilter(), SampleOperations());
+        Assert.True(rule.UpdatedAt > originalUpdatedAt);
+    }
+
+    [Fact]
+    public void DeviceRule_SetPriority_refreshes_UpdatedAt()
+    {
+        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, SampleFilter(), SampleOperations());
+        var originalUpdatedAt = rule.UpdatedAt;
+        Thread.Sleep(10);
+        rule.SetPriority(7);
+        Assert.True(rule.UpdatedAt > originalUpdatedAt);
+    }
+
+    [Fact]
+    public void DeviceRule_SetEnabled_refreshes_UpdatedAt()
+    {
+        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, SampleFilter(), SampleOperations());
+        var originalUpdatedAt = rule.UpdatedAt;
+        Thread.Sleep(10);
+        rule.SetEnabled(false);
+        Assert.True(rule.UpdatedAt > originalUpdatedAt);
     }
 
     // --- DeviceRiskScore ---
@@ -195,6 +291,43 @@ public class DeviceOwnershipTests
         Assert.Equal("calculationVersion", ex.ParamName);
     }
 
+    [Fact]
+    public void DeviceRiskScore_Create_rejects_whitespace_factorsJson()
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            DeviceRiskScore.Create(
+                Guid.NewGuid(), Guid.NewGuid(), 0m, 0m, 0, 0, 0, 0, 0, "   ", "v1"));
+        Assert.Equal("factorsJson", ex.ParamName);
+    }
+
+    [Fact]
+    public void DeviceRiskScore_Create_rejects_whitespace_calculationVersion()
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            DeviceRiskScore.Create(
+                Guid.NewGuid(), Guid.NewGuid(), 0m, 0m, 0, 0, 0, 0, 0, "[]", "   "));
+        Assert.Equal("calculationVersion", ex.ParamName);
+    }
+
+    [Fact]
+    public void DeviceRiskScore_Create_trims_calculationVersion()
+    {
+        var score = DeviceRiskScore.Create(
+            Guid.NewGuid(), Guid.NewGuid(), 0m, 0m, 0, 0, 0, 0, 0, "[]", "  v1  ");
+        Assert.Equal("v1", score.CalculationVersion);
+    }
+
+    [Fact]
+    public void DeviceRiskScore_Update_refreshes_CalculatedAt()
+    {
+        var score = DeviceRiskScore.Create(
+            Guid.NewGuid(), Guid.NewGuid(), 0m, 0m, 0, 0, 0, 0, 0, "[]", "v1");
+        var originalCalculatedAt = score.CalculatedAt;
+        Thread.Sleep(10);
+        score.Update(1m, 1m, 1, 1, 1, 1, 1, "[]", "v2");
+        Assert.True(score.CalculatedAt > originalCalculatedAt);
+    }
+
     // --- SecurityProfile ---
 
     [Fact]
@@ -240,5 +373,31 @@ public class DeviceOwnershipTests
         var profile = SecurityProfile.Create(Guid.NewGuid(), "  Gold  ", "  desc  ");
         Assert.Equal("Gold", profile.Name);
         Assert.Equal("desc", profile.Description);
+    }
+
+    [Fact]
+    public void SecurityProfile_Create_rejects_description_longer_than_max()
+    {
+        var longDescription = new string('d', SecurityProfile.DescriptionMaxLength + 1);
+        var ex = Assert.Throws<ArgumentException>(() =>
+            SecurityProfile.Create(Guid.NewGuid(), "Gold", longDescription));
+        Assert.Equal("description", ex.ParamName);
+    }
+
+    [Fact]
+    public void SecurityProfile_Update_refreshes_UpdatedAt()
+    {
+        var profile = SecurityProfile.Create(Guid.NewGuid(), "Gold", description: null);
+        var originalUpdatedAt = profile.UpdatedAt;
+        Thread.Sleep(10);
+        profile.Update(
+            "Gold2",
+            "desc",
+            EnvironmentClass.Workstation,
+            InternetReachability.InternalNetwork,
+            SecurityRequirementLevel.Low,
+            SecurityRequirementLevel.Low,
+            SecurityRequirementLevel.Low);
+        Assert.True(profile.UpdatedAt > originalUpdatedAt);
     }
 }
