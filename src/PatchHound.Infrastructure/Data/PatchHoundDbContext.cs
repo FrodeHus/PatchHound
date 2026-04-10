@@ -24,6 +24,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<SourceSystem> SourceSystems => Set<SourceSystem>();
     public DbSet<SoftwareProduct> SoftwareProducts => Set<SoftwareProduct>();
     public DbSet<SoftwareAlias> SoftwareAliases => Set<SoftwareAlias>();
+    public DbSet<Device> Devices => Set<Device>();
     public DbSet<TenantSourceConfiguration> TenantSourceConfigurations =>
         Set<TenantSourceConfiguration>();
     public DbSet<IngestionRun> IngestionRuns => Set<IngestionRun>();
@@ -176,6 +177,11 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
                     && (e.AssetType != AssetType.Device || e.DeviceActiveInTenant)
                 )
             );
+        modelBuilder
+            .Entity<Device>()
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || (AccessibleTenantIds.Contains(e.TenantId) && e.ActiveInTenant));
         modelBuilder
             .Entity<AssetSecurityProfile>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
