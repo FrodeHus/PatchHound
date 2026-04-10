@@ -44,6 +44,31 @@ public class InstalledSoftwareTests
     }
 
     [Fact]
+    public void Touch_ignores_older_timestamp()
+    {
+        var first = DateTimeOffset.UtcNow;
+        var i = InstalledSoftware.Observe(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "1.0", first);
+        i.Touch(first.AddDays(-1));
+        Assert.Equal(first, i.LastSeenAt);
+    }
+
+    [Fact]
+    public void Touch_ignores_equal_timestamp()
+    {
+        var at = DateTimeOffset.UtcNow;
+        var i = InstalledSoftware.Observe(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "1.0", at);
+        i.Touch(at);
+        Assert.Equal(at, i.LastSeenAt);
+    }
+
+    [Fact]
+    public void Observe_rejects_default_at()
+    {
+        Assert.Throws<ArgumentException>(
+            () => InstalledSoftware.Observe(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "1.0", default));
+    }
+
+    [Fact]
     public void Observe_rejects_empty_tenantId()
     {
         var ex = Assert.Throws<ArgumentException>(() =>

@@ -37,6 +37,10 @@ public class InstalledSoftware
         {
             throw new ArgumentException("SourceSystemId is required.", nameof(sourceSystemId));
         }
+        if (at == default)
+        {
+            throw new ArgumentException("Observation timestamp is required.", nameof(at));
+        }
 
         var normalizedVersion = version?.Trim() ?? "";
         if (normalizedVersion.Length > 128)
@@ -59,6 +63,9 @@ public class InstalledSoftware
 
     public void Touch(DateTimeOffset at)
     {
-        LastSeenAt = at;
+        if (at > LastSeenAt)
+        {
+            LastSeenAt = at;
+        }
     }
 }
