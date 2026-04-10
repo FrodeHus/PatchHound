@@ -413,6 +413,7 @@ builder.Services.AddPatchHoundInfrastructure(builder.Configuration);
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<ISoftwareProductResolver, SoftwareProductResolver>();
 builder.Services.AddScoped<IDeviceResolver, DeviceResolver>();
+builder.Services.AddScoped<IStagedDeviceMergeService, StagedDeviceMergeService>();
 builder.Services.AddScoped<PatchHound.Api.Services.TenantSoftwareAliasResolver>();
 builder.Services.AddScoped<PatchHound.Api.Services.DashboardQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.VulnerabilityDetailQueryService>();
