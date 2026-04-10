@@ -11,6 +11,7 @@ using PatchHound.Infrastructure.Options;
 using PatchHound.Infrastructure.Repositories;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Services.Inventory;
 using PatchHound.Infrastructure.Services.Workflows;
 using PatchHound.Infrastructure.Tenants;
 using PatchHound.Infrastructure.VulnerabilitySources;
@@ -138,6 +139,7 @@ public static class DependencyInjection
         services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ScanningToolVersionStore>();
         services.AddScoped<NotificationEmailConfigurationResolver>();
         services.AddHostedService<DefaultTeamSeedHostedService>();
+        services.AddHostedService<SourceSystemSeedHostedService>();
 
         // Notifications & Email
         services.AddScoped<INotificationService, EmailNotificationService>();
