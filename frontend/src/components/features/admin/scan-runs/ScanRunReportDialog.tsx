@@ -123,7 +123,7 @@ function SucceededHostsSection({ jobs }: { jobs: ScanJobSummary[] }) {
           <TableBody>
             {jobs.map((job) => (
               <TableRow key={job.id}>
-                <TableCell className="font-mono text-sm">{job.assetName}</TableCell>
+                <TableCell className="font-mono text-sm">{job.deviceName}</TableCell>
                 <TableCell>{job.entriesIngested}</TableCell>
                 <TableCell>{job.completedAt ? formatDateTime(job.completedAt) : '—'}</TableCell>
               </TableRow>
@@ -153,7 +153,7 @@ function FailedHostsSection({ jobs }: { jobs: ScanJobSummary[] }) {
           {jobs.map((job) => (
             <Fragment key={job.id}>
               <TableRow>
-                <TableCell className="font-mono text-sm">{job.assetName}</TableCell>
+                <TableCell className="font-mono text-sm">{job.deviceName}</TableCell>
                 <TableCell>
                   <Badge variant="destructive" className="text-[10px]">{job.status}</Badge>
                 </TableCell>

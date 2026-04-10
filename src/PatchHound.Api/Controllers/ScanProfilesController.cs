@@ -156,14 +156,14 @@ public class ScanProfilesController(
 
         var tools = await db.ScanProfileTools.Where(t => t.ScanProfileId == id).ToListAsync(ct);
         db.ScanProfileTools.RemoveRange(tools);
-        var assignments = await db.AssetScanProfileAssignments.Where(a => a.ScanProfileId == id).ToListAsync(ct);
-        db.AssetScanProfileAssignments.RemoveRange(assignments);
+        var assignments = await db.DeviceScanProfileAssignments.Where(a => a.ScanProfileId == id).ToListAsync(ct);
+        db.DeviceScanProfileAssignments.RemoveRange(assignments);
         db.ScanProfiles.Remove(profile);
         await db.SaveChangesAsync(ct);
         return NoContent();
     }
 
-    public record AssignedDeviceDto(Guid AssetId, string AssetName, Guid? AssignedByRuleId, DateTimeOffset AssignedAt);
+    public record AssignedDeviceDto(Guid DeviceId, string DeviceName, Guid? AssignedByRuleId, DateTimeOffset AssignedAt);
 
     [HttpGet("{id:guid}/assigned-devices")]
     public async Task<ActionResult<List<AssignedDeviceDto>>> GetAssignedDevices(Guid id, CancellationToken ct)
@@ -172,18 +172,18 @@ public class ScanProfilesController(
         if (profile is null) return NotFound();
         if (!tenantContext.HasAccessToTenant(profile.TenantId)) return Forbid();
 
-        var assignments = await db.AssetScanProfileAssignments.AsNoTracking()
+        var assignments = await db.DeviceScanProfileAssignments.AsNoTracking()
             .Where(a => a.ScanProfileId == id)
             .ToListAsync(ct);
 
-        var assetIds = assignments.Select(a => a.AssetId).Distinct().ToList();
-        var assetNames = await db.Assets.AsNoTracking()
-            .Where(a => assetIds.Contains(a.Id))
+        var deviceIds = assignments.Select(a => a.DeviceId).Distinct().ToList();
+        var deviceNames = await db.Assets.AsNoTracking()
+            .Where(a => deviceIds.Contains(a.Id))
             .ToDictionaryAsync(a => a.Id, a => a.Name, ct);
 
         return assignments.Select(a => new AssignedDeviceDto(
-            a.AssetId,
-            assetNames.GetValueOrDefault(a.AssetId, "—"),
+            a.DeviceId,
+            deviceNames.GetValueOrDefault(a.DeviceId, "—"),
             a.AssignedByRuleId,
             a.AssignedAt)).ToList();
     }

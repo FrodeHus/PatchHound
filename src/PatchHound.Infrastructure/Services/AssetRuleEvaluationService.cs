@@ -314,28 +314,28 @@ public class AssetRuleEvaluationService : IAssetRuleEvaluationService
                 if (op.Parameters.TryGetValue("scanProfileId", out var scanProfileIdStr)
                     && Guid.TryParse(scanProfileIdStr, out var scanProfileId))
                 {
-                    var existingAssignments = await _dbContext.AssetScanProfileAssignments
+                    var existingAssignments = await _dbContext.DeviceScanProfileAssignments
                         .Where(a => a.ScanProfileId == scanProfileId && a.AssignedByRuleId == rule.Id)
                         .ToListAsync(ct);
 
                     var assignmentsToRemove = existingAssignments
-                        .Where(a => !assetIds.Contains(a.AssetId))
+                        .Where(a => !assetIds.Contains(a.DeviceId))
                         .ToList();
                     if (assignmentsToRemove.Count > 0)
                     {
-                        _dbContext.AssetScanProfileAssignments.RemoveRange(assignmentsToRemove);
+                        _dbContext.DeviceScanProfileAssignments.RemoveRange(assignmentsToRemove);
                     }
 
-                    var existingAssetIds = existingAssignments
-                        .Select(a => a.AssetId)
+                    var existingDeviceIds = existingAssignments
+                        .Select(a => a.DeviceId)
                         .ToHashSet();
                     var newAssignments = assetIds
-                        .Where(assetId => !existingAssetIds.Contains(assetId))
-                        .Select(assetId => AssetScanProfileAssignment.Create(tenantId, assetId, scanProfileId, rule.Id))
+                        .Where(assetId => !existingDeviceIds.Contains(assetId))
+                        .Select(assetId => DeviceScanProfileAssignment.Create(tenantId, assetId, scanProfileId, rule.Id))
                         .ToList();
                     if (newAssignments.Count > 0)
                     {
-                        await _dbContext.AssetScanProfileAssignments.AddRangeAsync(newAssignments, ct);
+                        await _dbContext.DeviceScanProfileAssignments.AddRangeAsync(newAssignments, ct);
                     }
                 }
                 break;

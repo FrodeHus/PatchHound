@@ -4,9 +4,9 @@ using PatchHound.Core.Entities.AuthenticatedScans;
 
 namespace PatchHound.Infrastructure.Data.Configurations.AuthenticatedScans;
 
-public class StagedAuthenticatedScanSoftwareConfiguration : IEntityTypeConfiguration<StagedAuthenticatedScanSoftware>
+public class StagedDetectedSoftwareConfiguration : IEntityTypeConfiguration<StagedDetectedSoftware>
 {
-    public void Configure(EntityTypeBuilder<StagedAuthenticatedScanSoftware> b)
+    public void Configure(EntityTypeBuilder<StagedDetectedSoftware> b)
     {
         b.HasKey(x => x.Id);
         b.Property(x => x.CanonicalName).HasMaxLength(1024).IsRequired();

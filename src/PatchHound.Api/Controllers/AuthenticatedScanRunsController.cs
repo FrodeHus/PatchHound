@@ -31,7 +31,7 @@ public class AuthenticatedScanRunsController(
         List<ScanJobSummaryDto> Jobs);
 
     public record ScanJobSummaryDto(
-        Guid Id, Guid AssetId, string AssetName,
+        Guid Id, Guid DeviceId, string DeviceName,
         string Status, int AttemptCount,
         DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt,
         string ErrorMessage, int EntriesIngested,
@@ -97,9 +97,9 @@ public class AuthenticatedScanRunsController(
             .OrderBy(j => j.StartedAt)
             .ToListAsync(ct);
 
-        var assetIds = jobs.Select(j => j.AssetId).Distinct().ToList();
-        var assetNames = await db.Assets.AsNoTracking()
-            .Where(a => assetIds.Contains(a.Id))
+        var deviceIds = jobs.Select(j => j.DeviceId).Distinct().ToList();
+        var deviceNames = await db.Assets.AsNoTracking()
+            .Where(a => deviceIds.Contains(a.Id))
             .ToDictionaryAsync(a => a.Id, a => a.Name, ct);
 
         var jobIds = jobs.Select(j => j.Id).ToList();
@@ -112,8 +112,8 @@ public class AuthenticatedScanRunsController(
                 new ValidationIssueDto(v.FieldPath, v.Message, v.EntryIndex)).ToList());
 
         var jobDtos = jobs.Select(j => new ScanJobSummaryDto(
-            j.Id, j.AssetId,
-            assetNames.GetValueOrDefault(j.AssetId, "\u2014"),
+            j.Id, j.DeviceId,
+            deviceNames.GetValueOrDefault(j.DeviceId, "\u2014"),
             j.Status, j.AttemptCount,
             j.StartedAt, j.CompletedAt,
             j.ErrorMessage, j.EntriesIngested,

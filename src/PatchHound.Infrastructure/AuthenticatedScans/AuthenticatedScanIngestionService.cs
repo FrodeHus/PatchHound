@@ -48,7 +48,7 @@ public class AuthenticatedScanIngestionService(
         // Stage assets and device-software links into the existing pipeline
         var ingestionRunId = Guid.NewGuid();
         var stagedAt = DateTimeOffset.UtcNow;
-        var deviceExternalId = await GetDeviceExternalId(job.AssetId, ct);
+        var deviceExternalId = await GetDeviceExternalId(job.DeviceId, ct);
 
         var softwareAssets = new List<StagedAsset>();
         var softwareLinks = new List<StagedDeviceSoftwareInstallation>();
@@ -117,10 +117,10 @@ public class AuthenticatedScanIngestionService(
         await dbContext.SaveChangesAsync(ct);
     }
 
-    private async Task<string> GetDeviceExternalId(Guid assetId, CancellationToken ct)
+    private async Task<string> GetDeviceExternalId(Guid deviceId, CancellationToken ct)
     {
-        var asset = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == assetId, ct);
-        return asset?.ExternalId ?? assetId.ToString();
+        var asset = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == deviceId, ct);
+        return asset?.ExternalId ?? deviceId.ToString();
     }
 
     private static string BuildSoftwareExternalId(Guid tenantId, ValidatedSoftwareEntry entry)

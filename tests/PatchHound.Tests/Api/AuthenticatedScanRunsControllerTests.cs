@@ -122,11 +122,11 @@ public class AuthenticatedScanRunsControllerTests : IAsyncLifetime
         Assert.Equal(2, detail.Jobs.Count);
 
         var succeeded = detail.Jobs.Single(j => j.Status == "Succeeded");
-        Assert.Equal("server-1", succeeded.AssetName);
+        Assert.Equal("server-1", succeeded.DeviceName);
         Assert.Equal(5, succeeded.EntriesIngested);
 
         var failed = detail.Jobs.Single(j => j.Status == "Failed");
-        Assert.Equal("server-2", failed.AssetName);
+        Assert.Equal("server-2", failed.DeviceName);
         Assert.Equal("Connection refused", failed.ErrorMessage);
     }
 

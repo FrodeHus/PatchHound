@@ -59,7 +59,7 @@ public class BackendEndToEndTests : IAsyncLifetime
         var profile = ScanProfile.Create(_tenantId, "profile", "", "0 * * * *", conn.Id, runner.Id, true);
         _db.ScanProfiles.Add(profile);
         _db.ScanProfileTools.Add(ScanProfileTool.Create(profile.Id, tool.Id, 0));
-        _db.AssetScanProfileAssignments.Add(AssetScanProfileAssignment.Create(_tenantId, device.Id, profile.Id, null));
+        _db.DeviceScanProfileAssignments.Add(DeviceScanProfileAssignment.Create(_tenantId, device.Id, profile.Id, null));
         await _db.SaveChangesAsync();
 
         // Act 1: dispatcher creates run + jobs
@@ -71,7 +71,7 @@ public class BackendEndToEndTests : IAsyncLifetime
         Assert.Equal(1, run.TotalDevices);
 
         var job = await _db.ScanJobs.SingleAsync(j => j.RunId == runId);
-        Assert.Equal(device.Id, job.AssetId);
+        Assert.Equal(device.Id, job.DeviceId);
         Assert.Equal(ScanJobStatuses.Pending, job.Status);
 
         // Act 2: simulate runner posting results — ingestion service processes them

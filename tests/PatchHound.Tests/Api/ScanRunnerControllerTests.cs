@@ -59,7 +59,7 @@ public class ScanRunnerControllerTests : IAsyncLifetime
 
         _device = Asset.Create(_tenantId, "ext-device-1", AssetType.Device, "device-1", Criticality.Medium);
         _db.Assets.Add(_device);
-        _db.AssetScanProfileAssignments.Add(AssetScanProfileAssignment.Create(_tenantId, _device.Id, _profile.Id, null));
+        _db.DeviceScanProfileAssignments.Add(DeviceScanProfileAssignment.Create(_tenantId, _device.Id, _profile.Id, null));
         await _db.SaveChangesAsync();
 
         _secretStore = Substitute.For<ISecretStore>();

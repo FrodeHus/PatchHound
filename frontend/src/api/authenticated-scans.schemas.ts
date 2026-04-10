@@ -151,8 +151,8 @@ export const validationIssueSchema = z.object({
 
 export const scanJobSummarySchema = z.object({
   id: z.string().uuid(),
-  assetId: z.string().uuid(),
-  assetName: z.string(),
+  deviceId: z.string().uuid(),
+  deviceName: z.string(),
   status: z.string(),
   attemptCount: z.number(),
   startedAt: nullableIsoDateTimeSchema,
@@ -175,8 +175,8 @@ export type ValidationIssue = z.infer<typeof validationIssueSchema>
 // --- Scan Profile Assignments ---
 
 export const profileAssignedDeviceSchema = z.object({
-  assetId: z.string().uuid(),
-  assetName: z.string(),
+  deviceId: z.string().uuid(),
+  deviceName: z.string(),
   assignedByRuleId: z.string().uuid().nullable(),
   assignedAt: isoDateTimeSchema,
 })

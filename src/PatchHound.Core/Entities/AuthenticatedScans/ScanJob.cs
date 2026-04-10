@@ -16,7 +16,7 @@ public class ScanJob
     public Guid TenantId { get; private set; }
     public Guid RunId { get; private set; }
     public Guid ScanRunnerId { get; private set; }
-    public Guid AssetId { get; private set; }
+    public Guid DeviceId { get; private set; }
     public Guid ConnectionProfileId { get; private set; }
     public string ScanningToolVersionIdsJson { get; private set; } = "[]";
     public string Status { get; private set; } = ScanJobStatuses.Pending;
@@ -32,7 +32,7 @@ public class ScanJob
     private ScanJob() { }
 
     public static ScanJob Create(
-        Guid tenantId, Guid runId, Guid scanRunnerId, Guid assetId,
+        Guid tenantId, Guid runId, Guid scanRunnerId, Guid deviceId,
         Guid connectionProfileId, string scanningToolVersionIdsJson)
     {
         return new ScanJob
@@ -41,7 +41,7 @@ public class ScanJob
             TenantId = tenantId,
             RunId = runId,
             ScanRunnerId = scanRunnerId,
-            AssetId = assetId,
+            DeviceId = deviceId,
             ConnectionProfileId = connectionProfileId,
             ScanningToolVersionIdsJson = scanningToolVersionIdsJson,
             Status = ScanJobStatuses.Pending,

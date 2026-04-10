@@ -45,8 +45,8 @@ public class RunnerWorker(
         if (job is null)
             return false;
 
-        logger.LogInformation("Received job {JobId} for asset {AssetId} on {Host}",
-            job.JobId, job.AssetId, job.HostTarget.Host);
+        logger.LogInformation("Received job {JobId} for device {DeviceId} on {Host}",
+            job.JobId, job.DeviceId, job.HostTarget.Host);
 
         await ExecuteJobAsync(job, ct);
         return true;

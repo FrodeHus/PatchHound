@@ -1,11 +1,11 @@
 namespace PatchHound.Core.Entities.AuthenticatedScans;
 
-public class StagedAuthenticatedScanSoftware
+public class StagedDetectedSoftware
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public Guid ScanJobId { get; private set; }
-    public Guid DeviceAssetId { get; private set; }
+    public Guid DeviceId { get; private set; }
     public Guid ScanProfileId { get; private set; }
     public string CanonicalName { get; private set; } = string.Empty;
     public string CanonicalProductKey { get; private set; } = string.Empty;
@@ -15,10 +15,10 @@ public class StagedAuthenticatedScanSoftware
     public string? DetectedVersion { get; private set; }
     public DateTimeOffset StagedAt { get; private set; }
 
-    private StagedAuthenticatedScanSoftware() { }
+    private StagedDetectedSoftware() { }
 
-    public static StagedAuthenticatedScanSoftware Create(
-        Guid tenantId, Guid scanJobId, Guid deviceAssetId, Guid scanProfileId,
+    public static StagedDetectedSoftware Create(
+        Guid tenantId, Guid scanJobId, Guid deviceId, Guid scanProfileId,
         string canonicalName, string canonicalProductKey,
         string? canonicalVendor, string? category, string? primaryCpe23Uri, string? detectedVersion) =>
         new()
@@ -26,7 +26,7 @@ public class StagedAuthenticatedScanSoftware
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             ScanJobId = scanJobId,
-            DeviceAssetId = deviceAssetId,
+            DeviceId = deviceId,
             ScanProfileId = scanProfileId,
             CanonicalName = canonicalName.Trim(),
             CanonicalProductKey = canonicalProductKey.Trim(),

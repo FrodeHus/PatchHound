@@ -1,20 +1,20 @@
 namespace PatchHound.Core.Entities.AuthenticatedScans;
 
-public class AssetScanProfileAssignment
+public class DeviceScanProfileAssignment
 {
     public Guid TenantId { get; private set; }
-    public Guid AssetId { get; private set; }
+    public Guid DeviceId { get; private set; }
     public Guid ScanProfileId { get; private set; }
     public Guid? AssignedByRuleId { get; private set; }
     public DateTimeOffset AssignedAt { get; private set; }
 
-    private AssetScanProfileAssignment() { }
+    private DeviceScanProfileAssignment() { }
 
-    public static AssetScanProfileAssignment Create(Guid tenantId, Guid assetId, Guid scanProfileId, Guid? assignedByRuleId) =>
+    public static DeviceScanProfileAssignment Create(Guid tenantId, Guid deviceId, Guid scanProfileId, Guid? assignedByRuleId) =>
         new()
         {
             TenantId = tenantId,
-            AssetId = assetId,
+            DeviceId = deviceId,
             ScanProfileId = scanProfileId,
             AssignedByRuleId = assignedByRuleId,
             AssignedAt = DateTimeOffset.UtcNow,

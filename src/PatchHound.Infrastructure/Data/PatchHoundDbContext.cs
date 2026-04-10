@@ -98,12 +98,12 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<ScanningToolVersion> ScanningToolVersions => Set<ScanningToolVersion>();
     public DbSet<ScanProfile> ScanProfiles => Set<ScanProfile>();
     public DbSet<ScanProfileTool> ScanProfileTools => Set<ScanProfileTool>();
-    public DbSet<AssetScanProfileAssignment> AssetScanProfileAssignments => Set<AssetScanProfileAssignment>();
+    public DbSet<DeviceScanProfileAssignment> DeviceScanProfileAssignments => Set<DeviceScanProfileAssignment>();
     public DbSet<AuthenticatedScanRun> AuthenticatedScanRuns => Set<AuthenticatedScanRun>();
     public DbSet<ScanJob> ScanJobs => Set<ScanJob>();
     public DbSet<ScanJobResult> ScanJobResults => Set<ScanJobResult>();
     public DbSet<ScanJobValidationIssue> ScanJobValidationIssues => Set<ScanJobValidationIssue>();
-    public DbSet<StagedAuthenticatedScanSoftware> StagedAuthenticatedScanSoftware => Set<StagedAuthenticatedScanSoftware>();
+    public DbSet<StagedDetectedSoftware> StagedDetectedSoftware => Set<StagedDetectedSoftware>();
     public DbSet<RiskAcceptance> RiskAcceptances => Set<RiskAcceptance>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<Notification> Notifications => Set<Notification>();

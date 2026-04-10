@@ -343,8 +343,8 @@ public class AssetRuleEvaluationServiceTests : IDisposable
 
         await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
 
-        var assignment = await _dbContext.AssetScanProfileAssignments.SingleAsync();
-        assignment.AssetId.Should().Be(asset.Id);
+        var assignment = await _dbContext.DeviceScanProfileAssignments.SingleAsync();
+        assignment.DeviceId.Should().Be(asset.Id);
         assignment.ScanProfileId.Should().Be(scanProfileId);
         assignment.AssignedByRuleId.Should().Be(rule.Id);
     }
@@ -380,7 +380,7 @@ public class AssetRuleEvaluationServiceTests : IDisposable
         await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
         await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
 
-        var count = await _dbContext.AssetScanProfileAssignments.CountAsync();
+        var count = await _dbContext.DeviceScanProfileAssignments.CountAsync();
         count.Should().Be(1);
     }
 
