@@ -22,6 +22,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<SourceSystem> SourceSystems => Set<SourceSystem>();
+    public DbSet<SoftwareProduct> SoftwareProducts => Set<SoftwareProduct>();
+    public DbSet<SoftwareAlias> SoftwareAliases => Set<SoftwareAlias>();
     public DbSet<TenantSourceConfiguration> TenantSourceConfigurations =>
         Set<TenantSourceConfiguration>();
     public DbSet<IngestionRun> IngestionRuns => Set<IngestionRun>();
