@@ -412,6 +412,7 @@ builder.Services.AddPatchHoundInfrastructure(builder.Configuration);
 // Tenant context (scoped - one per request)
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<ISoftwareProductResolver, SoftwareProductResolver>();
+builder.Services.AddScoped<IDeviceResolver, DeviceResolver>();
 builder.Services.AddScoped<PatchHound.Api.Services.TenantSoftwareAliasResolver>();
 builder.Services.AddScoped<PatchHound.Api.Services.DashboardQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.VulnerabilityDetailQueryService>();
