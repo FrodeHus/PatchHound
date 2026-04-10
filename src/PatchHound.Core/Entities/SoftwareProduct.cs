@@ -15,15 +15,45 @@ public class SoftwareProduct
 
     public static SoftwareProduct Create(string vendor, string name, string? primaryCpe23Uri)
     {
-        if (string.IsNullOrWhiteSpace(vendor)) throw new ArgumentException("Vendor is required.", nameof(vendor));
-        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name is required.", nameof(name));
+        if (string.IsNullOrWhiteSpace(vendor))
+        {
+            throw new ArgumentException("Vendor is required.", nameof(vendor));
+        }
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Name is required.", nameof(name));
+        }
+
+        var normalizedVendor = vendor.Trim();
+        var normalizedName = name.Trim();
+
+        if (normalizedVendor.Length > 256)
+        {
+            throw new ArgumentException("Vendor must be 256 characters or fewer.", nameof(vendor));
+        }
+        if (normalizedName.Length > 512)
+        {
+            throw new ArgumentException("Name must be 512 characters or fewer.", nameof(name));
+        }
+
+        var canonicalProductKey = $"{normalizedVendor.ToLowerInvariant()}::{normalizedName.ToLowerInvariant()}";
+        if (canonicalProductKey.Length > 512)
+        {
+            throw new ArgumentException("Combined vendor and name exceed the 512-character canonical key limit.", nameof(name));
+        }
+
+        if (primaryCpe23Uri is not null && primaryCpe23Uri.Length > 512)
+        {
+            throw new ArgumentException("PrimaryCpe23Uri must be 512 characters or fewer.", nameof(primaryCpe23Uri));
+        }
+
         var now = DateTimeOffset.UtcNow;
         return new SoftwareProduct
         {
             Id = Guid.NewGuid(),
-            Vendor = vendor.Trim(),
-            Name = name.Trim(),
-            CanonicalProductKey = $"{vendor.Trim().ToLowerInvariant()}::{name.Trim().ToLowerInvariant()}",
+            Vendor = normalizedVendor,
+            Name = normalizedName,
+            CanonicalProductKey = canonicalProductKey,
             PrimaryCpe23Uri = primaryCpe23Uri,
             CreatedAt = now,
             UpdatedAt = now,

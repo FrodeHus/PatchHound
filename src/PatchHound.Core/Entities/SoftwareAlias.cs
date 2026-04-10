@@ -19,13 +19,41 @@ public class SoftwareAlias
         string? observedVendor = null,
         string? observedName = null)
     {
-        if (string.IsNullOrWhiteSpace(externalId)) throw new ArgumentException("ExternalId required.", nameof(externalId));
+        if (softwareProductId == Guid.Empty)
+        {
+            throw new ArgumentException("SoftwareProductId is required.", nameof(softwareProductId));
+        }
+        if (sourceSystemId == Guid.Empty)
+        {
+            throw new ArgumentException("SourceSystemId is required.", nameof(sourceSystemId));
+        }
+        if (string.IsNullOrWhiteSpace(externalId))
+        {
+            throw new ArgumentException("ExternalId is required.", nameof(externalId));
+        }
+
+        var normalizedExternalId = externalId.Trim();
+        if (normalizedExternalId.Length > 256)
+        {
+            throw new ArgumentException("ExternalId must be 256 characters or fewer.", nameof(externalId));
+        }
+
+        if (observedVendor is not null && observedVendor.Length > 256)
+        {
+            throw new ArgumentException("ObservedVendor must be 256 characters or fewer.", nameof(observedVendor));
+        }
+
+        if (observedName is not null && observedName.Length > 512)
+        {
+            throw new ArgumentException("ObservedName must be 512 characters or fewer.", nameof(observedName));
+        }
+
         return new SoftwareAlias
         {
             Id = Guid.NewGuid(),
             SoftwareProductId = softwareProductId,
             SourceSystemId = sourceSystemId,
-            ExternalId = externalId,
+            ExternalId = normalizedExternalId,
             ObservedVendor = observedVendor,
             ObservedName = observedName,
             CreatedAt = DateTimeOffset.UtcNow,
