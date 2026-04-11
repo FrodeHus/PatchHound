@@ -35,12 +35,14 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
         var criticalityRuleMatchedDeviceIds = new HashSet<Guid>();
         var securityProfileRuleMatchedDeviceIds = new HashSet<Guid>();
         var fallbackTeamRuleMatchedDeviceIds = new HashSet<Guid>();
+        var businessLabelRuleMatchedKeys = new HashSet<(Guid DeviceId, Guid BusinessLabelId, Guid RuleId)>();
 
         if (rules.Count == 0)
         {
             await ReconcileCriticalityAsync(tenantId, criticalityRuleMatchedDeviceIds, ct);
             await ReconcileSecurityProfilesAsync(tenantId, securityProfileRuleMatchedDeviceIds, ct);
             await ReconcileFallbackTeamsAsync(tenantId, fallbackTeamRuleMatchedDeviceIds, ct);
+            await ReconcileBusinessLabelsAsync(tenantId, businessLabelRuleMatchedKeys, ct);
             _logger.LogDebug("No enabled device rules for tenant {TenantId}", tenantId);
             return;
         }
@@ -78,6 +80,7 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
                             criticalityRuleMatchedDeviceIds,
                             securityProfileRuleMatchedDeviceIds,
                             fallbackTeamRuleMatchedDeviceIds,
+                            businessLabelRuleMatchedKeys,
                             ct
                         );
                     }
@@ -104,6 +107,7 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
         await ReconcileCriticalityAsync(tenantId, criticalityRuleMatchedDeviceIds, ct);
         await ReconcileSecurityProfilesAsync(tenantId, securityProfileRuleMatchedDeviceIds, ct);
         await ReconcileFallbackTeamsAsync(tenantId, fallbackTeamRuleMatchedDeviceIds, ct);
+        await ReconcileBusinessLabelsAsync(tenantId, businessLabelRuleMatchedKeys, ct);
     }
 
     public async Task EvaluateCriticalityForDeviceAsync(Guid tenantId, Guid deviceId, CancellationToken ct)
@@ -194,6 +198,7 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
         ISet<Guid> criticalityRuleMatchedDeviceIds,
         ISet<Guid> securityProfileRuleMatchedDeviceIds,
         ISet<Guid> fallbackTeamRuleMatchedDeviceIds,
+        ISet<(Guid DeviceId, Guid BusinessLabelId, Guid RuleId)> businessLabelRuleMatchedKeys,
         CancellationToken ct)
     {
         switch (op.Type)
@@ -257,18 +262,33 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
                 break;
 
             case "AssignBusinessLabel":
-                // DeviceBusinessLabel was simplified in the canonical cleanup and no
-                // longer carries rule-ownership fields, so rule-driven reconciliation
-                // cannot distinguish rule-assigned from manually-assigned labels.
-                // The AssignBusinessLabel operation is rewired during Task 14 (business
-                // labels controller rename) once DeviceBusinessLabel grows the required
-                // provenance fields back.
-                _logger.LogWarning(
-                    "Device rule '{RuleName}' ({RuleId}) uses AssignBusinessLabel, which is not yet "
-                        + "supported on DeviceBusinessLabel. Operation skipped for tenant {TenantId}.",
-                    rule.Name,
-                    rule.Id,
-                    tenantId);
+                if (op.Parameters.TryGetValue("businessLabelId", out var businessLabelIdStr)
+                    && Guid.TryParse(businessLabelIdStr, out var businessLabelId))
+                {
+                    var sourceKey = DeviceBusinessLabel.BuildRuleSourceKey(rule.Id);
+                    var existingLinks = await _dbContext.DeviceBusinessLabels
+                        .Where(link =>
+                            link.TenantId == tenantId
+                            && link.BusinessLabelId == businessLabelId
+                            && link.SourceKey == sourceKey
+                            && deviceIds.Contains(link.DeviceId))
+                        .Select(link => link.DeviceId)
+                        .ToListAsync(ct);
+
+                    var existingSet = existingLinks.ToHashSet();
+                    foreach (var deviceId in deviceIds)
+                    {
+                        businessLabelRuleMatchedKeys.Add((deviceId, businessLabelId, rule.Id));
+                        if (existingSet.Contains(deviceId))
+                        {
+                            continue;
+                        }
+
+                        await _dbContext.DeviceBusinessLabels.AddAsync(
+                            DeviceBusinessLabel.CreateRule(tenantId, deviceId, businessLabelId, rule.Id),
+                            ct);
+                    }
+                }
                 break;
 
             case "AssignScanProfile":
@@ -355,6 +375,30 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
 
         if (ruleDerivedDevices.Count > 0)
         {
+            await _dbContext.SaveChangesAsync(ct);
+        }
+    }
+
+    private async Task ReconcileBusinessLabelsAsync(
+        Guid tenantId,
+        ISet<(Guid DeviceId, Guid BusinessLabelId, Guid RuleId)> businessLabelRuleMatchedKeys,
+        CancellationToken ct)
+    {
+        var existingRuleLinks = await _dbContext.DeviceBusinessLabels
+            .Where(link =>
+                link.TenantId == tenantId
+                && link.SourceType == DeviceBusinessLabel.RuleSourceType
+                && link.AssignedByRuleId != null)
+            .ToListAsync(ct);
+
+        var staleLinks = existingRuleLinks
+            .Where(link => !businessLabelRuleMatchedKeys.Contains(
+                (link.DeviceId, link.BusinessLabelId, link.AssignedByRuleId!.Value)))
+            .ToList();
+
+        if (staleLinks.Count > 0)
+        {
+            _dbContext.DeviceBusinessLabels.RemoveRange(staleLinks);
             await _dbContext.SaveChangesAsync(ct);
         }
     }

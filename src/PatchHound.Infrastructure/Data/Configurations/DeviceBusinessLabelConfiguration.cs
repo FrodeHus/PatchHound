@@ -12,7 +12,14 @@ public class DeviceBusinessLabelConfiguration : IEntityTypeConfiguration<DeviceB
 
         builder.HasIndex(item => item.TenantId);
         builder.HasIndex(item => item.BusinessLabelId);
-        builder.HasIndex(item => new { item.DeviceId, item.BusinessLabelId }).IsUnique();
+        builder.HasIndex(item => item.AssignedByRuleId);
+        // Phase 1 canonical cleanup (Task 14): SourceKey is part of the
+        // uniqueness constraint so a device can hold the same label twice —
+        // once manually and once via a rule — without collision.
+        builder.HasIndex(item => new { item.DeviceId, item.BusinessLabelId, item.SourceKey }).IsUnique();
+
+        builder.Property(item => item.SourceType).HasMaxLength(16);
+        builder.Property(item => item.SourceKey).HasMaxLength(64);
 
         builder
             .HasOne<Device>()

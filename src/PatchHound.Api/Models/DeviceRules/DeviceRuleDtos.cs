@@ -1,8 +1,8 @@
 using System.Text.Json;
 
-namespace PatchHound.Api.Models.AssetRules;
+namespace PatchHound.Api.Models.DeviceRules;
 
-public record AssetRuleDto(
+public record DeviceRuleDto(
     Guid Id,
     string Name,
     string? Description,
@@ -16,14 +16,14 @@ public record AssetRuleDto(
     int? LastMatchCount
 );
 
-public record CreateAssetRuleRequest(
+public record CreateDeviceRuleRequest(
     string Name,
     string? Description,
     JsonElement FilterDefinition,
     JsonElement Operations
 );
 
-public record UpdateAssetRuleRequest(
+public record UpdateDeviceRuleRequest(
     string Name,
     string? Description,
     bool Enabled,
@@ -31,10 +31,10 @@ public record UpdateAssetRuleRequest(
     JsonElement Operations
 );
 
-public record PreviewFilterRequest(JsonElement FilterDefinition);
+public record PreviewDeviceRuleFilterRequest(JsonElement FilterDefinition);
 
-public record ReorderRulesRequest(List<Guid> RuleIds);
+public record ReorderDeviceRulesRequest(List<Guid> RuleIds);
 
-public record AssetRulePreviewDto(int Count, List<AssetPreviewItemDto> Samples);
+public record DeviceRulePreviewDto(int Count, List<DevicePreviewItemDto> Samples);
 
-public record AssetPreviewItemDto(Guid Id, string Name, string AssetType);
+public record DevicePreviewItemDto(Guid Id, string Name);

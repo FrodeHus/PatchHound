@@ -326,19 +326,24 @@ public class DevicesController : ControllerBase
                 }
             );
 
-        var existingLinks = await _dbContext.DeviceBusinessLabels
-            .Where(item => item.DeviceId == id)
+        // Only touch manual links; rule-assigned links are reconciled by
+        // DeviceRuleEvaluationService and must not be deleted here.
+        var existingManualLinks = await _dbContext.DeviceBusinessLabels
+            .Where(item =>
+                item.DeviceId == id
+                && item.SourceType == DeviceBusinessLabel.ManualSourceType)
             .ToListAsync(ct);
-        var existingLabelIds = existingLinks.Select(item => item.BusinessLabelId).ToHashSet();
+        var existingManualLabelIds = existingManualLinks.Select(item => item.BusinessLabelId).ToHashSet();
 
         _dbContext.DeviceBusinessLabels.RemoveRange(
-            existingLinks.Where(item => !validLabelIds.Contains(item.BusinessLabelId))
+            existingManualLinks.Where(item => !validLabelIds.Contains(item.BusinessLabelId))
         );
 
-        foreach (var labelId in validLabelIds.Where(labelId => !existingLabelIds.Contains(labelId)))
+        var assignedBy = _tenantContext.CurrentUserId;
+        foreach (var labelId in validLabelIds.Where(labelId => !existingManualLabelIds.Contains(labelId)))
         {
             await _dbContext.DeviceBusinessLabels.AddAsync(
-                DeviceBusinessLabel.Create(currentTenantId, id, labelId),
+                DeviceBusinessLabel.CreateManual(currentTenantId, id, labelId, assignedBy),
                 ct
             );
         }
