@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
-import type { Asset } from '@/api/assets.schemas'
+import type { Device } from '@/api/devices.schemas'
 import type { BusinessLabel } from '@/api/business-labels.schemas'
 import {
   DataTableActiveFilters,
@@ -24,26 +24,27 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Link } from '@tanstack/react-router'
-import { ExternalLinkIcon, SearchIcon, ShieldAlertIcon } from "lucide-react";
+import { ExternalLinkIcon, SearchIcon } from "lucide-react";
 import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
 import { toneBadge } from '@/lib/tone-classes'
 
-type AssetManagementTableProps = {
-  assets: Asset[];
+// Phase 1 canonical cleanup (Task 15): device-native management table.
+// The legacy AssetType filter/column was removed alongside the /assets
+// surface — /devices is device-only and the Software/CloudResource
+// filters will return in later phases on their own surfaces.
+
+type DeviceManagementTableProps = {
+  devices: Device[];
   totalCount: number;
   page: number;
   pageSize: number;
   totalPages: number;
   isUpdating: boolean;
-  selectedAssetId: string | null;
+  selectedDeviceId: string | null;
   title?: string;
   description?: string;
   searchPlaceholder?: string;
-  showAssetTypeFilter?: boolean;
-  showAssetTypeColumn?: boolean;
-  showRemediationLink?: boolean;
   searchValue: string;
-  assetTypeFilter: string;
   criticalityFilter: string;
   businessLabelIdFilter: string;
   availableBusinessLabels: BusinessLabel[];
@@ -56,7 +57,6 @@ type AssetManagementTableProps = {
   tagFilter: string;
   unassignedOnly: boolean;
   onSearchChange: (search: string) => void;
-  onAssetTypeFilterChange: (assetType: string) => void;
   onCriticalityFilterChange: (criticality: string) => void;
   onBusinessLabelFilterChange: (businessLabelId: string) => void;
   onOwnerTypeFilterChange: (ownerType: string) => void;
@@ -68,7 +68,6 @@ type AssetManagementTableProps = {
   onTagFilterChange: (tag: string) => void;
   onUnassignedOnlyChange: (value: boolean) => void;
   onApplyStructuredFilters: (filters: {
-    assetType: string;
     criticality: string;
     businessLabelId: string;
     ownerType: string;
@@ -83,13 +82,13 @@ type AssetManagementTableProps = {
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onClearFilters: () => void;
-  onSelectAsset: (assetId: string) => void;
+  onSelectDevice: (deviceId: string) => void;
   onAssignOwner: (
-    assetId: string,
+    deviceId: string,
     ownerType: "User" | "Team",
     ownerId: string,
   ) => void;
-  onSetCriticality: (assetId: string, criticality: string) => void;
+  onSetCriticality: (deviceId: string, criticality: string) => void;
 };
 
 const criticalityOptions = ['Low', 'Medium', 'High', 'Critical']
@@ -97,28 +96,23 @@ const healthStatusOptions = ['Active', 'Inactive', 'ImpairedCommunication', 'NoS
 const onboardingStatusOptions = ['Onboarded', 'CanBeOnboarded', 'Unsupported', 'InsufficientInfo']
 const riskScoreOptions = ['None', 'Low', 'Medium', 'High']
 const exposureLevelOptions = ['None', 'Low', 'Medium', 'High']
-const assetTypeOptions = ['All', 'Device', 'Software', 'CloudResource']
 const ownershipFilterOptions = [
   { label: 'Any ownership', value: '' },
   { label: 'Assigned user', value: 'User' },
   { label: 'Assignment group', value: 'Team' },
 ]
 
-export function AssetManagementTable({
-  assets,
+export function DeviceManagementTable({
+  devices,
   totalCount,
   page,
   pageSize,
   totalPages,
   isUpdating,
   searchValue,
-  title = "Assets",
-  description = "Scan device and software inventory, narrow the working set, and open the inspector from the asset name.",
-  searchPlaceholder = "Search assets",
-  showAssetTypeFilter = true,
-  showAssetTypeColumn = true,
-  showRemediationLink = false,
-  assetTypeFilter,
+  title = "Devices",
+  description = "Scan the device fleet, narrow the working set, and open the inspector from the device name.",
+  searchPlaceholder = "Search devices",
   criticalityFilter,
   businessLabelIdFilter,
   availableBusinessLabels,
@@ -131,7 +125,6 @@ export function AssetManagementTable({
   tagFilter,
   unassignedOnly,
   onSearchChange,
-  onAssetTypeFilterChange,
   onCriticalityFilterChange,
   onBusinessLabelFilterChange,
   onOwnerTypeFilterChange,
@@ -146,16 +139,15 @@ export function AssetManagementTable({
   onPageChange,
   onPageSizeChange,
   onClearFilters,
-  onSelectAsset,
+  onSelectDevice,
   onAssignOwner,
   onSetCriticality,
-}: AssetManagementTableProps) {
+}: DeviceManagementTableProps) {
   const [ownerType, setOwnerType] = useState<"User" | "Team">("User");
   const [ownerId, setOwnerId] = useState("");
   const [searchInput, setSearchInput] = useState(searchValue);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState({
-    assetType: assetTypeFilter,
     criticality: criticalityFilter,
     businessLabelId: businessLabelIdFilter,
     ownerType: ownerTypeFilter,
@@ -187,7 +179,6 @@ export function AssetManagementTable({
   useEffect(() => {
     if (!isFilterDrawerOpen) {
       setDraftFilters({
-        assetType: assetTypeFilter,
         criticality: criticalityFilter,
         businessLabelId: businessLabelIdFilter,
         ownerType: ownerTypeFilter,
@@ -201,7 +192,6 @@ export function AssetManagementTable({
       });
     }
   }, [
-    assetTypeFilter,
     businessLabelIdFilter,
     criticalityFilter,
     deviceGroupFilter,
@@ -231,15 +221,6 @@ export function AssetManagementTable({
               label: `Search: ${searchValue}`,
               onClear: () => {
                 onSearchChange("");
-              },
-            }
-          : null,
-        showAssetTypeFilter && assetTypeFilter
-          ? {
-              key: "type",
-              label: `Type: ${assetTypeFilter}`,
-              onClear: () => {
-                onAssetTypeFilterChange("");
               },
             }
           : null,
@@ -338,13 +319,11 @@ export function AssetManagementTable({
           : null,
       ].filter((value): value is NonNullable<typeof value> => value !== null),
     [
-      assetTypeFilter,
       businessLabelIdFilter,
       criticalityFilter,
       deviceGroupFilter,
       exposureLevelFilter,
       healthStatusFilter,
-      onAssetTypeFilterChange,
       onBusinessLabelFilterChange,
       onCriticalityFilterChange,
       onDeviceGroupFilterChange,
@@ -361,7 +340,6 @@ export function AssetManagementTable({
       riskScoreFilter,
       searchValue,
       selectedBusinessLabelName,
-      showAssetTypeFilter,
       tagFilter,
       unassignedOnly,
     ],
@@ -370,7 +348,6 @@ export function AssetManagementTable({
   const activeStructuredFilterCount = useMemo(
     () =>
       [
-        showAssetTypeFilter ? assetTypeFilter : "",
         criticalityFilter,
         businessLabelIdFilter,
         ownerTypeFilter,
@@ -383,7 +360,6 @@ export function AssetManagementTable({
         unassignedOnly ? "unassigned" : "",
       ].filter(Boolean).length,
     [
-      assetTypeFilter,
       businessLabelIdFilter,
       criticalityFilter,
       deviceGroupFilter,
@@ -392,18 +368,17 @@ export function AssetManagementTable({
       onboardingStatusFilter,
       ownerTypeFilter,
       riskScoreFilter,
-      showAssetTypeFilter,
       tagFilter,
       unassignedOnly,
     ],
   );
 
-  const columns = useMemo<ColumnDef<Asset>[]>(() => {
-    const columns: ColumnDef<Asset>[] = [
+  const columns = useMemo<ColumnDef<Device>[]>(() => {
+    const columns: ColumnDef<Device>[] = [
       {
         accessorKey: "name",
         header: ({ column }) => (
-          <SortableColumnHeader column={column} title="Asset" />
+          <SortableColumnHeader column={column} title="Device" />
         ),
         cell: ({ row }) => (
           <div className="space-y-1">
@@ -412,29 +387,19 @@ export function AssetManagementTable({
                 type="button"
                 className="text-left font-medium tracking-tight underline decoration-border/70 underline-offset-4 transition hover:decoration-foreground"
                 onClick={() => {
-                  onSelectAsset(row.original.id);
+                  onSelectDevice(row.original.id);
                 }}
               >
                 {row.original.name}
               </button>
               <Link
-                to="/assets/$id"
+                to="/devices/$id"
                 params={{ id: row.original.id }}
                 className="shrink-0 text-muted-foreground transition hover:text-foreground"
                 title="Open full detail view"
               >
                 <ExternalLinkIcon className="size-3.5" />
               </Link>
-              {showRemediationLink ? (
-                <Link
-                  to="/assets/$id/remediation"
-                  params={{ id: row.original.id }}
-                  className="shrink-0 text-muted-foreground transition hover:text-primary"
-                  title="Open remediation view"
-                >
-                  <ShieldAlertIcon className="size-3.5" />
-                </Link>
-              ) : null}
             </div>
             <p className="font-mono text-[11px] text-muted-foreground">
               {row.original.externalId}
@@ -463,36 +428,14 @@ export function AssetManagementTable({
           </div>
         ),
       },
-    ];
-
-    if (showAssetTypeColumn) {
-      columns.push({
-        accessorKey: "assetType",
-        header: ({ column }) => (
-          <SortableColumnHeader column={column} title="Type" />
-        ),
-        cell: ({ row }) => (
-          <Badge
-            variant="outline"
-            className="rounded-full border-border/70 bg-background/70"
-          >
-            {row.original.assetType}
-          </Badge>
-        ),
-      });
-    }
-
-    columns.push(
       {
-        accessorKey: "deviceGroupName",
+        accessorKey: "groupName",
         header: ({ column }) => (
           <SortableColumnHeader column={column} title="Device Group" />
         ),
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
-            {row.original.assetType === "Device"
-              ? (row.original.deviceGroupName ?? "Unknown")
-              : "Not applicable"}
+            {row.original.groupName ?? "Unknown"}
           </span>
         ),
       },
@@ -710,18 +653,16 @@ export function AssetManagementTable({
           </div>
         ),
       },
-    );
+    ];
 
     return columns;
   }, [
     isUpdating,
     onAssignOwner,
-    onSelectAsset,
+    onSelectDevice,
     onSetCriticality,
     ownerId,
     ownerType,
-    showAssetTypeColumn,
-    showRemediationLink,
   ]);
 
   return (
@@ -734,7 +675,7 @@ export function AssetManagementTable({
         <DataTableToolbarRow className="items-end gap-4">
           <DataTableField
             label="Search"
-            hint="Matches displayed asset name, DNS name, and external ID."
+            hint="Matches displayed device name, DNS name, and external ID."
             className="flex-1"
           >
             <div className="relative">
@@ -755,7 +696,6 @@ export function AssetManagementTable({
             className="h-10 rounded-xl border-border/70 bg-background/80 px-4"
             onClick={() => {
               setDraftFilters({
-                assetType: assetTypeFilter,
                 criticality: criticalityFilter,
                 businessLabelId: businessLabelIdFilter,
                 ownerType: ownerTypeFilter,
@@ -818,14 +758,13 @@ export function AssetManagementTable({
       <WorkbenchFilterDrawer
         open={isFilterDrawerOpen}
         onOpenChange={setIsFilterDrawerOpen}
-        title="Asset Filters"
+        title="Device Filters"
         description="Apply inventory, ownership, and risk filters without crowding the workbench."
         activeCount={activeStructuredFilterCount}
         onResetDraft={() => {
           setDraftFilters({
-            assetType: "",
             criticality: "",
-                businessLabelId: "",
+            businessLabelId: "",
             ownerType: "",
             deviceGroup: "",
             healthStatus: "",
@@ -843,37 +782,8 @@ export function AssetManagementTable({
       >
         <WorkbenchFilterSection
           title="Inventory"
-          description="Narrow the device and software estate to the inventory slice you want to inspect."
+          description="Narrow the device estate to the inventory slice you want to inspect."
         >
-          {showAssetTypeFilter ? (
-            <DataTableField label="Type">
-              <Select
-                value={draftFilters.assetType || "all"}
-                onValueChange={(value) => {
-                  const nextValue = value ?? "all";
-                  setDraftFilters((current) => ({
-                    ...current,
-                    assetType: nextValue === "all" ? "" : nextValue,
-                  }));
-                }}
-              >
-                <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
-                  <SelectValue placeholder="Any asset type" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                  {assetTypeOptions.map((option) => (
-                    <SelectItem
-                      key={option}
-                      value={option === "All" ? "all" : option}
-                    >
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </DataTableField>
-          ) : null}
-
           <DataTableField
             label="Business Label"
             hint="Filter by an exact tenant business label."
@@ -924,7 +834,7 @@ export function AssetManagementTable({
 
         <WorkbenchFilterSection
           title="Ownership"
-          description="Focus on assets by ownership model or isolate items that still need routing."
+          description="Focus on devices by ownership model or isolate items that still need routing."
         >
           <DataTableField label="Owner Type">
             <Select
@@ -962,7 +872,7 @@ export function AssetManagementTable({
               }}
               className="size-4 rounded border-border/70"
             />
-            <span>Show unassigned assets only</span>
+            <span>Show unassigned devices only</span>
           </label>
         </WorkbenchFilterSection>
 
@@ -1102,7 +1012,7 @@ export function AssetManagementTable({
 
           <DataTableField
             label="Tag"
-            hint="Filter assets by a specific Defender machine tag."
+            hint="Filter devices by a specific Defender machine tag."
           >
             <Input
               value={draftFilters.tag}
@@ -1119,16 +1029,16 @@ export function AssetManagementTable({
         </WorkbenchFilterSection>
       </WorkbenchFilterDrawer>
 
-      {assets.length === 0 ? (
+      {devices.length === 0 ? (
         <DataTableEmptyState
-          title="No assets match the current view"
-          description="Try clearing one or more filters, or broaden the search to bring more assets into the working set."
+          title="No devices match the current view"
+          description="Try clearing one or more filters, or broaden the search to bring more devices into the working set."
         />
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/30">
           <DataTable
             columns={columns}
-            data={assets}
+            data={devices}
             getRowId={(row) => row.id}
             className="min-w-[1080px]"
           />
@@ -1147,8 +1057,8 @@ export function AssetManagementTable({
   );
 }
 
-function renderOwnership(asset: Asset) {
-  if (asset.ownerTeamId) {
+function renderOwnership(device: Device) {
+  if (device.ownerTeamId) {
     return (
       <div className="space-y-1">
         <p className="text-sm font-medium">Assignment group</p>
@@ -1157,7 +1067,7 @@ function renderOwnership(asset: Asset) {
     )
   }
 
-  if (asset.ownerUserId) {
+  if (device.ownerUserId) {
     return (
       <div className="space-y-1">
         <p className="text-sm font-medium">Direct user</p>

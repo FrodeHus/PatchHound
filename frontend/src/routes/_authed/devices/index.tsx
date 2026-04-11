@@ -2,12 +2,22 @@ import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { assignAssetOwner, assignAssetSecurityProfile, fetchAssetDetail, fetchAssets, setAssetCriticality } from '@/api/assets.functions'
+import {
+  assignDeviceOwner,
+  assignDeviceSecurityProfile,
+  fetchDeviceDetail,
+  fetchDevices,
+  setDeviceCriticality,
+} from '@/api/devices.functions'
 import { fetchBusinessLabels } from '@/api/business-labels.functions'
-import { AssetDetailPane } from '@/components/features/assets/AssetDetailPane'
-import { AssetManagementTable } from '@/components/features/assets/AssetManagementTable'
+import { DeviceDetailPane } from '@/components/features/devices/DeviceDetailPane'
+import { DeviceManagementTable } from '@/components/features/devices/DeviceManagementTable'
 import { useTenantScope } from '@/components/layout/tenant-scope'
-import { assetQueryKeys, buildAssetsListRequest, type AssetsListSearch } from '@/features/assets/list-state'
+import {
+  buildDevicesListRequest,
+  deviceQueryKeys,
+  type DevicesListSearch,
+} from '@/features/devices/list-state'
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
 import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 
@@ -25,42 +35,15 @@ const devicesSearchSchema = baseListSearchSchema.extend({
   unassignedOnly: searchBooleanSchema,
 })
 
-type DevicesSearch = {
-  search: string
-  criticality: string
-  businessLabelId: string
-  ownerType: string
-  deviceGroup: string
-  healthStatus: string
-  onboardingStatus: string
-  riskScore: string
-  exposureLevel: string
-  tag: string
-  unassignedOnly: boolean
-  page: number
-  pageSize: number
-}
-
-function toDeviceAssetSearch(search: DevicesSearch): AssetsListSearch {
-  return {
-    ...search,
-    assetType: 'Device',
-  }
-}
-
-function buildDeviceListRequest(search: DevicesSearch) {
-  return buildAssetsListRequest(toDeviceAssetSearch(search))
-}
-
 export const Route = createFileRoute('/_authed/devices/')({
   validateSearch: devicesSearchSchema,
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
-    const [assets, businessLabels] = await Promise.all([
-      fetchAssets({ data: buildDeviceListRequest(deps) }),
+    const [devices, businessLabels] = await Promise.all([
+      fetchDevices({ data: buildDevicesListRequest(deps as DevicesListSearch) }),
       fetchBusinessLabels({ data: {} }),
     ])
-    return { assets, businessLabels }
+    return { devices, businessLabels }
   },
   component: DevicesPage,
 })
@@ -74,25 +57,25 @@ function DevicesPage() {
   const canUseInitialData = initialTenantId === selectedTenantId
   const searchActions = createListSearchUpdater<typeof search>(navigate)
   const queryClient = useQueryClient()
-  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
-  const deviceSearch = search as DevicesSearch
-  const assetsQuery = useQuery({
-    queryKey: assetQueryKeys.list(selectedTenantId, toDeviceAssetSearch(deviceSearch)),
-    queryFn: () => fetchAssets({ data: buildDeviceListRequest(deviceSearch) }),
-    initialData: canUseInitialData ? initialData.assets : undefined,
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
+  const deviceSearch = search as DevicesListSearch
+  const devicesQuery = useQuery({
+    queryKey: deviceQueryKeys.list(selectedTenantId, deviceSearch),
+    queryFn: () => fetchDevices({ data: buildDevicesListRequest(deviceSearch) }),
+    initialData: canUseInitialData ? initialData.devices : undefined,
   })
   const businessLabelsQuery = useQuery({
     queryKey: ['business-labels', selectedTenantId],
     queryFn: () => fetchBusinessLabels({ data: {} }),
     initialData: canUseInitialData ? initialData.businessLabels : undefined,
   })
-  const assets = assetsQuery.data ?? (canUseInitialData ? initialData.assets : undefined)
+  const devices = devicesQuery.data ?? (canUseInitialData ? initialData.devices : undefined)
   const businessLabels = businessLabelsQuery.data ?? (canUseInitialData ? initialData.businessLabels : [])
   const ownerMutation = useMutation({
-    mutationFn: async (payload: { assetId: string; ownerType: 'User' | 'Team'; ownerId: string }) => {
-      await assignAssetOwner({
+    mutationFn: async (payload: { deviceId: string; ownerType: 'User' | 'Team'; ownerId: string }) => {
+      await assignDeviceOwner({
         data: {
-          assetId: payload.assetId,
+          deviceId: payload.deviceId,
           ownerType: payload.ownerType,
           ownerId: payload.ownerId,
         },
@@ -100,68 +83,65 @@ function DevicesPage() {
     },
     onSuccess: async () => {
       toast.success('Owner assigned')
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+      await queryClient.invalidateQueries({ queryKey: deviceQueryKeys.all })
     },
     onError: () => {
       toast.error('Failed to assign owner')
     },
   })
   const criticalityMutation = useMutation({
-    mutationFn: async (payload: { assetId: string; criticality: string }) => {
-      await setAssetCriticality({
+    mutationFn: async (payload: { deviceId: string; criticality: string }) => {
+      await setDeviceCriticality({
         data: {
-          assetId: payload.assetId,
+          deviceId: payload.deviceId,
           criticality: payload.criticality,
         },
       })
     },
     onSuccess: async () => {
       toast.success('Criticality updated')
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+      await queryClient.invalidateQueries({ queryKey: deviceQueryKeys.all })
     },
     onError: () => {
       toast.error('Failed to update criticality')
     },
   })
   const securityProfileMutation = useMutation({
-    mutationFn: async (payload: { assetId: string; securityProfileId: string | null }) => {
-      await assignAssetSecurityProfile({ data: payload })
+    mutationFn: async (payload: { deviceId: string; securityProfileId: string | null }) => {
+      await assignDeviceSecurityProfile({ data: payload })
     },
     onSuccess: async () => {
       toast.success('Security profile assigned')
-      if (selectedAssetId) {
-        await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, selectedAssetId) })
+      if (selectedDeviceId) {
+        await queryClient.invalidateQueries({ queryKey: deviceQueryKeys.detail(selectedTenantId, selectedDeviceId) })
       }
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+      await queryClient.invalidateQueries({ queryKey: deviceQueryKeys.all })
     },
     onError: () => {
       toast.error('Failed to assign security profile')
     },
   })
-  const assetDetailQuery = useQuery({
-    queryKey: assetQueryKeys.detail(selectedTenantId, selectedAssetId),
-    queryFn: () => fetchAssetDetail({ data: { assetId: selectedAssetId! } }),
-    enabled: Boolean(selectedAssetId),
+  const deviceDetailQuery = useQuery({
+    queryKey: deviceQueryKeys.detail(selectedTenantId, selectedDeviceId),
+    queryFn: () => fetchDeviceDetail({ data: { deviceId: selectedDeviceId! } }),
+    enabled: Boolean(selectedDeviceId),
   })
 
-  if (!assets) {
+  if (!devices) {
     return null
   }
 
   return (
     <section className="space-y-4">
-      <AssetManagementTable
+      <DeviceManagementTable
         title="Devices"
         description="Work the endpoint fleet with device-centric filters, then open the inspector from the device name."
         searchPlaceholder="Search devices"
-        showAssetTypeFilter={false}
-        showAssetTypeColumn={false}
-        assets={assets.items}
-        totalCount={assets.totalCount}
+        devices={devices.items}
+        totalCount={devices.totalCount}
         isUpdating={ownerMutation.isPending || criticalityMutation.isPending || securityProfileMutation.isPending}
-        selectedAssetId={selectedAssetId}
+        selectedDeviceId={selectedDeviceId}
         searchValue={deviceSearch.search}
-        assetTypeFilter="Device"
         criticalityFilter={deviceSearch.criticality}
         businessLabelIdFilter={deviceSearch.businessLabelId}
         availableBusinessLabels={businessLabels}
@@ -173,53 +153,52 @@ function DevicesPage() {
         exposureLevelFilter={deviceSearch.exposureLevel}
         tagFilter={deviceSearch.tag}
         unassignedOnly={deviceSearch.unassignedOnly}
-        page={assets.page}
-        pageSize={assets.pageSize}
-        totalPages={assets.totalPages}
+        page={devices.page}
+        pageSize={devices.pageSize}
+        totalPages={devices.totalPages}
         onSearchChange={(searchValue) => {
           searchActions.updateField('search', searchValue)
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
-        onAssetTypeFilterChange={() => {}}
         onCriticalityFilterChange={(criticality) => {
           searchActions.updateField('criticality', criticality)
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
         onOwnerTypeFilterChange={(ownerType) => {
           searchActions.updateField('ownerType', ownerType)
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
         onBusinessLabelFilterChange={(businessLabelId) => {
           searchActions.updateField('businessLabelId', businessLabelId)
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
         onDeviceGroupFilterChange={(deviceGroup) => {
           searchActions.updateField('deviceGroup', deviceGroup)
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
         onHealthStatusFilterChange={(healthStatus) => {
           searchActions.updateField('healthStatus', healthStatus)
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
         onOnboardingStatusFilterChange={(onboardingStatus) => {
           searchActions.updateField('onboardingStatus', onboardingStatus)
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
         onRiskScoreFilterChange={(riskScore) => {
           searchActions.updateField('riskScore', riskScore)
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
         onExposureLevelFilterChange={(exposureLevel) => {
           searchActions.updateField('exposureLevel', exposureLevel)
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
         onTagFilterChange={(tag) => {
           searchActions.updateField('tag', tag)
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
         onUnassignedOnlyChange={(value) => {
           searchActions.updateField('unassignedOnly', value)
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
         onApplyStructuredFilters={(filters) => {
           searchActions.updateFields({
@@ -234,14 +213,14 @@ function DevicesPage() {
             tag: filters.tag,
             unassignedOnly: filters.unassignedOnly,
           })
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
         onPageChange={(page) => {
           searchActions.updatePage(page)
         }}
         onPageSizeChange={(nextPageSize) => {
           searchActions.updatePageSize(nextPageSize)
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
         onClearFilters={() => {
           searchActions.updateFields({
@@ -257,23 +236,23 @@ function DevicesPage() {
             tag: '',
             unassignedOnly: false,
           })
-          setSelectedAssetId(null)
+          setSelectedDeviceId(null)
         }}
-        onSelectAsset={setSelectedAssetId}
-        onAssignOwner={(assetId, ownerType, ownerId) => {
-          ownerMutation.mutate({ assetId, ownerType, ownerId })
+        onSelectDevice={setSelectedDeviceId}
+        onAssignOwner={(deviceId, ownerType, ownerId) => {
+          ownerMutation.mutate({ deviceId, ownerType, ownerId })
         }}
-        onSetCriticality={(assetId, criticality) => {
-          criticalityMutation.mutate({ assetId, criticality })
+        onSetCriticality={(deviceId, criticality) => {
+          criticalityMutation.mutate({ deviceId, criticality })
         }}
       />
-      <AssetDetailPane
-        asset={assetDetailQuery.data ?? null}
-        isLoading={assetDetailQuery.isLoading}
-        isOpen={selectedAssetId !== null}
+      <DeviceDetailPane
+        device={deviceDetailQuery.data ?? null}
+        isLoading={deviceDetailQuery.isLoading}
+        isOpen={selectedDeviceId !== null}
         onOpenChange={(open) => {
           if (!open) {
-            setSelectedAssetId(null)
+            setSelectedDeviceId(null)
           }
         }}
       />

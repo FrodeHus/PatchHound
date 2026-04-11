@@ -1,15 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchAssetRule } from '@/api/asset-rules.functions'
+import { fetchDeviceRule } from '@/api/device-rules.functions'
 import { fetchScanProfiles } from '@/api/authenticated-scans.functions'
 import { fetchBusinessLabels } from '@/api/business-labels.functions'
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { fetchTeams } from '@/api/teams.functions'
-import { AssetRuleWizard } from '@/components/features/admin/asset-rules/AssetRuleWizard'
+import { DeviceRuleWizard } from '@/components/features/admin/device-rules/DeviceRuleWizard'
 
-export const Route = createFileRoute('/_authed/admin/asset-rules/$id')({
+export const Route = createFileRoute('/_authed/admin/device-rules/$id')({
   loader: async ({ params }) => {
     const [rule, profiles, businessLabels, teams, scanProfiles] = await Promise.all([
-      fetchAssetRule({ data: { id: params.id } }),
+      fetchDeviceRule({ data: { id: params.id } }),
       fetchSecurityProfiles({ data: { pageSize: 100 } }),
       fetchBusinessLabels({ data: {} }),
       fetchTeams({ data: { pageSize: 100 } }),
@@ -17,19 +17,19 @@ export const Route = createFileRoute('/_authed/admin/asset-rules/$id')({
     ])
     return { rule, profiles, businessLabels, teams, scanProfiles }
   },
-  component: EditAssetRulePage,
+  component: EditDeviceRulePage,
 })
 
-function EditAssetRulePage() {
+function EditDeviceRulePage() {
   const { rule, profiles, businessLabels, teams, scanProfiles } = Route.useLoaderData()
 
   return (
     <section className="space-y-5">
       <div>
-        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Asset Rules</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Device Rules</p>
         <h1 className="text-2xl font-semibold tracking-[-0.04em]">Edit: {rule.name}</h1>
       </div>
-      <AssetRuleWizard
+      <DeviceRuleWizard
         mode="edit"
         initialData={rule}
         securityProfiles={profiles.items}

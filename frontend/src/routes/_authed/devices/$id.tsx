@@ -3,25 +3,25 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import {
-  assignAssetBusinessLabels,
-  assignAssetSecurityProfile,
-  fetchAssetDetail,
-  resetAssetCriticalityOverride,
-  setAssetCriticality,
-} from '@/api/assets.functions'
+  assignDeviceBusinessLabels,
+  assignDeviceSecurityProfile,
+  fetchDeviceDetail,
+  resetDeviceCriticalityOverride,
+  setDeviceCriticality,
+} from '@/api/devices.functions'
 import { fetchBusinessLabels } from '@/api/business-labels.functions'
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
-import { AssetDetailPageView } from '@/components/features/assets/AssetDetailPageView'
+import { DeviceDetailPageView } from '@/components/features/devices/DeviceDetailPageView'
 import { useTenantScope } from '@/components/layout/tenant-scope'
-import { assetQueryKeys } from '@/features/assets/list-state'
+import { deviceQueryKeys } from '@/features/devices/list-state'
 
-export const Route = createFileRoute('/_authed/assets/$id')({
-  loader: ({ params }) => fetchAssetDetail({ data: { assetId: params.id } }),
-  component: AssetDetailPage,
+export const Route = createFileRoute('/_authed/devices/$id')({
+  loader: ({ params }) => fetchDeviceDetail({ data: { deviceId: params.id } }),
+  component: DeviceDetailPage,
 })
 
-function AssetDetailPage() {
-  const initialAsset = Route.useLoaderData()
+function DeviceDetailPage() {
+  const initialDevice = Route.useLoaderData()
   const { user } = Route.useRouteContext()
   const { id } = Route.useParams()
   const { selectedTenantId } = useTenantScope()
@@ -29,12 +29,12 @@ function AssetDetailPage() {
   const canUseInitialData = initialTenantId === selectedTenantId
   const queryClient = useQueryClient()
 
-  const assetQuery = useQuery({
-    queryKey: assetQueryKeys.detail(selectedTenantId, id),
-    queryFn: () => fetchAssetDetail({ data: { assetId: id } }),
-    initialData: canUseInitialData ? initialAsset : undefined,
+  const deviceQuery = useQuery({
+    queryKey: deviceQueryKeys.detail(selectedTenantId, id),
+    queryFn: () => fetchDeviceDetail({ data: { deviceId: id } }),
+    initialData: canUseInitialData ? initialDevice : undefined,
   })
-  const asset = assetQuery.data ?? (canUseInitialData ? initialAsset : undefined)
+  const device = deviceQuery.data ?? (canUseInitialData ? initialDevice : undefined)
   const securityProfilesQuery = useQuery({
     queryKey: ['security-profiles', selectedTenantId],
     queryFn: () => fetchSecurityProfiles({ data: {} }),
@@ -45,12 +45,12 @@ function AssetDetailPage() {
   })
   const securityProfileMutation = useMutation({
     mutationFn: async (securityProfileId: string | null) => {
-      await assignAssetSecurityProfile({ data: { assetId: id, securityProfileId } })
+      await assignDeviceSecurityProfile({ data: { deviceId: id, securityProfileId } })
     },
     onSuccess: async () => {
       toast.success('Security profile assigned')
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, id) })
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+      await queryClient.invalidateQueries({ queryKey: deviceQueryKeys.detail(selectedTenantId, id) })
+      await queryClient.invalidateQueries({ queryKey: deviceQueryKeys.all })
     },
     onError: () => {
       toast.error('Failed to assign security profile')
@@ -58,12 +58,12 @@ function AssetDetailPage() {
   })
   const setCriticalityMutation = useMutation({
     mutationFn: async (criticality: string) => {
-      await setAssetCriticality({ data: { assetId: id, criticality } })
+      await setDeviceCriticality({ data: { deviceId: id, criticality } })
     },
     onSuccess: async () => {
       toast.success('Criticality updated')
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, id) })
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+      await queryClient.invalidateQueries({ queryKey: deviceQueryKeys.detail(selectedTenantId, id) })
+      await queryClient.invalidateQueries({ queryKey: deviceQueryKeys.all })
     },
     onError: () => {
       toast.error('Failed to update criticality')
@@ -71,12 +71,12 @@ function AssetDetailPage() {
   })
   const resetCriticalityMutation = useMutation({
     mutationFn: async () => {
-      await resetAssetCriticalityOverride({ data: { assetId: id } })
+      await resetDeviceCriticalityOverride({ data: { deviceId: id } })
     },
     onSuccess: async () => {
       toast.success('Manual criticality override removed')
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, id) })
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+      await queryClient.invalidateQueries({ queryKey: deviceQueryKeys.detail(selectedTenantId, id) })
+      await queryClient.invalidateQueries({ queryKey: deviceQueryKeys.all })
     },
     onError: () => {
       toast.error('Failed to remove manual criticality override')
@@ -84,25 +84,25 @@ function AssetDetailPage() {
   })
   const businessLabelsMutation = useMutation({
     mutationFn: async (businessLabelIds: string[]) => {
-      await assignAssetBusinessLabels({ data: { assetId: id, businessLabelIds } })
+      await assignDeviceBusinessLabels({ data: { deviceId: id, businessLabelIds } })
     },
     onSuccess: async () => {
       toast.success('Business labels updated')
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(selectedTenantId, id) })
-      await queryClient.invalidateQueries({ queryKey: assetQueryKeys.all })
+      await queryClient.invalidateQueries({ queryKey: deviceQueryKeys.detail(selectedTenantId, id) })
+      await queryClient.invalidateQueries({ queryKey: deviceQueryKeys.all })
       await queryClient.invalidateQueries({ queryKey: ['business-labels', selectedTenantId] })
     },
     onError: () => {
       toast.error('Failed to update business labels')
     },
   })
-  if (!asset) {
+  if (!device) {
     return null
   }
 
   return (
-    <AssetDetailPageView
-      asset={asset}
+    <DeviceDetailPageView
+      device={device}
       canUseAdvancedTools={
         (user.activeRoles ?? []).includes('GlobalAdmin')
         || (user.activeRoles ?? []).includes('SecurityManager')

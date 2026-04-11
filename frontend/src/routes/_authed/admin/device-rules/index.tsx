@@ -5,12 +5,12 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Play, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import {
-  deleteAssetRule,
-  fetchAssetRules,
-  runAssetRules,
-  updateAssetRule,
-} from "@/api/asset-rules.functions";
-import type { AssetRule } from "@/api/asset-rules.schemas";
+  deleteDeviceRule,
+  fetchDeviceRules,
+  runDeviceRules,
+  updateDeviceRule,
+} from "@/api/device-rules.functions";
+import type { DeviceRule } from "@/api/device-rules.schemas";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SortableColumnHeader } from "@/components/ui/sortable-column-header";
@@ -31,15 +31,15 @@ import {
 } from "@/components/ui/dialog";
 import { baseListSearchSchema } from "@/routes/-list-search";
 
-export const Route = createFileRoute("/_authed/admin/asset-rules/")({
+export const Route = createFileRoute("/_authed/admin/device-rules/")({
   validateSearch: baseListSearchSchema,
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) =>
-    fetchAssetRules({ data: { page: deps.page, pageSize: deps.pageSize } }),
-  component: AssetRulesPage,
+    fetchDeviceRules({ data: { page: deps.page, pageSize: deps.pageSize } }),
+  component: DeviceRulesPage,
 });
 
-const columns: ColumnDef<AssetRule>[] = [
+const columns: ColumnDef<DeviceRule>[] = [
   {
     accessorKey: "priority",
     header: ({ column }) => <SortableColumnHeader column={column} title="#" />,
@@ -55,7 +55,7 @@ const columns: ColumnDef<AssetRule>[] = [
     header: ({ column }) => <SortableColumnHeader column={column} title="Name" />,
     cell: ({ row }) => (
       <Link
-        to="/admin/asset-rules/$id"
+        to="/admin/device-rules/$id"
         params={{ id: row.original.id }}
         className="font-medium text-primary hover:underline"
       >
@@ -89,7 +89,7 @@ const columns: ColumnDef<AssetRule>[] = [
     cell: ({ row }) => (
       <span className="text-sm">
         {row.original.lastMatchCount !== null
-          ? `${row.original.lastMatchCount} assets`
+          ? `${row.original.lastMatchCount} devices`
           : "-"}
       </span>
     ),
@@ -108,25 +108,25 @@ const columns: ColumnDef<AssetRule>[] = [
   },
 ];
 
-function AssetRulesPage() {
+function DeviceRulesPage() {
   const loaderData = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [deleteTarget, setDeleteTarget] = useState<AssetRule | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeviceRule | null>(null);
 
   const query = useQuery({
-    queryKey: ["asset-rules", search.page, search.pageSize],
+    queryKey: ["device-rules", search.page, search.pageSize],
     queryFn: () =>
-      fetchAssetRules({
+      fetchDeviceRules({
         data: { page: search.page, pageSize: search.pageSize },
       }),
     initialData: loaderData,
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => deleteAssetRule({ data: { id } }),
+    mutationFn: async (id: string) => deleteDeviceRule({ data: { id } }),
     onSuccess: async () => {
       setDeleteTarget(null);
       toast.success("Rule deleted");
@@ -138,7 +138,7 @@ function AssetRulesPage() {
   });
 
   const runMutation = useMutation({
-    mutationFn: async () => runAssetRules(),
+    mutationFn: async () => runDeviceRules(),
     onSuccess: async () => {
       toast.success("Rules evaluation started");
       await router.invalidate();
@@ -149,8 +149,8 @@ function AssetRulesPage() {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: async (rule: AssetRule) =>
-      updateAssetRule({
+    mutationFn: async (rule: DeviceRule) =>
+      updateDeviceRule({
         data: {
           id: rule.id,
           name: rule.name,
@@ -161,7 +161,7 @@ function AssetRulesPage() {
         },
       }),
     onMutate: (rule) => {
-      const queryKey = ["asset-rules", search.page, search.pageSize];
+      const queryKey = ["device-rules", search.page, search.pageSize];
       queryClient.setQueryData(
         queryKey,
         (old: typeof query.data | undefined) => {
@@ -184,7 +184,7 @@ function AssetRulesPage() {
     },
   });
 
-  const actionsColumn: ColumnDef<AssetRule> = {
+  const actionsColumn: ColumnDef<DeviceRule> = {
     id: "actions",
     enableSorting: false,
     size: 120,
@@ -222,8 +222,8 @@ function AssetRulesPage() {
   return (
     <section className="space-y-5">
       <DataTableWorkbench
-        title="Asset Rules"
-        description="Rules run in priority order after each ingestion. First match wins per asset."
+        title="Device Rules"
+        description="Rules run in priority order after each ingestion. First match wins per device."
         totalCount={query.data.totalCount}
       >
         <div className="flex items-center gap-2">
@@ -237,7 +237,7 @@ function AssetRulesPage() {
             <Play className="size-3.5" />
             Run now
           </Button>
-          <Link to="/admin/asset-rules/new">
+          <Link to="/admin/device-rules/new">
             <Button type="button" size="sm">
               <Plus className="size-3.5" />
               Create rule
@@ -249,8 +249,8 @@ function AssetRulesPage() {
           data={query.data.items}
           emptyState={
             <DataTableEmptyState
-              title="No asset rules yet"
-              description="Create your first rule to automatically classify and tag assets after ingestion."
+              title="No device rules yet"
+              description="Create your first rule to automatically classify and tag devices after ingestion."
             />
           }
         />

@@ -27,13 +27,6 @@ export function readBoolean(value: unknown): boolean {
   return value === true
 }
 
-export function getDefaultDescription(assetType: string): string {
-  switch (assetType) {
-    case 'Software':
-      return 'Software package tracked through inventory sync and vulnerability correlation.'
-    case 'Device':
-      return 'Endpoint or host asset tracked through vulnerability and ownership workflows.'
-    default:
-      return 'Managed asset record tracked inside PatchHound.'
-  }
+export function getDefaultDescription(): string {
+  return 'Endpoint or host device tracked through vulnerability and ownership workflows.'
 }

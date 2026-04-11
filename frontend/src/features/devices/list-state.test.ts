@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { assetQueryKeys, buildAssetsListRequest } from '@/features/assets/list-state'
+import { deviceQueryKeys, buildDevicesListRequest } from '@/features/devices/list-state'
 
-describe('buildAssetsListRequest', () => {
+describe('buildDevicesListRequest', () => {
   it('includes only active filters while preserving paging', () => {
     expect(
-      buildAssetsListRequest({
+      buildDevicesListRequest({
         search: 'server',
-        assetType: 'Device',
         criticality: '',
         businessLabelId: '',
         ownerType: '',
@@ -22,7 +21,6 @@ describe('buildAssetsListRequest', () => {
       }),
     ).toEqual({
       search: 'server',
-      assetType: 'Device',
       deviceGroup: 'Tier 0 Servers',
       unassignedOnly: true,
       page: 4,
@@ -31,12 +29,11 @@ describe('buildAssetsListRequest', () => {
   })
 })
 
-describe('assetQueryKeys', () => {
+describe('deviceQueryKeys', () => {
   it('builds stable list and detail keys', () => {
     expect(
-      assetQueryKeys.list('tenant-1', {
+      deviceQueryKeys.list('tenant-1', {
         search: 'server',
-        assetType: 'Device',
         criticality: 'Critical',
         businessLabelId: '',
         ownerType: 'Team',
@@ -51,11 +48,10 @@ describe('assetQueryKeys', () => {
         pageSize: 25,
       }),
     ).toEqual([
-      'assets',
+      'devices',
       'list',
       'tenant-1',
       'server',
-      'Device',
       'Critical',
       '',
       'Team',
@@ -70,7 +66,7 @@ describe('assetQueryKeys', () => {
       25,
     ])
 
-    expect(assetQueryKeys.detail('tenant-1', 'asset-1')).toEqual(['assets', 'detail', 'tenant-1', 'asset-1'])
-    expect(assetQueryKeys.detail(null, null)).toEqual(['assets', 'detail', null, null])
+    expect(deviceQueryKeys.detail('tenant-1', 'device-1')).toEqual(['devices', 'detail', 'tenant-1', 'device-1'])
+    expect(deviceQueryKeys.detail(null, null)).toEqual(['devices', 'detail', null, null])
   })
 })

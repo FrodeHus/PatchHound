@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
-import type { MetadataRecord } from '@/components/features/assets/AssetDetailHelpers'
+import type { MetadataRecord } from '@/components/features/devices/DeviceDetailHelpers'
 import { toneBadge } from '@/lib/tone-classes'
 
 export function SectionHeader({

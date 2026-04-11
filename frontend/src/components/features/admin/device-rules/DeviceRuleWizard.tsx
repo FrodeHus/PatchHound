@@ -4,16 +4,16 @@ import { toast } from 'sonner'
 import { ArrowLeft, ArrowRight, Check, Eye, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import {
-  createAssetRule,
-  previewAssetRuleFilter,
-  updateAssetRule,
-} from '@/api/asset-rules.functions'
+  createDeviceRule,
+  previewDeviceRuleFilter,
+  updateDeviceRule,
+} from '@/api/device-rules.functions'
 import type {
-  AssetRule,
-  AssetRuleOperation,
+  DeviceRule,
+  DeviceRuleOperation,
   FilterGroup,
   FilterPreview,
-} from '@/api/asset-rules.schemas'
+} from '@/api/device-rules.schemas'
 import type { ScanProfile } from '@/api/authenticated-scans.schemas'
 import type { BusinessLabel } from '@/api/business-labels.schemas'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
@@ -28,9 +28,9 @@ import { Badge } from '@/components/ui/badge'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { FilterBuilder } from './FilterBuilder'
 
-type AssetRuleWizardProps = {
+type DeviceRuleWizardProps = {
   mode: 'create' | 'edit'
-  initialData?: AssetRule
+  initialData?: DeviceRule
   securityProfiles: SecurityProfile[]
   businessLabels: BusinessLabel[]
   teams: TeamItem[]
@@ -47,7 +47,7 @@ const criticalityOptions = [
 
 const emptyFilter: FilterGroup = { type: 'group', operator: 'AND', conditions: [] }
 
-export function AssetRuleWizard({ mode, initialData, securityProfiles, businessLabels, teams, scanProfiles }: AssetRuleWizardProps) {
+export function DeviceRuleWizard({ mode, initialData, securityProfiles, businessLabels, teams, scanProfiles }: DeviceRuleWizardProps) {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [name, setName] = useState(initialData?.name ?? '')
@@ -57,20 +57,20 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
       ? initialData.filterDefinition
       : emptyFilter,
   )
-  const [operations, setOperations] = useState<AssetRuleOperation[]>(
+  const [operations, setOperations] = useState<DeviceRuleOperation[]>(
     initialData?.operations ?? [],
   )
   const [preview, setPreview] = useState<FilterPreview | null>(null)
 
   const previewMutation = useMutation({
-    mutationFn: async () => previewAssetRuleFilter({ data: { filterDefinition: filter } }),
+    mutationFn: async () => previewDeviceRuleFilter({ data: { filterDefinition: filter } }),
     onSuccess: (data) => setPreview(data),
   })
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (mode === 'edit' && initialData) {
-        return updateAssetRule({
+        return updateDeviceRule({
           data: {
             id: initialData.id,
             name,
@@ -81,7 +81,7 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
           },
         })
       }
-      return createAssetRule({
+      return createDeviceRule({
         data: {
           name,
           description: description || undefined,
@@ -92,7 +92,7 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
     },
     onSuccess: async () => {
       toast.success(mode === 'create' ? 'Rule created' : 'Changes saved')
-      await router.navigate({ to: '/admin/asset-rules', search: { page: 1, pageSize: 25 } })
+      await router.navigate({ to: '/admin/device-rules', search: { page: 1, pageSize: 25 } })
       await router.invalidate()
     },
     onError: (error) => {
@@ -178,7 +178,7 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
           <CardHeader>
             <CardTitle>Filter Conditions</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Define which assets this rule applies to. Use groups to combine
+              Define which devices this rule applies to. Use groups to combine
               conditions with AND/OR logic.
             </p>
           </CardHeader>
@@ -223,12 +223,6 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
                             key={s.id}
                             className="flex items-center gap-2 text-xs"
                           >
-                            <Badge
-                              variant="outline"
-                              className="font-mono text-[10px]"
-                            >
-                              {s.assetType}
-                            </Badge>
                             <span>{s.name}</span>
                           </div>
                         ))}
@@ -252,14 +246,14 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
           <CardHeader>
             <CardTitle>Operations</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Select one or more operations to apply to matching assets.
+              Select one or more operations to apply to matching devices.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
             <OperationEditor
               type="AssignSecurityProfile"
               label="Assign Security Profile"
-              description="Set the security profile on matching assets for environmental CVSS scoring."
+              description="Set the security profile on matching devices for environmental CVSS scoring."
               options={securityProfiles.map((p) => ({
                 value: p.id,
                 label: p.name,
@@ -271,7 +265,7 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
             <OperationEditor
               type="AssignTeam"
               label="Assign Team"
-              description="Set the fallback assignment group for task routing on matching assets."
+              description="Set the fallback assignment group for task routing on matching devices."
               options={teams.map((t) => ({ value: t.id, label: t.name }))}
               paramKey="teamId"
               operations={operations}
@@ -280,7 +274,7 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
             <OperationEditor
               type="SetCriticality"
               label="Set Criticality"
-              description="Set the canonical asset criticality used by risk scoring and executive reporting."
+              description="Set the canonical device criticality used by risk scoring and executive reporting."
               options={criticalityOptions}
               paramKey="criticality"
               operations={operations}
@@ -289,7 +283,7 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
             <OperationEditor
               type="AssignBusinessLabel"
               label="Assign Business Label"
-              description="Apply a tenant business label to matching assets so dashboards and summaries use recognizable business context."
+              description="Apply a tenant business label to matching devices so dashboards and summaries use recognizable business context."
               options={businessLabels.filter((label) => label.isActive).map((label) => ({
                 value: label.id,
                 label: label.name,
@@ -301,7 +295,7 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
             <OperationEditor
               type="AssignScanProfile"
               label="Assign Scan Profile"
-              description="Assign an authenticated scan profile to matching assets for on-prem host scanning."
+              description="Assign an authenticated scan profile to matching devices for on-prem host scanning."
               options={scanProfiles.map((p) => ({
                 value: p.id,
                 label: p.name,
@@ -396,7 +390,7 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
             className="text-muted-foreground"
             onClick={() =>
               router.navigate({
-                to: "/admin/asset-rules",
+                to: "/admin/device-rules",
                 search: { page: 1, pageSize: 25 },
               })
             }
@@ -432,26 +426,26 @@ export function AssetRuleWizard({ mode, initialData, securityProfiles, businessL
 
 function buildPreviewHeadline(
   count: number,
-  operations: AssetRuleOperation[],
+  operations: DeviceRuleOperation[],
   securityProfiles: SecurityProfile[],
   businessLabels: BusinessLabel[],
   teams: TeamItem[],
   scanProfiles: ScanProfile[],
 ) {
   if (operations.length === 0) {
-    return `${count} asset${count !== 1 ? 's' : ''} match`
+    return `${count} device${count !== 1 ? 's' : ''} match`
   }
 
   const operationDescriptions = buildOperationImpactLines(operations, securityProfiles, businessLabels, teams, scanProfiles)
   if (operationDescriptions.length === 1) {
-    return `This rule will ${operationDescriptions[0]} for ${count} asset${count !== 1 ? 's' : ''}.`
+    return `This rule will ${operationDescriptions[0]} for ${count} device${count !== 1 ? 's' : ''}.`
   }
 
-  return `This rule will affect ${count} asset${count !== 1 ? 's' : ''} with ${operationDescriptions.length} operations.`
+  return `This rule will affect ${count} device${count !== 1 ? 's' : ''} with ${operationDescriptions.length} operations.`
 }
 
 function buildOperationImpactLines(
-  operations: AssetRuleOperation[],
+  operations: DeviceRuleOperation[],
   securityProfiles: SecurityProfile[],
   businessLabels: BusinessLabel[],
   teams: TeamItem[],
@@ -476,7 +470,7 @@ function buildOperationImpactLines(
 }
 
 function describeOperationTarget(
-  operation: AssetRuleOperation,
+  operation: DeviceRuleOperation,
   securityProfiles: SecurityProfile[],
   businessLabels: BusinessLabel[],
   teams: TeamItem[],
@@ -523,8 +517,8 @@ function OperationEditor({
   description: string
   options: { value: string; label: string }[]
   paramKey: string
-  operations: AssetRuleOperation[]
-  onChange: (ops: AssetRuleOperation[]) => void
+  operations: DeviceRuleOperation[]
+  onChange: (ops: DeviceRuleOperation[]) => void
 }) {
   const existing = operations.find((op) => op.type === type)
   const isActive = !!existing

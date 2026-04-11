@@ -1,6 +1,5 @@
-export type AssetsListSearch = {
+export type DevicesListSearch = {
   search: string
-  assetType: string
   criticality: string
   businessLabelId: string
   ownerType: string
@@ -15,10 +14,9 @@ export type AssetsListSearch = {
   pageSize: number
 }
 
-export function buildAssetsListRequest(search: AssetsListSearch) {
+export function buildDevicesListRequest(search: DevicesListSearch) {
   return {
     ...(search.search ? { search: search.search } : {}),
-    ...(search.assetType ? { assetType: search.assetType } : {}),
     ...(search.criticality ? { criticality: search.criticality } : {}),
     ...(search.businessLabelId ? { businessLabelId: search.businessLabelId } : {}),
     ...(search.ownerType ? { ownerType: search.ownerType } : {}),
@@ -34,14 +32,13 @@ export function buildAssetsListRequest(search: AssetsListSearch) {
   }
 }
 
-export const assetQueryKeys = {
-  all: ['assets'] as const,
-  list: (tenantId: string | null, search: AssetsListSearch) => [
-    ...assetQueryKeys.all,
+export const deviceQueryKeys = {
+  all: ['devices'] as const,
+  list: (tenantId: string | null, search: DevicesListSearch) => [
+    ...deviceQueryKeys.all,
     'list',
     tenantId,
     search.search,
-    search.assetType,
     search.criticality,
     search.businessLabelId,
     search.ownerType,
@@ -55,6 +52,6 @@ export const assetQueryKeys = {
     search.page,
     search.pageSize,
   ] as const,
-  detail: (tenantId: string | null, assetId: string | null) => [...assetQueryKeys.all, 'detail', tenantId, assetId] as const,
-  remediation: (tenantId: string | null, assetId: string) => [...assetQueryKeys.all, 'remediation', tenantId, assetId] as const,
+  detail: (tenantId: string | null, deviceId: string | null) => [...deviceQueryKeys.all, 'detail', tenantId, deviceId] as const,
+  remediation: (tenantId: string | null, deviceId: string) => [...deviceQueryKeys.all, 'remediation', tenantId, deviceId] as const,
 }

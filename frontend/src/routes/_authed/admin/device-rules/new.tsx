@@ -3,9 +3,9 @@ import { fetchScanProfiles } from '@/api/authenticated-scans.functions'
 import { fetchBusinessLabels } from '@/api/business-labels.functions'
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
 import { fetchTeams } from '@/api/teams.functions'
-import { AssetRuleWizard } from '@/components/features/admin/asset-rules/AssetRuleWizard'
+import { DeviceRuleWizard } from '@/components/features/admin/device-rules/DeviceRuleWizard'
 
-export const Route = createFileRoute('/_authed/admin/asset-rules/new')({
+export const Route = createFileRoute('/_authed/admin/device-rules/new')({
   loader: async () => {
     const [profiles, businessLabels, teams, scanProfiles] = await Promise.all([
       fetchSecurityProfiles({ data: { pageSize: 100 } }),
@@ -15,19 +15,19 @@ export const Route = createFileRoute('/_authed/admin/asset-rules/new')({
     ])
     return { profiles, businessLabels, teams, scanProfiles }
   },
-  component: NewAssetRulePage,
+  component: NewDeviceRulePage,
 })
 
-function NewAssetRulePage() {
+function NewDeviceRulePage() {
   const { profiles, businessLabels, teams, scanProfiles } = Route.useLoaderData()
 
   return (
     <section className="space-y-5">
       <div>
-        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Asset Rules</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Device Rules</p>
         <h1 className="text-2xl font-semibold tracking-[-0.04em]">Create Rule</h1>
       </div>
-      <AssetRuleWizard
+      <DeviceRuleWizard
         mode="create"
         securityProfiles={profiles.items}
         businessLabels={businessLabels}

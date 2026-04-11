@@ -15,7 +15,11 @@ function formatRiskScore(value: number | null) {
   return Math.round(value).toString()
 }
 
-export function AssetOwnerAttentionView({ items, isLoading }: Props) {
+// Phase 1 canonical cleanup (Task 15): component renamed; dashboard
+// schema remains legacy until Phase 5 rewires owner summaries to the
+// canonical Device identity.
+
+export function DeviceOwnerAttentionView({ items, isLoading }: Props) {
   return (
     <section className="space-y-6 pb-4">
       <Card className="overflow-hidden rounded-[2rem] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--destructive)_10%,var(--background)),var(--card)_58%,var(--background))] shadow-[0_28px_70px_-48px_rgba(0,0,0,0.55)]">
@@ -27,10 +31,10 @@ export function AssetOwnerAttentionView({ items, isLoading }: Props) {
               </Badge>
               <div>
                 <h1 className="text-3xl font-semibold tracking-[-0.06em] sm:text-4xl">
-                  Your assets that need attention now
+                  Your devices that need attention now
                 </h1>
                 <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground">
-                  This is the owner-scoped list behind the dashboard metric. It only includes assets you own that currently carry elevated risk pressure and should be reviewed rather than left in routine monitoring.
+                  This is the owner-scoped list behind the dashboard metric. It only includes devices you own that currently carry elevated risk pressure and should be reviewed rather than left in routine monitoring.
                 </p>
               </div>
             </div>
@@ -39,7 +43,7 @@ export function AssetOwnerAttentionView({ items, isLoading }: Props) {
                 <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Need attention</div>
                 <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{items.length}</div>
               </div>
-              <Button variant="outline" render={<Link to="/dashboard/my-assets" />}>
+              <Button variant="outline" render={<Link to="/dashboard/my-devices" />}>
                 <ArrowLeft className="mr-2 size-4" />
                 Back to dashboard
               </Button>
@@ -50,7 +54,7 @@ export function AssetOwnerAttentionView({ items, isLoading }: Props) {
 
       <Card className="rounded-[1.6rem] border-border/70">
         <CardHeader>
-          <CardTitle>Assets needing attention</CardTitle>
+          <CardTitle>Devices needing attention</CardTitle>
           <CardDescription>
             Ordered by current risk score, with the strongest driver shown in plain language.
           </CardDescription>
@@ -58,11 +62,11 @@ export function AssetOwnerAttentionView({ items, isLoading }: Props) {
         <CardContent className="space-y-3">
           {isLoading ? (
             <div className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-10 text-center text-sm text-muted-foreground">
-              Loading your owned assets…
+              Loading your owned devices…
             </div>
           ) : items.length === 0 ? (
             <div className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-10 text-center text-sm text-muted-foreground">
-              No owned assets currently need attention.
+              No owned devices currently need attention.
             </div>
           ) : (
             items.map((item) => (
@@ -84,7 +88,7 @@ export function AssetOwnerAttentionView({ items, isLoading }: Props) {
                     </div>
                     <div className="mt-2 text-lg font-medium tracking-tight">{item.assetName}</div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      {item.topDriverSummary || 'This asset has unresolved exposure that should be reviewed.'}
+                      {item.topDriverSummary || 'This device has unresolved exposure that should be reviewed.'}
                     </div>
                     <div className="mt-2 text-sm text-muted-foreground">
                       {item.openEpisodeCount} open exposure items
@@ -104,8 +108,8 @@ export function AssetOwnerAttentionView({ items, isLoading }: Props) {
                 </div>
 
                 <div className="mt-3">
-                  <Button size="sm" variant="outline" render={<Link to="/assets/$id" params={{ id: item.assetId }} />}>
-                    Review asset
+                  <Button size="sm" variant="outline" render={<Link to="/devices/$id" params={{ id: item.assetId }} />}>
+                    Review device
                   </Button>
                 </div>
               </div>

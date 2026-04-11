@@ -3,7 +3,12 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { FilterCondition, FilterGroup, FilterNode } from '@/api/asset-rules.schemas'
+import type { FilterCondition, FilterGroup, FilterNode } from '@/api/device-rules.schemas'
+
+// Phase 1 canonical cleanup (Task 15): device-only filter builder.
+// The legacy AssetType / Software / CloudResource branch has been
+// removed alongside the AssetType abstraction — rules now target
+// devices exclusively.
 
 type FilterBuilderProps = {
   value: FilterGroup
@@ -11,7 +16,6 @@ type FilterBuilderProps = {
 }
 
 const allFields = [
-  { value: 'AssetType', label: 'Asset Type' },
   { value: 'Name', label: 'Name' },
   { value: 'DeviceGroup', label: 'Device Group' },
   { value: 'Platform', label: 'Platform' },
@@ -26,39 +30,11 @@ const operators = [
   { value: 'EndsWith', label: 'Ends with' },
 ] as const
 
-const assetTypes = [
-  { value: 'Device', label: 'Device' },
-  { value: 'Software', label: 'Software' },
-  { value: 'CloudResource', label: 'Cloud Resource' },
-] as const
-
-function getConstrainedAssetType(group: FilterGroup): string | null {
-  for (const child of group.conditions) {
-    if (child.type === 'condition') {
-      if (child.field === 'AssetType' && child.operator === 'Equals') return child.value
-    }
-  }
-  return null
-}
-
-function getAvailableFields(ancestors: FilterGroup[]): typeof allFields[number][] {
-  let assetType: string | null = null
-  for (const group of ancestors) {
-    assetType = getConstrainedAssetType(group) ?? assetType
-  }
-
-  return allFields.filter((f) => {
-    if (['DeviceGroup', 'Platform', 'Domain'].includes(f.value)) return assetType === 'Device'
-    return true
-  })
-}
-
 export function FilterBuilder({ value, onChange }: FilterBuilderProps) {
   return (
     <FilterGroupEditor
       group={value}
       onChange={onChange}
-      ancestors={[]}
       isRoot
     />
   )
@@ -68,27 +44,21 @@ function FilterGroupEditor({
   group,
   onChange,
   onRemove,
-  ancestors,
   isRoot = false,
 }: {
   group: FilterGroup
   onChange: (group: FilterGroup) => void
   onRemove?: () => void
-  ancestors: FilterGroup[]
   isRoot?: boolean
 }) {
-  const currentAncestors = [...ancestors, group]
-
   const toggleOperator = () => {
     onChange({ ...group, operator: group.operator === 'AND' ? 'OR' : 'AND' })
   }
 
   const addCondition = () => {
-    const fields = getAvailableFields(currentAncestors)
-    const defaultField = fields[0]?.value ?? 'Name'
     const newCondition: FilterCondition = {
       type: 'condition',
-      field: defaultField,
+      field: allFields[0].value,
       operator: 'Equals',
       value: '',
     }
@@ -148,7 +118,6 @@ function FilterGroupEditor({
               group={child}
               onChange={(updated) => updateChild(index, updated)}
               onRemove={() => removeChild(index)}
-              ancestors={currentAncestors}
             />
           ) : (
             <FilterConditionEditor
@@ -156,7 +125,6 @@ function FilterGroupEditor({
               condition={child}
               onChange={(updated) => updateChild(index, updated)}
               onRemove={() => removeChild(index)}
-              ancestors={currentAncestors}
             />
           ),
         )}
@@ -180,37 +148,25 @@ function FilterConditionEditor({
   condition,
   onChange,
   onRemove,
-  ancestors,
 }: {
   condition: FilterCondition
   onChange: (condition: FilterCondition) => void
   onRemove: () => void
-  ancestors: FilterGroup[]
 }) {
-  const availableFields = getAvailableFields(ancestors)
-  const isAssetType = condition.field === 'AssetType'
-
   return (
     <div className="flex items-center gap-2">
       <Select
         value={condition.field}
         onValueChange={(field) => {
           if (!field) return
-          const updates: Partial<FilterCondition> = { field }
-          if (field === 'AssetType') {
-            updates.operator = 'Equals'
-            updates.value = 'Device'
-          } else if (condition.field === 'AssetType') {
-            updates.value = ''
-          }
-          onChange({ ...condition, ...updates })
+          onChange({ ...condition, field })
         }}
       >
         <SelectTrigger className="h-8 w-[140px] rounded-lg text-xs">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {availableFields.map((f) => (
+          {allFields.map((f) => (
             <SelectItem key={f.value} value={f.value}>
               {f.label}
             </SelectItem>
@@ -218,48 +174,28 @@ function FilterConditionEditor({
         </SelectContent>
       </Select>
 
-      {!isAssetType && (
-        <Select
-          value={condition.operator}
-          onValueChange={(operator) => operator && onChange({ ...condition, operator })}
-        >
-          <SelectTrigger className="h-8 w-[130px] rounded-lg text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {operators.map((op) => (
-              <SelectItem key={op.value} value={op.value}>
-                {op.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+      <Select
+        value={condition.operator}
+        onValueChange={(operator) => operator && onChange({ ...condition, operator })}
+      >
+        <SelectTrigger className="h-8 w-[130px] rounded-lg text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {operators.map((op) => (
+            <SelectItem key={op.value} value={op.value}>
+              {op.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-      {isAssetType ? (
-        <Select
-          value={condition.value}
-          onValueChange={(value) => value && onChange({ ...condition, value })}
-        >
-          <SelectTrigger className="h-8 w-[150px] rounded-lg text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {assetTypes.map((at) => (
-              <SelectItem key={at.value} value={at.value}>
-                {at.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <Input
-          value={condition.value}
-          onChange={(e) => onChange({ ...condition, value: e.target.value })}
-          placeholder="Value..."
-          className="h-8 min-w-[150px] flex-1 rounded-lg text-xs"
-        />
-      )}
+      <Input
+        value={condition.value}
+        onChange={(e) => onChange({ ...condition, value: e.target.value })}
+        placeholder="Value..."
+        className="h-8 min-w-[150px] flex-1 rounded-lg text-xs"
+      />
 
       <Tooltip>
         <TooltipTrigger

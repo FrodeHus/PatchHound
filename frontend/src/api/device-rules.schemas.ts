@@ -2,7 +2,10 @@ import { z } from 'zod'
 import { isoDateTimeSchema } from './common.schemas'
 import { pagedResponseMetaSchema } from './pagination.schemas'
 
-// Define types explicitly to avoid z.lazy inference issues
+// Phase 1 canonical cleanup (Task 15): schemas for /api/device-rules.
+// Replaces the legacy asset-rules surface. Preview items drop the
+// `assetType` column since the payload is always a device.
+
 export type FilterCondition = {
   type: 'condition'
   field: string
@@ -18,36 +21,34 @@ export type FilterGroup = {
 
 export type FilterNode = FilterCondition | FilterGroup
 
-export type AssetRuleOperation = {
+export type DeviceRuleOperation = {
   type: string
   parameters: Record<string, string>
 }
 
-// Schemas — use passthrough/any for the recursive filter tree since
-// runtime validation of deeply nested JSON is less important than type safety
 export const filterNodeSchema: z.ZodType<FilterNode> = z.any()
 
-export const assetRuleOperationSchema = z.object({
+export const deviceRuleOperationSchema = z.object({
   type: z.string(),
   parameters: z.record(z.string(), z.string()),
 })
 
-export const assetRuleSchema = z.object({
+export const deviceRuleSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   description: z.string().nullable(),
   priority: z.number(),
   enabled: z.boolean(),
   filterDefinition: filterNodeSchema,
-  operations: z.array(assetRuleOperationSchema),
+  operations: z.array(deviceRuleOperationSchema),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
   lastExecutedAt: isoDateTimeSchema.nullable(),
   lastMatchCount: z.number().nullable(),
 })
 
-export const pagedAssetRulesSchema = pagedResponseMetaSchema.extend({
-  items: z.array(assetRuleSchema),
+export const pagedDeviceRulesSchema = pagedResponseMetaSchema.extend({
+  items: z.array(deviceRuleSchema),
 })
 
 export const filterPreviewSchema = z.object({
@@ -56,10 +57,9 @@ export const filterPreviewSchema = z.object({
     z.object({
       id: z.string().uuid(),
       name: z.string(),
-      assetType: z.string(),
     }),
   ),
 })
 
-export type AssetRule = z.infer<typeof assetRuleSchema>
+export type DeviceRule = z.infer<typeof deviceRuleSchema>
 export type FilterPreview = z.infer<typeof filterPreviewSchema>

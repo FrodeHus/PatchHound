@@ -1,25 +1,25 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchOwnerAssetsNeedingAttention } from '@/api/dashboard.functions'
-import { AssetOwnerAttentionView } from '@/components/features/dashboard/AssetOwnerAttentionView'
+import { DeviceOwnerAttentionView } from '@/components/features/dashboard/DeviceOwnerAttentionView'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 
-export const Route = createFileRoute('/_authed/dashboard/my-assets/attention')({
-  component: MyAssetsAttentionPage,
+export const Route = createFileRoute('/_authed/dashboard/my-devices/attention')({
+  component: MyDevicesAttentionPage,
 })
 
-function MyAssetsAttentionPage() {
+function MyDevicesAttentionPage() {
   const { selectedTenantId } = useTenantScope()
 
   const attentionQuery = useQuery({
-    queryKey: ['dashboard', 'owner-assets-needing-attention', selectedTenantId],
+    queryKey: ['dashboard', 'owner-devices-needing-attention', selectedTenantId],
     queryFn: () => fetchOwnerAssetsNeedingAttention(),
     enabled: Boolean(selectedTenantId),
     staleTime: 30_000,
   })
 
   return (
-    <AssetOwnerAttentionView
+    <DeviceOwnerAttentionView
       items={attentionQuery.data ?? []}
       isLoading={attentionQuery.isPending || attentionQuery.isFetching}
     />

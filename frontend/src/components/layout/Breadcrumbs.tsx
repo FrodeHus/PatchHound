@@ -16,7 +16,7 @@ const segmentLabels: Record<string, string> = {
   teams: 'Teams',
   sources: 'Sources',
   tenants: 'Tenants',
-  'asset-rules': 'Asset Rules',
+  'device-rules': 'Device Rules',
   ai: 'AI Settings',
   notifications: 'Notification Delivery',
   workflows: 'Workflows',

@@ -1,14 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchOwnerDashboardSummary } from '@/api/dashboard.functions'
-import { AssetOwnerOverview } from '@/components/features/dashboard/AssetOwnerOverview'
+import { DeviceOwnerOverview } from '@/components/features/dashboard/DeviceOwnerOverview'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 
-export const Route = createFileRoute('/_authed/dashboard/my-assets')({
-  component: MyAssetsDashboardPage,
+export const Route = createFileRoute('/_authed/dashboard/my-devices')({
+  component: MyDevicesDashboardPage,
 })
 
-function MyAssetsDashboardPage() {
+function MyDevicesDashboardPage() {
   const { selectedTenantId } = useTenantScope()
 
   const ownerSummaryQuery = useQuery({
@@ -19,7 +19,7 @@ function MyAssetsDashboardPage() {
   })
 
   return (
-    <AssetOwnerOverview
+    <DeviceOwnerOverview
       summary={ownerSummaryQuery.data ?? {
         ownedAssetCount: 0,
         assetsNeedingAttention: 0,
