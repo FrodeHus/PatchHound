@@ -183,9 +183,13 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        // Asset Rules
+        // Device Rules
+        services.AddScoped<DeviceRuleFilterBuilder>();
+        services.AddScoped<IDeviceRuleEvaluationService, DeviceRuleEvaluationService>();
+        // AssetRuleFilterBuilder is still consumed directly by AssetRulesController for
+        // its legacy Asset-scoped preview/reset paths; the registration is dropped in
+        // Task 14 alongside the controller rename.
         services.AddScoped<AssetRuleFilterBuilder>();
-        services.AddScoped<IAssetRuleEvaluationService, AssetRuleEvaluationService>();
 
         // Ingestion
         services.AddScoped<IngestionService>();

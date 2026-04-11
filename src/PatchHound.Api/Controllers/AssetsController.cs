@@ -30,7 +30,7 @@ public class AssetsController : ControllerBase
     private readonly TenantSnapshotResolver _snapshotResolver;
     private readonly AssetDetailQueryService _detailQueryService;
     private readonly RiskRefreshService _riskRefreshService;
-    private readonly IAssetRuleEvaluationService _assetRuleEvaluationService;
+    private readonly IDeviceRuleEvaluationService _deviceRuleEvaluationService;
 
     public AssetsController(
         PatchHoundDbContext dbContext,
@@ -41,7 +41,7 @@ public class AssetsController : ControllerBase
         TenantSnapshotResolver snapshotResolver,
         AssetDetailQueryService detailQueryService,
         RiskRefreshService riskRefreshService,
-        IAssetRuleEvaluationService assetRuleEvaluationService
+        IDeviceRuleEvaluationService deviceRuleEvaluationService
     )
     {
         _dbContext = dbContext;
@@ -52,7 +52,7 @@ public class AssetsController : ControllerBase
         _snapshotResolver = snapshotResolver;
         _detailQueryService = detailQueryService;
         _riskRefreshService = riskRefreshService;
-        _assetRuleEvaluationService = assetRuleEvaluationService;
+        _deviceRuleEvaluationService = deviceRuleEvaluationService;
     }
 
     [HttpGet]
@@ -482,7 +482,11 @@ public class AssetsController : ControllerBase
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
 
-        await _assetRuleEvaluationService.EvaluateCriticalityForAssetAsync(asset.TenantId, id, ct);
+        // AssetsController is deleted in Task 13 of the canonical cleanup. Until then,
+        // pass the asset id as the device id — the new service looks up a Device with
+        // that id; if the id doesn't correspond to a canonical Device row, the call is
+        // a silent no-op, which is acceptable for the interim.
+        await _deviceRuleEvaluationService.EvaluateCriticalityForDeviceAsync(asset.TenantId, id, ct);
         await _riskRefreshService.RefreshForAssetAsync(
             asset.TenantId,
             id,

@@ -6,17 +6,18 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
-using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Services.Inventory;
 using PatchHound.Tests.TestData;
 
-namespace PatchHound.Tests.Infrastructure;
+namespace PatchHound.Tests.Infrastructure.Services;
 
-public class AssetRuleEvaluationServiceTests : IDisposable
+public class DeviceRuleEvaluationServiceTests : IDisposable
 {
     private readonly Guid _tenantId = Guid.NewGuid();
+    private readonly Guid _sourceSystemId = Guid.NewGuid();
     private readonly PatchHoundDbContext _dbContext;
 
-    public AssetRuleEvaluationServiceTests()
+    public DeviceRuleEvaluationServiceTests()
     {
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.CurrentTenantId.Returns(_tenantId);
@@ -32,20 +33,26 @@ public class AssetRuleEvaluationServiceTests : IDisposable
         );
     }
 
+    private Device CreateDevice(string externalId, string name, Criticality baseline)
+    {
+        return Device.Create(_tenantId, _sourceSystemId, externalId, name, baseline);
+    }
+
+    private DeviceRuleEvaluationService CreateService() =>
+        new(
+            _dbContext,
+            new DeviceRuleFilterBuilder(_dbContext),
+            Substitute.For<ILogger<DeviceRuleEvaluationService>>()
+        );
+
     [Fact]
     public async Task EvaluateRulesAsync_SetCriticalityOperation_UpdatesCanonicalCriticalityAndProvenance()
     {
-        var asset = Asset.Create(
+        var device = CreateDevice("device-1", "Tier0-DC-01", Criticality.Low);
+        var rule = DeviceRule.Create(
             _tenantId,
-            "asset-1",
-            AssetType.Device,
-            "Tier0-DC-01",
-            Criticality.Low
-        );
-        var rule = AssetRule.Create(
-            _tenantId,
-            "Tier 0 critical assets",
-            "Promote tier 0 assets to critical.",
+            "Tier 0 critical devices",
+            "Promote tier 0 devices to critical.",
             1,
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Tier0-"),
             [
@@ -60,18 +67,12 @@ public class AssetRuleEvaluationServiceTests : IDisposable
             ]
         );
 
-        await _dbContext.AddRangeAsync(asset, rule);
+        await _dbContext.AddRangeAsync(device, rule);
         await _dbContext.SaveChangesAsync();
 
-        var service = new AssetRuleEvaluationService(
-            _dbContext,
-            new AssetRuleFilterBuilder(_dbContext),
-            Substitute.For<ILogger<AssetRuleEvaluationService>>()
-        );
+        await CreateService().EvaluateRulesAsync(_tenantId, CancellationToken.None);
 
-        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
-
-        var refreshed = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        var refreshed = await _dbContext.Devices.SingleAsync(item => item.Id == device.Id);
         refreshed.Criticality.Should().Be(Criticality.Critical);
         refreshed.CriticalitySource.Should().Be("Rule");
         refreshed.CriticalityReason.Should().Be("Matched the Tier 0 naming rule.");
@@ -80,19 +81,13 @@ public class AssetRuleEvaluationServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task EvaluateRulesAsync_WhenAssetStopsMatchingRule_ResetsToBaselineCriticality()
+    public async Task EvaluateRulesAsync_WhenDeviceStopsMatchingRule_ResetsToBaselineCriticality()
     {
-        var asset = Asset.Create(
+        var device = CreateDevice("device-2", "Prod-Server-01", Criticality.Medium);
+        device.SetCriticalityFromRule(Criticality.Critical, Guid.NewGuid(), "old");
+        var rule = DeviceRule.Create(
             _tenantId,
-            "asset-2",
-            AssetType.Device,
-            "Prod-Server-01",
-            Criticality.Medium
-        );
-        asset.SetCriticalityFromRule(Criticality.Critical, Guid.NewGuid(), "old");
-        var rule = AssetRule.Create(
-            _tenantId,
-            "Tier 0 critical assets",
+            "Tier 0 critical devices",
             null,
             1,
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Tier0-"),
@@ -104,18 +99,12 @@ public class AssetRuleEvaluationServiceTests : IDisposable
             ]
         );
 
-        await _dbContext.AddRangeAsync(asset, rule);
+        await _dbContext.AddRangeAsync(device, rule);
         await _dbContext.SaveChangesAsync();
 
-        var service = new AssetRuleEvaluationService(
-            _dbContext,
-            new AssetRuleFilterBuilder(_dbContext),
-            Substitute.For<ILogger<AssetRuleEvaluationService>>()
-        );
+        await CreateService().EvaluateRulesAsync(_tenantId, CancellationToken.None);
 
-        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
-
-        var refreshed = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        var refreshed = await _dbContext.Devices.SingleAsync(item => item.Id == device.Id);
         refreshed.Criticality.Should().Be(Criticality.Medium);
         refreshed.CriticalitySource.Should().Be("Default");
         refreshed.CriticalityRuleId.Should().BeNull();
@@ -124,17 +113,11 @@ public class AssetRuleEvaluationServiceTests : IDisposable
     [Fact]
     public async Task EvaluateRulesAsync_DoesNotOverrideManualCriticality()
     {
-        var asset = Asset.Create(
+        var device = CreateDevice("device-3", "Tier0-Workstation-01", Criticality.Low);
+        device.SetCriticality(Criticality.High);
+        var rule = DeviceRule.Create(
             _tenantId,
-            "asset-3",
-            AssetType.Device,
-            "Tier0-Workstation-01",
-            Criticality.Low
-        );
-        asset.SetCriticality(Criticality.High);
-        var rule = AssetRule.Create(
-            _tenantId,
-            "Tier 0 critical assets",
+            "Tier 0 critical devices",
             null,
             1,
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Tier0-"),
@@ -146,35 +129,23 @@ public class AssetRuleEvaluationServiceTests : IDisposable
             ]
         );
 
-        await _dbContext.AddRangeAsync(asset, rule);
+        await _dbContext.AddRangeAsync(device, rule);
         await _dbContext.SaveChangesAsync();
 
-        var service = new AssetRuleEvaluationService(
-            _dbContext,
-            new AssetRuleFilterBuilder(_dbContext),
-            Substitute.For<ILogger<AssetRuleEvaluationService>>()
-        );
+        await CreateService().EvaluateRulesAsync(_tenantId, CancellationToken.None);
 
-        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
-
-        var refreshed = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        var refreshed = await _dbContext.Devices.SingleAsync(item => item.Id == device.Id);
         refreshed.Criticality.Should().Be(Criticality.High);
         refreshed.CriticalitySource.Should().Be("ManualOverride");
     }
 
     [Fact]
-    public async Task EvaluateCriticalityForAssetAsync_AppliesFirstMatchingCriticalityRule()
+    public async Task EvaluateCriticalityForDeviceAsync_AppliesFirstMatchingCriticalityRule()
     {
-        var asset = Asset.Create(
+        var device = CreateDevice("device-4", "Tier0-Host-01", Criticality.Low);
+        var rule = DeviceRule.Create(
             _tenantId,
-            "asset-4",
-            AssetType.Device,
-            "Tier0-Host-01",
-            Criticality.Low
-        );
-        var rule = AssetRule.Create(
-            _tenantId,
-            "Tier 0 critical assets",
+            "Tier 0 critical devices",
             null,
             1,
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Tier0-"),
@@ -186,18 +157,12 @@ public class AssetRuleEvaluationServiceTests : IDisposable
             ]
         );
 
-        await _dbContext.AddRangeAsync(asset, rule);
+        await _dbContext.AddRangeAsync(device, rule);
         await _dbContext.SaveChangesAsync();
 
-        var service = new AssetRuleEvaluationService(
-            _dbContext,
-            new AssetRuleFilterBuilder(_dbContext),
-            Substitute.For<ILogger<AssetRuleEvaluationService>>()
-        );
+        await CreateService().EvaluateCriticalityForDeviceAsync(_tenantId, device.Id, CancellationToken.None);
 
-        await service.EvaluateCriticalityForAssetAsync(_tenantId, asset.Id, CancellationToken.None);
-
-        var refreshed = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        var refreshed = await _dbContext.Devices.SingleAsync(item => item.Id == device.Id);
         refreshed.Criticality.Should().Be(Criticality.Critical);
         refreshed.CriticalitySource.Should().Be("Rule");
         refreshed.CriticalityRuleId.Should().Be(rule.Id);
@@ -216,14 +181,8 @@ public class AssetRuleEvaluationServiceTests : IDisposable
             SecurityRequirementLevel.High,
             SecurityRequirementLevel.High
         );
-        var asset = Asset.Create(
-            _tenantId,
-            "asset-5",
-            AssetType.Device,
-            "Prod-Server-01",
-            Criticality.High
-        );
-        var rule = AssetRule.Create(
+        var device = CreateDevice("device-5", "Prod-Server-01", Criticality.High);
+        var rule = DeviceRule.Create(
             _tenantId,
             "Assign production profile",
             null,
@@ -237,18 +196,13 @@ public class AssetRuleEvaluationServiceTests : IDisposable
             ]
         );
 
-        await _dbContext.AddRangeAsync(profile, asset, rule);
+        await _dbContext.AddRangeAsync(profile, device, rule);
         await _dbContext.SaveChangesAsync();
 
-        var service = new AssetRuleEvaluationService(
-            _dbContext,
-            new AssetRuleFilterBuilder(_dbContext),
-            Substitute.For<ILogger<AssetRuleEvaluationService>>()
-        );
-
+        var service = CreateService();
         await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
 
-        var assigned = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        var assigned = await _dbContext.Devices.SingleAsync(item => item.Id == device.Id);
         assigned.SecurityProfileId.Should().Be(profile.Id);
         assigned.SecurityProfileRuleId.Should().Be(rule.Id);
 
@@ -257,7 +211,7 @@ public class AssetRuleEvaluationServiceTests : IDisposable
 
         await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
 
-        var reconciled = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        var reconciled = await _dbContext.Devices.SingleAsync(item => item.Id == device.Id);
         reconciled.SecurityProfileId.Should().BeNull();
         reconciled.SecurityProfileRuleId.Should().BeNull();
     }
@@ -266,14 +220,8 @@ public class AssetRuleEvaluationServiceTests : IDisposable
     public async Task EvaluateRulesAsync_AssignTeamOperation_TracksAndReconcilesRuleOwnership()
     {
         var team = Team.Create(_tenantId, "Customer Operators");
-        var asset = Asset.Create(
-            _tenantId,
-            "asset-6",
-            AssetType.Device,
-            "Ops-Workstation-01",
-            Criticality.Medium
-        );
-        var rule = AssetRule.Create(
+        var device = CreateDevice("device-6", "Ops-Workstation-01", Criticality.Medium);
+        var rule = DeviceRule.Create(
             _tenantId,
             "Assign default team",
             null,
@@ -287,18 +235,13 @@ public class AssetRuleEvaluationServiceTests : IDisposable
             ]
         );
 
-        await _dbContext.AddRangeAsync(team, asset, rule);
+        await _dbContext.AddRangeAsync(team, device, rule);
         await _dbContext.SaveChangesAsync();
 
-        var service = new AssetRuleEvaluationService(
-            _dbContext,
-            new AssetRuleFilterBuilder(_dbContext),
-            Substitute.For<ILogger<AssetRuleEvaluationService>>()
-        );
-
+        var service = CreateService();
         await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
 
-        var assigned = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        var assigned = await _dbContext.Devices.SingleAsync(item => item.Id == device.Id);
         assigned.FallbackTeamId.Should().Be(team.Id);
         assigned.FallbackTeamRuleId.Should().Be(rule.Id);
 
@@ -307,7 +250,7 @@ public class AssetRuleEvaluationServiceTests : IDisposable
 
         await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
 
-        var reconciled = await _dbContext.Assets.SingleAsync(item => item.Id == asset.Id);
+        var reconciled = await _dbContext.Devices.SingleAsync(item => item.Id == device.Id);
         reconciled.FallbackTeamId.Should().BeNull();
         reconciled.FallbackTeamRuleId.Should().BeNull();
     }
@@ -315,15 +258,14 @@ public class AssetRuleEvaluationServiceTests : IDisposable
     [Fact]
     public async Task EvaluateRulesAsync_AssignScanProfile_CreatesAssignment()
     {
-        var asset = Asset.Create(_tenantId, "device-1", AssetType.Device, "Server-01", Criticality.Medium);
+        var device = CreateDevice("device-7", "Server-01", Criticality.Medium);
         var scanProfileId = Guid.NewGuid();
         var profile = PatchHound.Core.Entities.AuthenticatedScans.ScanProfile.Create(
             _tenantId, "profile", "", "", Guid.NewGuid(), Guid.NewGuid(), true);
-        // Force a known Id so we can reference it in the operation
         var profileIdProp = typeof(PatchHound.Core.Entities.AuthenticatedScans.ScanProfile).GetProperty("Id")!;
         profileIdProp.SetValue(profile, scanProfileId);
 
-        var rule = AssetRule.Create(
+        var rule = DeviceRule.Create(
             _tenantId, "Assign scan profile", null, 1,
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Server-"),
             [
@@ -333,18 +275,13 @@ public class AssetRuleEvaluationServiceTests : IDisposable
                 )
             ]);
 
-        await _dbContext.AddRangeAsync(asset, profile, rule);
+        await _dbContext.AddRangeAsync(device, profile, rule);
         await _dbContext.SaveChangesAsync();
 
-        var service = new AssetRuleEvaluationService(
-            _dbContext,
-            new AssetRuleFilterBuilder(_dbContext),
-            Substitute.For<ILogger<AssetRuleEvaluationService>>());
-
-        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+        await CreateService().EvaluateRulesAsync(_tenantId, CancellationToken.None);
 
         var assignment = await _dbContext.DeviceScanProfileAssignments.SingleAsync();
-        assignment.DeviceId.Should().Be(asset.Id);
+        assignment.DeviceId.Should().Be(device.Id);
         assignment.ScanProfileId.Should().Be(scanProfileId);
         assignment.AssignedByRuleId.Should().Be(rule.Id);
     }
@@ -352,14 +289,14 @@ public class AssetRuleEvaluationServiceTests : IDisposable
     [Fact]
     public async Task EvaluateRulesAsync_AssignScanProfile_IdempotentOnSecondRun()
     {
-        var asset = Asset.Create(_tenantId, "device-2", AssetType.Device, "Server-02", Criticality.Medium);
+        var device = CreateDevice("device-8", "Server-02", Criticality.Medium);
         var scanProfileId = Guid.NewGuid();
         var profile = PatchHound.Core.Entities.AuthenticatedScans.ScanProfile.Create(
             _tenantId, "profile2", "", "", Guid.NewGuid(), Guid.NewGuid(), true);
         typeof(PatchHound.Core.Entities.AuthenticatedScans.ScanProfile).GetProperty("Id")!
             .SetValue(profile, scanProfileId);
 
-        var rule = AssetRule.Create(
+        var rule = DeviceRule.Create(
             _tenantId, "Assign scan", null, 1,
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Server-"),
             [
@@ -369,19 +306,51 @@ public class AssetRuleEvaluationServiceTests : IDisposable
                 )
             ]);
 
-        await _dbContext.AddRangeAsync(asset, profile, rule);
+        await _dbContext.AddRangeAsync(device, profile, rule);
         await _dbContext.SaveChangesAsync();
 
-        var service = new AssetRuleEvaluationService(
-            _dbContext,
-            new AssetRuleFilterBuilder(_dbContext),
-            Substitute.For<ILogger<AssetRuleEvaluationService>>());
-
+        var service = CreateService();
         await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
         await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
 
         var count = await _dbContext.DeviceScanProfileAssignments.CountAsync();
         count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task EvaluateRulesAsync_DoesNotCrossTenants()
+    {
+        var otherTenantId = Guid.NewGuid();
+        var localDevice = CreateDevice("device-9", "Shared-Host-01", Criticality.Low);
+        var otherDevice = Device.Create(
+            otherTenantId,
+            _sourceSystemId,
+            "device-10",
+            "Shared-Host-01",
+            Criticality.Low);
+
+        var localRule = DeviceRule.Create(
+            _tenantId,
+            "Local tenant rule",
+            null,
+            1,
+            new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Shared-"),
+            [
+                new PatchHound.Core.Models.AssetRuleOperation(
+                    "SetCriticality",
+                    new Dictionary<string, string> { ["criticality"] = "Critical" }
+                )
+            ]);
+
+        await _dbContext.AddRangeAsync(localDevice, otherDevice, localRule);
+        await _dbContext.SaveChangesAsync();
+
+        await CreateService().EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var local = await _dbContext.Devices.SingleAsync(d => d.Id == localDevice.Id);
+        var other = await _dbContext.Devices.IgnoreQueryFilters().SingleAsync(d => d.Id == otherDevice.Id);
+        local.Criticality.Should().Be(Criticality.Critical);
+        other.Criticality.Should().Be(Criticality.Low);
     }
 
     public void Dispose()

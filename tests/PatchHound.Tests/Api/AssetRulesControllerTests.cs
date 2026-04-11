@@ -11,6 +11,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Services.Inventory;
 using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
@@ -20,7 +21,7 @@ public class AssetRulesControllerTests : IDisposable
     private readonly Guid _tenantId = Guid.NewGuid();
     private readonly ITenantContext _tenantContext;
     private readonly PatchHoundDbContext _dbContext;
-    private readonly FakeAssetRuleEvaluationService _evaluationService;
+    private readonly FakeDeviceRuleEvaluationService _evaluationService;
     private readonly AssetRulesController _controller;
 
     public AssetRulesControllerTests()
@@ -48,7 +49,7 @@ public class AssetRulesControllerTests : IDisposable
             new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>())
         );
-        _evaluationService = new FakeAssetRuleEvaluationService(_dbContext);
+        _evaluationService = new FakeDeviceRuleEvaluationService(_dbContext);
         _controller = new AssetRulesController(
             _dbContext,
             _tenantContext,
@@ -194,10 +195,10 @@ public class AssetRulesControllerTests : IDisposable
             new EnvironmentalSeverityCalculator(),
             snapshotResolver
         );
-        var evaluationService = new AssetRuleEvaluationService(
+        var evaluationService = new DeviceRuleEvaluationService(
             dbContext,
-            new AssetRuleFilterBuilder(dbContext),
-            Substitute.For<ILogger<AssetRuleEvaluationService>>()
+            new DeviceRuleFilterBuilder(dbContext),
+            Substitute.For<ILogger<DeviceRuleEvaluationService>>()
         );
         var riskRefreshService = new RiskRefreshService(
             dbContext,
@@ -290,10 +291,10 @@ public class AssetRulesControllerTests : IDisposable
             new EnvironmentalSeverityCalculator(),
             snapshotResolver
         );
-        var evaluationService = new AssetRuleEvaluationService(
+        var evaluationService = new DeviceRuleEvaluationService(
             dbContext,
-            new AssetRuleFilterBuilder(dbContext),
-            Substitute.For<ILogger<AssetRuleEvaluationService>>()
+            new DeviceRuleFilterBuilder(dbContext),
+            Substitute.For<ILogger<DeviceRuleEvaluationService>>()
         );
         var riskRefreshService = new RiskRefreshService(
             dbContext,
@@ -362,8 +363,8 @@ public class AssetRulesControllerTests : IDisposable
         _dbContext.Dispose();
     }
 
-    private sealed class FakeAssetRuleEvaluationService(PatchHoundDbContext dbContext)
-        : IAssetRuleEvaluationService
+    private sealed class FakeDeviceRuleEvaluationService(PatchHoundDbContext dbContext)
+        : IDeviceRuleEvaluationService
     {
         private Guid _assetId;
         private Guid _teamId;
@@ -385,16 +386,16 @@ public class AssetRulesControllerTests : IDisposable
             await dbContext.SaveChangesAsync(ct);
         }
 
-        public Task<AssetRulePreviewResult> PreviewFilterAsync(
+        public Task<DeviceRulePreviewResult> PreviewFilterAsync(
             Guid tenantId,
             FilterNode filter,
             CancellationToken ct
         )
         {
-            return Task.FromResult(new AssetRulePreviewResult(0, []));
+            return Task.FromResult(new DeviceRulePreviewResult(0, []));
         }
 
-        public Task EvaluateCriticalityForAssetAsync(Guid tenantId, Guid assetId, CancellationToken ct)
+        public Task EvaluateCriticalityForDeviceAsync(Guid tenantId, Guid deviceId, CancellationToken ct)
         {
             return Task.CompletedTask;
         }

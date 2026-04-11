@@ -26,13 +26,13 @@ public class AssetRulesController : ControllerBase
 
     private readonly PatchHoundDbContext _dbContext;
     private readonly ITenantContext _tenantContext;
-    private readonly IAssetRuleEvaluationService _evaluationService;
+    private readonly IDeviceRuleEvaluationService _evaluationService;
     private readonly RiskRefreshService _riskRefreshService;
 
     public AssetRulesController(
         PatchHoundDbContext dbContext,
         ITenantContext tenantContext,
-        IAssetRuleEvaluationService evaluationService,
+        IDeviceRuleEvaluationService evaluationService,
         RiskRefreshService riskRefreshService)
     {
         _dbContext = dbContext;
@@ -201,7 +201,7 @@ public class AssetRulesController : ControllerBase
         var result = await _evaluationService.PreviewFilterAsync(tenantId, filter, ct);
         return Ok(new AssetRulePreviewDto(
             result.Count,
-            result.Samples.Select(s => new AssetPreviewItemDto(s.Id, s.Name, s.AssetType)).ToList()));
+            result.Samples.Select(s => new AssetPreviewItemDto(s.Id, s.Name, "Device")).ToList()));
     }
 
     [HttpPost("run")]

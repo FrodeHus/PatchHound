@@ -89,7 +89,7 @@ public class IngestionServiceTests : IDisposable
             softwareMatchService,
             stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
-            Substitute.For<IAssetRuleEvaluationService>(),
+            Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             logger
         );
@@ -666,7 +666,7 @@ public class IngestionServiceTests : IDisposable
                 new IngestionStateCache()
             ),
             Substitute.For<IStagedDeviceMergeService>(),
-            Substitute.For<IAssetRuleEvaluationService>(),
+            Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             Substitute.For<ILogger<IngestionService>>()
         );
@@ -1094,7 +1094,7 @@ public class IngestionServiceTests : IDisposable
             softwareMatchService,
             stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
-            Substitute.For<IAssetRuleEvaluationService>(),
+            Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             logger
         );
@@ -1233,7 +1233,7 @@ public class IngestionServiceTests : IDisposable
             softwareMatchService,
             stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
-            Substitute.For<IAssetRuleEvaluationService>(),
+            Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             logger
         );
@@ -1397,7 +1397,7 @@ public class IngestionServiceTests : IDisposable
             softwareMatchService,
             stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
-            Substitute.For<IAssetRuleEvaluationService>(),
+            Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             logger
         );
@@ -1531,7 +1531,7 @@ public class IngestionServiceTests : IDisposable
             softwareMatchService,
             stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
-            Substitute.For<IAssetRuleEvaluationService>(),
+            Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             logger
         );
@@ -1697,7 +1697,7 @@ public class IngestionServiceTests : IDisposable
             softwareMatchService,
             stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
-            Substitute.For<IAssetRuleEvaluationService>(),
+            Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             logger
         );
@@ -1854,7 +1854,7 @@ public class IngestionServiceTests : IDisposable
             softwareMatchService,
             stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
-            Substitute.For<IAssetRuleEvaluationService>(),
+            Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             logger
         );
@@ -1970,7 +1970,7 @@ public class IngestionServiceTests : IDisposable
             softwareMatchService,
             stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
-            Substitute.For<IAssetRuleEvaluationService>(),
+            Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             logger
         );
@@ -3017,7 +3017,7 @@ public class IngestionServiceTests : IDisposable
                 new IngestionStateCache()
             ),
             Substitute.For<IStagedDeviceMergeService>(),
-            Substitute.For<IAssetRuleEvaluationService>(),
+            Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
             Substitute.For<ILogger<IngestionService>>()
         );

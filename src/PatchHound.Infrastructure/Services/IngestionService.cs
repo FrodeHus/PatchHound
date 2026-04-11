@@ -28,7 +28,7 @@ public class IngestionService
     private readonly SoftwareVulnerabilityMatchService _softwareVulnerabilityMatchService;
     private readonly StagedVulnerabilityMergeService _stagedVulnerabilityMergeService;
     private readonly IStagedDeviceMergeService _stagedDeviceMergeService;
-    private readonly IAssetRuleEvaluationService _assetRuleEvaluationService;
+    private readonly IDeviceRuleEvaluationService _deviceRuleEvaluationService;
     private readonly RiskScoreService _riskScoreService;
     private readonly RemediationDecisionService? _remediationDecisionService;
     private readonly ILogger<IngestionService> _logger;
@@ -43,7 +43,7 @@ public class IngestionService
         SoftwareVulnerabilityMatchService softwareVulnerabilityMatchService,
         StagedVulnerabilityMergeService stagedVulnerabilityMergeService,
         IStagedDeviceMergeService stagedDeviceMergeService,
-        IAssetRuleEvaluationService assetRuleEvaluationService,
+        IDeviceRuleEvaluationService deviceRuleEvaluationService,
         RiskScoreService riskScoreService,
         ILogger<IngestionService> logger
     )
@@ -55,7 +55,7 @@ public class IngestionService
             softwareVulnerabilityMatchService,
             stagedVulnerabilityMergeService,
             stagedDeviceMergeService,
-            assetRuleEvaluationService,
+            deviceRuleEvaluationService,
             riskScoreService,
             remediationDecisionService: null,
             logger
@@ -69,7 +69,7 @@ public class IngestionService
         SoftwareVulnerabilityMatchService softwareVulnerabilityMatchService,
         StagedVulnerabilityMergeService stagedVulnerabilityMergeService,
         IStagedDeviceMergeService stagedDeviceMergeService,
-        IAssetRuleEvaluationService assetRuleEvaluationService,
+        IDeviceRuleEvaluationService deviceRuleEvaluationService,
         RiskScoreService riskScoreService,
         RemediationDecisionService? remediationDecisionService,
         ILogger<IngestionService> logger
@@ -82,7 +82,7 @@ public class IngestionService
         _softwareVulnerabilityMatchService = softwareVulnerabilityMatchService;
         _stagedVulnerabilityMergeService = stagedVulnerabilityMergeService;
         _stagedDeviceMergeService = stagedDeviceMergeService;
-        _assetRuleEvaluationService = assetRuleEvaluationService;
+        _deviceRuleEvaluationService = deviceRuleEvaluationService;
         _riskScoreService = riskScoreService;
         _remediationDecisionService = remediationDecisionService;
         _logger = logger;
@@ -554,7 +554,7 @@ public class IngestionService
 
                         await EnqueueEnrichmentJobsForRunAsync(run.Id, tenantId, ct);
 
-                        await _assetRuleEvaluationService.EvaluateRulesAsync(tenantId, ct);
+                        await _deviceRuleEvaluationService.EvaluateRulesAsync(tenantId, ct);
 
                         if (SupportsSoftwareSnapshots(source.SourceKey))
                         {
