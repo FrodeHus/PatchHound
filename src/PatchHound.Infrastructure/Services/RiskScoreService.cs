@@ -2,7 +2,6 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
-using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Tenants;
 
@@ -84,9 +83,9 @@ public class RiskScoreService(
         var softwareResults = await CalculateSoftwareScoresAsync(tenantId, ct);
         var deviceGroupResults = await CalculateDeviceGroupScoresAsync(tenantId, assetResults, ct);
         var teamResults = await CalculateTeamScoresAsync(tenantId, assetResults, ct);
-        var existingScores = await dbContext.AssetRiskScores
+        var existingScores = await dbContext.DeviceRiskScores
             .Where(item => item.TenantId == tenantId)
-            .ToDictionaryAsync(item => item.AssetId, ct);
+            .ToDictionaryAsync(item => item.DeviceId, ct);
         var existingDeviceGroupScores = await dbContext.DeviceGroupRiskScores
             .Where(item => item.TenantId == tenantId)
             .ToDictionaryAsync(item => item.GroupKey, ct);
@@ -115,8 +114,8 @@ public class RiskScoreService(
             }
             else
             {
-                dbContext.AssetRiskScores.Add(
-                    AssetRiskScore.Create(
+                dbContext.DeviceRiskScores.Add(
+                    DeviceRiskScore.Create(
                         tenantId,
                         result.AssetId,
                         result.OverallScore,
@@ -135,11 +134,11 @@ public class RiskScoreService(
 
         var activeAssetIds = assetResults.Select(item => item.AssetId).ToHashSet();
         var staleScores = existingScores.Values
-            .Where(item => !activeAssetIds.Contains(item.AssetId))
+            .Where(item => !activeAssetIds.Contains(item.DeviceId))
             .ToList();
         if (staleScores.Count > 0)
         {
-            dbContext.AssetRiskScores.RemoveRange(staleScores);
+            dbContext.DeviceRiskScores.RemoveRange(staleScores);
         }
 
         foreach (var result in deviceGroupResults)
@@ -304,13 +303,13 @@ public class RiskScoreService(
 
     public async Task<TenantRiskResult> GetTenantRiskAsync(Guid tenantId, CancellationToken ct)
     {
-        var assetScores = await dbContext.AssetRiskScores
+        var deviceScores = await dbContext.DeviceRiskScores
             .Where(item => item.TenantId == tenantId)
             .OrderByDescending(item => item.OverallScore)
             .ToListAsync(ct);
 
-        return CalculateTenantRisk(assetScores.Select(item => new AssetRiskResult(
-            item.AssetId,
+        return CalculateTenantRisk(deviceScores.Select(item => new AssetRiskResult(
+            item.DeviceId,
             item.OverallScore,
             item.MaxEpisodeRiskScore,
             item.CriticalCount,
@@ -334,19 +333,23 @@ public class RiskScoreService(
             ? DateTime.UtcNow.Date.AddDays(-minAgeDays.Value)
             : (DateTime?)null;
 
+        // Phase 1 canonical baseline: the device filter joins canonical Device rows
+        // via VulnerabilityEpisodeRiskAssessment.AssetId. Phase 5 rewires the episode
+        // → device linkage once Phase 3 canonicalizes exposure; until then, tests and
+        // ingestion that seed this path must populate episode.AssetId with a Device.Id.
         var episodeScores = await (
             from episodeRisk in dbContext.VulnerabilityEpisodeRiskAssessments.AsNoTracking()
-            join asset in dbContext.Assets.AsNoTracking()
-                on episodeRisk.AssetId equals asset.Id
+            join device in dbContext.Devices.AsNoTracking()
+                on episodeRisk.AssetId equals device.Id
             join tenantVulnerability in dbContext.TenantVulnerabilities.AsNoTracking()
                 on episodeRisk.TenantVulnerabilityId equals tenantVulnerability.Id
             join definition in dbContext.VulnerabilityDefinitions.AsNoTracking()
                 on tenantVulnerability.VulnerabilityDefinitionId equals definition.Id
             where episodeRisk.TenantId == tenantId
                   && episodeRisk.ResolvedAt == null
-                  && asset.TenantId == tenantId
-                  && (string.IsNullOrWhiteSpace(platform) || asset.DeviceOsPlatform == platform)
-                  && (string.IsNullOrWhiteSpace(deviceGroup) || asset.DeviceGroupName == deviceGroup)
+                  && device.TenantId == tenantId
+                  && (string.IsNullOrWhiteSpace(platform) || device.OsPlatform == platform)
+                  && (string.IsNullOrWhiteSpace(deviceGroup) || device.GroupName == deviceGroup)
                   && (!publishedBefore.HasValue
                       || (definition.PublishedDate.HasValue && definition.PublishedDate.Value <= publishedBefore.Value))
             select new
@@ -594,24 +597,24 @@ public class RiskScoreService(
         CancellationToken ct
     )
     {
-        var assets = await dbContext.Assets.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.AssetType == AssetType.Device)
+        var devices = await dbContext.Devices.AsNoTracking()
+            .Where(item => item.TenantId == tenantId)
             .Select(item => new
             {
                 item.Id,
-                item.DeviceGroupId,
-                item.DeviceGroupName,
+                DeviceGroupId = item.GroupId,
+                DeviceGroupName = item.GroupName,
             })
             .ToListAsync(ct);
 
         return (
-            from asset in assets
-            join risk in assetResults on asset.Id equals risk.AssetId
-            let groupName = string.IsNullOrWhiteSpace(asset.DeviceGroupName) ? "Ungrouped" : asset.DeviceGroupName!
-            let groupKey = !string.IsNullOrWhiteSpace(asset.DeviceGroupId)
-                ? $"id:{asset.DeviceGroupId}"
+            from device in devices
+            join risk in assetResults on device.Id equals risk.AssetId
+            let groupName = string.IsNullOrWhiteSpace(device.DeviceGroupName) ? "Ungrouped" : device.DeviceGroupName!
+            let groupKey = !string.IsNullOrWhiteSpace(device.DeviceGroupId)
+                ? $"id:{device.DeviceGroupId}"
                 : $"name:{groupName.Trim().ToLowerInvariant()}"
-            group new { asset, risk } by new { groupKey, asset.DeviceGroupId, groupName } into grouped
+            group new { device, risk } by new { groupKey, device.DeviceGroupId, groupName } into grouped
             let orderedScores = grouped.Select(item => item.risk.OverallScore).OrderByDescending(score => score).ToList()
             let maxAssetRisk = orderedScores.FirstOrDefault()
             let topThreeAverage = orderedScores.Take(3).DefaultIfEmpty(0m).Average()
@@ -664,7 +667,7 @@ public class RiskScoreService(
         CancellationToken ct
     )
     {
-        var assets = await dbContext.Assets.AsNoTracking()
+        var devices = await dbContext.Devices.AsNoTracking()
             .Where(item => item.TenantId == tenantId)
             .Select(item => new
             {
@@ -675,9 +678,9 @@ public class RiskScoreService(
             .ToListAsync(ct);
 
         return (
-            from asset in assets
-            join risk in assetResults on asset.Id equals risk.AssetId
-            group risk by asset.EffectiveTeamId!.Value into grouped
+            from device in devices
+            join risk in assetResults on device.Id equals risk.AssetId
+            group risk by device.EffectiveTeamId!.Value into grouped
             let orderedScores = grouped.Select(item => item.OverallScore).OrderByDescending(score => score).ToList()
             let maxAssetRisk = orderedScores.FirstOrDefault()
             let topThreeAverage = orderedScores.Take(3).DefaultIfEmpty(0m).Average()
