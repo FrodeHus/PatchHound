@@ -102,6 +102,7 @@ public static class DependencyInjection
         services.AddScoped<SoftwareVulnerabilityMatchService>();
         services.AddScoped<NormalizedSoftwareResolver>();
         services.AddScoped<VulnerabilityResolver>();
+        services.AddScoped<ThreatAssessmentService>();
         services.AddScoped<NormalizedSoftwareProjectionService>();
         services.AddScoped<CycloneDxSupplyChainImportService>();
         services.AddScoped<EnrichmentJobEnqueuer>();
