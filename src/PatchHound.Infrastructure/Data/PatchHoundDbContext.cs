@@ -75,6 +75,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<DeviceSoftwareInstallationEpisode> DeviceSoftwareInstallationEpisodes =>
         Set<DeviceSoftwareInstallationEpisode>();
     public DbSet<Vulnerability> Vulnerabilities => Set<Vulnerability>();
+    public DbSet<VulnerabilityReference> VulnerabilityReferences => Set<VulnerabilityReference>();
     public DbSet<VulnerabilityDefinition> VulnerabilityDefinitions => Set<VulnerabilityDefinition>();
     public DbSet<VulnerabilityThreatAssessment> VulnerabilityThreatAssessments =>
         Set<VulnerabilityThreatAssessment>();
