@@ -17,13 +17,11 @@ public class IngestionStateCacheTests
         var cache = new IngestionStateCache(null);
         cache.SetScope(Guid.NewGuid(), Guid.NewGuid());
 
-        await cache.PreWarmTenantVulnerabilitiesAsync([], CancellationToken.None);
-        await cache.PreWarmDefinitionsAsync([], CancellationToken.None);
+        // Phase 2: legacy PreWarmTenantVulnerabilitiesAsync, PreWarmDefinitionsAsync,
+        // PreWarmProjectionsAsync, PreWarmOpenEpisodesAsync, PreWarmLatestEpisodeNumbersAsync,
+        // and PreWarmAssessmentsAsync have been removed. Replaced by PreWarmVulnerabilitiesAsync.
+        await cache.PreWarmVulnerabilitiesAsync([], CancellationToken.None);
         await cache.PreWarmAssetsAsync([], CancellationToken.None);
-        await cache.PreWarmProjectionsAsync([], CancellationToken.None);
-        await cache.PreWarmOpenEpisodesAsync([], CancellationToken.None);
-        await cache.PreWarmLatestEpisodeNumbersAsync([], CancellationToken.None);
-        await cache.PreWarmAssessmentsAsync([], CancellationToken.None);
         await cache.CleanupAsync(CancellationToken.None);
     }
 }

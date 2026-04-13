@@ -33,14 +33,13 @@ public class PatchingTaskService(
                 item.TenantId == decision.TenantId
                 && item.TenantSoftwareId == decision.TenantSoftwareId
                 && item.IsActive)
-            .Select(item => new { item.DeviceAssetId, item.SoftwareAssetId })
+            .Select(item => new { item.DeviceAssetId })
             .ToListAsync(ct);
 
         if (scopedInstallations.Count == 0)
             return 0;
 
         var deviceAssetIds = scopedInstallations.Select(d => d.DeviceAssetId).Distinct().ToList();
-        var scopedSoftwareAssetIds = scopedInstallations.Select(item => item.SoftwareAssetId).Distinct().ToList();
         var defaultTeamId = (await DefaultTeamHelper.EnsureDefaultTeamAsync(dbContext, decision.TenantId, ct)).Id;
 
         var deviceTeams = await dbContext.Assets
@@ -57,23 +56,12 @@ public class PatchingTaskService(
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(c => c.TenantId == decision.TenantId, ct);
 
-        var highestSeverity = await dbContext.SoftwareVulnerabilityMatches
-            .IgnoreQueryFilters()
-            .Where(svm =>
-                svm.TenantId == decision.TenantId
-                && svm.ResolvedAt == null
-                && scopedSoftwareAssetIds.Contains(svm.SoftwareAssetId))
-            .Join(
-                dbContext.VulnerabilityDefinitions,
-                svm => svm.VulnerabilityDefinitionId,
-                vd => vd.Id,
-                (svm, vd) => vd.VendorSeverity
-            )
-            .OrderByDescending(s => s)
-            .FirstOrDefaultAsync(ct);
+        // Phase 2: canonical exposure data not yet available; default to Medium.
+        // Phase 3 will rewire via DeviceVulnerabilityExposure.
+        var highestSeverity = Severity.Medium;
 
         var dueDate = slaService.CalculateDueDate(
-            highestSeverity != default ? highestSeverity : Severity.Medium,
+            highestSeverity,
             DateTimeOffset.UtcNow,
             tenantSla
         );
@@ -123,7 +111,7 @@ public class PatchingTaskService(
             .FirstOrDefaultAsync(ct)
             ?? "Unknown software";
 
-        var severityLabel = highestSeverity != default ? highestSeverity.ToString() : Severity.Medium.ToString();
+        var severityLabel = highestSeverity.ToString();
 
         foreach (var task in tasks)
         {

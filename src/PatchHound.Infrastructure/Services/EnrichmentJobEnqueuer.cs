@@ -68,25 +68,25 @@ public class EnrichmentJobEnqueuer(
         }
 
         var definitions = await dbContext
-            .VulnerabilityDefinitions.IgnoreQueryFilters()
+            .Vulnerabilities.IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(definition => vulnerabilityDefinitionIds.Contains(definition.Id))
-            .Select(definition => new
+            .Where(v => vulnerabilityDefinitionIds.Contains(v.Id))
+            .Select(v => new
             {
-                definition.Id,
-                definition.ExternalId,
-                definition.Source,
-                definition.Description,
-                definition.CvssScore,
-                definition.CvssVector,
-                definition.PublishedDate,
-                ReferenceCount = definition.References.Count,
-                AffectedSoftwareCount = definition.AffectedSoftware.Count,
-                HasDefenderReference = definition.References.Any(reference =>
-                    reference.Source == "MicrosoftDefender"),
-                DefenderLastRefreshedAt = dbContext.VulnerabilityThreatAssessments
-                    .Where(assessment => assessment.VulnerabilityDefinitionId == definition.Id)
-                    .Select(assessment => assessment.DefenderLastRefreshedAt)
+                v.Id,
+                v.ExternalId,
+                v.Source,
+                v.Description,
+                v.CvssScore,
+                v.CvssVector,
+                v.PublishedDate,
+                ReferenceCount = dbContext.VulnerabilityReferences.Count(r => r.VulnerabilityId == v.Id),
+                AffectedSoftwareCount = dbContext.VulnerabilityApplicabilities.Count(a => a.VulnerabilityId == v.Id),
+                HasDefenderReference = dbContext.VulnerabilityReferences.Any(r =>
+                    r.VulnerabilityId == v.Id && r.Source == "MicrosoftDefender"),
+                DefenderLastRefreshedAt = dbContext.ThreatAssessments
+                    .Where(ta => ta.VulnerabilityId == v.Id)
+                    .Select(ta => ta.DefenderLastRefreshedAt)
                     .FirstOrDefault(),
             })
             .ToListAsync(ct);

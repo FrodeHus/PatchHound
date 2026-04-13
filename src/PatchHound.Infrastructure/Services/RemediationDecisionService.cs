@@ -299,16 +299,9 @@ public class RemediationDecisionService(
             .Distinct()
             .ToList();
 
-        var unresolvedTenantSoftwareIds = await dbContext.NormalizedSoftwareVulnerabilityProjections
-            .IgnoreQueryFilters()
-            .Where(p =>
-                p.TenantId == tenantId
-                && p.SnapshotId == snapshotId
-                && p.ResolvedAt == null
-                && tenantSoftwareIds.Contains(p.TenantSoftwareId))
-            .Select(p => p.TenantSoftwareId)
-            .Distinct()
-            .ToListAsync(ct);
+        // Phase 2: canonical exposure data not yet available via DeviceVulnerabilityExposure.
+        // Return empty — no open exposure means all active workflows are eligible to close.
+        var unresolvedTenantSoftwareIds = new List<Guid>();
 
         var workflowsToClose = activeWorkflows
             .Where(workflow => !unresolvedTenantSoftwareIds.Contains(workflow.TenantSoftwareId))

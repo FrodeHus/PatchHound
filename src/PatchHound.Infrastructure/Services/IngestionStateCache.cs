@@ -2,7 +2,6 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PatchHound.Core.Entities;
-using PatchHound.Core.Enums;
 using StackExchange.Redis;
 
 namespace PatchHound.Infrastructure.Services;
@@ -29,27 +28,13 @@ public class IngestionStateCache
         _keyPrefix = $"ingestion:{tenantId:N}:{runId:N}:";
     }
 
-    public async Task PreWarmTenantVulnerabilitiesAsync(
-        IReadOnlyList<TenantVulnerability> items,
-        CancellationToken ct)
-    {
-        if (!IsAvailable) return;
-        var db = _redis!.GetDatabase();
-        var batch = db.CreateBatch();
-        var tasks = new List<Task>(items.Count);
-        foreach (var item in items)
-        {
-            var key = $"{_keyPrefix}tv:{item.VulnerabilityDefinition.ExternalId}";
-            var value = JsonSerializer.Serialize(new CachedTenantVulnerability(
-                item.Id, item.Status, item.VulnerabilityDefinitionId));
-            tasks.Add(batch.StringSetAsync(key, value, KeyExpiry));
-        }
-        batch.Execute();
-        await Task.WhenAll(tasks);
-    }
-
-    public async Task PreWarmDefinitionsAsync(
-        IReadOnlyList<VulnerabilityDefinition> items,
+    /// <summary>
+    /// Pre-warm canonical vulnerability lookup. Key: <c>vd:{ExternalId}</c>.
+    /// Replaces the legacy <c>PreWarmTenantVulnerabilitiesAsync</c> and
+    /// <c>PreWarmDefinitionsAsync</c> (both keyed on ExternalId).
+    /// </summary>
+    public async Task PreWarmVulnerabilitiesAsync(
+        IReadOnlyList<Vulnerability> items,
         CancellationToken ct)
     {
         if (!IsAvailable) return;
@@ -84,75 +69,6 @@ public class IngestionStateCache
         await Task.WhenAll(tasks);
     }
 
-    public async Task PreWarmProjectionsAsync(
-        IReadOnlyList<VulnerabilityAsset> items,
-        CancellationToken ct)
-    {
-        if (!IsAvailable) return;
-        var db = _redis!.GetDatabase();
-        var batch = db.CreateBatch();
-        var tasks = new List<Task>(items.Count);
-        foreach (var item in items)
-        {
-            var key = $"{_keyPrefix}va:{item.TenantVulnerabilityId:N}:{item.AssetId:N}";
-            tasks.Add(batch.StringSetAsync(key, "1", KeyExpiry));
-        }
-        batch.Execute();
-        await Task.WhenAll(tasks);
-    }
-
-    public async Task PreWarmOpenEpisodesAsync(
-        IReadOnlyList<VulnerabilityAssetEpisode> items,
-        CancellationToken ct)
-    {
-        if (!IsAvailable) return;
-        var db = _redis!.GetDatabase();
-        var batch = db.CreateBatch();
-        var tasks = new List<Task>(items.Count);
-        foreach (var item in items)
-        {
-            var key = $"{_keyPrefix}ep:{item.TenantVulnerabilityId:N}:{item.AssetId:N}";
-            var value = JsonSerializer.Serialize(new CachedEpisode(item.Id, item.EpisodeNumber));
-            tasks.Add(batch.StringSetAsync(key, value, KeyExpiry));
-        }
-        batch.Execute();
-        await Task.WhenAll(tasks);
-    }
-
-    public async Task PreWarmLatestEpisodeNumbersAsync(
-        IReadOnlyList<(Guid TenantVulnerabilityId, Guid AssetId, int EpisodeNumber)> items,
-        CancellationToken ct)
-    {
-        if (!IsAvailable) return;
-        var db = _redis!.GetDatabase();
-        var batch = db.CreateBatch();
-        var tasks = new List<Task>(items.Count);
-        foreach (var item in items)
-        {
-            var key = $"{_keyPrefix}epmax:{item.TenantVulnerabilityId:N}:{item.AssetId:N}";
-            tasks.Add(batch.StringSetAsync(key, item.EpisodeNumber.ToString(), KeyExpiry));
-        }
-        batch.Execute();
-        await Task.WhenAll(tasks);
-    }
-
-    public async Task PreWarmAssessmentsAsync(
-        IReadOnlyList<VulnerabilityAssetAssessment> items,
-        CancellationToken ct)
-    {
-        if (!IsAvailable) return;
-        var db = _redis!.GetDatabase();
-        var batch = db.CreateBatch();
-        var tasks = new List<Task>(items.Count);
-        foreach (var item in items)
-        {
-            var key = $"{_keyPrefix}assess:{item.TenantVulnerabilityId:N}:{item.AssetId:N}";
-            tasks.Add(batch.StringSetAsync(key, "1", KeyExpiry));
-        }
-        batch.Execute();
-        await Task.WhenAll(tasks);
-    }
-
     public async Task CleanupAsync(CancellationToken ct)
     {
         if (!IsAvailable || string.IsNullOrEmpty(_keyPrefix)) return;
@@ -175,8 +91,6 @@ public class IngestionStateCache
         }
     }
 
-    internal sealed record CachedTenantVulnerability(Guid Id, VulnerabilityStatus Status, Guid DefinitionId);
     internal sealed record CachedDefinition(Guid Id, string ExternalId, string Source);
     internal sealed record CachedAsset(Guid Id, string ExternalId);
-    internal sealed record CachedEpisode(Guid Id, int EpisodeNumber);
 }
