@@ -110,8 +110,8 @@ public static class DependencyInjection
         services.AddScoped<StagedAssetMergeService>();
         services.AddScoped<IngestionStateCache>();
         services.AddScoped<TenantSnapshotResolver>();
-        services.AddScoped<IEnrichmentSourceRunner, NvdVulnerabilityEnrichmentRunner>();
-        services.AddScoped<IEnrichmentSourceRunner, DefenderVulnerabilityEnrichmentRunner>();
+        services.AddScoped<NvdVulnerabilityEnrichmentRunner>();
+        services.AddScoped<DefenderVulnerabilityEnrichmentRunner>();
         services.AddScoped<IEnrichmentSourceRunner, EndOfLifeSoftwareEnrichmentRunner>();
         services.AddScoped<IEnrichmentSourceRunner, SupplyChainEvidenceEnrichmentRunner>();
         services.AddScoped<AiReportService>();
@@ -166,6 +166,7 @@ public static class DependencyInjection
 
         // Vulnerability Sources
         services.AddScoped<IVulnerabilitySource, DefenderVulnerabilitySource>();
+        services.AddScoped<NvdVulnerabilitySource>();
         services
             .AddHttpClient<DefenderApiClient>()
             .AddDefenderHttpPolicies();

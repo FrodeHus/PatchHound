@@ -170,8 +170,23 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     // so each query gets the current user's tenant list.
     private IReadOnlyList<Guid> AccessibleTenantIds =>
         _serviceProvider.GetService<ITenantContext>()?.AccessibleTenantIds ?? [];
+
+    // Local override: when set to true, bypasses tenant query filters for the
+    // current db context instance. Used by background enrichment runners that
+    // write global (non-tenant) canonical entities under system context.
+    private bool? _systemContextOverride;
+
+    /// <summary>
+    /// Temporarily override the system-context flag for this db context instance.
+    /// Call <c>SetSystemContext(true)</c> before writing global entities, and
+    /// <c>SetSystemContext(false)</c> (or dispose) when done.
+    /// </summary>
+    public void SetSystemContext(bool value) => _systemContextOverride = value;
+
     private bool IsSystemContext =>
-        _serviceProvider.GetService<ITenantContext>()?.IsSystemContext ?? false;
+        _systemContextOverride
+        ?? _serviceProvider.GetService<ITenantContext>()?.IsSystemContext
+        ?? false;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
