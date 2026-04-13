@@ -103,12 +103,8 @@ public class SoftwareDescriptionGenerationService
             .Cast<string>()
             .ToListAsync(ct);
 
-        var activeVulnerabilityCount = await _dbContext
-            .NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
-            .CountAsync(
-                item => item.TenantSoftwareId == tenantSoftwareId && item.ResolvedAt == null,
-                ct
-            );
+        // Phase-2 stub: NormalizedSoftwareVulnerabilityProjection deleted; restored in Phase 3.
+        var activeVulnerabilityCount = 0;
 
         var resolvedProfileResult = tenantAiProfileId.HasValue
             ? await _configurationResolver.ResolveByIdAsync(tenantId, tenantAiProfileId.Value, ct)

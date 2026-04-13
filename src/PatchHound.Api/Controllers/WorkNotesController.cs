@@ -195,10 +195,11 @@ public class WorkNotesController : ControllerBase
 
         Guid? tenantId = internalEntityType switch
         {
-            "TenantVulnerability" => await _dbContext.TenantVulnerabilities
+            // Canonical Vulnerability is a global entity — scope to current tenant context.
+            "TenantVulnerability" => await _dbContext.Vulnerabilities
                 .IgnoreQueryFilters()
                 .Where(v => v.Id == entityId)
-                .Select(v => (Guid?)v.TenantId)
+                .Select(_ => (Guid?)_tenantContext.CurrentTenantId)
                 .FirstOrDefaultAsync(ct),
             "TenantSoftware" or "TenantSoftwareRemediation" => await _dbContext.TenantSoftware
                 .IgnoreQueryFilters()

@@ -24,9 +24,6 @@ public class IngestionService
     private readonly PatchHoundDbContext _dbContext;
     private readonly IEnumerable<IVulnerabilitySource> _sources;
     private readonly EnrichmentJobEnqueuer _enrichmentJobEnqueuer;
-    private readonly VulnerabilityAssessmentService _assessmentService;
-    private readonly SoftwareVulnerabilityMatchService _softwareVulnerabilityMatchService;
-    private readonly StagedVulnerabilityMergeService _stagedVulnerabilityMergeService;
     private readonly IStagedDeviceMergeService _stagedDeviceMergeService;
     private readonly IDeviceRuleEvaluationService _deviceRuleEvaluationService;
     private readonly RiskScoreService _riskScoreService;
@@ -39,9 +36,6 @@ public class IngestionService
         PatchHoundDbContext dbContext,
         IEnumerable<IVulnerabilitySource> sources,
         EnrichmentJobEnqueuer enrichmentJobEnqueuer,
-        VulnerabilityAssessmentService assessmentService,
-        SoftwareVulnerabilityMatchService softwareVulnerabilityMatchService,
-        StagedVulnerabilityMergeService stagedVulnerabilityMergeService,
         IStagedDeviceMergeService stagedDeviceMergeService,
         IDeviceRuleEvaluationService deviceRuleEvaluationService,
         RiskScoreService riskScoreService,
@@ -51,9 +45,6 @@ public class IngestionService
             dbContext,
             sources,
             enrichmentJobEnqueuer,
-            assessmentService,
-            softwareVulnerabilityMatchService,
-            stagedVulnerabilityMergeService,
             stagedDeviceMergeService,
             deviceRuleEvaluationService,
             riskScoreService,
@@ -65,9 +56,6 @@ public class IngestionService
         PatchHoundDbContext dbContext,
         IEnumerable<IVulnerabilitySource> sources,
         EnrichmentJobEnqueuer enrichmentJobEnqueuer,
-        VulnerabilityAssessmentService assessmentService,
-        SoftwareVulnerabilityMatchService softwareVulnerabilityMatchService,
-        StagedVulnerabilityMergeService stagedVulnerabilityMergeService,
         IStagedDeviceMergeService stagedDeviceMergeService,
         IDeviceRuleEvaluationService deviceRuleEvaluationService,
         RiskScoreService riskScoreService,
@@ -78,9 +66,6 @@ public class IngestionService
         _dbContext = dbContext;
         _sources = sources;
         _enrichmentJobEnqueuer = enrichmentJobEnqueuer;
-        _assessmentService = assessmentService;
-        _softwareVulnerabilityMatchService = softwareVulnerabilityMatchService;
-        _stagedVulnerabilityMergeService = stagedVulnerabilityMergeService;
         _stagedDeviceMergeService = stagedDeviceMergeService;
         _deviceRuleEvaluationService = deviceRuleEvaluationService;
         _riskScoreService = riskScoreService;
@@ -565,16 +550,9 @@ public class IngestionService
                                 ct
                             );
                             var softwareMatchStartedAt = DateTimeOffset.UtcNow;
+                            // phase-3: re-introduce SoftwareVulnerabilityMatchService once DeviceVulnerabilityExposure is in place
                             await ExecuteWithConcurrencyRetryAsync(
-                                async () =>
-                                {
-                                    await _softwareVulnerabilityMatchService.SyncForTenantAsync(
-                                        tenantId,
-                                        softwareSnapshot.Id,
-                                        ct
-                                    );
-                                    return true;
-                                },
+                                () => Task.FromResult(true),
                                 source.SourceName,
                                 tenantId,
                                 ct
@@ -610,15 +588,9 @@ public class IngestionService
                         else
                         {
                             var softwareMatchStartedAt = DateTimeOffset.UtcNow;
+                            // phase-3: re-introduce SoftwareVulnerabilityMatchService once DeviceVulnerabilityExposure is in place
                             await ExecuteWithConcurrencyRetryAsync(
-                                async () =>
-                                {
-                                    await _softwareVulnerabilityMatchService.SyncForTenantAsync(
-                                        tenantId,
-                                        ct
-                                    );
-                                    return true;
-                                },
+                                () => Task.FromResult(true),
                                 source.SourceName,
                                 tenantId,
                                 ct
@@ -1931,16 +1903,16 @@ public class IngestionService
             return;
         }
 
-        var vulnerabilityDefinitionIds = await _dbContext
-            .TenantVulnerabilities.IgnoreQueryFilters()
-            .Where(item => item.TenantId == tenantId && externalIds.Contains(item.VulnerabilityDefinition.ExternalId))
-            .Select(item => item.VulnerabilityDefinitionId)
+        var vulnerabilityIds = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
+            .Where(v => externalIds.Contains(v.ExternalId))
+            .Select(v => v.Id)
             .Distinct()
             .ToListAsync(ct);
 
         await _enrichmentJobEnqueuer.EnqueueVulnerabilityJobsAsync(
             tenantId,
-            vulnerabilityDefinitionIds,
+            vulnerabilityIds,
             ct
         );
 
@@ -2023,16 +1995,12 @@ public class IngestionService
                 softwareSnapshot.Id,
                 ct
             );
-            await _softwareVulnerabilityMatchService.SyncForTenantAsync(
-                tenantId,
-                softwareSnapshot.Id,
-                ct
-            );
+            // phase-3: re-introduce SoftwareVulnerabilityMatchService once DeviceVulnerabilityExposure is in place
             await PublishSnapshotAsync(tenantId, run.SourceKey, softwareSnapshot.Id, ct);
         }
         else
         {
-            await _softwareVulnerabilityMatchService.SyncForTenantAsync(tenantId, ct);
+            // phase-3: re-introduce SoftwareVulnerabilityMatchService once DeviceVulnerabilityExposure is in place
         }
     }
 
@@ -2045,15 +2013,15 @@ public class IngestionService
         CancellationToken ct
     )
     {
-        return await _stagedVulnerabilityMergeService.ProcessAsync(
-            ingestionRunId,
-            tenantId,
-            sourceKey,
-            snapshotId,
-            sourceName,
-            UpdateVulnerabilityMergeProgressAsync,
-            ct
-        );
+        // phase-3: re-introduce staged vulnerability merge against DeviceVulnerabilityExposure
+        // (StagedVulnerabilityMergeService deleted in Phase 2)
+        var stagedCount = await _dbContext
+            .StagedVulnerabilities.IgnoreQueryFilters()
+            .CountAsync(item => item.IngestionRunId == ingestionRunId, ct);
+
+        await UpdateVulnerabilityMergeProgressAsync(stagedCount, 0, ct);
+
+        return new StagedVulnerabilityMergeSummary(stagedCount, 0, 0, 0, 0, 0);
 
         async Task UpdateVulnerabilityMergeProgressAsync(
             int stagedVulnerabilityCount,
@@ -2568,49 +2536,13 @@ public class IngestionService
                 .NormalizedSoftwareInstallations.IgnoreQueryFilters()
                 .Where(item => item.SnapshotId == snapshotId)
                 .ToListAsync(ct);
-            var softwareMatches = await _dbContext
-                .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
-                .Where(item => item.SnapshotId == snapshotId)
-                .ToListAsync(ct);
-            var softwareProjections = await _dbContext
-                .NormalizedSoftwareVulnerabilityProjections.IgnoreQueryFilters()
-                .Where(item => item.SnapshotId == snapshotId)
-                .ToListAsync(ct);
-            var vulnerabilityAssets = await _dbContext
-                .VulnerabilityAssets.IgnoreQueryFilters()
-                .Where(item => item.SnapshotId == snapshotId)
-                .ToListAsync(ct);
-            var assessments = await _dbContext
-                .VulnerabilityAssetAssessments.IgnoreQueryFilters()
-                .Where(item => item.SnapshotId == snapshotId)
-                .ToListAsync(ct);
 
             _dbContext.TenantSoftware.RemoveRange(tenantSoftware);
             _dbContext.NormalizedSoftwareInstallations.RemoveRange(installations);
-            _dbContext.SoftwareVulnerabilityMatches.RemoveRange(softwareMatches);
-            _dbContext.NormalizedSoftwareVulnerabilityProjections.RemoveRange(softwareProjections);
-            _dbContext.VulnerabilityAssets.RemoveRange(vulnerabilityAssets);
-            _dbContext.VulnerabilityAssetAssessments.RemoveRange(assessments);
             await _dbContext.SaveChangesAsync(ct);
             return;
         }
 
-        await _dbContext
-            .VulnerabilityAssetAssessments.IgnoreQueryFilters()
-            .Where(item => item.SnapshotId == snapshotId)
-            .ExecuteDeleteAsync(ct);
-        await _dbContext
-            .VulnerabilityAssets.IgnoreQueryFilters()
-            .Where(item => item.SnapshotId == snapshotId)
-            .ExecuteDeleteAsync(ct);
-        await _dbContext
-            .NormalizedSoftwareVulnerabilityProjections.IgnoreQueryFilters()
-            .Where(item => item.SnapshotId == snapshotId)
-            .ExecuteDeleteAsync(ct);
-        await _dbContext
-            .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
-            .Where(item => item.SnapshotId == snapshotId)
-            .ExecuteDeleteAsync(ct);
         await _dbContext
             .NormalizedSoftwareInstallations.IgnoreQueryFilters()
             .Where(item => item.SnapshotId == snapshotId)
@@ -2799,4 +2731,15 @@ internal sealed record IngestionArtifactCleanupSummary(
     int PrunedExposureCount,
     int PrunedAssetCount,
     int PrunedSoftwareLinkCount
+);
+
+// Defined here after StagedVulnerabilityMergeService was deleted in Phase 2.
+// Phase 3 will replace this with a proper merge summary from DeviceVulnerabilityExposure processing.
+internal sealed record StagedVulnerabilityMergeSummary(
+    int StagedVulnerabilityCount,
+    int PersistedVulnerabilityCount,
+    int StagedExposureCount,
+    int MergedExposureCount,
+    int OpenedProjectionCount,
+    int ResolvedProjectionCount
 );

@@ -56,11 +56,9 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
         nameof(StagedVulnerabilityExposure),
         nameof(StagedDeviceSoftwareInstallation),
         nameof(TenantSoftwareRiskScore),
-        nameof(VulnerabilityAssetAssessment),
         nameof(TeamRiskScore),
         nameof(AssetRiskScore),
         nameof(DeviceGroupRiskScore),
-        nameof(VulnerabilityEpisodeRiskAssessment),
         nameof(TenantRiskScoreSnapshot),
     };
 

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { z } from 'zod'
 import { fetchVulnerabilities } from '@/api/vulnerabilities.functions'
 import { VulnerabilityTable } from '@/components/features/vulnerabilities/VulnerabilityTable'
 import { useTenantScope } from '@/components/layout/tenant-scope'
@@ -13,10 +12,8 @@ import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
   severity: searchStringSchema,
-  status: z.string().catch(vulnerabilityStatusOptions[0]),
+  status: searchStringSchema,
   source: searchStringSchema,
-  recurrenceOnly: searchBooleanSchema,
-  presentOnly: searchBooleanSchema.catch(true),
   minAgeDays: searchStringSchema,
   publicExploitOnly: searchBooleanSchema,
   knownExploitedOnly: searchBooleanSchema,
@@ -62,8 +59,6 @@ function VulnerabilitiesPage() {
         severityFilter={search.severity}
         statusFilter={search.status}
         sourceFilter={search.source}
-        presentOnly={search.presentOnly}
-        recurrenceOnly={search.recurrenceOnly}
         minAgeDays={search.minAgeDays}
         publicExploitOnly={search.publicExploitOnly}
         knownExploitedOnly={search.knownExploitedOnly}
@@ -86,12 +81,6 @@ function VulnerabilitiesPage() {
         onPageSizeChange={(nextPageSize) => {
           searchActions.updatePageSize(nextPageSize)
         }}
-        onRecurrenceOnlyChange={(value) => {
-          searchActions.updateField('recurrenceOnly', value)
-        }}
-        onPresentOnlyChange={(value) => {
-          searchActions.updateField('presentOnly', value)
-        }}
         onMinAgeDaysChange={(value) => {
           searchActions.updateField('minAgeDays', value)
         }}
@@ -109,8 +98,6 @@ function VulnerabilitiesPage() {
             severity: filters.severity,
             status: filters.status,
             source: filters.source,
-            recurrenceOnly: filters.recurrenceOnly,
-            presentOnly: filters.presentOnly,
             minAgeDays: filters.minAgeDays,
             publicExploitOnly: filters.publicExploitOnly,
             knownExploitedOnly: filters.knownExploitedOnly,
@@ -123,8 +110,6 @@ function VulnerabilitiesPage() {
             severity: '',
             status: vulnerabilityStatusOptions[0],
             source: '',
-            recurrenceOnly: false,
-            presentOnly: true,
             minAgeDays: '',
             publicExploitOnly: false,
             knownExploitedOnly: false,

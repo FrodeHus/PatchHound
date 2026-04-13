@@ -31,12 +31,12 @@ public class EnrichmentJobEnqueuerTests : IDisposable
     )
     {
         var tenantId = Guid.NewGuid();
-        var definition = VulnerabilityDefinition.Create(
+        var vulnerability = Vulnerability.Create(
+            "MicrosoftDefender",
             "CVE-2026-4242",
             "Test title",
             string.Empty,
             Severity.High,
-            "MicrosoftDefender",
             cvssScore: 8.0m,
             cvssVector: null,
             publishedDate: null
@@ -52,14 +52,14 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             tenantId,
             "nvd",
             EnrichmentTargetModel.Vulnerability,
-            definition.Id,
-            definition.ExternalId,
+            vulnerability.Id,
+            vulnerability.ExternalId,
             100,
             DateTimeOffset.UtcNow.AddHours(-1)
         );
         job.Complete(existingStatus, DateTimeOffset.UtcNow.AddMinutes(-30));
 
-        await _dbContext.VulnerabilityDefinitions.AddAsync(definition);
+        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
         await _dbContext.EnrichmentSourceConfigurations.AddAsync(source);
         await _dbContext.EnrichmentJobs.AddAsync(job);
         await _dbContext.SaveChangesAsync();
@@ -69,7 +69,7 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
 
-        await enqueuer.EnqueueVulnerabilityJobsAsync(tenantId, [definition.Id], CancellationToken.None);
+        await enqueuer.EnqueueVulnerabilityJobsAsync(tenantId, [vulnerability.Id], CancellationToken.None);
 
         var refreshedJob = await _dbContext.EnrichmentJobs.IgnoreQueryFilters().SingleAsync();
         refreshedJob.Status.Should().Be(EnrichmentJobStatus.Pending);
@@ -81,12 +81,12 @@ public class EnrichmentJobEnqueuerTests : IDisposable
     {
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
-        var definition = VulnerabilityDefinition.Create(
+        var vulnerability = Vulnerability.Create(
+            "MicrosoftDefender",
             "CVE-2026-4243",
             "Test title",
             string.Empty,
             Severity.High,
-            "MicrosoftDefender",
             cvssScore: 8.0m,
             cvssVector: null,
             publishedDate: null
@@ -102,14 +102,14 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             tenantA,
             "nvd",
             EnrichmentTargetModel.Vulnerability,
-            definition.Id,
-            definition.ExternalId,
+            vulnerability.Id,
+            vulnerability.ExternalId,
             100,
             DateTimeOffset.UtcNow.AddHours(-1)
         );
         existingJob.Complete(EnrichmentJobStatus.Succeeded, DateTimeOffset.UtcNow.AddMinutes(-30));
 
-        await _dbContext.VulnerabilityDefinitions.AddAsync(definition);
+        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
         await _dbContext.EnrichmentSourceConfigurations.AddAsync(source);
         await _dbContext.EnrichmentJobs.AddAsync(existingJob);
         await _dbContext.SaveChangesAsync();
@@ -119,7 +119,7 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
 
-        await enqueuer.EnqueueVulnerabilityJobsAsync(tenantB, [definition.Id], CancellationToken.None);
+        await enqueuer.EnqueueVulnerabilityJobsAsync(tenantB, [vulnerability.Id], CancellationToken.None);
 
         var jobs = await _dbContext.EnrichmentJobs.IgnoreQueryFilters().ToListAsync();
         jobs.Should().HaveCount(1);
@@ -136,22 +136,38 @@ public class EnrichmentJobEnqueuerTests : IDisposable
     public async Task EnqueueVulnerabilityJobsAsync_WhenDefenderReferenceIsFresh_DoesNotQueueDefenderJob()
     {
         var tenantId = Guid.NewGuid();
-        var definition = VulnerabilityDefinition.Create(
+        var vulnerability = Vulnerability.Create(
+            "MicrosoftDefender",
             "CVE-2026-7777",
             "Test title",
             string.Empty,
             Severity.High,
-            "MicrosoftDefender",
             cvssScore: 8.0m,
             cvssVector: null,
             publishedDate: null
         );
-        var reference = VulnerabilityDefinitionReference.Create(
-            definition.Id,
+        var reference = VulnerabilityReference.Create(
+            vulnerability.Id,
             "https://api.securitycenter.microsoft.com/api/vulnerabilities/CVE-2026-7777",
             "MicrosoftDefender",
             ["Public Exploit"]
         );
+        var assessment = ThreatAssessment.Create(
+            vulnerability.Id,
+            72m,
+            70m,
+            75m,
+            65m,
+            0.5m,
+            false,
+            true,
+            false,
+            false,
+            false,
+            "[]",
+            "1"
+        );
+        assessment.MarkDefenderRefreshed(DateTimeOffset.UtcNow);
 
         var defenderSource = EnrichmentSourceConfiguration.Create(
             EnrichmentSourceCatalog.DefenderSourceKey,
@@ -171,28 +187,12 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             "client",
             TenantSourceCatalog.DefaultDefenderTokenScope
         );
-        var assessment = VulnerabilityThreatAssessment.Create(
-            definition.Id,
-            72m,
-            70m,
-            75m,
-            65m,
-            0.5m,
-            false,
-            true,
-            false,
-            false,
-            false,
-            "[]",
-            VulnerabilityThreatAssessmentService.CalculationVersion
-        );
-        assessment.MarkDefenderRefreshed(DateTimeOffset.UtcNow);
 
-        await _dbContext.VulnerabilityDefinitions.AddAsync(definition);
-        await _dbContext.VulnerabilityDefinitionReferences.AddAsync(reference);
+        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
+        await _dbContext.VulnerabilityReferences.AddAsync(reference);
+        await _dbContext.ThreatAssessments.AddAsync(assessment);
         await _dbContext.EnrichmentSourceConfigurations.AddAsync(defenderSource);
         await _dbContext.TenantSourceConfigurations.AddAsync(tenantDefenderSource);
-        await _dbContext.VulnerabilityThreatAssessments.AddAsync(assessment);
         await _dbContext.SaveChangesAsync();
 
         var enqueuer = new EnrichmentJobEnqueuer(
@@ -200,7 +200,7 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
 
-        await enqueuer.EnqueueVulnerabilityJobsAsync(tenantId, [definition.Id], CancellationToken.None);
+        await enqueuer.EnqueueVulnerabilityJobsAsync(tenantId, [vulnerability.Id], CancellationToken.None);
 
         var jobs = await _dbContext.EnrichmentJobs.IgnoreQueryFilters().ToListAsync();
         jobs.Should().BeEmpty();
@@ -210,21 +210,39 @@ public class EnrichmentJobEnqueuerTests : IDisposable
     public async Task EnqueueVulnerabilityJobsAsync_WhenDefenderReferenceIsStale_QueuesDefenderJob()
     {
         var tenantId = Guid.NewGuid();
-        var definition = VulnerabilityDefinition.Create(
+        var vulnerability = Vulnerability.Create(
+            "MicrosoftDefender",
             "CVE-2026-8888",
             "Test title",
             string.Empty,
             Severity.High,
-            "MicrosoftDefender",
             cvssScore: 8.0m,
             cvssVector: null,
             publishedDate: null
         );
-        var reference = VulnerabilityDefinitionReference.Create(
-            definition.Id,
+        var reference = VulnerabilityReference.Create(
+            vulnerability.Id,
             "https://api.securitycenter.microsoft.com/api/vulnerabilities/CVE-2026-8888",
             "MicrosoftDefender",
             ["Public Exploit"]
+        );
+        var assessment = ThreatAssessment.Create(
+            vulnerability.Id,
+            72m,
+            70m,
+            75m,
+            65m,
+            0.5m,
+            false,
+            true,
+            false,
+            false,
+            false,
+            "[]",
+            "1"
+        );
+        assessment.MarkDefenderRefreshed(
+            DateTimeOffset.UtcNow.Subtract(EnrichmentJobEnqueuer.DefaultDefenderRefreshTtl).AddMinutes(-1)
         );
 
         var defenderSource = EnrichmentSourceConfiguration.Create(
@@ -245,30 +263,12 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             "client",
             TenantSourceCatalog.DefaultDefenderTokenScope
         );
-        var assessment = VulnerabilityThreatAssessment.Create(
-            definition.Id,
-            72m,
-            70m,
-            75m,
-            65m,
-            0.5m,
-            false,
-            true,
-            false,
-            false,
-            false,
-            "[]",
-            VulnerabilityThreatAssessmentService.CalculationVersion
-        );
-        assessment.MarkDefenderRefreshed(
-            DateTimeOffset.UtcNow.Subtract(EnrichmentJobEnqueuer.DefaultDefenderRefreshTtl).AddMinutes(-1)
-        );
 
-        await _dbContext.VulnerabilityDefinitions.AddAsync(definition);
-        await _dbContext.VulnerabilityDefinitionReferences.AddAsync(reference);
+        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
+        await _dbContext.VulnerabilityReferences.AddAsync(reference);
+        await _dbContext.ThreatAssessments.AddAsync(assessment);
         await _dbContext.EnrichmentSourceConfigurations.AddAsync(defenderSource);
         await _dbContext.TenantSourceConfigurations.AddAsync(tenantDefenderSource);
-        await _dbContext.VulnerabilityThreatAssessments.AddAsync(assessment);
         await _dbContext.SaveChangesAsync();
 
         var enqueuer = new EnrichmentJobEnqueuer(
@@ -276,7 +276,7 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
 
-        await enqueuer.EnqueueVulnerabilityJobsAsync(tenantId, [definition.Id], CancellationToken.None);
+        await enqueuer.EnqueueVulnerabilityJobsAsync(tenantId, [vulnerability.Id], CancellationToken.None);
 
         var jobs = await _dbContext.EnrichmentJobs.IgnoreQueryFilters().ToListAsync();
         jobs.Should().ContainSingle();

@@ -12,7 +12,7 @@ public class AIReportConfiguration : IEntityTypeConfiguration<AIReport>
 
         builder.HasIndex(r => r.TenantId);
         builder.HasIndex(r => r.TenantAiProfileId);
-        builder.HasIndex(r => r.TenantVulnerabilityId);
+        builder.HasIndex(r => r.VulnerabilityId);
 
         builder.Property(r => r.Content).HasColumnType("text").IsRequired();
         builder.Property(r => r.ProviderType).HasMaxLength(32).IsRequired();
@@ -22,9 +22,9 @@ public class AIReportConfiguration : IEntityTypeConfiguration<AIReport>
         builder.Property(r => r.Temperature).HasPrecision(4, 2);
 
         builder
-            .HasOne(r => r.TenantVulnerability)
+            .HasOne(r => r.Vulnerability)
             .WithMany()
-            .HasForeignKey(r => r.TenantVulnerabilityId)
+            .HasForeignKey(r => r.VulnerabilityId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder

@@ -264,19 +264,9 @@ public class EmailNotificationService(
         if (string.IsNullOrWhiteSpace(softwareName))
             return null;
 
-        var severity = await dbContext.NormalizedSoftwareVulnerabilityProjections.AsNoTracking()
-            .Where(item =>
-                item.TenantId == tenantId
-                && item.TenantSoftwareId == tenantSoftwareId
-                && item.ResolvedAt == null)
-            .Join(
-                dbContext.VulnerabilityDefinitions.AsNoTracking(),
-                projection => projection.VulnerabilityDefinitionId,
-                definition => definition.Id,
-                (projection, definition) => definition.VendorSeverity
-            )
-            .OrderByDescending(item => item)
-            .FirstOrDefaultAsync(ct);
+        // Phase 2: canonical exposure data not yet available; default to Medium.
+        // Phase 3 will rewire severity via DeviceVulnerabilityExposure.
+        var severity = Severity.Medium;
 
         var affectedDeviceCount = ownerTeamId.HasValue
             ? await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
@@ -305,7 +295,7 @@ public class EmailNotificationService(
 
         return new RemediationSummary(
             softwareName,
-            (severity == default ? Severity.Medium : severity).ToString(),
+            severity.ToString(),
             affectedDeviceCount
         );
     }

@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
 using PatchHound.Infrastructure.Data;
-using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Infrastructure.Services;
 
@@ -321,7 +320,7 @@ public class RiskScoreService(
         )).ToList());
     }
 
-    public async Task<TenantRiskResult> GetFilteredTenantRiskAsync(
+    public Task<TenantRiskResult> GetFilteredTenantRiskAsync(
         Guid tenantId,
         int? minAgeDays,
         string? platform,
@@ -329,42 +328,9 @@ public class RiskScoreService(
         CancellationToken ct
     )
     {
-        var publishedBefore = minAgeDays.HasValue
-            ? DateTime.UtcNow.Date.AddDays(-minAgeDays.Value)
-            : (DateTime?)null;
-
-        // Phase 1 canonical baseline: the device filter joins canonical Device rows
-        // via VulnerabilityEpisodeRiskAssessment.AssetId. Phase 5 rewires the episode
-        // → device linkage once Phase 3 canonicalizes exposure; until then, tests and
-        // ingestion that seed this path must populate episode.AssetId with a Device.Id.
-        var episodeScores = await (
-            from episodeRisk in dbContext.VulnerabilityEpisodeRiskAssessments.AsNoTracking()
-            join device in dbContext.Devices.AsNoTracking()
-                on episodeRisk.AssetId equals device.Id
-            join tenantVulnerability in dbContext.TenantVulnerabilities.AsNoTracking()
-                on episodeRisk.TenantVulnerabilityId equals tenantVulnerability.Id
-            join definition in dbContext.VulnerabilityDefinitions.AsNoTracking()
-                on tenantVulnerability.VulnerabilityDefinitionId equals definition.Id
-            where episodeRisk.TenantId == tenantId
-                  && episodeRisk.ResolvedAt == null
-                  && device.TenantId == tenantId
-                  && (string.IsNullOrWhiteSpace(platform) || device.OsPlatform == platform)
-                  && (string.IsNullOrWhiteSpace(deviceGroup) || device.GroupName == deviceGroup)
-                  && (!publishedBefore.HasValue
-                      || (definition.PublishedDate.HasValue && definition.PublishedDate.Value <= publishedBefore.Value))
-            select new
-            {
-                episodeRisk.AssetId,
-                episodeRisk.EpisodeRiskScore,
-                episodeRisk.RiskBand,
-            }
-        ).ToListAsync(ct);
-
-        return CalculateTenantRisk(BuildAssetRiskResults(episodeScores.Select(item => (
-            item.AssetId,
-            item.EpisodeRiskScore,
-            item.RiskBand
-        ))));
+        // Phase 2: canonical exposure data not yet available via DeviceVulnerabilityExposure.
+        // Phase 5 will rewire this query against the canonical exposure graph.
+        return Task.FromResult(CalculateTenantRisk([]));
     }
 
     public async Task<List<TenantRiskScoreSnapshot>> GetRiskHistoryAsync(Guid tenantId, CancellationToken ct)
@@ -414,23 +380,11 @@ public class RiskScoreService(
         );
     }
 
-    private async Task<List<AssetRiskResult>> CalculateAssetScoresAsync(Guid tenantId, CancellationToken ct)
+    private Task<List<AssetRiskResult>> CalculateAssetScoresAsync(Guid tenantId, CancellationToken ct)
     {
-        var episodeScores = await dbContext.VulnerabilityEpisodeRiskAssessments
-            .Where(item => item.TenantId == tenantId && item.ResolvedAt == null)
-            .Select(item => new
-            {
-                item.AssetId,
-                item.EpisodeRiskScore,
-                item.RiskBand,
-            })
-            .ToListAsync(ct);
-
-        return BuildAssetRiskResults(episodeScores.Select(item => (
-            item.AssetId,
-            item.EpisodeRiskScore,
-            item.RiskBand
-        )));
+        // Phase 2: canonical exposure data not yet available via DeviceVulnerabilityExposure.
+        // Phase 5 will rewire this against the canonical exposure graph.
+        return Task.FromResult(new List<AssetRiskResult>());
     }
 
     private static List<AssetRiskResult> BuildAssetRiskResults(
@@ -490,105 +444,14 @@ public class RiskScoreService(
             .ToList();
     }
 
-    private async Task<List<SoftwareRiskResult>> CalculateSoftwareScoresAsync(
+    private Task<List<SoftwareRiskResult>> CalculateSoftwareScoresAsync(
         Guid tenantId,
         CancellationToken ct
     )
     {
-        var activeSnapshotId = await dbContext.TenantSourceConfigurations
-            .AsNoTracking()
-            .Where(item =>
-                item.TenantId == tenantId
-                && item.SourceKey == TenantSourceCatalog.DefenderSourceKey
-            )
-            .Select(item => item.ActiveSnapshotId)
-            .FirstOrDefaultAsync(ct);
-
-        if (activeSnapshotId is null)
-        {
-            return [];
-        }
-
-        var episodeRows = await (
-            from installation in dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            join match in dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-                on installation.SoftwareAssetId equals match.SoftwareAssetId
-            join tenantVulnerability in dbContext.TenantVulnerabilities.AsNoTracking()
-                on new { DefinitionId = match.VulnerabilityDefinitionId, TenantId = installation.TenantId }
-                equals new { DefinitionId = tenantVulnerability.VulnerabilityDefinitionId, TenantId = tenantVulnerability.TenantId }
-            join episodeRisk in dbContext.VulnerabilityEpisodeRiskAssessments.AsNoTracking()
-                on new { AssetId = installation.DeviceAssetId, TenantVulnerabilityId = tenantVulnerability.Id }
-                equals new { episodeRisk.AssetId, episodeRisk.TenantVulnerabilityId }
-            where installation.TenantId == tenantId
-                  && installation.SnapshotId == activeSnapshotId
-                  && installation.IsActive
-                  && match.SnapshotId == activeSnapshotId
-                  && match.ResolvedAt == null
-                  && episodeRisk.ResolvedAt == null
-            select new
-            {
-                installation.TenantSoftwareId,
-                installation.DeviceAssetId,
-                SnapshotId = installation.SnapshotId,
-                episodeRisk.EpisodeRiskScore,
-                episodeRisk.RiskBand,
-            }
-        ).Distinct().ToListAsync(ct);
-
-        return episodeRows
-            .GroupBy(item => item.TenantSoftwareId)
-            .Select(group =>
-            {
-                var orderedScores = group
-                    .Select(item => item.EpisodeRiskScore)
-                    .OrderByDescending(score => score)
-                    .ToList();
-                var maxEpisodeRisk = orderedScores.FirstOrDefault();
-                var topThreeAverage = orderedScores.Take(3).DefaultIfEmpty(0m).Average();
-                var criticalCount = group.Count(item => item.RiskBand == "Critical");
-                var highCount = group.Count(item => item.RiskBand == "High");
-                var mediumCount = group.Count(item => item.RiskBand == "Medium");
-                var lowCount = group.Count(item => item.RiskBand == "Low");
-                var affectedDeviceCount = group.Select(item => item.DeviceAssetId).Distinct().Count();
-
-                var overallScore = Math.Clamp(
-                    Math.Round(
-                        (0.65m * maxEpisodeRisk)
-                        + (0.20m * topThreeAverage)
-                        + Math.Min(criticalCount * 30m, 120m)
-                        + Math.Min(highCount * 12m, 48m)
-                        + Math.Min(mediumCount * 4m, 16m)
-                        + Math.Min(lowCount * 1m, 6m),
-                        2),
-                    0m,
-                    1000m);
-
-                var factorsJson = JsonSerializer.Serialize(new List<RiskFactor>
-                {
-                    new("MaxEpisodeRisk", "Highest unresolved episode risk linked to the software.", maxEpisodeRisk),
-                    new("TopThreeAverage", "Average of the top three unresolved episode risks linked to the software.", Math.Round(topThreeAverage, 2)),
-                    new("CriticalEpisodes", $"{criticalCount} critical-risk software-linked episodes.", Math.Min(criticalCount * 30m, 120m)),
-                    new("HighEpisodes", $"{highCount} high-risk software-linked episodes.", Math.Min(highCount * 12m, 48m)),
-                    new("MediumEpisodes", $"{mediumCount} medium-risk software-linked episodes.", Math.Min(mediumCount * 4m, 16m)),
-                    new("LowEpisodes", $"{lowCount} low-risk software-linked episodes.", Math.Min(lowCount * 1m, 6m)),
-                });
-
-                return new SoftwareRiskResult(
-                    group.Key,
-                    group.Select(item => item.SnapshotId).FirstOrDefault(),
-                    overallScore,
-                    maxEpisodeRisk,
-                    criticalCount,
-                    highCount,
-                    mediumCount,
-                    lowCount,
-                    affectedDeviceCount,
-                    group.Count(),
-                    factorsJson
-                );
-            })
-            .OrderByDescending(item => item.OverallScore)
-            .ToList();
+        // Phase 2: canonical exposure data not yet available via DeviceVulnerabilityExposure.
+        // Phase 5 will rewire this against the canonical exposure graph.
+        return Task.FromResult(new List<SoftwareRiskResult>());
     }
 
     private async Task<List<DeviceGroupRiskResult>> CalculateDeviceGroupScoresAsync(

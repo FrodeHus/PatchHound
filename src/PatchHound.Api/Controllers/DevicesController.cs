@@ -132,9 +132,8 @@ public class DevicesController : ControllerBase
                 .Where(score => score.DeviceId == d.Id)
                 .Select(score => (decimal?)score.OverallScore)
                 .FirstOrDefault(),
-            VulnerabilityCount = _dbContext.VulnerabilityAssets
-                .IgnoreQueryFilters()
-                .Count(va => va.AssetId == d.Id && va.SnapshotId == activeSnapshotId),
+            // Phase-2 stub: VulnerabilityAssets deleted; restored by canonical exposure merge in Phase 3.
+            VulnerabilityCount = 0,
         });
 
         var deviceIds = await rankedQuery
@@ -146,24 +145,8 @@ public class DevicesController : ControllerBase
             .Select(item => item.Device.Id)
             .ToListAsync(ct);
 
-        // Phase 1 bridge: vulnerability episodes still keyed by legacy AssetId
-        // (semantically a device id). IgnoreQueryFilters because the Asset
-        // navigation filter on VulnerabilityAssetEpisodes cannot resolve for
-        // canonical Device ids without paired Asset rows.
-        var recurringCounts = await _dbContext.VulnerabilityAssetEpisodes
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(episode => deviceIds.Contains(episode.AssetId))
-            .GroupBy(episode => new { episode.AssetId, episode.TenantVulnerabilityId })
-            .Select(group => new { group.Key.AssetId, IsRecurring = group.Count() > 1 })
-            .Where(item => item.IsRecurring)
-            .GroupBy(item => item.AssetId)
-            .Select(group => new { AssetId = group.Key, Count = group.Count() })
-            .ToListAsync(ct);
-        var recurringCountsByDeviceId = recurringCounts.ToDictionary(
-            item => item.AssetId,
-            item => item.Count
-        );
+        // Phase-2 stub: VulnerabilityAssetEpisodes deleted; restored by canonical exposure merge in Phase 3.
+        var recurringCountsByDeviceId = new Dictionary<Guid, int>();
 
         var itemRows = await _dbContext.Devices
             .AsNoTracking()
@@ -186,9 +169,8 @@ public class DevicesController : ControllerBase
                     .Where(profile => profile.Id == d.SecurityProfileId)
                     .Select(profile => profile.Name)
                     .FirstOrDefault(),
-                VulnerabilityCount = _dbContext.VulnerabilityAssets
-                    .IgnoreQueryFilters()
-                    .Count(va => va.AssetId == d.Id && va.SnapshotId == activeSnapshotId),
+                // Phase-2 stub: restored by canonical exposure merge in Phase 3.
+                VulnerabilityCount = 0,
                 d.HealthStatus,
                 RiskScore = d.ExternalRiskLabel,
                 d.ExposureLevel,

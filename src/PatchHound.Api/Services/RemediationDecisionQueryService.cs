@@ -157,19 +157,8 @@ public class RemediationDecisionQueryService(
             .Select(g => g.OrderByDescending(d => d.CreatedAt).First())
             .ToDictionaryAsync(d => d.TenantSoftwareId, ct);
 
-        var openMatchRows = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(m =>
-                m.TenantId == tenantId
-                && m.ResolvedAt == null
-                && m.SnapshotId == activeSnapshotId
-                && softwareAssetIds.Contains(m.SoftwareAssetId))
-            .Join(
-                dbContext.VulnerabilityDefinitions.AsNoTracking(),
-                m => m.VulnerabilityDefinitionId,
-                v => v.Id,
-                (m, v) => new { m.SoftwareAssetId, m.FirstSeenAt, m.VulnerabilityDefinitionId, v.VendorSeverity }
-            )
-            .ToListAsync(ct);
+        // Phase-2: SoftwareVulnerabilityMatch deleted.
+        var openMatchRows = new List<(Guid SoftwareAssetId, DateTimeOffset FirstSeenAt, Guid VulnerabilityDefinitionId, Severity VendorSeverity)>();
 
         var tenantSoftwareIdBySoftwareAssetId = activeInstallations
             .GroupBy(item => item.SoftwareAssetId)
@@ -489,43 +478,16 @@ public class RemediationDecisionQueryService(
 
         var activeSnapshotId = await snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
 
-        // Load vulnerability matches
-        var matches = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(m =>
-                scopedSoftwareAssetIds.Contains(m.SoftwareAssetId)
-                && m.TenantId == tenantId
-                && m.ResolvedAt == null
-                && m.SnapshotId == activeSnapshotId
-            )
-            .Join(
-                dbContext.VulnerabilityDefinitions.AsNoTracking(),
-                m => m.VulnerabilityDefinitionId,
-                v => v.Id,
-                (m, v) => new
-                {
-                    v.Id,
-                    v.ExternalId,
-                    v.Title,
-                    v.VendorSeverity,
-                    VendorScore = v.CvssScore.HasValue ? (double?)((double)v.CvssScore.Value) : null,
-                    v.CvssVector,
-                    m.FirstSeenAt,
-                }
-            )
-            .ToListAsync(ct);
+        // Phase-2: SoftwareVulnerabilityMatch deleted.
+        var matches = new List<(Guid Id, string ExternalId, string Title, Severity VendorSeverity, double? VendorScore, string? CvssVector, DateTimeOffset FirstSeenAt)>();
 
         var vulnDefIds = matches.Select(m => m.Id).Distinct().ToList();
 
-        // Threat assessments
-        var threats = await dbContext.VulnerabilityThreatAssessments.AsNoTracking()
-            .Where(t => vulnDefIds.Contains(t.VulnerabilityDefinitionId))
-            .ToDictionaryAsync(t => t.VulnerabilityDefinitionId, ct);
+        // Phase-2: VulnerabilityThreatAssessment deleted.
+        var threats = new Dictionary<Guid, ThreatAssessment>();
 
-        // TenantVulnerability lookup
-        var tenantVulnLookup = await dbContext.TenantVulnerabilities.AsNoTracking()
-            .Where(tv => tv.TenantId == tenantId && vulnDefIds.Contains(tv.VulnerabilityDefinitionId))
-            .Select(tv => new { tv.Id, tv.VulnerabilityDefinitionId })
-            .ToListAsync(ct);
+        // Phase-2: TenantVulnerability deleted.
+        var tenantVulnLookup = new List<(Guid Id, Guid VulnerabilityDefinitionId)>();
 
         var tenantVulnIdByDefId = tenantVulnLookup
             .GroupBy(x => x.VulnerabilityDefinitionId)
@@ -538,23 +500,11 @@ public class RemediationDecisionQueryService(
             ct
         );
 
-        // Episode risk assessments for effective severity/score
-        var assessmentsByTenantVulnId = await dbContext.VulnerabilityAssetAssessments.AsNoTracking()
-            .Where(a =>
-                representativeAsset != null
-                && a.AssetId == assetId
-                && a.SnapshotId == activeSnapshotId
-                && allTenantVulnIds.Contains(a.TenantVulnerabilityId))
-            .ToDictionaryAsync(a => a.TenantVulnerabilityId, ct);
+        // Phase-2: VulnerabilityAssetAssessment deleted.
+        var assessmentsByTenantVulnId = new Dictionary<Guid, object?>();
 
-        // Episode risk scores
-        var episodeRiskScores = await dbContext.VulnerabilityEpisodeRiskAssessments.AsNoTracking()
-            .Where(r =>
-                representativeAsset != null
-                && r.AssetId == assetId
-                && allTenantVulnIds.Contains(r.TenantVulnerabilityId)
-                && r.ResolvedAt == null)
-            .ToDictionaryAsync(r => r.TenantVulnerabilityId, ct);
+        // Phase-2: VulnerabilityEpisodeRiskAssessment deleted.
+        var episodeRiskScores = new Dictionary<Guid, object?>();
 
         var activeWorkflow = await dbContext.RemediationWorkflows.AsNoTracking()
             .Where(workflow =>
@@ -634,15 +584,9 @@ public class RemediationDecisionQueryService(
 
                 if (tvId != Guid.Empty)
                 {
-                    if (assessmentsByTenantVulnId.TryGetValue(tvId, out var assessment))
-                    {
-                        effectiveSeverity = assessment.EffectiveSeverity.ToString();
-                        effectiveScore = (double?)assessment.EffectiveScore;
-                    }
-                    if (episodeRiskScores.TryGetValue(tvId, out var riskAssessment))
-                    {
-                        episodeScore = (double?)riskAssessment.EpisodeRiskScore;
-                    }
+                    // Phase-2: VulnerabilityAssetAssessment + VulnerabilityEpisodeRiskAssessment deleted.
+                    _ = assessmentsByTenantVulnId.TryGetValue(tvId, out _);
+                    _ = episodeRiskScores.TryGetValue(tvId, out _);
                 }
 
                 string? overrideOutcome = null;
@@ -665,7 +609,7 @@ public class RemediationDecisionQueryService(
                     threat?.KnownExploited ?? false,
                     threat?.PublicExploit ?? false,
                     threat?.ActiveAlert ?? false,
-                    threat is not null ? (double?)threat.EpssScore : null,
+                    threat is not null ? threat.EpssScore.HasValue ? (double?)((double)threat.EpssScore.Value) : null : null,
                     episodeScore,
                     overrideOutcome
                 );
@@ -1269,26 +1213,9 @@ public class RemediationDecisionQueryService(
         CancellationToken ct
     )
     {
-        var start = StartOfUtcDay(DateTimeOffset.UtcNow).AddDays(-29);
-        return await dbContext.VulnerabilityAssetEpisodes.AsNoTracking()
-            .Where(episode =>
-                episode.TenantId == tenantId
-                && deviceAssetIds.Contains(episode.AssetId)
-                && episode.FirstSeenAt < start.AddDays(30)
-                && (episode.ResolvedAt == null || episode.ResolvedAt >= start))
-            .Join(
-                dbContext.TenantVulnerabilities.AsNoTracking()
-                    .Where(tv => tv.TenantId == tenantId && vulnerabilityDefinitionIds.Contains(tv.VulnerabilityDefinitionId)),
-                episode => episode.TenantVulnerabilityId,
-                tenantVulnerability => tenantVulnerability.Id,
-                (episode, tenantVulnerability) => new OpenEpisodeRow(
-                    episode.AssetId,
-                    tenantVulnerability.VulnerabilityDefinitionId,
-                    episode.FirstSeenAt,
-                    episode.ResolvedAt
-                )
-            )
-            .ToListAsync(ct);
+        // Phase-2: VulnerabilityAssetEpisode + TenantVulnerability deleted.
+        await Task.CompletedTask;
+        return [];
     }
 
     private static List<OpenEpisodeTrendPointDto> BuildOpenEpisodeTrend(

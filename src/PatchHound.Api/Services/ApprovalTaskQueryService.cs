@@ -3,14 +3,12 @@ using PatchHound.Api.Models;
 using PatchHound.Api.Models.ApprovalTasks;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
-using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Api.Services;
 
 public class ApprovalTaskQueryService(
-    PatchHoundDbContext dbContext,
-    SlaService slaService
+    PatchHoundDbContext dbContext
 )
 {
     public async Task<PagedResponse<ApprovalTaskListItemDto>> ListAsync(
@@ -190,69 +188,8 @@ public class ApprovalTaskQueryService(
             .FirstOrDefaultAsync(u => u.Id == decision.DecidedBy, ct);
 
         // Vulnerabilities (paginated, sorted by severity)
-        var scopedSoftwareAssetIds = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(i => i.TenantId == tenantId && i.TenantSoftwareId == tenantSoftwareId && i.IsActive)
-            .Select(i => i.SoftwareAssetId)
-            .Distinct()
-            .ToListAsync(ct);
-        var vulnQuery = dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(m =>
-                m.TenantId == tenantId
-                && m.ResolvedAt == null
-                && scopedSoftwareAssetIds.Contains(m.SoftwareAssetId))
-            .Join(
-                dbContext.VulnerabilityDefinitions.AsNoTracking(),
-                m => m.VulnerabilityDefinitionId,
-                v => v.Id,
-                (m, v) => new { m, v }
-            )
-            .Join(
-                dbContext.TenantVulnerabilities.AsNoTracking().Where(tv => tv.TenantId == tenantId),
-                mv => mv.v.Id,
-                tv => tv.VulnerabilityDefinitionId,
-                (mv, tv) => new { mv.v, TenantVulnId = tv.Id }
-            );
-
-        var vulnTotalCount = await vulnQuery.CountAsync(ct);
-
-        // Load threats for KnownExploited and EpssScore
-        var vulnDefIds = await vulnQuery.Select(x => x.v.Id).Distinct().ToListAsync(ct);
-        var threats = await dbContext.VulnerabilityThreatAssessments.AsNoTracking()
-            .Where(t => vulnDefIds.Contains(t.VulnerabilityDefinitionId))
-            .ToDictionaryAsync(t => t.VulnerabilityDefinitionId, ct);
-
-        var vulns = await vulnQuery
-            .OrderByDescending(x => x.v.VendorSeverity)
-            .ThenByDescending(x => x.v.CvssScore)
-            .Skip(vulnPagination.Skip)
-            .Take(vulnPagination.BoundedPageSize)
-            .Select(x => new
-            {
-                x.TenantVulnId,
-                x.v.Id,
-                x.v.ExternalId,
-                x.v.Title,
-                x.v.VendorSeverity,
-                VendorScore = x.v.CvssScore.HasValue ? (double?)((double)x.v.CvssScore.Value) : null,
-            })
-            .ToListAsync(ct);
-
-        var vulnDtos = vulns.Select(v =>
-        {
-            threats.TryGetValue(v.Id, out var threat);
-            return new ApprovalVulnDto(
-                v.TenantVulnId,
-                v.ExternalId,
-                v.Title,
-                v.VendorSeverity.ToString(),
-                v.VendorScore,
-                v.VendorSeverity.ToString(),
-                threat?.KnownExploited ?? false,
-                threat is not null ? (double?)threat.EpssScore : null
-            );
-        }).ToList();
-
-        var vulnList = new PagedVulnerabilityList(vulnDtos, vulnTotalCount, vulnPagination.Page, vulnPagination.BoundedPageSize);
+        // Phase-2 stub: SoftwareVulnerabilityMatch + VulnerabilityDefinition + TenantVulnerability deleted; restored in Phase 3.
+        var vulnList = new PagedVulnerabilityList([], 0, vulnPagination.Page, vulnPagination.BoundedPageSize);
 
         // Devices in scope for the approval's software scope
         var deviceVersionCohorts = new List<ApprovalDeviceVersionCohortDto>();
@@ -276,14 +213,8 @@ public class ApprovalTaskQueryService(
             .Select(item => item.SoftwareAssetId)
             .Distinct()
             .ToList();
-        var openMatchRows = await dbContext.SoftwareVulnerabilityMatches.AsNoTracking()
-            .Where(match =>
-                match.TenantId == tenantId
-                && match.ResolvedAt == null
-                && softwareAssetIdsForInstalls.Contains(match.SoftwareAssetId))
-            .Select(match => new { match.SoftwareAssetId, match.VulnerabilityDefinitionId })
-            .Distinct()
-            .ToListAsync(ct);
+        // Phase-2 stub: SoftwareVulnerabilityMatch deleted; restored in Phase 3.
+        var openMatchRows = Array.Empty<object>().Select(_ => new { SoftwareAssetId = Guid.Empty, VulnerabilityDefinitionId = Guid.Empty }).ToList();
 
         deviceVersionCohorts = installationRows
             .GroupBy(item => NormalizeVersionKey(item.DetectedVersion))
@@ -327,11 +258,8 @@ public class ApprovalTaskQueryService(
                     Criticality = nsi.DeviceAsset.Criticality,
                     nsi.DetectedVersion,
                     nsi.LastSeenAt,
-                    OpenVulnerabilityCount = dbContext.VulnerabilityAssets
-                        .Where(link =>
-                            link.AssetId == nsi.DeviceAssetId
-                            && link.Status == Core.Enums.VulnerabilityStatus.Open)
-                        .Count(),
+                    // Phase-2 stub: VulnerabilityAsset deleted; restored in Phase 3.
+                    OpenVulnerabilityCount = 0,
                 })
                 .Distinct();
 
@@ -455,27 +383,10 @@ public class ApprovalTaskQueryService(
         return "Unknown software";
     }
 
-    private async Task<Dictionary<Guid, Severity>> GetHighestSeveritiesAsync(
+    private Task<Dictionary<Guid, Severity>> GetHighestSeveritiesAsync(
         Guid tenantId, List<Guid> tenantSoftwareIds, CancellationToken ct)
-    {
-        return await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(i => i.TenantId == tenantId && i.IsActive && tenantSoftwareIds.Contains(i.TenantSoftwareId))
-            .Join(
-                dbContext.SoftwareVulnerabilityMatches.AsNoTracking().Where(m => m.TenantId == tenantId && m.ResolvedAt == null),
-                i => i.SoftwareAssetId,
-                m => m.SoftwareAssetId,
-                (i, m) => new { i.TenantSoftwareId, m.VulnerabilityDefinitionId }
-            )
-            .Join(
-                dbContext.VulnerabilityDefinitions.AsNoTracking(),
-                x => x.VulnerabilityDefinitionId,
-                v => v.Id,
-                (x, v) => new { x.TenantSoftwareId, v.VendorSeverity }
-            )
-            .GroupBy(x => x.TenantSoftwareId)
-            .Select(g => new { TenantSoftwareId = g.Key, HighestSeverity = g.Max(x => x.VendorSeverity) })
-            .ToDictionaryAsync(x => x.TenantSoftwareId, x => x.HighestSeverity, ct);
-    }
+        // Phase-2 stub: SoftwareVulnerabilityMatch + VulnerabilityDefinition deleted; restored in Phase 3.
+        => Task.FromResult(new Dictionary<Guid, Severity>());
 
     private async Task<Dictionary<Guid, string>> GetSoftwareNamesAsync(
         Guid tenantId, List<Guid> tenantSoftwareIds, CancellationToken ct)
@@ -516,66 +427,15 @@ public class ApprovalTaskQueryService(
             .ToDictionaryAsync(item => item.TenantSoftwareId, item => item.HighestCriticality, ct);
     }
 
-    private async Task<Dictionary<Guid, int>> GetVulnCountsAsync(
+    private Task<Dictionary<Guid, int>> GetVulnCountsAsync(
         Guid tenantId, List<Guid> tenantSoftwareIds, CancellationToken ct)
-    {
-        return await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(i => i.TenantId == tenantId && i.IsActive && tenantSoftwareIds.Contains(i.TenantSoftwareId))
-            .Join(
-                dbContext.SoftwareVulnerabilityMatches.AsNoTracking().Where(m => m.TenantId == tenantId && m.ResolvedAt == null),
-                i => i.SoftwareAssetId,
-                m => m.SoftwareAssetId,
-                (i, m) => new { i.TenantSoftwareId, m.VulnerabilityDefinitionId }
-            )
-            .Distinct()
-            .GroupBy(x => x.TenantSoftwareId)
-            .Select(g => new { TenantSoftwareId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.TenantSoftwareId, x => x.Count, ct);
-    }
+        // Phase-2 stub: SoftwareVulnerabilityMatch deleted; restored in Phase 3.
+        => Task.FromResult(new Dictionary<Guid, int>());
 
-    private async Task<Dictionary<Guid, (string Status, DateTimeOffset DueDate)>> GetSlaInfoAsync(
+    private Task<Dictionary<Guid, (string Status, DateTimeOffset DueDate)>> GetSlaInfoAsync(
         Guid tenantId, List<Guid> tenantSoftwareIds, CancellationToken ct)
-    {
-        var tenantSla = await dbContext.TenantSlaConfigurations.AsNoTracking()
-            .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
-
-        if (tenantSla is null)
-            return [];
-
-        var vulnData = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(i => i.TenantId == tenantId && i.IsActive && tenantSoftwareIds.Contains(i.TenantSoftwareId))
-            .Join(
-                dbContext.SoftwareVulnerabilityMatches.AsNoTracking().Where(m => m.TenantId == tenantId && m.ResolvedAt == null),
-                i => i.SoftwareAssetId,
-                m => m.SoftwareAssetId,
-                (i, m) => new { i.TenantSoftwareId, m.FirstSeenAt, m.VulnerabilityDefinitionId }
-            )
-            .Join(
-                dbContext.VulnerabilityDefinitions.AsNoTracking(),
-                x => x.VulnerabilityDefinitionId,
-                v => v.Id,
-                (x, v) => new { x.TenantSoftwareId, x.FirstSeenAt, v.VendorSeverity }
-            )
-            .GroupBy(x => x.TenantSoftwareId)
-            .Select(g => new
-            {
-                TenantSoftwareId = g.Key,
-                EarliestFirstSeen = g.Min(x => x.FirstSeenAt),
-                HighestSeverity = g.Max(x => x.VendorSeverity),
-            })
-            .ToListAsync(ct);
-
-        var result = new Dictionary<Guid, (string Status, DateTimeOffset DueDate)>();
-        foreach (var item in vulnData)
-        {
-            if (item.HighestSeverity == default) continue;
-            var dueDate = slaService.CalculateDueDate(item.HighestSeverity, item.EarliestFirstSeen, tenantSla);
-            var status = slaService.GetSlaStatus(item.EarliestFirstSeen, dueDate, DateTimeOffset.UtcNow);
-            result[item.TenantSoftwareId] = (status.ToString(), dueDate);
-        }
-
-        return result;
-    }
+        // Phase-2 stub: SoftwareVulnerabilityMatch + VulnerabilityDefinition deleted; restored in Phase 3.
+        => Task.FromResult(new Dictionary<Guid, (string Status, DateTimeOffset DueDate)>());
 
     private static string NormalizeVersionKey(string? version)
     {

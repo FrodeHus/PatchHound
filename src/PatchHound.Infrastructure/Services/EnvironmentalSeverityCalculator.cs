@@ -9,7 +9,7 @@ public class EnvironmentalSeverityCalculator
     public const string CalculationVersion = "1";
 
     public EnvironmentalSeverityCalculationResult Calculate(
-        VulnerabilityDefinition vulnerability,
+        Vulnerability vulnerability,
         Asset asset,
         AssetSecurityProfile? profile
     )

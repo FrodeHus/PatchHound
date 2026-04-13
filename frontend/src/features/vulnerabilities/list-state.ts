@@ -3,8 +3,6 @@ type VulnerabilitiesListSearch = {
   severity: string
   status: string
   source: string
-  presentOnly: boolean
-  recurrenceOnly: boolean
   minAgeDays: string
   publicExploitOnly: boolean
   knownExploitedOnly: boolean
@@ -19,8 +17,6 @@ export function buildVulnerabilitiesListRequest(search: VulnerabilitiesListSearc
     ...(search.severity ? { severity: search.severity } : {}),
     ...(search.status ? { status: search.status } : {}),
     ...(search.source ? { source: search.source } : {}),
-    ...(search.presentOnly ? { presentOnly: true } : { presentOnly: false }),
-    ...(search.recurrenceOnly ? { recurrenceOnly: true } : {}),
     ...(search.minAgeDays ? { minAgeDays: Number(search.minAgeDays) } : {}),
     ...(search.publicExploitOnly ? { publicExploitOnly: true } : {}),
     ...(search.knownExploitedOnly ? { knownExploitedOnly: true } : {}),
@@ -40,8 +36,6 @@ export const vulnerabilityQueryKeys = {
     search.severity,
     search.status,
     search.source,
-    search.presentOnly,
-    search.recurrenceOnly,
     search.minAgeDays,
     search.publicExploitOnly,
     search.knownExploitedOnly,

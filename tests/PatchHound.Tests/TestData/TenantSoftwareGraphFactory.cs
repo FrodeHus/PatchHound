@@ -4,13 +4,12 @@ using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Tests.TestData;
 
+// Phase-2: VulnerabilityDefinition, TenantVulnerability, SoftwareVulnerabilityMatch,
+// NormalizedSoftwareVulnerabilityProjection, and VulnerabilityAsset deleted.
+// Graph record retains only TenantSoftware (the only property accessed by callers).
 internal static class TenantSoftwareGraphFactory
 {
-    internal sealed record Graph(
-        TenantSoftware TenantSoftware,
-        VulnerabilityDefinition VulnerabilityDefinition,
-        TenantVulnerability TenantVulnerability
-    );
+    internal sealed record Graph(TenantSoftware TenantSoftware);
 
     public static async Task<Graph> SeedAsync(PatchHoundDbContext dbContext, Guid tenantId)
     {
@@ -49,23 +48,6 @@ internal static class TenantSoftwareGraphFactory
         );
         deviceOne.AssignSecurityProfile(profile.Id);
 
-        var definition = VulnerabilityDefinition.Create(
-            "CVE-2026-1000",
-            "Contoso Agent vulnerability",
-            "Description",
-            Severity.Critical,
-            "NVD",
-            9.8m,
-            null,
-            new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero)
-        );
-        var tenantVulnerability = TenantVulnerability.Create(
-            tenantId,
-            definition.Id,
-            VulnerabilityStatus.Open,
-            DateTimeOffset.UtcNow
-        );
-
         await dbContext.AddRangeAsync(
             normalizedSoftware,
             tenantSoftware,
@@ -73,9 +55,7 @@ internal static class TenantSoftwareGraphFactory
             deviceTwo,
             softwareOne,
             softwareTwo,
-            profile,
-            definition,
-            tenantVulnerability
+            profile
         );
         await dbContext.NormalizedSoftwareAliases.AddRangeAsync(
             NormalizedSoftwareAlias.Create(
@@ -145,61 +125,8 @@ internal static class TenantSoftwareGraphFactory
                 new DateTimeOffset(2026, 3, 9, 0, 0, 0, TimeSpan.Zero)
             )
         );
-        await dbContext.SoftwareVulnerabilityMatches.AddRangeAsync(
-            SoftwareVulnerabilityMatch.Create(
-                tenantId,
-                null,
-                softwareOne.Id,
-                definition.Id,
-                SoftwareVulnerabilityMatchMethod.CpeBinding,
-                MatchConfidence.High,
-                "match-one",
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
-            ),
-            SoftwareVulnerabilityMatch.Create(
-                tenantId,
-                null,
-                softwareTwo.Id,
-                definition.Id,
-                SoftwareVulnerabilityMatchMethod.CpeBinding,
-                MatchConfidence.High,
-                "match-two",
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
-            )
-        );
-        await dbContext.NormalizedSoftwareVulnerabilityProjections.AddAsync(
-            NormalizedSoftwareVulnerabilityProjection.Create(
-                tenantId,
-                null,
-                tenantSoftware.Id,
-                definition.Id,
-                SoftwareVulnerabilityMatchMethod.CpeBinding,
-                MatchConfidence.High,
-                2,
-                2,
-                2,
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero),
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero),
-                null,
-                """
-                [{"method":"CpeBinding","confidence":"High","evidence":"contoso-agent","firstSeenAt":"2026-03-10T00:00:00+00:00","lastSeenAt":"2026-03-10T00:00:00+00:00","resolvedAt":null}]
-                """
-            )
-        );
-        await dbContext.VulnerabilityAssets.AddRangeAsync(
-            VulnerabilityAsset.Create(
-                tenantVulnerability.Id,
-                deviceOne.Id,
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
-            ),
-            VulnerabilityAsset.Create(
-                tenantVulnerability.Id,
-                deviceTwo.Id,
-                new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
-            )
-        );
         await dbContext.SaveChangesAsync();
 
-        return new Graph(tenantSoftware, definition, tenantVulnerability);
+        return new Graph(tenantSoftware);
     }
 }

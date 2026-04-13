@@ -426,11 +426,6 @@ public class TenantsController : ControllerBase
                         .Contains(item.RemediationDecisionId)),
             ct);
         await DeleteEntitiesAsync(
-            _dbContext.VulnerabilityAssets
-                .IgnoreQueryFilters()
-                .Where(item => item.TenantVulnerability.TenantId == id),
-            ct);
-        await DeleteEntitiesAsync(
             _dbContext.TeamMembers
                 .IgnoreQueryFilters()
                 .Where(member => member.Team.TenantId == id),
@@ -463,15 +458,11 @@ public class TenantsController : ControllerBase
         await DeleteEntitiesAsync(_dbContext.TenantSoftwareRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.TenantRiskScoreSnapshots.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.OrganizationalSeverities.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.VulnerabilityEpisodeRiskAssessments.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.VulnerabilityAssetAssessments.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.VulnerabilityAssetEpisodes.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.TenantVulnerabilities.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        // Phase-2: VulnerabilityEpisodeRiskAssessment, VulnerabilityAssetAssessment, VulnerabilityAssetEpisode,
+        //          TenantVulnerability, NormalizedSoftwareVulnerabilityProjection, SoftwareVulnerabilityMatch deleted.
         await DeleteEntitiesAsync(_dbContext.DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.DeviceSoftwareInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.NormalizedSoftwareVulnerabilityProjections.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.NormalizedSoftwareInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.SoftwareVulnerabilityMatches.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.TenantSoftware.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.AssetSecurityProfiles.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.Assets.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
