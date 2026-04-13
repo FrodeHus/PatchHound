@@ -85,7 +85,6 @@ public static class DependencyInjection
         >();
 
         // Application services
-        services.AddScoped<VulnerabilityService>();
         services.AddScoped<AssetService>();
         services.AddScoped<DeviceService>();
         services.AddScoped<UserService>();
