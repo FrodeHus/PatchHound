@@ -320,7 +320,7 @@ public class RiskScoreService(
         )).ToList());
     }
 
-    public Task<TenantRiskResult> GetFilteredTenantRiskAsync(
+    public async Task<TenantRiskResult> GetFilteredTenantRiskAsync(
         Guid tenantId,
         int? minAgeDays,
         string? platform,
@@ -328,9 +328,47 @@ public class RiskScoreService(
         CancellationToken ct
     )
     {
-        // Phase 2: canonical exposure data not yet available via DeviceVulnerabilityExposure.
-        // Phase 5 will rewire this query against the canonical exposure graph.
-        return Task.FromResult(CalculateTenantRisk([]));
+        var query = dbContext.DeviceRiskScores.AsNoTracking()
+            .Where(item => item.TenantId == tenantId)
+            .Join(
+                dbContext.Devices.AsNoTracking().Where(item => item.TenantId == tenantId),
+                score => score.DeviceId,
+                device => device.Id,
+                (score, device) => new { score, device }
+            );
+
+        if (minAgeDays.HasValue)
+        {
+            var cutoff = DateTimeOffset.UtcNow.AddDays(-minAgeDays.Value);
+            query = query.Where(item => item.device.LastSeenAt == null || item.device.LastSeenAt <= cutoff);
+        }
+
+        if (!string.IsNullOrWhiteSpace(platform))
+        {
+            query = query.Where(item => item.device.OsPlatform != null && item.device.OsPlatform.Contains(platform));
+        }
+
+        if (!string.IsNullOrWhiteSpace(deviceGroup))
+        {
+            query = query.Where(item => item.device.GroupName != null && item.device.GroupName == deviceGroup);
+        }
+
+        var filtered = await query
+            .OrderByDescending(item => item.score.OverallScore)
+            .Select(item => new AssetRiskResult(
+                item.score.DeviceId,
+                item.score.OverallScore,
+                item.score.MaxEpisodeRiskScore,
+                item.score.CriticalCount,
+                item.score.HighCount,
+                item.score.MediumCount,
+                item.score.LowCount,
+                item.score.OpenEpisodeCount,
+                item.score.FactorsJson
+            ))
+            .ToListAsync(ct);
+
+        return CalculateTenantRisk(filtered);
     }
 
     public async Task<List<TenantRiskScoreSnapshot>> GetRiskHistoryAsync(Guid tenantId, CancellationToken ct)
@@ -380,11 +418,21 @@ public class RiskScoreService(
         );
     }
 
-    private Task<List<AssetRiskResult>> CalculateAssetScoresAsync(Guid tenantId, CancellationToken ct)
+    private async Task<List<AssetRiskResult>> CalculateAssetScoresAsync(Guid tenantId, CancellationToken ct)
     {
-        // Phase 2: canonical exposure data not yet available via DeviceVulnerabilityExposure.
-        // Phase 5 will rewire this against the canonical exposure graph.
-        return Task.FromResult(new List<AssetRiskResult>());
+        var episodeScores = await dbContext.ExposureAssessments.AsNoTracking()
+            .Where(item => item.TenantId == tenantId)
+            .Select(item => new
+            {
+                AssetId = item.DeviceId,
+                EpisodeRiskScore = item.Score ?? 0m,
+                RiskBand = item.EffectiveSeverity.ToString(),
+            })
+            .ToListAsync(ct);
+
+        return BuildAssetRiskResults(
+            episodeScores.Select(item => (item.AssetId, item.EpisodeRiskScore, item.RiskBand))
+        );
     }
 
     private static List<AssetRiskResult> BuildAssetRiskResults(
@@ -444,14 +492,36 @@ public class RiskScoreService(
             .ToList();
     }
 
-    private Task<List<SoftwareRiskResult>> CalculateSoftwareScoresAsync(
+    private async Task<List<SoftwareRiskResult>> CalculateSoftwareScoresAsync(
         Guid tenantId,
         CancellationToken ct
     )
     {
-        // Phase 2: canonical exposure data not yet available via DeviceVulnerabilityExposure.
-        // Phase 5 will rewire this against the canonical exposure graph.
-        return Task.FromResult(new List<SoftwareRiskResult>());
+        var exposures = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.SoftwareProductId != null)
+            .Select(item => new
+            {
+                item.Id,
+                item.DeviceId,
+                item.SoftwareProductId,
+                item.VulnerabilityId,
+                Score = dbContext.ExposureAssessments
+                    .Where(assessment => assessment.DeviceVulnerabilityExposureId == item.Id)
+                    .Select(assessment => (decimal?)assessment.Score)
+                    .FirstOrDefault(),
+                Severity = dbContext.ExposureAssessments
+                    .Where(assessment => assessment.DeviceVulnerabilityExposureId == item.Id)
+                    .Select(assessment => assessment.EffectiveSeverity)
+                    .FirstOrDefault(),
+            })
+            .ToListAsync(ct);
+
+        // Phase 3 note: DeviceVulnerabilityExposure is now available, but TenantSoftware
+        // still lacks a canonical direct link back to SoftwareProduct. Until that model link
+        // lands, software rollups remain disabled to avoid assigning exposures to the wrong
+        // tenant-software row.
+        _ = exposures;
+        return [];
     }
 
     private async Task<List<DeviceGroupRiskResult>> CalculateDeviceGroupScoresAsync(

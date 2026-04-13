@@ -73,6 +73,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<VulnerabilityReference> VulnerabilityReferences => Set<VulnerabilityReference>();
     public DbSet<VulnerabilityApplicability> VulnerabilityApplicabilities => Set<VulnerabilityApplicability>();
     public DbSet<ThreatAssessment> ThreatAssessments => Set<ThreatAssessment>();
+    public DbSet<DeviceVulnerabilityExposure> DeviceVulnerabilityExposures => Set<DeviceVulnerabilityExposure>();
+    public DbSet<ExposureEpisode> ExposureEpisodes => Set<ExposureEpisode>();
+    public DbSet<ExposureAssessment> ExposureAssessments => Set<ExposureAssessment>();
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<AdvancedTool> AdvancedTools => Set<AdvancedTool>();
@@ -208,6 +211,15 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<SecurityProfile>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<DeviceVulnerabilityExposure>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<ExposureEpisode>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<ExposureAssessment>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<AssetSecurityProfile>()

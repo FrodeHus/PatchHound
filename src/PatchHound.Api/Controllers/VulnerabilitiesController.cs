@@ -102,6 +102,11 @@ public class VulnerabilitiesController : ControllerBase
                         a.ActiveAlert,
                     })
                     .FirstOrDefault(),
+                AffectedDeviceCount = _dbContext.DeviceVulnerabilityExposures
+                    .Where(e => e.TenantId == _tenantContext.CurrentTenantId.Value && e.VulnerabilityId == v.Id)
+                    .Select(e => e.DeviceId)
+                    .Distinct()
+                    .Count(),
             })
             .ToListAsync(ct);
 
@@ -114,8 +119,8 @@ public class VulnerabilitiesController : ControllerBase
                 v.Source,
                 v.CvssScore,
                 v.PublishedDate,
-                ExposureDataAvailable: false,
-                AffectedDeviceCount: 0,
+                ExposureDataAvailable: true,
+                AffectedDeviceCount: v.AffectedDeviceCount,
                 ThreatScore: v.Threat?.ThreatScore,
                 EpssScore: v.Threat?.EpssScore,
                 PublicExploit: v.Threat?.PublicExploit ?? false,

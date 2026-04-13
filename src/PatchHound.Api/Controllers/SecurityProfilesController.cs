@@ -40,7 +40,7 @@ public class SecurityProfilesController : ControllerBase
         CancellationToken ct
     )
     {
-        var query = _dbContext.AssetSecurityProfiles.AsNoTracking().AsQueryable();
+        var query = _dbContext.SecurityProfiles.AsNoTracking().AsQueryable();
         if (tenantId.HasValue)
         {
             if (!_tenantContext.HasAccessToTenant(tenantId.Value))
@@ -108,7 +108,7 @@ public class SecurityProfilesController : ControllerBase
             return BadRequest(new ProblemDetails { Title = error });
         }
 
-        var profile = AssetSecurityProfile.Create(
+        var profile = SecurityProfile.Create(
             tenantId,
             request.Name.Trim(),
             request.Description?.Trim(),
@@ -127,7 +127,7 @@ public class SecurityProfilesController : ControllerBase
             parsed.ModifiedAvailabilityImpact
         );
 
-        _dbContext.AssetSecurityProfiles.Add(profile);
+        _dbContext.SecurityProfiles.Add(profile);
         await _dbContext.SaveChangesAsync(ct);
 
         return CreatedAtAction(nameof(List), new { tenantId = profile.TenantId }, ToDto(profile));
@@ -146,7 +146,7 @@ public class SecurityProfilesController : ControllerBase
             return BadRequest(new ProblemDetails { Title = error });
         }
 
-        var profile = await _dbContext.AssetSecurityProfiles.FirstOrDefaultAsync(
+        var profile = await _dbContext.SecurityProfiles.FirstOrDefaultAsync(
             item => item.Id == id,
             ct
         );
@@ -201,7 +201,7 @@ public class SecurityProfilesController : ControllerBase
     [Authorize(Policy = Policies.ConfigureTenant)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        var profile = await _dbContext.AssetSecurityProfiles.FirstOrDefaultAsync(
+        var profile = await _dbContext.SecurityProfiles.FirstOrDefaultAsync(
             item => item.Id == id,
             ct
         );
@@ -225,13 +225,13 @@ public class SecurityProfilesController : ControllerBase
             );
         }
 
-        _dbContext.AssetSecurityProfiles.Remove(profile);
+        _dbContext.SecurityProfiles.Remove(profile);
         await _dbContext.SaveChangesAsync(ct);
 
         return NoContent();
     }
 
-    private static SecurityProfileDto ToDto(AssetSecurityProfile profile) =>
+    private static SecurityProfileDto ToDto(SecurityProfile profile) =>
         new(
             profile.Id,
             profile.TenantId,

@@ -134,4 +134,63 @@ public class EnvironmentalSeverityCalculatorTests
         result.EffectiveVector.Should().Contain("MC:L");
         result.EffectiveScore.Should().BeLessThan(vulnerability.CvssScore!.Value);
     }
+
+    [Fact]
+    public void Calculate_WithSecurityProfile_AssessmentCarriesModifiedScoreAndVersion()
+    {
+        var tenantId = Guid.NewGuid();
+        var vulnerability = Vulnerability.Create(
+            "MicrosoftDefender",
+            "CVE-2026-5000",
+            "Profile-sensitive issue",
+            "Desc",
+            Severity.High,
+            8.8m,
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            null
+        );
+        var asset = Asset.Create(
+            tenantId,
+            "device-4",
+            AssetType.Device,
+            "Device",
+            Criticality.High
+        );
+        var profile = AssetSecurityProfile.Create(
+            tenantId,
+            "Constrained network",
+            null,
+            EnvironmentClass.Server,
+            InternetReachability.LocalOnly,
+            SecurityRequirementLevel.High,
+            SecurityRequirementLevel.High,
+            SecurityRequirementLevel.High
+        );
+
+        var result = _calculator.Calculate(vulnerability, asset, profile);
+
+        result.AssetSecurityProfileId.Should().Be(profile.Id);
+        result.EffectiveScore.Should().NotBeNull();
+        result.EffectiveScore.Should().NotBe(vulnerability.CvssScore);
+        result.EffectiveVector.Should().NotBe(vulnerability.CvssVector);
+
+        var exposureAssessment = ExposureAssessment.Create(
+            tenantId,
+            Guid.NewGuid(),
+            asset.Id,
+            vulnerability.Id,
+            profile.Id,
+            result.EffectiveSeverity,
+            result.EffectiveScore,
+            result.EffectiveVector,
+            result.FactorsJson,
+            result.ReasonSummary,
+            EnvironmentalSeverityCalculator.CalculationVersion
+        );
+
+        exposureAssessment.SecurityProfileId.Should().Be(profile.Id);
+        exposureAssessment.Score.Should().Be(result.EffectiveScore);
+        exposureAssessment.EffectiveSeverity.Should().Be(result.EffectiveSeverity);
+        exposureAssessment.CalculationVersion.Should().Be(EnvironmentalSeverityCalculator.CalculationVersion);
+    }
 }
