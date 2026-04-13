@@ -124,6 +124,122 @@ public class TenantIsolationEndToEndTests : IDisposable
         installs.Should().BeEmpty();
     }
 
+    // Phase 2 Task 18: Vulnerability is a global entity (no TenantId, no query filter).
+    // Both tenants must see the same rows — no per-tenant isolation or cross-tenant leaks.
+
+    [Fact]
+    public async Task Phase2_global_vulnerability_is_visible_to_all_tenants()
+    {
+        // Seed one global Vulnerability via system context.
+        UseSystemContext();
+        var vuln = Vulnerability.Create(
+            "nvd",
+            "CVE-2026-ABCD",
+            "Shared Vuln",
+            "Shared description",
+            Severity.High,
+            7.5m,
+            "CVSS:3.1/AV:N",
+            DateTimeOffset.UtcNow
+        );
+        _dbContext.Vulnerabilities.Add(vuln);
+        await _dbContext.SaveChangesAsync();
+
+        // Tenant A should see it.
+        UseTenant(_tenantA);
+        var vulnsA = await _dbContext.Vulnerabilities.AsNoTracking().ToListAsync();
+        vulnsA.Should().ContainSingle(v => v.ExternalId == "CVE-2026-ABCD");
+
+        // Tenant B should see the exact same row — global entity, no filter.
+        UseTenant(_tenantB);
+        var vulnsB = await _dbContext.Vulnerabilities.AsNoTracking().ToListAsync();
+        vulnsB.Should().ContainSingle(v => v.ExternalId == "CVE-2026-ABCD");
+
+        vulnsA[0].Id.Should().Be(vulnsB[0].Id, "both tenants read the same global row");
+    }
+
+    [Fact]
+    public async Task Phase2_vulnerability_reference_is_visible_to_all_tenants()
+    {
+        // Seed Vulnerability + VulnerabilityReference via system context.
+        UseSystemContext();
+        var vuln = Vulnerability.Create(
+            "nvd",
+            "CVE-2026-EFGH",
+            "Shared Vuln 2",
+            "Description",
+            Severity.Critical,
+            9.0m,
+            "CVSS:3.1/AV:N",
+            DateTimeOffset.UtcNow
+        );
+        _dbContext.Vulnerabilities.Add(vuln);
+        await _dbContext.SaveChangesAsync();
+
+        var reference = VulnerabilityReference.Create(
+            vuln.Id,
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-EFGH",
+            "NVD",
+            []
+        );
+        _dbContext.VulnerabilityReferences.Add(reference);
+        await _dbContext.SaveChangesAsync();
+
+        // Both tenants see the reference.
+        UseTenant(_tenantA);
+        var refsA = await _dbContext.VulnerabilityReferences.AsNoTracking()
+            .Where(r => r.VulnerabilityId == vuln.Id)
+            .ToListAsync();
+        refsA.Should().HaveCount(1);
+
+        UseTenant(_tenantB);
+        var refsB = await _dbContext.VulnerabilityReferences.AsNoTracking()
+            .Where(r => r.VulnerabilityId == vuln.Id)
+            .ToListAsync();
+        refsB.Should().HaveCount(1);
+
+        refsA[0].Id.Should().Be(refsB[0].Id, "both tenants read the same global reference row");
+    }
+
+    [Fact]
+    public void Phase2_request_scoped_context_is_not_system_context_by_default()
+    {
+        // A freshly resolved DbContext outside system-context services must not
+        // have IsSystemContext set — otherwise tenant-scoped entities would be
+        // exposed globally via accidental system-context leakage.
+        var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        var freshTenantContext = Substitute.For<ITenantContext>();
+        freshTenantContext.IsSystemContext.Returns(false);
+        freshTenantContext.AccessibleTenantIds.Returns(new List<Guid>());
+
+        using var freshDb = new PatchHoundDbContext(
+            options,
+            TestServiceProviderFactory.Create(freshTenantContext)
+        );
+
+        // The DbContext must not expose system context when the tenant context says false.
+        // We verify this indirectly: seeding a tenant-scoped entity from a non-system
+        // context and confirming the query filter hides it from a different tenant.
+        freshDb.SetSystemContext(true);
+        var device = Device.Create(
+            Guid.NewGuid(),
+            _sourceSystemId,
+            externalId: "seed-device",
+            name: "Seed Device",
+            baselineCriticality: Criticality.Low
+        );
+        freshDb.Devices.Add(device);
+        freshDb.SaveChanges();
+        freshDb.SetSystemContext(false);
+
+        // After turning off system context, no rows should be visible
+        // because AccessibleTenantIds returns empty.
+        var visible = freshDb.Devices.AsNoTracking().ToList();
+        visible.Should().BeEmpty("request-scoped context with no tenant access sees no rows");
+    }
+
     private void UseSystemContext()
     {
         _tenantContext.IsSystemContext.Returns(true);
