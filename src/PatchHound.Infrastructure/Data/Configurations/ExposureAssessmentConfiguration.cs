@@ -8,20 +8,22 @@ public class ExposureAssessmentConfiguration : IEntityTypeConfiguration<Exposure
 {
     public void Configure(EntityTypeBuilder<ExposureAssessment> builder)
     {
-        builder.HasKey(x => x.Id);
+        builder.HasKey(a => a.Id);
+        builder.Property(a => a.BaseCvss).HasColumnType("numeric(4,2)");
+        builder.Property(a => a.EnvironmentalCvss).HasColumnType("numeric(4,2)");
+        builder.Property(a => a.Reason).HasMaxLength(512);
 
-        builder.HasIndex(x => x.TenantId);
-        builder.HasIndex(x => x.DeviceVulnerabilityExposureId).IsUnique();
-        builder.HasIndex(x => new { x.TenantId, x.DeviceId });
-        builder.HasIndex(x => new { x.TenantId, x.VulnerabilityId });
-
-        builder.Property(x => x.Vector).HasMaxLength(512);
-        builder.Property(x => x.ReasonSummary).HasMaxLength(2048);
-        builder.Property(x => x.CalculationVersion).HasMaxLength(ExposureAssessment.CalculationVersionMaxLength).IsRequired();
-
-        builder.HasOne(x => x.Exposure)
+        builder.HasOne(a => a.Exposure)
             .WithMany()
-            .HasForeignKey(x => x.DeviceVulnerabilityExposureId)
+            .HasForeignKey(a => a.DeviceVulnerabilityExposureId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(a => a.SecurityProfile)
+            .WithMany()
+            .HasForeignKey(a => a.SecurityProfileId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Ignore(a => a.Score);
+        builder.HasIndex(a => new { a.TenantId, a.DeviceVulnerabilityExposureId }).IsUnique();
     }
 }

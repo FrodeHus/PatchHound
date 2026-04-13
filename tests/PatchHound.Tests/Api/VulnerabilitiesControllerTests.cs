@@ -60,8 +60,13 @@ public class VulnerabilitiesControllerTests : IDisposable
         _dbContext.Vulnerabilities.AddRange(recurringVuln, nonRecurringVuln);
         await _dbContext.SaveChangesAsync();
 
-        var recurringExposure = DeviceVulnerabilityExposure.Create(_tenantId, device.Id, recurringVuln.Id, null, null, "test", DateTimeOffset.UtcNow.AddDays(-4));
-        var nonRecurringExposure = DeviceVulnerabilityExposure.Create(_tenantId, device.Id, nonRecurringVuln.Id, null, null, "test", DateTimeOffset.UtcNow.AddDays(-1));
+        var recurringInstall = InstalledSoftware.Observe(_tenantId, device.Id, Guid.NewGuid(), sourceSystem.Id, "1.0", DateTimeOffset.UtcNow.AddDays(-4));
+        var nonRecurringInstall = InstalledSoftware.Observe(_tenantId, device.Id, Guid.NewGuid(), sourceSystem.Id, "1.0", DateTimeOffset.UtcNow.AddDays(-1));
+        _dbContext.InstalledSoftware.AddRange(recurringInstall, nonRecurringInstall);
+        await _dbContext.SaveChangesAsync();
+
+        var recurringExposure = DeviceVulnerabilityExposure.Observe(_tenantId, device.Id, recurringVuln.Id, recurringInstall.SoftwareProductId, recurringInstall.Id, recurringInstall.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow.AddDays(-4));
+        var nonRecurringExposure = DeviceVulnerabilityExposure.Observe(_tenantId, device.Id, nonRecurringVuln.Id, nonRecurringInstall.SoftwareProductId, nonRecurringInstall.Id, nonRecurringInstall.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow.AddDays(-1));
         _dbContext.DeviceVulnerabilityExposures.AddRange(recurringExposure, nonRecurringExposure);
         await _dbContext.SaveChangesAsync();
 
@@ -98,14 +103,19 @@ public class VulnerabilitiesControllerTests : IDisposable
         _dbContext.Vulnerabilities.AddRange(v1, v2);
         await _dbContext.SaveChangesAsync();
 
+        var installed = InstalledSoftware.Observe(_tenantId, device.Id, Guid.NewGuid(), sourceSystem.Id, "1.0", DateTimeOffset.UtcNow);
+        _dbContext.InstalledSoftware.Add(installed);
+        await _dbContext.SaveChangesAsync();
+
         _dbContext.DeviceVulnerabilityExposures.Add(
-            DeviceVulnerabilityExposure.Create(
+            DeviceVulnerabilityExposure.Observe(
                 _tenantId,
                 device.Id,
                 v1.Id,
-                installedSoftwareId: null,
-                softwareProductId: null,
-                evidenceSource: "phase3-test",
+                softwareProductId: installed.SoftwareProductId,
+                installedSoftwareId: installed.Id,
+                matchedVersion: installed.Version,
+                matchSource: ExposureMatchSource.Product,
                 observedAt: DateTimeOffset.UtcNow));
         await _dbContext.SaveChangesAsync();
 
@@ -227,7 +237,11 @@ public class VulnerabilitiesControllerTests : IDisposable
         _dbContext.Vulnerabilities.Add(vuln);
         await _dbContext.SaveChangesAsync();
 
-        var exposure = DeviceVulnerabilityExposure.Create(_tenantId, device.Id, vuln.Id, null, product.Id, "test", DateTimeOffset.UtcNow.AddHours(-4));
+        var installed = InstalledSoftware.Observe(_tenantId, device.Id, product.Id, sourceSystem.Id, "1.0", DateTimeOffset.UtcNow.AddHours(-4));
+        _dbContext.InstalledSoftware.Add(installed);
+        await _dbContext.SaveChangesAsync();
+
+        var exposure = DeviceVulnerabilityExposure.Observe(_tenantId, device.Id, vuln.Id, product.Id, installed.Id, installed.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow.AddHours(-4));
         _dbContext.DeviceVulnerabilityExposures.Add(exposure);
         _dbContext.ExposureEpisodes.Add(ExposureEpisode.Open(_tenantId, exposure.Id, 1, DateTimeOffset.UtcNow.AddHours(-4)));
         await _dbContext.SaveChangesAsync();
@@ -251,14 +265,19 @@ public class VulnerabilitiesControllerTests : IDisposable
         _dbContext.Vulnerabilities.Add(vuln);
         await _dbContext.SaveChangesAsync();
 
-        var exposureA = DeviceVulnerabilityExposure.Create(_tenantId, device.Id, vuln.Id, null, null, "test-a", DateTimeOffset.UtcNow.AddDays(-2));
-        var exposureB = DeviceVulnerabilityExposure.Create(_tenantId, device.Id, vuln.Id, null, null, "test-b", DateTimeOffset.UtcNow.AddDays(-1));
+        var installA = InstalledSoftware.Observe(_tenantId, device.Id, Guid.NewGuid(), sourceSystem.Id, "1.0", DateTimeOffset.UtcNow.AddDays(-2));
+        var installB = InstalledSoftware.Observe(_tenantId, device.Id, Guid.NewGuid(), sourceSystem.Id, "1.1", DateTimeOffset.UtcNow.AddDays(-1));
+        _dbContext.InstalledSoftware.AddRange(installA, installB);
+        await _dbContext.SaveChangesAsync();
+
+        var exposureA = DeviceVulnerabilityExposure.Observe(_tenantId, device.Id, vuln.Id, installA.SoftwareProductId, installA.Id, installA.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow.AddDays(-2));
+        var exposureB = DeviceVulnerabilityExposure.Observe(_tenantId, device.Id, vuln.Id, installB.SoftwareProductId, installB.Id, installB.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow.AddDays(-1));
         _dbContext.DeviceVulnerabilityExposures.AddRange(exposureA, exposureB);
         await _dbContext.SaveChangesAsync();
 
         _dbContext.ExposureAssessments.AddRange(
-            ExposureAssessment.Create(_tenantId, exposureA.Id, device.Id, vuln.Id, null, Severity.Critical, 9.1m, null, "[]", "a", "1"),
-            ExposureAssessment.Create(_tenantId, exposureB.Id, device.Id, vuln.Id, null, Severity.Critical, 9.0m, null, "[]", "b", "1")
+            ExposureAssessment.Create(_tenantId, exposureA.Id, null, vuln.CvssScore ?? 0m, 9.1m, "a", DateTimeOffset.UtcNow),
+            ExposureAssessment.Create(_tenantId, exposureB.Id, null, vuln.CvssScore ?? 0m, 9.0m, "b", DateTimeOffset.UtcNow)
         );
         _dbContext.ExposureEpisodes.AddRange(
             ExposureEpisode.Open(_tenantId, exposureA.Id, 1, DateTimeOffset.UtcNow.AddDays(-2)),

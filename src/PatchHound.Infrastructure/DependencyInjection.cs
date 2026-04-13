@@ -122,6 +122,9 @@ public static class DependencyInjection
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<EnvironmentalSeverityCalculator>();
+        services.AddScoped<ExposureDerivationService>();
+        services.AddScoped<ExposureEpisodeService>();
+        services.AddScoped<ExposureAssessmentService>();
         services.AddScoped<RiskScoreService>();
         services.AddScoped<RiskRefreshService>();
         services.AddScoped<AuditLogWriter>();

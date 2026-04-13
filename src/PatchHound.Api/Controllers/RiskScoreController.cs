@@ -61,18 +61,18 @@ public class RiskScoreController : ControllerBase
             .Select(item => new { item.Id, item.Name })
             .ToDictionaryAsync(item => item.Id, item => item.Name, ct);
         var episodeDrivers = await _dbContext.ExposureAssessments.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && assetIds.Contains(item.DeviceId))
+            .Where(item => item.TenantId == tenantId && assetIds.Contains(item.Exposure.DeviceId))
             .Select(item => new AssetRiskEpisodeDriverDto(
-                item.VulnerabilityId,
+                item.Exposure.VulnerabilityId,
                 item.Exposure.Vulnerability.ExternalId,
                 item.Exposure.Vulnerability.Title,
-                item.EffectiveSeverity.ToString(),
-                item.Score ?? 0m,
+                item.EnvironmentalCvss >= 9.0m ? "Critical" : item.EnvironmentalCvss >= 7.0m ? "High" : item.EnvironmentalCvss >= 4.0m ? "Medium" : "Low",
+                item.EnvironmentalCvss,
                 _dbContext.ThreatAssessments
-                    .Where(t => t.VulnerabilityId == item.VulnerabilityId)
+                    .Where(t => t.VulnerabilityId == item.Exposure.VulnerabilityId)
                     .Select(t => t.ThreatScore)
                     .FirstOrDefault(),
-                item.Score ?? 0m,
+                item.EnvironmentalCvss,
                 0m
             ))
             .ToListAsync(ct);
@@ -181,18 +181,18 @@ public class RiskScoreController : ControllerBase
 
         var assetIds = topRiskAssets.Select(item => item.AssetId).ToHashSet();
         var episodeDrivers = await _dbContext.ExposureAssessments.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && assetIds.Contains(item.DeviceId))
+            .Where(item => item.TenantId == tenantId && assetIds.Contains(item.Exposure.DeviceId))
             .Select(item => new
             {
-                item.DeviceId,
+                DeviceId = item.Exposure.DeviceId,
                 Driver = new AssetRiskEpisodeDriverDto(
-                    item.VulnerabilityId,
+                    item.Exposure.VulnerabilityId,
                     item.Exposure.Vulnerability.ExternalId,
                     item.Exposure.Vulnerability.Title,
-                    item.EffectiveSeverity.ToString(),
-                    item.Score ?? 0m,
-                    _dbContext.ThreatAssessments.Where(t => t.VulnerabilityId == item.VulnerabilityId).Select(t => t.ThreatScore).FirstOrDefault(),
-                    item.Score ?? 0m,
+                    item.EnvironmentalCvss >= 9.0m ? "Critical" : item.EnvironmentalCvss >= 7.0m ? "High" : item.EnvironmentalCvss >= 4.0m ? "Medium" : "Low",
+                    item.EnvironmentalCvss,
+                    _dbContext.ThreatAssessments.Where(t => t.VulnerabilityId == item.Exposure.VulnerabilityId).Select(t => t.ThreatScore).FirstOrDefault(),
+                    item.EnvironmentalCvss,
                     0m)
             })
             .ToListAsync(ct);
@@ -314,15 +314,15 @@ public class RiskScoreController : ControllerBase
                 (assessment, exposure) => new
                 {
                     exposure.SoftwareProductId,
-                    assessment.DeviceId,
+                    DeviceId = assessment.Exposure.DeviceId,
                     Driver = new AssetRiskEpisodeDriverDto(
-                        assessment.VulnerabilityId,
+                        assessment.Exposure.VulnerabilityId,
                         exposure.Vulnerability.ExternalId,
                         exposure.Vulnerability.Title,
-                        assessment.EffectiveSeverity.ToString(),
-                        assessment.Score ?? 0m,
-                        _dbContext.ThreatAssessments.Where(t => t.VulnerabilityId == assessment.VulnerabilityId).Select(t => t.ThreatScore).FirstOrDefault(),
-                        assessment.Score ?? 0m,
+                        assessment.EnvironmentalCvss >= 9.0m ? "Critical" : assessment.EnvironmentalCvss >= 7.0m ? "High" : assessment.EnvironmentalCvss >= 4.0m ? "Medium" : "Low",
+                        assessment.EnvironmentalCvss,
+                        _dbContext.ThreatAssessments.Where(t => t.VulnerabilityId == assessment.Exposure.VulnerabilityId).Select(t => t.ThreatScore).FirstOrDefault(),
+                        assessment.EnvironmentalCvss,
                         0m)
                 })
             .ToListAsync(ct);

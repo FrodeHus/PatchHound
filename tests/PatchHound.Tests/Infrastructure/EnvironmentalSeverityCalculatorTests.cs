@@ -177,20 +177,15 @@ public class EnvironmentalSeverityCalculatorTests
         var exposureAssessment = ExposureAssessment.Create(
             tenantId,
             Guid.NewGuid(),
-            asset.Id,
-            vulnerability.Id,
             profile.Id,
-            result.EffectiveSeverity,
-            result.EffectiveScore,
-            result.EffectiveVector,
-            result.FactorsJson,
+            vulnerability.CvssScore ?? 0m,
+            result.EffectiveScore ?? vulnerability.CvssScore ?? 0m,
             result.ReasonSummary,
-            EnvironmentalSeverityCalculator.CalculationVersion
+            DateTimeOffset.UtcNow
         );
 
         exposureAssessment.SecurityProfileId.Should().Be(profile.Id);
         exposureAssessment.Score.Should().Be(result.EffectiveScore);
-        exposureAssessment.EffectiveSeverity.Should().Be(result.EffectiveSeverity);
-        exposureAssessment.CalculationVersion.Should().Be(EnvironmentalSeverityCalculator.CalculationVersion);
+        exposureAssessment.Reason.Should().Be(result.ReasonSummary);
     }
 }

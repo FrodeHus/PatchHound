@@ -105,14 +105,14 @@ public class DashboardQueryService(
             .ToListAsync(ct);
 
         var resolved = await dbContext.ExposureEpisodes.AsNoTracking()
-            .Where(e => e.TenantId == tenantId && e.ResolvedAt != null && e.ResolvedAt >= cutoff)
+            .Where(e => e.TenantId == tenantId && e.ClosedAt != null && e.ClosedAt >= cutoff)
             .Select(e => new
             {
                 e.Exposure.VulnerabilityId,
                 e.Exposure.Vulnerability.ExternalId,
                 e.Exposure.Vulnerability.Title,
                 Severity = e.Exposure.Vulnerability.VendorSeverity.ToString(),
-                ChangedAt = e.ResolvedAt!.Value,
+                ChangedAt = e.ClosedAt!.Value,
                 e.Exposure.DeviceId,
             })
             .ToListAsync(ct);

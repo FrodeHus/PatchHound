@@ -61,7 +61,7 @@ public class TenantIsolationEndToEndTests : IDisposable
         var installs = await _dbContext.InstalledSoftware.AsNoTracking().ToListAsync();
 
         installs.Should().OnlyContain(i => i.TenantId == _tenantB);
-        installs.Should().HaveCount(1);
+        installs.Should().HaveCount(2);
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public class TenantIsolationEndToEndTests : IDisposable
         var profiles = await _dbContext.SecurityProfiles.AsNoTracking().ToListAsync();
 
         devices.Should().HaveCount(2);
-        installs.Should().HaveCount(2);
+        installs.Should().HaveCount(4);
         profiles.Should().HaveCount(2);
     }
 
@@ -353,13 +353,25 @@ public class TenantIsolationEndToEndTests : IDisposable
         _dbContext.Vulnerabilities.Add(vulnerability);
         _dbContext.SaveChanges();
 
-        var exposure = DeviceVulnerabilityExposure.Create(
+        var installed = InstalledSoftware.Observe(
+            tenantId,
+            device.Id,
+            Guid.NewGuid(),
+            _sourceSystemId,
+            "1.0",
+            DateTimeOffset.UtcNow
+        );
+        _dbContext.InstalledSoftware.Add(installed);
+        _dbContext.SaveChanges();
+
+        var exposure = DeviceVulnerabilityExposure.Observe(
             tenantId,
             device.Id,
             vulnerability.Id,
-            installedSoftwareId: null,
-            softwareProductId: null,
-            evidenceSource: "tenant-seed",
+            softwareProductId: installed.SoftwareProductId,
+            installedSoftwareId: installed.Id,
+            matchedVersion: installed.Version,
+            matchSource: ExposureMatchSource.Product,
             observedAt: DateTimeOffset.UtcNow
         );
         _dbContext.DeviceVulnerabilityExposures.Add(exposure);
@@ -371,15 +383,11 @@ public class TenantIsolationEndToEndTests : IDisposable
         var assessment = ExposureAssessment.Create(
             tenantId,
             exposure.Id,
-            device.Id,
-            vulnerability.Id,
             device.SecurityProfileId,
-            Severity.High,
+            vulnerability.CvssScore ?? 0m,
             700m,
-            vulnerability.CvssVector,
-            "[]",
             "tenant-seed",
-            "1"
+            DateTimeOffset.UtcNow
         );
         _dbContext.ExposureAssessments.Add(assessment);
     }

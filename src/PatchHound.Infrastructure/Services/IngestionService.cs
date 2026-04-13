@@ -26,6 +26,9 @@ public class IngestionService
     private readonly EnrichmentJobEnqueuer _enrichmentJobEnqueuer;
     private readonly IStagedDeviceMergeService _stagedDeviceMergeService;
     private readonly IDeviceRuleEvaluationService _deviceRuleEvaluationService;
+    private readonly ExposureDerivationService _exposureDerivationService;
+    private readonly ExposureEpisodeService _exposureEpisodeService;
+    private readonly ExposureAssessmentService _exposureAssessmentService;
     private readonly RiskScoreService _riskScoreService;
     private readonly RemediationDecisionService? _remediationDecisionService;
     private readonly ILogger<IngestionService> _logger;
@@ -38,6 +41,9 @@ public class IngestionService
         EnrichmentJobEnqueuer enrichmentJobEnqueuer,
         IStagedDeviceMergeService stagedDeviceMergeService,
         IDeviceRuleEvaluationService deviceRuleEvaluationService,
+        ExposureDerivationService exposureDerivationService,
+        ExposureEpisodeService exposureEpisodeService,
+        ExposureAssessmentService exposureAssessmentService,
         RiskScoreService riskScoreService,
         ILogger<IngestionService> logger
     )
@@ -47,6 +53,9 @@ public class IngestionService
             enrichmentJobEnqueuer,
             stagedDeviceMergeService,
             deviceRuleEvaluationService,
+            exposureDerivationService,
+            exposureEpisodeService,
+            exposureAssessmentService,
             riskScoreService,
             remediationDecisionService: null,
             logger
@@ -58,6 +67,9 @@ public class IngestionService
         EnrichmentJobEnqueuer enrichmentJobEnqueuer,
         IStagedDeviceMergeService stagedDeviceMergeService,
         IDeviceRuleEvaluationService deviceRuleEvaluationService,
+        ExposureDerivationService exposureDerivationService,
+        ExposureEpisodeService exposureEpisodeService,
+        ExposureAssessmentService exposureAssessmentService,
         RiskScoreService riskScoreService,
         RemediationDecisionService? remediationDecisionService,
         ILogger<IngestionService> logger
@@ -68,9 +80,23 @@ public class IngestionService
         _enrichmentJobEnqueuer = enrichmentJobEnqueuer;
         _stagedDeviceMergeService = stagedDeviceMergeService;
         _deviceRuleEvaluationService = deviceRuleEvaluationService;
+        _exposureDerivationService = exposureDerivationService;
+        _exposureEpisodeService = exposureEpisodeService;
+        _exposureAssessmentService = exposureAssessmentService;
         _riskScoreService = riskScoreService;
         _remediationDecisionService = remediationDecisionService;
         _logger = logger;
+    }
+
+    public async Task RunExposureDerivationAsync(Guid tenantId, CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+        await _exposureDerivationService.DeriveForTenantAsync(tenantId, now, ct);
+        await _dbContext.SaveChangesAsync(ct);
+        await _exposureEpisodeService.SyncEpisodesForTenantAsync(tenantId, now, ct);
+        await _dbContext.SaveChangesAsync(ct);
+        await _exposureAssessmentService.AssessForTenantAsync(tenantId, now, ct);
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     public async Task<bool> RunIngestionAsync(Guid tenantId, CancellationToken ct)
@@ -588,9 +614,12 @@ public class IngestionService
                         else
                         {
                             var softwareMatchStartedAt = DateTimeOffset.UtcNow;
-                            // phase-3: re-introduce SoftwareVulnerabilityMatchService once DeviceVulnerabilityExposure is in place
                             await ExecuteWithConcurrencyRetryAsync(
-                                () => Task.FromResult(true),
+                                async () =>
+                                {
+                                    await RunExposureDerivationAsync(tenantId, ct);
+                                    return true;
+                                },
                                 source.SourceName,
                                 tenantId,
                                 ct
@@ -604,7 +633,7 @@ public class IngestionService
                                 );
                             }
                             _logger.LogInformation(
-                                "Software vulnerability match sync completed for ingestion run {IngestionRunId}. Duration: {DurationMs} ms.",
+                                "Exposure derivation sync completed for ingestion run {IngestionRunId}. Duration: {DurationMs} ms.",
                                 run.Id,
                                 (DateTimeOffset.UtcNow - softwareMatchStartedAt).TotalMilliseconds
                             );

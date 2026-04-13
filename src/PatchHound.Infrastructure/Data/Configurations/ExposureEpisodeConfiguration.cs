@@ -11,8 +11,7 @@ public class ExposureEpisodeConfiguration : IEntityTypeConfiguration<ExposureEpi
         builder.HasKey(x => x.Id);
 
         builder.HasIndex(x => x.TenantId);
-        builder.HasIndex(x => new { x.DeviceVulnerabilityExposureId, x.EpisodeNumber }).IsUnique();
-        builder.Property(x => x.Status).HasMaxLength(32).IsRequired();
+        builder.HasIndex(x => new { x.TenantId, x.DeviceVulnerabilityExposureId, x.EpisodeNumber }).IsUnique();
 
         builder.HasOne(x => x.Exposure)
             .WithMany()

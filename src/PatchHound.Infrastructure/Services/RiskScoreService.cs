@@ -424,9 +424,15 @@ public class RiskScoreService(
             .Where(item => item.TenantId == tenantId)
             .Select(item => new
             {
-                AssetId = item.DeviceId,
-                EpisodeRiskScore = item.Score ?? 0m,
-                RiskBand = item.EffectiveSeverity.ToString(),
+                AssetId = item.Exposure.DeviceId,
+                EpisodeRiskScore = item.EnvironmentalCvss,
+                RiskBand = item.EnvironmentalCvss >= 9.0m
+                    ? "Critical"
+                    : item.EnvironmentalCvss >= 7.0m
+                        ? "High"
+                        : item.EnvironmentalCvss >= 4.0m
+                            ? "Medium"
+                            : "Low",
             })
             .ToListAsync(ct);
 
@@ -507,11 +513,17 @@ public class RiskScoreService(
                 item.VulnerabilityId,
                 Score = dbContext.ExposureAssessments
                     .Where(assessment => assessment.DeviceVulnerabilityExposureId == item.Id)
-                    .Select(assessment => (decimal?)assessment.Score)
+                    .Select(assessment => (decimal?)assessment.EnvironmentalCvss)
                     .FirstOrDefault(),
                 Severity = dbContext.ExposureAssessments
                     .Where(assessment => assessment.DeviceVulnerabilityExposureId == item.Id)
-                    .Select(assessment => assessment.EffectiveSeverity)
+                    .Select(assessment => assessment.EnvironmentalCvss >= 9.0m
+                        ? Core.Enums.Severity.Critical
+                        : assessment.EnvironmentalCvss >= 7.0m
+                            ? Core.Enums.Severity.High
+                            : assessment.EnvironmentalCvss >= 4.0m
+                                ? Core.Enums.Severity.Medium
+                                : Core.Enums.Severity.Low)
                     .FirstOrDefault(),
             })
             .ToListAsync(ct);

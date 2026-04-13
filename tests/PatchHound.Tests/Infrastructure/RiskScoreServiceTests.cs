@@ -49,14 +49,19 @@ public class RiskScoreServiceTests : IDisposable
         await _dbContext.AddRangeAsync(deviceA, deviceB, team, vulnA, vulnB);
         await _dbContext.SaveChangesAsync();
 
-        var exposureA = DeviceVulnerabilityExposure.Create(_tenantId, deviceA.Id, vulnA.Id, null, null, "test", DateTimeOffset.UtcNow);
-        var exposureB = DeviceVulnerabilityExposure.Create(_tenantId, deviceB.Id, vulnB.Id, null, null, "test", DateTimeOffset.UtcNow);
+        var installA = InstalledSoftware.Observe(_tenantId, deviceA.Id, Guid.NewGuid(), _sourceSystemId, "1.0", DateTimeOffset.UtcNow);
+        var installB = InstalledSoftware.Observe(_tenantId, deviceB.Id, Guid.NewGuid(), _sourceSystemId, "1.0", DateTimeOffset.UtcNow);
+        await _dbContext.AddRangeAsync(installA, installB);
+        await _dbContext.SaveChangesAsync();
+
+        var exposureA = DeviceVulnerabilityExposure.Observe(_tenantId, deviceA.Id, vulnA.Id, installA.SoftwareProductId, installA.Id, installA.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow);
+        var exposureB = DeviceVulnerabilityExposure.Observe(_tenantId, deviceB.Id, vulnB.Id, installB.SoftwareProductId, installB.Id, installB.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow);
         await _dbContext.AddRangeAsync(exposureA, exposureB);
         await _dbContext.SaveChangesAsync();
 
         await _dbContext.AddRangeAsync(
-            ExposureAssessment.Create(_tenantId, exposureA.Id, deviceA.Id, vulnA.Id, null, Severity.Critical, 950m, null, "[]", "critical", "1"),
-            ExposureAssessment.Create(_tenantId, exposureB.Id, deviceB.Id, vulnB.Id, null, Severity.High, 700m, null, "[]", "high", "1")
+            ExposureAssessment.Create(_tenantId, exposureA.Id, null, vulnA.CvssScore ?? 0m, 950m, "critical", DateTimeOffset.UtcNow),
+            ExposureAssessment.Create(_tenantId, exposureB.Id, null, vulnB.CvssScore ?? 0m, 700m, "high", DateTimeOffset.UtcNow)
         );
         await _dbContext.SaveChangesAsync();
 
