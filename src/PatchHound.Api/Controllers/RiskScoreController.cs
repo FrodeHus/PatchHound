@@ -60,22 +60,7 @@ public class RiskScoreController : ControllerBase
             .Where(item => assetIds.Contains(item.Id))
             .Select(item => new { item.Id, item.Name })
             .ToDictionaryAsync(item => item.Id, item => item.Name, ct);
-        var episodeDrivers = await _dbContext.VulnerabilityEpisodeRiskAssessments
-            .AsNoTracking()
-            .Where(item => assetIds.Contains(item.AssetId) && item.ResolvedAt == null)
-            .Select(item => new
-            {
-                item.AssetId,
-                item.TenantVulnerabilityId,
-                ExternalId = item.TenantVulnerability.VulnerabilityDefinition.ExternalId,
-                Title = item.TenantVulnerability.VulnerabilityDefinition.Title,
-                item.RiskBand,
-                item.EpisodeRiskScore,
-                item.ThreatScore,
-                item.ContextScore,
-                item.OperationalScore,
-            })
-            .ToListAsync(ct);
+        // Phase-2 stub: VulnerabilityEpisodeRiskAssessments deleted; restored in Phase 3.
 
         var history = hasFilters
             ? []
@@ -102,21 +87,8 @@ public class RiskScoreController : ControllerBase
                 item.MediumCount,
                 item.LowCount,
                 item.OpenEpisodeCount,
-                episodeDrivers
-                    .Where(driver => driver.AssetId == item.AssetId)
-                    .OrderByDescending(driver => driver.EpisodeRiskScore)
-                    .Take(3)
-                    .Select(driver => new AssetRiskEpisodeDriverDto(
-                        driver.TenantVulnerabilityId,
-                        driver.ExternalId,
-                        driver.Title,
-                        driver.RiskBand,
-                        driver.EpisodeRiskScore,
-                        driver.ThreatScore,
-                        driver.ContextScore,
-                        driver.OperationalScore
-                    ))
-                    .ToList()
+                // Phase-2 stub: VulnerabilityEpisodeRiskAssessments deleted; restored in Phase 3.
+                []
             )).ToList(),
             history.Select(item => new RiskScoreSnapshotDto(
                 item.Date,
@@ -191,22 +163,7 @@ public class RiskScoreController : ControllerBase
             .ToListAsync(ct);
 
         var assetIds = topRiskAssets.Select(item => item.AssetId).ToHashSet();
-        var episodeDrivers = await _dbContext.VulnerabilityEpisodeRiskAssessments
-            .AsNoTracking()
-            .Where(item => assetIds.Contains(item.AssetId) && item.ResolvedAt == null)
-            .Select(item => new
-            {
-                item.AssetId,
-                item.TenantVulnerabilityId,
-                ExternalId = item.TenantVulnerability.VulnerabilityDefinition.ExternalId,
-                Title = item.TenantVulnerability.VulnerabilityDefinition.Title,
-                item.RiskBand,
-                item.EpisodeRiskScore,
-                item.ThreatScore,
-                item.ContextScore,
-                item.OperationalScore,
-            })
-            .ToListAsync(ct);
+        // Phase-2 stub: VulnerabilityEpisodeRiskAssessments deleted; restored in Phase 3.
 
         return Ok(new DeviceGroupRiskDetailDto(
             groupScore.DeviceGroupName,
@@ -242,21 +199,7 @@ public class RiskScoreController : ControllerBase
                 item.MediumCount,
                 item.LowCount,
                 item.OpenEpisodeCount,
-                episodeDrivers
-                    .Where(driver => driver.AssetId == item.AssetId)
-                    .OrderByDescending(driver => driver.EpisodeRiskScore)
-                    .Take(3)
-                    .Select(driver => new AssetRiskEpisodeDriverDto(
-                        driver.TenantVulnerabilityId,
-                        driver.ExternalId,
-                        driver.Title,
-                        driver.RiskBand,
-                        driver.EpisodeRiskScore,
-                        driver.ThreatScore,
-                        driver.ContextScore,
-                        driver.OperationalScore
-                    ))
-                    .ToList()
+                new List<AssetRiskEpisodeDriverDto>()
             )).ToList()
         ));
     }
@@ -326,24 +269,7 @@ public class RiskScoreController : ControllerBase
             .Take(5)
             .ToListAsync(ct);
 
-        var assetIds = topRiskAssets.Select(item => item.AssetId).ToHashSet();
-        var episodeDrivers = await _dbContext.VulnerabilityEpisodeRiskAssessments
-            .AsNoTracking()
-            .Where(item => assetIds.Contains(item.AssetId) && item.ResolvedAt == null)
-            .Select(item => new
-            {
-                item.AssetId,
-                item.TenantVulnerabilityId,
-                ExternalId = item.TenantVulnerability.VulnerabilityDefinition.ExternalId,
-                Title = item.TenantVulnerability.VulnerabilityDefinition.Title,
-                item.RiskBand,
-                item.EpisodeRiskScore,
-                item.ThreatScore,
-                item.ContextScore,
-                item.OperationalScore,
-            })
-            .ToListAsync(ct);
-
+        // Phase-2 stub: VulnerabilityEpisodeRiskAssessments deleted; restored in Phase 3.
         return Ok(new SoftwareRiskDetailDto(
             softwareScore.TenantSoftwareId,
             softwareScore.SoftwareName,
@@ -369,21 +295,7 @@ public class RiskScoreController : ControllerBase
                 item.MediumCount,
                 item.LowCount,
                 item.OpenEpisodeCount,
-                episodeDrivers
-                    .Where(driver => driver.AssetId == item.AssetId)
-                    .OrderByDescending(driver => driver.EpisodeRiskScore)
-                    .Take(3)
-                    .Select(driver => new AssetRiskEpisodeDriverDto(
-                        driver.TenantVulnerabilityId,
-                        driver.ExternalId,
-                        driver.Title,
-                        driver.RiskBand,
-                        driver.EpisodeRiskScore,
-                        driver.ThreatScore,
-                        driver.ContextScore,
-                        driver.OperationalScore
-                    ))
-                    .ToList()
+                new List<AssetRiskEpisodeDriverDto>()
             )).ToList()
         ));
     }

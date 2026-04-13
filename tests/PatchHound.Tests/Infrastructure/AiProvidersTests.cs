@@ -237,13 +237,15 @@ public class AiProvidersTests
 
     private static AiReportGenerationRequest BuildRequest(Guid tenantId) =>
         new(
-            VulnerabilityDefinition.Create(
+            Vulnerability.Create(
+                "NVD",
                 "CVE-2026-0001",
                 "Test vulnerability",
                 "Description",
                 Severity.High,
-                "NVD",
-                8.1m
+                8.1m,
+                null,
+                null
             ),
             [Asset.Create(tenantId, "asset-1", AssetType.Device, "srv-01", Criticality.High)]
         );

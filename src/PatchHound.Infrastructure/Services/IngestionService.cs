@@ -1903,16 +1903,16 @@ public class IngestionService
             return;
         }
 
-        var vulnerabilityDefinitionIds = await _dbContext
-            .TenantVulnerabilities.IgnoreQueryFilters()
-            .Where(item => item.TenantId == tenantId && externalIds.Contains(item.VulnerabilityDefinition.ExternalId))
-            .Select(item => item.VulnerabilityDefinitionId)
+        var vulnerabilityIds = await _dbContext
+            .Vulnerabilities.IgnoreQueryFilters()
+            .Where(v => externalIds.Contains(v.ExternalId))
+            .Select(v => v.Id)
             .Distinct()
             .ToListAsync(ct);
 
         await _enrichmentJobEnqueuer.EnqueueVulnerabilityJobsAsync(
             tenantId,
-            vulnerabilityDefinitionIds,
+            vulnerabilityIds,
             ct
         );
 
@@ -2536,49 +2536,13 @@ public class IngestionService
                 .NormalizedSoftwareInstallations.IgnoreQueryFilters()
                 .Where(item => item.SnapshotId == snapshotId)
                 .ToListAsync(ct);
-            var softwareMatches = await _dbContext
-                .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
-                .Where(item => item.SnapshotId == snapshotId)
-                .ToListAsync(ct);
-            var softwareProjections = await _dbContext
-                .NormalizedSoftwareVulnerabilityProjections.IgnoreQueryFilters()
-                .Where(item => item.SnapshotId == snapshotId)
-                .ToListAsync(ct);
-            var vulnerabilityAssets = await _dbContext
-                .VulnerabilityAssets.IgnoreQueryFilters()
-                .Where(item => item.SnapshotId == snapshotId)
-                .ToListAsync(ct);
-            var assessments = await _dbContext
-                .VulnerabilityAssetAssessments.IgnoreQueryFilters()
-                .Where(item => item.SnapshotId == snapshotId)
-                .ToListAsync(ct);
 
             _dbContext.TenantSoftware.RemoveRange(tenantSoftware);
             _dbContext.NormalizedSoftwareInstallations.RemoveRange(installations);
-            _dbContext.SoftwareVulnerabilityMatches.RemoveRange(softwareMatches);
-            _dbContext.NormalizedSoftwareVulnerabilityProjections.RemoveRange(softwareProjections);
-            _dbContext.VulnerabilityAssets.RemoveRange(vulnerabilityAssets);
-            _dbContext.VulnerabilityAssetAssessments.RemoveRange(assessments);
             await _dbContext.SaveChangesAsync(ct);
             return;
         }
 
-        await _dbContext
-            .VulnerabilityAssetAssessments.IgnoreQueryFilters()
-            .Where(item => item.SnapshotId == snapshotId)
-            .ExecuteDeleteAsync(ct);
-        await _dbContext
-            .VulnerabilityAssets.IgnoreQueryFilters()
-            .Where(item => item.SnapshotId == snapshotId)
-            .ExecuteDeleteAsync(ct);
-        await _dbContext
-            .NormalizedSoftwareVulnerabilityProjections.IgnoreQueryFilters()
-            .Where(item => item.SnapshotId == snapshotId)
-            .ExecuteDeleteAsync(ct);
-        await _dbContext
-            .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
-            .Where(item => item.SnapshotId == snapshotId)
-            .ExecuteDeleteAsync(ct);
         await _dbContext
             .NormalizedSoftwareInstallations.IgnoreQueryFilters()
             .Where(item => item.SnapshotId == snapshotId)

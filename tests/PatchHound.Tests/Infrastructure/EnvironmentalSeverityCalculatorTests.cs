@@ -12,14 +12,15 @@ public class EnvironmentalSeverityCalculatorTests
     [Fact]
     public void Calculate_LocalOnlyProfile_DowngradesNetworkReachability()
     {
-        var vulnerability = VulnerabilityDefinition.Create(
+        var vulnerability = Vulnerability.Create(
+            "MicrosoftDefender",
             "CVE-2026-4000",
             "Remote issue",
             "Desc",
             Severity.Critical,
-            "MicrosoftDefender",
             9.8m,
-            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            null
         );
         var asset = Asset.Create(
             Guid.NewGuid(),
@@ -49,14 +50,15 @@ public class EnvironmentalSeverityCalculatorTests
     [Fact]
     public void Calculate_HighRequirements_CanIncreaseEffectiveScore()
     {
-        var vulnerability = VulnerabilityDefinition.Create(
+        var vulnerability = Vulnerability.Create(
+            "MicrosoftDefender",
             "CVE-2026-4001",
             "Sensitive data issue",
             "Desc",
             Severity.Medium,
-            "MicrosoftDefender",
             5.5m,
-            "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:L"
+            "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:L",
+            null
         );
         var asset = Asset.Create(
             Guid.NewGuid(),
@@ -87,14 +89,15 @@ public class EnvironmentalSeverityCalculatorTests
     [Fact]
     public void Calculate_ExplicitModifiedMetrics_AreAuthoritative()
     {
-        var vulnerability = VulnerabilityDefinition.Create(
+        var vulnerability = Vulnerability.Create(
+            "MicrosoftDefender",
             "CVE-2026-4999",
             "Remote issue",
             "Desc",
             Severity.High,
-            "MicrosoftDefender",
             8.8m,
-            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            null
         );
         var asset = Asset.Create(
             Guid.NewGuid(),

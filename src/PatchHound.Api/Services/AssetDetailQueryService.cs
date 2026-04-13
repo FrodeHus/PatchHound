@@ -86,21 +86,8 @@ public class AssetDetailQueryService(
                 .Where(team => relevantTeamIds.Contains(team.Id))
                 .ToDictionaryAsync(team => team.Id, team => team.Name, ct);
 
-        var episodeRows = await dbContext
-            .VulnerabilityAssetEpisodes.AsNoTracking()
-            .Where(episode => episode.AssetId == assetId)
-            .OrderBy(episode => episode.TenantVulnerabilityId)
-            .ThenBy(episode => episode.EpisodeNumber)
-            .Select(episode => new
-            {
-                VulnerabilityId = episode.TenantVulnerabilityId,
-                episode.EpisodeNumber,
-                episode.Status,
-                episode.FirstSeenAt,
-                episode.LastSeenAt,
-                episode.ResolvedAt,
-            })
-            .ToListAsync(ct);
+        // Phase-2: VulnerabilityAssetEpisode deleted.
+        var episodeRows = new List<(Guid VulnerabilityId, int EpisodeNumber, string Status, DateTimeOffset FirstSeenAt, DateTimeOffset LastSeenAt, DateTimeOffset? ResolvedAt)>();
 
         var episodesByVulnerabilityId = episodeRows
             .GroupBy(row => row.VulnerabilityId)
@@ -214,12 +201,8 @@ public class AssetDetailQueryService(
 
         var softwareNamesByAssetId = softwareRows.ToDictionary(row => row.Id, row => row.Name);
 
-        var assessmentsByVulnerabilityId = await dbContext
-            .VulnerabilityAssetAssessments.AsNoTracking()
-            .Where(assessment =>
-                assessment.AssetId == assetId && assessment.SnapshotId == activeSnapshotId
-            )
-            .ToDictionaryAsync(assessment => assessment.TenantVulnerabilityId, ct);
+        // Phase-2: VulnerabilityAssetAssessment deleted.
+        var assessmentsByVulnerabilityId = new Dictionary<Guid, object?>();
 
         var possibleCorrelationsByVulnerabilityId = episodeRows
             .GroupBy(row => row.VulnerabilityId)
@@ -241,82 +224,16 @@ public class AssetDetailQueryService(
                     )
             );
 
-        var vulnerabilityRows = await dbContext
-            .VulnerabilityAssets.AsNoTracking()
-            .Where(va => va.AssetId == assetId && va.SnapshotId == activeSnapshotId)
-            .Join(
-                dbContext.TenantVulnerabilities.AsNoTracking(),
-                va => va.TenantVulnerabilityId,
-                tv => tv.Id,
-                (va, tv) =>
-                    new
-                    {
-                        Id = tv.Id,
-                        ExternalId = tv.VulnerabilityDefinition.ExternalId,
-                        Title = tv.VulnerabilityDefinition.Title,
-                        Description = tv.VulnerabilityDefinition.Description,
-                        VendorSeverity = tv.VulnerabilityDefinition.VendorSeverity.ToString(),
-                        CvssVector = tv.VulnerabilityDefinition.CvssVector,
-                        PublishedDate = tv.VulnerabilityDefinition.PublishedDate,
-                        Status = va.Status.ToString(),
-                        va.DetectedDate,
-                        va.ResolvedDate,
-                    }
-            )
-            .ToListAsync(ct);
+        // Phase-2: VulnerabilityAsset + TenantVulnerability deleted.
+        var vulnerabilityRows = new List<(Guid Id, string ExternalId, string Title, string? Description, string VendorSeverity, string? CvssVector, DateTimeOffset? PublishedDate, string Status, DateTimeOffset DetectedDate, DateTimeOffset? ResolvedDate)>();
 
+        // Phase-2: SoftwareVulnerabilityMatch deleted.
         IReadOnlyList<AssetKnownSoftwareVulnerabilityDto> softwareVulnerabilityRows = [];
-        if (asset.AssetType == AssetType.Software)
-        {
-            var softwareVulnerabilityItems = await dbContext
-                .SoftwareVulnerabilityMatches.AsNoTracking()
-                .Where(match => match.SoftwareAssetId == assetId && match.ResolvedAt == null)
-                .Join(
-                    dbContext.VulnerabilityDefinitions.AsNoTracking(),
-                    match => match.VulnerabilityDefinitionId,
-                    vulnerability => vulnerability.Id,
-                    (match, vulnerability) =>
-                        new
-                        {
-                            vulnerability.Id,
-                            vulnerability.ExternalId,
-                            vulnerability.Title,
-                            VendorSeverity = vulnerability.VendorSeverity.ToString(),
-                            vulnerability.CvssScore,
-                            vulnerability.CvssVector,
-                            MatchMethod = match.MatchMethod.ToString(),
-                            Confidence = match.Confidence.ToString(),
-                            match.Evidence,
-                            match.FirstSeenAt,
-                            match.LastSeenAt,
-                            match.ResolvedAt,
-                        }
-                )
-                .OrderBy(item => item.ExternalId)
-                .ToListAsync(ct);
-
-            softwareVulnerabilityRows = softwareVulnerabilityItems
-                .Select(item => new AssetKnownSoftwareVulnerabilityDto(
-                    item.Id,
-                    item.ExternalId,
-                    item.Title,
-                    item.VendorSeverity,
-                    item.CvssScore,
-                    item.CvssVector,
-                    item.MatchMethod,
-                    item.Confidence,
-                    item.Evidence,
-                    item.FirstSeenAt,
-                    item.LastSeenAt,
-                    item.ResolvedAt
-                ))
-                .ToList();
-        }
 
         var vulnerabilities = vulnerabilityRows
             .Select(row =>
             {
-                assessmentsByVulnerabilityId.TryGetValue(row.Id, out var assessment);
+                assessmentsByVulnerabilityId.TryGetValue(row.Id, out _);
                 episodesByVulnerabilityId.TryGetValue(row.Id, out var episodeHistory);
                 possibleCorrelationsByVulnerabilityId.TryGetValue(
                     row.Id,
@@ -327,14 +244,14 @@ public class AssetDetailQueryService(
                     row.Id,
                     row.ExternalId,
                     row.Title,
-                    row.Description,
+                    row.Description ?? string.Empty,
                     row.VendorSeverity,
-                    assessment?.BaseScore,
-                    assessment?.BaseVector ?? row.CvssVector,
+                    null,
+                    row.CvssVector,
                     row.PublishedDate,
-                    assessment?.EffectiveSeverity.ToString() ?? row.VendorSeverity,
-                    assessment?.EffectiveScore,
-                    assessment?.ReasonSummary,
+                    row.VendorSeverity,
+                    null,
+                    null,
                     row.Status,
                     row.DetectedDate,
                     row.ResolvedDate,
@@ -393,22 +310,8 @@ public class AssetDetailQueryService(
         AssetRiskDetailDto? risk = null;
         if (assetRiskScore is not null)
         {
-            var topDrivers = await dbContext.VulnerabilityEpisodeRiskAssessments
-                .AsNoTracking()
-                .Where(item => item.AssetId == assetId && item.TenantId == tenantId && item.ResolvedAt == null)
-                .OrderByDescending(item => item.EpisodeRiskScore)
-                .Take(5)
-                .Select(item => new AssetRiskDriverDto(
-                    item.TenantVulnerabilityId,
-                    item.TenantVulnerability.VulnerabilityDefinition.ExternalId,
-                    item.TenantVulnerability.VulnerabilityDefinition.Title,
-                    item.RiskBand,
-                    item.EpisodeRiskScore,
-                    item.ThreatScore,
-                    item.ContextScore,
-                    item.OperationalScore
-                ))
-                .ToListAsync(ct);
+            // Phase-2: VulnerabilityEpisodeRiskAssessment deleted.
+            var topDrivers = new List<AssetRiskDriverDto>();
 
             risk = new AssetRiskDetailDto(
                 assetRiskScore.OverallScore,

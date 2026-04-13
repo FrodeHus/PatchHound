@@ -59,17 +59,12 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<AssetBusinessLabel> AssetBusinessLabels => Set<AssetBusinessLabel>();
     public DbSet<AssetSecurityProfile> AssetSecurityProfiles => Set<AssetSecurityProfile>();
     public DbSet<SoftwareCpeBinding> SoftwareCpeBindings => Set<SoftwareCpeBinding>();
-    public DbSet<SoftwareVulnerabilityMatch> SoftwareVulnerabilityMatches =>
-        Set<SoftwareVulnerabilityMatch>();
     public DbSet<NormalizedSoftware> NormalizedSoftware => Set<NormalizedSoftware>();
     public DbSet<TenantSoftware> TenantSoftware => Set<TenantSoftware>();
     public DbSet<NormalizedSoftwareAlias> NormalizedSoftwareAliases =>
         Set<NormalizedSoftwareAlias>();
     public DbSet<NormalizedSoftwareInstallation> NormalizedSoftwareInstallations =>
         Set<NormalizedSoftwareInstallation>();
-    public DbSet<NormalizedSoftwareVulnerabilityProjection>
-        NormalizedSoftwareVulnerabilityProjections =>
-            Set<NormalizedSoftwareVulnerabilityProjection>();
     public DbSet<DeviceSoftwareInstallation> DeviceSoftwareInstallations =>
         Set<DeviceSoftwareInstallation>();
     public DbSet<DeviceSoftwareInstallationEpisode> DeviceSoftwareInstallationEpisodes =>
@@ -78,21 +73,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<VulnerabilityReference> VulnerabilityReferences => Set<VulnerabilityReference>();
     public DbSet<VulnerabilityApplicability> VulnerabilityApplicabilities => Set<VulnerabilityApplicability>();
     public DbSet<ThreatAssessment> ThreatAssessments => Set<ThreatAssessment>();
-    public DbSet<VulnerabilityDefinition> VulnerabilityDefinitions => Set<VulnerabilityDefinition>();
-    public DbSet<VulnerabilityThreatAssessment> VulnerabilityThreatAssessments =>
-        Set<VulnerabilityThreatAssessment>();
-    public DbSet<VulnerabilityDefinitionAffectedSoftware> VulnerabilityDefinitionAffectedSoftware =>
-        Set<VulnerabilityDefinitionAffectedSoftware>();
-    public DbSet<VulnerabilityDefinitionReference> VulnerabilityDefinitionReferences =>
-        Set<VulnerabilityDefinitionReference>();
-    public DbSet<TenantVulnerability> TenantVulnerabilities => Set<TenantVulnerability>();
-    public DbSet<VulnerabilityAsset> VulnerabilityAssets => Set<VulnerabilityAsset>();
-    public DbSet<VulnerabilityAssetEpisode> VulnerabilityAssetEpisodes =>
-        Set<VulnerabilityAssetEpisode>();
-    public DbSet<VulnerabilityAssetAssessment> VulnerabilityAssetAssessments =>
-        Set<VulnerabilityAssetAssessment>();
-    public DbSet<VulnerabilityEpisodeRiskAssessment> VulnerabilityEpisodeRiskAssessments =>
-        Set<VulnerabilityEpisodeRiskAssessment>();
     public DbSet<OrganizationalSeverity> OrganizationalSeverities => Set<OrganizationalSeverity>();
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<AdvancedTool> AdvancedTools => Set<AdvancedTool>();
@@ -248,9 +228,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<TeamMembershipRule>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
-            .Entity<SoftwareVulnerabilityMatch>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
             .Entity<TenantSoftware>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
@@ -259,9 +236,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
                 IsSystemContext
                 || (AccessibleTenantIds.Contains(e.TenantId) && e.DeviceAsset.DeviceActiveInTenant)
             );
-        modelBuilder
-            .Entity<NormalizedSoftwareVulnerabilityProjection>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<DeviceSoftwareInstallation>()
             .HasQueryFilter(e =>
@@ -273,46 +247,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e =>
                 IsSystemContext
                 || (AccessibleTenantIds.Contains(e.TenantId) && e.DeviceAsset.DeviceActiveInTenant)
-            );
-        modelBuilder
-            .Entity<TenantVulnerability>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<VulnerabilityAsset>()
-            .HasQueryFilter(e =>
-                IsSystemContext
-                || (
-                    AccessibleTenantIds.Contains(e.TenantVulnerability.TenantId)
-                    && AccessibleTenantIds.Contains(e.Asset.TenantId)
-                    && (e.Asset.AssetType != AssetType.Device || e.Asset.DeviceActiveInTenant)
-                )
-            );
-        modelBuilder
-            .Entity<VulnerabilityAssetEpisode>()
-            .HasQueryFilter(e =>
-                IsSystemContext
-                || (
-                    AccessibleTenantIds.Contains(e.TenantId)
-                    && (e.Asset.AssetType != AssetType.Device || e.Asset.DeviceActiveInTenant)
-                )
-            );
-        modelBuilder
-            .Entity<VulnerabilityAssetAssessment>()
-            .HasQueryFilter(e =>
-                IsSystemContext
-                || (
-                    AccessibleTenantIds.Contains(e.TenantId)
-                    && (e.Asset.AssetType != AssetType.Device || e.Asset.DeviceActiveInTenant)
-                )
-            );
-        modelBuilder
-            .Entity<VulnerabilityEpisodeRiskAssessment>()
-            .HasQueryFilter(e =>
-                IsSystemContext
-                || (
-                    AccessibleTenantIds.Contains(e.TenantId)
-                    && (e.Asset.AssetType != AssetType.Device || e.Asset.DeviceActiveInTenant)
-                )
             );
         modelBuilder
             .Entity<Comment>()

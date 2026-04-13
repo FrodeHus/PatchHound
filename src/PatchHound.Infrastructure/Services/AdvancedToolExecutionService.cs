@@ -241,59 +241,11 @@ public class AdvancedToolExecutionService(
             );
         }
 
-        var openVulnerabilityRows = await dbContext.VulnerabilityAssets.AsNoTracking()
-            .Where(item => item.AssetId == assetId && item.ResolvedDate == null)
-            .Select(item => new
-            {
-                item.TenantVulnerabilityId,
-                ExternalId = item.TenantVulnerability.VulnerabilityDefinition.ExternalId,
-            })
-            .ToListAsync(ct);
-
-        var requestedIds = useAllOpenVulnerabilities
-            ? openVulnerabilityRows.Select(item => item.TenantVulnerabilityId).ToHashSet()
-            : (vulnerabilityIds ?? []).ToHashSet();
-
-        var vulnerabilityRows = requestedIds.Count == 0
-            ? []
-            : await dbContext.VulnerabilityAssets.AsNoTracking()
-                .Where(item =>
-                    item.AssetId == assetId
-                    && item.ResolvedDate == null
-                    && requestedIds.Contains(item.TenantVulnerabilityId)
-                )
-                .Select(item => new
-                {
-                    item.TenantVulnerabilityId,
-                    ExternalId = item.TenantVulnerability.VulnerabilityDefinition.ExternalId,
-                })
-                .ToListAsync(ct);
-
-        var softwareEvidenceRows = vulnerabilityRows.Count == 0
-            ? []
-            : await dbContext.DeviceSoftwareInstallations.AsNoTracking()
-                .Where(item => item.DeviceAssetId == assetId)
-                .Join(
-                    dbContext.SoftwareVulnerabilityMatches.AsNoTracking(),
-                    installation => installation.SoftwareAssetId,
-                    match => match.SoftwareAssetId,
-                    (installation, match) => new
-                    {
-                        match.SoftwareAssetId,
-                        match.VulnerabilityDefinition.ExternalId,
-                    }
-                )
-                .Join(
-                    dbContext.Assets.AsNoTracking(),
-                    row => row.SoftwareAssetId,
-                    software => software.Id,
-                    (row, software) => new
-                    {
-                        row.ExternalId,
-                        software.Metadata,
-                    }
-                )
-                .ToListAsync(ct);
+        // Phase-2: VulnerabilityAsset + SoftwareVulnerabilityMatch deleted. Return empty context.
+        var openVulnerabilityRows = new List<(Guid TenantVulnerabilityId, string ExternalId)>();
+        var requestedIds = new HashSet<Guid>();
+        var vulnerabilityRows = openVulnerabilityRows;
+        var softwareEvidenceRows = new List<(string ExternalId, string? Metadata)>();
 
         var evidenceByExternalId = softwareEvidenceRows
             .GroupBy(row => row.ExternalId, StringComparer.OrdinalIgnoreCase)

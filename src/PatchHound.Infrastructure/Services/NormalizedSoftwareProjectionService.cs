@@ -1,7 +1,5 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Core.Entities;
-using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Infrastructure.Services;
@@ -11,8 +9,6 @@ public class NormalizedSoftwareProjectionService(
     NormalizedSoftwareResolver resolver
 )
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public async Task SyncTenantAsync(Guid tenantId, CancellationToken ct)
     {
         await SyncTenantAsync(tenantId, null, ct);
@@ -115,116 +111,8 @@ public class NormalizedSoftwareProjectionService(
         CancellationToken ct
     )
     {
-        var existingProjections = await dbContext
-            .NormalizedSoftwareVulnerabilityProjections.IgnoreQueryFilters()
-            .Where(item => item.TenantId == tenantId && item.SnapshotId == snapshotId)
-            .ToListAsync(ct);
-        if (existingProjections.Count > 0)
-        {
-            dbContext.NormalizedSoftwareVulnerabilityProjections.RemoveRange(existingProjections);
-        }
-
-        if (resolutions.Count == 0)
-        {
-            return;
-        }
-
-        var matches = await dbContext
-            .SoftwareVulnerabilityMatches.IgnoreQueryFilters()
-            .Where(match =>
-                match.TenantId == tenantId
-                && match.SnapshotId == snapshotId
-                && resolutions.Keys.Contains(match.SoftwareAssetId)
-            )
-            .ToListAsync(ct);
-
-        if (matches.Count == 0)
-        {
-            return;
-        }
-
-        var activeInstallations = await dbContext
-            .NormalizedSoftwareInstallations.IgnoreQueryFilters()
-            .Where(item =>
-                item.TenantId == tenantId && item.SnapshotId == snapshotId && item.IsActive
-            )
-            .ToListAsync(ct);
-
-        var tenantSoftwareIdBySoftwareAssetId = activeInstallations
-            .GroupBy(item => item.SoftwareAssetId)
-            .ToDictionary(group => group.Key, group => group.First().TenantSoftwareId);
-
-        var grouped = matches
-            .Where(match => tenantSoftwareIdBySoftwareAssetId.ContainsKey(match.SoftwareAssetId))
-            .GroupBy(match => new
-            {
-                TenantSoftwareId = tenantSoftwareIdBySoftwareAssetId[match.SoftwareAssetId],
-                match.VulnerabilityDefinitionId,
-            })
-            .ToList();
-
-        var projections = new List<NormalizedSoftwareVulnerabilityProjection>(grouped.Count);
-
-        foreach (var group in grouped)
-        {
-            var orderedMatches = group
-                .OrderByDescending(match => GetMethodPriority(match.MatchMethod))
-                .ThenByDescending(match => GetConfidencePriority(match.Confidence))
-                .ThenByDescending(match => match.LastSeenAt)
-                .ToList();
-
-            var relatedSoftwareAssetIds = group
-                .Select(item => item.SoftwareAssetId)
-                .ToHashSet();
-            var relatedInstallations = activeInstallations
-                .Where(item =>
-                    item.TenantSoftwareId == group.Key.TenantSoftwareId
-                    && relatedSoftwareAssetIds.Contains(item.SoftwareAssetId)
-                )
-                .ToList();
-
-            var allResolved = group.All(item => item.ResolvedAt.HasValue);
-            var evidence = group
-                .Select(item => new
-                {
-                    method = item.MatchMethod.ToString(),
-                    confidence = item.Confidence.ToString(),
-                    evidence = item.Evidence,
-                    firstSeenAt = item.FirstSeenAt,
-                    lastSeenAt = item.LastSeenAt,
-                    resolvedAt = item.ResolvedAt,
-                })
-                .ToList();
-
-            projections.Add(
-                NormalizedSoftwareVulnerabilityProjection.Create(
-                    tenantId,
-                    snapshotId,
-                    group.Key.TenantSoftwareId,
-                    group.Key.VulnerabilityDefinitionId,
-                    orderedMatches[0].MatchMethod,
-                    orderedMatches[0].Confidence,
-                    relatedInstallations.Count,
-                    relatedInstallations.Select(item => item.DeviceAssetId).Distinct().Count(),
-                    relatedInstallations
-                        .Select(item => item.DetectedVersion ?? string.Empty)
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .Count(version => !string.IsNullOrWhiteSpace(version)),
-                    group.Min(item => item.FirstSeenAt),
-                    group.Max(item => item.LastSeenAt),
-                    allResolved ? group.Max(item => item.ResolvedAt) : null,
-                    JsonSerializer.Serialize(evidence, JsonOptions)
-                )
-            );
-        }
-
-        if (projections.Count > 0)
-        {
-            await dbContext.NormalizedSoftwareVulnerabilityProjections.AddRangeAsync(
-                projections,
-                ct
-            );
-        }
+        // Phase-2: SoftwareVulnerabilityMatch deleted. No-op — projections will be rebuilt in Phase 3.
+        await Task.CompletedTask;
     }
 
     private async Task<Dictionary<Guid, TenantSoftware>> UpsertTenantSoftwareAsync(
@@ -281,23 +169,4 @@ public class NormalizedSoftwareProjectionService(
         return $"{deviceAssetId:N}:{softwareAssetId:N}";
     }
 
-    private static int GetMethodPriority(SoftwareVulnerabilityMatchMethod method)
-    {
-        return method switch
-        {
-            SoftwareVulnerabilityMatchMethod.DefenderDirect => 200,
-            SoftwareVulnerabilityMatchMethod.CpeBinding => 100,
-            _ => 0,
-        };
-    }
-
-    private static int GetConfidencePriority(MatchConfidence confidence)
-    {
-        return confidence switch
-        {
-            MatchConfidence.High => 30,
-            MatchConfidence.Medium => 20,
-            _ => 10,
-        };
-    }
 }

@@ -2,7 +2,8 @@ using PatchHound.Core.Entities;
 
 namespace PatchHound.Core.Models;
 
+// Phase-2: VulnerabilityDefinition replaced by canonical Vulnerability.
 public record AiReportGenerationRequest(
-    VulnerabilityDefinition VulnerabilityDefinition,
+    Vulnerability VulnerabilityDefinition,
     IReadOnlyList<Asset> AffectedAssets
 );

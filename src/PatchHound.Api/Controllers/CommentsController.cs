@@ -78,9 +78,10 @@ public class CommentsController : ControllerBase
         // Verify the referenced entity exists and resolve its tenant
         var entityTenantId = internalEntityType switch
         {
+            // Canonical Vulnerability is a global entity — scope to current tenant context.
             "TenantVulnerability" => await _dbContext
-                .TenantVulnerabilities.Where(v => v.Id == entityId)
-                .Select(v => (Guid?)v.TenantId)
+                .Vulnerabilities.Where(v => v.Id == entityId)
+                .Select(_ => _tenantContext.CurrentTenantId)
                 .FirstOrDefaultAsync(ct),
             "PatchingTask" => await _dbContext
                 .PatchingTasks.Where(t => t.Id == entityId)

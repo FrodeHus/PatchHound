@@ -140,9 +140,8 @@ public class AssetsController : ControllerBase
                     .Where(score => score.AssetId == a.Id)
                     .Select(score => (decimal?)score.OverallScore)
                     .FirstOrDefault(),
-                VulnerabilityCount = _dbContext.VulnerabilityAssets.Count(va =>
-                    va.AssetId == a.Id && va.SnapshotId == activeSnapshotId
-                ),
+                // Phase-2 stub: VulnerabilityAsset deleted; restored in Phase 3.
+                VulnerabilityCount = 0,
             });
 
         var assetIds = await rankedQuery
@@ -154,20 +153,8 @@ public class AssetsController : ControllerBase
             .Select(item => item.Asset.Id)
             .ToListAsync(ct);
 
-        var recurringCounts = await _dbContext
-            .VulnerabilityAssetEpisodes.AsNoTracking()
-            .Where(episode => assetIds.Contains(episode.AssetId))
-            .GroupBy(episode => new { episode.AssetId, episode.TenantVulnerabilityId })
-            .Select(group => new { group.Key.AssetId, IsRecurring = group.Count() > 1 })
-            .Where(item => item.IsRecurring)
-            .GroupBy(item => item.AssetId)
-            .Select(group => new { AssetId = group.Key, Count = group.Count() })
-            .ToListAsync(ct);
-
-        var recurringCountsByAssetId = recurringCounts.ToDictionary(
-            item => item.AssetId,
-            item => item.Count
-        );
+        // Phase-2 stub: VulnerabilityAssetEpisodes deleted; restored in Phase 3.
+        var recurringCountsByAssetId = new Dictionary<Guid, int>();
 
         // Fetch full DTOs using the pre-computed ID list instead of
         // re-running the sort+pagination query with correlated aggregates.
@@ -194,9 +181,8 @@ public class AssetsController : ControllerBase
                     .AssetSecurityProfiles.Where(profile => profile.Id == a.SecurityProfileId)
                     .Select(profile => profile.Name)
                     .FirstOrDefault(),
-                VulnerabilityCount = _dbContext.VulnerabilityAssets.Count(va =>
-                    va.AssetId == a.Id && va.SnapshotId == activeSnapshotId
-                ),
+                // Phase-2 stub: VulnerabilityAssets deleted; restored in Phase 3.
+                VulnerabilityCount = 0,
                 a.DeviceHealthStatus,
                 a.DeviceRiskScore,
                 a.DeviceExposureLevel,

@@ -10,7 +10,7 @@ public class OrganizationalSeverityConfiguration : IEntityTypeConfiguration<Orga
     {
         builder.HasKey(os => os.Id);
 
-        builder.HasIndex(os => new { os.TenantId, os.TenantVulnerabilityId }).IsUnique();
+        builder.HasIndex(os => new { os.TenantId, os.VulnerabilityId }).IsUnique();
 
         builder.Property(os => os.AdjustedSeverity).HasConversion<string>().HasMaxLength(32);
         builder.Property(os => os.Justification).HasColumnType("text").IsRequired();
@@ -19,9 +19,9 @@ public class OrganizationalSeverityConfiguration : IEntityTypeConfiguration<Orga
         builder.Property(os => os.CompensatingControls).HasMaxLength(1024);
 
         builder
-            .HasOne(os => os.TenantVulnerability)
+            .HasOne(os => os.Vulnerability)
             .WithMany()
-            .HasForeignKey(os => os.TenantVulnerabilityId)
+            .HasForeignKey(os => os.VulnerabilityId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
