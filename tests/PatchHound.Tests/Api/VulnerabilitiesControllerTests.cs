@@ -143,7 +143,7 @@ public class VulnerabilitiesControllerTests : IDisposable
                 false,
                 false,
                 "[]",
-                VulnerabilityThreatAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityThreatAssessmentService.CalculationVersion
             ),
             VulnerabilityAssetEpisode.Create(
                 _tenantId,
@@ -238,7 +238,7 @@ public class VulnerabilitiesControllerTests : IDisposable
                 741m,
                 "Medium",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             )
         );
 
@@ -328,7 +328,7 @@ public class VulnerabilitiesControllerTests : IDisposable
                 true,
                 false,
                 "[]",
-                VulnerabilityThreatAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityThreatAssessmentService.CalculationVersion
             )
         );
         await _dbContext.SaveChangesAsync();
@@ -383,7 +383,7 @@ public class VulnerabilitiesControllerTests : IDisposable
                 650m,
                 "Medium",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             ),
             VulnerabilityEpisodeRiskAssessment.Create(
                 _tenantId,
@@ -397,7 +397,7 @@ public class VulnerabilitiesControllerTests : IDisposable
                 780m,
                 "High",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             )
         );
         await _dbContext.SaveChangesAsync();

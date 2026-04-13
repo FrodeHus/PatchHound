@@ -144,7 +144,7 @@ public class RiskScoreServiceTests : IDisposable
                 930m,
                 "Critical",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             ),
             VulnerabilityEpisodeRiskAssessment.Create(
                 _tenantId,
@@ -158,7 +158,7 @@ public class RiskScoreServiceTests : IDisposable
                 520m,
                 "Medium",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             )
         );
         await _dbContext.SaveChangesAsync();
@@ -313,7 +313,7 @@ public class RiskScoreServiceTests : IDisposable
                 845m,
                 "High",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             )
         );
         await _dbContext.SaveChangesAsync();

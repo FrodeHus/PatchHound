@@ -184,7 +184,7 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             false,
             false,
             "[]",
-            VulnerabilityThreatAssessmentService.CalculationVersion
+            "1" // phase-2: was VulnerabilityThreatAssessmentService.CalculationVersion
         );
         assessment.MarkDefenderRefreshed(DateTimeOffset.UtcNow);
 
@@ -258,7 +258,7 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             false,
             false,
             "[]",
-            VulnerabilityThreatAssessmentService.CalculationVersion
+            "1" // phase-2: was VulnerabilityThreatAssessmentService.CalculationVersion
         );
         assessment.MarkDefenderRefreshed(
             DateTimeOffset.UtcNow.Subtract(EnrichmentJobEnqueuer.DefaultDefenderRefreshTtl).AddMinutes(-1)

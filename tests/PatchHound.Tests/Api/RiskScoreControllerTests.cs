@@ -105,7 +105,7 @@ public class RiskScoreControllerTests : IDisposable
                 930m,
                 "Critical",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             ),
             TenantRiskScoreSnapshot.Create(_tenantId, new DateOnly(2026, 3, 20), 880m, 2, 1, 0),
             TenantRiskScoreSnapshot.Create(_tenantId, new DateOnly(2026, 3, 21), 910m, 2, 1, 1)
@@ -206,7 +206,7 @@ public class RiskScoreControllerTests : IDisposable
                 780m,
                 "High",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             )
         );
         await _dbContext.SaveChangesAsync();
@@ -335,7 +335,7 @@ public class RiskScoreControllerTests : IDisposable
                 910m,
                 "Critical",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             ),
             VulnerabilityEpisodeRiskAssessment.Create(
                 _tenantId,
@@ -349,7 +349,7 @@ public class RiskScoreControllerTests : IDisposable
                 900m,
                 "Critical",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             ),
             TenantRiskScoreSnapshot.Create(_tenantId, DateOnly.FromDateTime(DateTime.UtcNow.Date), 920m, 2, 2, 0)
         );
@@ -466,7 +466,7 @@ public class RiskScoreControllerTests : IDisposable
                 720m,
                 "High",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             )
         );
         await _dbContext.SaveChangesAsync();
@@ -528,7 +528,7 @@ public class RiskScoreControllerTests : IDisposable
                 700m,
                 "Medium",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             )
         );
         await _dbContext.SaveChangesAsync();

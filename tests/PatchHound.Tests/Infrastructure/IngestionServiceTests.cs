@@ -53,41 +53,14 @@ public class IngestionServiceTests : IDisposable
             .Returns(new IngestionAssetInventorySnapshot([], []));
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var assessmentService = new VulnerabilityAssessmentService(
-            _dbContext,
-            new EnvironmentalSeverityCalculator(),
-            new TenantSnapshotResolver(_dbContext)
-        );
-        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
-        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
-            _dbContext,
-            normalizedSoftwareResolver
-        );
-        var softwareMatchService = new SoftwareVulnerabilityMatchService(
-            _dbContext,
-            normalizedSoftwareProjectionService
-        );
         var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var stagedMergeService = new StagedVulnerabilityMergeService(
-            _dbContext,
-            CreateDbContextFactory(),
-            assessmentService,
-            new VulnerabilityThreatAssessmentService(_dbContext),
-            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            Substitute.For<IWorkflowTriggerService>(),
-            new IngestionStateCache()
-        );
-        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         _service = new IngestionService(
             _dbContext,
             new[] { _source },
             enrichmentJobEnqueuer,
-            assessmentService,
-            softwareMatchService,
-            stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
@@ -640,31 +613,6 @@ public class IngestionServiceTests : IDisposable
                 _dbContext,
                 Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
             ),
-            new VulnerabilityAssessmentService(
-                _dbContext,
-                new EnvironmentalSeverityCalculator(),
-                new TenantSnapshotResolver(_dbContext)
-            ),
-            new SoftwareVulnerabilityMatchService(
-                _dbContext,
-                new NormalizedSoftwareProjectionService(
-                    _dbContext,
-                    new NormalizedSoftwareResolver(_dbContext)
-                )
-            ),
-            new StagedVulnerabilityMergeService(
-                _dbContext,
-                CreateDbContextFactory(),
-                new VulnerabilityAssessmentService(
-                    _dbContext,
-                    new EnvironmentalSeverityCalculator(),
-                    new TenantSnapshotResolver(_dbContext)
-                ),
-                new VulnerabilityThreatAssessmentService(_dbContext),
-                new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-                Substitute.For<IWorkflowTriggerService>(),
-                new IngestionStateCache()
-            ),
             Substitute.For<IStagedDeviceMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
@@ -1058,41 +1006,14 @@ public class IngestionServiceTests : IDisposable
             );
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var assessmentService = new VulnerabilityAssessmentService(
-            _dbContext,
-            new EnvironmentalSeverityCalculator(),
-            new TenantSnapshotResolver(_dbContext)
-        );
-        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
-        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
-            _dbContext,
-            normalizedSoftwareResolver
-        );
-        var softwareMatchService = new SoftwareVulnerabilityMatchService(
-            _dbContext,
-            normalizedSoftwareProjectionService
-        );
         var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var stagedMergeService = new StagedVulnerabilityMergeService(
-            _dbContext,
-            CreateDbContextFactory(),
-            assessmentService,
-            new VulnerabilityThreatAssessmentService(_dbContext),
-            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            Substitute.For<IWorkflowTriggerService>(),
-            new IngestionStateCache()
-        );
-        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
             _dbContext,
-            [(IVulnerabilitySource)batchSource],
+            [batchSource],
             enrichmentJobEnqueuer,
-            assessmentService,
-            softwareMatchService,
-            stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
@@ -1197,41 +1118,14 @@ public class IngestionServiceTests : IDisposable
             });
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var assessmentService = new VulnerabilityAssessmentService(
-            _dbContext,
-            new EnvironmentalSeverityCalculator(),
-            new TenantSnapshotResolver(_dbContext)
-        );
-        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
-        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
-            _dbContext,
-            normalizedSoftwareResolver
-        );
-        var softwareMatchService = new SoftwareVulnerabilityMatchService(
-            _dbContext,
-            normalizedSoftwareProjectionService
-        );
         var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var stagedMergeService = new StagedVulnerabilityMergeService(
-            _dbContext,
-            CreateDbContextFactory(),
-            assessmentService,
-            new VulnerabilityThreatAssessmentService(_dbContext),
-            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            Substitute.For<IWorkflowTriggerService>(),
-            new IngestionStateCache()
-        );
-        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
             _dbContext,
             [batchSource],
             enrichmentJobEnqueuer,
-            assessmentService,
-            softwareMatchService,
-            stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
@@ -1361,41 +1255,14 @@ public class IngestionServiceTests : IDisposable
             .Returns(new SourceBatchResult<IngestionResult>([], null, true));
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var assessmentService = new VulnerabilityAssessmentService(
-            _dbContext,
-            new EnvironmentalSeverityCalculator(),
-            new TenantSnapshotResolver(_dbContext)
-        );
-        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
-        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
-            _dbContext,
-            normalizedSoftwareResolver
-        );
-        var softwareMatchService = new SoftwareVulnerabilityMatchService(
-            _dbContext,
-            normalizedSoftwareProjectionService
-        );
         var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var stagedMergeService = new StagedVulnerabilityMergeService(
-            _dbContext,
-            CreateDbContextFactory(),
-            assessmentService,
-            new VulnerabilityThreatAssessmentService(_dbContext),
-            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            Substitute.For<IWorkflowTriggerService>(),
-            new IngestionStateCache()
-        );
-        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
             _dbContext,
             [batchSource],
             enrichmentJobEnqueuer,
-            assessmentService,
-            softwareMatchService,
-            stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
@@ -1495,41 +1362,14 @@ public class IngestionServiceTests : IDisposable
             .Returns(new SourceBatchResult<IngestionResult>([], null, true));
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var assessmentService = new VulnerabilityAssessmentService(
-            _dbContext,
-            new EnvironmentalSeverityCalculator(),
-            new TenantSnapshotResolver(_dbContext)
-        );
-        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
-        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
-            _dbContext,
-            normalizedSoftwareResolver
-        );
-        var softwareMatchService = new SoftwareVulnerabilityMatchService(
-            _dbContext,
-            normalizedSoftwareProjectionService
-        );
         var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var stagedMergeService = new StagedVulnerabilityMergeService(
-            _dbContext,
-            CreateDbContextFactory(),
-            assessmentService,
-            new VulnerabilityThreatAssessmentService(_dbContext),
-            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            Substitute.For<IWorkflowTriggerService>(),
-            new IngestionStateCache()
-        );
-        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
             _dbContext,
             [batchSource],
             enrichmentJobEnqueuer,
-            assessmentService,
-            softwareMatchService,
-            stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
@@ -1661,41 +1501,14 @@ public class IngestionServiceTests : IDisposable
             );
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var assessmentService = new VulnerabilityAssessmentService(
-            _dbContext,
-            new EnvironmentalSeverityCalculator(),
-            new TenantSnapshotResolver(_dbContext)
-        );
-        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
-        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
-            _dbContext,
-            normalizedSoftwareResolver
-        );
-        var softwareMatchService = new SoftwareVulnerabilityMatchService(
-            _dbContext,
-            normalizedSoftwareProjectionService
-        );
         var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var stagedMergeService = new StagedVulnerabilityMergeService(
-            _dbContext,
-            CreateDbContextFactory(),
-            assessmentService,
-            new VulnerabilityThreatAssessmentService(_dbContext),
-            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            Substitute.For<IWorkflowTriggerService>(),
-            new IngestionStateCache()
-        );
-        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
             _dbContext,
             [batchSource],
             enrichmentJobEnqueuer,
-            assessmentService,
-            softwareMatchService,
-            stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
@@ -1818,41 +1631,14 @@ public class IngestionServiceTests : IDisposable
             });
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var assessmentService = new VulnerabilityAssessmentService(
-            _dbContext,
-            new EnvironmentalSeverityCalculator(),
-            new TenantSnapshotResolver(_dbContext)
-        );
-        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
-        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
-            _dbContext,
-            normalizedSoftwareResolver
-        );
-        var softwareMatchService = new SoftwareVulnerabilityMatchService(
-            _dbContext,
-            normalizedSoftwareProjectionService
-        );
         var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var stagedMergeService = new StagedVulnerabilityMergeService(
-            _dbContext,
-            CreateDbContextFactory(),
-            assessmentService,
-            new VulnerabilityThreatAssessmentService(_dbContext),
-            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            Substitute.For<IWorkflowTriggerService>(),
-            new IngestionStateCache()
-        );
-        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
             _dbContext,
             [batchSource],
             enrichmentJobEnqueuer,
-            assessmentService,
-            softwareMatchService,
-            stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
@@ -1934,41 +1720,14 @@ public class IngestionServiceTests : IDisposable
             );
 
         var logger = Substitute.For<ILogger<IngestionService>>();
-        var assessmentService = new VulnerabilityAssessmentService(
-            _dbContext,
-            new EnvironmentalSeverityCalculator(),
-            new TenantSnapshotResolver(_dbContext)
-        );
-        var normalizedSoftwareResolver = new NormalizedSoftwareResolver(_dbContext);
-        var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
-            _dbContext,
-            normalizedSoftwareResolver
-        );
-        var softwareMatchService = new SoftwareVulnerabilityMatchService(
-            _dbContext,
-            normalizedSoftwareProjectionService
-        );
         var enrichmentJobEnqueuer = new EnrichmentJobEnqueuer(
             _dbContext,
             Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
         );
-        var stagedMergeService = new StagedVulnerabilityMergeService(
-            _dbContext,
-            CreateDbContextFactory(),
-            assessmentService,
-            new VulnerabilityThreatAssessmentService(_dbContext),
-            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-            Substitute.For<IWorkflowTriggerService>(),
-            new IngestionStateCache()
-        );
-        var stagedAssetMergeService = new StagedAssetMergeService(_dbContext);
         var service = new IngestionService(
             _dbContext,
             [batchSource],
             enrichmentJobEnqueuer,
-            assessmentService,
-            softwareMatchService,
-            stagedMergeService,
             Substitute.For<IStagedDeviceMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),
@@ -2913,7 +2672,7 @@ public class IngestionServiceTests : IDisposable
             730m,
             "High",
             "[]",
-            VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+            "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion (deleted)
         );
         await _dbContext.VulnerabilityEpisodeRiskAssessments.AddAsync(assessment);
         await _dbContext.SaveChangesAsync();
@@ -2991,31 +2750,6 @@ public class IngestionServiceTests : IDisposable
             _dbContext,
             [source],
             new EnrichmentJobEnqueuer(_dbContext, Substitute.For<ILogger<EnrichmentJobEnqueuer>>()),
-            new VulnerabilityAssessmentService(
-                _dbContext,
-                new EnvironmentalSeverityCalculator(),
-                new TenantSnapshotResolver(_dbContext)
-            ),
-            new SoftwareVulnerabilityMatchService(
-                _dbContext,
-                new NormalizedSoftwareProjectionService(
-                    _dbContext,
-                    new NormalizedSoftwareResolver(_dbContext)
-                )
-            ),
-            new StagedVulnerabilityMergeService(
-                _dbContext,
-                CreateDbContextFactory(),
-                new VulnerabilityAssessmentService(
-                    _dbContext,
-                    new EnvironmentalSeverityCalculator(),
-                    new TenantSnapshotResolver(_dbContext)
-                ),
-                new VulnerabilityThreatAssessmentService(_dbContext),
-                new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
-                Substitute.For<IWorkflowTriggerService>(),
-                new IngestionStateCache()
-            ),
             Substitute.For<IStagedDeviceMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>()),

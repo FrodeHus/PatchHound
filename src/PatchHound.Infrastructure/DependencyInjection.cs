@@ -83,7 +83,6 @@ public static class DependencyInjection
             IRepository<OrganizationalSeverity>,
             RepositoryBase<OrganizationalSeverity>
         >();
-        services.AddScoped<IRepository<TenantVulnerability>, RepositoryBase<TenantVulnerability>>();
 
         // Application services
         services.AddScoped<VulnerabilityService>();
@@ -99,14 +98,12 @@ public static class DependencyInjection
         services.AddScoped<ApprovalTaskService>();
         services.AddScoped<RemediationDecisionService>();
         services.AddScoped<AnalystRecommendationService>();
-        services.AddScoped<SoftwareVulnerabilityMatchService>();
         services.AddScoped<NormalizedSoftwareResolver>();
         services.AddScoped<VulnerabilityResolver>();
         services.AddScoped<ThreatAssessmentService>();
         services.AddScoped<NormalizedSoftwareProjectionService>();
         services.AddScoped<CycloneDxSupplyChainImportService>();
         services.AddScoped<EnrichmentJobEnqueuer>();
-        services.AddScoped<StagedVulnerabilityMergeService>();
         services.AddScoped<StagedAssetMergeService>();
         services.AddScoped<IngestionStateCache>();
         services.AddScoped<TenantSnapshotResolver>();
@@ -126,9 +123,6 @@ public static class DependencyInjection
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<EnvironmentalSeverityCalculator>();
-        services.AddScoped<VulnerabilityAssessmentService>();
-        services.AddScoped<VulnerabilityThreatAssessmentService>();
-        services.AddScoped<VulnerabilityEpisodeRiskAssessmentService>();
         services.AddScoped<RiskScoreService>();
         services.AddScoped<RiskRefreshService>();
         services.AddScoped<AuditLogWriter>();

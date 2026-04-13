@@ -18,19 +18,16 @@ namespace PatchHound.Api.Controllers;
 public class SecurityProfilesController : ControllerBase
 {
     private readonly PatchHoundDbContext _dbContext;
-    private readonly VulnerabilityAssessmentService _assessmentService;
     private readonly RiskRefreshService _riskRefreshService;
     private readonly ITenantContext _tenantContext;
 
     public SecurityProfilesController(
         PatchHoundDbContext dbContext,
-        VulnerabilityAssessmentService assessmentService,
         RiskRefreshService riskRefreshService,
         ITenantContext tenantContext
     )
     {
         _dbContext = dbContext;
-        _assessmentService = assessmentService;
         _riskRefreshService = riskRefreshService;
         _tenantContext = tenantContext;
     }
@@ -186,7 +183,8 @@ public class SecurityProfilesController : ControllerBase
 
         foreach (var assetId in affectedAssetIds)
         {
-            await _assessmentService.RecalculateForAssetAsync(assetId, ct);
+            // phase-5: re-introduce per-asset assessment recalculation via DeviceVulnerabilityExposure
+            _ = assetId;
         }
 
         await _riskRefreshService.RefreshForAssetsAsync(

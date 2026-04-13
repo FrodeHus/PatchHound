@@ -24,7 +24,6 @@ public class AssetsController : ControllerBase
 
     private readonly PatchHoundDbContext _dbContext;
     private readonly AssetService _assetService;
-    private readonly VulnerabilityAssessmentService _assessmentService;
     private readonly NormalizedSoftwareProjectionService _normalizedSoftwareProjectionService;
     private readonly ITenantContext _tenantContext;
     private readonly TenantSnapshotResolver _snapshotResolver;
@@ -35,7 +34,6 @@ public class AssetsController : ControllerBase
     public AssetsController(
         PatchHoundDbContext dbContext,
         AssetService assetService,
-        VulnerabilityAssessmentService assessmentService,
         NormalizedSoftwareProjectionService normalizedSoftwareProjectionService,
         ITenantContext tenantContext,
         TenantSnapshotResolver snapshotResolver,
@@ -46,7 +44,6 @@ public class AssetsController : ControllerBase
     {
         _dbContext = dbContext;
         _assetService = assetService;
-        _assessmentService = assessmentService;
         _normalizedSoftwareProjectionService = normalizedSoftwareProjectionService;
         _tenantContext = tenantContext;
         _snapshotResolver = snapshotResolver;

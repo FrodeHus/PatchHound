@@ -46,16 +46,8 @@ public class AssetsControllerTests : IDisposable
             Substitute.For<IUnitOfWork>()
         );
         var snapshotResolver = new TenantSnapshotResolver(_dbContext);
-        var assessmentService = new VulnerabilityAssessmentService(
-            _dbContext,
-            new EnvironmentalSeverityCalculator(),
-            snapshotResolver
-        );
         var riskRefreshService = new RiskRefreshService(
             _dbContext,
-            snapshotResolver,
-            assessmentService,
-            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
             new RiskScoreService(_dbContext, Substitute.For<Microsoft.Extensions.Logging.ILogger<RiskScoreService>>())
         );
         var normalizedSoftwareProjectionService = new NormalizedSoftwareProjectionService(
@@ -86,7 +78,6 @@ public class AssetsControllerTests : IDisposable
         _controller = new AssetsController(
             _dbContext,
             assetService,
-            assessmentService,
             normalizedSoftwareProjectionService,
             _tenantContext,
             snapshotResolver,
@@ -284,7 +275,7 @@ public class AssetsControllerTests : IDisposable
                 790m,
                 "High",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             )
         );
         await _dbContext.SaveChangesAsync();
@@ -407,7 +398,7 @@ public class AssetsControllerTests : IDisposable
                 742.5m,
                 "Medium",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             )
         );
         await _dbContext.SaveChangesAsync();

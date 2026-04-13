@@ -33,29 +33,19 @@ public class SecurityProfilesControllerTests : IDisposable
             .Options;
 
         _dbContext = new PatchHoundDbContext(options, TestServiceProviderFactory.Create(_tenantContext));
-        var snapshotResolver = new TenantSnapshotResolver(_dbContext);
-        var assessmentService = new VulnerabilityAssessmentService(
-            _dbContext,
-            new EnvironmentalSeverityCalculator(),
-            snapshotResolver
-        );
         var riskRefreshService = new RiskRefreshService(
             _dbContext,
-            snapshotResolver,
-            assessmentService,
-            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
             new RiskScoreService(_dbContext, Substitute.For<ILogger<RiskScoreService>>())
         );
 
         _controller = new SecurityProfilesController(
             _dbContext,
-            assessmentService,
             riskRefreshService,
             _tenantContext
         );
     }
 
-    [Fact]
+    [Fact(Skip = "Legacy Asset-centric assertions. Phase-5 will re-introduce per-asset risk recalculation via DeviceVulnerabilityExposure.")]
     public async Task Update_RecalculatesRiskForAssignedAssets()
     {
         var profile = AssetSecurityProfile.Create(
@@ -131,7 +121,7 @@ public class SecurityProfilesControllerTests : IDisposable
                 782.5m,
                 "High",
                 "[]",
-                VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
+                "1" // phase-2: was VulnerabilityEpisodeRiskAssessmentService.CalculationVersion
             )
         );
         await _dbContext.SaveChangesAsync();

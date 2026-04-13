@@ -53,16 +53,8 @@ public class DeviceRulesControllerTests : IDisposable
         );
 
         var snapshotResolver = new TenantSnapshotResolver(_dbContext);
-        var assessmentService = new VulnerabilityAssessmentService(
-            _dbContext,
-            new EnvironmentalSeverityCalculator(),
-            snapshotResolver
-        );
         var riskRefreshService = new RiskRefreshService(
             _dbContext,
-            snapshotResolver,
-            assessmentService,
-            new VulnerabilityEpisodeRiskAssessmentService(_dbContext),
             new RiskScoreService(
                 _dbContext,
                 Substitute.For<Microsoft.Extensions.Logging.ILogger<RiskScoreService>>()
