@@ -250,7 +250,7 @@ public class VulnerabilitiesControllerTests : IDisposable
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<VulnerabilityDetailDto>().Subject;
-        payload.Exposures.ActiveExposures.Should().HaveCount(1);
+        payload.Exposures.ActiveEpisodes.Should().HaveCount(1);
     }
 
     [Fact]

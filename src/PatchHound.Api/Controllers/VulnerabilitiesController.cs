@@ -103,7 +103,10 @@ public class VulnerabilitiesController : ControllerBase
                     })
                     .FirstOrDefault(),
                 AffectedDeviceCount = _dbContext.DeviceVulnerabilityExposures
-                    .Where(e => e.TenantId == _tenantContext.CurrentTenantId.Value && e.VulnerabilityId == v.Id)
+                    .Where(e =>
+                        e.TenantId == _tenantContext.CurrentTenantId.Value
+                        && e.VulnerabilityId == v.Id
+                        && e.Status == ExposureStatus.Open)
                     .Select(e => e.DeviceId)
                     .Distinct()
                     .Count(),
