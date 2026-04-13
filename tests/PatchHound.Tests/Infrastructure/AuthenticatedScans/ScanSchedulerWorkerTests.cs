@@ -57,7 +57,7 @@ public class ScanSchedulerWorkerTests : IAsyncLifetime
 
         var device = Asset.Create(_tenantId, "ext-d1", AssetType.Device, "d1", Criticality.Medium);
         _db.Assets.Add(device);
-        _db.AssetScanProfileAssignments.Add(AssetScanProfileAssignment.Create(_tenantId, device.Id, profile.Id, null));
+        _db.DeviceScanProfileAssignments.Add(DeviceScanProfileAssignment.Create(_tenantId, device.Id, profile.Id, null));
 
         // Force LastRunStartedAt to 2 minutes ago
         profile.RecordRunStarted(DateTimeOffset.UtcNow.AddMinutes(-2));

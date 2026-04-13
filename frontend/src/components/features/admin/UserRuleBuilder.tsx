@@ -1,5 +1,5 @@
 import { Plus, Trash2, Layers } from 'lucide-react'
-import type { FilterCondition, FilterGroup, FilterNode } from '@/api/asset-rules.schemas'
+import type { FilterCondition, FilterGroup, FilterNode } from '@/api/device-rules.schemas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'

@@ -28,7 +28,7 @@ type AdminArea = {
     | '/admin/sources'
     | '/admin/security-profiles'
     | '/admin/business-labels'
-    | '/admin/asset-rules'
+    | '/admin/device-rules'
     | '/admin/workflows'
     | '/admin/integrations'
     | '/admin/advanced-tools'
@@ -66,9 +66,9 @@ const adminSections: AdminSection[] = [
         icon: Tags,
       },
       {
-        title: 'Asset rules',
-        description: 'Automate ownership and security-profile assignment based on tenant asset conditions.',
-        to: '/admin/asset-rules',
+        title: 'Device rules',
+        description: 'Automate ownership and security-profile assignment based on tenant device conditions.',
+        to: '/admin/device-rules',
         roles: ['GlobalAdmin', 'SecurityManager'],
         icon: GitBranchPlus,
       },

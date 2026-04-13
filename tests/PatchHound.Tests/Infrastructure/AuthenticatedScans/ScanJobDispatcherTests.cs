@@ -70,8 +70,8 @@ public class ScanJobDispatcherTests : IAsyncLifetime
     {
         var a1 = await SeedDeviceAsync("host-1");
         var a2 = await SeedDeviceAsync("host-2");
-        _db.AssetScanProfileAssignments.Add(AssetScanProfileAssignment.Create(_tenantId, a1, _profile.Id, null));
-        _db.AssetScanProfileAssignments.Add(AssetScanProfileAssignment.Create(_tenantId, a2, _profile.Id, null));
+        _db.DeviceScanProfileAssignments.Add(DeviceScanProfileAssignment.Create(_tenantId, a1, _profile.Id, null));
+        _db.DeviceScanProfileAssignments.Add(DeviceScanProfileAssignment.Create(_tenantId, a2, _profile.Id, null));
         await _db.SaveChangesAsync();
 
         var runId = await _sut.StartRunAsync(_profile.Id, "scheduled", null, CancellationToken.None);
@@ -96,7 +96,7 @@ public class ScanJobDispatcherTests : IAsyncLifetime
     public async Task StartRun_throws_when_profile_has_active_run()
     {
         var a1 = await SeedDeviceAsync("host-1");
-        _db.AssetScanProfileAssignments.Add(AssetScanProfileAssignment.Create(_tenantId, a1, _profile.Id, null));
+        _db.DeviceScanProfileAssignments.Add(DeviceScanProfileAssignment.Create(_tenantId, a1, _profile.Id, null));
         await _db.SaveChangesAsync();
 
         await _sut.StartRunAsync(_profile.Id, "scheduled", null, CancellationToken.None);
@@ -108,7 +108,7 @@ public class ScanJobDispatcherTests : IAsyncLifetime
     public async Task StartRun_snapshots_current_tool_version_ids_into_job()
     {
         var a1 = await SeedDeviceAsync("host-1");
-        _db.AssetScanProfileAssignments.Add(AssetScanProfileAssignment.Create(_tenantId, a1, _profile.Id, null));
+        _db.DeviceScanProfileAssignments.Add(DeviceScanProfileAssignment.Create(_tenantId, a1, _profile.Id, null));
         await _db.SaveChangesAsync();
 
         var runId = await _sut.StartRunAsync(_profile.Id, "scheduled", null, CancellationToken.None);

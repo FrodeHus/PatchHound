@@ -39,7 +39,7 @@ export function ConnectionProfilesTab({ initialData, page, pageSize, onPageChang
   const createMutation = useMutation({
     mutationFn: createConnectionProfile,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['connection-profiles'] })
+      void queryClient.invalidateQueries({ queryKey: ['connection-profiles'] })
       setDialogOpen(false)
       toast.success('Connection profile created')
     },
@@ -49,7 +49,7 @@ export function ConnectionProfilesTab({ initialData, page, pageSize, onPageChang
   const updateMutation = useMutation({
     mutationFn: updateConnectionProfile,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['connection-profiles'] })
+      void queryClient.invalidateQueries({ queryKey: ['connection-profiles'] })
       setDialogOpen(false)
       setEditing(null)
       toast.success('Connection profile updated')
@@ -60,7 +60,7 @@ export function ConnectionProfilesTab({ initialData, page, pageSize, onPageChang
   const deleteMutation = useMutation({
     mutationFn: deleteConnectionProfile,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['connection-profiles'] })
+      void queryClient.invalidateQueries({ queryKey: ['connection-profiles'] })
       toast.success('Connection profile deleted')
     },
     onError: () => toast.error('Failed to delete connection profile'),
@@ -142,6 +142,7 @@ export function ConnectionProfilesTab({ initialData, page, pageSize, onPageChang
       </Card>
 
       <ConnectionProfileDialog
+        key={editing?.id ?? 'new'}
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open)

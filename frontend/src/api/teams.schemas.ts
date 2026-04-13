@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { pagedResponseMetaSchema } from './pagination.schemas'
-import { filterNodeSchema } from './asset-rules.schemas'
+import { filterNodeSchema } from './device-rules.schemas'
 import { isoDateTimeSchema } from './common.schemas'
 
 const rollupRiskExplanationSchema = z.object({

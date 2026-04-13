@@ -26,10 +26,9 @@ public class IngestionService
     private readonly EnrichmentJobEnqueuer _enrichmentJobEnqueuer;
     private readonly VulnerabilityAssessmentService _assessmentService;
     private readonly SoftwareVulnerabilityMatchService _softwareVulnerabilityMatchService;
-    private readonly NormalizedSoftwareProjectionService _normalizedSoftwareProjectionService;
     private readonly StagedVulnerabilityMergeService _stagedVulnerabilityMergeService;
-    private readonly StagedAssetMergeService _stagedAssetMergeService;
-    private readonly IAssetRuleEvaluationService _assetRuleEvaluationService;
+    private readonly IStagedDeviceMergeService _stagedDeviceMergeService;
+    private readonly IDeviceRuleEvaluationService _deviceRuleEvaluationService;
     private readonly RiskScoreService _riskScoreService;
     private readonly RemediationDecisionService? _remediationDecisionService;
     private readonly ILogger<IngestionService> _logger;
@@ -42,10 +41,9 @@ public class IngestionService
         EnrichmentJobEnqueuer enrichmentJobEnqueuer,
         VulnerabilityAssessmentService assessmentService,
         SoftwareVulnerabilityMatchService softwareVulnerabilityMatchService,
-        NormalizedSoftwareProjectionService normalizedSoftwareProjectionService,
         StagedVulnerabilityMergeService stagedVulnerabilityMergeService,
-        StagedAssetMergeService stagedAssetMergeService,
-        IAssetRuleEvaluationService assetRuleEvaluationService,
+        IStagedDeviceMergeService stagedDeviceMergeService,
+        IDeviceRuleEvaluationService deviceRuleEvaluationService,
         RiskScoreService riskScoreService,
         ILogger<IngestionService> logger
     )
@@ -55,10 +53,9 @@ public class IngestionService
             enrichmentJobEnqueuer,
             assessmentService,
             softwareVulnerabilityMatchService,
-            normalizedSoftwareProjectionService,
             stagedVulnerabilityMergeService,
-            stagedAssetMergeService,
-            assetRuleEvaluationService,
+            stagedDeviceMergeService,
+            deviceRuleEvaluationService,
             riskScoreService,
             remediationDecisionService: null,
             logger
@@ -70,10 +67,9 @@ public class IngestionService
         EnrichmentJobEnqueuer enrichmentJobEnqueuer,
         VulnerabilityAssessmentService assessmentService,
         SoftwareVulnerabilityMatchService softwareVulnerabilityMatchService,
-        NormalizedSoftwareProjectionService normalizedSoftwareProjectionService,
         StagedVulnerabilityMergeService stagedVulnerabilityMergeService,
-        StagedAssetMergeService stagedAssetMergeService,
-        IAssetRuleEvaluationService assetRuleEvaluationService,
+        IStagedDeviceMergeService stagedDeviceMergeService,
+        IDeviceRuleEvaluationService deviceRuleEvaluationService,
         RiskScoreService riskScoreService,
         RemediationDecisionService? remediationDecisionService,
         ILogger<IngestionService> logger
@@ -84,10 +80,9 @@ public class IngestionService
         _enrichmentJobEnqueuer = enrichmentJobEnqueuer;
         _assessmentService = assessmentService;
         _softwareVulnerabilityMatchService = softwareVulnerabilityMatchService;
-        _normalizedSoftwareProjectionService = normalizedSoftwareProjectionService;
         _stagedVulnerabilityMergeService = stagedVulnerabilityMergeService;
-        _stagedAssetMergeService = stagedAssetMergeService;
-        _assetRuleEvaluationService = assetRuleEvaluationService;
+        _stagedDeviceMergeService = stagedDeviceMergeService;
+        _deviceRuleEvaluationService = deviceRuleEvaluationService;
         _riskScoreService = riskScoreService;
         _remediationDecisionService = remediationDecisionService;
         _logger = logger;
@@ -559,7 +554,7 @@ public class IngestionService
 
                         await EnqueueEnrichmentJobsForRunAsync(run.Id, tenantId, ct);
 
-                        await _assetRuleEvaluationService.EvaluateRulesAsync(tenantId, ct);
+                        await _deviceRuleEvaluationService.EvaluateRulesAsync(tenantId, ct);
 
                         if (SupportsSoftwareSnapshots(source.SourceKey))
                         {
@@ -2276,15 +2271,51 @@ public class IngestionService
         CancellationToken ct
     )
     {
-        var summary = await _stagedAssetMergeService.ProcessAsync(
+        // Canonical merge: writes Device + InstalledSoftware directly via resolvers.
+        // The legacy StagedAssetMergeService / NormalizedSoftwareProjectionService path
+        // is no longer invoked here. Those services remain for other consumers
+        // (AuthenticatedScanIngestionService, AssetsController, SoftwareVulnerabilityMatchService)
+        // until Task 10b deletes them.
+        var canonicalSummary = await _stagedDeviceMergeService.MergeAsync(
             ingestionRunId,
             tenantId,
-            sourceKey,
-            UpdateAssetMergeProgressAsync,
             ct
         );
-        await _normalizedSoftwareProjectionService.SyncTenantAsync(tenantId, snapshotId, ct);
-        return summary;
+
+        var persistedMachineCount =
+            canonicalSummary.DevicesCreated + canonicalSummary.DevicesTouched;
+        var persistedSoftwareCount =
+            canonicalSummary.InstalledSoftwareCreated + canonicalSummary.InstalledSoftwareTouched;
+
+        // The canonical merge service does not expose mid-run progress, so emit a
+        // single final-state progress update after the merge completes.
+        await UpdateAssetMergeProgressAsync(
+            stagedMachineCount: persistedMachineCount,
+            stagedSoftwareCount: persistedSoftwareCount,
+            persistedMachineCount: persistedMachineCount,
+            persistedSoftwareCount: persistedSoftwareCount,
+            ct
+        );
+
+        // Adapt the 4-field canonical summary into the 13-field legacy shape so the
+        // ~30 downstream call sites in IngestionService keep working unchanged.
+        // Fields with no canonical equivalent are set to zero; they tracked concerns
+        // (episodes, stale installations) that no longer exist after Phase 1.
+        return new StagedAssetMergeSummary(
+            StagedMachineCount: persistedMachineCount,
+            StagedSoftwareCount: persistedSoftwareCount,
+            MergedAssetCount: persistedMachineCount + persistedSoftwareCount,
+            PersistedMachineCount: persistedMachineCount,
+            PersistedSoftwareCount: persistedSoftwareCount,
+            StagedSoftwareLinkCount: 0,
+            ResolvedSoftwareLinkCount: 0,
+            InstallationsCreated: canonicalSummary.InstalledSoftwareCreated,
+            InstallationsTouched: canonicalSummary.InstalledSoftwareTouched,
+            EpisodesOpened: 0,
+            EpisodesSeen: 0,
+            StaleInstallationsMarked: 0,
+            InstallationsRemoved: 0
+        );
 
         async Task UpdateAssetMergeProgressAsync(
             int stagedMachineCount,

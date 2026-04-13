@@ -27,7 +27,7 @@ public class ScanRunnerController(
     public record PostResultRequest(string Status, string Stdout, string Stderr, string? ErrorMessage);
 
     public record JobPayload(
-        Guid JobId, Guid AssetId,
+        Guid JobId, Guid DeviceId,
         HostTarget HostTarget, Credentials Credentials,
         string? HostKeyFingerprint,
         List<ToolPayload> Tools,
@@ -116,7 +116,7 @@ public class ScanRunnerController(
         await db.SaveChangesAsync(ct);
 
         return Ok(new JobPayload(
-            job.Id, job.AssetId,
+            job.Id, job.DeviceId,
             new HostTarget(connProfile.SshHost, connProfile.SshPort, connProfile.SshUsername, connProfile.AuthMethod),
             new Credentials(password, privateKey, passphrase),
             connProfile.HostKeyFingerprint,

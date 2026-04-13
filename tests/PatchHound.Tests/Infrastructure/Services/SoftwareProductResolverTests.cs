@@ -1,0 +1,109 @@
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using PatchHound.Core.Entities;
+using PatchHound.Core.Interfaces;
+using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services.Inventory;
+
+namespace PatchHound.Tests.Infrastructure.Services;
+
+public class SoftwareProductResolverTests : IAsyncLifetime
+{
+    private PatchHoundDbContext _db = null!;
+    private SourceSystem _sourceSystem = null!;
+    private SoftwareProductResolver _sut = null!;
+
+    public async Task InitializeAsync()
+    {
+        _db = await TestDbContextFactory.CreateAsync();
+        _sourceSystem = SourceSystem.Create("defender", "Defender");
+        _db.SourceSystems.Add(_sourceSystem);
+        await _db.SaveChangesAsync();
+
+        _sut = new SoftwareProductResolver(_db);
+    }
+
+    public Task DisposeAsync()
+    {
+        _db.Dispose();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task Resolve_creates_product_and_alias_on_first_observation()
+    {
+        var observation = new SoftwareObservation(
+            SourceSystemId: _sourceSystem.Id,
+            ExternalId: "sw-001",
+            Vendor: "Mozilla",
+            Name: "Firefox");
+
+        var product = await _sut.ResolveAsync(observation, CancellationToken.None);
+
+        product.Should().NotBeNull();
+        product.Vendor.Should().Be("Mozilla");
+        product.Name.Should().Be("Firefox");
+        product.CanonicalProductKey.Should().Be("mozilla::firefox");
+
+        var allProducts = await _db.SoftwareProducts.ToListAsync();
+        allProducts.Should().ContainSingle();
+
+        var allAliases = await _db.SoftwareAliases.ToListAsync();
+        allAliases.Should().ContainSingle();
+        var alias = allAliases.Single();
+        alias.SoftwareProductId.Should().Be(product.Id);
+        alias.SourceSystemId.Should().Be(_sourceSystem.Id);
+        alias.ExternalId.Should().Be("sw-001");
+        alias.ObservedVendor.Should().Be("Mozilla");
+        alias.ObservedName.Should().Be("Firefox");
+    }
+
+    [Fact]
+    public async Task Resolve_returns_existing_product_on_second_observation()
+    {
+        var observation = new SoftwareObservation(
+            SourceSystemId: _sourceSystem.Id,
+            ExternalId: "sw-002",
+            Vendor: "Mozilla",
+            Name: "Firefox");
+
+        var first = await _sut.ResolveAsync(observation, CancellationToken.None);
+        var second = await _sut.ResolveAsync(observation, CancellationToken.None);
+
+        second.Id.Should().Be(first.Id);
+
+        var allProducts = await _db.SoftwareProducts.ToListAsync();
+        allProducts.Should().ContainSingle();
+
+        var allAliases = await _db.SoftwareAliases.ToListAsync();
+        allAliases.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Resolve_different_external_ids_same_canonical_resolve_to_same_product()
+    {
+        var observation1 = new SoftwareObservation(
+            SourceSystemId: _sourceSystem.Id,
+            ExternalId: "sw-A",
+            Vendor: "Mozilla",
+            Name: "Firefox");
+        var observation2 = new SoftwareObservation(
+            SourceSystemId: _sourceSystem.Id,
+            ExternalId: "sw-B",
+            Vendor: "mozilla",
+            Name: "firefox");
+
+        var first = await _sut.ResolveAsync(observation1, CancellationToken.None);
+        var second = await _sut.ResolveAsync(observation2, CancellationToken.None);
+
+        second.Id.Should().Be(first.Id);
+
+        var allProducts = await _db.SoftwareProducts.ToListAsync();
+        allProducts.Should().ContainSingle();
+
+        var allAliases = await _db.SoftwareAliases.ToListAsync();
+        allAliases.Should().HaveCount(2);
+        allAliases.Select(a => a.ExternalId).Should().BeEquivalentTo(new[] { "sw-A", "sw-B" });
+        allAliases.Should().OnlyContain(a => a.SoftwareProductId == first.Id);
+    }
+}

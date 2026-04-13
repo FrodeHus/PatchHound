@@ -36,13 +36,13 @@ public class ScanJobDispatcher(PatchHoundDbContext db)
             .ToListAsync(ct);
         var versionIdsJson = JsonSerializer.Serialize(versionIds);
 
-        // Assigned assets
-        var assetIds = await db.AssetScanProfileAssignments
+        // Assigned devices
+        var deviceIds = await db.DeviceScanProfileAssignments
             .Where(a => a.ScanProfileId == scanProfileId)
-            .Select(a => a.AssetId)
+            .Select(a => a.DeviceId)
             .ToListAsync(ct);
 
-        if (assetIds.Count == 0)
+        if (deviceIds.Count == 0)
         {
             run.MarkRunning(0);
             run.Complete(0, 0, 0, now);
@@ -50,14 +50,14 @@ public class ScanJobDispatcher(PatchHoundDbContext db)
             return run.Id;
         }
 
-        foreach (var assetId in assetIds)
+        foreach (var deviceId in deviceIds)
         {
             db.ScanJobs.Add(ScanJob.Create(
                 profile.TenantId, run.Id, profile.ScanRunnerId,
-                assetId, profile.ConnectionProfileId, versionIdsJson));
+                deviceId, profile.ConnectionProfileId, versionIdsJson));
         }
 
-        run.MarkRunning(assetIds.Count);
+        run.MarkRunning(deviceIds.Count);
         profile.RecordRunStarted(now);
         profile.ClearManualRequest();
 

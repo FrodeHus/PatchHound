@@ -4,7 +4,7 @@ import { apiGet, apiPost, apiPut } from '@/server/api'
 import { pagedTeamsSchema, teamDetailSchema, teamMembershipRulePreviewSchema } from './teams.schemas'
 import { buildFilterParams } from './utils'
 import { z } from 'zod'
-import { filterNodeSchema } from './asset-rules.schemas'
+import { filterNodeSchema } from './device-rules.schemas'
 
 export const fetchTeams = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])

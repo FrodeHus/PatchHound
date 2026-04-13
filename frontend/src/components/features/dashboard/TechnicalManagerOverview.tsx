@@ -151,7 +151,7 @@ export function TechnicalManagerOverview({ summary, isLoading }: Props) {
                           </Badge>
                         </div>
                         <Link
-                          to="/assets/$id"
+                          to="/devices/$id"
                           params={{ id: item.deviceAssetId }}
                           className="mt-2 block text-base font-medium tracking-tight hover:text-primary"
                         >

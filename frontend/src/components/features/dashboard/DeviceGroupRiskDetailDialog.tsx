@@ -96,7 +96,7 @@ function GroupAssetRow({ asset }: { asset: RiskAssetScoreSummary }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <Link
-            to="/assets/$id"
+            to="/devices/$id"
             params={{ id: asset.assetId }}
             className="truncate text-sm font-medium hover:underline"
           >

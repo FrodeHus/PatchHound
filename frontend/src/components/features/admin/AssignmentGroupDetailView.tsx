@@ -1,5 +1,5 @@
 import { Plus, UserMinus } from 'lucide-react'
-import type { FilterGroup } from '@/api/asset-rules.schemas'
+import type { FilterGroup } from '@/api/device-rules.schemas'
 import type { TeamDetail, TeamMembershipRulePreview } from '@/api/teams.schemas'
 import type { UserListItem } from '@/api/users.schemas'
 import { Badge } from '@/components/ui/badge'

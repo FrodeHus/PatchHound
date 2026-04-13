@@ -64,7 +64,7 @@ export function ScanProfilesTab({ initialData, runners, connections, tools, page
   const createMutation = useMutation({
     mutationFn: createScanProfile,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scan-profiles'] })
+      void queryClient.invalidateQueries({ queryKey: ['scan-profiles'] })
       setDialogOpen(false)
       toast.success('Scan profile created')
     },
@@ -74,7 +74,7 @@ export function ScanProfilesTab({ initialData, runners, connections, tools, page
   const updateMutation = useMutation({
     mutationFn: updateScanProfile,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scan-profiles'] })
+      void queryClient.invalidateQueries({ queryKey: ['scan-profiles'] })
       setDialogOpen(false)
       setEditing(null)
       toast.success('Scan profile updated')
@@ -85,7 +85,7 @@ export function ScanProfilesTab({ initialData, runners, connections, tools, page
   const deleteMutation = useMutation({
     mutationFn: deleteScanProfile,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scan-profiles'] })
+      void queryClient.invalidateQueries({ queryKey: ['scan-profiles'] })
       toast.success('Scan profile deleted')
     },
     onError: () => toast.error('Failed to delete scan profile'),
@@ -210,6 +210,7 @@ export function ScanProfilesTab({ initialData, runners, connections, tools, page
       </Card>
 
       <ScanProfileDialog
+        key={editing?.id ?? 'new'}
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open)
@@ -245,8 +246,8 @@ export function ScanProfilesTab({ initialData, runners, connections, tools, page
               <p className="text-sm text-muted-foreground">No devices assigned yet.</p>
             )}
             {devicesQuery.data?.map((device) => (
-              <div key={device.assetId} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
-                <span className="font-mono">{device.assetName}</span>
+              <div key={device.deviceId} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+                <span className="font-mono">{device.deviceName}</span>
                 {device.assignedByRuleId && (
                   <Badge variant="outline" className="text-[10px]">rule</Badge>
                 )}

@@ -58,7 +58,7 @@ export function ScanRunnersTab({ initialData, page, pageSize, onPageChange, onPa
   const createMutation = useMutation({
     mutationFn: createScanRunner,
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['scan-runners'] })
+      void queryClient.invalidateQueries({ queryKey: ['scan-runners'] })
       setCreateOpen(false)
       setName('')
       setDescription('')
@@ -75,7 +75,7 @@ export function ScanRunnersTab({ initialData, page, pageSize, onPageChange, onPa
   const deleteMutation = useMutation({
     mutationFn: deleteScanRunner,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scan-runners'] })
+      void queryClient.invalidateQueries({ queryKey: ['scan-runners'] })
       toast.success('Runner deleted')
     },
     onError: () => toast.error('Failed to delete runner'),

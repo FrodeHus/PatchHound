@@ -15,6 +15,7 @@ namespace PatchHound.Tests.Infrastructure;
 public class RiskScoreServiceTests : IDisposable
 {
     private readonly Guid _tenantId = Guid.NewGuid();
+    private readonly Guid _sourceSystemId = Guid.NewGuid();
     private readonly PatchHoundDbContext _dbContext;
     private readonly RiskScoreService _service;
 
@@ -36,35 +37,44 @@ public class RiskScoreServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RecalculateForTenantAsync_CreatesAssetScoresAndDailySnapshot()
+    public async Task RecalculateForTenantAsync_CreatesDeviceScoresAndDailySnapshot()
     {
-        var assetA = Asset.Create(_tenantId, "asset-a", AssetType.Device, "Asset A", Criticality.High);
-        var assetB = Asset.Create(_tenantId, "asset-b", AssetType.Device, "Asset B", Criticality.Medium);
+        // Phase 1 canonical baseline: risk scoring sources rows from Devices and
+        // writes into DeviceRiskScores. The legacy `VulnerabilityEpisodeRiskAssessment.AssetId`
+        // field is treated as a device-identity handle (Phase 5 renames the column). Until
+        // Phase 5 drops the Asset-dependent query filter on episodes, we seed a matching
+        // legacy Asset row whose Id is forced to the Device.Id so the filter passes.
+        var assetA = Asset.Create(_tenantId, "device-a", AssetType.Device, "Device A", Criticality.High);
+        var assetB = Asset.Create(_tenantId, "device-b", AssetType.Device, "Device B", Criticality.Medium);
+        var deviceA = Device.Create(_tenantId, _sourceSystemId, "device-a", "Device A", Criticality.High);
+        var deviceB = Device.Create(_tenantId, _sourceSystemId, "device-b", "Device B", Criticality.Medium);
+        ForceId(deviceA, assetA.Id);
+        ForceId(deviceB, assetB.Id);
         var team = Team.Create(_tenantId, "SecOps");
-        assetA.AssignTeamOwner(team.Id);
-        assetA.UpdateDeviceDetails(
-            "asset-a.contoso.local",
-            "Active",
-            "Windows",
-            "11",
-            "High",
-            DateTimeOffset.UtcNow,
-            "10.0.0.1",
-            "aad-a",
-            "group-1",
-            "Workstations"
+        deviceA.AssignTeamOwner(team.Id);
+        deviceA.UpdateInventoryDetails(
+            computerDnsName: "device-a.contoso.local",
+            healthStatus: "Active",
+            osPlatform: "Windows",
+            osVersion: "11",
+            externalRiskLabel: "High",
+            lastSeenAt: DateTimeOffset.UtcNow,
+            lastIpAddress: "10.0.0.1",
+            aadDeviceId: "aad-a",
+            groupId: "group-1",
+            groupName: "Workstations"
         );
-        assetB.UpdateDeviceDetails(
-            "asset-b.contoso.local",
-            "Active",
-            "Windows",
-            "11",
-            "Medium",
-            DateTimeOffset.UtcNow,
-            "10.0.0.2",
-            "aad-b",
-            "group-1",
-            "Workstations"
+        deviceB.UpdateInventoryDetails(
+            computerDnsName: "device-b.contoso.local",
+            healthStatus: "Active",
+            osPlatform: "Windows",
+            osVersion: "11",
+            externalRiskLabel: "Medium",
+            lastSeenAt: DateTimeOffset.UtcNow,
+            lastIpAddress: "10.0.0.2",
+            aadDeviceId: "aad-b",
+            groupId: "group-1",
+            groupName: "Workstations"
         );
 
         var definitionA = VulnerabilityDefinition.Create(
@@ -98,14 +108,14 @@ public class RiskScoreServiceTests : IDisposable
         var episodeA = VulnerabilityAssetEpisode.Create(
             _tenantId,
             tenantVulnerabilityA.Id,
-            assetA.Id,
+            deviceA.Id,
             1,
             DateTimeOffset.UtcNow.AddDays(-2)
         );
         var episodeB = VulnerabilityAssetEpisode.Create(
             _tenantId,
             tenantVulnerabilityB.Id,
-            assetB.Id,
+            deviceB.Id,
             1,
             DateTimeOffset.UtcNow.AddDays(-1)
         );
@@ -113,6 +123,8 @@ public class RiskScoreServiceTests : IDisposable
         await _dbContext.AddRangeAsync(
             assetA,
             assetB,
+            deviceA,
+            deviceB,
             team,
             definitionA,
             definitionB,
@@ -124,7 +136,7 @@ public class RiskScoreServiceTests : IDisposable
                 _tenantId,
                 episodeA.Id,
                 tenantVulnerabilityA.Id,
-                assetA.Id,
+                deviceA.Id,
                 null,
                 92m,
                 88m,
@@ -138,7 +150,7 @@ public class RiskScoreServiceTests : IDisposable
                 _tenantId,
                 episodeB.Id,
                 tenantVulnerabilityB.Id,
-                assetB.Id,
+                deviceB.Id,
                 null,
                 50m,
                 45m,
@@ -153,14 +165,14 @@ public class RiskScoreServiceTests : IDisposable
 
         await _service.RecalculateForTenantAsync(_tenantId, CancellationToken.None);
 
-        var assetScores = await _dbContext.AssetRiskScores
+        var deviceScores = await _dbContext.DeviceRiskScores
             .OrderByDescending(item => item.OverallScore)
             .ToListAsync();
-        assetScores.Should().HaveCount(2);
-        assetScores[0].AssetId.Should().Be(assetA.Id);
-        assetScores[0].OverallScore.Should().BeGreaterThan(assetScores[1].OverallScore);
-        assetScores[0].CriticalCount.Should().Be(1);
-        assetScores[1].MediumCount.Should().Be(1);
+        deviceScores.Should().HaveCount(2);
+        deviceScores[0].DeviceId.Should().Be(deviceA.Id);
+        deviceScores[0].OverallScore.Should().BeGreaterThan(deviceScores[1].OverallScore);
+        deviceScores[0].CriticalCount.Should().Be(1);
+        deviceScores[1].MediumCount.Should().Be(1);
 
         var deviceGroupScore = await _dbContext.DeviceGroupRiskScores.SingleAsync();
         deviceGroupScore.DeviceGroupName.Should().Be("Workstations");
@@ -321,5 +333,16 @@ public class RiskScoreServiceTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
+    }
+
+    // Phase 1 bridge: legacy VulnerabilityEpisodeRiskAssessment.AssetId still has a
+    // query filter that traverses the Asset navigation. We keep paired Asset+Device
+    // rows with synchronized Ids so the filter passes while the service reads from
+    // the canonical Device table. Phase 5 removes this when the filter is dropped.
+    private static void ForceId(Device device, Guid id)
+    {
+        typeof(Device)
+            .GetProperty(nameof(Device.Id), System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)!
+            .SetValue(device, id);
     }
 }

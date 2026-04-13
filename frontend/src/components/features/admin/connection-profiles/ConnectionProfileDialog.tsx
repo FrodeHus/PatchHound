@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -33,39 +33,18 @@ type Props = {
 }
 
 export function ConnectionProfileDialog({ open, onOpenChange, profile, onSubmit, isPending }: Props) {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [sshHost, setSshHost] = useState('')
-  const [sshPort, setSshPort] = useState(22)
-  const [sshUsername, setSshUsername] = useState('')
-  const [authMethod, setAuthMethod] = useState<'password' | 'privateKey'>('password')
+  const [name, setName] = useState(profile?.name ?? '')
+  const [description, setDescription] = useState(profile?.description ?? '')
+  const [sshHost, setSshHost] = useState(profile?.sshHost ?? '')
+  const [sshPort, setSshPort] = useState(profile?.sshPort ?? 22)
+  const [sshUsername, setSshUsername] = useState(profile?.sshUsername ?? '')
+  const [authMethod, setAuthMethod] = useState<'password' | 'privateKey'>(
+    (profile?.authMethod as 'password' | 'privateKey') ?? 'password'
+  )
   const [password, setPassword] = useState('')
   const [privateKey, setPrivateKey] = useState('')
   const [passphrase, setPassphrase] = useState('')
-  const [hostKeyFingerprint, setHostKeyFingerprint] = useState('')
-
-  useEffect(() => {
-    if (profile) {
-      setName(profile.name)
-      setDescription(profile.description)
-      setSshHost(profile.sshHost)
-      setSshPort(profile.sshPort)
-      setSshUsername(profile.sshUsername)
-      setAuthMethod(profile.authMethod as 'password' | 'privateKey')
-      setHostKeyFingerprint(profile.hostKeyFingerprint ?? '')
-    } else {
-      setName('')
-      setDescription('')
-      setSshHost('')
-      setSshPort(22)
-      setSshUsername('')
-      setAuthMethod('password')
-      setHostKeyFingerprint('')
-    }
-    setPassword('')
-    setPrivateKey('')
-    setPassphrase('')
-  }, [profile, open])
+  const [hostKeyFingerprint, setHostKeyFingerprint] = useState(profile?.hostKeyFingerprint ?? '')
 
   const isEdit = Boolean(profile)
   const canSubmit = name && sshHost && sshUsername && (isEdit || (authMethod === 'password' ? password : privateKey))

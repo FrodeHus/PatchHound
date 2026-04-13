@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -77,33 +77,15 @@ export function ScanProfileDialog({
   onSubmit,
   isPending,
 }: Props) {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [cronSchedule, setCronSchedule] = useState('')
-  const [connectionProfileId, setConnectionProfileId] = useState('')
-  const [scanRunnerId, setScanRunnerId] = useState('')
-  const [enabled, setEnabled] = useState(true)
-  const [selectedToolIds, setSelectedToolIds] = useState<string[]>([])
-
-  useEffect(() => {
-    if (profile) {
-      setName(profile.name)
-      setDescription(profile.description)
-      setCronSchedule(profile.cronSchedule)
-      setConnectionProfileId(profile.connectionProfileId)
-      setScanRunnerId(profile.scanRunnerId)
-      setEnabled(profile.enabled)
-      setSelectedToolIds(profile.toolIds)
-    } else {
-      setName('')
-      setDescription('')
-      setCronSchedule('')
-      setConnectionProfileId(connections[0]?.id ?? '')
-      setScanRunnerId(runners[0]?.id ?? '')
-      setEnabled(true)
-      setSelectedToolIds([])
-    }
-  }, [profile, open, connections, runners])
+  const [name, setName] = useState(profile?.name ?? '')
+  const [description, setDescription] = useState(profile?.description ?? '')
+  const [cronSchedule, setCronSchedule] = useState(profile?.cronSchedule ?? '')
+  const [connectionProfileId, setConnectionProfileId] = useState(
+    profile?.connectionProfileId ?? connections[0]?.id ?? ''
+  )
+  const [scanRunnerId, setScanRunnerId] = useState(profile?.scanRunnerId ?? runners[0]?.id ?? '')
+  const [enabled, setEnabled] = useState(profile?.enabled ?? true)
+  const [selectedToolIds, setSelectedToolIds] = useState<string[]>(profile?.toolIds ?? [])
 
   const toggleTool = (toolId: string) => {
     setSelectedToolIds((prev) =>

@@ -498,7 +498,7 @@ function OverviewTab({
                         <td className="px-4 py-3">
                           <div>
                             <Link
-                              to="/assets/$id"
+                              to="/devices/$id"
                               params={{ id: item.deviceAssetId }}
                               className="font-medium hover:text-primary"
                             >

@@ -21,6 +21,17 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<SourceSystem> SourceSystems => Set<SourceSystem>();
+    public DbSet<SoftwareProduct> SoftwareProducts => Set<SoftwareProduct>();
+    public DbSet<SoftwareAlias> SoftwareAliases => Set<SoftwareAlias>();
+    public DbSet<Device> Devices => Set<Device>();
+    public DbSet<InstalledSoftware> InstalledSoftware => Set<InstalledSoftware>();
+    public DbSet<TenantSoftwareProductInsight> TenantSoftwareProductInsights => Set<TenantSoftwareProductInsight>();
+    public DbSet<DeviceBusinessLabel> DeviceBusinessLabels => Set<DeviceBusinessLabel>();
+    public DbSet<DeviceTag> DeviceTags => Set<DeviceTag>();
+    public DbSet<DeviceRule> DeviceRules => Set<DeviceRule>();
+    public DbSet<DeviceRiskScore> DeviceRiskScores => Set<DeviceRiskScore>();
+    public DbSet<SecurityProfile> SecurityProfiles => Set<SecurityProfile>();
     public DbSet<TenantSourceConfiguration> TenantSourceConfigurations =>
         Set<TenantSourceConfiguration>();
     public DbSet<IngestionRun> IngestionRuns => Set<IngestionRun>();
@@ -87,12 +98,12 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<ScanningToolVersion> ScanningToolVersions => Set<ScanningToolVersion>();
     public DbSet<ScanProfile> ScanProfiles => Set<ScanProfile>();
     public DbSet<ScanProfileTool> ScanProfileTools => Set<ScanProfileTool>();
-    public DbSet<AssetScanProfileAssignment> AssetScanProfileAssignments => Set<AssetScanProfileAssignment>();
+    public DbSet<DeviceScanProfileAssignment> DeviceScanProfileAssignments => Set<DeviceScanProfileAssignment>();
     public DbSet<AuthenticatedScanRun> AuthenticatedScanRuns => Set<AuthenticatedScanRun>();
     public DbSet<ScanJob> ScanJobs => Set<ScanJob>();
     public DbSet<ScanJobResult> ScanJobResults => Set<ScanJobResult>();
     public DbSet<ScanJobValidationIssue> ScanJobValidationIssues => Set<ScanJobValidationIssue>();
-    public DbSet<StagedAuthenticatedScanSoftware> StagedAuthenticatedScanSoftware => Set<StagedAuthenticatedScanSoftware>();
+    public DbSet<StagedDetectedSoftware> StagedDetectedSoftware => Set<StagedDetectedSoftware>();
     public DbSet<RiskAcceptance> RiskAcceptances => Set<RiskAcceptance>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -173,6 +184,32 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
                     && (e.AssetType != AssetType.Device || e.DeviceActiveInTenant)
                 )
             );
+        modelBuilder
+            .Entity<Device>()
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || (AccessibleTenantIds.Contains(e.TenantId) && e.ActiveInTenant));
+        modelBuilder
+            .Entity<InstalledSoftware>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<TenantSoftwareProductInsight>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<DeviceBusinessLabel>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<DeviceTag>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<DeviceRule>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<DeviceRiskScore>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<SecurityProfile>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<AssetSecurityProfile>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));

@@ -63,20 +63,19 @@ export function ScanningToolsTab({ initialData, toolDetail, currentScript, page,
     initialData,
   })
 
-  if (toolDetail) {
-    return (
-      <ScanningToolEditor
-        tool={toolDetail}
-        initialScript={currentScript ?? ''}
-        onBack={onDeselectTool}
-      />
-    )
+  const resetForm = () => {
+    setName('')
+    setDescription('')
+    setScriptType('python')
+    setInterpreterPath(defaultInterpreters.python)
+    setTimeoutSeconds(300)
+    setNewToolScript('')
   }
 
   const createMutation = useMutation({
     mutationFn: createScanningTool,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scanning-tools'] })
+      void queryClient.invalidateQueries({ queryKey: ['scanning-tools'] })
       setCreateOpen(false)
       resetForm()
       toast.success('Scanning tool created')
@@ -87,19 +86,20 @@ export function ScanningToolsTab({ initialData, toolDetail, currentScript, page,
   const deleteMutation = useMutation({
     mutationFn: deleteScanningTool,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scanning-tools'] })
+      void queryClient.invalidateQueries({ queryKey: ['scanning-tools'] })
       toast.success('Scanning tool deleted')
     },
     onError: () => toast.error('Failed to delete scanning tool'),
   })
 
-  const resetForm = () => {
-    setName('')
-    setDescription('')
-    setScriptType('python')
-    setInterpreterPath(defaultInterpreters.python)
-    setTimeoutSeconds(300)
-    setNewToolScript('')
+  if (toolDetail) {
+    return (
+      <ScanningToolEditor
+        tool={toolDetail}
+        initialScript={currentScript ?? ''}
+        onBack={onDeselectTool}
+      />
+    )
   }
 
   const columns: ColumnDef<ScanningTool>[] = [

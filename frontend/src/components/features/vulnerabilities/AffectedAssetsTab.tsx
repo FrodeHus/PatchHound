@@ -29,7 +29,7 @@ const columns: ColumnDef<AffectedAsset>[] = [
     cell: ({ row }) => (
       <div className="space-y-0.5">
         <Link
-          to="/assets/$id"
+          to="/devices/$id"
           params={{ id: row.original.assetId }}
           className="font-medium underline decoration-border/70 underline-offset-4 hover:decoration-foreground"
         >

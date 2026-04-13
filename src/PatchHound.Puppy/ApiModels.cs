@@ -8,7 +8,7 @@ public record HeartbeatRequest(
 
 public record JobPayload(
     [property: JsonPropertyName("jobId")] Guid JobId,
-    [property: JsonPropertyName("assetId")] Guid AssetId,
+    [property: JsonPropertyName("deviceId")] Guid DeviceId,
     [property: JsonPropertyName("hostTarget")] HostTarget HostTarget,
     [property: JsonPropertyName("credentials")] JobCredentials Credentials,
     [property: JsonPropertyName("hostKeyFingerprint")] string? HostKeyFingerprint,

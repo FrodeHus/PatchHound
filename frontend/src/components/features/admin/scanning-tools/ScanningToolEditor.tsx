@@ -49,7 +49,7 @@ export function ScanningToolEditor({ tool, initialScript, onBack }: Props) {
   const metadataMutation = useMutation({
     mutationFn: updateScanningTool,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scanning-tools'] })
+      void queryClient.invalidateQueries({ queryKey: ['scanning-tools'] })
       toast.success('Tool metadata updated')
     },
     onError: () => toast.error('Failed to update tool metadata'),
@@ -58,8 +58,8 @@ export function ScanningToolEditor({ tool, initialScript, onBack }: Props) {
   const publishMutation = useMutation({
     mutationFn: publishToolVersion,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tool-versions', tool.id] })
-      queryClient.invalidateQueries({ queryKey: ['scanning-tools'] })
+      void queryClient.invalidateQueries({ queryKey: ['tool-versions', tool.id] })
+      void queryClient.invalidateQueries({ queryKey: ['scanning-tools'] })
       toast.success('New version published')
     },
     onError: () => toast.error('Failed to publish version'),
@@ -129,7 +129,7 @@ export function ScanningToolEditor({ tool, initialScript, onBack }: Props) {
                     value={scriptType}
                     onValueChange={(v) => {
                       if (!v) return
-                      const st = v as (typeof scriptTypes)[number]
+                      const st = v
                       setScriptType(st)
                       setInterpreterPath(defaultInterpreters[st] ?? interpreterPath)
                     }}
