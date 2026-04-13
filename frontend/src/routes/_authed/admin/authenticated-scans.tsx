@@ -50,7 +50,7 @@ export const Route = createFileRoute('/_authed/admin/authenticated-scans')({
           fetchScanningTool({ data: { id: deps.toolId } }),
           fetchToolVersions({ data: { toolId: deps.toolId } }),
         ])
-        const currentScript = versions.find((v: any) => v.id === tool.currentVersionId)?.scriptContent ?? ''
+        const currentScript = versions.find((v) => v.id === tool.currentVersionId)?.scriptContent ?? ''
         return { tools, toolDetail: tool, toolVersions: versions, currentScript, tab }
       }
       return { tools, tab }

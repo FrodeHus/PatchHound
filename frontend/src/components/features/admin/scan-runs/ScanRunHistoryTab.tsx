@@ -35,7 +35,7 @@ export function ScanRunHistoryTab({ initialData, page, pageSize, onPageChange, o
     mutationFn: triggerScanRun,
     onSuccess: () => {
       toast.success('Scan run triggered')
-      queryClient.invalidateQueries({ queryKey: ['scan-runs'] })
+      void queryClient.invalidateQueries({ queryKey: ['scan-runs'] })
     },
     onError: () => toast.error('Failed to trigger scan run'),
   })

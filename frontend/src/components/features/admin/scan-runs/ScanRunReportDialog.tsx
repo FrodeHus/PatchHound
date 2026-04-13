@@ -5,7 +5,6 @@ import { fetchScanRunDetail } from '@/api/authenticated-scans.functions'
 import type { ScanJobSummary, ScanRunDetail } from '@/api/authenticated-scans.schemas'
 import { formatDateTime } from '@/lib/formatting'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
