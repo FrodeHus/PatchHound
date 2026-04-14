@@ -2,7 +2,7 @@ using PatchHound.Core.Enums;
 
 namespace PatchHound.Core.Entities;
 
-public class NormalizedSoftwareInstallation
+public class SoftwareProductInstallation
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
@@ -18,13 +18,13 @@ public class NormalizedSoftwareInstallation
     public bool IsActive { get; private set; }
     public int CurrentEpisodeNumber { get; private set; }
 
-    public TenantSoftware TenantSoftware { get; private set; } = null!;
+    public SoftwareTenantRecord TenantSoftware { get; private set; } = null!;
     public Asset SoftwareAsset { get; private set; } = null!;
     public Asset DeviceAsset { get; private set; } = null!;
 
-    private NormalizedSoftwareInstallation() { }
+    private SoftwareProductInstallation() { }
 
-    public static NormalizedSoftwareInstallation Create(
+    public static SoftwareProductInstallation Create(
         Guid tenantId,
         Guid? snapshotId,
         Guid tenantSoftwareId,
@@ -39,7 +39,7 @@ public class NormalizedSoftwareInstallation
         int currentEpisodeNumber
     )
     {
-        return new NormalizedSoftwareInstallation
+        return new SoftwareProductInstallation
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,

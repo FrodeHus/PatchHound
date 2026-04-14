@@ -1,6 +1,6 @@
 namespace PatchHound.Core.Entities;
 
-public class TenantSoftware
+public class SoftwareTenantRecord
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
@@ -27,9 +27,9 @@ public class TenantSoftware
 
     public SoftwareProduct SoftwareProduct { get; private set; } = null!;
 
-    private TenantSoftware() { }
+    private SoftwareTenantRecord() { }
 
-    public static TenantSoftware Create(
+    public static SoftwareTenantRecord Create(
         Guid tenantId,
         Guid? snapshotId,
         Guid softwareProductId,
@@ -37,7 +37,7 @@ public class TenantSoftware
         DateTimeOffset lastSeenAt
     )
     {
-        return new TenantSoftware
+        return new SoftwareTenantRecord
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,

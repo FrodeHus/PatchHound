@@ -4,9 +4,9 @@ using PatchHound.Core.Entities;
 
 namespace PatchHound.Infrastructure.Data.Configurations;
 
-public class TenantSoftwareConfiguration : IEntityTypeConfiguration<TenantSoftware>
+public class SoftwareTenantRecordConfiguration : IEntityTypeConfiguration<SoftwareTenantRecord>
 {
-    public void Configure(EntityTypeBuilder<TenantSoftware> builder)
+    public void Configure(EntityTypeBuilder<SoftwareTenantRecord> builder)
     {
         builder.HasKey(item => item.Id);
 

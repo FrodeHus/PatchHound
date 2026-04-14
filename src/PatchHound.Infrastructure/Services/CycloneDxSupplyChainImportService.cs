@@ -21,7 +21,7 @@ public class CycloneDxSupplyChainImportService(PatchHoundDbContext dbContext)
     )
     {
         var tenantSoftware = await dbContext
-            .TenantSoftware.Include(item => item.SoftwareProduct)
+            .SoftwareTenantRecords.Include(item => item.SoftwareProduct)
             .FirstOrDefaultAsync(item => item.Id == tenantSoftwareId, ct);
 
         if (tenantSoftware is null)

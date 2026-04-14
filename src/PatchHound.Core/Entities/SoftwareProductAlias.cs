@@ -2,7 +2,7 @@ using PatchHound.Core.Enums;
 
 namespace PatchHound.Core.Entities;
 
-public class NormalizedSoftwareAlias
+public class SoftwareProductAlias
 {
     public Guid Id { get; private set; }
     public Guid SoftwareProductId { get; private set; }
@@ -18,9 +18,9 @@ public class NormalizedSoftwareAlias
 
     public SoftwareProduct SoftwareProduct { get; private set; } = null!;
 
-    private NormalizedSoftwareAlias() { }
+    private SoftwareProductAlias() { }
 
-    public static NormalizedSoftwareAlias Create(
+    public static SoftwareProductAlias Create(
         Guid softwareProductId,
         SoftwareIdentitySourceSystem sourceSystem,
         string externalSoftwareId,
@@ -32,7 +32,7 @@ public class NormalizedSoftwareAlias
         DateTimeOffset timestamp
     )
     {
-        return new NormalizedSoftwareAlias
+        return new SoftwareProductAlias
         {
             Id = Guid.NewGuid(),
             SoftwareProductId = softwareProductId,

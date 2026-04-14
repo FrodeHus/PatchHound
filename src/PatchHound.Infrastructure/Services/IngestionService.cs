@@ -1946,7 +1946,7 @@ public class IngestionService
         );
 
         var normalizedSoftwareIds = await _dbContext
-            .TenantSoftware.IgnoreQueryFilters()
+            .SoftwareTenantRecords.IgnoreQueryFilters()
             .AsNoTracking()
             .Where(ts => ts.TenantId == tenantId)
             .Select(ts => ts.SoftwareProductId)
@@ -2476,13 +2476,13 @@ public class IngestionService
     )
     {
         var oldRows = await _dbContext
-            .TenantSoftware.IgnoreQueryFilters()
+            .SoftwareTenantRecords.IgnoreQueryFilters()
             .Where(ts => ts.SnapshotId == oldSnapshotId)
             .Select(ts => new { ts.Id, ts.SoftwareProductId })
             .ToListAsync(ct);
 
         var newRows = await _dbContext
-            .TenantSoftware.IgnoreQueryFilters()
+            .SoftwareTenantRecords.IgnoreQueryFilters()
             .Where(ts => ts.SnapshotId == newSnapshotId)
             .Select(ts => new { ts.Id, ts.SoftwareProductId })
             .ToListAsync(ct);
@@ -2538,26 +2538,26 @@ public class IngestionService
         if (_dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
         {
             var tenantSoftware = await _dbContext
-                .TenantSoftware.IgnoreQueryFilters()
+                .SoftwareTenantRecords.IgnoreQueryFilters()
                 .Where(item => item.SnapshotId == snapshotId)
                 .ToListAsync(ct);
             var installations = await _dbContext
-                .NormalizedSoftwareInstallations.IgnoreQueryFilters()
+                .SoftwareProductInstallations.IgnoreQueryFilters()
                 .Where(item => item.SnapshotId == snapshotId)
                 .ToListAsync(ct);
 
-            _dbContext.TenantSoftware.RemoveRange(tenantSoftware);
-            _dbContext.NormalizedSoftwareInstallations.RemoveRange(installations);
+            _dbContext.SoftwareTenantRecords.RemoveRange(tenantSoftware);
+            _dbContext.SoftwareProductInstallations.RemoveRange(installations);
             await _dbContext.SaveChangesAsync(ct);
             return;
         }
 
         await _dbContext
-            .NormalizedSoftwareInstallations.IgnoreQueryFilters()
+            .SoftwareProductInstallations.IgnoreQueryFilters()
             .Where(item => item.SnapshotId == snapshotId)
             .ExecuteDeleteAsync(ct);
         await _dbContext
-            .TenantSoftware.IgnoreQueryFilters()
+            .SoftwareTenantRecords.IgnoreQueryFilters()
             .Where(item => item.SnapshotId == snapshotId)
             .ExecuteDeleteAsync(ct);
     }

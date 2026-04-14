@@ -128,11 +128,11 @@ public class CycloneDxSupplyChainImportServiceTests : IDisposable
         result.FixedVersion.Should().Be("5.2.4");
     }
 
-    private async Task<TenantSoftware> SeedTenantSoftwareAsync()
+    private async Task<SoftwareTenantRecord> SeedTenantSoftwareAsync()
     {
         var timestamp = new DateTimeOffset(2026, 3, 30, 10, 0, 0, TimeSpan.Zero);
         var softwareProduct = SoftwareProduct.Create("contoso", "contoso-app", null);
-        var tenantSoftware = TenantSoftware.Create(_tenantId, null, softwareProduct.Id, timestamp, timestamp);
+        var tenantSoftware = SoftwareTenantRecord.Create(_tenantId, null, softwareProduct.Id, timestamp, timestamp);
 
         await _dbContext.AddRangeAsync(softwareProduct, tenantSoftware);
         await _dbContext.SaveChangesAsync();

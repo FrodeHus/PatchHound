@@ -20,9 +20,9 @@ public class TenantSoftwareAliasResolver(PatchHoundDbContext dbContext)
         }
 
         return await dbContext
-            .TenantSoftware.AsNoTracking()
+            .SoftwareTenantRecords.AsNoTracking()
             .Join(
-                dbContext.NormalizedSoftwareAliases.AsNoTracking(),
+                dbContext.SoftwareProductAliases.AsNoTracking(),
                 tenantSoftware => tenantSoftware.SoftwareProductId,
                 alias => alias.SoftwareProductId,
                 (tenantSoftware, alias) => new

@@ -1148,7 +1148,7 @@ public class RemediationDecisionQueryService(
     }
 
     private DecisionAiSummaryDto BuildAiSummaryDto(
-        TenantSoftware tenantSoftware,
+        SoftwareTenantRecord tenantSoftware,
         RemediationAiJob? latestJob,
         bool canGenerate,
         bool isStale,
@@ -1184,7 +1184,7 @@ public class RemediationDecisionQueryService(
         );
     }
 
-    private static bool HasStoredAiGuidance(TenantSoftware tenantSoftware) =>
+    private static bool HasStoredAiGuidance(SoftwareTenantRecord tenantSoftware) =>
         !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiSummaryContent)
         || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiOwnerRecommendationContent)
         || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiAnalystAssessmentContent)
@@ -1193,7 +1193,7 @@ public class RemediationDecisionQueryService(
         || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiRecommendedPriority);
 
     private static string ResolveAiSummaryStatus(
-        TenantSoftware tenantSoftware,
+        SoftwareTenantRecord tenantSoftware,
         RemediationAiJob? latestJob,
         bool canGenerate,
         bool isStale
