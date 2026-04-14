@@ -91,8 +91,10 @@ public class SoftwareDescriptionGenerationService
             .Cast<string>()
             .ToListAsync(ct);
 
-        // Phase 4 debt (#17): NormalizedSoftwareVulnerabilityProjection removed by canonical cleanup; remediation-surface rewrite restores this.
-        var activeVulnerabilityCount = 0;
+        // Phase 4 debt (#17): restored — count open exposures from canonical DeviceVulnerabilityExposures
+        var activeVulnerabilityCount = await _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .CountAsync(e => e.TenantId == tenantId && e.SoftwareProductId == softwareProductId
+                && e.Status == ExposureStatus.Open, ct);
 
         var resolvedProfileResult = tenantAiProfileId.HasValue
             ? await _configurationResolver.ResolveByIdAsync(tenantId, tenantAiProfileId.Value, ct)
