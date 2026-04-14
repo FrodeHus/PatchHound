@@ -61,12 +61,10 @@ public class ApprovalTaskServiceTests : IDisposable
 
     private RemediationDecision CreateDecision(RemediationOutcome outcome = RemediationOutcome.RiskAcceptance)
     {
-        var tenantSoftwareId = Guid.NewGuid();
-        var softwareAssetId = Guid.NewGuid();
+        var remediationCaseId = Guid.NewGuid();
         var decision = RemediationDecision.Create(
             _tenantId,
-            tenantSoftwareId,
-            softwareAssetId,
+            remediationCaseId,
             outcome,
             outcome == RemediationOutcome.ApprovedForPatching ? null : "Test justification",
             _userId,
