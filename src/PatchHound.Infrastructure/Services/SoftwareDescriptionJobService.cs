@@ -10,19 +10,16 @@ public class SoftwareDescriptionJobService(PatchHoundDbContext dbContext)
 {
     public async Task<Result<SoftwareDescriptionJob>> EnqueueAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid softwareProductId,
         Guid? tenantAiProfileId,
         CancellationToken ct
     )
     {
-        var tenantSoftware = await dbContext
-            .TenantSoftware
-            .Where(item => item.Id == tenantSoftwareId && item.TenantId == tenantId)
-            .Select(item => new { item.Id, item.NormalizedSoftwareId })
-            .FirstOrDefaultAsync(ct);
-        if (tenantSoftware is null)
+        var softwareProductExists = await dbContext.SoftwareProducts
+            .AnyAsync(item => item.Id == softwareProductId, ct);
+        if (!softwareProductExists)
         {
-            return Result<SoftwareDescriptionJob>.Failure("Tenant software was not found.");
+            return Result<SoftwareDescriptionJob>.Failure("Software product was not found.");
         }
 
         if (tenantAiProfileId.HasValue)
@@ -41,7 +38,7 @@ public class SoftwareDescriptionJobService(PatchHoundDbContext dbContext)
             .Set<SoftwareDescriptionJob>()
             .Where(item =>
                 item.TenantId == tenantId
-                && item.TenantSoftwareId == tenantSoftwareId
+                && item.SoftwareProductId == softwareProductId
                 && (
                     item.Status == SoftwareDescriptionJobStatus.Pending
                     || item.Status == SoftwareDescriptionJobStatus.Running
@@ -56,8 +53,7 @@ public class SoftwareDescriptionJobService(PatchHoundDbContext dbContext)
 
         var job = SoftwareDescriptionJob.Create(
             tenantId,
-            tenantSoftwareId,
-            tenantSoftware.NormalizedSoftwareId,
+            softwareProductId,
             tenantAiProfileId,
             DateTimeOffset.UtcNow
         );
@@ -69,14 +65,14 @@ public class SoftwareDescriptionJobService(PatchHoundDbContext dbContext)
 
     public Task<SoftwareDescriptionJob?> GetLatestAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid softwareProductId,
         CancellationToken ct
     )
     {
         return dbContext
             .Set<SoftwareDescriptionJob>()
             .AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId)
+            .Where(item => item.TenantId == tenantId && item.SoftwareProductId == softwareProductId)
             .OrderByDescending(item => item.RequestedAt)
             .FirstOrDefaultAsync(ct);
     }

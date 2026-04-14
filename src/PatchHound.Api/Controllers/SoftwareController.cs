@@ -306,7 +306,7 @@ public class SoftwareController(
         return Ok(
             new TenantSoftwareDescriptionJobDto(
                 result.Value.Id,
-                result.Value.TenantSoftwareId,
+                result.Value.SoftwareProductId,
                 result.Value.Status.ToString(),
                 string.IsNullOrWhiteSpace(result.Value.Error) ? null : result.Value.Error,
                 result.Value.RequestedAt,
@@ -337,7 +337,7 @@ public class SoftwareController(
         return Ok(
             new TenantSoftwareDescriptionJobDto(
                 job.Id,
-                job.TenantSoftwareId,
+                job.SoftwareProductId,
                 job.Status.ToString(),
                 string.IsNullOrWhiteSpace(job.Error) ? null : job.Error,
                 job.RequestedAt,
@@ -394,18 +394,10 @@ public class SoftwareController(
 
         if (filter.MissedMaintenanceWindow == true)
         {
-            var now = DateTimeOffset.UtcNow;
-            // Phase-2: NormalizedSoftwareVulnerabilityProjection deleted — filter returns no results.
-            query = query.Where(item =>
-                dbContext.RemediationDecisions.Any(decision =>
-                    decision.TenantId == currentTenantId
-                    && decision.TenantSoftwareId == item.Id
-                    && decision.MaintenanceWindowDate != null
-                    && decision.MaintenanceWindowDate < now
-                    && decision.ApprovalStatus != DecisionApprovalStatus.Rejected
-                    && decision.ApprovalStatus != DecisionApprovalStatus.Expired)
-                && false
-            );
+            // Phase 4 (#17): RemediationDecision no longer has TenantSoftwareId.
+            // MissedMaintenanceWindow filter stubbed — always returns no results.
+            // TODO Phase 5: re-implement via RemediationCase join.
+            query = query.Where(_ => false);
         }
 
         var totalCount = await query.CountAsync(ct);
@@ -461,15 +453,9 @@ public class SoftwareController(
                     )
                     .Select(installation => (DateTimeOffset?)installation.LastSeenAt)
                     .Max(),
-                MaintenanceWindowDate = dbContext.RemediationDecisions
-                    .Where(decision =>
-                        decision.TenantId == currentTenantId
-                        && decision.TenantSoftwareId == item.Id
-                        && decision.ApprovalStatus != DecisionApprovalStatus.Rejected
-                        && decision.ApprovalStatus != DecisionApprovalStatus.Expired)
-                    .OrderByDescending(decision => decision.DecidedAt)
-                    .Select(decision => decision.MaintenanceWindowDate)
-                    .FirstOrDefault(),
+                // Phase 4 (#17): RemediationDecision no longer has TenantSoftwareId.
+                // TODO Phase 5: re-implement via RemediationCase join (TenantSoftware → NormalizedSoftware.CanonicalProductKey → SoftwareProduct → RemediationCase).
+                MaintenanceWindowDate = (DateTimeOffset?)null,
                 ExposureImpactScore = dbContext
                     .NormalizedSoftwareInstallations
                     .Where(installation =>

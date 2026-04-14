@@ -33,7 +33,7 @@ public class ApprovalTaskService(
         var initialStatus = decision.ApprovalStatus == DecisionApprovalStatus.PendingApproval
             ? ApprovalTaskStatus.Pending
             : ApprovalTaskStatus.AutoApproved;
-        var task = ApprovalTask.Create(decision.TenantId, decision.Id, decision.Outcome, initialStatus, expiresAt);
+        var task = ApprovalTask.Create(decision.TenantId, decision.RemediationCaseId, decision.Id, decision.Outcome, initialStatus, expiresAt);
         await remediationWorkflowService.AttachApprovalTaskAsync(task, decision, ct);
 
         await dbContext.ApprovalTasks.AddAsync(task, ct);

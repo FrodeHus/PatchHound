@@ -10,24 +10,24 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
 {
     public async Task<RemediationWorkflow> GetOrCreateActiveWorkflowAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid remediationCaseId,
         CancellationToken ct
     )
     {
         var existing = await dbContext.RemediationWorkflows
             .FirstOrDefaultAsync(workflow =>
                 workflow.TenantId == tenantId
-                && workflow.TenantSoftwareId == tenantSoftwareId
+                && workflow.RemediationCaseId == remediationCaseId
                 && workflow.Status == RemediationWorkflowStatus.Active,
                 ct);
         if (existing is not null)
             return existing;
 
-        var softwareOwnerTeamId = await ResolveSoftwareOwnerTeamIdAsync(tenantId, tenantSoftwareId, ct);
+        var softwareOwnerTeamId = await ResolveSoftwareOwnerTeamIdAsync(tenantId, ct);
         var previousWorkflow = await dbContext.RemediationWorkflows.AsNoTracking()
             .Where(item =>
                 item.TenantId == tenantId
-                && item.TenantSoftwareId == tenantSoftwareId
+                && item.RemediationCaseId == remediationCaseId
                 && item.Status != RemediationWorkflowStatus.Active
                 && item.ProposedOutcome != null)
             .OrderByDescending(item => item.CreatedAt)
@@ -39,7 +39,7 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
             : RemediationWorkflowStage.SecurityAnalysis;
         var workflow = RemediationWorkflow.Create(
             tenantId,
-            tenantSoftwareId,
+            remediationCaseId,
             softwareOwnerTeamId,
             initialStage,
             previousWorkflow?.Id
@@ -75,12 +75,12 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
 
     public async Task AttachRecommendationAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid remediationCaseId,
         AnalystRecommendation recommendation,
         CancellationToken ct
     )
     {
-        var workflow = await GetOrCreateActiveWorkflowAsync(tenantId, tenantSoftwareId, ct);
+        var workflow = await GetOrCreateActiveWorkflowAsync(tenantId, remediationCaseId, ct);
         recommendation.AttachToWorkflow(workflow.Id);
 
         var priority = ParsePriority(recommendation.PriorityOverride);
@@ -139,7 +139,7 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
         CancellationToken ct
     )
     {
-        var workflow = await GetOrCreateActiveWorkflowAsync(decision.TenantId, decision.TenantSoftwareId, ct);
+        var workflow = await GetOrCreateActiveWorkflowAsync(decision.TenantId, decision.RemediationCaseId, ct);
         decision.AttachToWorkflow(workflow.Id);
 
         var priority = workflow.Priority ?? RemediationWorkflowPriority.Normal;
@@ -472,7 +472,7 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
             var latestHistoricalDecision = await dbContext.RemediationDecisions.AsNoTracking()
                 .Where(item =>
                     item.TenantId == tenantId
-                    && item.TenantSoftwareId == workflow.TenantSoftwareId
+                    && item.RemediationCaseId == workflow.RemediationCaseId
                     && item.RemediationWorkflowId == workflow.RecurrenceSourceWorkflowId
                     && item.ApprovalStatus == DecisionApprovalStatus.Approved)
                 .OrderByDescending(item => item.DecidedAt)
@@ -545,28 +545,16 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
         openRecord.Complete(completedByUserId, systemCompleted, summary);
     }
 
+    /// <summary>
+    /// Resolves the software owner team for a remediation workflow.
+    /// TODO Phase 5: wire this to device owner teams via DeviceVulnerabilityExposure once
+    /// the canonical exposure model is available. For now falls back to the tenant default team.
+    /// </summary>
     private async Task<Guid> ResolveSoftwareOwnerTeamIdAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
         CancellationToken ct
     )
     {
-        var candidateTeamIds = await dbContext.NormalizedSoftwareInstallations
-            .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
-            .Join(
-                dbContext.Assets,
-                item => item.SoftwareAssetId,
-                asset => asset.Id,
-                (item, asset) => asset.OwnerTeamId ?? asset.FallbackTeamId
-            )
-            .Where(teamId => teamId != null)
-            .Select(teamId => teamId!.Value)
-            .Distinct()
-            .ToListAsync(ct);
-
-        if (candidateTeamIds.Count == 1)
-            return candidateTeamIds[0];
-
         var defaultTeam = await DefaultTeamHelper.EnsureDefaultTeamAsync(dbContext, tenantId, ct);
         return defaultTeam.Id;
     }

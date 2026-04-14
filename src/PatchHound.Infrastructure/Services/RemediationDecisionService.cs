@@ -16,9 +16,9 @@ public class RemediationDecisionService(
 {
     private const int DefaultApprovalExpiryHours = 24;
 
-    public async Task<Result<RemediationDecision>> CreateDecisionAsync(
+    public async Task<Result<RemediationDecision>> CreateDecisionForCaseAsync(
         Guid tenantId,
-        Guid softwareAssetId,
+        Guid remediationCaseId,
         RemediationOutcome outcome,
         string? justification,
         Guid decidedBy,
@@ -28,14 +28,15 @@ public class RemediationDecisionService(
         DateTimeOffset? maintenanceWindowDate = null
     )
     {
-        var remediationScope = await ResolveScopeAsync(tenantId, softwareAssetId, ct);
-        if (remediationScope is null)
-            return Result<RemediationDecision>.Failure("No tenant software scope was found for this software.");
+        var caseExists = await dbContext.RemediationCases
+            .AnyAsync(c => c.TenantId == tenantId && c.Id == remediationCaseId, ct);
+        if (!caseExists)
+            return Result<RemediationDecision>.Failure("Remediation case not found.");
 
         var hasOpenDecision = await dbContext.RemediationDecisions
             .Where(d =>
                 d.TenantId == tenantId
-                && d.TenantSoftwareId == remediationScope.TenantSoftwareId
+                && d.RemediationCaseId == remediationCaseId
                 && d.ApprovalStatus != DecisionApprovalStatus.Rejected
                 && d.ApprovalStatus != DecisionApprovalStatus.Expired)
             .AnyAsync(
@@ -48,12 +49,12 @@ public class RemediationDecisionService(
 
         if (hasOpenDecision)
             return Result<RemediationDecision>.Failure(
-                "An active remediation decision already exists for this software. Reject or expire the current decision before creating a new one.");
+                "An active remediation decision already exists for this case. Reject or expire the current decision before creating a new one.");
 
         var existingWorkflow = await dbContext.RemediationWorkflows.AsNoTracking()
             .Where(workflow =>
                 workflow.TenantId == tenantId
-                && workflow.TenantSoftwareId == remediationScope.TenantSoftwareId
+                && workflow.RemediationCaseId == remediationCaseId
                 && workflow.Status == RemediationWorkflowStatus.Active)
             .OrderByDescending(workflow => workflow.CreatedAt)
             .FirstOrDefaultAsync(ct);
@@ -65,8 +66,7 @@ public class RemediationDecisionService(
 
         var decision = RemediationDecision.Create(
             tenantId,
-            remediationScope.TenantSoftwareId,
-            remediationScope.RepresentativeSoftwareAssetId,
+            remediationCaseId,
             outcome,
             justification,
             decidedBy,
@@ -97,35 +97,6 @@ public class RemediationDecisionService(
         return Result<RemediationDecision>.Success(decision);
     }
 
-    public async Task<Result<RemediationDecision>> CreateDecisionForTenantSoftwareAsync(
-        Guid tenantId,
-        Guid tenantSoftwareId,
-        RemediationOutcome outcome,
-        string? justification,
-        Guid decidedBy,
-        DateTimeOffset? expiryDate,
-        DateTimeOffset? reEvaluationDate,
-        CancellationToken ct,
-        DateTimeOffset? maintenanceWindowDate = null
-    )
-    {
-        var remediationScope = await ResolveScopeByTenantSoftwareAsync(tenantId, tenantSoftwareId, ct);
-        if (remediationScope is null)
-            return Result<RemediationDecision>.Failure("No tenant software scope was found for this software.");
-
-        return await CreateDecisionAsync(
-            tenantId,
-            remediationScope.RepresentativeSoftwareAssetId,
-            outcome,
-            justification,
-            decidedBy,
-            expiryDate,
-            reEvaluationDate,
-            ct,
-            maintenanceWindowDate
-        );
-    }
-
     public async Task<Result<RemediationDecision>> VerifyAndCarryForwardDecisionAsync(
         Guid tenantId,
         Guid workflowId,
@@ -144,18 +115,13 @@ public class RemediationDecisionService(
         if (!verificationResult.IsSuccess)
             return Result<RemediationDecision>.Failure(verificationResult.Error ?? "Verification failed.");
 
-        var remediationScope = await ResolveScopeByTenantSoftwareAsync(tenantId, previousDecision.TenantSoftwareId, ct);
-        if (remediationScope is null)
-            return Result<RemediationDecision>.Failure("No tenant software scope was found for this software.");
-
         var carriedApprovalStatus = previousDecision.Outcome == RemediationOutcome.ApprovedForPatching
             ? DecisionApprovalStatus.Approved
             : DecisionApprovalStatus.PendingApproval;
 
         var decision = RemediationDecision.Create(
             tenantId,
-            previousDecision.TenantSoftwareId,
-            remediationScope.RepresentativeSoftwareAssetId,
+            previousDecision.RemediationCaseId,
             previousDecision.Outcome,
             previousDecision.Justification,
             actedBy,
@@ -294,17 +260,17 @@ public class RemediationDecisionService(
         if (activeWorkflows.Count == 0)
             return 0;
 
-        var tenantSoftwareIds = activeWorkflows
-            .Select(workflow => workflow.TenantSoftwareId)
+        var remediationCaseIds = activeWorkflows
+            .Select(workflow => workflow.RemediationCaseId)
             .Distinct()
             .ToList();
 
         // Phase 2: canonical exposure data not yet available via DeviceVulnerabilityExposure.
         // Return empty — no open exposure means all active workflows are eligible to close.
-        var unresolvedTenantSoftwareIds = new List<Guid>();
+        var unresolvedCaseIds = new List<Guid>();
 
         var workflowsToClose = activeWorkflows
-            .Where(workflow => !unresolvedTenantSoftwareIds.Contains(workflow.TenantSoftwareId))
+            .Where(workflow => !unresolvedCaseIds.Contains(workflow.RemediationCaseId))
             .ToList();
 
         if (workflowsToClose.Count == 0)
@@ -362,7 +328,7 @@ public class RemediationDecisionService(
 
     public async Task<Result<RemediationDecisionVulnerabilityOverride>> AddVulnerabilityOverrideAsync(
         Guid decisionId,
-        Guid tenantVulnerabilityId,
+        Guid vulnerabilityId,
         RemediationOutcome outcome,
         string justification,
         CancellationToken ct
@@ -376,7 +342,7 @@ public class RemediationDecisionService(
 
         var existing = await dbContext.RemediationDecisionVulnerabilityOverrides
             .FirstOrDefaultAsync(
-                vo => vo.RemediationDecisionId == decisionId && vo.TenantVulnerabilityId == tenantVulnerabilityId,
+                vo => vo.RemediationDecisionId == decisionId && vo.VulnerabilityId == vulnerabilityId,
                 ct
             );
 
@@ -387,7 +353,7 @@ public class RemediationDecisionService(
 
         var overrideEntity = RemediationDecisionVulnerabilityOverride.Create(
             decisionId,
-            tenantVulnerabilityId,
+            vulnerabilityId,
             outcome,
             justification
         );
@@ -411,60 +377,4 @@ public class RemediationDecisionService(
 
         return await patchingTaskService.EnsurePatchingTasksAsync(decision, ct);
     }
-
-    private async Task<RemediationScope?> ResolveScopeAsync(
-        Guid tenantId,
-        Guid softwareAssetId,
-        CancellationToken ct
-    )
-    {
-        var scopeRow = await dbContext.NormalizedSoftwareInstallations
-            .IgnoreQueryFilters()
-            .Where(item =>
-                item.TenantId == tenantId
-                && item.SoftwareAssetId == softwareAssetId
-                && item.IsActive)
-            .Select(item => new { item.TenantSoftwareId })
-            .FirstOrDefaultAsync(ct);
-
-        if (scopeRow is null)
-            return null;
-
-        var representativeSoftwareAssetId = await dbContext.NormalizedSoftwareInstallations
-            .IgnoreQueryFilters()
-            .Where(item =>
-                item.TenantId == tenantId
-                && item.TenantSoftwareId == scopeRow.TenantSoftwareId
-                && item.IsActive)
-            .Select(item => item.SoftwareAssetId)
-            .Distinct()
-            .OrderBy(id => id)
-            .FirstAsync(ct);
-
-        return new RemediationScope(scopeRow.TenantSoftwareId, representativeSoftwareAssetId);
-    }
-
-    private async Task<RemediationScope?> ResolveScopeByTenantSoftwareAsync(
-        Guid tenantId,
-        Guid tenantSoftwareId,
-        CancellationToken ct
-    )
-    {
-        var representativeSoftwareAssetId = await dbContext.NormalizedSoftwareInstallations
-            .IgnoreQueryFilters()
-            .Where(item =>
-                item.TenantId == tenantId
-                && item.TenantSoftwareId == tenantSoftwareId
-                && item.IsActive)
-            .Select(item => item.SoftwareAssetId)
-            .Distinct()
-            .OrderBy(id => id)
-            .FirstOrDefaultAsync(ct);
-
-        return representativeSoftwareAssetId == Guid.Empty
-            ? null
-            : new RemediationScope(tenantSoftwareId, representativeSoftwareAssetId);
-    }
-
-    private sealed record RemediationScope(Guid TenantSoftwareId, Guid RepresentativeSoftwareAssetId);
 }

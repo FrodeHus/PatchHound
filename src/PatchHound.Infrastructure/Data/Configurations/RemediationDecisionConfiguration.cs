@@ -11,18 +11,19 @@ public class RemediationDecisionConfiguration : IEntityTypeConfiguration<Remedia
         builder.HasKey(rd => rd.Id);
 
         builder.HasIndex(rd => rd.TenantId);
-        builder.HasIndex(rd => new { rd.TenantId, rd.TenantSoftwareId });
         builder.HasIndex(rd => rd.ApprovalStatus);
         builder.HasIndex(rd => rd.RemediationWorkflowId);
+        builder.HasIndex(rd => new { rd.TenantId, rd.RemediationCaseId, rd.ApprovalStatus });
 
+        builder.Property(rd => rd.RemediationCaseId).IsRequired();
         builder.Property(rd => rd.Outcome).HasConversion<string>().HasMaxLength(32);
         builder.Property(rd => rd.ApprovalStatus).HasConversion<string>().HasMaxLength(32);
         builder.Property(rd => rd.Justification).HasColumnType("text");
 
         builder
-            .HasOne(rd => rd.SoftwareAsset)
+            .HasOne(rd => rd.RemediationCase)
             .WithMany()
-            .HasForeignKey(rd => rd.SoftwareAssetId)
+            .HasForeignKey(rd => rd.RemediationCaseId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder

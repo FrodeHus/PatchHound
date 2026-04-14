@@ -5,9 +5,9 @@ namespace PatchHound.Core.Entities;
 public class RiskAcceptance
 {
     public Guid Id { get; private set; }
-    public Guid TenantVulnerabilityId { get; private set; }
-    public Guid? AssetId { get; private set; }
     public Guid TenantId { get; private set; }
+    public Guid RemediationCaseId { get; private set; }
+    public Guid? VulnerabilityId { get; private set; }
     public Guid RequestedBy { get; private set; }
     public DateTimeOffset RequestedAt { get; private set; }
     public Guid? ApprovedBy { get; private set; }
@@ -19,30 +19,34 @@ public class RiskAcceptance
     public int? ReviewFrequency { get; private set; }
     public DateTimeOffset? NextReviewDate { get; private set; }
 
+    public RemediationCase RemediationCase { get; private set; } = null!;
+
     private RiskAcceptance() { }
 
     public static RiskAcceptance Create(
-        Guid tenantVulnerabilityId,
         Guid tenantId,
+        Guid remediationCaseId,
         Guid requestedBy,
         string justification,
-        Guid? assetId = null,
+        Guid? vulnerabilityId = null,
         string? conditions = null,
         DateTimeOffset? expiryDate = null,
         int? reviewFrequency = null,
-        DateTimeOffset? nextReviewDate = null
-    )
+        DateTimeOffset? nextReviewDate = null)
     {
+        if (string.IsNullOrWhiteSpace(justification))
+            throw new ArgumentException("Justification is required.", nameof(justification));
+
         return new RiskAcceptance
         {
             Id = Guid.NewGuid(),
-            TenantVulnerabilityId = tenantVulnerabilityId,
             TenantId = tenantId,
+            RemediationCaseId = remediationCaseId,
+            VulnerabilityId = vulnerabilityId,
             RequestedBy = requestedBy,
             RequestedAt = DateTimeOffset.UtcNow,
             Status = RiskAcceptanceStatus.Pending,
             Justification = justification,
-            AssetId = assetId,
             Conditions = conditions,
             ExpiryDate = expiryDate,
             ReviewFrequency = reviewFrequency,
@@ -50,23 +54,14 @@ public class RiskAcceptance
         };
     }
 
-    public void Approve(
-        Guid approvedBy,
-        string? conditions = null,
-        DateTimeOffset? expiryDate = null,
-        int? reviewFrequency = null
-    )
+    public void Approve(Guid approvedBy, string? conditions = null, DateTimeOffset? expiryDate = null, int? reviewFrequency = null)
     {
         ApprovedBy = approvedBy;
         ApprovedAt = DateTimeOffset.UtcNow;
         Status = RiskAcceptanceStatus.Approved;
-
-        if (conditions is not null)
-            Conditions = conditions;
-        if (expiryDate.HasValue)
-            ExpiryDate = expiryDate;
-        if (reviewFrequency.HasValue)
-            ReviewFrequency = reviewFrequency;
+        if (conditions is not null) Conditions = conditions;
+        if (expiryDate.HasValue) ExpiryDate = expiryDate;
+        if (reviewFrequency.HasValue) ReviewFrequency = reviewFrequency;
     }
 
     public void Reject(Guid rejectedBy)
@@ -76,8 +71,5 @@ public class RiskAcceptance
         Status = RiskAcceptanceStatus.Rejected;
     }
 
-    public void Expire()
-    {
-        Status = RiskAcceptanceStatus.Expired;
-    }
+    public void Expire() => Status = RiskAcceptanceStatus.Expired;
 }

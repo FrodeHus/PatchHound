@@ -6,8 +6,7 @@ public class SoftwareDescriptionJob
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
-    public Guid TenantSoftwareId { get; private set; }
-    public Guid NormalizedSoftwareId { get; private set; }
+    public Guid SoftwareProductId { get; private set; }
     public Guid? TenantAiProfileId { get; private set; }
     public SoftwareDescriptionJobStatus Status { get; private set; }
     public string Error { get; private set; } = string.Empty;
@@ -20,18 +19,17 @@ public class SoftwareDescriptionJob
 
     public static SoftwareDescriptionJob Create(
         Guid tenantId,
-        Guid tenantSoftwareId,
-        Guid normalizedSoftwareId,
+        Guid softwareProductId,
         Guid? tenantAiProfileId,
-        DateTimeOffset requestedAt
-    )
+        DateTimeOffset requestedAt)
     {
+        if (tenantId == Guid.Empty) throw new ArgumentException("TenantId is required.");
+        if (softwareProductId == Guid.Empty) throw new ArgumentException("SoftwareProductId is required.");
         return new SoftwareDescriptionJob
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            TenantSoftwareId = tenantSoftwareId,
-            NormalizedSoftwareId = normalizedSoftwareId,
+            SoftwareProductId = softwareProductId,
             TenantAiProfileId = tenantAiProfileId,
             Status = SoftwareDescriptionJobStatus.Pending,
             RequestedAt = requestedAt,

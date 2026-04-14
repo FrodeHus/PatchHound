@@ -155,7 +155,7 @@ public class EmailNotificationService(
                 item.Id,
                 item.Type,
                 item.Status,
-                item.RemediationDecision.TenantSoftwareId,
+                item.RemediationCaseId,
                 item.RemediationDecision.MaintenanceWindowDate
             })
             .FirstOrDefaultAsync(ct);
@@ -163,7 +163,7 @@ public class EmailNotificationService(
         if (task is null)
             return null;
 
-        var summary = await BuildRemediationSummaryAsync(tenantId, task.TenantSoftwareId, ct);
+        var summary = await BuildRemediationSummaryAsync(tenantId, task.RemediationCaseId, ct);
         if (summary is null)
             return null;
 
@@ -190,7 +190,7 @@ public class EmailNotificationService(
             requirementText,
             $"{GetFrontendOrigin()}/approvals/{task.Id}",
             "Open approval task",
-            $"{GetFrontendOrigin()}/software/{task.TenantSoftwareId}/remediation",
+            $"{GetFrontendOrigin()}/remediation/cases/{task.RemediationCaseId}",
             "View remediation"
         );
     }
@@ -206,7 +206,7 @@ public class EmailNotificationService(
             .Select(item => new
             {
                 item.Id,
-                item.TenantSoftwareId,
+                item.RemediationCaseId,
                 item.OwnerTeamId
             })
             .FirstOrDefaultAsync(ct);
@@ -214,7 +214,7 @@ public class EmailNotificationService(
         if (task is null)
             return null;
 
-        var summary = await BuildRemediationSummaryAsync(tenantId, task.TenantSoftwareId, ct, task.OwnerTeamId);
+        var summary = await BuildRemediationSummaryAsync(tenantId, task.RemediationCaseId, ct);
         if (summary is null)
             return null;
 
@@ -224,42 +224,28 @@ public class EmailNotificationService(
             summary.AffectedDeviceCount,
             "Execution",
             "Patch the affected devices owned by your team and update progress in PatchHound so the remediation can be tracked to completion.",
-            $"{GetFrontendOrigin()}/remediation/tasks?tenantSoftwareId={task.TenantSoftwareId}",
+            $"{GetFrontendOrigin()}/remediation/tasks?caseId={task.RemediationCaseId}",
             "Open remediation tasks",
-            $"{GetFrontendOrigin()}/software/{task.TenantSoftwareId}/remediation",
+            $"{GetFrontendOrigin()}/remediation/cases/{task.RemediationCaseId}",
             "View remediation"
         );
     }
 
     private async Task<RemediationSummary?> BuildRemediationSummaryAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
-        CancellationToken ct,
-        Guid? ownerTeamId = null
+        Guid remediationCaseId,
+        CancellationToken ct
     )
     {
-        var softwareName = await dbContext.TenantSoftware.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.Id == tenantSoftwareId)
+        var softwareName = await dbContext.RemediationCases.AsNoTracking()
+            .Where(c => c.TenantId == tenantId && c.Id == remediationCaseId)
             .Join(
-                dbContext.NormalizedSoftware.AsNoTracking(),
-                tenantSoftware => tenantSoftware.NormalizedSoftwareId,
-                normalizedSoftware => normalizedSoftware.Id,
-                (tenantSoftware, normalizedSoftware) => normalizedSoftware.CanonicalName
+                dbContext.SoftwareProducts.AsNoTracking(),
+                c => c.SoftwareProductId,
+                sp => sp.Id,
+                (c, sp) => sp.Name
             )
             .FirstOrDefaultAsync(ct);
-
-        if (string.IsNullOrWhiteSpace(softwareName))
-        {
-            softwareName = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-                .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
-                .Join(
-                    dbContext.Assets.AsNoTracking(),
-                    item => item.SoftwareAssetId,
-                    asset => asset.Id,
-                    (item, asset) => asset.Name
-                )
-                .FirstOrDefaultAsync(ct);
-        }
 
         if (string.IsNullOrWhiteSpace(softwareName))
             return null;
@@ -268,30 +254,8 @@ public class EmailNotificationService(
         // Phase 3 will rewire severity via DeviceVulnerabilityExposure.
         var severity = Severity.Medium;
 
-        var affectedDeviceCount = ownerTeamId.HasValue
-            ? await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-                .Where(item =>
-                    item.TenantId == tenantId
-                    && item.TenantSoftwareId == tenantSoftwareId
-                    && item.IsActive)
-                .Join(
-                    dbContext.Assets.AsNoTracking(),
-                    item => item.DeviceAssetId,
-                    asset => asset.Id,
-                    (item, asset) => new { item.DeviceAssetId, TeamId = asset.OwnerTeamId ?? asset.FallbackTeamId }
-                )
-                .Where(item => item.TeamId == ownerTeamId.Value)
-                .Select(item => item.DeviceAssetId)
-                .Distinct()
-                .CountAsync(ct)
-            : await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-                .Where(item =>
-                    item.TenantId == tenantId
-                    && item.TenantSoftwareId == tenantSoftwareId
-                    && item.IsActive)
-                .Select(item => item.DeviceAssetId)
-                .Distinct()
-                .CountAsync(ct);
+        // TODO Phase 5: count affected devices via DeviceVulnerabilityExposure once available.
+        const int affectedDeviceCount = 0;
 
         return new RemediationSummary(
             softwareName,

@@ -11,9 +11,14 @@ public class RemediationWorkflowConfiguration : IEntityTypeConfiguration<Remedia
         builder.HasKey(workflow => workflow.Id);
 
         builder.HasIndex(workflow => workflow.TenantId);
-        builder.HasIndex(workflow => new { workflow.TenantId, workflow.TenantSoftwareId });
-        builder.HasIndex(workflow => new { workflow.TenantId, workflow.Status });
         builder.HasIndex(workflow => workflow.RecurrenceSourceWorkflowId);
+
+        builder.Property(workflow => workflow.RemediationCaseId).IsRequired();
+        builder.HasOne(workflow => workflow.RemediationCase)
+            .WithMany()
+            .HasForeignKey(workflow => workflow.RemediationCaseId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(workflow => new { workflow.TenantId, workflow.RemediationCaseId, workflow.Status });
 
         builder.Property(workflow => workflow.CurrentStage).HasConversion<string>().HasMaxLength(32);
         builder.Property(workflow => workflow.Status).HasConversion<string>().HasMaxLength(32);

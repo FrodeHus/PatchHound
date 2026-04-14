@@ -6,9 +6,8 @@ public class RemediationDecision
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public Guid RemediationCaseId { get; private set; }
     public Guid? RemediationWorkflowId { get; private set; }
-    public Guid TenantSoftwareId { get; private set; }
-    public Guid SoftwareAssetId { get; private set; }
     public RemediationOutcome Outcome { get; private set; }
     public DecisionApprovalStatus ApprovalStatus { get; private set; }
     public string Justification { get; private set; } = null!;
@@ -23,7 +22,7 @@ public class RemediationDecision
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    public Asset SoftwareAsset { get; private set; } = null!;
+    public RemediationCase RemediationCase { get; private set; } = null!;
     public RemediationWorkflow? RemediationWorkflow { get; private set; }
     public ICollection<RemediationDecisionVulnerabilityOverride> VulnerabilityOverrides { get; private set; } = [];
 
@@ -44,17 +43,20 @@ public class RemediationDecision
 
     public static RemediationDecision Create(
         Guid tenantId,
-        Guid tenantSoftwareId,
-        Guid softwareAssetId,
+        Guid remediationCaseId,
         RemediationOutcome outcome,
         string? justification,
         Guid decidedBy,
         DecisionApprovalStatus? initialApprovalStatus = null,
         DateTimeOffset? expiryDate = null,
         DateTimeOffset? reEvaluationDate = null,
-        DateTimeOffset? maintenanceWindowDate = null
-    )
+        DateTimeOffset? maintenanceWindowDate = null)
     {
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("TenantId is required.", nameof(tenantId));
+        if (remediationCaseId == Guid.Empty)
+            throw new ArgumentException("RemediationCaseId is required.", nameof(remediationCaseId));
+
         if (OutcomesRequiringJustification.Contains(outcome) && string.IsNullOrWhiteSpace(justification))
             throw new ArgumentException($"Justification is required for {outcome}.");
 
@@ -72,8 +74,7 @@ public class RemediationDecision
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            TenantSoftwareId = tenantSoftwareId,
-            SoftwareAssetId = softwareAssetId,
+            RemediationCaseId = remediationCaseId,
             Outcome = outcome,
             ApprovalStatus = approvalStatus,
             Justification = justification ?? string.Empty,
@@ -93,7 +94,6 @@ public class RemediationDecision
     {
         if (ApprovalStatus != DecisionApprovalStatus.PendingApproval)
             throw new InvalidOperationException($"Cannot approve a decision with status {ApprovalStatus}.");
-
         ApprovedBy = approvedBy;
         ApprovedAt = DateTimeOffset.UtcNow;
         ApprovalStatus = DecisionApprovalStatus.Approved;
@@ -110,7 +110,6 @@ public class RemediationDecision
     {
         if (ApprovalStatus != DecisionApprovalStatus.PendingApproval)
             throw new InvalidOperationException($"Cannot reject a decision with status {ApprovalStatus}.");
-
         ApprovedBy = rejectedBy;
         ApprovedAt = DateTimeOffset.UtcNow;
         ApprovalStatus = DecisionApprovalStatus.Rejected;
@@ -120,12 +119,6 @@ public class RemediationDecision
     public void Expire()
     {
         ApprovalStatus = DecisionApprovalStatus.Expired;
-        UpdatedAt = DateTimeOffset.UtcNow;
-    }
-
-    public void ReassignTenantSoftware(Guid newTenantSoftwareId)
-    {
-        TenantSoftwareId = newTenantSoftwareId;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 

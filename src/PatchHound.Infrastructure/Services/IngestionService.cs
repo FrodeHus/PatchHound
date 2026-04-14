@@ -2495,30 +2495,10 @@ public class IngestionService
         if (oldToNew.Count == 0)
             return;
 
-        var oldIds = oldToNew.Keys.ToHashSet();
-
-        var decisions = await _dbContext
-            .RemediationDecisions.IgnoreQueryFilters()
-            .Where(d => oldIds.Contains(d.TenantSoftwareId))
-            .ToListAsync(ct);
-        foreach (var decision in decisions)
-            decision.ReassignTenantSoftware(oldToNew[decision.TenantSoftwareId]);
-
-        var workflows = await _dbContext
-            .RemediationWorkflows.IgnoreQueryFilters()
-            .Where(w => oldIds.Contains(w.TenantSoftwareId))
-            .ToListAsync(ct);
-        foreach (var workflow in workflows)
-            workflow.ReassignTenantSoftware(oldToNew[workflow.TenantSoftwareId]);
-
-        var tasks = await _dbContext
-            .PatchingTasks.IgnoreQueryFilters()
-            .Where(t => oldIds.Contains(t.TenantSoftwareId))
-            .ToListAsync(ct);
-        foreach (var task in tasks)
-            task.ReassignTenantSoftware(oldToNew[task.TenantSoftwareId]);
-
-        await _dbContext.SaveChangesAsync(ct);
+        // Phase 4: Remediation entities (RemediationDecision, RemediationWorkflow, PatchingTask)
+        // are now anchored on RemediationCase, which is keyed by (TenantId, SoftwareProductId).
+        // RemediationCase IDs are stable across snapshot rotations — no re-keying required.
+        await Task.CompletedTask;
     }
 
     private async Task DiscardBuildingSnapshotAsync(

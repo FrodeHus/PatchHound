@@ -15,10 +15,19 @@ public class ApprovalTaskConfiguration : IEntityTypeConfiguration<ApprovalTask>
         builder.HasIndex(at => at.Status);
         builder.HasIndex(at => at.ExpiresAt);
         builder.HasIndex(at => at.RemediationWorkflowId);
+        builder.HasIndex(at => new { at.TenantId, at.RemediationCaseId, at.Status });
+
+        builder.Property(at => at.RemediationCaseId).IsRequired();
 
         builder.Property(at => at.Type).HasConversion<string>().HasMaxLength(32);
         builder.Property(at => at.Status).HasConversion<string>().HasMaxLength(32);
         builder.Property(at => at.ResolutionJustification).HasColumnType("text");
+
+        builder
+            .HasOne(at => at.RemediationCase)
+            .WithMany()
+            .HasForeignKey(at => at.RemediationCaseId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder
             .HasOne(at => at.RemediationDecision)
