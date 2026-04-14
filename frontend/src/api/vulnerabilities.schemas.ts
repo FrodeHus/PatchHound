@@ -58,6 +58,29 @@ export const orgSeveritySchema = z.object({
   adjustedAt: isoDateTimeSchema,
 })
 
+export const affectedDeviceSchema = z.object({
+  deviceId: z.string().uuid(),
+  deviceName: z.string(),
+  softwareProductId: z.string().uuid().nullable(),
+  softwareProductName: z.string().nullable(),
+  matchedVersion: z.string().nullable(),
+  matchSource: z.string(),
+  status: z.string(),
+  environmentalCvss: z.number().nullable(),
+  environmentalReason: z.string().nullable(),
+  firstObservedAt: isoDateTimeSchema,
+  lastObservedAt: isoDateTimeSchema,
+  resolvedAt: isoDateTimeSchema.nullable(),
+})
+
+export const exposureEpisodeSchema = z.object({
+  episodeId: z.string().uuid(),
+  exposureId: z.string().uuid(),
+  episodeNumber: z.number(),
+  openedAt: isoDateTimeSchema,
+  closedAt: isoDateTimeSchema.nullable(),
+})
+
 export const vulnerabilityDetailSchema = z.object({
   id: z.string().uuid(),
   externalId: z.string(),
@@ -92,11 +115,10 @@ export const vulnerabilityDetailSchema = z.object({
   }).nullable(),
   exposures: z.object({
     dataAvailable: z.boolean(),
-    dataAvailableReason: z.string(),
-    // Phase 3 stub — always empty arrays until DeviceVulnerabilityExposure is introduced
-    affectedDevices: z.array(z.any()),
-    activeExposures: z.array(z.any()),
-    resolvedExposures: z.array(z.any()),
+    dataAvailableReason: z.string().nullable(),
+    affectedDevices: z.array(affectedDeviceSchema),
+    activeEpisodes: z.array(exposureEpisodeSchema),
+    resolvedEpisodes: z.array(exposureEpisodeSchema),
   }),
 })
 
@@ -123,5 +145,7 @@ export const commentSchema = z.object({
 export type Vulnerability = z.infer<typeof vulnerabilitySchema>
 export type VulnerabilityDetail = z.infer<typeof vulnerabilityDetailSchema>
 export type AffectedAsset = z.infer<typeof affectedAssetSchema>
+export type AffectedDevice = z.infer<typeof affectedDeviceSchema>
+export type ExposureEpisode = z.infer<typeof exposureEpisodeSchema>
 export type AiReport = z.infer<typeof aiReportSchema>
 export type CommentItem = z.infer<typeof commentSchema>
