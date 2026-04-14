@@ -107,6 +107,27 @@ export const pagedDevicesSchema = pagedResponseMetaSchema.extend({
   items: z.array(deviceSchema),
 })
 
+export const deviceExposureSchema = z.object({
+  exposureId: z.string().uuid(),
+  vulnerabilityId: z.string().uuid(),
+  externalId: z.string(),
+  title: z.string(),
+  severity: z.string(),
+  matchedVersion: z.string(),
+  matchSource: z.string(),
+  status: z.string(),
+  firstObservedAt: z.string().datetime({ offset: true }),
+  lastObservedAt: z.string().datetime({ offset: true }),
+  resolvedAt: z.string().datetime({ offset: true }).nullable(),
+  environmentalCvss: z.number().nullable(),
+})
+
+export const pagedDeviceExposuresSchema = pagedResponseMetaSchema.extend({
+  items: z.array(deviceExposureSchema),
+})
+
 export type Device = z.infer<typeof deviceSchema>
 export type DeviceDetail = z.infer<typeof deviceDetailSchema>
 export type PagedDevices = z.infer<typeof pagedDevicesSchema>
+export type DeviceExposure = z.infer<typeof deviceExposureSchema>
+export type PagedDeviceExposures = z.infer<typeof pagedDeviceExposuresSchema>

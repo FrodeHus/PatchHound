@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Loader2, RotateCcw } from 'lucide-react'
 import type { DeviceDetail } from '@/api/devices.schemas'
+import type { DeviceExposure } from '@/api/devices.schemas'
 import type { BusinessLabel } from '@/api/business-labels.schemas'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import { Badge } from '@/components/ui/badge'
@@ -23,6 +24,7 @@ const criticalityOptions = ['Low', 'Medium', 'High', 'Critical']
 
 type DeviceDetailPageViewProps = {
   device: DeviceDetail
+  exposures: DeviceExposure[]
   canUseAdvancedTools: boolean
   securityProfiles: SecurityProfile[]
   availableBusinessLabels: BusinessLabel[]
@@ -36,10 +38,11 @@ type DeviceDetailPageViewProps = {
   onAssignBusinessLabels: (businessLabelIds: string[]) => void
 }
 
-type DetailTab = 'overview' | 'advanced'
+type DetailTab = 'overview' | 'exposures' | 'advanced'
 
 export function DeviceDetailPageView({
   device,
+  exposures,
   canUseAdvancedTools,
   securityProfiles,
   availableBusinessLabels,
@@ -162,6 +165,11 @@ export function DeviceDetailPageView({
                 label="Overview"
                 active={activeTab === 'overview'}
                 onClick={() => setActiveTab('overview')}
+              />
+              <TabButton
+                label="Exposures"
+                active={activeTab === 'exposures'}
+                onClick={() => setActiveTab('exposures')}
               />
               {canUseAdvancedTools ? (
                 <TabButton
@@ -342,6 +350,49 @@ export function DeviceDetailPageView({
                   </div>
                 </section>
               </div>
+            ) : null}
+
+            {activeTab === 'exposures' ? (
+              <section className="rounded-2xl border border-border/70 bg-background p-4">
+                <SectionHeader
+                  title="Exposures"
+                  description="Observed vulnerabilities linked to this device from the canonical exposure pipeline."
+                />
+                {exposures.length === 0 ? (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    No exposures observed for this device.
+                  </p>
+                ) : (
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="min-w-full border-separate border-spacing-y-2 text-sm">
+                      <thead>
+                        <tr className="text-left text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                          <th className="px-3 py-2">CVE</th>
+                          <th className="px-3 py-2">Severity</th>
+                          <th className="px-3 py-2">Matched version</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2">Environmental CVSS</th>
+                          <th className="px-3 py-2">First observed</th>
+                          <th className="px-3 py-2">Last observed</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {exposures.map((exposure) => (
+                          <tr key={exposure.exposureId} className="rounded-xl border border-border/70 bg-card">
+                            <td className="px-3 py-3 font-medium">{exposure.externalId}</td>
+                            <td className="px-3 py-3">{exposure.severity}</td>
+                            <td className="px-3 py-3">{exposure.matchedVersion}</td>
+                            <td className="px-3 py-3">{exposure.status}</td>
+                            <td className="px-3 py-3">{exposure.environmentalCvss?.toFixed(1) ?? 'Unknown'}</td>
+                            <td className="px-3 py-3">{formatDateTime(exposure.firstObservedAt)}</td>
+                            <td className="px-3 py-3">{formatDateTime(exposure.lastObservedAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
             ) : null}
 
             {activeTab === 'advanced' && canUseAdvancedTools ? (

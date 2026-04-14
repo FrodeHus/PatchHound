@@ -85,6 +85,20 @@ public record DeviceRiskDetailDto(
     DateTimeOffset CalculatedAt
 );
 
+public record DeviceExposureDto(
+    Guid ExposureId,
+    Guid VulnerabilityId,
+    string ExternalId,
+    string Title,
+    string Severity,
+    string MatchedVersion,
+    string MatchSource,
+    string Status,
+    DateTimeOffset FirstObservedAt,
+    DateTimeOffset LastObservedAt,
+    DateTimeOffset? ResolvedAt,
+    decimal? EnvironmentalCvss);
+
 public record DeviceFilterQuery(
     string? Criticality = null,
     string? OwnerType = null,
