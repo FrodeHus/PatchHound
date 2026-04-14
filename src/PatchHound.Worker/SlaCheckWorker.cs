@@ -67,7 +67,7 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
                 decision.TenantId,
                 NotificationType.SLAWarning,
                 "Deferred patching decision approaching re-evaluation",
-                $"Remediation decision {decision.Id} for software asset {decision.SoftwareAssetId} has a re-evaluation date of {decision.ReEvaluationDate!.Value:yyyy-MM-dd}.",
+                $"Remediation decision {decision.Id} for remediation case {decision.RemediationCaseId} has a re-evaluation date of {decision.ReEvaluationDate!.Value:yyyy-MM-dd}.",
                 "RemediationDecision",
                 decision.Id,
                 ct
@@ -96,7 +96,7 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
                 decision.TenantId,
                 NotificationType.SLAWarning,
                 "Remediation decision approaching expiry",
-                $"Remediation decision {decision.Id} for software asset {decision.SoftwareAssetId} expires on {decision.ExpiryDate!.Value:yyyy-MM-dd}.",
+                $"Remediation decision {decision.Id} for remediation case {decision.RemediationCaseId} expires on {decision.ExpiryDate!.Value:yyyy-MM-dd}.",
                 "RemediationDecision",
                 decision.Id,
                 ct
@@ -124,8 +124,8 @@ public class SlaCheckWorker(IServiceScopeFactory scopeFactory, ILogger<SlaCheckW
                     ? "Patching task overdue"
                     : "Patching task nearing SLA deadline";
                 var body = status == SlaStatus.Overdue
-                    ? $"Patching task {patchingTask.Id} for software asset {patchingTask.SoftwareAssetId} is past its SLA due date of {patchingTask.DueDate:yyyy-MM-dd}."
-                    : $"Patching task {patchingTask.Id} for software asset {patchingTask.SoftwareAssetId} is approaching its SLA due date of {patchingTask.DueDate:yyyy-MM-dd}.";
+                    ? $"Patching task {patchingTask.Id} for remediation case {patchingTask.RemediationCaseId} is past its SLA due date of {patchingTask.DueDate:yyyy-MM-dd}."
+                    : $"Patching task {patchingTask.Id} for remediation case {patchingTask.RemediationCaseId} is approaching its SLA due date of {patchingTask.DueDate:yyyy-MM-dd}.";
 
                 // Notify team members
                 var teamMembers = await dbContext.TeamMembers.IgnoreQueryFilters()

@@ -13,13 +13,9 @@ namespace PatchHound.Infrastructure.Services;
 public class SoftwareDescriptionGenerationService
 {
     private sealed record AliasIdentity(
-        string SourceSystem,
-        string ExternalSoftwareId,
-        string RawName,
-        string? RawVendor,
-        string? RawVersion,
-        string AliasConfidence,
-        string MatchReason
+        string ExternalId,
+        string? ObservedVendor,
+        string? ObservedName
     );
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -44,58 +40,50 @@ public class SoftwareDescriptionGenerationService
 
     public async Task<Result<SoftwareDescriptionGenerationResult>> GenerateAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid softwareProductId,
         Guid? tenantAiProfileId,
         CancellationToken ct
     )
     {
-        var software = await _dbContext
-            .TenantSoftware
-            .Where(item => item.Id == tenantSoftwareId && item.TenantId == tenantId)
+        var product = await _dbContext
+            .SoftwareProducts
+            .Where(item => item.Id == softwareProductId)
             .Select(item => new
             {
                 item.Id,
-                item.TenantId,
-                item.NormalizedSoftwareId,
-                item.NormalizedSoftware.CanonicalName,
-                item.NormalizedSoftware.CanonicalVendor,
-                item.NormalizedSoftware.PrimaryCpe23Uri,
-                item.NormalizedSoftware.Description,
+                item.Vendor,
+                item.Name,
+                item.PrimaryCpe23Uri,
             })
             .FirstOrDefaultAsync(ct);
-        if (software is null)
+        if (product is null)
         {
             return Result<SoftwareDescriptionGenerationResult>.Failure(
-                "Tenant software was not found."
+                "Software product was not found."
             );
         }
 
         var aliases = await _dbContext
-            .NormalizedSoftwareAliases.AsNoTracking()
-            .Where(item => item.NormalizedSoftwareId == software.NormalizedSoftwareId)
-            .OrderBy(item => item.SourceSystem)
-            .ThenBy(item => item.ExternalSoftwareId)
+            .SoftwareAliases.AsNoTracking()
+            .Where(item => item.SoftwareProductId == softwareProductId)
+            .OrderBy(item => item.ExternalId)
             .Select(item => new AliasIdentity(
-                item.SourceSystem.ToString(),
-                item.ExternalSoftwareId,
-                item.RawName,
-                item.RawVendor,
-                item.RawVersion,
-                item.AliasConfidence.ToString(),
-                item.MatchReason
+                item.ExternalId,
+                item.ObservedVendor,
+                item.ObservedName
             ))
             .ToListAsync(ct);
 
         var identityCandidates = BuildIdentityCandidates(
-            software.CanonicalVendor,
-            software.CanonicalName,
+            product.Vendor,
+            product.Name,
             aliases
         );
 
         var observedVersions = await _dbContext
-            .NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
-            .Select(item => item.DetectedVersion)
+            .InstalledSoftware.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.SoftwareProductId == softwareProductId)
+            .Select(item => item.Version)
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .Distinct()
             .OrderBy(item => item)
@@ -120,17 +108,17 @@ public class SoftwareDescriptionGenerationService
         var request = new AiTextGenerationRequest(
             "You are a PatchHound software analyst. Write a concise product-level markdown description for security and vulnerability analysts. Explain what the software product is, who publishes it, common enterprise use cases, and why it may appear in enterprise environments. Keep the description general to the product rather than version-specific. Use the strongest vendor/name evidence available from the provided identities and aliases. If the identity appears ambiguous or generic, say so briefly instead of guessing. Use at most two short paragraphs and up to three short bullet points.",
             BuildUserPrompt(
-                software.CanonicalVendor,
-                software.CanonicalName,
-                software.PrimaryCpe23Uri,
+                product.Vendor,
+                product.Name,
+                product.PrimaryCpe23Uri,
                 identityCandidates,
                 observedVersions,
                 activeVulnerabilityCount,
                 new
                 {
-                    canonicalName = software.CanonicalName,
-                    canonicalVendor = software.CanonicalVendor,
-                    primaryCpe23Uri = software.PrimaryCpe23Uri,
+                    vendor = product.Vendor,
+                    name = product.Name,
+                    primaryCpe23Uri = product.PrimaryCpe23Uri,
                     identityCandidates,
                     observedVersions,
                     activeVulnerabilityCount,
@@ -190,22 +178,25 @@ public class SoftwareDescriptionGenerationService
             );
         }
 
-        var normalizedSoftware = await _dbContext
-            .NormalizedSoftware
-            .FirstAsync(item => item.Id == software.NormalizedSoftwareId, ct);
-        normalizedSoftware.UpdateDescription(
-            generationResult.Value.Content,
-            generationResult.Value.GeneratedAt,
-            generationResult.Value.ProviderType,
-            generationResult.Value.ProfileName,
-            generationResult.Value.Model
-        );
+        // Store the description in TenantSoftwareProductInsight (upsert).
+        var insight = await _dbContext
+            .TenantSoftwareProductInsights
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(
+                item => item.TenantId == tenantId && item.SoftwareProductId == softwareProductId,
+                ct
+            );
+        if (insight is null)
+        {
+            insight = TenantSoftwareProductInsight.Create(tenantId, softwareProductId);
+            _dbContext.TenantSoftwareProductInsights.Add(insight);
+        }
+        insight.UpdateDescription(generationResult.Value.Content);
         await _dbContext.SaveChangesAsync(ct);
 
         return Result<SoftwareDescriptionGenerationResult>.Success(
             new SoftwareDescriptionGenerationResult(
-                tenantSoftwareId,
-                software.NormalizedSoftwareId,
+                softwareProductId,
                 generationResult.Value.Content,
                 generationResult.Value.ProviderType,
                 generationResult.Value.ProfileName,
@@ -234,26 +225,26 @@ public class SoftwareDescriptionGenerationService
     }
 
     private static IReadOnlyList<string> BuildIdentityCandidates(
-        string? canonicalVendor,
-        string canonicalName,
+        string vendor,
+        string name,
         IReadOnlyList<AliasIdentity> aliases
     )
     {
         var candidates = new List<string>();
 
-        if (!string.IsNullOrWhiteSpace(canonicalName))
+        if (!string.IsNullOrWhiteSpace(name))
         {
             candidates.Add(
-                string.IsNullOrWhiteSpace(canonicalVendor)
-                    ? canonicalName.Trim()
-                    : $"{canonicalVendor.Trim()} {canonicalName.Trim()}"
+                string.IsNullOrWhiteSpace(vendor)
+                    ? name.Trim()
+                    : $"{vendor.Trim()} {name.Trim()}"
             );
         }
 
         foreach (var alias in aliases)
         {
-            var rawName = alias.RawName;
-            var rawVendor = alias.RawVendor;
+            var rawName = alias.ObservedName;
+            var rawVendor = alias.ObservedVendor;
             if (string.IsNullOrWhiteSpace(rawName))
             {
                 continue;
@@ -273,8 +264,8 @@ public class SoftwareDescriptionGenerationService
     }
 
     private static string BuildUserPrompt(
-        string? canonicalVendor,
-        string canonicalName,
+        string vendor,
+        string name,
         string? primaryCpe23Uri,
         IReadOnlyList<string> identityCandidates,
         IReadOnlyList<string> observedVersions,
@@ -283,9 +274,9 @@ public class SoftwareDescriptionGenerationService
     )
     {
         return
-            $"Primary software identity: {identityCandidates.FirstOrDefault() ?? canonicalName}\n"
-            + $"Canonical name: {canonicalName}\n"
-            + $"Canonical vendor: {(canonicalVendor ?? "Unknown")}\n"
+            $"Primary software identity: {identityCandidates.FirstOrDefault() ?? name}\n"
+            + $"Canonical name: {name}\n"
+            + $"Canonical vendor: {vendor}\n"
             + $"Primary CPE: {(primaryCpe23Uri ?? "None")}\n"
             + $"Observed versions: {(observedVersions.Count == 0 ? "None" : string.Join(", ", observedVersions))}\n"
             + $"Open vulnerability count in tenant: {activeVulnerabilityCount}\n"

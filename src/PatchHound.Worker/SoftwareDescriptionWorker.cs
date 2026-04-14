@@ -71,7 +71,7 @@ public class SoftwareDescriptionWorker(
         {
             var result = await generationService.GenerateAsync(
                 job.TenantId,
-                job.TenantSoftwareId,
+                job.SoftwareProductId,
                 job.TenantAiProfileId,
                 ct
             );
@@ -84,9 +84,9 @@ public class SoftwareDescriptionWorker(
             {
                 trackedJob.CompleteSucceeded(DateTimeOffset.UtcNow);
                 logger.LogInformation(
-                    "Completed software description job {JobId} for tenant software {TenantSoftwareId}",
+                    "Completed software description job {JobId} for software product {SoftwareProductId}",
                     trackedJob.Id,
-                    trackedJob.TenantSoftwareId
+                    trackedJob.SoftwareProductId
                 );
             }
             else
