@@ -71,6 +71,7 @@ public class SoftwareController(
                 item.Id,
                 item.TenantId,
                 item.NormalizedSoftwareId,
+                item.NormalizedSoftware.CanonicalProductKey,
                 item.FirstSeenAt,
                 item.LastSeenAt,
                 item.NormalizedSoftware.CanonicalName,
@@ -103,6 +104,11 @@ public class SoftwareController(
         {
             return NotFound();
         }
+
+        var softwareProductId = await dbContext.SoftwareProducts.AsNoTracking()
+            .Where(item => item.CanonicalProductKey == tenantSoftware.CanonicalProductKey)
+            .Select(item => (Guid?)item.Id)
+            .FirstOrDefaultAsync(ct);
 
         var installations = await dbContext
             .NormalizedSoftwareInstallations.AsNoTracking()
@@ -167,6 +173,7 @@ public class SoftwareController(
             new TenantSoftwareDetailDto(
                 tenantSoftware.Id,
                 tenantSoftware.NormalizedSoftwareId,
+                softwareProductId,
                 softwareAssetIds.FirstOrDefault() is var primaryAssetId && primaryAssetId != Guid.Empty ? primaryAssetId : null,
                 tenantSoftware.CanonicalName,
                 tenantSoftware.CanonicalVendor,
@@ -406,6 +413,7 @@ public class SoftwareController(
             {
                 item.Id,
                 item.NormalizedSoftwareId,
+                CanonicalProductKey = item.NormalizedSoftware.CanonicalProductKey,
                 CanonicalName = item.NormalizedSoftware.CanonicalName,
                 CanonicalVendor = item.NormalizedSoftware.CanonicalVendor,
                 Category = item.NormalizedSoftware.Category,
@@ -475,17 +483,29 @@ public class SoftwareController(
             .Take(pagination.BoundedPageSize)
             .ToListAsync(ct);
 
+        var canonicalProductKeys = rows
+            .Select(item => item.CanonicalProductKey)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct()
+            .ToList();
+        var softwareProductIdsByKey = canonicalProductKeys.Count == 0
+            ? new Dictionary<string, Guid>()
+            : await dbContext.SoftwareProducts.AsNoTracking()
+                .Where(item => canonicalProductKeys.Contains(item.CanonicalProductKey))
+                .ToDictionaryAsync(item => item.CanonicalProductKey, item => item.Id, ct);
+
         return Ok(
             new PagedResponse<TenantSoftwareListItemDto>(
                 rows
                     .Select(item => new TenantSoftwareListItemDto(
-                    item.Id,
-                    item.NormalizedSoftwareId,
-                    item.CanonicalName,
-                    item.CanonicalVendor,
-                    item.Category,
-                    item.CurrentRiskScore,
-                    item.ActiveInstallCount,
+                        item.Id,
+                        item.NormalizedSoftwareId,
+                        softwareProductIdsByKey.GetValueOrDefault(item.CanonicalProductKey),
+                        item.CanonicalName,
+                        item.CanonicalVendor,
+                        item.Category,
+                        item.CurrentRiskScore,
+                        item.ActiveInstallCount,
                         item.UniqueDeviceCount,
                         item.ActiveVulnerabilityCount,
                         item.VersionCount,

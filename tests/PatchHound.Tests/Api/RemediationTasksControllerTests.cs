@@ -108,7 +108,7 @@ public class RemediationTasksControllerTests : IDisposable
         await CreateAndApproveDecisionAsync(remediationCase.Id, userId);
 
         var action = await _controller.List(
-            new RemediationTaskFilterQuery(TenantSoftwareId: remediationCase.Id),
+            new RemediationTaskFilterQuery(CaseId: remediationCase.Id),
             new PaginationQuery(1, 25),
             CancellationToken.None
         );

@@ -3,6 +3,7 @@ namespace PatchHound.Api.Models.Software;
 public record TenantSoftwareListItemDto(
     Guid Id,
     Guid NormalizedSoftwareId,
+    Guid? SoftwareProductId,
     string CanonicalName,
     string? CanonicalVendor,
     string? Category,

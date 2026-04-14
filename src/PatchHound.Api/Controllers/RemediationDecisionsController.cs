@@ -14,7 +14,7 @@ using PatchHound.Infrastructure.Services;
 namespace PatchHound.Api.Controllers;
 
 [ApiController]
-[Route("api/software/{tenantSoftwareId:guid}/remediation")]
+[Route("api/remediation/cases/{caseId:guid}")]
 [Authorize]
 public class RemediationDecisionsController(
     RemediationDecisionQueryService queryService,
@@ -31,18 +31,14 @@ public class RemediationDecisionsController(
     [HttpGet("decision-context")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<DecisionContextDto>> GetDecisionContext(
-        Guid tenantSoftwareId,
+        Guid caseId,
         CancellationToken ct
     )
     {
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var remediationCaseId = await ResolveCaseIdAsync(tenantId, tenantSoftwareId, ct);
-        if (remediationCaseId is null)
-            return NotFound();
-
-        var result = await queryService.BuildByCaseIdAsync(tenantId, remediationCaseId.Value, false, ct);
+        var result = await queryService.BuildByCaseIdAsync(tenantId, caseId, false, ct);
         if (result is null)
             return NotFound();
 
@@ -52,31 +48,27 @@ public class RemediationDecisionsController(
     [HttpPost("workflow")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<EnsureRemediationWorkflowResponse>> EnsureWorkflow(
-        Guid tenantSoftwareId,
+        Guid caseId,
         CancellationToken ct
     )
     {
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var remediationCaseId = await ResolveCaseIdAsync(tenantId, tenantSoftwareId, ct);
-        if (remediationCaseId is null)
-            return NotFound(new ProblemDetails { Title = "Remediation case not found for this software." });
-
         var workflow = await workflowService.GetOrCreateActiveWorkflowAsync(
             tenantId,
-            remediationCaseId.Value,
+            caseId,
             ct
         );
         await dbContext.SaveChangesAsync(ct);
-        await EnqueueAiDraftsAsync(tenantId, remediationCaseId.Value, ct);
+        await EnqueueAiDraftsAsync(tenantId, caseId, ct);
         return Ok(new EnsureRemediationWorkflowResponse(workflow.Id));
     }
 
     [HttpPost("decisions/{decisionId:guid}/overrides")]
     [Authorize(Policy = Policies.UpdateTaskStatus)]
     public async Task<ActionResult<VulnerabilityOverrideDto>> AddOverride(
-        Guid tenantSoftwareId,
+        Guid caseId,
         Guid decisionId,
         [FromBody] CreateOverrideRequest request,
         CancellationToken ct
@@ -99,10 +91,8 @@ public class RemediationDecisionsController(
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
 
-        var remediationCaseId = await ResolveCaseIdAsync(tenantId, tenantSoftwareId, ct);
         var vo = result.Value;
-        if (remediationCaseId is not null)
-            await EnqueueAiDraftsAsync(tenantId, remediationCaseId.Value, ct);
+        await EnqueueAiDraftsAsync(tenantId, caseId, ct);
         return Created("", new VulnerabilityOverrideDto(
             vo.Id, vo.VulnerabilityId, vo.Outcome.ToString(), vo.Justification, vo.CreatedAt
         ));
@@ -111,28 +101,24 @@ public class RemediationDecisionsController(
     [HttpGet("recommendations")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<List<AnalystRecommendationDto>>> GetRecommendations(
-        Guid tenantSoftwareId,
+        Guid caseId,
         CancellationToken ct
     )
     {
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var remediationCaseId = await ResolveCaseIdAsync(tenantId, tenantSoftwareId, ct);
-        if (remediationCaseId is null)
-            return NotFound();
-
-        var context = await queryService.BuildByCaseIdAsync(tenantId, remediationCaseId.Value, false, ct);
+        var context = await queryService.BuildByCaseIdAsync(tenantId, caseId, false, ct);
         if (context is null)
             return NotFound();
 
         return Ok(context.Recommendations);
     }
 
-    [HttpPost("/api/remediation/{workflowId:guid}/analysis")]
+    [HttpPost("analysis")]
     [Authorize(Policy = Policies.AddComments)]
-    public async Task<ActionResult<AnalystRecommendationDto>> AddRecommendationByWorkflow(
-        Guid workflowId,
+    public async Task<ActionResult<AnalystRecommendationDto>> AddRecommendation(
+        Guid caseId,
         [FromBody] CreateRecommendationRequest request,
         CancellationToken ct
     )
@@ -140,12 +126,7 @@ public class RemediationDecisionsController(
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var workflow = await dbContext.RemediationWorkflows.AsNoTracking()
-            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == workflowId, ct);
-        if (workflow is null)
-            return NotFound(new ProblemDetails { Title = "Remediation workflow not found." });
-
-        var auth = await workflowAuthorizationService.EnsureCanAddRecommendationAsync(tenantId, workflow.RemediationCaseId, ct);
+        var auth = await workflowAuthorizationService.EnsureCanAddRecommendationAsync(tenantId, caseId, ct);
         if (!auth.IsSuccess)
             return BadRequest(new ProblemDetails { Title = auth.Error });
 
@@ -155,7 +136,7 @@ public class RemediationDecisionsController(
         var userId = tenantContext.CurrentUserId;
         var result = await recommendationService.AddRecommendationForCaseAsync(
             tenantId,
-            workflow.RemediationCaseId,
+            caseId,
             outcome,
             request.Rationale,
             userId,
@@ -173,17 +154,17 @@ public class RemediationDecisionsController(
             .FirstOrDefaultAsync(ct);
 
         var r = result.Value;
-        await EnqueueAiDraftsAsync(tenantId, workflow.RemediationCaseId, ct);
+        await EnqueueAiDraftsAsync(tenantId, caseId, ct);
         return Created("", new AnalystRecommendationDto(
             r.Id, r.VulnerabilityId, r.RecommendedOutcome.ToString(),
             r.Rationale, r.PriorityOverride, r.AnalystId, analystDisplayName, r.CreatedAt
         ));
     }
 
-    [HttpPost("/api/remediation/{workflowId:guid}/verification")]
+    [HttpPost("verification")]
     [Authorize(Policy = Policies.UpdateTaskStatus)]
     public async Task<IActionResult> VerifyRecurringRemediation(
-        Guid workflowId,
+        Guid caseId,
         [FromBody] VerifyRemediationRequest request,
         CancellationToken ct
     )
@@ -192,11 +173,11 @@ public class RemediationDecisionsController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
         var workflow = await dbContext.RemediationWorkflows.AsNoTracking()
-            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == workflowId, ct);
+            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.RemediationCaseId == caseId && item.Status == RemediationWorkflowStatus.Active, ct);
         if (workflow is null)
             return NotFound(new ProblemDetails { Title = "Remediation workflow not found." });
 
-        var auth = await workflowAuthorizationService.EnsureCanVerifyAsync(tenantId, workflowId, ct);
+        var auth = await workflowAuthorizationService.EnsureCanVerifyAsync(tenantId, workflow.Id, ct);
         if (!auth.IsSuccess)
             return BadRequest(new ProblemDetails { Title = auth.Error });
 
@@ -221,7 +202,7 @@ public class RemediationDecisionsController(
 
             var verificationResult = await decisionService.VerifyAndCarryForwardDecisionAsync(
                 tenantId,
-                workflowId,
+                workflow.Id,
                 previousDecision,
                 tenantContext.CurrentUserId,
                 ct
@@ -237,7 +218,7 @@ public class RemediationDecisionsController(
         {
             var verificationResult = await decisionService.VerifyAndRequireNewDecisionAsync(
                 tenantId,
-                workflowId,
+                workflow.Id,
                 tenantContext.CurrentUserId,
                 ct
             );
@@ -251,10 +232,10 @@ public class RemediationDecisionsController(
         return BadRequest(new ProblemDetails { Title = "Verification action must be 'keepCurrentDecision' or 'chooseNewDecision'." });
     }
 
-    [HttpPost("/api/remediation/{workflowId:guid}/decision")]
+    [HttpPost("decision")]
     [Authorize(Policy = Policies.UpdateTaskStatus)]
-    public async Task<ActionResult<RemediationDecisionDto>> CreateDecisionByWorkflow(
-        Guid workflowId,
+    public async Task<ActionResult<RemediationDecisionDto>> CreateDecision(
+        Guid caseId,
         [FromBody] CreateDecisionRequest request,
         CancellationToken ct
     )
@@ -263,11 +244,11 @@ public class RemediationDecisionsController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
         var workflow = await dbContext.RemediationWorkflows.AsNoTracking()
-            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == workflowId, ct);
+            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.RemediationCaseId == caseId && item.Status == RemediationWorkflowStatus.Active, ct);
         if (workflow is null)
             return NotFound(new ProblemDetails { Title = "Remediation workflow not found." });
 
-        var auth = await workflowAuthorizationService.EnsureCanCreateDecisionAsync(tenantId, workflow.RemediationCaseId, ct);
+        var auth = await workflowAuthorizationService.EnsureCanCreateDecisionAsync(tenantId, caseId, ct);
         if (!auth.IsSuccess)
             return BadRequest(new ProblemDetails { Title = auth.Error });
 
@@ -276,20 +257,21 @@ public class RemediationDecisionsController(
 
         var result = await decisionService.CreateDecisionForCaseAsync(
             tenantId,
-            workflow.RemediationCaseId,
+            caseId,
             outcome,
             request.Justification,
             tenantContext.CurrentUserId,
             request.ExpiryDate,
             request.ReEvaluationDate,
-            ct
+            ct,
+            request.MaintenanceWindowDate
         );
 
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
 
         var d = result.Value;
-        await EnqueueAiDraftsAsync(tenantId, workflow.RemediationCaseId, ct);
+        await EnqueueAiDraftsAsync(tenantId, caseId, ct);
         return Created("", new RemediationDecisionDto(
             d.Id, d.Outcome.ToString(), d.ApprovalStatus.ToString(),
             d.Justification, d.DecidedBy, d.DecidedAt,
@@ -299,10 +281,10 @@ public class RemediationDecisionsController(
         ));
     }
 
-    [HttpPost("/api/remediation/{workflowId:guid}/approval")]
+    [HttpPost("approval")]
     [Authorize(Policy = Policies.ResolveApprovalTask)]
-    public async Task<IActionResult> ResolveApprovalByWorkflow(
-        Guid workflowId,
+    public async Task<IActionResult> ResolveApproval(
+        Guid caseId,
         [FromBody] ResolveApprovalTaskRequest request,
         CancellationToken ct
     )
@@ -311,14 +293,14 @@ public class RemediationDecisionsController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
         var workflow = await dbContext.RemediationWorkflows.AsNoTracking()
-            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == workflowId, ct);
+            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.RemediationCaseId == caseId && item.Status == RemediationWorkflowStatus.Active, ct);
         if (workflow is null)
             return NotFound(new ProblemDetails { Title = "Remediation workflow not found." });
 
         var currentDecision = await dbContext.RemediationDecisions.AsNoTracking()
             .Where(item =>
                 item.TenantId == tenantId
-                && item.RemediationWorkflowId == workflowId
+                && item.RemediationWorkflowId == workflow.Id
                 && item.ApprovalStatus == DecisionApprovalStatus.PendingApproval)
             .OrderByDescending(item => item.CreatedAt)
             .FirstOrDefaultAsync(ct);
@@ -360,7 +342,7 @@ public class RemediationDecisionsController(
                 return BadRequest(new ProblemDetails { Title = "Action must be 'approve' or 'deny'." });
             }
 
-            await EnqueueAiDraftsAsync(tenantId, workflow.RemediationCaseId, ct);
+            await EnqueueAiDraftsAsync(tenantId, caseId, ct);
             return Ok();
         }
         catch (InvalidOperationException ex)
@@ -369,10 +351,10 @@ public class RemediationDecisionsController(
         }
     }
 
-    [HttpPost("/api/remediation/{workflowId:guid}/decision/{decisionId:guid}/cancel")]
+    [HttpPost("decision/{decisionId:guid}/cancel")]
     [Authorize(Policy = Policies.UpdateTaskStatus)]
-    public async Task<IActionResult> CancelDecisionByWorkflow(
-        Guid workflowId,
+    public async Task<IActionResult> CancelDecision(
+        Guid caseId,
         Guid decisionId,
         CancellationToken ct
     )
@@ -381,7 +363,7 @@ public class RemediationDecisionsController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
         var workflow = await dbContext.RemediationWorkflows.AsNoTracking()
-            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == workflowId, ct);
+            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.RemediationCaseId == caseId && item.Status == RemediationWorkflowStatus.Active, ct);
         if (workflow is null)
             return NotFound(new ProblemDetails { Title = "Remediation workflow not found." });
 
@@ -398,26 +380,22 @@ public class RemediationDecisionsController(
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
 
-        await EnqueueAiDraftsAsync(tenantId, workflow.RemediationCaseId, ct);
+        await EnqueueAiDraftsAsync(tenantId, caseId, ct);
         return Ok();
     }
 
     [HttpPost("ai-summary")]
     [Authorize(Policy = Policies.GenerateAiReports)]
     public async Task<ActionResult<DecisionAiSummaryDto>> GenerateAiSummary(
-        Guid tenantSoftwareId,
+        Guid caseId,
         CancellationToken ct
     )
     {
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var remediationCaseId = await ResolveCaseIdAsync(tenantId, tenantSoftwareId, ct);
-        if (remediationCaseId is null)
-            return NotFound(new ProblemDetails { Title = "Remediation case not found for this software." });
-
-        await EnqueueAiDraftsAsync(tenantId, remediationCaseId.Value, ct);
-        var context = await queryService.BuildByCaseIdAsync(tenantId, remediationCaseId.Value, false, ct);
+        await EnqueueAiDraftsAsync(tenantId, caseId, ct);
+        var context = await queryService.BuildByCaseIdAsync(tenantId, caseId, false, ct);
         if (context is null)
             return NotFound(new ProblemDetails { Title = "Remediation context not found." });
 
@@ -435,19 +413,13 @@ public class RemediationDecisionsController(
     [HttpPost("ai-summary/review")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<DecisionAiSummaryDto>> ReviewAiSummary(
-        Guid tenantSoftwareId,
+        Guid caseId,
         [FromBody] ReviewDecisionAiSummaryRequest request,
         CancellationToken ct
     )
     {
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
-
-        // TenantSoftware still exists as snapshot-versioned table; AI review state lives there for now (TODO Phase 5)
-        var tenantSoftware = await dbContext.TenantSoftware
-            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == tenantSoftwareId, ct);
-        if (tenantSoftware is null)
-            return NotFound(new ProblemDetails { Title = "Remediation context not found." });
 
         var action = request.Action?.Trim();
         if (string.IsNullOrWhiteSpace(action))
@@ -463,14 +435,7 @@ public class RemediationDecisionsController(
         if (reviewStatus is null)
             return BadRequest(new ProblemDetails { Title = "Review action must be accept, edit, or reject." });
 
-        tenantSoftware.MarkRemediationAiReviewed(reviewStatus, tenantContext.CurrentUserId);
-        await dbContext.SaveChangesAsync(ct);
-
-        var remediationCaseId = await ResolveCaseIdAsync(tenantId, tenantSoftwareId, ct);
-        if (remediationCaseId is null)
-            return NotFound(new ProblemDetails { Title = "Remediation context not found." });
-
-        var context = await queryService.BuildByCaseIdAsync(tenantId, remediationCaseId.Value, false, ct);
+        var context = await queryService.BuildByCaseIdAsync(tenantId, caseId, false, ct);
         if (context is null)
             return NotFound(new ProblemDetails { Title = "Remediation context not found." });
 
@@ -480,24 +445,20 @@ public class RemediationDecisionsController(
     [HttpGet("audit-trail")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<List<ApprovalAuditEntryDto>>> GetAuditTrail(
-        Guid tenantSoftwareId,
+        Guid caseId,
         CancellationToken ct
     )
     {
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var remediationCaseId = await ResolveCaseIdAsync(tenantId, tenantSoftwareId, ct);
-        if (remediationCaseId is null)
-            return Ok(new List<ApprovalAuditEntryDto>());
-
         var decisionIds = await dbContext.RemediationDecisions.AsNoTracking()
-            .Where(decision => decision.TenantId == tenantId && decision.RemediationCaseId == remediationCaseId.Value)
+            .Where(decision => decision.TenantId == tenantId && decision.RemediationCaseId == caseId)
             .Select(decision => decision.Id)
             .ToListAsync(ct);
 
         var workflowIds = await dbContext.RemediationWorkflows.AsNoTracking()
-            .Where(workflow => workflow.TenantId == tenantId && workflow.RemediationCaseId == remediationCaseId.Value)
+            .Where(workflow => workflow.TenantId == tenantId && workflow.RemediationCaseId == caseId)
             .Select(workflow => workflow.Id)
             .ToListAsync(ct);
 
@@ -536,36 +497,6 @@ public class RemediationDecisionsController(
 
         return Ok(dtos);
     }
-
-    /// <summary>
-    /// Resolves a RemediationCase ID from a TenantSoftware ID by joining through
-    /// NormalizedSoftware.CanonicalProductKey → SoftwareProduct.CanonicalProductKey.
-    /// Returns null if no matching RemediationCase exists.
-    /// </summary>
-    private async Task<Guid?> ResolveCaseIdAsync(Guid tenantId, Guid tenantSoftwareId, CancellationToken ct)
-    {
-        var canonicalKey = await dbContext.TenantSoftware.AsNoTracking()
-            .Where(ts => ts.TenantId == tenantId && ts.Id == tenantSoftwareId)
-            .Join(dbContext.NormalizedSoftware.AsNoTracking(),
-                ts => ts.NormalizedSoftwareId,
-                ns => ns.Id,
-                (ts, ns) => ns.CanonicalProductKey)
-            .FirstOrDefaultAsync(ct);
-
-        if (canonicalKey is null)
-            return null;
-
-        return await dbContext.RemediationCases.AsNoTracking()
-            .Where(rc => rc.TenantId == tenantId)
-            .Join(dbContext.SoftwareProducts.AsNoTracking(),
-                rc => rc.SoftwareProductId,
-                sp => sp.Id,
-                (rc, sp) => new { rc.Id, sp.CanonicalProductKey })
-            .Where(x => x.CanonicalProductKey == canonicalKey)
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync(ct);
-    }
-
     private async Task EnqueueAiDraftsAsync(Guid tenantId, Guid remediationCaseId, CancellationToken ct)
     {
         await remediationAiJobService.EnqueueAsync(tenantId, remediationCaseId, string.Empty, ct);

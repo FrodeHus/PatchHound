@@ -12,7 +12,7 @@ import { severityTone, outcomeLabel, outcomeTone } from './remediation-utils'
 type RemediationVulnTableProps = {
   vulnerabilities: DecisionVuln[]
   decisionId: string | null
-  tenantSoftwareId: string
+  caseId: string
   queryKey: readonly unknown[]
   onSelectVuln: (vuln: DecisionVuln) => void
 }
@@ -20,7 +20,7 @@ type RemediationVulnTableProps = {
 export function RemediationVulnTable({
   vulnerabilities,
   decisionId,
-  tenantSoftwareId,
+  caseId,
   queryKey,
   onSelectVuln,
 }: RemediationVulnTableProps) {
@@ -29,13 +29,13 @@ export function RemediationVulnTable({
 
   const handleOverride = useCallback(async (vuln: DecisionVuln, outcome: string) => {
     if (!decisionId) return
-    setOverridingId(vuln.tenantVulnerabilityId)
+    setOverridingId(vuln.vulnerabilityId)
     try {
       await addVulnerabilityOverride({
         data: {
-          tenantSoftwareId,
+          caseId,
           decisionId,
-          tenantVulnerabilityId: vuln.tenantVulnerabilityId,
+          vulnerabilityId: vuln.vulnerabilityId,
           outcome,
           justification: `Per-vulnerability override to ${outcome}`,
         },
@@ -44,7 +44,7 @@ export function RemediationVulnTable({
     } finally {
       setOverridingId(null)
     }
-  }, [decisionId, tenantSoftwareId, queryClient, queryKey])
+  }, [caseId, decisionId, queryClient, queryKey])
 
   const columns = useMemo<ColumnDef<DecisionVuln>[]>(
     () => [
@@ -141,7 +141,7 @@ export function RemediationVulnTable({
             )
           }
           if (!decisionId) return <span className="text-muted-foreground">-</span>
-          const isLoading = overridingId === v.tenantVulnerabilityId
+          const isLoading = overridingId === v.vulnerabilityId
           return (
             <Button
               variant="ghost"
@@ -163,7 +163,7 @@ export function RemediationVulnTable({
     <DataTable
       columns={columns}
       data={vulnerabilities}
-      getRowId={(row) => row.tenantVulnerabilityId}
+      getRowId={(row) => row.vulnerabilityId}
       emptyState={
         <div className="py-12 text-center text-muted-foreground">
           No vulnerabilities are currently linked to this software.

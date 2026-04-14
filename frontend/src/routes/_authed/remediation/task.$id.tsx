@@ -43,7 +43,7 @@ function RemediationTaskDetailRoute() {
                 criticality: '',
                 assetOwner: '',
                 taskId: task.id,
-                tenantSoftwareId: '',
+                caseId: '',
                 deviceAssetId: '',
               }}
               className="underline decoration-border/70 underline-offset-4 hover:decoration-foreground"
@@ -121,17 +121,16 @@ function RemediationTaskDetailRoute() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {task.tenantSoftwareId ? (
+              {task.remediationCaseId ? (
                 <Button
                   render={
                     <Link
-                      to="/software/$id"
-                      params={{ id: task.tenantSoftwareId }}
-                      search={{ page: 1, pageSize: 25, version: '', tab: 'remediation' }}
+                      to="/remediation/cases/$caseId"
+                      params={{ caseId: task.remediationCaseId }}
                     />
                   }
                 >
-                  Open software remediation
+                  Open related case
                 </Button>
               ) : null}
               <Button
@@ -147,7 +146,7 @@ function RemediationTaskDetailRoute() {
                       criticality: '',
                       assetOwner: '',
                       taskId: task.id,
-                      tenantSoftwareId: '',
+                      caseId: '',
                       deviceAssetId: '',
                     }}
                   />

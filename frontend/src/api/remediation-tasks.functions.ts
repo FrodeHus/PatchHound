@@ -19,7 +19,7 @@ export const fetchRemediationTasks = createServerFn({ method: 'GET' })
       assetOwner: z.string().optional(),
       taskId: z.string().uuid().optional(),
       deviceAssetId: z.string().uuid().optional(),
-      tenantSoftwareId: z.string().uuid().optional(),
+      caseId: z.string().uuid().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
     }),
@@ -32,16 +32,16 @@ export const fetchRemediationTasks = createServerFn({ method: 'GET' })
 
 export const createRemediationTasksForSoftware = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .inputValidator(z.object({ tenantSoftwareId: z.string().uuid() }))
-  .handler(async ({ context, data: { tenantSoftwareId } }) => {
-    const data = await apiPost(`/remediation/tasks/software/${tenantSoftwareId}`, context, {})
+  .inputValidator(z.object({ caseId: z.string().uuid() }))
+  .handler(async ({ context, data: { caseId } }) => {
+    const data = await apiPost(`/remediation/cases/${caseId}/tasks`, context, {})
     return remediationTaskCreateResultSchema.parse(data)
   })
 
 export const fetchRemediationTaskTeamStatuses = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .inputValidator(z.object({ tenantSoftwareId: z.string().uuid() }))
-  .handler(async ({ context, data: { tenantSoftwareId } }) => {
-    const data = await apiGet(`/remediation/tasks/software/${tenantSoftwareId}/team-statuses`, context)
+  .inputValidator(z.object({ caseId: z.string().uuid() }))
+  .handler(async ({ context, data: { caseId } }) => {
+    const data = await apiGet(`/remediation/cases/${caseId}/team-statuses`, context)
     return z.array(remediationTaskTeamStatusSchema).parse(data)
   })

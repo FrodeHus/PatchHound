@@ -61,7 +61,8 @@ import {
 
 type SoftwareRemediationViewProps = {
   data: DecisionContext
-  tenantSoftwareId: string
+  caseId: string
+  tenantSoftwareId?: string
   embedded?: boolean
   initialSoftwareDetail?: TenantSoftwareDetail
   initialInstallations?: PagedTenantSoftwareInstallations
@@ -70,6 +71,7 @@ type SoftwareRemediationViewProps = {
 
 export function SoftwareRemediationView({
   data,
+  caseId,
   tenantSoftwareId,
   embedded = false,
   initialSoftwareDetail,
@@ -79,7 +81,7 @@ export function SoftwareRemediationView({
   const [selectedVuln, setSelectedVuln] = useState<DecisionVuln | null>(null)
   const { selectedTenantId } = useTenantScope()
   const queryClient = useQueryClient()
-  const queryKey = softwareQueryKeys.remediation(selectedTenantId, tenantSoftwareId)
+  const queryKey = ['remediation-case', selectedTenantId, caseId]
   const [deviceVersion, setDeviceVersion] = useState(initialDeviceVersion ?? '')
 
   const [approving, setApproving] = useState(false)
@@ -109,9 +111,10 @@ export function SoftwareRemediationView({
   }))
 
   const softwareDetailQuery = useQuery({
-    queryKey: softwareQueryKeys.detail(selectedTenantId, tenantSoftwareId),
-    queryFn: () => fetchTenantSoftwareDetail({ data: { id: tenantSoftwareId } }),
+    queryKey: softwareQueryKeys.detail(selectedTenantId, tenantSoftwareId ?? ''),
+    queryFn: () => fetchTenantSoftwareDetail({ data: { id: tenantSoftwareId! } }),
     initialData: initialSoftwareDetail,
+    enabled: Boolean(tenantSoftwareId),
   })
 
   const softwareDetail = softwareDetailQuery.data ?? initialSoftwareDetail
@@ -130,17 +133,17 @@ export function SoftwareRemediationView({
   }, [softwareDetail, deviceVersion])
 
   const installationsQuery = useQuery({
-    queryKey: softwareQueryKeys.installations(selectedTenantId, tenantSoftwareId, normalizedDeviceVersion, 1, 25),
+    queryKey: softwareQueryKeys.installations(selectedTenantId, tenantSoftwareId ?? '', normalizedDeviceVersion, 1, 25),
     queryFn: () => fetchTenantSoftwareInstallations({
       data: {
-        id: tenantSoftwareId,
+        id: tenantSoftwareId!,
         version: normalizedDeviceVersion || undefined,
         activeOnly: true,
         page: 1,
         pageSize: 25,
       },
     }),
-    enabled: Boolean(softwareDetail),
+    enabled: Boolean(softwareDetail) && Boolean(tenantSoftwareId),
     initialData:
       initialInstallations && (initialDeviceVersion ?? '') === normalizedDeviceVersion
         ? initialInstallations
@@ -149,8 +152,8 @@ export function SoftwareRemediationView({
 
   const remediationInstallations = installationsQuery.data ?? initialInstallations
   const teamStatusesQuery = useQuery({
-    queryKey: ['remediation-team-statuses', selectedTenantId, tenantSoftwareId],
-    queryFn: () => fetchRemediationTaskTeamStatuses({ data: { tenantSoftwareId } }),
+    queryKey: ['remediation-team-statuses', selectedTenantId, caseId],
+    queryFn: () => fetchRemediationTaskTeamStatuses({ data: { caseId } }),
   })
   const teamStatuses = teamStatusesQuery.data ?? []
 
@@ -161,8 +164,7 @@ export function SoftwareRemediationView({
     try {
       await approveOrRejectDecision({
         data: {
-          tenantSoftwareId,
-          workflowId,
+          caseId,
           decisionId: data.currentDecision.id,
           action,
           justification,
@@ -178,13 +180,12 @@ export function SoftwareRemediationView({
   }
 
   async function handleVerification(action: 'keepCurrentDecision' | 'chooseNewDecision') {
-    if (!workflowId) return
     setApproving(true)
     setStageError(null)
     try {
       await verifyRecurringRemediation({
         data: {
-          workflowId,
+          caseId,
           action,
         },
       })
@@ -202,7 +203,7 @@ export function SoftwareRemediationView({
     try {
       await generateRemediationAiSummary({
         data: {
-          tenantSoftwareId,
+          caseId,
         },
       })
       await queryClient.invalidateQueries({ queryKey })
@@ -228,7 +229,7 @@ export function SoftwareRemediationView({
     try {
       await reviewRemediationAiSummary({
         data: {
-          tenantSoftwareId,
+          caseId,
           action: 'edit',
         },
       })
@@ -259,7 +260,7 @@ export function SoftwareRemediationView({
     try {
       await reviewRemediationAiSummary({
         data: {
-          tenantSoftwareId,
+          caseId,
           action: 'edit',
         },
       })
@@ -275,15 +276,26 @@ export function SoftwareRemediationView({
         <header className="rounded-[28px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_52%),var(--color-card)] p-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 space-y-1.5">
-              <Link
-                to="/software/$id"
-                params={{ id: tenantSoftwareId }}
-                search={{ page: 1, pageSize: 25, version: '', tab: 'remediation' }}
-                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="size-4" />
-                Back to software
-              </Link>
+              {tenantSoftwareId ? (
+                <Link
+                  to="/software/$id"
+                  params={{ id: tenantSoftwareId }}
+                  search={{ page: 1, pageSize: 25, version: '', tab: 'remediation' }}
+                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  <ArrowLeft className="size-4" />
+                  Back to software
+                </Link>
+              ) : (
+                <Link
+                  to="/software"
+                  search={{ page: 1, pageSize: 25, search: '', category: '', vulnerableOnly: false, missedMaintenanceWindow: false }}
+                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  <ArrowLeft className="size-4" />
+                  Back to software list
+                </Link>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-[2rem] font-semibold tracking-[-0.05em] leading-none">
                   {startCase(data.softwareName)}
@@ -337,7 +349,7 @@ export function SoftwareRemediationView({
       <div className="flex justify-end">
         <WorkNotesSheet
           entityType="remediations"
-          entityId={tenantSoftwareId}
+          entityId={caseId}
           title="Remediation work notes"
           description="Capture tenant-local notes for this remediation workflow."
         />
@@ -388,8 +400,7 @@ export function SoftwareRemediationView({
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.85fr)]">
             <CurrentActionSection
               data={data}
-              tenantSoftwareId={tenantSoftwareId}
-              workflowId={workflowId}
+              caseId={caseId}
               queryKey={queryKey}
               currentStageId={currentStageId}
               recommendationSeed={recommendationSeed}
@@ -420,8 +431,7 @@ export function SoftwareRemediationView({
         ) : (
           <CurrentActionSection
             data={data}
-            tenantSoftwareId={tenantSoftwareId}
-            workflowId={workflowId}
+            caseId={caseId}
             queryKey={queryKey}
             currentStageId={currentStageId}
             recommendationSeed={recommendationSeed}
@@ -545,7 +555,7 @@ export function SoftwareRemediationView({
             <RemediationVulnTable
               vulnerabilities={data.topVulnerabilities}
               decisionId={data.currentDecision?.id ?? null}
-              tenantSoftwareId={tenantSoftwareId}
+              caseId={caseId}
               queryKey={queryKey}
               onSelectVuln={setSelectedVuln}
             />
@@ -564,7 +574,7 @@ export function SoftwareRemediationView({
 
         <TabsContent value="history" className="pt-1">
           <DecisionHistorySection
-            tenantSoftwareId={tenantSoftwareId}
+            caseId={caseId}
             recommendations={data.recommendations}
           />
         </TabsContent>
@@ -898,8 +908,7 @@ function AiStatusBadge({ aiSummary }: { aiSummary: DecisionAiSummary }) {
 
 function CurrentActionSection({
   data,
-  tenantSoftwareId,
-  workflowId,
+  caseId,
   queryKey,
   currentStageId,
   recommendationSeed,
@@ -914,8 +923,7 @@ function CurrentActionSection({
   onUseExceptionDecision: _onUseExceptionDecision,
 }: {
   data: DecisionContext
-  tenantSoftwareId: string
-  workflowId: string | null
+  caseId: string
   queryKey: readonly unknown[]
   currentStageId: RemediationStageId
   recommendationSeed: {
@@ -1039,8 +1047,7 @@ function CurrentActionSection({
         ) : null}
         {currentStageId === 'securityAnalysis' ? (
           <RecommendationPanel
-            tenantSoftwareId={tenantSoftwareId}
-            workflowId={workflowId}
+            caseId={caseId}
             recommendations={data.recommendations}
             aiAnalystAssessment={data.aiSummary.analystAssessment}
             aiRecommendedOutcome={data.aiSummary.recommendedOutcome}
@@ -1093,8 +1100,7 @@ function CurrentActionSection({
             ) : null}
 
             <DecisionForm
-              tenantSoftwareId={tenantSoftwareId}
-              workflowId={workflowId}
+              caseId={caseId}
               queryKey={queryKey}
               readOnly={!data.workflowState.canActOnCurrentStage || currentStageId !== 'remediationDecision'}
               initialOutcome={data.currentDecision?.outcome}
@@ -1364,8 +1370,8 @@ function StageExecutionPanel({
   onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string, maintenanceWindowDate?: string) => Promise<void>
 }) {
   const auditQuery = useQuery({
-    queryKey: ['decision-audit-trail', data.tenantSoftwareId, 'execution-stage'],
-    queryFn: () => fetchDecisionAuditTrail({ data: { tenantSoftwareId: data.tenantSoftwareId } }),
+    queryKey: ['decision-audit-trail', data.remediationCaseId, 'execution-stage'],
+    queryFn: () => fetchDecisionAuditTrail({ data: { caseId: data.remediationCaseId } }),
     enabled: Boolean(data.currentDecision),
   })
 
@@ -1412,7 +1418,7 @@ function StageExecutionPanel({
               criticality: '',
               assetOwner: '',
               taskId: '',
-              tenantSoftwareId: data.tenantSoftwareId,
+              caseId: data.remediationCaseId,
               deviceAssetId: '',
             }}
             className="block rounded-2xl border border-border/70 bg-background/55 p-4 transition hover:border-foreground/20 hover:bg-muted/20"
@@ -1970,15 +1976,15 @@ function DevicesTab({
 
 
 function DecisionHistorySection({
-  tenantSoftwareId,
+  caseId,
   recommendations,
 }: {
-  tenantSoftwareId: string
+  caseId: string
   recommendations: DecisionContext['recommendations']
 }) {
   const auditQuery = useQuery({
-    queryKey: ['decision-audit-trail', tenantSoftwareId],
-    queryFn: () => fetchDecisionAuditTrail({ data: { tenantSoftwareId } }),
+    queryKey: ['decision-audit-trail', caseId],
+    queryFn: () => fetchDecisionAuditTrail({ data: { caseId } }),
   })
 
   const recommendationEvents: AuditTimelineEvent[] = recommendations.map((recommendation) => ({

@@ -371,6 +371,7 @@ export function SoftwareDetailPage({
         remediationData ? (
           <SoftwareRemediationView
             data={remediationData}
+            caseId={remediationData.remediationCaseId}
             tenantSoftwareId={tenantSoftwareId}
             embedded
             initialSoftwareDetail={detail}

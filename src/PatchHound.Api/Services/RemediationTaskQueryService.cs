@@ -36,7 +36,7 @@ public class RemediationTaskQueryService(
                 BuildLinkedTaskRowsQuery(
                     tenantId,
                     taskId: filter.TaskId,
-                    remediationCaseId: filter.TenantSoftwareId // filter param kept for API compat; treated as case ID
+                    remediationCaseId: filter.CaseId
                 ),
                 filter
             )
@@ -72,8 +72,7 @@ public class RemediationTaskQueryService(
         var items = pageRows
             .Select(item => new RemediationTaskListItemDto(
                 item.TaskId,
-                Guid.Empty, // SoftwareAssetId — Phase 5 debt (#17): device-level joins removed
-                null,       // TenantSoftwareId — Phase 5 debt (#17)
+                item.RemediationCaseId,
                 item.SoftwareName,
                 item.SoftwareVendor,
                 item.OwnerTeamId,
