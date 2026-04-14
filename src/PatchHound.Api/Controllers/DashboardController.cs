@@ -317,8 +317,8 @@ public class DashboardController : ControllerBase
             select new
             {
                 RemediationCaseId = pt.RemediationCaseId,
-                SoftwareAssetId = Guid.Empty, // Phase 4 debt (#17): SoftwareAsset removed from RemediationDecision
-                SoftwareAssetName = sp.Name,
+                SoftwareProductId = rc.SoftwareProductId,
+                SoftwareProductName = sp.Name,
                 OwnerTeamName = ownerTeam.Name,
                 PatchingTaskId = pt.Id,
                 pt.DueDate,
@@ -330,16 +330,15 @@ public class DashboardController : ControllerBase
             .ToListAsync(ct);
 
         // Build owner actions from patching tasks — use the top vulnerability per software asset
-        var patchingSoftwareAssetIds = ownerPatchingRows
-            .Select(p => p.SoftwareAssetId)
+        var patchingSoftwareProductIds = ownerPatchingRows
+            .Select(p => p.SoftwareProductId)
             .Distinct()
             .ToList();
 
-        // Phase-2: SoftwareVulnerabilityMatch + TenantVulnerability + VulnerabilityDefinition deleted — stub.
-        var topVulnPerSoftwareAsset = Array.Empty<OwnerTopVulnRow>();
+        var topVulnPerSoftwareProduct = Array.Empty<OwnerTopVulnRow>();
 
-        var topVulnBySoftware = topVulnPerSoftwareAsset
-            .GroupBy(v => v.SoftwareAssetId)
+        var topVulnBySoftware = topVulnPerSoftwareProduct
+            .GroupBy(v => v.SoftwareProductId)
             .ToDictionary(
                 g => g.Key,
                 g => g.OrderByDescending(v => v.Severity).First()
@@ -347,14 +346,14 @@ public class DashboardController : ControllerBase
 
         var ownerActionRows = ownerPatchingRows.Select(p =>
         {
-            var topVuln = topVulnBySoftware.GetValueOrDefault(p.SoftwareAssetId);
+            var topVuln = topVulnBySoftware.GetValueOrDefault(p.SoftwareProductId);
             return new
             {
-                RemediationCaseId = p.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
-                AssetId = p.SoftwareAssetId,
+                RemediationCaseId = p.RemediationCaseId,
+                AssetId = p.SoftwareProductId,
                 VulnerabilityId = topVuln?.Id ?? Guid.Empty,
                 TaskId = (Guid?)p.PatchingTaskId,
-                AssetName = p.SoftwareAssetName,
+                AssetName = p.SoftwareProductName,
                 p.OwnerTeamName,
                 ExternalId = topVuln?.ExternalId ?? "-",
                 Title = topVuln?.Title ?? "Patching required",
@@ -1038,7 +1037,7 @@ public class DashboardController : ControllerBase
     );
 
     private sealed record OwnerTopVulnRow(
-        Guid SoftwareAssetId,
+        Guid SoftwareProductId,
         Guid Id,
         string ExternalId,
         string Title,

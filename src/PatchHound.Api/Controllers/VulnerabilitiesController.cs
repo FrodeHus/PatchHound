@@ -191,6 +191,6 @@ public class VulnerabilitiesController : ControllerBase
     public IActionResult GenerateAiReport(Guid id, [FromBody] GenerateAiReportRequest _) =>
         Conflict(new ProblemDetails
         {
-            Title = "AI report generation is disabled during canonical migration; restored in Phase 4 (case-first).",
+            Title = "AI report generation is disabled pending case-first rewire; see issue #17.",
         });
 }
