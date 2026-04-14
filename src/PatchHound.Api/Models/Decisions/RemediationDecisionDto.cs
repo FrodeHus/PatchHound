@@ -123,7 +123,7 @@ public record AnalystRecommendationDto(
 );
 
 public record DecisionVulnDto(
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     Guid VulnerabilityDefinitionId,
     string ExternalId,
     string Title,

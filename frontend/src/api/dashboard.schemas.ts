@@ -35,7 +35,7 @@ export const dashboardSummarySchema = z.object({
     appearedCount: z.number(),
     resolvedCount: z.number(),
     appeared: z.array(z.object({
-      tenantVulnerabilityId: z.string().uuid(),
+      vulnerabilityId: z.string().uuid(),
       externalId: z.string(),
       title: z.string(),
       severity: z.string(),
@@ -43,7 +43,7 @@ export const dashboardSummarySchema = z.object({
       changedAt: z.string(),
     })),
     resolved: z.array(z.object({
-      tenantVulnerabilityId: z.string().uuid(),
+      vulnerabilityId: z.string().uuid(),
       externalId: z.string(),
       title: z.string(),
       severity: z.string(),
@@ -153,7 +153,7 @@ export const ownerAssetSummarySchema = z.object({
 
 export const ownerActionSchema = z.object({
   tenantSoftwareId: z.string().uuid(),
-  tenantVulnerabilityId: z.string().uuid(),
+  vulnerabilityId: z.string().uuid(),
   taskId: z.string().uuid().nullable(),
   softwareName: z.string(),
   ownerTeamName: z.string(),

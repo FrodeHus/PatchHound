@@ -134,7 +134,7 @@ export const tenantSoftwareVulnerabilityEvidenceSchema = z.object({
 })
 
 export const tenantSoftwareVulnerabilitySchema = z.object({
-  tenantVulnerabilityId: z.string().uuid(),
+  vulnerabilityId: z.string().uuid(),
   vulnerabilityDefinitionId: z.string().uuid(),
   externalId: z.string(),
   title: z.string(),

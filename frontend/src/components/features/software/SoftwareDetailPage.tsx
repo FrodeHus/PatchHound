@@ -575,7 +575,7 @@ function OverviewTab({
               <div className="mt-5 space-y-3">
                 {vulnerabilities.map((item) => (
                   <details
-                    key={item.tenantVulnerabilityId}
+                    key={item.vulnerabilityId}
                     className="group overflow-hidden rounded-xl border border-border/70 bg-background"
                   >
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/20">
@@ -640,7 +640,7 @@ function OverviewTab({
                           </div>
                           <Link
                             to="/vulnerabilities/$id"
-                            params={{ id: item.tenantVulnerabilityId }}
+                            params={{ id: item.vulnerabilityId }}
                             className="font-medium text-primary hover:underline"
                           >
                             Open vulnerability

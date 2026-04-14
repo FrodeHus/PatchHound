@@ -176,7 +176,7 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
         cell: ({ row }) => (
           <Link
             to="/vulnerabilities/$id"
-            params={{ id: row.original.tenantVulnerabilityId }}
+            params={{ id: row.original.vulnerabilityId }}
             className="font-medium underline decoration-border/70 underline-offset-4 transition hover:text-primary hover:decoration-foreground"
           >
             {row.original.externalId}
@@ -337,7 +337,7 @@ export function RiskChangeWorkbench({ brief }: RiskChangeWorkbenchProps) {
       <DataTable
         columns={columns}
         data={filteredRows}
-        getRowId={(row) => `${row.changeType}:${row.tenantVulnerabilityId}`}
+        getRowId={(row) => `${row.changeType}:${row.vulnerabilityId}`}
         emptyState={
           <DataTableEmptyState
             title="No matching changes"

@@ -69,7 +69,7 @@ public record DashboardRiskChangeBriefDto(
 );
 
 public record DashboardRiskChangeItemDto(
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     string ExternalId,
     string Title,
     string Severity,
@@ -162,7 +162,7 @@ public record OwnerAssetSummaryDto(
 
 public record OwnerActionDto(
     Guid TenantSoftwareId,
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     Guid? TaskId,
     string SoftwareName,
     string OwnerTeamName,

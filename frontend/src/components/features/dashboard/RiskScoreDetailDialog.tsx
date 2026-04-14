@@ -110,7 +110,7 @@ function RiskAssetRow({ asset }: { asset: RiskAssetScoreSummary }) {
           </p>
           <div className="space-y-2">
             {asset.episodeDrivers.map((driver) => (
-              <EpisodeDriverRow key={driver.tenantVulnerabilityId} driver={driver} />
+              <EpisodeDriverRow key={driver.vulnerabilityId} driver={driver} />
             ))}
           </div>
         </div>
@@ -128,7 +128,7 @@ function EpisodeDriverRow({ driver }: { driver: RiskAssetEpisodeDriver }) {
         <div className="min-w-0">
           <Link
             to="/vulnerabilities/$id"
-            params={{ id: driver.tenantVulnerabilityId }}
+            params={{ id: driver.vulnerabilityId }}
             className="truncate text-sm font-medium hover:underline"
           >
             {driver.externalId}

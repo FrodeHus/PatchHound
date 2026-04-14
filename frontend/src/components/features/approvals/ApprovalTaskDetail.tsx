@@ -380,7 +380,7 @@ export function ApprovalTaskDetail({
                       </tr>
                     ) : (
                       data.vulnerabilities.items.map((vuln) => (
-                        <tr key={vuln.tenantVulnerabilityId} className="align-top">
+                        <tr key={vuln.vulnerabilityId} className="align-top">
                           <td className="px-4 py-3 font-mono text-xs">
                             {vuln.externalId}
                           </td>

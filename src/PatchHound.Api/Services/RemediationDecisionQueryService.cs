@@ -1410,7 +1410,7 @@ public class RemediationDecisionQueryService(
                 $"{item.Id}:{item.RecommendedOutcome}:{item.Rationale}:{item.PriorityOverride}:{item.CreatedAt:O}"
             )),
             string.Join(";", topVulns.Select(item =>
-                $"{item.TenantVulnerabilityId}:{item.ExternalId}:{item.EffectiveSeverity}:{item.EpisodeRiskScore}:{item.KnownExploited}:{item.PublicExploit}:{item.ActiveAlert}:{item.OverrideOutcome}"
+                $"{item.VulnerabilityId}:{item.ExternalId}:{item.EffectiveSeverity}:{item.EpisodeRiskScore}:{item.KnownExploited}:{item.PublicExploit}:{item.ActiveAlert}:{item.OverrideOutcome}"
             )),
             summary.TotalVulnerabilities,
             summary.CriticalCount,

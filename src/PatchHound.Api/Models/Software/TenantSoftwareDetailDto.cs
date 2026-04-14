@@ -107,7 +107,7 @@ public record TenantSoftwareInstallationDto(
 );
 
 public record TenantSoftwareVulnerabilityDto(
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     Guid VulnerabilityDefinitionId,
     string ExternalId,
     string Title,

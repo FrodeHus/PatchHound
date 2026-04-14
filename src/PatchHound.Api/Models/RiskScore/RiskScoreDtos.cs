@@ -24,7 +24,7 @@ public record AssetRiskScoreSummaryDto(
 );
 
 public record AssetRiskEpisodeDriverDto(
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     string ExternalId,
     string Title,
     string RiskBand,

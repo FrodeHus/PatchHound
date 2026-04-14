@@ -334,7 +334,7 @@ public class DashboardController : ControllerBase
             {
                 RemediationCaseId = p.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
                 AssetId = p.SoftwareAssetId,
-                TenantVulnerabilityId = topVuln?.Id ?? Guid.Empty,
+                VulnerabilityId = topVuln?.Id ?? Guid.Empty,
                 TaskId = (Guid?)p.PatchingTaskId,
                 AssetName = p.SoftwareAssetName,
                 p.OwnerTeamName,
@@ -357,7 +357,7 @@ public class DashboardController : ControllerBase
         var ownerActions = ownerActionRows
             .Select(item => new OwnerActionDto(
                 item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
-                item.TenantVulnerabilityId,
+                item.VulnerabilityId,
                 item.TaskId,
                 item.AssetName,
                 item.OwnerTeamName,

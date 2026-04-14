@@ -157,9 +157,9 @@ function RiskChangeLane({ title, count, tone, emptyText, items }: RiskChangeLane
         ) : (
           items.map((item) => (
             <Link
-              key={item.tenantVulnerabilityId}
+              key={item.vulnerabilityId}
               to="/vulnerabilities/$id"
-              params={{ id: item.tenantVulnerabilityId }}
+              params={{ id: item.vulnerabilityId }}
               className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-background px-3 py-3 transition-colors hover:bg-accent/20"
             >
               <div className="min-w-0">

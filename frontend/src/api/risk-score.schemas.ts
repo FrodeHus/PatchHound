@@ -35,7 +35,7 @@ export const riskAssetScoreSummarySchema = z.object({
   lowCount: z.number(),
   openEpisodeCount: z.number(),
   episodeDrivers: z.array(z.object({
-    tenantVulnerabilityId: z.string().uuid(),
+    vulnerabilityId: z.string().uuid(),
     externalId: z.string(),
     title: z.string(),
     riskBand: z.string(),
