@@ -103,7 +103,7 @@ public class SoftwareDescriptionGenerationService
             .Cast<string>()
             .ToListAsync(ct);
 
-        // Phase-2 stub: NormalizedSoftwareVulnerabilityProjection deleted; restored in Phase 3.
+        // Phase 4 debt (#17): NormalizedSoftwareVulnerabilityProjection removed by canonical cleanup; remediation-surface rewrite restores this.
         var activeVulnerabilityCount = 0;
 
         var resolvedProfileResult = tenantAiProfileId.HasValue

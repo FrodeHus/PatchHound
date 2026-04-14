@@ -154,7 +154,7 @@ public class VulnerabilitiesController : ControllerBase
     public IActionResult UpdateOrganizationalSeverity(Guid id, [FromBody] UpdateOrgSeverityRequest _) =>
         Conflict(new ProblemDetails
         {
-            Title = "Organizational severity is disabled during canonical migration; restored in Phase 3.",
+            Title = "Organizational severity is disabled during canonical migration; see issue #17 Phase 4.",
         });
 
     [HttpPost("{id:guid}/ai-report")]
