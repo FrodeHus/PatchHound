@@ -57,6 +57,7 @@ import { Route as AuthedAdminWorkflowsIdRouteImport } from './routes/_authed/adm
 import { Route as AuthedAdminTenantsIdRouteImport } from './routes/_authed/admin/tenants/$id'
 import { Route as AuthedAdminTeamsIdRouteImport } from './routes/_authed/admin/teams/$id'
 import { Route as AuthedAdminPlatformNotificationsRouteImport } from './routes/_authed/admin/platform/notifications'
+import { Route as AuthedAdminPlatformFeatureFlagsRouteImport } from './routes/_authed/admin/platform/feature-flags'
 import { Route as AuthedAdminPlatformAiRouteImport } from './routes/_authed/admin/platform/ai'
 import { Route as AuthedAdminDeviceRulesNewRouteImport } from './routes/_authed/admin/device-rules/new'
 import { Route as AuthedAdminDeviceRulesIdRouteImport } from './routes/_authed/admin/device-rules/$id'
@@ -315,6 +316,12 @@ const AuthedAdminPlatformNotificationsRoute =
     path: '/admin/platform/notifications',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedAdminPlatformFeatureFlagsRoute =
+  AuthedAdminPlatformFeatureFlagsRouteImport.update({
+    id: '/admin/platform/feature-flags',
+    path: '/admin/platform/feature-flags',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAdminPlatformAiRoute = AuthedAdminPlatformAiRouteImport.update({
   id: '/admin/platform/ai',
   path: '/admin/platform/ai',
@@ -371,6 +378,7 @@ export interface FileRoutesByFullPath {
   '/admin/device-rules/$id': typeof AuthedAdminDeviceRulesIdRoute
   '/admin/device-rules/new': typeof AuthedAdminDeviceRulesNewRoute
   '/admin/platform/ai': typeof AuthedAdminPlatformAiRoute
+  '/admin/platform/feature-flags': typeof AuthedAdminPlatformFeatureFlagsRoute
   '/admin/platform/notifications': typeof AuthedAdminPlatformNotificationsRoute
   '/admin/teams/$id': typeof AuthedAdminTeamsIdRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
@@ -423,6 +431,7 @@ export interface FileRoutesByTo {
   '/admin/device-rules/$id': typeof AuthedAdminDeviceRulesIdRoute
   '/admin/device-rules/new': typeof AuthedAdminDeviceRulesNewRoute
   '/admin/platform/ai': typeof AuthedAdminPlatformAiRoute
+  '/admin/platform/feature-flags': typeof AuthedAdminPlatformFeatureFlagsRoute
   '/admin/platform/notifications': typeof AuthedAdminPlatformNotificationsRoute
   '/admin/teams/$id': typeof AuthedAdminTeamsIdRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
@@ -477,6 +486,7 @@ export interface FileRoutesById {
   '/_authed/admin/device-rules/$id': typeof AuthedAdminDeviceRulesIdRoute
   '/_authed/admin/device-rules/new': typeof AuthedAdminDeviceRulesNewRoute
   '/_authed/admin/platform/ai': typeof AuthedAdminPlatformAiRoute
+  '/_authed/admin/platform/feature-flags': typeof AuthedAdminPlatformFeatureFlagsRoute
   '/_authed/admin/platform/notifications': typeof AuthedAdminPlatformNotificationsRoute
   '/_authed/admin/teams/$id': typeof AuthedAdminTeamsIdRoute
   '/_authed/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
@@ -531,6 +541,7 @@ export interface FileRouteTypes {
     | '/admin/device-rules/$id'
     | '/admin/device-rules/new'
     | '/admin/platform/ai'
+    | '/admin/platform/feature-flags'
     | '/admin/platform/notifications'
     | '/admin/teams/$id'
     | '/admin/tenants/$id'
@@ -583,6 +594,7 @@ export interface FileRouteTypes {
     | '/admin/device-rules/$id'
     | '/admin/device-rules/new'
     | '/admin/platform/ai'
+    | '/admin/platform/feature-flags'
     | '/admin/platform/notifications'
     | '/admin/teams/$id'
     | '/admin/tenants/$id'
@@ -636,6 +648,7 @@ export interface FileRouteTypes {
     | '/_authed/admin/device-rules/$id'
     | '/_authed/admin/device-rules/new'
     | '/_authed/admin/platform/ai'
+    | '/_authed/admin/platform/feature-flags'
     | '/_authed/admin/platform/notifications'
     | '/_authed/admin/teams/$id'
     | '/_authed/admin/tenants/$id'
@@ -1001,6 +1014,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminPlatformNotificationsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/platform/feature-flags': {
+      id: '/_authed/admin/platform/feature-flags'
+      path: '/admin/platform/feature-flags'
+      fullPath: '/admin/platform/feature-flags'
+      preLoaderRoute: typeof AuthedAdminPlatformFeatureFlagsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/admin/platform/ai': {
       id: '/_authed/admin/platform/ai'
       path: '/admin/platform/ai'
@@ -1070,6 +1090,7 @@ interface AuthedRouteChildren {
   AuthedAdminDeviceRulesIdRoute: typeof AuthedAdminDeviceRulesIdRoute
   AuthedAdminDeviceRulesNewRoute: typeof AuthedAdminDeviceRulesNewRoute
   AuthedAdminPlatformAiRoute: typeof AuthedAdminPlatformAiRoute
+  AuthedAdminPlatformFeatureFlagsRoute: typeof AuthedAdminPlatformFeatureFlagsRoute
   AuthedAdminPlatformNotificationsRoute: typeof AuthedAdminPlatformNotificationsRoute
   AuthedAdminTeamsIdRoute: typeof AuthedAdminTeamsIdRoute
   AuthedAdminTenantsIdRoute: typeof AuthedAdminTenantsIdRoute
@@ -1114,6 +1135,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminDeviceRulesIdRoute: AuthedAdminDeviceRulesIdRoute,
   AuthedAdminDeviceRulesNewRoute: AuthedAdminDeviceRulesNewRoute,
   AuthedAdminPlatformAiRoute: AuthedAdminPlatformAiRoute,
+  AuthedAdminPlatformFeatureFlagsRoute: AuthedAdminPlatformFeatureFlagsRoute,
   AuthedAdminPlatformNotificationsRoute: AuthedAdminPlatformNotificationsRoute,
   AuthedAdminTeamsIdRoute: AuthedAdminTeamsIdRoute,
   AuthedAdminTenantsIdRoute: AuthedAdminTenantsIdRoute,
@@ -1145,3 +1167,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

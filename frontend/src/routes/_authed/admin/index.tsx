@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Bell, Bot, Braces, Building2, ChevronRight, DatabaseZap, GitBranchPlus, Plug, ScanSearch, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
+import { Bell, Bot, Braces, Building2, ChevronRight, DatabaseZap, Flag, GitBranchPlus, Plug, ScanSearch, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({
@@ -36,8 +36,10 @@ type AdminArea = {
     | '/admin/authenticated-scans'
     | '/admin/platform/ai'
     | '/admin/platform/notifications'
+    | '/admin/platform/feature-flags'
   roles: AdminRole[]
   icon: typeof Users
+  featureFlag?: string
 }
 
 type AdminSection = {
@@ -111,6 +113,7 @@ const adminSections: AdminSection[] = [
         to: '/admin/workflows',
         roles: ['GlobalAdmin', 'SecurityManager'],
         icon: Workflow,
+        featureFlag: 'Workflows',
       },
       {
         title: 'Security profiles',
@@ -173,6 +176,13 @@ const adminSections: AdminSection[] = [
         roles: ['GlobalAdmin'],
         icon: Bell,
       },
+      {
+        title: 'Feature flags',
+        description: 'Manage per-tenant and per-user feature flag overrides across the platform.',
+        to: '/admin/platform/feature-flags',
+        roles: ['GlobalAdmin'],
+        icon: Flag,
+      },
     ],
   },
 ]
@@ -184,10 +194,15 @@ function canAccess(roles: AdminRole[], activeRoles: string[]) {
 function AdminLandingPage() {
   const { user } = Route.useRouteContext()
   const activeRoles = user.activeRoles ?? []
+  const featureFlags = user.featureFlags ?? {}
   const accessibleSections = adminSections
     .map((section) => ({
       ...section,
-      areas: section.areas.filter((area) => canAccess(area.roles, activeRoles)),
+      areas: section.areas.filter((area) => {
+        if (!canAccess(area.roles, activeRoles)) return false
+        if (area.featureFlag && !featureFlags[area.featureFlag]?.isEnabled) return false
+        return true
+      }),
     }))
     .filter((section) => section.areas.length > 0)
 

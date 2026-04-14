@@ -4,6 +4,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.FeatureManagement;
 using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Logging;
 using Npgsql;
@@ -467,6 +468,12 @@ if (!string.IsNullOrWhiteSpace(frontendOrigin))
 // OpenAPI
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
+
+// Feature management (database-backed overrides + config defaults)
+// Register the custom provider as IFeatureDefinitionProvider — FeatureManager resolves it via DI.
+builder.Services.AddScoped<Microsoft.FeatureManagement.IFeatureDefinitionProvider,
+    PatchHound.Infrastructure.FeatureFlags.DatabaseFeatureDefinitionProvider>();
+builder.Services.AddFeatureManagement(builder.Configuration.GetSection("FeatureManagement"));
 
 var app = builder.Build();
 

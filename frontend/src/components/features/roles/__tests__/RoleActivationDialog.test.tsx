@@ -38,6 +38,7 @@ function makeUser(overrides: Partial<CurrentUser> = {}): CurrentUser {
     tenantIds: ['tenant-1'],
     requiresSetup: false,
     systemStatus: null,
+    featureFlags: {},
     ...overrides,
   }
 }

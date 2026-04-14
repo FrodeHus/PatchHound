@@ -4,6 +4,7 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Entities.AuthenticatedScans;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
+using PatchHound.Core.Common;
 
 namespace PatchHound.Infrastructure.Data;
 
@@ -119,6 +120,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<RemediationWorkflowStageRecord> RemediationWorkflowStageRecords => Set<RemediationWorkflowStageRecord>();
     public DbSet<SentinelConnectorConfiguration> SentinelConnectorConfigurations =>
         Set<SentinelConnectorConfiguration>();
+    public DbSet<FeatureFlagOverride> FeatureFlagOverrides => Set<FeatureFlagOverride>();
 
     public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken ct = default)
     {
