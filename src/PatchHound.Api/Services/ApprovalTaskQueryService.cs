@@ -3,12 +3,14 @@ using PatchHound.Api.Models;
 using PatchHound.Api.Models.ApprovalTasks;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Api.Services;
 
 public class ApprovalTaskQueryService(
-    PatchHoundDbContext dbContext
+    PatchHoundDbContext dbContext,
+    SlaService slaService
 )
 {
     public async Task<PagedResponse<ApprovalTaskListItemDto>> ListAsync(
@@ -157,32 +159,144 @@ public class ApprovalTaskQueryService(
         var slaInfo = await GetSlaInfoAsync(tenantId, [remediationCaseId], ct);
         var hasSla = slaInfo.TryGetValue(remediationCaseId, out var sla);
 
-        // Risk score — TODO Phase 5 (#17): re-implement via RemediationCase risk model
+        // Risk score — read from SoftwareRiskScores via RemediationCase.SoftwareProductId
+        var remCase = await dbContext.RemediationCases.AsNoTracking()
+            .FirstOrDefaultAsync(rc => rc.Id == remediationCaseId && rc.TenantId == tenantId, ct);
         double? riskScore = null;
         string? riskBand = null;
+        if (remCase is not null)
+        {
+            var softwareScore = await dbContext.SoftwareRiskScores.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.TenantId == tenantId && s.SoftwareProductId == remCase.SoftwareProductId, ct);
+            if (softwareScore is not null)
+            {
+                riskScore = (double)softwareScore.OverallScore;
+                riskBand = ResolveRiskBand(softwareScore.OverallScore);
+            }
+        }
 
         // Decided-by name
         var decidedByUser = await dbContext.Users.AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == decision.DecidedBy, ct);
 
-        // Vulnerabilities — Phase 4 debt (#17): SoftwareVulnerabilityMatch removed by canonical cleanup
-        var vulnList = new PagedVulnerabilityList([], 0, vulnPagination.Page, vulnPagination.BoundedPageSize);
+        // Vulnerabilities — query DVE → Vulnerability for this remediation case's software product
+        PagedVulnerabilityList vulnList;
+        if (remCase is not null)
+        {
+            var vulnQuery = dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                .Where(e => e.TenantId == tenantId
+                    && e.SoftwareProductId == remCase.SoftwareProductId
+                    && e.Status == ExposureStatus.Open)
+                .Select(e => e.VulnerabilityId)
+                .Distinct();
 
-        // Devices in scope — Phase 4 debt (#17): still uses TenantSoftwareId on NormalizedSoftwareInstallations
-        // We derive tenantSoftwareId by joining RemediationCase → SoftwareProduct → NormalizedSoftware via CanonicalProductKey
+            var vulnTotalCount = await vulnQuery.CountAsync(ct);
+            var vulnIds = await vulnQuery
+                .Skip(vulnPagination.Skip)
+                .Take(vulnPagination.BoundedPageSize)
+                .ToListAsync(ct);
+
+            var vulnItems = await dbContext.Vulnerabilities.AsNoTracking()
+                .Where(v => vulnIds.Contains(v.Id))
+                .Select(v => new ApprovalVulnDto(
+                    v.Id, v.ExternalId, v.Title, v.VendorSeverity.ToString(),
+                    (double?)v.CvssScore, null, false, null))
+                .ToListAsync(ct);
+
+            vulnList = new PagedVulnerabilityList(vulnItems, vulnTotalCount, vulnPagination.Page, vulnPagination.BoundedPageSize);
+        }
+        else
+        {
+            vulnList = new PagedVulnerabilityList([], 0, vulnPagination.Page, vulnPagination.BoundedPageSize);
+        }
+
+        // Devices in scope — query InstalledSoftware → Device for this remediation case's software product
         var deviceVersionCohorts = new List<ApprovalDeviceVersionCohortDto>();
         PagedDeviceList? deviceList = null;
 
-        // TODO Phase 5 (#17): restore device listing via new canonical device-software join path
-        var installationRows = Array.Empty<object>()
-            .Select(_ => new { DeviceAssetId = Guid.Empty, DetectedVersion = (string?)null, FirstSeenAt = DateTimeOffset.MinValue, LastSeenAt = DateTimeOffset.MinValue, SoftwareAssetId = Guid.Empty })
-            .ToList();
+        if (remCase is not null)
+        {
+            // Version cohorts (all pages)
+            var installRows = await dbContext.InstalledSoftware.AsNoTracking()
+                .Where(i => i.TenantId == tenantId && i.SoftwareProductId == remCase.SoftwareProductId)
+                .Select(i => new { i.Version, i.FirstSeenAt, i.LastSeenAt, i.DeviceId })
+                .ToListAsync(ct);
 
-        var openMatchRows = Array.Empty<object>()
-            .Select(_ => new { SoftwareAssetId = Guid.Empty, VulnerabilityDefinitionId = Guid.Empty })
-            .ToList();
+            deviceVersionCohorts = installRows
+                .GroupBy(r => NormalizeVersionKey(r.Version))
+                .Select(g => new ApprovalDeviceVersionCohortDto(
+                    RestoreVersion(g.Key),
+                    g.Count(),
+                    g.Select(r => r.DeviceId).Distinct().Count(),
+                    0, // open vuln count per-cohort not needed for this surface
+                    g.Min(r => r.FirstSeenAt),
+                    g.Max(r => r.LastSeenAt)
+                ))
+                .OrderBy(c => c.Version)
+                .ToList();
 
-        if (devicePagination is not null)
+            if (devicePagination is not null)
+            {
+                var deviceQuery = dbContext.InstalledSoftware.AsNoTracking()
+                    .Where(i => i.TenantId == tenantId && i.SoftwareProductId == remCase.SoftwareProductId);
+
+                if (!string.IsNullOrWhiteSpace(deviceVersion))
+                {
+                    deviceQuery = deviceQuery.Where(i => i.Version == deviceVersion);
+                }
+
+                var deviceTotalCount = await deviceQuery.Select(i => i.DeviceId).Distinct().CountAsync(ct);
+                var deviceIds = await deviceQuery
+                    .Select(i => i.DeviceId)
+                    .Distinct()
+                    .Skip(devicePagination.Skip)
+                    .Take(devicePagination.BoundedPageSize)
+                    .ToListAsync(ct);
+
+                var deviceMap = await dbContext.Devices.AsNoTracking()
+                    .Where(d => deviceIds.Contains(d.Id))
+                    .Select(d => new { d.Id, Name = d.ComputerDnsName ?? d.Name, d.Criticality })
+                    .ToDictionaryAsync(d => d.Id, ct);
+
+                var openCountPerDevice = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                    .Where(e => e.TenantId == tenantId
+                        && e.SoftwareProductId == remCase.SoftwareProductId
+                        && e.Status == ExposureStatus.Open
+                        && deviceIds.Contains(e.DeviceId))
+                    .GroupBy(e => e.DeviceId)
+                    .Select(g => new { DeviceId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(r => r.DeviceId, r => r.Count, ct);
+
+                var latestSeenPerDevice = await dbContext.InstalledSoftware.AsNoTracking()
+                    .Where(i => i.TenantId == tenantId
+                        && i.SoftwareProductId == remCase.SoftwareProductId
+                        && deviceIds.Contains(i.DeviceId))
+                    .GroupBy(i => i.DeviceId)
+                    .Select(g => new { DeviceId = g.Key, LastSeen = g.Max(i => i.LastSeenAt), Version = g.Max(i => i.Version) })
+                    .ToDictionaryAsync(r => r.DeviceId, ct);
+
+                var deviceItems = deviceIds
+                    .Where(id => deviceMap.ContainsKey(id))
+                    .Select(id =>
+                    {
+                        deviceMap.TryGetValue(id, out var dev);
+                        latestSeenPerDevice.TryGetValue(id, out var seen);
+                        openCountPerDevice.TryGetValue(id, out var openCount);
+                        return new ApprovalDeviceDto(
+                            id,
+                            dev?.Name ?? "Unknown",
+                            dev?.Criticality.ToString() ?? "Unknown",
+                            seen?.Version,
+                            seen?.LastSeen ?? DateTimeOffset.MinValue,
+                            openCount
+                        );
+                    })
+                    .ToList();
+
+                deviceList = new PagedDeviceList(deviceItems, deviceTotalCount, devicePagination.Page, devicePagination.BoundedPageSize);
+            }
+        }
+        else if (devicePagination is not null)
         {
             deviceList = new PagedDeviceList([], 0, devicePagination.Page, devicePagination.BoundedPageSize);
         }
@@ -283,10 +397,25 @@ public class ApprovalTaskQueryService(
         return "Unknown software";
     }
 
-    private Task<Dictionary<Guid, Severity>> GetHighestSeveritiesAsync(
+    private async Task<Dictionary<Guid, Severity>> GetHighestSeveritiesAsync(
         Guid tenantId, List<Guid> remediationCaseIds, CancellationToken ct)
-        // Phase 4 debt (#17): SoftwareVulnerabilityMatch + VulnerabilityDefinition removed by canonical cleanup
-        => Task.FromResult(new Dictionary<Guid, Severity>());
+    {
+        if (remediationCaseIds.Count == 0) return [];
+
+        // Join RemediationCase → DVE via SoftwareProductId, get max VendorSeverity per case
+        var rows = await dbContext.RemediationCases.AsNoTracking()
+            .Where(rc => rc.TenantId == tenantId && remediationCaseIds.Contains(rc.Id))
+            .Join(dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                    .Where(e => e.TenantId == tenantId && e.Status == ExposureStatus.Open),
+                rc => rc.SoftwareProductId,
+                e => e.SoftwareProductId,
+                (rc, e) => new { CaseId = rc.Id, e.Vulnerability.VendorSeverity })
+            .ToListAsync(ct);
+
+        return rows
+            .GroupBy(r => r.CaseId)
+            .ToDictionary(g => g.Key, g => g.Max(r => r.VendorSeverity));
+    }
 
     private async Task<Dictionary<Guid, string>> GetSoftwareNamesAsync(
         Guid tenantId, List<Guid> remediationCaseIds, CancellationToken ct)
@@ -306,22 +435,81 @@ public class ApprovalTaskQueryService(
     private async Task<Dictionary<Guid, Criticality>> GetHighestCriticalitiesAsync(
         Guid tenantId, List<Guid> remediationCaseIds, CancellationToken ct)
     {
-        // TODO Phase 5 (#17): re-implement device criticality lookup via new canonical device-software join path
-        return new Dictionary<Guid, Criticality>();
+        if (remediationCaseIds.Count == 0) return [];
+
+        // RC → InstalledSoftware → Device to get max Criticality per case
+        var rows = await dbContext.RemediationCases.AsNoTracking()
+            .Where(rc => rc.TenantId == tenantId && remediationCaseIds.Contains(rc.Id))
+            .Join(dbContext.InstalledSoftware.AsNoTracking()
+                    .Where(i => i.TenantId == tenantId),
+                rc => rc.SoftwareProductId,
+                i => i.SoftwareProductId,
+                (rc, i) => new { CaseId = rc.Id, i.DeviceId })
+            .Join(dbContext.Devices.AsNoTracking()
+                    .Where(d => d.TenantId == tenantId),
+                x => x.DeviceId,
+                d => d.Id,
+                (x, d) => new { x.CaseId, d.Criticality })
+            .ToListAsync(ct);
+
+        return rows
+            .GroupBy(r => r.CaseId)
+            .ToDictionary(g => g.Key, g => g.Max(r => r.Criticality));
     }
 
-    private Task<Dictionary<Guid, int>> GetVulnCountsAsync(
+    private async Task<Dictionary<Guid, int>> GetVulnCountsAsync(
         Guid tenantId, List<Guid> remediationCaseIds, CancellationToken ct)
-        // Phase 4 debt (#17): SoftwareVulnerabilityMatch removed by canonical cleanup
-        => Task.FromResult(new Dictionary<Guid, int>());
+    {
+        if (remediationCaseIds.Count == 0) return [];
 
-    private Task<Dictionary<Guid, (string Status, DateTimeOffset DueDate)>> GetSlaInfoAsync(
+        // Count distinct open VulnerabilityIds per case via DVE
+        var rows = await dbContext.RemediationCases.AsNoTracking()
+            .Where(rc => rc.TenantId == tenantId && remediationCaseIds.Contains(rc.Id))
+            .Join(dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                    .Where(e => e.TenantId == tenantId && e.Status == ExposureStatus.Open),
+                rc => rc.SoftwareProductId,
+                e => e.SoftwareProductId,
+                (rc, e) => new { CaseId = rc.Id, e.VulnerabilityId })
+            .Distinct()
+            .ToListAsync(ct);
+
+        return rows
+            .GroupBy(r => r.CaseId)
+            .ToDictionary(g => g.Key, g => g.Select(r => r.VulnerabilityId).Distinct().Count());
+    }
+
+    private async Task<Dictionary<Guid, (string Status, DateTimeOffset DueDate)>> GetSlaInfoAsync(
         Guid tenantId, List<Guid> remediationCaseIds, CancellationToken ct)
-        // Phase 4 debt (#17): SoftwareVulnerabilityMatch + VulnerabilityDefinition removed by canonical cleanup
-        => Task.FromResult(new Dictionary<Guid, (string Status, DateTimeOffset DueDate)>());
+    {
+        if (remediationCaseIds.Count == 0) return [];
 
-    private static string NormalizeVersionKey(string? version)
-        => string.IsNullOrWhiteSpace(version) ? string.Empty : version.Trim();
+        var highestSeverities = await GetHighestSeveritiesAsync(tenantId, remediationCaseIds, ct);
+        if (highestSeverities.Count == 0) return [];
+
+        var caseDates = await dbContext.RemediationCases.AsNoTracking()
+            .Where(rc => rc.TenantId == tenantId && remediationCaseIds.Contains(rc.Id))
+            .Select(rc => new { rc.Id, rc.CreatedAt })
+            .ToDictionaryAsync(rc => rc.Id, rc => rc.CreatedAt, ct);
+
+        var tenantSla = await dbContext.TenantSlaConfigurations.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);
+
+        var now = DateTimeOffset.UtcNow;
+        var result = new Dictionary<Guid, (string Status, DateTimeOffset DueDate)>();
+        foreach (var (caseId, severity) in highestSeverities)
+        {
+            if (!caseDates.TryGetValue(caseId, out var createdAt)) continue;
+            var dueDate = slaService.CalculateDueDate(severity, createdAt, tenantSla);
+            var status = slaService.GetSlaStatus(createdAt, dueDate, now);
+            result[caseId] = (status.ToString(), dueDate);
+        }
+        return result;
+    }
+
+    private static string ResolveRiskBand(decimal score) =>
+        score >= 900m ? "Critical" : score >= 750m ? "High" : score >= 500m ? "Medium" : "Low";
+
+    private static string NormalizeVersionKey(string? version)        => string.IsNullOrWhiteSpace(version) ? string.Empty : version.Trim();
 
     private static string? RestoreVersion(string versionKey)
         => string.IsNullOrWhiteSpace(versionKey) ? null : versionKey;

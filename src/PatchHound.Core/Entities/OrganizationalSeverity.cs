@@ -44,4 +44,22 @@ public class OrganizationalSeverity
             CompensatingControls = compensatingControls,
         };
     }
+
+    public void Update(
+        Severity adjustedSeverity,
+        string justification,
+        Guid adjustedBy,
+        string? assetCriticalityFactor = null,
+        string? exposureFactor = null,
+        string? compensatingControls = null
+    )
+    {
+        AdjustedSeverity = adjustedSeverity;
+        Justification = justification;
+        AdjustedBy = adjustedBy;
+        AdjustedAt = DateTimeOffset.UtcNow;
+        AssetCriticalityFactor = assetCriticalityFactor;
+        ExposureFactor = exposureFactor;
+        CompensatingControls = compensatingControls;
+    }
 }

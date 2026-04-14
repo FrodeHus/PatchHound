@@ -103,6 +103,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<AssetRiskScore> AssetRiskScores => Set<AssetRiskScore>();
     public DbSet<DeviceGroupRiskScore> DeviceGroupRiskScores => Set<DeviceGroupRiskScore>();
     public DbSet<TenantSoftwareRiskScore> TenantSoftwareRiskScores => Set<TenantSoftwareRiskScore>();
+    public DbSet<SoftwareRiskScore> SoftwareRiskScores => Set<SoftwareRiskScore>();
     public DbSet<TeamRiskScore> TeamRiskScores => Set<TeamRiskScore>();
     public DbSet<TenantRiskScoreSnapshot> TenantRiskScoreSnapshots => Set<TenantRiskScoreSnapshot>();
     public DbSet<WorkflowDefinition> WorkflowDefinitions => Set<WorkflowDefinition>();
@@ -350,6 +351,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantSoftwareRiskScore>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<SoftwareRiskScore>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TeamRiskScore>()

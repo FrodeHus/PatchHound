@@ -289,6 +289,69 @@ public class VulnerabilitiesControllerTests : IDisposable
         action.Result.Should().BeOfType<OkObjectResult>();
     }
 
+    // ── Organizational severity tests ────────────────────────────────────────
+
+    [Fact]
+    public async Task UpdateOrganizationalSeverity_CreatesRecord_WhenNoneExists()
+    {
+        var vuln = Vulnerability.Create("nvd", "CVE-2026-0500", "Sev-adjust vuln", "desc",
+            Severity.Critical, 9.0m, null, DateTimeOffset.UtcNow);
+        _dbContext.Vulnerabilities.Add(vuln);
+        await _dbContext.SaveChangesAsync();
+
+        var request = new UpdateOrgSeverityRequest("High", "Mitigated by WAF", null, null, null);
+        var result = await _controller.UpdateOrganizationalSeverity(vuln.Id, request, CancellationToken.None);
+
+        result.Should().BeOfType<NoContentResult>();
+        var record = _dbContext.OrganizationalSeverities
+            .Single(s => s.VulnerabilityId == vuln.Id && s.TenantId == _tenantId);
+        record.AdjustedSeverity.Should().Be(Severity.High);
+        record.Justification.Should().Be("Mitigated by WAF");
+    }
+
+    [Fact]
+    public async Task UpdateOrganizationalSeverity_UpdatesExistingRecord()
+    {
+        var vuln = Vulnerability.Create("nvd", "CVE-2026-0501", "Sev-adjust vuln 2", "desc",
+            Severity.Critical, 9.0m, null, DateTimeOffset.UtcNow);
+        _dbContext.Vulnerabilities.Add(vuln);
+        await _dbContext.SaveChangesAsync();
+
+        // Seed existing record
+        var userId = Guid.NewGuid();
+        _dbContext.OrganizationalSeverities.Add(
+            PatchHound.Core.Entities.OrganizationalSeverity.Create(
+                vuln.Id, _tenantId, Severity.Critical, "Original", userId));
+        await _dbContext.SaveChangesAsync();
+
+        var request = new UpdateOrgSeverityRequest("Medium", "Now patched in env", null, null, "Firewall rule active");
+        var result = await _controller.UpdateOrganizationalSeverity(vuln.Id, request, CancellationToken.None);
+
+        result.Should().BeOfType<NoContentResult>();
+        var records = _dbContext.OrganizationalSeverities
+            .Where(s => s.VulnerabilityId == vuln.Id && s.TenantId == _tenantId)
+            .ToList();
+        records.Should().HaveCount(1, "upsert must not create a duplicate");
+        records[0].AdjustedSeverity.Should().Be(Severity.Medium);
+        records[0].Justification.Should().Be("Now patched in env");
+        records[0].CompensatingControls.Should().Be("Firewall rule active");
+    }
+
+    [Fact]
+    public async Task UpdateOrganizationalSeverity_ReturnsBadRequest_WhenNoTenant()
+    {
+        var noTenantContext = Substitute.For<ITenantContext>();
+        noTenantContext.CurrentTenantId.Returns((Guid?)null);
+        noTenantContext.CurrentUserId.Returns(Guid.NewGuid());
+        var detailQueryService = new PatchHound.Api.Services.VulnerabilityDetailQueryService(_dbContext);
+        var controllerNoTenant = new VulnerabilitiesController(_dbContext, noTenantContext, detailQueryService);
+
+        var request = new UpdateOrgSeverityRequest("High", "justification");
+        var result = await controllerNoTenant.UpdateOrganizationalSeverity(Guid.NewGuid(), request, CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
     public void Dispose() => _dbContext.Dispose();
 
     private sealed class StubNvdApiClient(NvdCveResponse response) : NvdApiClient(new HttpClient())

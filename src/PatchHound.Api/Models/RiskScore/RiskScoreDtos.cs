@@ -57,7 +57,7 @@ public record DeviceGroupRiskDetailDto(
 );
 
 public record SoftwareRiskDetailDto(
-    Guid TenantSoftwareId,
+    Guid SoftwareProductId,
     string SoftwareName,
     string? Vendor,
     decimal OverallScore,

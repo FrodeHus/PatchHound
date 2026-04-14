@@ -273,6 +273,129 @@ public class TenantIsolationEndToEndTests : IDisposable
         assessments.Should().HaveCount(1);
     }
 
+    // Phase 5 Task 8: tenant isolation for canonical Phase-5 entities:
+    // SoftwareRiskScore, RemediationCase, and DashboardQueryService.BuildRiskChangeBriefAsync.
+
+    [Fact]
+    public async Task Phase5_software_risk_score_query_only_returns_rows_for_accessible_tenant()
+    {
+        // Seed one SoftwareRiskScore per tenant under system context.
+        UseSystemContext();
+        var scoreA = SoftwareRiskScore.Create(
+            _tenantA,
+            Guid.NewGuid(),
+            overallScore: 600m,
+            maxExposureScore: 600m,
+            criticalExposureCount: 0,
+            highExposureCount: 1,
+            mediumExposureCount: 0,
+            lowExposureCount: 0,
+            affectedDeviceCount: 1,
+            openExposureCount: 1,
+            factorsJson: "[]",
+            calculationVersion: "v1"
+        );
+        var scoreB = SoftwareRiskScore.Create(
+            _tenantB,
+            Guid.NewGuid(),
+            overallScore: 800m,
+            maxExposureScore: 800m,
+            criticalExposureCount: 1,
+            highExposureCount: 0,
+            mediumExposureCount: 0,
+            lowExposureCount: 0,
+            affectedDeviceCount: 1,
+            openExposureCount: 1,
+            factorsJson: "[]",
+            calculationVersion: "v1"
+        );
+        _dbContext.SoftwareRiskScores.AddRange(scoreA, scoreB);
+        await _dbContext.SaveChangesAsync();
+
+        // Tenant A should only see its own score.
+        UseTenant(_tenantA);
+        var scores = await _dbContext.SoftwareRiskScores.AsNoTracking().ToListAsync();
+
+        scores.Should().OnlyContain(s => s.TenantId == _tenantA);
+        scores.Should().ContainSingle(s => s.Id == scoreA.Id);
+    }
+
+    [Fact]
+    public async Task Phase5_remediation_case_query_only_returns_rows_for_accessible_tenant()
+    {
+        // Seed one RemediationCase per tenant under system context.
+        UseSystemContext();
+        var caseA = RemediationCase.Create(_tenantA, Guid.NewGuid());
+        var caseB = RemediationCase.Create(_tenantB, Guid.NewGuid());
+        _dbContext.RemediationCases.AddRange(caseA, caseB);
+        await _dbContext.SaveChangesAsync();
+
+        // Tenant B should only see its own case.
+        UseTenant(_tenantB);
+        var cases = await _dbContext.RemediationCases.AsNoTracking().ToListAsync();
+
+        cases.Should().OnlyContain(c => c.TenantId == _tenantB);
+        cases.Should().ContainSingle(c => c.Id == caseB.Id);
+    }
+
+    [Fact]
+    public async Task Phase5_dashboard_risk_change_brief_scoped_to_tenant()
+    {
+        // Seed a distinct vulnerability for tenantB (within the cutoff window) under system context.
+        // Then call BuildRiskChangeBriefAsync scoped to tenantA and assert
+        // that tenantB's vulnerability does not appear in the results.
+        UseSystemContext();
+
+        var vulnB = Vulnerability.Create(
+            "nvd",
+            "CVE-2026-PHASE5-TENANTB",
+            "TenantB-Only Vuln",
+            "desc",
+            Severity.Critical,
+            9.8m,
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            DateTimeOffset.UtcNow
+        );
+        _dbContext.Vulnerabilities.Add(vulnB);
+        await _dbContext.SaveChangesAsync();
+
+        // Retrieve the tenantB device seeded in the constructor for the DVE.
+        var deviceB = await _dbContext.Devices.AsNoTracking()
+            .FirstAsync(d => d.TenantId == _tenantB);
+
+        var dveB = DeviceVulnerabilityExposure.Observe(
+            _tenantB,
+            deviceB.Id,
+            vulnB.Id,
+            softwareProductId: null,
+            installedSoftwareId: null,
+            matchedVersion: string.Empty,
+            matchSource: ExposureMatchSource.Product,
+            observedAt: DateTimeOffset.UtcNow
+        );
+        _dbContext.DeviceVulnerabilityExposures.Add(dveB);
+        await _dbContext.SaveChangesAsync();
+
+        // Call the service scoped to tenantA — tenantB's vulnerability must not appear.
+        UseTenant(_tenantA);
+        var sut = new global::PatchHound.Api.Services.DashboardQueryService(
+            _dbContext,
+            NSubstitute.Substitute.For<global::PatchHound.Core.Interfaces.IRiskChangeBriefAiSummaryService>()
+        );
+        var brief = await sut.BuildRiskChangeBriefAsync(
+            tenantId: _tenantA,
+            currentTenantId: _tenantA,
+            limit: null,
+            highCriticalOnly: false,
+            ct: CancellationToken.None,
+            cutoffHours: 72
+        );
+
+        brief.Appeared.Should().NotContain(i => i.ExternalId == "CVE-2026-PHASE5-TENANTB",
+            "tenantB exposures must not bleed into tenantA's risk change brief");
+        brief.Resolved.Should().NotContain(i => i.ExternalId == "CVE-2026-PHASE5-TENANTB");
+    }
+
     private void UseSystemContext()
     {
         _tenantContext.IsSystemContext.Returns(true);

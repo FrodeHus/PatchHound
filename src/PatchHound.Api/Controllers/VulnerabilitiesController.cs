@@ -5,6 +5,7 @@ using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Vulnerabilities;
 using PatchHound.Api.Services;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
@@ -151,17 +152,45 @@ public class VulnerabilitiesController : ControllerBase
 
     [HttpPut("{id:guid}/organizational-severity")]
     [Authorize(Policy = Policies.AdjustSeverity)]
-    public IActionResult UpdateOrganizationalSeverity(Guid id, [FromBody] UpdateOrgSeverityRequest _) =>
-        Conflict(new ProblemDetails
+    public async Task<IActionResult> UpdateOrganizationalSeverity(
+        Guid id,
+        [FromBody] UpdateOrgSeverityRequest request,
+        CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is null)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var tenantId = _tenantContext.CurrentTenantId.Value;
+        var userId = _tenantContext.CurrentUserId;
+
+        if (!Enum.TryParse<Severity>(request.AdjustedSeverity, ignoreCase: true, out var severity))
+            return BadRequest(new ProblemDetails { Title = $"Invalid severity value: {request.AdjustedSeverity}" });
+
+        var existing = await _dbContext.OrganizationalSeverities
+            .FirstOrDefaultAsync(s => s.TenantId == tenantId && s.VulnerabilityId == id, ct);
+
+        if (existing is null)
         {
-            Title = "Organizational severity is disabled during canonical migration; see issue #17 Phase 4.",
-        });
+            var entry = OrganizationalSeverity.Create(
+                id, tenantId, severity, request.Justification, userId,
+                request.AssetCriticalityFactor, request.ExposureFactor, request.CompensatingControls);
+            _dbContext.OrganizationalSeverities.Add(entry);
+        }
+        else
+        {
+            existing.Update(severity, request.Justification, userId,
+                request.AssetCriticalityFactor, request.ExposureFactor, request.CompensatingControls);
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
+        return NoContent();
+    }
 
     [HttpPost("{id:guid}/ai-report")]
     [Authorize(Policy = Policies.GenerateAiReports)]
     public IActionResult GenerateAiReport(Guid id, [FromBody] GenerateAiReportRequest _) =>
         Conflict(new ProblemDetails
         {
-            Title = "AI report generation is disabled during canonical migration; restored in Phase 4 (case-first).",
+            Title = "AI report generation is disabled pending case-first rewire; see issue #17.",
         });
 }

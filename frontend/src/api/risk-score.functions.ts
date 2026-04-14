@@ -39,9 +39,9 @@ export const fetchDeviceGroupRiskDetail = createServerFn({ method: 'GET' })
 
 export const fetchSoftwareRiskDetail = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .inputValidator(z.object({ tenantSoftwareId: z.string() }))
-  .handler(async ({ context, data: { tenantSoftwareId } }) => {
-    const data = await apiGet(`/risk-score/software/${tenantSoftwareId}`, context)
+  .inputValidator(z.object({ softwareProductId: z.string() }))
+  .handler(async ({ context, data: { softwareProductId } }) => {
+    const data = await apiGet(`/risk-score/software/${softwareProductId}`, context)
     return softwareRiskDetailSchema.parse(data)
   })
 

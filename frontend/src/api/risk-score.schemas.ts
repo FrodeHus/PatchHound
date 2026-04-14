@@ -79,7 +79,7 @@ export const deviceGroupRiskDetailSchema = z.object({
 })
 
 export const softwareRiskDetailSchema = z.object({
-  tenantSoftwareId: z.string().uuid(),
+  softwareProductId: z.string().uuid(),
   softwareName: z.string(),
   vendor: z.string().nullable(),
   overallScore: z.number(),
