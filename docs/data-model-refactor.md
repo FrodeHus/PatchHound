@@ -99,9 +99,22 @@ one, it is a bug.
 
 The database baseline is a single EF Core migration named `Initial`, generated
 against the final canonical entity set and living at
-`src/PatchHound.Infrastructure/Data/Migrations/<timestamp>_Initial.cs`. The
+`src/PatchHound.Infrastructure/Migrations/<timestamp>_Initial.cs`. The
 `PatchHoundDbContextModelSnapshot.cs` beside it is the authoritative record
 of the model that `Initial` builds.
+
+> **Phase 7 (2026-04-14):** The `Initial` migration was regenerated after all
+> remaining legacy entities (`AssetRiskScore`, `TenantSoftwareRiskScore`,
+> `NormalizedSoftware`) were deleted and their consumers rewritten against the
+> canonical model. The migration no longer contains `AssetRiskScores`,
+> `TenantSoftwareRiskScores`, or `NormalizedSoftware` tables. This change
+> closes issue #17 — the canonical baseline now truly is canonical.
+>
+> Note: `NormalizedSoftwareAlias`, `NormalizedSoftwareInstallation`, and
+> `NormalizedSoftwareProjectionService` are retained as operational
+> infrastructure for the software alias resolution pipeline. The class/table
+> names are historical; their FK `SoftwareProductId` points to the canonical
+> `SoftwareProduct` entity.
 
 To create a fresh dev database:
 
