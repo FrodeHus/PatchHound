@@ -101,7 +101,6 @@ export function SoftwareRemediationView({
     reEvaluationDate?: string | null
   } | null>(null)
   const [stageError, setStageError] = useState<string | null>(null)
-  const workflowId = data.workflowState.workflowId
   const currentStageId = data.workflowState.currentStage as RemediationStageId
   const stages: RemediationStage[] = data.workflowState.stages.map((stage) => ({
     id: stage.id as RemediationStageId,
