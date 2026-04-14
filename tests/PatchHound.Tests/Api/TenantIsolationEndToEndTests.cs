@@ -61,7 +61,7 @@ public class TenantIsolationEndToEndTests : IDisposable
         var installs = await _dbContext.InstalledSoftware.AsNoTracking().ToListAsync();
 
         installs.Should().OnlyContain(i => i.TenantId == _tenantB);
-        installs.Should().HaveCount(1);
+        installs.Should().HaveCount(2);
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public class TenantIsolationEndToEndTests : IDisposable
         var profiles = await _dbContext.SecurityProfiles.AsNoTracking().ToListAsync();
 
         devices.Should().HaveCount(2);
-        installs.Should().HaveCount(2);
+        installs.Should().HaveCount(4);
         profiles.Should().HaveCount(2);
     }
 
@@ -240,6 +240,39 @@ public class TenantIsolationEndToEndTests : IDisposable
         visible.Should().BeEmpty("request-scoped context with no tenant access sees no rows");
     }
 
+    [Fact]
+    public async Task Phase3_device_vulnerability_exposure_query_only_returns_rows_for_accessible_tenant()
+    {
+        UseTenant(_tenantA);
+
+        var exposures = await _dbContext.DeviceVulnerabilityExposures.AsNoTracking().ToListAsync();
+
+        exposures.Should().OnlyContain(e => e.TenantId == _tenantA);
+        exposures.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task Phase3_exposure_episode_query_only_returns_rows_for_accessible_tenant()
+    {
+        UseTenant(_tenantB);
+
+        var episodes = await _dbContext.ExposureEpisodes.AsNoTracking().ToListAsync();
+
+        episodes.Should().OnlyContain(e => e.TenantId == _tenantB);
+        episodes.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task Phase3_exposure_assessment_query_only_returns_rows_for_accessible_tenant()
+    {
+        UseTenant(_tenantA);
+
+        var assessments = await _dbContext.ExposureAssessments.AsNoTracking().ToListAsync();
+
+        assessments.Should().OnlyContain(e => e.TenantId == _tenantA);
+        assessments.Should().HaveCount(1);
+    }
+
     private void UseSystemContext()
     {
         _tenantContext.IsSystemContext.Returns(true);
@@ -306,6 +339,57 @@ public class TenantIsolationEndToEndTests : IDisposable
             operations: new List<AssetRuleOperation>()
         );
         _dbContext.DeviceRules.Add(rule);
+
+        var vulnerability = Vulnerability.Create(
+            "nvd",
+            $"CVE-{tenantId:N}",
+            $"Vuln-{tenantId:N}",
+            "desc",
+            Severity.High,
+            7.1m,
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            DateTimeOffset.UtcNow
+        );
+        _dbContext.Vulnerabilities.Add(vulnerability);
+        _dbContext.SaveChanges();
+
+        var installed = InstalledSoftware.Observe(
+            tenantId,
+            device.Id,
+            Guid.NewGuid(),
+            _sourceSystemId,
+            "1.0",
+            DateTimeOffset.UtcNow
+        );
+        _dbContext.InstalledSoftware.Add(installed);
+        _dbContext.SaveChanges();
+
+        var exposure = DeviceVulnerabilityExposure.Observe(
+            tenantId,
+            device.Id,
+            vulnerability.Id,
+            softwareProductId: installed.SoftwareProductId,
+            installedSoftwareId: installed.Id,
+            matchedVersion: installed.Version,
+            matchSource: ExposureMatchSource.Product,
+            observedAt: DateTimeOffset.UtcNow
+        );
+        _dbContext.DeviceVulnerabilityExposures.Add(exposure);
+        _dbContext.SaveChanges();
+
+        var episode = ExposureEpisode.Open(tenantId, exposure.Id, 1, DateTimeOffset.UtcNow);
+        _dbContext.ExposureEpisodes.Add(episode);
+
+        var assessment = ExposureAssessment.Create(
+            tenantId,
+            exposure.Id,
+            device.SecurityProfileId,
+            vulnerability.CvssScore ?? 0m,
+            700m,
+            "tenant-seed",
+            DateTimeOffset.UtcNow
+        );
+        _dbContext.ExposureAssessments.Add(assessment);
     }
 
     public void Dispose()

@@ -60,7 +60,25 @@ public class RiskScoreController : ControllerBase
             .Where(item => assetIds.Contains(item.Id))
             .Select(item => new { item.Id, item.Name })
             .ToDictionaryAsync(item => item.Id, item => item.Name, ct);
-        // Phase-2 stub: VulnerabilityEpisodeRiskAssessments deleted; restored in Phase 3.
+        var episodeDrivers = await _dbContext.ExposureAssessments.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && assetIds.Contains(item.Exposure.DeviceId))
+            .Select(item => new
+            {
+                DeviceId = item.Exposure.DeviceId,
+                Driver = new AssetRiskEpisodeDriverDto(
+                    item.Exposure.VulnerabilityId,
+                    item.Exposure.Vulnerability.ExternalId,
+                    item.Exposure.Vulnerability.Title,
+                    item.EnvironmentalCvss >= 9.0m ? "Critical" : item.EnvironmentalCvss >= 7.0m ? "High" : item.EnvironmentalCvss >= 4.0m ? "Medium" : "Low",
+                    item.EnvironmentalCvss,
+                    _dbContext.ThreatAssessments
+                        .Where(t => t.VulnerabilityId == item.Exposure.VulnerabilityId)
+                        .Select(t => t.ThreatScore)
+                        .FirstOrDefault(),
+                    item.EnvironmentalCvss,
+                    0m)
+            })
+            .ToListAsync(ct);
 
         var history = hasFilters
             ? []
@@ -87,8 +105,11 @@ public class RiskScoreController : ControllerBase
                 item.MediumCount,
                 item.LowCount,
                 item.OpenEpisodeCount,
-                // Phase-2 stub: VulnerabilityEpisodeRiskAssessments deleted; restored in Phase 3.
-                []
+                episodeDrivers
+                    .Where(driver => driver.DeviceId == item.AssetId)
+                    .Select(driver => driver.Driver)
+                    .Take(3)
+                    .ToList()
             )).ToList(),
             history.Select(item => new RiskScoreSnapshotDto(
                 item.Date,
@@ -163,7 +184,22 @@ public class RiskScoreController : ControllerBase
             .ToListAsync(ct);
 
         var assetIds = topRiskAssets.Select(item => item.AssetId).ToHashSet();
-        // Phase-2 stub: VulnerabilityEpisodeRiskAssessments deleted; restored in Phase 3.
+        var episodeDrivers = await _dbContext.ExposureAssessments.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && assetIds.Contains(item.Exposure.DeviceId))
+            .Select(item => new
+            {
+                DeviceId = item.Exposure.DeviceId,
+                Driver = new AssetRiskEpisodeDriverDto(
+                    item.Exposure.VulnerabilityId,
+                    item.Exposure.Vulnerability.ExternalId,
+                    item.Exposure.Vulnerability.Title,
+                    item.EnvironmentalCvss >= 9.0m ? "Critical" : item.EnvironmentalCvss >= 7.0m ? "High" : item.EnvironmentalCvss >= 4.0m ? "Medium" : "Low",
+                    item.EnvironmentalCvss,
+                    _dbContext.ThreatAssessments.Where(t => t.VulnerabilityId == item.Exposure.VulnerabilityId).Select(t => t.ThreatScore).FirstOrDefault(),
+                    item.EnvironmentalCvss,
+                    0m)
+            })
+            .ToListAsync(ct);
 
         return Ok(new DeviceGroupRiskDetailDto(
             groupScore.DeviceGroupName,
@@ -199,7 +235,11 @@ public class RiskScoreController : ControllerBase
                 item.MediumCount,
                 item.LowCount,
                 item.OpenEpisodeCount,
-                new List<AssetRiskEpisodeDriverDto>()
+                episodeDrivers
+                    .Where(driver => driver.DeviceId == item.AssetId)
+                    .Select(driver => driver.Driver)
+                    .Take(3)
+                    .ToList()
             )).ToList()
         ));
     }
@@ -269,7 +309,27 @@ public class RiskScoreController : ControllerBase
             .Take(5)
             .ToListAsync(ct);
 
-        // Phase-2 stub: VulnerabilityEpisodeRiskAssessments deleted; restored in Phase 3.
+        var episodeDrivers = await _dbContext.ExposureAssessments.AsNoTracking()
+            .Where(item => item.TenantId == tenantId)
+            .Join(
+                _dbContext.DeviceVulnerabilityExposures.AsNoTracking().Where(e => e.TenantId == tenantId && e.SoftwareProductId != null),
+                assessment => assessment.DeviceVulnerabilityExposureId,
+                exposure => exposure.Id,
+                (assessment, exposure) => new
+                {
+                    exposure.SoftwareProductId,
+                    DeviceId = assessment.Exposure.DeviceId,
+                    Driver = new AssetRiskEpisodeDriverDto(
+                        assessment.Exposure.VulnerabilityId,
+                        exposure.Vulnerability.ExternalId,
+                        exposure.Vulnerability.Title,
+                        assessment.EnvironmentalCvss >= 9.0m ? "Critical" : assessment.EnvironmentalCvss >= 7.0m ? "High" : assessment.EnvironmentalCvss >= 4.0m ? "Medium" : "Low",
+                        assessment.EnvironmentalCvss,
+                        _dbContext.ThreatAssessments.Where(t => t.VulnerabilityId == assessment.Exposure.VulnerabilityId).Select(t => t.ThreatScore).FirstOrDefault(),
+                        assessment.EnvironmentalCvss,
+                        0m)
+                })
+            .ToListAsync(ct);
         return Ok(new SoftwareRiskDetailDto(
             softwareScore.TenantSoftwareId,
             softwareScore.SoftwareName,
@@ -295,7 +355,11 @@ public class RiskScoreController : ControllerBase
                 item.MediumCount,
                 item.LowCount,
                 item.OpenEpisodeCount,
-                new List<AssetRiskEpisodeDriverDto>()
+                episodeDrivers
+                    .Where(driver => driver.DeviceId == item.AssetId)
+                    .Select(driver => driver.Driver)
+                    .Take(3)
+                    .ToList()
             )).ToList()
         ));
     }

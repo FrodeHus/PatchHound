@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost, apiPut } from '@/server/api'
-import { deviceDetailSchema, pagedDevicesSchema } from './devices.schemas'
+import { deviceDetailSchema, pagedDeviceExposuresSchema, pagedDevicesSchema } from './devices.schemas'
 import { buildFilterParams } from './utils'
 
 // Phase 1 canonical cleanup (Task 15): thin client for /api/devices.
@@ -42,6 +42,24 @@ export const fetchDeviceDetail = createServerFn({ method: 'GET' })
   .handler(async ({ context, data: { deviceId } }) => {
     const data = await apiGet(`/devices/${deviceId}`, context)
     return deviceDetailSchema.parse(data)
+  })
+
+export const fetchDeviceExposures = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      deviceId: z.string(),
+      page: z.number().optional(),
+      pageSize: z.number().optional(),
+    }),
+  )
+  .handler(async ({ context, data: { deviceId, page, pageSize } }) => {
+    const params = new URLSearchParams()
+    if (page) params.set('page', String(page))
+    if (pageSize) params.set('pageSize', String(pageSize))
+    const suffix = params.size > 0 ? `?${params.toString()}` : ''
+    const data = await apiGet(`/devices/${deviceId}/exposures${suffix}`, context)
+    return pagedDeviceExposuresSchema.parse(data)
   })
 
 export const assignDeviceOwner = createServerFn({ method: 'POST' })

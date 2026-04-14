@@ -263,6 +263,41 @@ public class DevicesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task ListExposures_ReturnsTenantScopedExposuresForDevice_And404ForCrossTenantDevice()
+    {
+        var tenantADevice = CreateDevice("device-a", "Device A", Criticality.High);
+        var tenantB = Guid.NewGuid();
+        var tenantBDevice = Device.Create(tenantB, _sourceSystemId, "device-b", "Device B", Criticality.Medium);
+        var vuln = Vulnerability.Create("nvd", "CVE-2026-1000", "Exposure vuln", "desc", Severity.High, 7.5m, null, DateTimeOffset.UtcNow);
+
+        var installA = InstalledSoftware.Observe(_tenantId, tenantADevice.Id, Guid.NewGuid(), _sourceSystemId, "1.0", DateTimeOffset.UtcNow);
+        var installB = InstalledSoftware.Observe(tenantB, tenantBDevice.Id, Guid.NewGuid(), _sourceSystemId, "2.0", DateTimeOffset.UtcNow);
+
+        await _dbContext.AddRangeAsync(tenantADevice, tenantBDevice, vuln, installA, installB);
+        await _dbContext.SaveChangesAsync();
+
+        var exposureA = DeviceVulnerabilityExposure.Observe(_tenantId, tenantADevice.Id, vuln.Id, installA.SoftwareProductId, installA.Id, installA.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow);
+        var exposureB = DeviceVulnerabilityExposure.Observe(tenantB, tenantBDevice.Id, vuln.Id, installB.SoftwareProductId, installB.Id, installB.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow);
+        await _dbContext.AddRangeAsync(exposureA, exposureB);
+        await _dbContext.SaveChangesAsync();
+
+        await _dbContext.ExposureAssessments.AddAsync(
+            ExposureAssessment.Create(_tenantId, exposureA.Id, null, vuln.CvssScore ?? 0m, 8.2m, "test", DateTimeOffset.UtcNow));
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.ListExposures(tenantADevice.Id, new PaginationQuery(), CancellationToken.None);
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = ok.Value.Should().BeOfType<PagedResponse<DeviceExposureDto>>().Subject;
+        payload.TotalCount.Should().Be(1);
+        payload.Items.Should().ContainSingle();
+        payload.Items[0].ExternalId.Should().Be("CVE-2026-1000");
+        payload.Items[0].EnvironmentalCvss.Should().Be(8.2m);
+
+        var crossTenant = await _controller.ListExposures(tenantBDevice.Id, new PaginationQuery(), CancellationToken.None);
+        crossTenant.Result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
     public async Task AssignOwner_PersistsOwnerAndReturnsNoContent()
     {
         var device = CreateDevice("device-1", "Device 1", Criticality.Medium);

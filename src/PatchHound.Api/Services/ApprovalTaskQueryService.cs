@@ -188,7 +188,7 @@ public class ApprovalTaskQueryService(
             .FirstOrDefaultAsync(u => u.Id == decision.DecidedBy, ct);
 
         // Vulnerabilities (paginated, sorted by severity)
-        // Phase-2 stub: SoftwareVulnerabilityMatch + VulnerabilityDefinition + TenantVulnerability deleted; restored in Phase 3.
+        // Phase 4 debt (#17): SoftwareVulnerabilityMatch + VulnerabilityDefinition + TenantVulnerability removed by canonical cleanup; remediation-surface rewrite restores this.
         var vulnList = new PagedVulnerabilityList([], 0, vulnPagination.Page, vulnPagination.BoundedPageSize);
 
         // Devices in scope for the approval's software scope
@@ -213,7 +213,7 @@ public class ApprovalTaskQueryService(
             .Select(item => item.SoftwareAssetId)
             .Distinct()
             .ToList();
-        // Phase-2 stub: SoftwareVulnerabilityMatch deleted; restored in Phase 3.
+        // Phase 4 debt (#17): SoftwareVulnerabilityMatch removed by canonical cleanup; remediation-surface rewrite restores this.
         var openMatchRows = Array.Empty<object>().Select(_ => new { SoftwareAssetId = Guid.Empty, VulnerabilityDefinitionId = Guid.Empty }).ToList();
 
         deviceVersionCohorts = installationRows
@@ -258,7 +258,7 @@ public class ApprovalTaskQueryService(
                     Criticality = nsi.DeviceAsset.Criticality,
                     nsi.DetectedVersion,
                     nsi.LastSeenAt,
-                    // Phase-2 stub: VulnerabilityAsset deleted; restored in Phase 3.
+                    // Phase 4 debt (#17): VulnerabilityAsset removed by canonical cleanup; remediation-surface rewrite restores this.
                     OpenVulnerabilityCount = 0,
                 })
                 .Distinct();
@@ -385,7 +385,7 @@ public class ApprovalTaskQueryService(
 
     private Task<Dictionary<Guid, Severity>> GetHighestSeveritiesAsync(
         Guid tenantId, List<Guid> tenantSoftwareIds, CancellationToken ct)
-        // Phase-2 stub: SoftwareVulnerabilityMatch + VulnerabilityDefinition deleted; restored in Phase 3.
+        // Phase 4 debt (#17): SoftwareVulnerabilityMatch + VulnerabilityDefinition removed by canonical cleanup; remediation-surface rewrite restores this.
         => Task.FromResult(new Dictionary<Guid, Severity>());
 
     private async Task<Dictionary<Guid, string>> GetSoftwareNamesAsync(
@@ -429,12 +429,12 @@ public class ApprovalTaskQueryService(
 
     private Task<Dictionary<Guid, int>> GetVulnCountsAsync(
         Guid tenantId, List<Guid> tenantSoftwareIds, CancellationToken ct)
-        // Phase-2 stub: SoftwareVulnerabilityMatch deleted; restored in Phase 3.
+        // Phase 4 debt (#17): SoftwareVulnerabilityMatch removed by canonical cleanup; remediation-surface rewrite restores this.
         => Task.FromResult(new Dictionary<Guid, int>());
 
     private Task<Dictionary<Guid, (string Status, DateTimeOffset DueDate)>> GetSlaInfoAsync(
         Guid tenantId, List<Guid> tenantSoftwareIds, CancellationToken ct)
-        // Phase-2 stub: SoftwareVulnerabilityMatch + VulnerabilityDefinition deleted; restored in Phase 3.
+        // Phase 4 debt (#17): SoftwareVulnerabilityMatch + VulnerabilityDefinition removed by canonical cleanup; remediation-surface rewrite restores this.
         => Task.FromResult(new Dictionary<Guid, (string Status, DateTimeOffset DueDate)>());
 
     private static string NormalizeVersionKey(string? version)

@@ -39,33 +39,48 @@ public class RiskScoreServiceTests : IDisposable
     [Fact]
     public async Task RecalculateForTenantAsync_CreatesDeviceScoresAndDailySnapshot()
     {
-        // Phase 2: CalculateAssetScoresAsync is stubbed to return [] (no canonical
-        // DeviceVulnerabilityExposure data yet). DeviceRiskScores, DeviceGroupRiskScores,
-        // and TeamRiskScores are all empty. The snapshot is still written with zero counts.
-        // Phase 3 will restore device-score assertions once DeviceVulnerabilityExposure lands.
         var deviceA = Device.Create(_tenantId, _sourceSystemId, "device-a", "Device A", Criticality.High);
         var deviceB = Device.Create(_tenantId, _sourceSystemId, "device-b", "Device B", Criticality.Medium);
         var team = Team.Create(_tenantId, "SecOps");
+        var vulnA = Vulnerability.Create("nvd", "CVE-2026-5001", "Critical vuln", "desc", Severity.Critical, 9.8m, null, DateTimeOffset.UtcNow);
+        var vulnB = Vulnerability.Create("nvd", "CVE-2026-5002", "High vuln", "desc", Severity.High, 7.4m, null, DateTimeOffset.UtcNow);
         deviceA.AssignTeamOwner(team.Id);
 
-        await _dbContext.AddRangeAsync(deviceA, deviceB, team);
+        await _dbContext.AddRangeAsync(deviceA, deviceB, team, vulnA, vulnB);
+        await _dbContext.SaveChangesAsync();
+
+        var installA = InstalledSoftware.Observe(_tenantId, deviceA.Id, Guid.NewGuid(), _sourceSystemId, "1.0", DateTimeOffset.UtcNow);
+        var installB = InstalledSoftware.Observe(_tenantId, deviceB.Id, Guid.NewGuid(), _sourceSystemId, "1.0", DateTimeOffset.UtcNow);
+        await _dbContext.AddRangeAsync(installA, installB);
+        await _dbContext.SaveChangesAsync();
+
+        var exposureA = DeviceVulnerabilityExposure.Observe(_tenantId, deviceA.Id, vulnA.Id, installA.SoftwareProductId, installA.Id, installA.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow);
+        var exposureB = DeviceVulnerabilityExposure.Observe(_tenantId, deviceB.Id, vulnB.Id, installB.SoftwareProductId, installB.Id, installB.Version, ExposureMatchSource.Product, DateTimeOffset.UtcNow);
+        await _dbContext.AddRangeAsync(exposureA, exposureB);
+        await _dbContext.SaveChangesAsync();
+
+        await _dbContext.AddRangeAsync(
+            ExposureAssessment.Create(_tenantId, exposureA.Id, null, vulnA.CvssScore ?? 0m, 950m, "critical", DateTimeOffset.UtcNow),
+            ExposureAssessment.Create(_tenantId, exposureB.Id, null, vulnB.CvssScore ?? 0m, 700m, "high", DateTimeOffset.UtcNow)
+        );
         await _dbContext.SaveChangesAsync();
 
         await _service.RecalculateForTenantAsync(_tenantId, CancellationToken.None);
 
         var deviceScores = await _dbContext.DeviceRiskScores.ToListAsync();
-        deviceScores.Should().BeEmpty();
+        deviceScores.Should().HaveCount(2);
+        deviceScores.Should().Contain(item => item.DeviceId == deviceA.Id && item.CriticalCount == 1);
 
         var deviceGroupScores = await _dbContext.DeviceGroupRiskScores.ToListAsync();
-        deviceGroupScores.Should().BeEmpty();
+        deviceGroupScores.Should().ContainSingle(item => item.DeviceGroupName == "Ungrouped");
 
         var teamScores = await _dbContext.TeamRiskScores.ToListAsync();
-        teamScores.Should().BeEmpty();
+        teamScores.Should().ContainSingle(item => item.TeamId == team.Id);
 
         var snapshot = await _dbContext.TenantRiskScoreSnapshots.SingleAsync();
         snapshot.TenantId.Should().Be(_tenantId);
-        snapshot.AssetCount.Should().Be(0);
-        snapshot.OverallScore.Should().Be(0m);
+        snapshot.AssetCount.Should().Be(2);
+        snapshot.OverallScore.Should().BeGreaterThan(0m);
     }
 
     [Fact]
@@ -89,9 +104,6 @@ public class RiskScoreServiceTests : IDisposable
     [Fact]
     public async Task RecalculateForTenantAsync_CreatesSoftwareRiskScoresFromSoftwareLinkedEpisodes()
     {
-        // Phase 2: CalculateSoftwareScoresAsync is stubbed to return [] (no canonical
-        // DeviceVulnerabilityExposure data yet). TenantSoftwareRiskScores will be empty.
-        // Phase 3 will restore the full assertion once DeviceVulnerabilityExposure lands.
         await _dbContext.TenantSourceConfigurations.AddAsync(
             TenantSourceConfiguration.Create(
                 _tenantId,

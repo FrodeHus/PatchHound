@@ -10,6 +10,36 @@ public class EnvironmentalSeverityCalculator
 
     public EnvironmentalSeverityCalculationResult Calculate(
         Vulnerability vulnerability,
+        Device device,
+        SecurityProfile? profile)
+    {
+        var asset = Asset.Create(device.TenantId, device.ExternalId, AssetType.Device, device.Name, device.Criticality);
+        var assetProfile = profile is null
+            ? null
+            : AssetSecurityProfile.Create(
+                profile.TenantId,
+                profile.Name,
+                profile.Description,
+                profile.EnvironmentClass,
+                profile.InternetReachability,
+                profile.ConfidentialityRequirement,
+                profile.IntegrityRequirement,
+                profile.AvailabilityRequirement,
+                profile.ModifiedAttackVector,
+                profile.ModifiedAttackComplexity,
+                profile.ModifiedPrivilegesRequired,
+                profile.ModifiedUserInteraction,
+                profile.ModifiedScope,
+                profile.ModifiedConfidentialityImpact,
+                profile.ModifiedIntegrityImpact,
+                profile.ModifiedAvailabilityImpact
+            );
+
+        return Calculate(vulnerability, asset, assetProfile);
+    }
+
+    public EnvironmentalSeverityCalculationResult Calculate(
+        Vulnerability vulnerability,
         Asset asset,
         AssetSecurityProfile? profile
     )

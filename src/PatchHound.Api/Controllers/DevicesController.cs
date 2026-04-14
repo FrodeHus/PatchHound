@@ -132,8 +132,11 @@ public class DevicesController : ControllerBase
                 .Where(score => score.DeviceId == d.Id)
                 .Select(score => (decimal?)score.OverallScore)
                 .FirstOrDefault(),
-            // Phase-2 stub: VulnerabilityAssets deleted; restored by canonical exposure merge in Phase 3.
-            VulnerabilityCount = 0,
+            VulnerabilityCount = _dbContext.DeviceVulnerabilityExposures
+                .Where(e => e.TenantId == _tenantContext.CurrentTenantId.Value && e.DeviceId == d.Id)
+                .Select(e => e.VulnerabilityId)
+                .Distinct()
+                .Count(),
         });
 
         var deviceIds = await rankedQuery
@@ -145,8 +148,12 @@ public class DevicesController : ControllerBase
             .Select(item => item.Device.Id)
             .ToListAsync(ct);
 
-        // Phase-2 stub: VulnerabilityAssetEpisodes deleted; restored by canonical exposure merge in Phase 3.
-        var recurringCountsByDeviceId = new Dictionary<Guid, int>();
+        var recurringCountsByDeviceId = await _dbContext.ExposureEpisodes
+            .AsNoTracking()
+            .Where(episode => deviceIds.Contains(episode.Exposure.DeviceId))
+            .GroupBy(episode => episode.Exposure.DeviceId)
+            .Select(group => new { DeviceId = group.Key, Count = group.Count(episode => episode.EpisodeNumber > 1) })
+            .ToDictionaryAsync(item => item.DeviceId, item => item.Count, ct);
 
         var itemRows = await _dbContext.Devices
             .AsNoTracking()
@@ -165,12 +172,15 @@ public class DevicesController : ControllerBase
                 OwnerType = d.OwnerType.ToString(),
                 d.OwnerUserId,
                 d.OwnerTeamId,
-                SecurityProfileName = _dbContext.AssetSecurityProfiles
+                SecurityProfileName = _dbContext.SecurityProfiles
                     .Where(profile => profile.Id == d.SecurityProfileId)
                     .Select(profile => profile.Name)
                     .FirstOrDefault(),
-                // Phase-2 stub: restored by canonical exposure merge in Phase 3.
-                VulnerabilityCount = 0,
+                VulnerabilityCount = _dbContext.DeviceVulnerabilityExposures
+                    .Where(e => e.TenantId == _tenantContext.CurrentTenantId.Value && e.DeviceId == d.Id)
+                    .Select(e => e.VulnerabilityId)
+                    .Distinct()
+                    .Count(),
                 d.HealthStatus,
                 RiskScore = d.ExternalRiskLabel,
                 d.ExposureLevel,
@@ -267,6 +277,53 @@ public class DevicesController : ControllerBase
             return NotFound();
 
         return Ok(detail);
+    }
+
+    [HttpGet("{deviceId:guid}/exposures")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
+    public async Task<ActionResult<PagedResponse<DeviceExposureDto>>> ListExposures(
+        Guid deviceId,
+        [FromQuery] PaginationQuery pagination,
+        CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is null)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var device = await _dbContext.Devices
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == deviceId, ct);
+        if (device is null)
+            return NotFound();
+
+        var query = _dbContext.DeviceVulnerabilityExposures
+            .AsNoTracking()
+            .Where(e => e.DeviceId == deviceId);
+        var total = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderByDescending(e => e.Status == ExposureStatus.Open)
+            .ThenByDescending(e => e.LastObservedAt)
+            .Skip(pagination.Skip)
+            .Take(pagination.BoundedPageSize)
+            .Select(e => new DeviceExposureDto(
+                e.Id,
+                e.VulnerabilityId,
+                e.Vulnerability.ExternalId,
+                e.Vulnerability.Title,
+                e.Vulnerability.VendorSeverity.ToString(),
+                e.MatchedVersion,
+                e.MatchSource.ToString(),
+                e.Status.ToString(),
+                e.FirstObservedAt,
+                e.LastObservedAt,
+                e.ResolvedAt,
+                _dbContext.ExposureAssessments
+                    .Where(a => a.DeviceVulnerabilityExposureId == e.Id)
+                    .Select(a => (decimal?)a.EnvironmentalCvss)
+                    .FirstOrDefault()))
+            .ToListAsync(ct);
+
+        return Ok(new PagedResponse<DeviceExposureDto>(items, total, pagination.Page, pagination.BoundedPageSize));
     }
 
     [HttpPut("{id:guid}/business-labels")]
@@ -391,7 +448,7 @@ public class DevicesController : ControllerBase
 
         if (request.SecurityProfileId.HasValue)
         {
-            var exists = await _dbContext.AssetSecurityProfiles
+            var exists = await _dbContext.SecurityProfiles
                 .AsNoTracking()
                 .AnyAsync(profile => profile.Id == request.SecurityProfileId.Value, ct);
             if (!exists)

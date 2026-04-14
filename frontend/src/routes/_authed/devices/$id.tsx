@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import {
   assignDeviceBusinessLabels,
   assignDeviceSecurityProfile,
+  fetchDeviceExposures,
   fetchDeviceDetail,
   resetDeviceCriticalityOverride,
   setDeviceCriticality,
@@ -38,6 +39,10 @@ function DeviceDetailPage() {
   const securityProfilesQuery = useQuery({
     queryKey: ['security-profiles', selectedTenantId],
     queryFn: () => fetchSecurityProfiles({ data: {} }),
+  })
+  const exposuresQuery = useQuery({
+    queryKey: ['device-exposures', selectedTenantId, id],
+    queryFn: () => fetchDeviceExposures({ data: { deviceId: id, page: 1, pageSize: 50 } }),
   })
   const businessLabelsQuery = useQuery({
     queryKey: ['business-labels', selectedTenantId],
@@ -107,6 +112,7 @@ function DeviceDetailPage() {
         (user.activeRoles ?? []).includes('GlobalAdmin')
         || (user.activeRoles ?? []).includes('SecurityManager')
       }
+      exposures={exposuresQuery.data?.items ?? []}
       securityProfiles={securityProfilesQuery.data?.items ?? []}
       availableBusinessLabels={businessLabelsQuery.data ?? []}
       isAssigningSecurityProfile={securityProfileMutation.isPending}

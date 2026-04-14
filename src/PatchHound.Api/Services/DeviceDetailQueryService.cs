@@ -41,7 +41,7 @@ public class DeviceDetailQueryService
             return null;
 
         var securityProfile = device.SecurityProfileId is Guid securityProfileId
-            ? await _dbContext.AssetSecurityProfiles
+            ? await _dbContext.SecurityProfiles
                 .AsNoTracking()
                 .Where(profile => profile.Id == securityProfileId)
                 .Select(profile => new AssetSecurityProfileSummaryDto(

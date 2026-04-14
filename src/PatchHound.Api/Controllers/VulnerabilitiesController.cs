@@ -102,6 +102,14 @@ public class VulnerabilitiesController : ControllerBase
                         a.ActiveAlert,
                     })
                     .FirstOrDefault(),
+                AffectedDeviceCount = _dbContext.DeviceVulnerabilityExposures
+                    .Where(e =>
+                        e.TenantId == _tenantContext.CurrentTenantId.Value
+                        && e.VulnerabilityId == v.Id
+                        && e.Status == ExposureStatus.Open)
+                    .Select(e => e.DeviceId)
+                    .Distinct()
+                    .Count(),
             })
             .ToListAsync(ct);
 
@@ -114,8 +122,8 @@ public class VulnerabilitiesController : ControllerBase
                 v.Source,
                 v.CvssScore,
                 v.PublishedDate,
-                ExposureDataAvailable: false,
-                AffectedDeviceCount: 0,
+                ExposureDataAvailable: true,
+                AffectedDeviceCount: v.AffectedDeviceCount,
                 ThreatScore: v.Threat?.ThreatScore,
                 EpssScore: v.Threat?.EpssScore,
                 PublicExploit: v.Threat?.PublicExploit ?? false,
@@ -146,7 +154,7 @@ public class VulnerabilitiesController : ControllerBase
     public IActionResult UpdateOrganizationalSeverity(Guid id, [FromBody] UpdateOrgSeverityRequest _) =>
         Conflict(new ProblemDetails
         {
-            Title = "Organizational severity is disabled during canonical migration; restored in Phase 3.",
+            Title = "Organizational severity is disabled during canonical migration; see issue #17 Phase 4.",
         });
 
     [HttpPost("{id:guid}/ai-report")]
