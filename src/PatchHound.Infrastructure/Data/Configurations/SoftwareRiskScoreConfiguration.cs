@@ -25,6 +25,6 @@ public class SoftwareRiskScoreConfiguration : IEntityTypeConfiguration<SoftwareR
             .HasOne(item => item.SoftwareProduct)
             .WithMany()
             .HasForeignKey(item => item.SoftwareProductId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
