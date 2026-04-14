@@ -174,18 +174,18 @@ public class AssetDetailQueryService(
             kvp => (Guid?)kvp.Value.TenantSoftwareId,
             StringComparer.Ordinal
         );
-        var normalizedSoftwareIdsByExternalId = resolvedAliases.ToDictionary(
+        var softwareProductIdsByExternalId = resolvedAliases.ToDictionary(
             kvp => kvp.Key,
-            kvp => kvp.Value.NormalizedSoftwareId,
+            kvp => kvp.Value.SoftwareProductId,
             StringComparer.Ordinal
         );
 
-        var normalizedSoftwareIds = normalizedSoftwareIdsByExternalId.Values.Distinct().ToList();
+        var softwareProductIds = softwareProductIdsByExternalId.Values.Distinct().ToList();
         var cpeBindingsByNormalizedSoftwareId = await dbContext
             .SoftwareCpeBindings.AsNoTracking()
-            .Where(binding => normalizedSoftwareIds.Contains(binding.NormalizedSoftwareId))
+            .Where(binding => softwareProductIds.Contains(binding.SoftwareProductId))
             .ToDictionaryAsync(
-                binding => binding.NormalizedSoftwareId,
+                binding => binding.SoftwareProductId,
                 binding => new SoftwareCpeBindingDto(
                     binding.Id,
                     binding.Cpe23Uri,
@@ -271,8 +271,8 @@ public class AssetDetailQueryService(
                 row.Name,
                 row.ExternalId,
                 row.LastSeenAt,
-                normalizedSoftwareIdsByExternalId.TryGetValue(row.ExternalId, out var normalizedSoftwareId)
-                    ? cpeBindingsByNormalizedSoftwareId.GetValueOrDefault(normalizedSoftwareId)
+                softwareProductIdsByExternalId.TryGetValue(row.ExternalId, out var softwareProductId)
+                    ? cpeBindingsByNormalizedSoftwareId.GetValueOrDefault(softwareProductId)
                     : null,
                 softwareEpisodesByAssetId.TryGetValue(row.Id, out var episodes)
                     ? episodes.Count
@@ -289,9 +289,9 @@ public class AssetDetailQueryService(
             .Select(t => t.Tag)
             .ToArrayAsync(ct);
 
-        var assetRiskScore = await dbContext.AssetRiskScores
+        var assetRiskScore = await dbContext.DeviceRiskScores
             .AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.AssetId == assetId)
+            .Where(item => item.TenantId == tenantId && item.DeviceId == assetId)
             .Select(item => new
             {
                 item.OverallScore,
@@ -392,8 +392,8 @@ public class AssetDetailQueryService(
             remediation,
             tags,
             asset.AssetType == AssetType.Software
-                && normalizedSoftwareIdsByExternalId.TryGetValue(asset.ExternalId, out var assetNormalizedSoftwareId)
-                ? cpeBindingsByNormalizedSoftwareId.GetValueOrDefault(assetNormalizedSoftwareId)
+                && softwareProductIdsByExternalId.TryGetValue(asset.ExternalId, out var assetSoftwareProductId)
+                ? cpeBindingsByNormalizedSoftwareId.GetValueOrDefault(assetSoftwareProductId)
                 : null,
             asset.Metadata,
             vulnerabilities,

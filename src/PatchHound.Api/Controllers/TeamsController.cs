@@ -138,12 +138,12 @@ public class TeamsController : ControllerBase
             .FirstOrDefaultAsync(ct);
         var membershipRule = await _dbContext.TeamMembershipRules.AsNoTracking()
             .FirstOrDefaultAsync(rule => rule.TeamId == team.Id, ct);
-        var topRiskAssets = await _dbContext.AssetRiskScores.AsNoTracking()
+        var topRiskAssets = await _dbContext.DeviceRiskScores.AsNoTracking()
             .Where(score => score.TenantId == team.TenantId)
             .Join(
                 _dbContext.Assets.AsNoTracking()
                     .Where(asset => asset.OwnerTeamId == team.Id || asset.FallbackTeamId == team.Id),
-                score => score.AssetId,
+                score => score.DeviceId,
                 asset => asset.Id,
                 (score, asset) => new
                 {

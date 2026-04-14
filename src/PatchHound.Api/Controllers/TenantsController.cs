@@ -452,10 +452,8 @@ public class TenantsController : ControllerBase
         );
         await DeleteEntitiesAsync(_dbContext.BusinessLabels.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.AssetRules.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.AssetRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.DeviceGroupRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.TeamRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.TenantSoftwareRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.TenantRiskScoreSnapshots.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.OrganizationalSeverities.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         // Phase-2: VulnerabilityEpisodeRiskAssessment, VulnerabilityAssetAssessment, VulnerabilityAssetEpisode,
@@ -581,7 +579,7 @@ public class TenantsController : ControllerBase
             .TenantSoftware.IgnoreQueryFilters()
             .AsNoTracking()
             .Where(ts => ts.TenantId == id)
-            .Select(ts => ts.NormalizedSoftwareId)
+            .Select(ts => ts.SoftwareProductId)
             .Distinct()
             .ToListAsync(ct);
 

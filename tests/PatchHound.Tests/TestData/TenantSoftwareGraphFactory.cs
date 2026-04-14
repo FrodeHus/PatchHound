@@ -4,28 +4,26 @@ using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Tests.TestData;
 
-// Phase-2: VulnerabilityDefinition, TenantVulnerability, SoftwareVulnerabilityMatch,
-// NormalizedSoftwareVulnerabilityProjection, and VulnerabilityAsset deleted.
-// Graph record retains only TenantSoftware (the only property accessed by callers).
+// Phase-7: NormalizedSoftware removed; factory now seeds canonical SoftwareProduct +
+// TenantSoftware + NormalizedSoftwareAlias + NormalizedSoftwareInstallation rows.
 internal static class TenantSoftwareGraphFactory
 {
     internal sealed record Graph(TenantSoftware TenantSoftware);
 
     public static async Task<Graph> SeedAsync(PatchHoundDbContext dbContext, Guid tenantId)
     {
-        var normalizedSoftware = NormalizedSoftware.Create(
-            "agent",
+        var softwareProduct = SoftwareProduct.Create(
             "contoso",
-            "cpe:contoso:agent",
-            "cpe:2.3:a:contoso:agent:*:*:*:*:*:*:*:*",
-            SoftwareNormalizationMethod.ExplicitCpe,
-            SoftwareNormalizationConfidence.High,
-            new DateTimeOffset(2026, 3, 10, 10, 0, 0, TimeSpan.Zero)
+            "agent",
+            "cpe:2.3:a:contoso:agent:*:*:*:*:*:*:*:*"
         );
+        await dbContext.SoftwareProducts.AddAsync(softwareProduct);
+        await dbContext.SaveChangesAsync();
+
         var tenantSoftware = TenantSoftware.Create(
             tenantId,
             null,
-            normalizedSoftware.Id,
+            softwareProduct.Id,
             new DateTimeOffset(2026, 2, 10, 0, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 3, 10, 0, 0, 0, TimeSpan.Zero)
         );
@@ -49,7 +47,6 @@ internal static class TenantSoftwareGraphFactory
         deviceOne.AssignSecurityProfile(profile.Id);
 
         await dbContext.AddRangeAsync(
-            normalizedSoftware,
             tenantSoftware,
             deviceOne,
             deviceTwo,
@@ -59,7 +56,7 @@ internal static class TenantSoftwareGraphFactory
         );
         await dbContext.NormalizedSoftwareAliases.AddRangeAsync(
             NormalizedSoftwareAlias.Create(
-                normalizedSoftware.Id,
+                softwareProduct.Id,
                 SoftwareIdentitySourceSystem.Defender,
                 "software-1",
                 "Contoso Agent",
@@ -70,7 +67,7 @@ internal static class TenantSoftwareGraphFactory
                 DateTimeOffset.UtcNow
             ),
             NormalizedSoftwareAlias.Create(
-                normalizedSoftware.Id,
+                softwareProduct.Id,
                 SoftwareIdentitySourceSystem.Defender,
                 "software-2",
                 "Contoso Agent",

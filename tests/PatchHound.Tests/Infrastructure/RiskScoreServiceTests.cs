@@ -117,7 +117,7 @@ public class RiskScoreServiceTests : IDisposable
 
         await _service.RecalculateForTenantAsync(_tenantId, CancellationToken.None);
 
-        var softwareScores = await _dbContext.TenantSoftwareRiskScores.ToListAsync();
+        var softwareScores = await _dbContext.SoftwareRiskScores.ToListAsync();
         softwareScores.Should().BeEmpty();
     }
 

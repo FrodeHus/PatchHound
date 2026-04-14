@@ -21,7 +21,7 @@ public class CycloneDxSupplyChainImportService(PatchHoundDbContext dbContext)
     )
     {
         var tenantSoftware = await dbContext
-            .TenantSoftware.Include(item => item.NormalizedSoftware)
+            .TenantSoftware.Include(item => item.SoftwareProduct)
             .FirstOrDefaultAsync(item => item.Id == tenantSoftwareId, ct);
 
         if (tenantSoftware is null)
@@ -30,7 +30,7 @@ public class CycloneDxSupplyChainImportService(PatchHoundDbContext dbContext)
         }
 
         var parsed = Parse(documentJson);
-        tenantSoftware.NormalizedSoftware.UpdateSupplyChainInsight(
+        tenantSoftware.SoftwareProduct.UpdateSupplyChainInsight(
             parsed.RemediationPath,
             parsed.Confidence,
             parsed.SourceFormat,
@@ -48,17 +48,17 @@ public class CycloneDxSupplyChainImportService(PatchHoundDbContext dbContext)
     }
 
     public async Task<SupplyChainImportResult> ImportAsyncForNormalizedSoftware(
-        Guid normalizedSoftwareId,
+        Guid softwareProductId,
         string documentJson,
         CancellationToken ct
     )
     {
         var software = await dbContext
-            .NormalizedSoftware
-            .FirstOrDefaultAsync(item => item.Id == normalizedSoftwareId, ct);
+            .SoftwareProducts
+            .FirstOrDefaultAsync(item => item.Id == softwareProductId, ct);
         if (software is null)
         {
-            throw new InvalidOperationException("Normalized software was not found.");
+            throw new InvalidOperationException("Software product was not found.");
         }
 
         var parsed = Parse(documentJson);

@@ -24,7 +24,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
     );
 
     public sealed record ResolutionResult(
-        Guid NormalizedSoftwareId,
+        Guid SoftwareProductId,
         Guid SoftwareAssetId,
         string? DetectedVersion,
         SoftwareIdentitySourceSystem SourceSystem
@@ -59,11 +59,11 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             StringComparer.Ordinal
         );
 
-        var normalizedSoftware = await dbContext
-            .NormalizedSoftware.IgnoreQueryFilters()
+        var softwareProducts = await dbContext
+            .SoftwareProducts.IgnoreQueryFilters()
             .ToListAsync(ct);
-        var normalizedById = normalizedSoftware.ToDictionary(item => item.Id);
-        var normalizedByProductKey = normalizedSoftware.ToDictionary(
+        var productsById = softwareProducts.ToDictionary(item => item.Id);
+        var productsByKey = softwareProducts.ToDictionary(
             item => item.CanonicalProductKey,
             StringComparer.Ordinal
         );
@@ -86,62 +86,62 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             activeAliasKeys.Add(aliasKey);
             aliasesBySourceKey.TryGetValue(aliasKey, out var existingAlias);
 
-            NormalizedSoftware? normalized = null;
+            SoftwareProduct? product = null;
             if (existingAlias is not null)
             {
-                normalizedById.TryGetValue(existingAlias.NormalizedSoftwareId, out normalized);
+                productsById.TryGetValue(existingAlias.SoftwareProductId, out product);
             }
 
             if (
-                normalized is not null
-                && !string.Equals(normalized.CanonicalProductKey, identity.CanonicalProductKey, StringComparison.Ordinal)
-                && normalizedByProductKey.TryGetValue(identity.CanonicalProductKey, out var matchingNormalized)
-                && matchingNormalized.Id != normalized.Id
+                product is not null
+                && !string.Equals(product.CanonicalProductKey, identity.CanonicalProductKey, StringComparison.Ordinal)
+                && productsByKey.TryGetValue(identity.CanonicalProductKey, out var matchingProduct)
+                && matchingProduct.Id != product.Id
             )
             {
-                normalized = matchingNormalized;
+                product = matchingProduct;
             }
 
-            if (normalized is null)
+            if (product is null)
             {
-                normalizedByProductKey.TryGetValue(identity.CanonicalProductKey, out normalized);
+                productsByKey.TryGetValue(identity.CanonicalProductKey, out product);
             }
 
-            if (normalized is null)
+            if (product is null)
             {
-                normalized = NormalizedSoftware.Create(
+                var vendor = identity.CanonicalVendor ?? string.Empty;
+                product = SoftwareProduct.Create(
+                    string.IsNullOrWhiteSpace(vendor) ? identity.CanonicalName : vendor,
                     identity.CanonicalName,
-                    identity.CanonicalVendor,
+                    identity.PrimaryCpe23Uri
+                );
+                product.UpdateIdentity(
                     identity.Category,
-                    identity.CanonicalProductKey,
                     identity.PrimaryCpe23Uri,
                     identity.NormalizationMethod,
                     identity.Confidence,
                     now
                 );
-                await dbContext.NormalizedSoftware.AddAsync(normalized, ct);
-                normalizedById[normalized.Id] = normalized;
-                normalizedByProductKey[normalized.CanonicalProductKey] = normalized;
+                await dbContext.SoftwareProducts.AddAsync(product, ct);
+                productsById[product.Id] = product;
+                productsByKey[product.CanonicalProductKey] = product;
             }
             else
             {
-                normalized.UpdateIdentity(
-                    normalized.PrimaryCpe23Uri is null ? identity.CanonicalName : normalized.CanonicalName,
-                    normalized.PrimaryCpe23Uri is null ? identity.CanonicalVendor : normalized.CanonicalVendor,
-                    normalized.PrimaryCpe23Uri is null ? identity.Category : normalized.Category,
-                    normalized.PrimaryCpe23Uri is null ? identity.CanonicalProductKey : normalized.CanonicalProductKey,
-                    normalized.PrimaryCpe23Uri ?? identity.PrimaryCpe23Uri,
-                    normalized.PrimaryCpe23Uri is null ? identity.NormalizationMethod : SoftwareNormalizationMethod.ExplicitCpe,
-                    normalized.PrimaryCpe23Uri is null ? identity.Confidence : SoftwareNormalizationConfidence.High,
+                product.UpdateIdentity(
+                    product.PrimaryCpe23Uri is null ? identity.Category : product.Category,
+                    product.PrimaryCpe23Uri ?? identity.PrimaryCpe23Uri,
+                    product.PrimaryCpe23Uri is null ? identity.NormalizationMethod : SoftwareNormalizationMethod.ExplicitCpe,
+                    product.PrimaryCpe23Uri is null ? identity.Confidence : SoftwareNormalizationConfidence.High,
                     now
                 );
-                normalizedByProductKey[normalized.CanonicalProductKey] = normalized;
+                productsByKey[product.CanonicalProductKey] = product;
             }
 
             if (existingAlias is null)
             {
                 existingAlias = NormalizedSoftwareAlias.Create(
-                    normalized.Id,
+                    product.Id,
                     identity.SourceSystem,
                     identity.ExternalSoftwareId,
                     identity.CanonicalName,
@@ -157,7 +157,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             else
             {
                 existingAlias.UpdateMatch(
-                    normalized.Id,
+                    product.Id,
                     identity.CanonicalName,
                     identity.CanonicalVendor,
                     identity.DetectedVersion,
@@ -168,7 +168,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             }
 
             resolutions[asset.Id] = new ResolutionResult(
-                normalized.Id,
+                product.Id,
                 asset.Id,
                 identity.DetectedVersion,
                 identity.SourceSystem
@@ -217,14 +217,15 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
 
         if (!string.IsNullOrWhiteSpace(rawName))
         {
+            var vendor = string.IsNullOrWhiteSpace(rawVendor) ? null : rawVendor.Trim();
             return new SoftwareIdentitySnapshot(
                 softwareAssetId,
                 externalSoftwareId,
                 sourceSystem,
                 rawName.Trim(),
-                string.IsNullOrWhiteSpace(rawVendor) ? null : rawVendor.Trim(),
+                vendor,
                 string.IsNullOrWhiteSpace(rawCategory) ? null : rawCategory.Trim(),
-                BuildCanonicalProductKey(rawVendor, rawName, null),
+                BuildCanonicalProductKey(vendor, rawName),
                 null,
                 string.IsNullOrWhiteSpace(rawVersion) ? null : rawVersion.Trim(),
                 SoftwareNormalizationMethod.Heuristic,
@@ -268,28 +269,18 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             : null;
     }
 
-    private static string BuildCanonicalProductKey(
-        string? vendor,
-        string product,
-        string? cpe23Uri
-    )
+    /// <summary>
+    /// Builds the canonical product key in the <c>vendor::name</c> format used by
+    /// <see cref="SoftwareProduct"/>. Both tokens are lowercased and stripped of
+    /// non-alphanumeric characters to match the key stored in the database.
+    /// </summary>
+    private static string BuildCanonicalProductKey(string? vendor, string product)
     {
-        if (!string.IsNullOrWhiteSpace(cpe23Uri) && TryParseCpe23(cpe23Uri, out var cpe))
-        {
-            return $"cpe:{NormalizeToken(cpe.Vendor)}:{NormalizeToken(cpe.Product)}";
-        }
-
-        return $"{NormalizeToken(vendor)}|{NormalizeToken(product)}";
-    }
-
-    private static SoftwareNormalizationConfidence MapConfidence(MatchConfidence confidence)
-    {
-        return confidence switch
-        {
-            MatchConfidence.High => SoftwareNormalizationConfidence.High,
-            MatchConfidence.Medium => SoftwareNormalizationConfidence.Medium,
-            _ => SoftwareNormalizationConfidence.Low,
-        };
+        var vendorToken = NormalizeToken(vendor);
+        var productToken = NormalizeToken(product);
+        // Use the vendor token as vendor when present; fall back to the product token
+        // so that SoftwareProduct.Create can always receive a non-empty vendor.
+        return $"{(string.IsNullOrEmpty(vendorToken) ? productToken : vendorToken)}::{productToken}";
     }
 
     private static string BuildAliasKey(
@@ -298,11 +289,6 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
     )
     {
         return $"{sourceSystem}:{externalSoftwareId.Trim()}";
-    }
-
-    private static string? FirstNonEmpty(params string?[] values)
-    {
-        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
     private static string NormalizeToken(string? value)
@@ -314,30 +300,5 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
 
         var chars = value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray();
         return new string(chars);
-    }
-
-    private static bool TryParseCpe23(
-        string? cpe23Uri,
-        out (string Vendor, string Product, string? Version) components
-    )
-    {
-        components = default;
-        if (string.IsNullOrWhiteSpace(cpe23Uri))
-        {
-            return false;
-        }
-
-        var segments = cpe23Uri.Split(':', StringSplitOptions.None);
-        if (segments.Length < 6 || !string.Equals(segments[0], "cpe", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        components = (
-            segments[3],
-            segments[4],
-            string.Equals(segments[5], "*", StringComparison.Ordinal) ? null : segments[5]
-        );
-        return true;
     }
 }

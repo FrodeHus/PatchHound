@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace PatchHound.Infrastructure.Data.Migrations
+namespace PatchHound.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class Initial : Migration
@@ -380,48 +380,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "NormalizedSoftware",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    CanonicalName = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    CanonicalVendor = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    Category = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    CanonicalProductKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    PrimaryCpe23Uri = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
-                    Description = table.Column<string>(type: "text", nullable: true),
-                    DescriptionGeneratedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    DescriptionProviderType = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    DescriptionProfileName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    DescriptionModel = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    NormalizationMethod = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    Confidence = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    LastEvaluatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    EolProductSlug = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    EolDate = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    EolLatestVersion = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    EolIsLts = table.Column<bool>(type: "boolean", nullable: true),
-                    EolSupportEndDate = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    EolIsDiscontinued = table.Column<bool>(type: "boolean", nullable: true),
-                    EolEnrichedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    SupplyChainRemediationPath = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    SupplyChainInsightConfidence = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    SupplyChainSourceFormat = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    SupplyChainPrimaryComponentName = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
-                    SupplyChainPrimaryComponentVersion = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    SupplyChainFixedVersion = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    SupplyChainAffectedVulnerabilityCount = table.Column<int>(type: "integer", nullable: true),
-                    SupplyChainSummary = table.Column<string>(type: "text", nullable: true),
-                    SupplyChainEnrichedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_NormalizedSoftware", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Notifications",
                 columns: table => new
                 {
@@ -689,7 +647,32 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     PrimaryCpe23Uri = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     EndOfLifeAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    Category = table.Column<string>(type: "text", nullable: true),
+                    NormalizationMethod = table.Column<int>(type: "integer", nullable: false),
+                    Confidence = table.Column<int>(type: "integer", nullable: false),
+                    LastEvaluatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: true),
+                    DescriptionGeneratedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DescriptionProviderType = table.Column<string>(type: "text", nullable: true),
+                    DescriptionProfileName = table.Column<string>(type: "text", nullable: true),
+                    DescriptionModel = table.Column<string>(type: "text", nullable: true),
+                    EolProductSlug = table.Column<string>(type: "text", nullable: true),
+                    EolDate = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    EolLatestVersion = table.Column<string>(type: "text", nullable: true),
+                    EolIsLts = table.Column<bool>(type: "boolean", nullable: true),
+                    EolSupportEndDate = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    EolIsDiscontinued = table.Column<bool>(type: "boolean", nullable: true),
+                    EolEnrichedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    SupplyChainRemediationPath = table.Column<int>(type: "integer", nullable: false),
+                    SupplyChainInsightConfidence = table.Column<int>(type: "integer", nullable: false),
+                    SupplyChainSourceFormat = table.Column<string>(type: "text", nullable: true),
+                    SupplyChainPrimaryComponentName = table.Column<string>(type: "text", nullable: true),
+                    SupplyChainPrimaryComponentVersion = table.Column<string>(type: "text", nullable: true),
+                    SupplyChainFixedVersion = table.Column<string>(type: "text", nullable: true),
+                    SupplyChainAffectedVulnerabilityCount = table.Column<int>(type: "integer", nullable: true),
+                    SupplyChainSummary = table.Column<string>(type: "text", nullable: true),
+                    SupplyChainEnrichedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -1061,7 +1044,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    NormalizedSoftwareId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SoftwareProductId = table.Column<Guid>(type: "uuid", nullable: false),
                     SourceSystem = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     ExternalSoftwareId = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
                     RawName = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
@@ -1076,74 +1059,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 {
                     table.PrimaryKey("PK_NormalizedSoftwareAliases", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_NormalizedSoftwareAliases_NormalizedSoftware_NormalizedSoft~",
-                        column: x => x.NormalizedSoftwareId,
-                        principalTable: "NormalizedSoftware",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "SoftwareCpeBindings",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    NormalizedSoftwareId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Cpe23Uri = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: false),
-                    BindingMethod = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    Confidence = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    MatchedVendor = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    MatchedProduct = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    MatchedVersion = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    LastValidatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_SoftwareCpeBindings", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_SoftwareCpeBindings_NormalizedSoftware_NormalizedSoftwareId",
-                        column: x => x.NormalizedSoftwareId,
-                        principalTable: "NormalizedSoftware",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "TenantSoftware",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
-                    SnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
-                    NormalizedSoftwareId = table.Column<Guid>(type: "uuid", nullable: false),
-                    FirstSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    LastSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    RemediationAiSummaryContent = table.Column<string>(type: "text", nullable: false),
-                    RemediationAiSummaryInputHash = table.Column<string>(type: "text", nullable: false),
-                    RemediationAiSummaryProviderType = table.Column<string>(type: "text", nullable: false),
-                    RemediationAiSummaryProfileName = table.Column<string>(type: "text", nullable: false),
-                    RemediationAiSummaryModel = table.Column<string>(type: "text", nullable: false),
-                    RemediationAiOwnerRecommendationContent = table.Column<string>(type: "text", nullable: false),
-                    RemediationAiAnalystAssessmentContent = table.Column<string>(type: "text", nullable: false),
-                    RemediationAiExceptionRecommendationContent = table.Column<string>(type: "text", nullable: false),
-                    RemediationAiRecommendedOutcome = table.Column<string>(type: "text", nullable: false),
-                    RemediationAiRecommendedPriority = table.Column<string>(type: "text", nullable: false),
-                    RemediationAiReviewStatus = table.Column<string>(type: "text", nullable: false),
-                    RemediationAiReviewedBy = table.Column<Guid>(type: "uuid", nullable: true),
-                    RemediationAiReviewedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    RemediationAiSummaryGeneratedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_TenantSoftware", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_TenantSoftware_NormalizedSoftware_NormalizedSoftwareId",
-                        column: x => x.NormalizedSoftwareId,
-                        principalTable: "NormalizedSoftware",
+                        name: "FK_NormalizedSoftwareAliases_SoftwareProducts_SoftwareProductId",
+                        column: x => x.SoftwareProductId,
+                        principalTable: "SoftwareProducts",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -1169,6 +1087,33 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         principalTable: "SoftwareProducts",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SoftwareCpeBindings",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    SoftwareProductId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Cpe23Uri = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: false),
+                    BindingMethod = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    Confidence = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    MatchedVendor = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    MatchedProduct = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    MatchedVersion = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    LastValidatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SoftwareCpeBindings", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_SoftwareCpeBindings_SoftwareProducts_SoftwareProductId",
+                        column: x => x.SoftwareProductId,
+                        principalTable: "SoftwareProducts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -1199,6 +1144,44 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         principalTable: "SoftwareProducts",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "TenantSoftware",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
+                    SoftwareProductId = table.Column<Guid>(type: "uuid", nullable: false),
+                    FirstSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    LastSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    RemediationAiSummaryContent = table.Column<string>(type: "text", nullable: false),
+                    RemediationAiSummaryInputHash = table.Column<string>(type: "text", nullable: false),
+                    RemediationAiSummaryProviderType = table.Column<string>(type: "text", nullable: false),
+                    RemediationAiSummaryProfileName = table.Column<string>(type: "text", nullable: false),
+                    RemediationAiSummaryModel = table.Column<string>(type: "text", nullable: false),
+                    RemediationAiOwnerRecommendationContent = table.Column<string>(type: "text", nullable: false),
+                    RemediationAiAnalystAssessmentContent = table.Column<string>(type: "text", nullable: false),
+                    RemediationAiExceptionRecommendationContent = table.Column<string>(type: "text", nullable: false),
+                    RemediationAiRecommendedOutcome = table.Column<string>(type: "text", nullable: false),
+                    RemediationAiRecommendedPriority = table.Column<string>(type: "text", nullable: false),
+                    RemediationAiReviewStatus = table.Column<string>(type: "text", nullable: false),
+                    RemediationAiReviewedBy = table.Column<Guid>(type: "uuid", nullable: true),
+                    RemediationAiReviewedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    RemediationAiSummaryGeneratedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TenantSoftware", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_TenantSoftware_SoftwareProducts_SoftwareProductId",
+                        column: x => x.SoftwareProductId,
+                        principalTable: "SoftwareProducts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -1607,35 +1590,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "AssetRiskScores",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
-                    AssetId = table.Column<Guid>(type: "uuid", nullable: false),
-                    OverallScore = table.Column<decimal>(type: "numeric(7,2)", precision: 7, scale: 2, nullable: false),
-                    MaxEpisodeRiskScore = table.Column<decimal>(type: "numeric(7,2)", precision: 7, scale: 2, nullable: false),
-                    CriticalCount = table.Column<int>(type: "integer", nullable: false),
-                    HighCount = table.Column<int>(type: "integer", nullable: false),
-                    MediumCount = table.Column<int>(type: "integer", nullable: false),
-                    LowCount = table.Column<int>(type: "integer", nullable: false),
-                    OpenEpisodeCount = table.Column<int>(type: "integer", nullable: false),
-                    FactorsJson = table.Column<string>(type: "text", nullable: false),
-                    CalculationVersion = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    CalculatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AssetRiskScores", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_AssetRiskScores_Assets_AssetId",
-                        column: x => x.AssetId,
-                        principalTable: "Assets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "AssetTags",
                 columns: table => new
                 {
@@ -1712,78 +1666,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         name: "FK_DeviceSoftwareInstallations_Assets_SoftwareAssetId",
                         column: x => x.SoftwareAssetId,
                         principalTable: "Assets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "NormalizedSoftwareInstallations",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
-                    SnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
-                    TenantSoftwareId = table.Column<Guid>(type: "uuid", nullable: false),
-                    SoftwareAssetId = table.Column<Guid>(type: "uuid", nullable: false),
-                    DeviceAssetId = table.Column<Guid>(type: "uuid", nullable: false),
-                    SourceSystem = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    DetectedVersion = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    FirstSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    LastSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    RemovedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
-                    CurrentEpisodeNumber = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_NormalizedSoftwareInstallations", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_NormalizedSoftwareInstallations_Assets_DeviceAssetId",
-                        column: x => x.DeviceAssetId,
-                        principalTable: "Assets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_NormalizedSoftwareInstallations_Assets_SoftwareAssetId",
-                        column: x => x.SoftwareAssetId,
-                        principalTable: "Assets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_NormalizedSoftwareInstallations_TenantSoftware_TenantSoftwa~",
-                        column: x => x.TenantSoftwareId,
-                        principalTable: "TenantSoftware",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "TenantSoftwareRiskScores",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
-                    TenantSoftwareId = table.Column<Guid>(type: "uuid", nullable: false),
-                    SnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
-                    OverallScore = table.Column<decimal>(type: "numeric(7,2)", precision: 7, scale: 2, nullable: false),
-                    MaxEpisodeRiskScore = table.Column<decimal>(type: "numeric(7,2)", precision: 7, scale: 2, nullable: false),
-                    CriticalEpisodeCount = table.Column<int>(type: "integer", nullable: false),
-                    HighEpisodeCount = table.Column<int>(type: "integer", nullable: false),
-                    MediumEpisodeCount = table.Column<int>(type: "integer", nullable: false),
-                    LowEpisodeCount = table.Column<int>(type: "integer", nullable: false),
-                    AffectedDeviceCount = table.Column<int>(type: "integer", nullable: false),
-                    OpenEpisodeCount = table.Column<int>(type: "integer", nullable: false),
-                    FactorsJson = table.Column<string>(type: "text", nullable: false),
-                    CalculationVersion = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    CalculatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_TenantSoftwareRiskScores", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_TenantSoftwareRiskScores_TenantSoftware_TenantSoftwareId",
-                        column: x => x.TenantSoftwareId,
-                        principalTable: "TenantSoftware",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -1889,6 +1771,47 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         principalTable: "RemediationCases",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "NormalizedSoftwareInstallations",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SnapshotId = table.Column<Guid>(type: "uuid", nullable: true),
+                    TenantSoftwareId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SoftwareAssetId = table.Column<Guid>(type: "uuid", nullable: false),
+                    DeviceAssetId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SourceSystem = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    DetectedVersion = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    FirstSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    LastSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    RemovedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    CurrentEpisodeNumber = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_NormalizedSoftwareInstallations", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_NormalizedSoftwareInstallations_Assets_DeviceAssetId",
+                        column: x => x.DeviceAssetId,
+                        principalTable: "Assets",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_NormalizedSoftwareInstallations_Assets_SoftwareAssetId",
+                        column: x => x.SoftwareAssetId,
+                        principalTable: "Assets",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_NormalizedSoftwareInstallations_TenantSoftware_TenantSoftwa~",
+                        column: x => x.TenantSoftwareId,
+                        principalTable: "TenantSoftware",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -2513,22 +2436,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 column: "BusinessLabelId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AssetRiskScores_AssetId",
-                table: "AssetRiskScores",
-                column: "AssetId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AssetRiskScores_TenantId",
-                table: "AssetRiskScores",
-                column: "TenantId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AssetRiskScores_TenantId_AssetId",
-                table: "AssetRiskScores",
-                columns: new[] { "TenantId", "AssetId" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "IX_AssetRules_TenantId",
                 table: "AssetRules",
                 column: "TenantId");
@@ -2955,15 +2862,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 columns: new[] { "TenantId", "SoftwareProductId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftware_CanonicalProductKey",
-                table: "NormalizedSoftware",
-                column: "CanonicalProductKey",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareAliases_NormalizedSoftwareId",
+                name: "IX_NormalizedSoftwareAliases_SoftwareProductId",
                 table: "NormalizedSoftwareAliases",
-                column: "NormalizedSoftwareId");
+                column: "SoftwareProductId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_NormalizedSoftwareAliases_SourceSystem_ExternalSoftwareId",
@@ -3253,9 +3154,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_SoftwareCpeBindings_NormalizedSoftwareId",
+                name: "IX_SoftwareCpeBindings_SoftwareProductId",
                 table: "SoftwareCpeBindings",
-                column: "NormalizedSoftwareId",
+                column: "SoftwareProductId",
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -3439,14 +3340,14 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_TenantSoftware_NormalizedSoftwareId",
-                table: "TenantSoftware",
-                column: "NormalizedSoftwareId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_TenantSoftware_SnapshotId",
                 table: "TenantSoftware",
                 column: "SnapshotId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TenantSoftware_SoftwareProductId",
+                table: "TenantSoftware",
+                column: "SoftwareProductId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_TenantSoftware_TenantId",
@@ -3454,9 +3355,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 column: "TenantId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_TenantSoftware_TenantId_SnapshotId_NormalizedSoftwareId",
+                name: "IX_TenantSoftware_TenantId_SnapshotId_SoftwareProductId",
                 table: "TenantSoftware",
-                columns: new[] { "TenantId", "SnapshotId", "NormalizedSoftwareId" },
+                columns: new[] { "TenantId", "SnapshotId", "SoftwareProductId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -3468,22 +3369,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 name: "IX_TenantSoftwareProductInsights_TenantId_SoftwareProductId",
                 table: "TenantSoftwareProductInsights",
                 columns: new[] { "TenantId", "SoftwareProductId" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TenantSoftwareRiskScores_TenantId",
-                table: "TenantSoftwareRiskScores",
-                column: "TenantId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TenantSoftwareRiskScores_TenantId_SnapshotId",
-                table: "TenantSoftwareRiskScores",
-                columns: new[] { "TenantId", "SnapshotId" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TenantSoftwareRiskScores_TenantSoftwareId",
-                table: "TenantSoftwareRiskScores",
-                column: "TenantSoftwareId",
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -3627,9 +3512,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "AssetBusinessLabels");
-
-            migrationBuilder.DropTable(
-                name: "AssetRiskScores");
 
             migrationBuilder.DropTable(
                 name: "AssetRules");
@@ -3800,9 +3682,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 name: "TenantSoftwareProductInsights");
 
             migrationBuilder.DropTable(
-                name: "TenantSoftwareRiskScores");
-
-            migrationBuilder.DropTable(
                 name: "TenantSourceConfigurations");
 
             migrationBuilder.DropTable(
@@ -3839,10 +3718,10 @@ namespace PatchHound.Infrastructure.Data.Migrations
                 name: "Assets");
 
             migrationBuilder.DropTable(
-                name: "Teams");
+                name: "TenantSoftware");
 
             migrationBuilder.DropTable(
-                name: "TenantSoftware");
+                name: "Teams");
 
             migrationBuilder.DropTable(
                 name: "Tenants");
@@ -3864,9 +3743,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "AssetSecurityProfiles");
-
-            migrationBuilder.DropTable(
-                name: "NormalizedSoftware");
 
             migrationBuilder.DropTable(
                 name: "WorkflowInstances");

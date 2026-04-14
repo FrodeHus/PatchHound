@@ -12,15 +12,15 @@ public class TenantSoftwareConfiguration : IEntityTypeConfiguration<TenantSoftwa
 
         builder.HasIndex(item => item.TenantId);
         builder.HasIndex(item => item.SnapshotId);
-        builder.HasIndex(item => item.NormalizedSoftwareId);
+        builder.HasIndex(item => item.SoftwareProductId);
         builder
-            .HasIndex(item => new { item.TenantId, item.SnapshotId, item.NormalizedSoftwareId })
+            .HasIndex(item => new { item.TenantId, item.SnapshotId, item.SoftwareProductId })
             .IsUnique();
 
         builder
-            .HasOne(item => item.NormalizedSoftware)
+            .HasOne(item => item.SoftwareProduct)
             .WithMany()
-            .HasForeignKey(item => item.NormalizedSoftwareId)
+            .HasForeignKey(item => item.SoftwareProductId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

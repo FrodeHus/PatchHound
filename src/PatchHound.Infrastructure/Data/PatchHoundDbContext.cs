@@ -60,7 +60,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<AssetBusinessLabel> AssetBusinessLabels => Set<AssetBusinessLabel>();
     public DbSet<AssetSecurityProfile> AssetSecurityProfiles => Set<AssetSecurityProfile>();
     public DbSet<SoftwareCpeBinding> SoftwareCpeBindings => Set<SoftwareCpeBinding>();
-    public DbSet<NormalizedSoftware> NormalizedSoftware => Set<NormalizedSoftware>();
     public DbSet<TenantSoftware> TenantSoftware => Set<TenantSoftware>();
     public DbSet<NormalizedSoftwareAlias> NormalizedSoftwareAliases =>
         Set<NormalizedSoftwareAlias>();
@@ -100,9 +99,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<RemediationAiJob> RemediationAiJobs => Set<RemediationAiJob>();
     public DbSet<AssetTag> AssetTags => Set<AssetTag>();
     public DbSet<AssetRule> AssetRules => Set<AssetRule>();
-    public DbSet<AssetRiskScore> AssetRiskScores => Set<AssetRiskScore>();
     public DbSet<DeviceGroupRiskScore> DeviceGroupRiskScores => Set<DeviceGroupRiskScore>();
-    public DbSet<TenantSoftwareRiskScore> TenantSoftwareRiskScores => Set<TenantSoftwareRiskScore>();
     public DbSet<SoftwareRiskScore> SoftwareRiskScores => Set<SoftwareRiskScore>();
     public DbSet<TeamRiskScore> TeamRiskScores => Set<TeamRiskScore>();
     public DbSet<TenantRiskScoreSnapshot> TenantRiskScoreSnapshots => Set<TenantRiskScoreSnapshot>();
@@ -338,19 +335,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<AssetRule>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
-            .Entity<AssetRiskScore>()
-            .HasQueryFilter(e =>
-                IsSystemContext
-                || (
-                    AccessibleTenantIds.Contains(e.TenantId)
-                    && (e.Asset.AssetType != AssetType.Device || e.Asset.DeviceActiveInTenant)
-                )
-            );
-        modelBuilder
             .Entity<DeviceGroupRiskScore>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<TenantSoftwareRiskScore>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<SoftwareRiskScore>()

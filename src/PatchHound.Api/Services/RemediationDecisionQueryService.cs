@@ -437,7 +437,7 @@ public class RemediationDecisionQueryService(
             : null;
 
         // Asset risk score — TODO Phase 5: restore from canonical risk scores.
-        _ = await dbContext.AssetRiskScores.AsNoTracking()
+        _ = await dbContext.DeviceRiskScores.AsNoTracking()
             .FirstOrDefaultAsync(r => r.TenantId == tenantId, ct);
 
         // SLA configuration

@@ -106,7 +106,7 @@ public class TeamsControllerTests : IDisposable
             tenant,
             team,
             asset,
-            AssetRiskScore.Create(_tenantId, asset.Id, 710m, 680m, 0, 1, 0, 0, 1, "[]", "1"),
+            DeviceRiskScore.Create(_tenantId, asset.Id, 710m, 680m, 0, 1, 0, 0, 1, "[]", "1"),
             TeamRiskScore.Create(_tenantId, team.Id, 640m, 620m, 0, 1, 0, 0, 1, 1, "[]", "1")
         );
         await _dbContext.SaveChangesAsync();

@@ -77,8 +77,8 @@ public class CycloneDxSupplyChainImportServiceTests : IDisposable
         result.PrimaryComponentName.Should().Be("commons-text");
         result.AffectedVulnerabilityCount.Should().Be(1);
 
-        var normalizedSoftware = await _dbContext.NormalizedSoftware.SingleAsync();
-        normalizedSoftware.SupplyChainRemediationPath.Should().Be(SupplyChainRemediationPath.VendorUpdateRequired);
+        var softwareProduct = await _dbContext.SoftwareProducts.SingleAsync();
+        softwareProduct.SupplyChainRemediationPath.Should().Be(SupplyChainRemediationPath.VendorUpdateRequired);
     }
 
     [Fact]
@@ -131,18 +131,10 @@ public class CycloneDxSupplyChainImportServiceTests : IDisposable
     private async Task<TenantSoftware> SeedTenantSoftwareAsync()
     {
         var timestamp = new DateTimeOffset(2026, 3, 30, 10, 0, 0, TimeSpan.Zero);
-        var normalizedSoftware = NormalizedSoftware.Create(
-            "contoso-app",
-            "contoso",
-            "contoso|contoso-app",
-            null,
-            SoftwareNormalizationMethod.Heuristic,
-            SoftwareNormalizationConfidence.High,
-            timestamp
-        );
-        var tenantSoftware = TenantSoftware.Create(_tenantId, null, normalizedSoftware.Id, timestamp, timestamp);
+        var softwareProduct = SoftwareProduct.Create("contoso", "contoso-app", null);
+        var tenantSoftware = TenantSoftware.Create(_tenantId, null, softwareProduct.Id, timestamp, timestamp);
 
-        await _dbContext.AddRangeAsync(normalizedSoftware, tenantSoftware);
+        await _dbContext.AddRangeAsync(softwareProduct, tenantSoftware);
         await _dbContext.SaveChangesAsync();
 
         return tenantSoftware;
