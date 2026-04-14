@@ -15,12 +15,6 @@ public class AdvancedToolExecutionService(
     TenantAiTextGenerationService aiTextGenerationService
 )
 {
-    private sealed record SoftwareEvidenceMetadata(
-        string? Vendor,
-        string? Product,
-        string? Version
-    );
-
     public sealed record AssetExecutionReportResult(
         IReadOnlyList<DefenderAdvancedQuerySchemaColumn> Schema,
         IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows,
@@ -241,32 +235,38 @@ public class AdvancedToolExecutionService(
             );
         }
 
-        // Phase-2: VulnerabilityAsset + SoftwareVulnerabilityMatch deleted. Return empty context.
-        var openVulnerabilityRows = new List<(Guid VulnerabilityId, string ExternalId)>();
-        var requestedIds = new HashSet<Guid>();
-        var vulnerabilityRows = openVulnerabilityRows;
-        var softwareEvidenceRows = new List<(string ExternalId, string? Metadata)>();
+        // Source open vulnerability context from canonical DeviceVulnerabilityExposures.
+        var openExposureQuery = dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(e => e.TenantId == tenantId && e.DeviceId == assetId
+                && e.Status == Core.Enums.ExposureStatus.Open);
 
-        var evidenceByExternalId = softwareEvidenceRows
-            .GroupBy(row => row.ExternalId, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                group => group.Key,
-                group => ExtractSoftwareMetadata(group.Select(item => item.Metadata).FirstOrDefault()),
-                StringComparer.OrdinalIgnoreCase
-            );
+        if (!useAllOpenVulnerabilities && vulnerabilityIds is { Count: > 0 })
+            openExposureQuery = openExposureQuery.Where(e => vulnerabilityIds.Contains(e.VulnerabilityId));
 
-        var vulnerabilities = vulnerabilityRows
-            .Select(row =>
+        var requestedIds = vulnerabilityIds is { Count: > 0 }
+            ? vulnerabilityIds.ToHashSet()
+            : new HashSet<Guid>();
+
+        var exposureRows = await openExposureQuery
+            .Select(e => new
             {
-                evidenceByExternalId.TryGetValue(row.ExternalId, out var softwareEvidence);
-                return new AdvancedToolVulnerabilityContext(
-                    row.VulnerabilityId,
-                    row.ExternalId,
-                    softwareEvidence?.Vendor,
-                    softwareEvidence?.Product,
-                    softwareEvidence?.Version
-                );
+                e.VulnerabilityId,
+                ExternalId = e.Vulnerability.ExternalId,
+                Vendor = e.SoftwareProduct != null ? e.SoftwareProduct.Vendor : null,
+                Product = e.SoftwareProduct != null ? e.SoftwareProduct.Name : null,
+                Version = e.InstalledSoftware != null ? e.InstalledSoftware.Version : null,
             })
+            .Distinct()
+            .ToListAsync(ct);
+
+        var vulnerabilities = exposureRows
+            .Select(row => new AdvancedToolVulnerabilityContext(
+                row.VulnerabilityId,
+                row.ExternalId,
+                row.Vendor,
+                row.Product,
+                row.Version
+            ))
             .ToList();
 
         var deviceName = asset.DeviceComputerDnsName ?? asset.Name;
@@ -278,29 +278,6 @@ public class AdvancedToolExecutionService(
             deviceName,
             vulnerabilities
         );
-    }
-
-    private static SoftwareEvidenceMetadata? ExtractSoftwareMetadata(string? metadataJson)
-    {
-        if (string.IsNullOrWhiteSpace(metadataJson))
-        {
-            return null;
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(metadataJson);
-            var root = document.RootElement;
-            return new SoftwareEvidenceMetadata(
-                root.TryGetProperty("vendor", out var vendor) ? vendor.GetString() : null,
-                root.TryGetProperty("name", out var product) ? product.GetString() : null,
-                root.TryGetProperty("version", out var version) ? version.GetString() : null
-            );
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
     }
 
     private static (IReadOnlyList<DefenderAdvancedQuerySchemaColumn> Schema, IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows) MergeQueryResults(
