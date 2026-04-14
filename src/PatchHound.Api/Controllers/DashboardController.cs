@@ -47,8 +47,6 @@ public class DashboardController : ControllerBase
         {
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
-        var activeSnapshotId = await _snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
-
         var (filteredAssetIds, minPublishedDate) = BuildFilterContext(tenantId, filter);
 
         var riskChangeBrief = await _dashboardQueryService.BuildRiskChangeBriefAsync(
@@ -237,8 +235,8 @@ public class DashboardController : ControllerBase
             ? 0
             : await (
                 from asset in ownedAssetsQuery
-                join score in _dbContext.AssetRiskScores.AsNoTracking()
-                    on asset.Id equals score.AssetId
+                join score in _dbContext.DeviceRiskScores.AsNoTracking()
+                    on asset.Id equals score.DeviceId
                 where score.OverallScore >= 500m
                 select asset.Id
             )
@@ -250,8 +248,28 @@ public class DashboardController : ControllerBase
             : await BuildOwnerAssetSummariesAsync(tenantId, ownedAssetsQuery, take: 6, attentionOnly: false, ct);
 
         var topAssetIds = topOwnedAssets.Select(item => item.AssetId).ToList();
-        // Phase-2: VulnerabilityEpisodeRiskAssessment deleted — stub top driver rows.
-        var topDriverRows = Array.Empty<OwnerTopDriverRow>();
+        var topDriverRows = topAssetIds.Count == 0
+            ? []
+            : await (
+                from assessment in _dbContext.ExposureAssessments.AsNoTracking()
+                where assessment.TenantId == tenantId
+                      && topAssetIds.Contains(assessment.Exposure.DeviceId)
+                      && assessment.Exposure.Status == ExposureStatus.Open
+                orderby assessment.EnvironmentalCvss descending
+                select new OwnerTopDriverRow(
+                    assessment.Exposure.DeviceId,
+                    assessment.EnvironmentalCvss,
+                    assessment.EnvironmentalCvss >= 9.0m ? "Critical"
+                        : assessment.EnvironmentalCvss >= 7.0m ? "High"
+                        : assessment.EnvironmentalCvss >= 4.0m ? "Medium" : "Low",
+                    assessment.Exposure.Vulnerability.ExternalId,
+                    assessment.Exposure.Vulnerability.Title,
+                    assessment.Exposure.Vulnerability.Description,
+                    assessment.EnvironmentalCvss >= 9.0m ? Severity.Critical
+                        : assessment.EnvironmentalCvss >= 7.0m ? Severity.High
+                        : assessment.EnvironmentalCvss >= 4.0m ? Severity.Medium : Severity.Low
+                )
+            ).ToArrayAsync(ct);
 
         var ownerAssets = topOwnedAssets
             .Select(item =>
@@ -455,8 +473,8 @@ public class DashboardController : ControllerBase
     {
         var query =
             from asset in ownedAssetsQuery
-            join score in _dbContext.AssetRiskScores.AsNoTracking()
-                on asset.Id equals score.AssetId into scoreJoin
+            join score in _dbContext.DeviceRiskScores.AsNoTracking()
+                on asset.Id equals score.DeviceId into scoreJoin
             from score in scoreJoin.DefaultIfEmpty()
             select new
             {
@@ -487,8 +505,28 @@ public class DashboardController : ControllerBase
             : await query.ToListAsync(ct);
 
         var assetIds = rows.Select(item => item.Id).ToList();
-        // Phase-2: VulnerabilityEpisodeRiskAssessment deleted — stub top driver rows.
-        var topDriverRows = Array.Empty<OwnerTopDriverRow>();
+        var topDriverRows = assetIds.Count == 0
+            ? []
+            : await (
+                from assessment in _dbContext.ExposureAssessments.AsNoTracking()
+                where assessment.TenantId == tenantId
+                      && assetIds.Contains(assessment.Exposure.DeviceId)
+                      && assessment.Exposure.Status == ExposureStatus.Open
+                orderby assessment.EnvironmentalCvss descending
+                select new OwnerTopDriverRow(
+                    assessment.Exposure.DeviceId,
+                    assessment.EnvironmentalCvss,
+                    assessment.EnvironmentalCvss >= 9.0m ? "Critical"
+                        : assessment.EnvironmentalCvss >= 7.0m ? "High"
+                        : assessment.EnvironmentalCvss >= 4.0m ? "Medium" : "Low",
+                    assessment.Exposure.Vulnerability.ExternalId,
+                    assessment.Exposure.Vulnerability.Title,
+                    assessment.Exposure.Vulnerability.Description,
+                    assessment.EnvironmentalCvss >= 9.0m ? Severity.Critical
+                        : assessment.EnvironmentalCvss >= 7.0m ? Severity.High
+                        : assessment.EnvironmentalCvss >= 4.0m ? Severity.Medium : Severity.Low
+                )
+            ).ToArrayAsync(ct);
 
         return rows
             .Select(item =>
@@ -638,11 +676,60 @@ public class DashboardController : ControllerBase
             ct);
 
         var now = DateTimeOffset.UtcNow;
-        // Phase-2: NormalizedSoftwareVulnerabilityProjection deleted — stub missed maintenance window count.
-        var missedMaintenanceWindowCount = 0;
+        var missedMaintenanceWindowCount = await (
+            from task in _dbContext.PatchingTasks.AsNoTracking()
+            join decision in _dbContext.RemediationDecisions.AsNoTracking()
+                on task.RemediationDecisionId equals decision.Id
+            where task.TenantId == tenantId
+                  && task.Status != PatchingTaskStatus.Completed
+                  && decision.MaintenanceWindowDate != null
+                  && decision.MaintenanceWindowDate < now
+            select task.Id
+        ).CountAsync(ct);
 
-        // Phase-2: VulnerabilityAssetEpisode + TenantVulnerability + VulnerabilityDefinition deleted — stub.
-        var devicesWithAgedVulnerabilities = new List<DevicePatchDriftDto>();
+        // Devices with open exposures older than the Low SLA (180 days)
+        const int agedThresholdDays = 180;
+        var agedCutoff = now.AddDays(-agedThresholdDays);
+        var devicesWithAgedVulnerabilities = await (
+            from exposure in _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            where exposure.TenantId == tenantId
+                  && exposure.Status == ExposureStatus.Open
+                  && exposure.FirstObservedAt < agedCutoff
+            join assessment in _dbContext.ExposureAssessments.AsNoTracking()
+                on exposure.Id equals assessment.DeviceVulnerabilityExposureId into assessmentJoin
+            from assessment in assessmentJoin.DefaultIfEmpty()
+            group new { exposure, assessment } by exposure.DeviceId into g
+            select new
+            {
+                DeviceId = g.Key,
+                OldVulnerabilityCount = g.Select(x => x.exposure.VulnerabilityId).Distinct().Count(),
+                OldestPublishedDate = g.Min(x => x.exposure.Vulnerability.PublishedDate),
+                MaxCvss = g.Max(x => x.assessment != null ? (decimal?)x.assessment.EnvironmentalCvss : null),
+                DeviceName = g.First().exposure.Device.ComputerDnsName ?? g.First().exposure.Device.Name,
+                Criticality = g.First().exposure.Device.Criticality,
+            }
+        )
+            .OrderByDescending(x => x.MaxCvss)
+            .Take(20)
+            .ToListAsync(ct);
+
+        var devicesWithAgedVulnerabilitiesDtos = devicesWithAgedVulnerabilities
+            .Select(x => new DevicePatchDriftDto(
+                x.DeviceId,
+                x.DeviceName,
+                x.Criticality.ToString(),
+                x.MaxCvss switch
+                {
+                    >= 9.0m => "Critical",
+                    >= 7.0m => "High",
+                    >= 4.0m => "Medium",
+                    not null => "Low",
+                    _ => "Unknown",
+                },
+                x.OldVulnerabilityCount,
+                x.OldestPublishedDate ?? now
+            ))
+            .ToList();
 
         var approvalTasks = await BuildApprovalAttentionTasksAsync(
             tenantId,
@@ -668,7 +755,7 @@ public class DashboardController : ControllerBase
                     item.Status.ToString()
                 );
             }).ToList(),
-            devicesWithAgedVulnerabilities,
+            devicesWithAgedVulnerabilitiesDtos,
             approvalTasks
         ));
     }
@@ -832,16 +919,67 @@ public class DashboardController : ControllerBase
         }).ToList();
     }
 
-    private Task<Dictionary<Guid, SoftwareScopeStats>> BuildSoftwareScopeStatsAsync(
+    private async Task<Dictionary<Guid, SoftwareScopeStats>> BuildSoftwareScopeStatsAsync(
         Guid tenantId,
-        List<Guid> tenantSoftwareIds,
+        List<Guid> remediationCaseIds,
         CancellationToken ct)
     {
-        // Phase-2: NormalizedSoftwareVulnerabilityProjection deleted — return empty stats.
-        _ = tenantId;
-        _ = tenantSoftwareIds;
-        _ = ct;
-        return Task.FromResult(new Dictionary<Guid, SoftwareScopeStats>());
+        if (remediationCaseIds.Count == 0)
+            return new Dictionary<Guid, SoftwareScopeStats>();
+
+        // Map remediationCaseId -> softwareProductId
+        var caseToProduct = await _dbContext.RemediationCases.AsNoTracking()
+            .Where(rc => rc.TenantId == tenantId && remediationCaseIds.Contains(rc.Id))
+            .Select(rc => new { rc.Id, rc.SoftwareProductId })
+            .ToListAsync(ct);
+
+        var softwareProductIds = caseToProduct.Select(x => x.SoftwareProductId).Distinct().ToList();
+
+        // For each softwareProductId: max EnvironmentalCvss and distinct affected device count
+        var exposureStats = await (
+            from exposure in _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            where exposure.TenantId == tenantId
+                  && exposure.Status == ExposureStatus.Open
+                  && exposure.SoftwareProductId != null
+                  && softwareProductIds.Contains(exposure.SoftwareProductId!.Value)
+            join assessment in _dbContext.ExposureAssessments.AsNoTracking()
+                on exposure.Id equals assessment.DeviceVulnerabilityExposureId into assessmentJoin
+            from assessment in assessmentJoin.DefaultIfEmpty()
+            group new { exposure, assessment } by exposure.SoftwareProductId!.Value into g
+            select new
+            {
+                SoftwareProductId = g.Key,
+                MaxCvss = g.Max(x => x.assessment != null ? (decimal?)x.assessment.EnvironmentalCvss : null),
+                VulnerabilityCount = g.Select(x => x.exposure.VulnerabilityId).Distinct().Count(),
+                AffectedDeviceCount = g.Select(x => x.exposure.DeviceId).Distinct().Count(),
+            }
+        ).ToListAsync(ct);
+
+        var statsByProduct = exposureStats.ToDictionary(x => x.SoftwareProductId);
+
+        var result = new Dictionary<Guid, SoftwareScopeStats>();
+        foreach (var c in caseToProduct)
+        {
+            if (!statsByProduct.TryGetValue(c.SoftwareProductId, out var stats))
+                continue;
+
+            var highestSeverity = stats.MaxCvss switch
+            {
+                >= 9.0m => "Critical",
+                >= 7.0m => "High",
+                >= 4.0m => "Medium",
+                not null => "Low",
+                _ => "Unknown",
+            };
+
+            result[c.Id] = new SoftwareScopeStats(
+                highestSeverity,
+                stats.VulnerabilityCount,
+                stats.AffectedDeviceCount
+            );
+        }
+
+        return result;
     }
 
     private (IQueryable<Guid>? FilteredAssetIdQuery, DateTimeOffset? MinPublishedDate) BuildFilterContext(

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models.RiskScore;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
@@ -85,7 +86,7 @@ public class RiskScoreController : ControllerBase
             : await _riskScoreService.GetRiskHistoryAsync(tenantId, ct);
         var calculatedAt = hasFilters
             ? DateTimeOffset.UtcNow
-            : await _dbContext.AssetRiskScores.AsNoTracking()
+            : await _dbContext.DeviceRiskScores.AsNoTracking()
                 .Where(item => item.TenantId == tenantId)
                 .Select(item => (DateTimeOffset?)item.CalculatedAt)
                 .MaxAsync(ct);
@@ -157,19 +158,17 @@ public class RiskScoreController : ControllerBase
             return NotFound();
         }
 
-        var topRiskAssets = await _dbContext.AssetRiskScores.AsNoTracking()
+        var topRiskAssets = await _dbContext.DeviceRiskScores.AsNoTracking()
             .Where(score => score.TenantId == tenantId)
             .Join(
-                _dbContext.Assets.AsNoTracking()
-                    .Where(asset => asset.TenantId == tenantId && asset.DeviceGroupName == deviceGroupName),
-                score => score.AssetId,
-                asset => asset.Id,
-                (score, asset) => new
+                _dbContext.Devices.AsNoTracking()
+                    .Where(device => device.TenantId == tenantId && device.GroupName == deviceGroupName),
+                score => score.DeviceId,
+                device => device.Id,
+                (score, device) => new
                 {
-                    score.AssetId,
-                    AssetName = asset.AssetType == PatchHound.Core.Enums.AssetType.Device
-                        ? asset.DeviceComputerDnsName ?? asset.Name
-                        : asset.Name,
+                    AssetId = score.DeviceId,
+                    AssetName = device.ComputerDnsName ?? device.Name,
                     score.OverallScore,
                     score.MaxEpisodeRiskScore,
                     score.CriticalCount,
@@ -244,9 +243,9 @@ public class RiskScoreController : ControllerBase
         ));
     }
 
-    [HttpGet("software/{tenantSoftwareId:guid}")]
+    [HttpGet("software/{softwareProductId:guid}")]
     public async Task<ActionResult<SoftwareRiskDetailDto>> GetSoftwareDetail(
-        Guid tenantSoftwareId,
+        Guid softwareProductId,
         CancellationToken ct
     )
     {
@@ -255,20 +254,21 @@ public class RiskScoreController : ControllerBase
             return BadRequest("No tenant selected.");
         }
 
-        var softwareScore = await _dbContext.TenantSoftwareRiskScores.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId)
+        var softwareScore = await _dbContext.SoftwareRiskScores.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.SoftwareProductId == softwareProductId)
             .Select(item => new
             {
-                item.TenantSoftwareId,
+                item.SoftwareProductId,
                 item.OverallScore,
                 item.AffectedDeviceCount,
-                item.OpenEpisodeCount,
-                item.CriticalEpisodeCount,
-                item.HighEpisodeCount,
-                item.MediumEpisodeCount,
-                item.LowEpisodeCount,
-                SoftwareName = item.TenantSoftware.NormalizedSoftware.CanonicalName,
-                Vendor = item.TenantSoftware.NormalizedSoftware.CanonicalVendor,
+                item.OpenExposureCount,
+                item.CriticalExposureCount,
+                item.HighExposureCount,
+                item.MediumExposureCount,
+                item.LowExposureCount,
+                item.CalculatedAt,
+                SoftwareName = item.SoftwareProduct.Name,
+                Vendor = (string?)item.SoftwareProduct.Vendor,
             })
             .FirstOrDefaultAsync(ct);
         if (softwareScore is null)
@@ -276,26 +276,24 @@ public class RiskScoreController : ControllerBase
             return NotFound();
         }
 
-        var topRiskAssets = await _dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
-            .Select(item => item.DeviceAssetId)
+        var topRiskAssets = await _dbContext.InstalledSoftware.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.SoftwareProductId == softwareProductId)
+            .Select(item => item.DeviceId)
             .Distinct()
             .Join(
-                _dbContext.AssetRiskScores.AsNoTracking().Where(item => item.TenantId == tenantId),
-                assetId => assetId,
-                score => score.AssetId,
-                (assetId, score) => score
+                _dbContext.DeviceRiskScores.AsNoTracking().Where(item => item.TenantId == tenantId),
+                deviceId => deviceId,
+                score => score.DeviceId,
+                (deviceId, score) => score
             )
             .Join(
-                _dbContext.Assets.AsNoTracking(),
-                score => score.AssetId,
-                asset => asset.Id,
-                (score, asset) => new
+                _dbContext.Devices.AsNoTracking(),
+                score => score.DeviceId,
+                device => device.Id,
+                (score, device) => new
                 {
-                    score.AssetId,
-                    AssetName = asset.AssetType == PatchHound.Core.Enums.AssetType.Device
-                        ? asset.DeviceComputerDnsName ?? asset.Name
-                        : asset.Name,
+                    AssetId = score.DeviceId,
+                    AssetName = device.ComputerDnsName ?? device.Name,
                     score.OverallScore,
                     score.MaxEpisodeRiskScore,
                     score.CriticalCount,
@@ -312,7 +310,8 @@ public class RiskScoreController : ControllerBase
         var episodeDrivers = await _dbContext.ExposureAssessments.AsNoTracking()
             .Where(item => item.TenantId == tenantId)
             .Join(
-                _dbContext.DeviceVulnerabilityExposures.AsNoTracking().Where(e => e.TenantId == tenantId && e.SoftwareProductId != null),
+                _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                    .Where(e => e.TenantId == tenantId && e.SoftwareProductId == softwareProductId),
                 assessment => assessment.DeviceVulnerabilityExposureId,
                 exposure => exposure.Id,
                 (assessment, exposure) => new
@@ -331,20 +330,17 @@ public class RiskScoreController : ControllerBase
                 })
             .ToListAsync(ct);
         return Ok(new SoftwareRiskDetailDto(
-            softwareScore.TenantSoftwareId,
+            softwareScore.SoftwareProductId,
             softwareScore.SoftwareName,
             softwareScore.Vendor,
             softwareScore.OverallScore,
-            await _dbContext.TenantSoftwareRiskScores.AsNoTracking()
-                .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId)
-                .Select(item => item.CalculatedAt)
-                .FirstAsync(ct),
+            softwareScore.CalculatedAt,
             softwareScore.AffectedDeviceCount,
-            softwareScore.OpenEpisodeCount,
-            softwareScore.CriticalEpisodeCount,
-            softwareScore.HighEpisodeCount,
-            softwareScore.MediumEpisodeCount,
-            softwareScore.LowEpisodeCount,
+            softwareScore.OpenExposureCount,
+            softwareScore.CriticalExposureCount,
+            softwareScore.HighExposureCount,
+            softwareScore.MediumExposureCount,
+            softwareScore.LowExposureCount,
             topRiskAssets.Select(item => new AssetRiskScoreSummaryDto(
                 item.AssetId,
                 item.AssetName,

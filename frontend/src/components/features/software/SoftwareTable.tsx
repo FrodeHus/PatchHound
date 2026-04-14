@@ -47,7 +47,7 @@ type SoftwareTableProps = {
     vulnerableOnly: boolean
     missedMaintenanceWindow: boolean
   }) => void
-  onShowRiskDetail: (tenantSoftwareId: string) => void
+  onShowRiskDetail: (softwareProductId: string) => void
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
   onClearFilters: () => void
@@ -176,12 +176,16 @@ export function SoftwareTable({
         header: ({ column }) => <SortableColumnHeader column={column} title="Current risk" />,
         cell: ({ row }) => {
           const score = row.original.currentRiskScore
+          const softwareProductId = row.original.softwareProductId
           if (score == null) return <span className="text-muted-foreground">—</span>
           const tone = score >= 900 ? 'danger' : score >= 750 ? 'warning' : score >= 500 ? 'info' : 'success'
+          if (!softwareProductId) {
+            return <span className={`font-medium tabular-nums ${toneText(tone)}`}>{score.toFixed(0)}</span>
+          }
           return (
             <button
               type="button"
-              onClick={() => onShowRiskDetail(row.original.id)}
+              onClick={() => onShowRiskDetail(softwareProductId)}
               className={`font-medium tabular-nums underline decoration-current/25 underline-offset-4 hover:decoration-current ${toneText(tone)}`}
             >
               {score.toFixed(0)}

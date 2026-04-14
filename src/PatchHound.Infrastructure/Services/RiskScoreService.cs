@@ -35,16 +35,15 @@ public class RiskScoreService(
     );
 
     public record SoftwareRiskResult(
-        Guid TenantSoftwareId,
-        Guid? SnapshotId,
+        Guid SoftwareProductId,
         decimal OverallScore,
-        decimal MaxEpisodeRiskScore,
-        int CriticalEpisodeCount,
-        int HighEpisodeCount,
-        int MediumEpisodeCount,
-        int LowEpisodeCount,
+        decimal MaxExposureScore,
+        int CriticalExposureCount,
+        int HighExposureCount,
+        int MediumExposureCount,
+        int LowExposureCount,
         int AffectedDeviceCount,
-        int OpenEpisodeCount,
+        int OpenExposureCount,
         string FactorsJson
     );
 
@@ -88,9 +87,9 @@ public class RiskScoreService(
         var existingDeviceGroupScores = await dbContext.DeviceGroupRiskScores
             .Where(item => item.TenantId == tenantId)
             .ToDictionaryAsync(item => item.GroupKey, ct);
-        var existingSoftwareScores = await dbContext.TenantSoftwareRiskScores
+        var existingSoftwareScores = await dbContext.SoftwareRiskScores
             .Where(item => item.TenantId == tenantId)
-            .ToDictionaryAsync(item => item.TenantSoftwareId, ct);
+            .ToDictionaryAsync(item => item.SoftwareProductId, ct);
         var existingTeamScores = await dbContext.TeamRiskScores
             .Where(item => item.TenantId == tenantId)
             .ToDictionaryAsync(item => item.TeamId, ct);
@@ -193,37 +192,35 @@ public class RiskScoreService(
 
         foreach (var result in softwareResults)
         {
-            if (existingSoftwareScores.TryGetValue(result.TenantSoftwareId, out var existing))
+            if (existingSoftwareScores.TryGetValue(result.SoftwareProductId, out var existing))
             {
                 existing.Update(
-                    result.SnapshotId,
                     result.OverallScore,
-                    result.MaxEpisodeRiskScore,
-                    result.CriticalEpisodeCount,
-                    result.HighEpisodeCount,
-                    result.MediumEpisodeCount,
-                    result.LowEpisodeCount,
+                    result.MaxExposureScore,
+                    result.CriticalExposureCount,
+                    result.HighExposureCount,
+                    result.MediumExposureCount,
+                    result.LowExposureCount,
                     result.AffectedDeviceCount,
-                    result.OpenEpisodeCount,
+                    result.OpenExposureCount,
                     result.FactorsJson,
                     CalculationVersion
                 );
             }
             else
             {
-                dbContext.TenantSoftwareRiskScores.Add(
-                    TenantSoftwareRiskScore.Create(
+                dbContext.SoftwareRiskScores.Add(
+                    SoftwareRiskScore.Create(
                         tenantId,
-                        result.TenantSoftwareId,
-                        result.SnapshotId,
+                        result.SoftwareProductId,
                         result.OverallScore,
-                        result.MaxEpisodeRiskScore,
-                        result.CriticalEpisodeCount,
-                        result.HighEpisodeCount,
-                        result.MediumEpisodeCount,
-                        result.LowEpisodeCount,
+                        result.MaxExposureScore,
+                        result.CriticalExposureCount,
+                        result.HighExposureCount,
+                        result.MediumExposureCount,
+                        result.LowExposureCount,
                         result.AffectedDeviceCount,
-                        result.OpenEpisodeCount,
+                        result.OpenExposureCount,
                         result.FactorsJson,
                         CalculationVersion
                     )
@@ -231,13 +228,13 @@ public class RiskScoreService(
             }
         }
 
-        var activeTenantSoftwareIds = softwareResults.Select(item => item.TenantSoftwareId).ToHashSet();
+        var activeSoftwareProductIds = softwareResults.Select(item => item.SoftwareProductId).ToHashSet();
         var staleSoftwareScores = existingSoftwareScores.Values
-            .Where(item => !activeTenantSoftwareIds.Contains(item.TenantSoftwareId))
+            .Where(item => !activeSoftwareProductIds.Contains(item.SoftwareProductId))
             .ToList();
         if (staleSoftwareScores.Count > 0)
         {
-            dbContext.TenantSoftwareRiskScores.RemoveRange(staleSoftwareScores);
+            dbContext.SoftwareRiskScores.RemoveRange(staleSoftwareScores);
         }
 
         foreach (var result in teamResults)
@@ -509,31 +506,70 @@ public class RiskScoreService(
             {
                 item.Id,
                 item.DeviceId,
-                item.SoftwareProductId,
-                item.VulnerabilityId,
+                SoftwareProductId = item.SoftwareProductId!.Value,
+                item.Status,
                 Score = dbContext.ExposureAssessments
-                    .Where(assessment => assessment.DeviceVulnerabilityExposureId == item.Id)
-                    .Select(assessment => (decimal?)assessment.EnvironmentalCvss)
-                    .FirstOrDefault(),
-                Severity = dbContext.ExposureAssessments
-                    .Where(assessment => assessment.DeviceVulnerabilityExposureId == item.Id)
-                    .Select(assessment => assessment.EnvironmentalCvss >= 9.0m
-                        ? Core.Enums.Severity.Critical
-                        : assessment.EnvironmentalCvss >= 7.0m
-                            ? Core.Enums.Severity.High
-                            : assessment.EnvironmentalCvss >= 4.0m
-                                ? Core.Enums.Severity.Medium
-                                : Core.Enums.Severity.Low)
+                    .Where(a => a.DeviceVulnerabilityExposureId == item.Id)
+                    .Select(a => (decimal?)a.EnvironmentalCvss)
                     .FirstOrDefault(),
             })
             .ToListAsync(ct);
 
-        // Phase 3 note: DeviceVulnerabilityExposure is now available, but TenantSoftware
-        // still lacks a canonical direct link back to SoftwareProduct. Until that model link
-        // lands, software rollups remain disabled to avoid assigning exposures to the wrong
-        // tenant-software row.
-        _ = exposures;
-        return [];
+        return exposures
+            .GroupBy(item => item.SoftwareProductId)
+            .Select(group =>
+            {
+                var openExposures = group.Where(e => e.Status == Core.Enums.ExposureStatus.Open).ToList();
+                var scores = openExposures
+                    .Select(e => e.Score ?? 0m)
+                    .OrderByDescending(s => s)
+                    .ToList();
+                var maxScore = scores.FirstOrDefault();
+                var topThreeAvg = scores.Take(3).DefaultIfEmpty(0m).Average();
+                var criticalCount = openExposures.Count(e => (e.Score ?? 0m) >= 9.0m);
+                var highCount = openExposures.Count(e => (e.Score ?? 0m) >= 7.0m && (e.Score ?? 0m) < 9.0m);
+                var mediumCount = openExposures.Count(e => (e.Score ?? 0m) >= 4.0m && (e.Score ?? 0m) < 7.0m);
+                var lowCount = openExposures.Count(e => (e.Score ?? 0m) > 0m && (e.Score ?? 0m) < 4.0m);
+                var affectedDeviceCount = openExposures.Select(e => e.DeviceId).Distinct().Count();
+
+                var overallScore = Math.Clamp(
+                    Math.Round(
+                        (0.7m * maxScore)
+                        + (0.2m * topThreeAvg)
+                        + Math.Min(criticalCount * 35m, 120m)
+                        + Math.Min(highCount * 15m, 60m)
+                        + Math.Min(mediumCount * 5m, 20m)
+                        + Math.Min(lowCount * 1m, 5m),
+                        2),
+                    0m,
+                    1000m);
+
+                var factorsJson = JsonSerializer.Serialize(new List<RiskFactor>
+                {
+                    new("MaxExposureScore", "Highest open exposure score for this software product.", maxScore),
+                    new("TopThreeAverage", "Average of the top three open exposure scores.", Math.Round(topThreeAvg, 2)),
+                    new("CriticalExposures", $"{criticalCount} critical-risk open exposures.", Math.Min(criticalCount * 35m, 120m)),
+                    new("HighExposures", $"{highCount} high-risk open exposures.", Math.Min(highCount * 15m, 60m)),
+                    new("MediumExposures", $"{mediumCount} medium-risk open exposures.", Math.Min(mediumCount * 5m, 20m)),
+                    new("LowExposures", $"{lowCount} low-risk open exposures.", Math.Min(lowCount * 1m, 5m)),
+                });
+
+                return new SoftwareRiskResult(
+                    group.Key,
+                    overallScore,
+                    maxScore,
+                    criticalCount,
+                    highCount,
+                    mediumCount,
+                    lowCount,
+                    affectedDeviceCount,
+                    openExposures.Count,
+                    factorsJson
+                );
+            })
+            .Where(r => r.OpenExposureCount > 0)
+            .OrderByDescending(r => r.OverallScore)
+            .ToList();
     }
 
     private async Task<List<DeviceGroupRiskResult>> CalculateDeviceGroupScoresAsync(

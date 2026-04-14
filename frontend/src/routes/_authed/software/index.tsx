@@ -92,7 +92,7 @@ function SoftwareIndexPage() {
         }}
       />
       <SoftwareRiskDetailDialog
-        tenantSoftwareId={selectedRiskSoftwareId}
+        softwareProductId={selectedRiskSoftwareId}
         open={selectedRiskSoftwareId !== null}
         onOpenChange={(open) => {
           if (!open) {

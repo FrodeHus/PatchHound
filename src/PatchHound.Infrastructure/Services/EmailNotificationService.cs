@@ -250,12 +250,48 @@ public class EmailNotificationService(
         if (string.IsNullOrWhiteSpace(softwareName))
             return null;
 
-        // Phase 2: canonical exposure data not yet available; default to Medium.
-        // Phase 3 will rewire severity via DeviceVulnerabilityExposure.
-        var severity = Severity.Medium;
+        // Resolve SoftwareProductId for this remediationCase to query exposures
+        var softwareProductId = await dbContext.RemediationCases.AsNoTracking()
+            .Where(c => c.TenantId == tenantId && c.Id == remediationCaseId)
+            .Select(c => (Guid?)c.SoftwareProductId)
+            .FirstOrDefaultAsync(ct);
 
-        // TODO Phase 5: count affected devices via DeviceVulnerabilityExposure once available.
-        const int affectedDeviceCount = 0;
+        int affectedDeviceCount;
+        Severity severity;
+
+        if (softwareProductId.HasValue)
+        {
+            var exposureStats = await (
+                from exposure in dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                where exposure.TenantId == tenantId
+                      && exposure.SoftwareProductId == softwareProductId.Value
+                      && exposure.Status == ExposureStatus.Open
+                join assessment in dbContext.ExposureAssessments.AsNoTracking()
+                    on exposure.Id equals assessment.DeviceVulnerabilityExposureId into assessmentJoin
+                from assessment in assessmentJoin.DefaultIfEmpty()
+                group new { exposure, assessment } by exposure.SoftwareProductId into g
+                select new
+                {
+                    AffectedDeviceCount = g.Select(x => x.exposure.DeviceId).Distinct().Count(),
+                    MaxCvss = g.Max(x => x.assessment != null ? (decimal?)x.assessment.EnvironmentalCvss : null),
+                }
+            ).FirstOrDefaultAsync(ct);
+
+            affectedDeviceCount = exposureStats?.AffectedDeviceCount ?? 0;
+            severity = exposureStats?.MaxCvss switch
+            {
+                >= 9.0m => Severity.Critical,
+                >= 7.0m => Severity.High,
+                >= 4.0m => Severity.Medium,
+                not null => Severity.Low,
+                _ => Severity.Medium,
+            };
+        }
+        else
+        {
+            affectedDeviceCount = 0;
+            severity = Severity.Medium;
+        }
 
         return new RemediationSummary(
             softwareName,

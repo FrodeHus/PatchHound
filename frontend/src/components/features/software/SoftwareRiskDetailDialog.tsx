@@ -15,20 +15,20 @@ import { fetchSoftwareRiskDetail } from '@/api/risk-score.functions'
 import type { RiskAssetScoreSummary } from '@/api/risk-score.schemas'
 
 type SoftwareRiskDetailDialogProps = {
-  tenantSoftwareId: string | null
+  softwareProductId: string | null
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
 export function SoftwareRiskDetailDialog({
-  tenantSoftwareId,
+  softwareProductId,
   open,
   onOpenChange,
 }: SoftwareRiskDetailDialogProps) {
   const { data, isFetching } = useQuery({
-    queryKey: ['risk-score', 'software-detail', tenantSoftwareId],
-    queryFn: () => fetchSoftwareRiskDetail({ data: { tenantSoftwareId: tenantSoftwareId ?? '' } }),
-    enabled: open && Boolean(tenantSoftwareId),
+    queryKey: ['risk-score', 'software-detail', softwareProductId],
+    queryFn: () => fetchSoftwareRiskDetail({ data: { softwareProductId: softwareProductId ?? '' } }),
+    enabled: open && Boolean(softwareProductId),
     staleTime: 30_000,
   })
 
