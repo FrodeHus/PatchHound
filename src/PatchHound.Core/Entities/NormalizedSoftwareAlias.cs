@@ -5,7 +5,7 @@ namespace PatchHound.Core.Entities;
 public class NormalizedSoftwareAlias
 {
     public Guid Id { get; private set; }
-    public Guid NormalizedSoftwareId { get; private set; }
+    public Guid SoftwareProductId { get; private set; }
     public SoftwareIdentitySourceSystem SourceSystem { get; private set; }
     public string ExternalSoftwareId { get; private set; } = null!;
     public string RawName { get; private set; } = null!;
@@ -16,12 +16,12 @@ public class NormalizedSoftwareAlias
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    public NormalizedSoftware NormalizedSoftware { get; private set; } = null!;
+    public SoftwareProduct SoftwareProduct { get; private set; } = null!;
 
     private NormalizedSoftwareAlias() { }
 
     public static NormalizedSoftwareAlias Create(
-        Guid normalizedSoftwareId,
+        Guid softwareProductId,
         SoftwareIdentitySourceSystem sourceSystem,
         string externalSoftwareId,
         string rawName,
@@ -35,7 +35,7 @@ public class NormalizedSoftwareAlias
         return new NormalizedSoftwareAlias
         {
             Id = Guid.NewGuid(),
-            NormalizedSoftwareId = normalizedSoftwareId,
+            SoftwareProductId = softwareProductId,
             SourceSystem = sourceSystem,
             ExternalSoftwareId = externalSoftwareId.Trim(),
             RawName = rawName.Trim(),
@@ -49,7 +49,7 @@ public class NormalizedSoftwareAlias
     }
 
     public void UpdateMatch(
-        Guid normalizedSoftwareId,
+        Guid softwareProductId,
         string rawName,
         string? rawVendor,
         string? rawVersion,
@@ -58,7 +58,7 @@ public class NormalizedSoftwareAlias
         DateTimeOffset updatedAt
     )
     {
-        NormalizedSoftwareId = normalizedSoftwareId;
+        SoftwareProductId = softwareProductId;
         RawName = rawName.Trim();
         RawVendor = string.IsNullOrWhiteSpace(rawVendor) ? null : rawVendor.Trim();
         RawVersion = string.IsNullOrWhiteSpace(rawVersion) ? null : rawVersion.Trim();

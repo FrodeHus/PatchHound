@@ -6,7 +6,7 @@ namespace PatchHound.Api.Services;
 
 public class TenantSoftwareAliasResolver(PatchHoundDbContext dbContext)
 {
-    public record ResolvedAlias(Guid TenantSoftwareId, Guid NormalizedSoftwareId);
+    public record ResolvedAlias(Guid TenantSoftwareId, Guid SoftwareProductId);
 
     public async Task<Dictionary<string, ResolvedAlias>> ResolveByExternalIdsAsync(
         Guid tenantId,
@@ -23,12 +23,12 @@ public class TenantSoftwareAliasResolver(PatchHoundDbContext dbContext)
             .TenantSoftware.AsNoTracking()
             .Join(
                 dbContext.NormalizedSoftwareAliases.AsNoTracking(),
-                tenantSoftware => tenantSoftware.NormalizedSoftwareId,
-                alias => alias.NormalizedSoftwareId,
+                tenantSoftware => tenantSoftware.SoftwareProductId,
+                alias => alias.SoftwareProductId,
                 (tenantSoftware, alias) => new
                 {
                     tenantSoftware.Id,
-                    tenantSoftware.NormalizedSoftwareId,
+                    tenantSoftware.SoftwareProductId,
                     tenantSoftware.TenantId,
                     alias.SourceSystem,
                     alias.ExternalSoftwareId,
@@ -44,11 +44,11 @@ public class TenantSoftwareAliasResolver(PatchHoundDbContext dbContext)
             {
                 ExternalSoftwareId = group.Key,
                 TenantSoftwareId = group.Select(item => item.Id).First(),
-                NormalizedSoftwareId = group.Select(item => item.NormalizedSoftwareId).First(),
+                SoftwareProductId = group.Select(item => item.SoftwareProductId).First(),
             })
             .ToDictionaryAsync(
                 item => item.ExternalSoftwareId,
-                item => new ResolvedAlias(item.TenantSoftwareId, item.NormalizedSoftwareId),
+                item => new ResolvedAlias(item.TenantSoftwareId, item.SoftwareProductId),
                 ct
             );
     }

@@ -288,15 +288,7 @@ public class EnrichmentJobEnqueuerTests : IDisposable
     {
         var tenantId = Guid.NewGuid();
         var timestamp = new DateTimeOffset(2026, 3, 30, 12, 0, 0, TimeSpan.Zero);
-        var software = NormalizedSoftware.Create(
-            "contoso app",
-            "contoso",
-            "contoso|app",
-            null,
-            SoftwareNormalizationMethod.Heuristic,
-            SoftwareNormalizationConfidence.High,
-            timestamp
-        );
+        var software = SoftwareProduct.Create("contoso", "contoso app", null);
 
         var source = EnrichmentSourceConfiguration.Create(
             EnrichmentSourceCatalog.SupplyChainSourceKey,
@@ -306,7 +298,7 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             refreshTtlHours: 24
         );
 
-        await _dbContext.NormalizedSoftware.AddAsync(software);
+        await _dbContext.SoftwareProducts.AddAsync(software);
         await _dbContext.EnrichmentSourceConfigurations.AddAsync(source);
         await _dbContext.SaveChangesAsync();
 

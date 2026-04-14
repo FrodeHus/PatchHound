@@ -4,8 +4,7 @@ namespace PatchHound.Api.Models.Software;
 
 public record TenantSoftwareDetailDto(
     Guid Id,
-    Guid NormalizedSoftwareId,
-    Guid? SoftwareProductId,
+    Guid SoftwareProductId,
     Guid? PrimarySoftwareAssetId,
     string CanonicalName,
     string? CanonicalVendor,
@@ -139,7 +138,7 @@ public record TenantSoftwareVulnerabilityEvidenceDto(
 
 public record TenantSoftwareDescriptionDto(
     Guid TenantSoftwareId,
-    Guid NormalizedSoftwareId,
+    Guid SoftwareProductId,
     string Description,
     string ProviderType,
     string ProfileName,

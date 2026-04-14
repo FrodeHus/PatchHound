@@ -581,7 +581,7 @@ public class TenantsController : ControllerBase
             .TenantSoftware.IgnoreQueryFilters()
             .AsNoTracking()
             .Where(ts => ts.TenantId == id)
-            .Select(ts => ts.NormalizedSoftwareId)
+            .Select(ts => ts.SoftwareProductId)
             .Distinct()
             .ToListAsync(ct);
 

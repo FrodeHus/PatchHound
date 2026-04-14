@@ -1949,7 +1949,7 @@ public class IngestionService
             .TenantSoftware.IgnoreQueryFilters()
             .AsNoTracking()
             .Where(ts => ts.TenantId == tenantId)
-            .Select(ts => ts.NormalizedSoftwareId)
+            .Select(ts => ts.SoftwareProductId)
             .Distinct()
             .ToListAsync(ct);
 
@@ -2478,19 +2478,19 @@ public class IngestionService
         var oldRows = await _dbContext
             .TenantSoftware.IgnoreQueryFilters()
             .Where(ts => ts.SnapshotId == oldSnapshotId)
-            .Select(ts => new { ts.Id, ts.NormalizedSoftwareId })
+            .Select(ts => new { ts.Id, ts.SoftwareProductId })
             .ToListAsync(ct);
 
         var newRows = await _dbContext
             .TenantSoftware.IgnoreQueryFilters()
             .Where(ts => ts.SnapshotId == newSnapshotId)
-            .Select(ts => new { ts.Id, ts.NormalizedSoftwareId })
+            .Select(ts => new { ts.Id, ts.SoftwareProductId })
             .ToListAsync(ct);
 
-        var newByNormalized = newRows.ToDictionary(r => r.NormalizedSoftwareId, r => r.Id);
+        var newByNormalized = newRows.ToDictionary(r => r.SoftwareProductId, r => r.Id);
         var oldToNew = oldRows
-            .Where(old => newByNormalized.ContainsKey(old.NormalizedSoftwareId))
-            .ToDictionary(old => old.Id, old => newByNormalized[old.NormalizedSoftwareId]);
+            .Where(old => newByNormalized.ContainsKey(old.SoftwareProductId))
+            .ToDictionary(old => old.Id, old => newByNormalized[old.SoftwareProductId]);
 
         if (oldToNew.Count == 0)
             return;

@@ -5,7 +5,7 @@ public class TenantSoftware
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public Guid? SnapshotId { get; private set; }
-    public Guid NormalizedSoftwareId { get; private set; }
+    public Guid SoftwareProductId { get; private set; }
     public DateTimeOffset FirstSeenAt { get; private set; }
     public DateTimeOffset LastSeenAt { get; private set; }
     public string RemediationAiSummaryContent { get; private set; } = string.Empty;
@@ -25,14 +25,14 @@ public class TenantSoftware
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    public NormalizedSoftware NormalizedSoftware { get; private set; } = null!;
+    public SoftwareProduct SoftwareProduct { get; private set; } = null!;
 
     private TenantSoftware() { }
 
     public static TenantSoftware Create(
         Guid tenantId,
         Guid? snapshotId,
-        Guid normalizedSoftwareId,
+        Guid softwareProductId,
         DateTimeOffset firstSeenAt,
         DateTimeOffset lastSeenAt
     )
@@ -42,7 +42,7 @@ public class TenantSoftware
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             SnapshotId = snapshotId,
-            NormalizedSoftwareId = normalizedSoftwareId,
+            SoftwareProductId = softwareProductId,
             FirstSeenAt = firstSeenAt,
             LastSeenAt = lastSeenAt,
             CreatedAt = firstSeenAt,

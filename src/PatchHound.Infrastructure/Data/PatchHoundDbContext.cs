@@ -60,7 +60,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<AssetBusinessLabel> AssetBusinessLabels => Set<AssetBusinessLabel>();
     public DbSet<AssetSecurityProfile> AssetSecurityProfiles => Set<AssetSecurityProfile>();
     public DbSet<SoftwareCpeBinding> SoftwareCpeBindings => Set<SoftwareCpeBinding>();
-    public DbSet<NormalizedSoftware> NormalizedSoftware => Set<NormalizedSoftware>();
     public DbSet<TenantSoftware> TenantSoftware => Set<TenantSoftware>();
     public DbSet<NormalizedSoftwareAlias> NormalizedSoftwareAliases =>
         Set<NormalizedSoftwareAlias>();

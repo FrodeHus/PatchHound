@@ -79,7 +79,7 @@ public class NormalizedSoftwareProjectionService(
                 var key = BuildPairKey(episode.DeviceAssetId, episode.SoftwareAssetId);
                 currentInstallationsByPair.TryGetValue(key, out var currentInstallation);
                 var resolution = resolutions[episode.SoftwareAssetId];
-                var tenantSoftware = tenantSoftwareRows[resolution.NormalizedSoftwareId];
+                var tenantSoftware = tenantSoftwareRows[resolution.SoftwareProductId];
 
                 return NormalizedSoftwareInstallation.Create(
                     tenantId,
@@ -122,8 +122,8 @@ public class NormalizedSoftwareProjectionService(
         CancellationToken ct
     )
     {
-        var normalizedSoftwareIds = resolutions
-            .Values.Select(item => item.NormalizedSoftwareId)
+        var softwareProductIds = resolutions
+            .Values.Select(item => item.SoftwareProductId)
             .Distinct()
             .ToList();
 
@@ -132,15 +132,15 @@ public class NormalizedSoftwareProjectionService(
             .Where(item => item.TenantId == tenantId && item.SnapshotId == snapshotId)
             .ToListAsync(ct);
 
-        var existingByNormalizedId = existingRows.ToDictionary(item => item.NormalizedSoftwareId);
-        var rowsByNormalizedId = new Dictionary<Guid, TenantSoftware>();
+        var existingBySoftwareProductId = existingRows.ToDictionary(item => item.SoftwareProductId);
+        var rowsBySoftwareProductId = new Dictionary<Guid, TenantSoftware>();
         var now = DateTimeOffset.UtcNow;
 
-        foreach (var normalizedSoftwareId in normalizedSoftwareIds)
+        foreach (var softwareProductId in softwareProductIds)
         {
-            if (!existingByNormalizedId.TryGetValue(normalizedSoftwareId, out var row))
+            if (!existingBySoftwareProductId.TryGetValue(softwareProductId, out var row))
             {
-                row = TenantSoftware.Create(tenantId, snapshotId, normalizedSoftwareId, now, now);
+                row = TenantSoftware.Create(tenantId, snapshotId, softwareProductId, now, now);
                 await dbContext.TenantSoftware.AddAsync(row, ct);
             }
             else
@@ -149,11 +149,11 @@ public class NormalizedSoftwareProjectionService(
                 row.UpdateObservationWindow(row.FirstSeenAt, now);
             }
 
-            rowsByNormalizedId[normalizedSoftwareId] = row;
+            rowsBySoftwareProductId[softwareProductId] = row;
         }
 
         var staleRows = existingRows
-            .Where(item => !normalizedSoftwareIds.Contains(item.NormalizedSoftwareId))
+            .Where(item => !softwareProductIds.Contains(item.SoftwareProductId))
             .ToList();
         if (staleRows.Count > 0)
         {
@@ -161,7 +161,7 @@ public class NormalizedSoftwareProjectionService(
         }
 
         await dbContext.SaveChangesAsync(ct);
-        return rowsByNormalizedId;
+        return rowsBySoftwareProductId;
     }
 
     private static string BuildPairKey(Guid deviceAssetId, Guid softwareAssetId)

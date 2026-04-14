@@ -70,45 +70,40 @@ public class SoftwareController(
             {
                 item.Id,
                 item.TenantId,
-                item.NormalizedSoftwareId,
-                item.NormalizedSoftware.CanonicalProductKey,
+                item.SoftwareProductId,
+                item.SoftwareProduct.CanonicalProductKey,
                 item.FirstSeenAt,
                 item.LastSeenAt,
-                item.NormalizedSoftware.CanonicalName,
-                item.NormalizedSoftware.CanonicalVendor,
-                item.NormalizedSoftware.Category,
-                item.NormalizedSoftware.Description,
-                item.NormalizedSoftware.DescriptionGeneratedAt,
-                item.NormalizedSoftware.DescriptionProviderType,
-                item.NormalizedSoftware.DescriptionProfileName,
-                item.NormalizedSoftware.DescriptionModel,
-                item.NormalizedSoftware.EolProductSlug,
-                item.NormalizedSoftware.EolDate,
-                item.NormalizedSoftware.EolLatestVersion,
-                item.NormalizedSoftware.EolIsLts,
-                item.NormalizedSoftware.EolSupportEndDate,
-                item.NormalizedSoftware.EolIsDiscontinued,
-                item.NormalizedSoftware.EolEnrichedAt,
-                item.NormalizedSoftware.SupplyChainRemediationPath,
-                item.NormalizedSoftware.SupplyChainInsightConfidence,
-                item.NormalizedSoftware.SupplyChainSourceFormat,
-                item.NormalizedSoftware.SupplyChainPrimaryComponentName,
-                item.NormalizedSoftware.SupplyChainPrimaryComponentVersion,
-                item.NormalizedSoftware.SupplyChainFixedVersion,
-                item.NormalizedSoftware.SupplyChainAffectedVulnerabilityCount,
-                item.NormalizedSoftware.SupplyChainSummary,
-                item.NormalizedSoftware.SupplyChainEnrichedAt,
+                item.SoftwareProduct.Name,
+                item.SoftwareProduct.Vendor,
+                item.SoftwareProduct.Category,
+                item.SoftwareProduct.Description,
+                item.SoftwareProduct.DescriptionGeneratedAt,
+                item.SoftwareProduct.DescriptionProviderType,
+                item.SoftwareProduct.DescriptionProfileName,
+                item.SoftwareProduct.DescriptionModel,
+                item.SoftwareProduct.EolProductSlug,
+                item.SoftwareProduct.EolDate,
+                item.SoftwareProduct.EolLatestVersion,
+                item.SoftwareProduct.EolIsLts,
+                item.SoftwareProduct.EolSupportEndDate,
+                item.SoftwareProduct.EolIsDiscontinued,
+                item.SoftwareProduct.EolEnrichedAt,
+                item.SoftwareProduct.SupplyChainRemediationPath,
+                item.SoftwareProduct.SupplyChainInsightConfidence,
+                item.SoftwareProduct.SupplyChainSourceFormat,
+                item.SoftwareProduct.SupplyChainPrimaryComponentName,
+                item.SoftwareProduct.SupplyChainPrimaryComponentVersion,
+                item.SoftwareProduct.SupplyChainFixedVersion,
+                item.SoftwareProduct.SupplyChainAffectedVulnerabilityCount,
+                item.SoftwareProduct.SupplyChainSummary,
+                item.SoftwareProduct.SupplyChainEnrichedAt,
             })
             .FirstOrDefaultAsync(ct);
         if (tenantSoftware is null)
         {
             return NotFound();
         }
-
-        var softwareProductId = await dbContext.SoftwareProducts.AsNoTracking()
-            .Where(item => item.CanonicalProductKey == tenantSoftware.CanonicalProductKey)
-            .Select(item => (Guid?)item.Id)
-            .FirstOrDefaultAsync(ct);
 
         var installations = await dbContext
             .NormalizedSoftwareInstallations.AsNoTracking()
@@ -172,11 +167,10 @@ public class SoftwareController(
         return Ok(
             new TenantSoftwareDetailDto(
                 tenantSoftware.Id,
-                tenantSoftware.NormalizedSoftwareId,
-                softwareProductId,
+                tenantSoftware.SoftwareProductId,
                 softwareAssetIds.FirstOrDefault() is var primaryAssetId && primaryAssetId != Guid.Empty ? primaryAssetId : null,
-                tenantSoftware.CanonicalName,
-                tenantSoftware.CanonicalVendor,
+                tenantSoftware.Name,
+                tenantSoftware.Vendor,
                 tenantSoftware.Category,
                 tenantSoftware.Description,
                 tenantSoftware.DescriptionGeneratedAt,
@@ -378,10 +372,10 @@ public class SoftwareController(
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             query = query.Where(item =>
-                item.NormalizedSoftware.CanonicalName.Contains(filter.Search)
+                item.SoftwareProduct.Name.Contains(filter.Search)
                 || (
-                    item.NormalizedSoftware.CanonicalVendor != null
-                    && item.NormalizedSoftware.CanonicalVendor.Contains(filter.Search)
+                    item.SoftwareProduct.Vendor != null
+                    && item.SoftwareProduct.Vendor.Contains(filter.Search)
                 )
             );
         }
@@ -389,7 +383,7 @@ public class SoftwareController(
         if (!string.IsNullOrWhiteSpace(filter.Category))
         {
             query = query.Where(item =>
-                item.NormalizedSoftware.Category == filter.Category
+                item.SoftwareProduct.Category == filter.Category
             );
         }
 
@@ -412,17 +406,12 @@ public class SoftwareController(
             .Select(item => new
             {
                 item.Id,
-                item.NormalizedSoftwareId,
-                CanonicalProductKey = item.NormalizedSoftware.CanonicalProductKey,
-                CanonicalName = item.NormalizedSoftware.CanonicalName,
-                CanonicalVendor = item.NormalizedSoftware.CanonicalVendor,
-                Category = item.NormalizedSoftware.Category,
-                CurrentRiskScore = dbContext.TenantSoftwareRiskScores
-                    .Where(score =>
-                        score.TenantSoftwareId == item.Id && score.SnapshotId == activeSnapshotId
-                    )
-                    .Select(score => (decimal?)score.OverallScore)
-                    .FirstOrDefault(),
+                item.SoftwareProductId,
+                CanonicalProductKey = item.SoftwareProduct.CanonicalProductKey,
+                CanonicalName = item.SoftwareProduct.Name,
+                CanonicalVendor = item.SoftwareProduct.Vendor,
+                Category = item.SoftwareProduct.Category,
+                CurrentRiskScore = (decimal?)null,
                 ActiveInstallCount = dbContext
                     .NormalizedSoftwareInstallations
                     .Where(installation =>
@@ -483,24 +472,12 @@ public class SoftwareController(
             .Take(pagination.BoundedPageSize)
             .ToListAsync(ct);
 
-        var canonicalProductKeys = rows
-            .Select(item => item.CanonicalProductKey)
-            .Where(item => !string.IsNullOrWhiteSpace(item))
-            .Distinct()
-            .ToList();
-        var softwareProductIdsByKey = canonicalProductKeys.Count == 0
-            ? new Dictionary<string, Guid>()
-            : await dbContext.SoftwareProducts.AsNoTracking()
-                .Where(item => canonicalProductKeys.Contains(item.CanonicalProductKey))
-                .ToDictionaryAsync(item => item.CanonicalProductKey, item => item.Id, ct);
-
         return Ok(
             new PagedResponse<TenantSoftwareListItemDto>(
                 rows
                     .Select(item => new TenantSoftwareListItemDto(
                         item.Id,
-                        item.NormalizedSoftwareId,
-                        softwareProductIdsByKey.GetValueOrDefault(item.CanonicalProductKey),
+                        item.SoftwareProductId,
                         item.CanonicalName,
                         item.CanonicalVendor,
                         item.Category,
@@ -701,14 +678,14 @@ public class SoftwareController(
             {
                 item.Id,
                 item.TenantId,
-                item.NormalizedSoftwareId,
+                item.SoftwareProductId,
                 item.FirstSeenAt,
                 item.LastSeenAt,
-                item.NormalizedSoftware.CanonicalName,
-                item.NormalizedSoftware.CanonicalVendor,
-                item.NormalizedSoftware.PrimaryCpe23Uri,
-                NormalizationMethod = item.NormalizedSoftware.NormalizationMethod.ToString(),
-                Confidence = item.NormalizedSoftware.Confidence.ToString(),
+                Name = item.SoftwareProduct.Name,
+                Vendor = item.SoftwareProduct.Vendor,
+                PrimaryCpe23Uri = item.SoftwareProduct.PrimaryCpe23Uri,
+                NormalizationMethod = item.SoftwareProduct.NormalizationMethod.ToString(),
+                Confidence = item.SoftwareProduct.Confidence.ToString(),
             })
             .FirstOrDefaultAsync(ct);
         if (tenantSoftware is null)
@@ -718,7 +695,7 @@ public class SoftwareController(
 
         var aliases = await dbContext
             .NormalizedSoftwareAliases.AsNoTracking()
-            .Where(item => item.NormalizedSoftwareId == tenantSoftware.NormalizedSoftwareId)
+            .Where(item => item.SoftwareProductId == tenantSoftware.SoftwareProductId)
             .OrderBy(item => item.SourceSystem)
             .ThenBy(item => item.ExternalSoftwareId)
             .Select(item => new
@@ -786,8 +763,8 @@ public class SoftwareController(
             software = new
             {
                 tenantSoftware.Id,
-                tenantSoftware.CanonicalName,
-                tenantSoftware.CanonicalVendor,
+                tenantSoftware.Name,
+                tenantSoftware.Vendor,
                 tenantSoftware.PrimaryCpe23Uri,
                 tenantSoftware.NormalizationMethod,
                 tenantSoftware.Confidence,
@@ -852,8 +829,8 @@ public class SoftwareController(
             else if (profile.WebResearchMode == TenantAiWebResearchMode.PatchHoundManaged)
             {
                 var researchQuery = BuildSoftwareRiskResearchQuery(
-                    tenantSoftware.CanonicalVendor,
-                    tenantSoftware.CanonicalName,
+                    tenantSoftware.Vendor,
+                    tenantSoftware.Name,
                     tenantSoftware.PrimaryCpe23Uri,
                     vulnerabilityExternalIds
                 );

@@ -5,7 +5,7 @@ namespace PatchHound.Core.Entities;
 public class SoftwareCpeBinding
 {
     public Guid Id { get; private set; }
-    public Guid NormalizedSoftwareId { get; private set; }
+    public Guid SoftwareProductId { get; private set; }
     public string Cpe23Uri { get; private set; } = null!;
     public CpeBindingMethod BindingMethod { get; private set; }
     public MatchConfidence Confidence { get; private set; }
@@ -16,12 +16,12 @@ public class SoftwareCpeBinding
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    public NormalizedSoftware NormalizedSoftware { get; private set; } = null!;
+    public SoftwareProduct SoftwareProduct { get; private set; } = null!;
 
     private SoftwareCpeBinding() { }
 
     public static SoftwareCpeBinding Create(
-        Guid normalizedSoftwareId,
+        Guid softwareProductId,
         string cpe23Uri,
         CpeBindingMethod bindingMethod,
         MatchConfidence confidence,
@@ -34,7 +34,7 @@ public class SoftwareCpeBinding
         return new SoftwareCpeBinding
         {
             Id = Guid.NewGuid(),
-            NormalizedSoftwareId = normalizedSoftwareId,
+            SoftwareProductId = softwareProductId,
             Cpe23Uri = cpe23Uri,
             BindingMethod = bindingMethod,
             Confidence = confidence,

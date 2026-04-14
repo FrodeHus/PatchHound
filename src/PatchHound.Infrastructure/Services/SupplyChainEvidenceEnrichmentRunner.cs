@@ -38,13 +38,13 @@ public class SupplyChainEvidenceEnrichmentRunner(
         }
 
         var software = await dbContext
-            .NormalizedSoftware.IgnoreQueryFilters()
+            .SoftwareProducts.IgnoreQueryFilters()
             .FirstOrDefaultAsync(item => item.Id == job.TargetId, ct);
         if (software is null)
         {
             return new EnrichmentJobExecutionResult(
                 EnrichmentJobExecutionOutcome.NoData,
-                "NormalizedSoftware no longer exists."
+                "SoftwareProduct no longer exists."
             );
         }
 
@@ -77,10 +77,10 @@ public class SupplyChainEvidenceEnrichmentRunner(
             }
 
             var documentJson = await client.GetStringAsync(documentUrl, ct);
-            await importService.ImportAsyncForNormalizedSoftware(job.TargetId, documentJson, ct);
+            await importService.ImportAsyncForNormalizedSoftware(software.Id, documentJson, ct);
 
             logger.LogInformation(
-                "Supply-chain evidence applied to NormalizedSoftware {SoftwareId} from {DocumentUrl}.",
+                "Supply-chain evidence applied to SoftwareProduct {SoftwareId} from {DocumentUrl}.",
                 software.Id,
                 documentUrl
             );
@@ -101,7 +101,7 @@ public class SupplyChainEvidenceEnrichmentRunner(
         }
         catch (HttpRequestException ex)
         {
-            logger.LogWarning(ex, "HTTP error enriching NormalizedSoftware {SoftwareId}.", software.Id);
+            logger.LogWarning(ex, "HTTP error enriching SoftwareProduct {SoftwareId}.", software.Id);
             return new EnrichmentJobExecutionResult(
                 EnrichmentJobExecutionOutcome.Retry,
                 $"HTTP error: {ex.Message}",
@@ -132,7 +132,7 @@ public class SupplyChainEvidenceEnrichmentRunner(
 
     private async Task<string?> ResolveDocumentUrlAsync(
         string catalogUrlOrTemplate,
-        NormalizedSoftware software,
+        SoftwareProduct software,
         CancellationToken ct
     )
     {
@@ -154,8 +154,8 @@ public class SupplyChainEvidenceEnrichmentRunner(
         };
 
         var canonicalProductKey = software.CanonicalProductKey.Trim();
-        var canonicalName = software.CanonicalName.Trim();
-        var canonicalVendor = software.CanonicalVendor?.Trim();
+        var canonicalName = software.Name.Trim();
+        var canonicalVendor = software.Vendor?.Trim();
 
         foreach (var entry in entries)
         {
@@ -228,11 +228,11 @@ public class SupplyChainEvidenceEnrichmentRunner(
         return false;
     }
 
-    private static string ExpandTemplate(string template, NormalizedSoftware software)
+    private static string ExpandTemplate(string template, SoftwareProduct software)
     {
         return template
             .Replace("{productKey}", Uri.EscapeDataString(software.CanonicalProductKey), StringComparison.OrdinalIgnoreCase)
-            .Replace("{name}", Uri.EscapeDataString(software.CanonicalName), StringComparison.OrdinalIgnoreCase)
-            .Replace("{vendor}", Uri.EscapeDataString(software.CanonicalVendor ?? string.Empty), StringComparison.OrdinalIgnoreCase);
+            .Replace("{name}", Uri.EscapeDataString(software.Name), StringComparison.OrdinalIgnoreCase)
+            .Replace("{vendor}", Uri.EscapeDataString(software.Vendor ?? string.Empty), StringComparison.OrdinalIgnoreCase);
     }
 }

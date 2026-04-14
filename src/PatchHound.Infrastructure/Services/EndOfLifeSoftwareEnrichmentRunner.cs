@@ -36,14 +36,14 @@ public class EndOfLifeSoftwareEnrichmentRunner(
         }
 
         var software = await dbContext
-            .NormalizedSoftware.IgnoreQueryFilters()
+            .SoftwareProducts.IgnoreQueryFilters()
             .FirstOrDefaultAsync(item => item.Id == job.TargetId, ct);
 
         if (software is null)
         {
             return new EnrichmentJobExecutionResult(
                 EnrichmentJobExecutionOutcome.NoData,
-                "NormalizedSoftware no longer exists."
+                "SoftwareProduct no longer exists."
             );
         }
 
@@ -72,7 +72,7 @@ public class EndOfLifeSoftwareEnrichmentRunner(
         // Use stored slug or fall back to the product name from the canonical key (vendor|product)
         var productSlug = !string.IsNullOrWhiteSpace(software.EolProductSlug)
             ? software.EolProductSlug
-            : ResolveProductSlug(job.ExternalKey, software.CanonicalName);
+            : ResolveProductSlug(job.ExternalKey, software.Name);
 
         try
         {
@@ -80,7 +80,7 @@ public class EndOfLifeSoftwareEnrichmentRunner(
             if (response?.Result is null || response.Result.Releases.Count == 0)
             {
                 logger.LogInformation(
-                    "No end-of-life data found for product slug '{ProductSlug}' (NormalizedSoftware {SoftwareId}).",
+                    "No end-of-life data found for product slug '{ProductSlug}' (SoftwareProduct {SoftwareId}).",
                     productSlug,
                     software.Id
                 );
@@ -107,7 +107,7 @@ public class EndOfLifeSoftwareEnrichmentRunner(
             await dbContext.SaveChangesAsync(ct);
 
             logger.LogInformation(
-                "Enriched NormalizedSoftware {SoftwareId} with end-of-life data from '{ProductSlug}'. EOL={EolDate}, Latest={LatestVersion}, LTS={IsLts}.",
+                "Enriched SoftwareProduct {SoftwareId} with end-of-life data from '{ProductSlug}'. EOL={EolDate}, Latest={LatestVersion}, LTS={IsLts}.",
                 software.Id,
                 productSlug,
                 release.EolFrom,
@@ -133,7 +133,7 @@ public class EndOfLifeSoftwareEnrichmentRunner(
         {
             logger.LogWarning(
                 ex,
-                "HTTP error enriching NormalizedSoftware {SoftwareId} from endoflife.date.",
+                "HTTP error enriching SoftwareProduct {SoftwareId} from endoflife.date.",
                 software.Id
             );
             return new EnrichmentJobExecutionResult(
@@ -145,7 +145,7 @@ public class EndOfLifeSoftwareEnrichmentRunner(
         catch (TaskCanceledException) when (!ct.IsCancellationRequested)
         {
             logger.LogWarning(
-                "Timeout enriching NormalizedSoftware {SoftwareId} from endoflife.date.",
+                "Timeout enriching SoftwareProduct {SoftwareId} from endoflife.date.",
                 software.Id
             );
             return new EnrichmentJobExecutionResult(
@@ -157,7 +157,7 @@ public class EndOfLifeSoftwareEnrichmentRunner(
         catch (DbUpdateConcurrencyException)
         {
             logger.LogWarning(
-                "Concurrency conflict updating NormalizedSoftware {SoftwareId}. Retrying.",
+                "Concurrency conflict updating SoftwareProduct {SoftwareId}. Retrying.",
                 software.Id
             );
             return new EnrichmentJobExecutionResult(
@@ -178,19 +178,20 @@ public class EndOfLifeSoftwareEnrichmentRunner(
         return DateTimeOffset.TryParse(value, out var result) ? result : null;
     }
 
-    private static string ResolveProductSlug(string canonicalProductKey, string canonicalName)
+    private static string ResolveProductSlug(string canonicalProductKey, string name)
     {
-        var name = canonicalName.ToLowerInvariant();
+        var lowerName = name.ToLowerInvariant();
 
         // Map Windows OS variants to their endoflife.date product slugs
-        if (name.Contains("windows server"))
+        if (lowerName.Contains("windows server"))
             return "windows-server";
-        if (name.Contains("windows 10") || name.Contains("windows 11"))
+        if (lowerName.Contains("windows 10") || lowerName.Contains("windows 11"))
             return "windows";
 
-        var separatorIndex = canonicalProductKey.IndexOf('|');
+        // New canonical key format is vendor::name — extract the name part
+        var separatorIndex = canonicalProductKey.IndexOf("::", StringComparison.Ordinal);
         return separatorIndex >= 0
-            ? canonicalProductKey[(separatorIndex + 1)..]
+            ? canonicalProductKey[(separatorIndex + 2)..]
             : canonicalProductKey;
     }
 }

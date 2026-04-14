@@ -12,7 +12,7 @@ public class NormalizedSoftwareAliasConfiguration
         builder.HasKey(item => item.Id);
 
         builder.HasIndex(item => new { item.SourceSystem, item.ExternalSoftwareId }).IsUnique();
-        builder.HasIndex(item => item.NormalizedSoftwareId);
+        builder.HasIndex(item => item.SoftwareProductId);
 
         builder.Property(item => item.SourceSystem).HasConversion<string>().HasMaxLength(32);
         builder.Property(item => item.ExternalSoftwareId).HasMaxLength(512).IsRequired();
@@ -23,9 +23,9 @@ public class NormalizedSoftwareAliasConfiguration
         builder.Property(item => item.MatchReason).HasMaxLength(1024).IsRequired();
 
         builder
-            .HasOne(item => item.NormalizedSoftware)
+            .HasOne(item => item.SoftwareProduct)
             .WithMany()
-            .HasForeignKey(item => item.NormalizedSoftwareId)
+            .HasForeignKey(item => item.SoftwareProductId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

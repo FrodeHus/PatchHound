@@ -267,7 +267,7 @@ public class EnrichmentJobEnqueuer(
         }
 
         var softwareItems = await dbContext
-            .NormalizedSoftware.IgnoreQueryFilters()
+            .SoftwareProducts.IgnoreQueryFilters()
             .AsNoTracking()
             .Where(software => normalizedSoftwareIds.Contains(software.Id))
             .Select(software => new
@@ -379,7 +379,7 @@ public class EnrichmentJobEnqueuer(
             : refreshTtl);
 
         var softwareItems = await dbContext
-            .NormalizedSoftware.IgnoreQueryFilters()
+            .SoftwareProducts.IgnoreQueryFilters()
             .AsNoTracking()
             .Where(software => normalizedSoftwareIds.Contains(software.Id))
             .Select(software => new
