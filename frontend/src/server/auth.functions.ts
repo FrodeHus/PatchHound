@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { apiGet } from '@/server/api'
 import { getSession, isTokenExpired } from '@/server/session'
 import { refreshAccessTokenSilent } from '@/server/auth'
+import type { FeaturesResponse } from '@/api/feature-flags.schemas'
 
 type SystemStatus = {
   openBaoAvailable: boolean
@@ -49,6 +50,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
     let setupStatus: SetupStatus | null = null
     let roles = session.roles ?? []
     let tenantIds = session.tenantIds ?? (session.tenantId ? [session.tenantId] : [])
+    let featureFlags: FeaturesResponse = {}
     try {
       systemStatus = await apiGet<SystemStatus>('/system/status', {
         token: session.accessToken,
@@ -96,6 +98,15 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       tenantIds = session.tenantIds ?? (session.tenantId ? [session.tenantId] : [])
     }
 
+    try {
+      featureFlags = await apiGet<FeaturesResponse>('/features', {
+        token: session.accessToken,
+        tenantId: session.tenantId,
+      })
+    } catch {
+      featureFlags = {}
+    }
+
     return {
       id: session.userId,
       email: session.email ?? '',
@@ -106,6 +117,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       tenantIds,
       requiresSetup: setupStatus?.requiresSetup ?? false,
       systemStatus,
+      featureFlags,
     }
   })
 
