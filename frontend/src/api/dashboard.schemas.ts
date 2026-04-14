@@ -41,6 +41,7 @@ export const dashboardSummarySchema = z.object({
       severity: z.string(),
       affectedAssetCount: z.number(),
       changedAt: z.string(),
+      remediationCaseId: z.string().uuid().nullable().optional(),
     })),
     resolved: z.array(z.object({
       vulnerabilityId: z.string().uuid(),
@@ -49,6 +50,7 @@ export const dashboardSummarySchema = z.object({
       severity: z.string(),
       affectedAssetCount: z.number(),
       changedAt: z.string(),
+      remediationCaseId: z.string().uuid().nullable().optional(),
     })),
     aiSummary: z.string().nullable(),
   }),

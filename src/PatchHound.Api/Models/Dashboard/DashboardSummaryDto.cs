@@ -74,7 +74,8 @@ public record DashboardRiskChangeItemDto(
     string Title,
     string Severity,
     int AffectedAssetCount,
-    DateTimeOffset ChangedAt
+    DateTimeOffset ChangedAt,
+    Guid? RemediationCaseId = null
 );
 
 public record DashboardFilterQuery(
