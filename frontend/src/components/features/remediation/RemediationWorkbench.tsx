@@ -309,13 +309,13 @@ export function RemediationWorkbench({
                 </tr>
               ) : (
                 data.items.map((item) => (
-                  <tr key={item.tenantSoftwareId} className="align-top">
+                  <tr key={item.remediationCaseId} className="align-top">
                     <td className="px-4 py-3">
                       <div className="space-y-1">
-                        {item.tenantSoftwareId ? (
+                        {item.remediationCaseId ? (
                           <Link
-                            to="/software/$id/remediation"
-                            params={{ id: item.tenantSoftwareId }}
+                            to="/remediation/cases/$caseId"
+                            params={{ caseId: item.remediationCaseId }}
                             className="font-medium hover:text-primary"
                           >
                             {startCase(item.softwareName)}
@@ -342,19 +342,13 @@ export function RemediationWorkbench({
                               Maintenance {formatDate(item.maintenanceWindowDate)}
                             </span>
                           ) : null}
-                          {item.tenantSoftwareId ? (
+                          {item.remediationCaseId ? (
                             <Link
-                              to="/software/$id"
-                              params={{ id: item.tenantSoftwareId }}
-                              search={{
-                                page: 1,
-                                pageSize: 25,
-                                version: "",
-                                tab: "overview",
-                              }}
+                              to="/remediation/cases/$caseId"
+                              params={{ caseId: item.remediationCaseId }}
                               className="text-[10px] text-muted-foreground hover:text-primary"
                             >
-                              Software detail
+                              Open case
                             </Link>
                           ) : null}
                         </div>

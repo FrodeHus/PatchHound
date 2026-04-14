@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const vulnerabilityOverrideSchema = z.object({
   id: z.string().uuid(),
-  tenantVulnerabilityId: z.string().uuid(),
+  vulnerabilityId: z.string().uuid(),
   outcome: z.string(),
   justification: z.string(),
   createdAt: z.string(),
@@ -29,7 +29,7 @@ export const remediationDecisionSchema = z.object({
 
 export const analystRecommendationSchema = z.object({
   id: z.string().uuid(),
-  tenantVulnerabilityId: z.string().uuid().nullable(),
+  vulnerabilityId: z.string().uuid().nullable(),
   recommendedOutcome: z.string(),
   rationale: z.string(),
   priorityOverride: z.string().nullable(),
@@ -39,7 +39,7 @@ export const analystRecommendationSchema = z.object({
 })
 
 export const decisionVulnSchema = z.object({
-  tenantVulnerabilityId: z.string().uuid(),
+  vulnerabilityId: z.string().uuid(),
   vulnerabilityDefinitionId: z.string().uuid(),
   externalId: z.string(),
   title: z.string(),
@@ -141,7 +141,7 @@ export const decisionAiSummarySchema = z.object({
 })
 
 export const decisionContextSchema = z.object({
-  tenantSoftwareId: z.string().uuid(),
+  remediationCaseId: z.string().uuid(),
   softwareName: z.string(),
   criticality: z.string(),
   summary: decisionSummarySchema,
@@ -157,7 +157,7 @@ export const decisionContextSchema = z.object({
 })
 
 export const decisionListItemSchema = z.object({
-  tenantSoftwareId: z.string().uuid(),
+  remediationCaseId: z.string().uuid(),
   softwareName: z.string(),
   criticality: z.string(),
   outcome: z.string().nullable(),

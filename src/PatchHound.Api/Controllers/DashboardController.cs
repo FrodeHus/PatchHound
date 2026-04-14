@@ -287,8 +287,10 @@ public class DashboardController : ControllerBase
             from pt in _dbContext.PatchingTasks.AsNoTracking()
             join decision in _dbContext.RemediationDecisions.AsNoTracking()
                 on pt.RemediationDecisionId equals decision.Id
-            join softwareAsset in _dbContext.Assets.AsNoTracking()
-                on decision.SoftwareAssetId equals softwareAsset.Id
+            join rc in _dbContext.RemediationCases.AsNoTracking()
+                on pt.RemediationCaseId equals rc.Id
+            join sp in _dbContext.SoftwareProducts.AsNoTracking()
+                on rc.SoftwareProductId equals sp.Id
             join ownerTeam in _dbContext.Teams.AsNoTracking()
                 on pt.OwnerTeamId equals ownerTeam.Id
             where pt.TenantId == tenantId
@@ -296,9 +298,9 @@ public class DashboardController : ControllerBase
                   && pt.Status != PatchingTaskStatus.Completed
             select new
             {
-                pt.TenantSoftwareId,
-                SoftwareAssetId = decision.SoftwareAssetId,
-                SoftwareAssetName = softwareAsset.Name,
+                RemediationCaseId = pt.RemediationCaseId,
+                SoftwareAssetId = Guid.Empty, // Phase 4 debt (#17): SoftwareAsset removed from RemediationDecision
+                SoftwareAssetName = sp.Name,
                 OwnerTeamName = ownerTeam.Name,
                 PatchingTaskId = pt.Id,
                 pt.DueDate,
@@ -330,9 +332,9 @@ public class DashboardController : ControllerBase
             var topVuln = topVulnBySoftware.GetValueOrDefault(p.SoftwareAssetId);
             return new
             {
-                p.TenantSoftwareId,
+                RemediationCaseId = p.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
                 AssetId = p.SoftwareAssetId,
-                TenantVulnerabilityId = topVuln?.Id ?? Guid.Empty,
+                VulnerabilityId = topVuln?.Id ?? Guid.Empty,
                 TaskId = (Guid?)p.PatchingTaskId,
                 AssetName = p.SoftwareAssetName,
                 p.OwnerTeamName,
@@ -354,8 +356,8 @@ public class DashboardController : ControllerBase
 
         var ownerActions = ownerActionRows
             .Select(item => new OwnerActionDto(
-                item.TenantSoftwareId,
-                item.TenantVulnerabilityId,
+                item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
+                item.VulnerabilityId,
                 item.TaskId,
                 item.AssetName,
                 item.OwnerTeamName,
@@ -535,10 +537,10 @@ public class DashboardController : ControllerBase
 
         var recentApprovedDecisions = await (
             from decision in _dbContext.RemediationDecisions.AsNoTracking()
-            join tenantSoftware in _dbContext.TenantSoftware.AsNoTracking()
-                on decision.TenantSoftwareId equals tenantSoftware.Id
-            join normalizedSoftware in _dbContext.NormalizedSoftware.AsNoTracking()
-                on tenantSoftware.NormalizedSoftwareId equals normalizedSoftware.Id
+            join rc in _dbContext.RemediationCases.AsNoTracking()
+                on decision.RemediationCaseId equals rc.Id
+            join sp in _dbContext.SoftwareProducts.AsNoTracking()
+                on rc.SoftwareProductId equals sp.Id
             where decision.TenantId == tenantId
                   && decision.ApprovalStatus == DecisionApprovalStatus.Approved
                   && (decision.Outcome == RemediationOutcome.RiskAcceptance
@@ -547,8 +549,8 @@ public class DashboardController : ControllerBase
             select new
             {
                 decision.Id,
-                decision.TenantSoftwareId,
-                SoftwareName = normalizedSoftware.CanonicalName,
+                RemediationCaseId = decision.RemediationCaseId,
+                SoftwareName = sp.Name,
                 Outcome = decision.Outcome.ToString(),
                 decision.Justification,
                 decision.DecidedAt,
@@ -561,7 +563,7 @@ public class DashboardController : ControllerBase
 
         var policySoftwareStats = await BuildSoftwareScopeStatsAsync(
             tenantId,
-            recentApprovedDecisions.Select(item => item.TenantSoftwareId).Distinct().ToList(),
+            recentApprovedDecisions.Select(item => item.RemediationCaseId).Distinct().ToList(),
             ct);
 
         var approvalTasks = await BuildApprovalAttentionTasksAsync(
@@ -572,10 +574,10 @@ public class DashboardController : ControllerBase
         return Ok(new SecurityManagerDashboardSummaryDto(
             recentApprovedDecisions.Select(item =>
             {
-                var stats = policySoftwareStats.GetValueOrDefault(item.TenantSoftwareId);
+                var stats = policySoftwareStats.GetValueOrDefault(item.RemediationCaseId);
                 return new ApprovedPolicyDecisionDto(
                     item.Id,
-                    item.TenantSoftwareId,
+                    item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
                     item.SoftwareName,
                     item.Outcome,
                     string.IsNullOrWhiteSpace(item.Justification) ? null : item.Justification,
@@ -602,10 +604,10 @@ public class DashboardController : ControllerBase
             from task in _dbContext.PatchingTasks.AsNoTracking()
             join decision in _dbContext.RemediationDecisions.AsNoTracking()
                 on task.RemediationDecisionId equals decision.Id
-            join tenantSoftware in _dbContext.TenantSoftware.AsNoTracking()
-                on task.TenantSoftwareId equals tenantSoftware.Id
-            join normalizedSoftware in _dbContext.NormalizedSoftware.AsNoTracking()
-                on tenantSoftware.NormalizedSoftwareId equals normalizedSoftware.Id
+            join rc in _dbContext.RemediationCases.AsNoTracking()
+                on task.RemediationCaseId equals rc.Id
+            join sp in _dbContext.SoftwareProducts.AsNoTracking()
+                on rc.SoftwareProductId equals sp.Id
             join ownerTeam in _dbContext.Teams.AsNoTracking()
                 on task.OwnerTeamId equals ownerTeam.Id
             where task.TenantId == tenantId
@@ -617,8 +619,8 @@ public class DashboardController : ControllerBase
             {
                 task.Id,
                 task.RemediationDecisionId,
-                task.TenantSoftwareId,
-                SoftwareName = normalizedSoftware.CanonicalName,
+                RemediationCaseId = task.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
+                SoftwareName = sp.Name,
                 OwnerTeamName = ownerTeam.Name,
                 task.DueDate,
                 task.Status,
@@ -632,7 +634,7 @@ public class DashboardController : ControllerBase
 
         var patchingSoftwareStats = await BuildSoftwareScopeStatsAsync(
             tenantId,
-            approvedPatchingTasks.Select(item => item.TenantSoftwareId).Distinct().ToList(),
+            approvedPatchingTasks.Select(item => item.RemediationCaseId).Distinct().ToList(),
             ct);
 
         var now = DateTimeOffset.UtcNow;
@@ -651,11 +653,11 @@ public class DashboardController : ControllerBase
             missedMaintenanceWindowCount,
             approvedPatchingTasks.Select(item =>
             {
-                var stats = patchingSoftwareStats.GetValueOrDefault(item.TenantSoftwareId);
+                var stats = patchingSoftwareStats.GetValueOrDefault(item.RemediationCaseId);
                 return new ApprovedPatchingTaskDto(
                     item.Id,
                     item.RemediationDecisionId,
-                    item.TenantSoftwareId,
+                    item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId; DTO field kept for API compat
                     item.SoftwareName,
                     item.OwnerTeamName,
                     stats?.HighestSeverity ?? "Unknown",
@@ -776,10 +778,10 @@ public class DashboardController : ControllerBase
             from task in _dbContext.ApprovalTasks.AsNoTracking()
             join decision in _dbContext.RemediationDecisions.AsNoTracking()
                 on task.RemediationDecisionId equals decision.Id
-            join tenantSoftware in _dbContext.TenantSoftware.AsNoTracking()
-                on decision.TenantSoftwareId equals tenantSoftware.Id
-            join normalizedSoftware in _dbContext.NormalizedSoftware.AsNoTracking()
-                on tenantSoftware.NormalizedSoftwareId equals normalizedSoftware.Id
+            join rc in _dbContext.RemediationCases.AsNoTracking()
+                on decision.RemediationCaseId equals rc.Id
+            join sp in _dbContext.SoftwareProducts.AsNoTracking()
+                on rc.SoftwareProductId equals sp.Id
             where task.TenantId == tenantId
                   && task.Status == ApprovalTaskStatus.Pending
                   && task.VisibleRoles.Any(role => visibleRoles.Contains(role.Role))
@@ -788,8 +790,8 @@ public class DashboardController : ControllerBase
             {
                 task.Id,
                 task.RemediationDecisionId,
-                decision.TenantSoftwareId,
-                SoftwareName = normalizedSoftware.CanonicalName,
+                RemediationCaseId = decision.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
+                SoftwareName = sp.Name,
                 ApprovalType = task.Type.ToString(),
                 task.ExpiresAt,
                 decision.MaintenanceWindowDate,
@@ -801,13 +803,13 @@ public class DashboardController : ControllerBase
 
         var softwareStats = await BuildSoftwareScopeStatsAsync(
             tenantId,
-            pendingTasks.Select(item => item.TenantSoftwareId).Distinct().ToList(),
+            pendingTasks.Select(item => item.RemediationCaseId).Distinct().ToList(),
             ct);
 
         var now = DateTimeOffset.UtcNow;
         return pendingTasks.Select(item =>
         {
-            var stats = softwareStats.GetValueOrDefault(item.TenantSoftwareId);
+            var stats = softwareStats.GetValueOrDefault(item.RemediationCaseId);
             var attentionState = item.ExpiresAt <= now
                 ? "Overdue"
                 : item.ExpiresAt <= now.AddHours(24)
@@ -817,7 +819,7 @@ public class DashboardController : ControllerBase
             return new ApprovalAttentionTaskDto(
                 item.Id,
                 item.RemediationDecisionId,
-                item.TenantSoftwareId,
+                item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId; DTO field kept for API compat
                 item.SoftwareName,
                 item.ApprovalType,
                 stats?.HighestSeverity ?? "Unknown",

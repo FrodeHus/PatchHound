@@ -10,8 +10,7 @@ public record RemediationTaskSummaryDto(
 
 public record RemediationTaskListItemDto(
     Guid Id,
-    Guid SoftwareAssetId,
-    Guid? TenantSoftwareId,
+    Guid RemediationCaseId,
     string SoftwareName,
     string? SoftwareVendor,
     Guid OwnerTeamId,
@@ -50,5 +49,5 @@ public record RemediationTaskFilterQuery(
     string? AssetOwner = null,
     Guid? TaskId = null,
     Guid? DeviceAssetId = null,
-    Guid? TenantSoftwareId = null
+    Guid? CaseId = null
 );

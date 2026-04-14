@@ -109,6 +109,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<WorkflowInstance> WorkflowInstances => Set<WorkflowInstance>();
     public DbSet<WorkflowNodeExecution> WorkflowNodeExecutions => Set<WorkflowNodeExecution>();
     public DbSet<WorkflowAction> WorkflowActions => Set<WorkflowAction>();
+    public DbSet<RemediationCase> RemediationCases => Set<RemediationCase>();
     public DbSet<RemediationDecision> RemediationDecisions => Set<RemediationDecision>();
     public DbSet<RemediationDecisionVulnerabilityOverride> RemediationDecisionVulnerabilityOverrides =>
         Set<RemediationDecisionVulnerabilityOverride>();
@@ -388,6 +389,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             );
         modelBuilder
             .Entity<WorkflowAction>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<RemediationCase>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<RemediationDecision>()

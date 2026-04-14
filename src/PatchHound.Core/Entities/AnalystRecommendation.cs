@@ -6,28 +6,28 @@ public class AnalystRecommendation
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public Guid RemediationCaseId { get; private set; }
     public Guid? RemediationWorkflowId { get; private set; }
-    public Guid SoftwareAssetId { get; private set; }
-    public Guid? TenantVulnerabilityId { get; private set; }
+    public Guid? VulnerabilityId { get; private set; }
     public RemediationOutcome RecommendedOutcome { get; private set; }
     public string Rationale { get; private set; } = null!;
     public string? PriorityOverride { get; private set; }
     public Guid AnalystId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
+    public RemediationCase RemediationCase { get; private set; } = null!;
     public RemediationWorkflow? RemediationWorkflow { get; private set; }
 
     private AnalystRecommendation() { }
 
     public static AnalystRecommendation Create(
         Guid tenantId,
-        Guid softwareAssetId,
+        Guid remediationCaseId,
         RemediationOutcome recommendedOutcome,
         string rationale,
         Guid analystId,
-        Guid? tenantVulnerabilityId = null,
-        string? priorityOverride = null
-    )
+        Guid? vulnerabilityId = null,
+        string? priorityOverride = null)
     {
         if (string.IsNullOrWhiteSpace(rationale))
             throw new ArgumentException("Rationale is required.");
@@ -36,8 +36,8 @@ public class AnalystRecommendation
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            SoftwareAssetId = softwareAssetId,
-            TenantVulnerabilityId = tenantVulnerabilityId,
+            RemediationCaseId = remediationCaseId,
+            VulnerabilityId = vulnerabilityId,
             RecommendedOutcome = recommendedOutcome,
             Rationale = rationale,
             PriorityOverride = priorityOverride,
@@ -55,9 +55,8 @@ public class AnalystRecommendation
         RemediationOutcome recommendedOutcome,
         string rationale,
         Guid analystId,
-        Guid? tenantVulnerabilityId = null,
-        string? priorityOverride = null
-    )
+        Guid? vulnerabilityId = null,
+        string? priorityOverride = null)
     {
         if (string.IsNullOrWhiteSpace(rationale))
             throw new ArgumentException("Rationale is required.");
@@ -65,7 +64,7 @@ public class AnalystRecommendation
         RecommendedOutcome = recommendedOutcome;
         Rationale = rationale;
         AnalystId = analystId;
-        TenantVulnerabilityId = tenantVulnerabilityId;
+        VulnerabilityId = vulnerabilityId;
         PriorityOverride = priorityOverride;
         CreatedAt = DateTimeOffset.UtcNow;
     }

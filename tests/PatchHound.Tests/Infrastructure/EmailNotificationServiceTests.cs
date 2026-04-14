@@ -239,20 +239,25 @@ public class EmailNotificationServiceTests : IDisposable
     {
         var user = User.Create("alice@example.com", "Alice", "entra-1");
         _dbContext.Users.Add(user);
-        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+
+        // Phase 4 (#17): seed SoftwareProduct + RemediationCase instead of TenantSoftware graph
+        var product = SoftwareProduct.Create("contoso", "agent", "contoso:agent");
+        var remCase = RemediationCase.Create(_tenantId, product.Id);
+        _dbContext.SoftwareProducts.Add(product);
+        _dbContext.RemediationCases.Add(remCase);
+
         var decision = RemediationDecision.Create(
             _tenantId,
-            graph.TenantSoftware.Id,
-            await _dbContext.NormalizedSoftwareInstallations.Select(x => x.SoftwareAssetId).FirstAsync(),
+            remCase.Id,
             RemediationOutcome.RiskAcceptance,
             "Temporary exception proposed.",
             Guid.NewGuid(),
             DecisionApprovalStatus.PendingApproval,
-            DateTimeOffset.UtcNow.AddDays(14),
-            null
+            DateTimeOffset.UtcNow.AddDays(14)
         );
         var approvalTask = ApprovalTask.Create(
             _tenantId,
+            remCase.Id,
             decision.Id,
             RemediationOutcome.RiskAcceptance,
             ApprovalTaskStatus.Pending,
@@ -278,7 +283,7 @@ public class EmailNotificationServiceTests : IDisposable
             Arg.Is<string>(body =>
                 body.Contains("agent")
                 && body.Contains("Severity:")
-                && body.Contains("Affected devices: 2")
+                && body.Contains("Affected devices: 0") // Phase 5 TODO: will be actual count
                 && body.Contains("Open approval task")
                 && body.Contains("https://app.patchhound.test/approvals/")),
             Arg.Any<CancellationToken>()
@@ -293,30 +298,25 @@ public class EmailNotificationServiceTests : IDisposable
         var team = Team.Create(_tenantId, "Infrastructure");
         _dbContext.Teams.Add(team);
         _dbContext.TeamMembers.Add(TeamMember.Create(team.Id, user.Id));
-        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
-        var devices = await _dbContext.Assets.Where(item => item.AssetType == AssetType.Device).ToListAsync();
-        foreach (var device in devices)
-        {
-            device.AssignTeamOwner(team.Id);
-        }
 
-        var softwareAssetId = await _dbContext.NormalizedSoftwareInstallations.Select(x => x.SoftwareAssetId).FirstAsync();
+        // Phase 4 (#17): seed SoftwareProduct + RemediationCase instead of TenantSoftware graph
+        var product = SoftwareProduct.Create("contoso", "agent", "contoso:agent");
+        var remCase = RemediationCase.Create(_tenantId, product.Id);
+        _dbContext.SoftwareProducts.Add(product);
+        _dbContext.RemediationCases.Add(remCase);
+
         var decision = RemediationDecision.Create(
             _tenantId,
-            graph.TenantSoftware.Id,
-            softwareAssetId,
+            remCase.Id,
             RemediationOutcome.ApprovedForPatching,
             null,
             Guid.NewGuid(),
-            DecisionApprovalStatus.Approved,
-            null,
-            null
+            DecisionApprovalStatus.Approved
         );
         var patchingTask = PatchingTask.Create(
             _tenantId,
+            remCase.Id,
             decision.Id,
-            graph.TenantSoftware.Id,
-            softwareAssetId,
             team.Id,
             DateTimeOffset.UtcNow.AddDays(7)
         );
@@ -341,7 +341,7 @@ public class EmailNotificationServiceTests : IDisposable
             Arg.Is<string>(body =>
                 body.Contains("Stage: Execution")
                 && body.Contains("Open remediation tasks")
-                && body.Contains("https://app.patchhound.test/remediation/tasks?tenantSoftwareId=")),
+                && body.Contains("https://app.patchhound.test/remediation/tasks?caseId=")), // Phase 4 (#17): was tenantSoftwareId
             Arg.Any<CancellationToken>()
         );
     }

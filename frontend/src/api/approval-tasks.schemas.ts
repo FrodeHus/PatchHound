@@ -8,7 +8,7 @@ export const approvalAuditEntrySchema = z.object({
 })
 
 export const approvalVulnSchema = z.object({
-  tenantVulnerabilityId: z.string().uuid(),
+  vulnerabilityId: z.string().uuid(),
   externalId: z.string(),
   title: z.string(),
   vendorSeverity: z.string(),

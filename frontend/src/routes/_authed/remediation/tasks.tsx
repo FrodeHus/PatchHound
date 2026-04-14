@@ -12,7 +12,7 @@ const remediationTasksSearchSchema = baseListSearchSchema.extend({
   criticality: searchStringSchema,
   assetOwner: searchStringSchema,
   taskId: searchStringSchema,
-  tenantSoftwareId: searchStringSchema,
+  caseId: searchStringSchema,
   deviceAssetId: searchStringSchema,
 })
 
@@ -65,7 +65,7 @@ function RemediationTasksRoute() {
         criticality: search.criticality,
         assetOwner: search.assetOwner,
       }}
-      scopedToSoftware={Boolean(search.tenantSoftwareId)}
+      scopedToSoftware={Boolean(search.caseId)}
       scopedToDevice={Boolean(search.deviceAssetId)}
       onFiltersChange={(filters) => {
         void navigate({
@@ -93,7 +93,7 @@ function normalizeFilters(search: {
   vendor: string
   criticality: string
   assetOwner: string
-  tenantSoftwareId: string
+  caseId: string
   deviceAssetId: string
   taskId: string
 }) {
@@ -103,7 +103,7 @@ function normalizeFilters(search: {
     criticality: search.criticality || undefined,
     assetOwner: search.assetOwner || undefined,
     taskId: search.taskId || undefined,
-    tenantSoftwareId: search.tenantSoftwareId || undefined,
+    caseId: search.caseId || undefined,
     deviceAssetId: search.deviceAssetId || undefined,
   }
 }

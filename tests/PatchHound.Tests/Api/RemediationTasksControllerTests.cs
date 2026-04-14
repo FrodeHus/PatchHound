@@ -40,67 +40,75 @@ public class RemediationTasksControllerTests : IDisposable
             TestServiceProviderFactory.Create(_tenantContext)
         );
 
-        var workflowService = new RemediationWorkflowService(_dbContext);
-        var notificationService = Substitute.For<INotificationService>();
-        var patchingTaskService = new PatchingTaskService(_dbContext, new SlaService(), workflowService, notificationService);
-        var approvalTaskService = new ApprovalTaskService(_dbContext, notificationService, Substitute.For<IRealTimeNotifier>(), workflowService, patchingTaskService);
-        var decisionService = new RemediationDecisionService(_dbContext, approvalTaskService, workflowService, patchingTaskService);
-        var queryService = new RemediationTaskQueryService(_dbContext, decisionService);
+        var queryService = new RemediationTaskQueryService(_dbContext);
         _controller = new RemediationTasksController(queryService, _tenantContext);
     }
 
-    [Fact]
-    public async Task List_ReturnsOpenTasksForTenantSoftwareFilter()
+    // Seeds a SoftwareProduct + RemediationCase + Team, returns (remediationCase, team).
+    private async Task<(RemediationCase remediationCase, Team team)> SeedCaseAsync()
     {
-        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
+        var product = SoftwareProduct.Create("acme", "agent", null);
+        await _dbContext.SoftwareProducts.AddAsync(product);
+
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        await _dbContext.RemediationCases.AddAsync(remediationCase);
+
         var team = Team.Create(_tenantId, "Platform");
         await _dbContext.Teams.AddAsync(team);
 
-        var devices = await _dbContext.Assets
-            .Where(item => item.AssetType == AssetType.Device)
-            .ToListAsync();
-
-        foreach (var device in devices)
-        {
-            device.AssignTeamOwner(team.Id);
-        }
-
         await _dbContext.SaveChangesAsync();
 
-        var softwareAssetIds = await _dbContext.NormalizedSoftwareInstallations
-            .Where(item => item.TenantSoftwareId == graph.TenantSoftware.Id)
-            .Select(item => item.SoftwareAssetId)
-            .Distinct()
-            .ToListAsync();
+        return (remediationCase, team);
+    }
 
+    // Creates decision + approves it, returning the resulting PatchingTask.
+    private async Task<PatchingTask> CreateAndApproveDecisionAsync(Guid remediationCaseId, Guid userId)
+    {
         var workflowService = new RemediationWorkflowService(_dbContext);
         var notificationService = Substitute.For<INotificationService>();
         var patchingTaskService = new PatchingTaskService(_dbContext, new SlaService(), workflowService, notificationService);
         var approvalTaskService = new ApprovalTaskService(_dbContext, notificationService, Substitute.For<IRealTimeNotifier>(), workflowService, patchingTaskService);
         var decisionService = new RemediationDecisionService(_dbContext, approvalTaskService, workflowService, patchingTaskService);
-        var createResult = await decisionService.CreateDecisionAsync(
+
+        var createResult = await decisionService.CreateDecisionForCaseAsync(
             _tenantId,
-            softwareAssetIds[0],
+            remediationCaseId,
             RemediationOutcome.ApprovedForPatching,
             "Create software task",
-            _tenantContext.CurrentUserId,
+            userId,
             null,
             null,
             CancellationToken.None
         );
         createResult.IsSuccess.Should().BeTrue();
 
-        var approvalTask = await _dbContext.ApprovalTasks.OrderByDescending(item => item.CreatedAt).FirstAsync();
+        var approvalTask = await _dbContext.ApprovalTasks
+            .OrderByDescending(item => item.CreatedAt)
+            .FirstAsync();
+
         await approvalTaskService.ApproveAsync(
             approvalTask.Id,
-            _tenantContext.CurrentUserId,
+            userId,
             "Approved for execution",
             new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero),
             CancellationToken.None
         );
 
+        return await _dbContext.PatchingTasks
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstAsync();
+    }
+
+    [Fact]
+    public async Task List_ReturnsOpenTasksForCaseFilter()
+    {
+        var (remediationCase, _) = await SeedCaseAsync();
+        var userId = _tenantContext.CurrentUserId;
+
+        await CreateAndApproveDecisionAsync(remediationCase.Id, userId);
+
         var action = await _controller.List(
-            new RemediationTaskFilterQuery(TenantSoftwareId: graph.TenantSoftware.Id),
+            new RemediationTaskFilterQuery(CaseId: remediationCase.Id),
             new PaginationQuery(1, 25),
             CancellationToken.None
         );
@@ -111,63 +119,25 @@ public class RemediationTasksControllerTests : IDisposable
         payload.TotalCount.Should().Be(1);
         payload.Items.Should().HaveCount(1);
         payload.Items.Should().OnlyContain(item => item.SoftwareName == "agent");
-        payload.Items.Should().OnlyContain(item => item.OwnerTeamName == "Platform");
     }
 
     [Fact]
-    public async Task CreateForSoftware_CreatesMissingTasksForCurrentExposure()
+    public async Task CreateForSoftware_ReturnsStubZeroCounts()
     {
-        var graph = await TenantSoftwareGraphFactory.SeedAsync(_dbContext, _tenantId);
-        var team = Team.Create(_tenantId, "Platform");
-        await _dbContext.Teams.AddAsync(team);
-        var devices = await _dbContext.Assets
-            .Where(item => item.AssetType == AssetType.Device)
-            .ToListAsync();
-        foreach (var device in devices)
-        {
-            device.AssignTeamOwner(team.Id);
-        }
-        await _dbContext.SaveChangesAsync();
+        // Phase 4: CreateMissingTasksForSoftwareAsync is stubbed to (0, 0).
+        // Phase 5 will re-implement device-level task creation.
+        var (remediationCase, _) = await SeedCaseAsync();
+        var userId = _tenantContext.CurrentUserId;
 
-        var softwareAssetId = await _dbContext.NormalizedSoftwareInstallations
-            .Where(item => item.TenantSoftwareId == graph.TenantSoftware.Id)
-            .Select(item => item.SoftwareAssetId)
-            .OrderBy(id => id)
-            .FirstAsync();
+        await CreateAndApproveDecisionAsync(remediationCase.Id, userId);
 
-        var workflowService = new RemediationWorkflowService(_dbContext);
-        var notificationService = Substitute.For<INotificationService>();
-        var patchingTaskService = new PatchingTaskService(_dbContext, new SlaService(), workflowService, notificationService);
-        var approvalTaskService = new ApprovalTaskService(_dbContext, notificationService, Substitute.For<IRealTimeNotifier>(), workflowService, patchingTaskService);
-        var decisionService = new RemediationDecisionService(_dbContext, approvalTaskService, workflowService, patchingTaskService);
-        var createResult = await decisionService.CreateDecisionAsync(
-            _tenantId,
-            softwareAssetId,
-            RemediationOutcome.ApprovedForPatching,
-            "Patch it",
-            _tenantContext.CurrentUserId,
-            null,
-            null,
-            CancellationToken.None
-        );
-        createResult.IsSuccess.Should().BeTrue();
-
-        var approvalTask = await _dbContext.ApprovalTasks.OrderByDescending(item => item.CreatedAt).FirstAsync();
-        await approvalTaskService.ApproveAsync(
-            approvalTask.Id,
-            _tenantContext.CurrentUserId,
-            "Approved for execution",
-            new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero),
-            CancellationToken.None
-        );
-
-        var action = await _controller.CreateForSoftware(graph.TenantSoftware.Id, CancellationToken.None);
+        var action = await _controller.CreateForSoftware(remediationCase.Id, CancellationToken.None);
 
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<RemediationTaskCreateResultDto>().Subject;
 
         payload.CreatedCount.Should().Be(0);
-        payload.EligibleCount.Should().Be(2);
+        payload.EligibleCount.Should().Be(0);
         _dbContext.PatchingTasks.Should().HaveCount(1);
     }
 

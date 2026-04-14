@@ -10,8 +10,7 @@ export const remediationTaskSummarySchema = z.object({
 
 export const remediationTaskListItemSchema = z.object({
   id: z.string().uuid(),
-  softwareAssetId: z.string().uuid(),
-  tenantSoftwareId: z.string().uuid().nullable(),
+  remediationCaseId: z.string().uuid(),
   softwareName: z.string(),
   softwareVendor: z.string().nullable(),
   ownerTeamId: z.string().uuid(),

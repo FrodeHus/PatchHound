@@ -114,18 +114,13 @@ export function RemediationTaskWorkbench({
                   <tr key={task.id} className="align-top">
                     <td className="px-4 py-3">
                       <div className="space-y-1">
-                        {task.tenantSoftwareId ? (
-                          <Link
-                            to="/software/$id"
-                            params={{ id: task.tenantSoftwareId }}
-                            search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
-                            className="font-medium hover:text-primary"
-                          >
-                            {startCase(task.softwareName)}
-                          </Link>
-                        ) : (
-                          <span className="font-medium">{startCase(task.softwareName)}</span>
-                        )}
+                        <Link
+                          to="/remediation/cases/$caseId"
+                          params={{ caseId: task.remediationCaseId }}
+                          className="font-medium hover:text-primary"
+                        >
+                          {startCase(task.softwareName)}
+                        </Link>
                         <p className="text-xs text-muted-foreground">
                           {task.deviceNames.length > 0
                             ? `Examples: ${task.deviceNames.join(', ')}`

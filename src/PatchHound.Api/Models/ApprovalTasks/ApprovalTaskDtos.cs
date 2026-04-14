@@ -53,7 +53,7 @@ public record PagedVulnerabilityList(
 );
 
 public record ApprovalVulnDto(
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     string ExternalId,
     string Title,
     string VendorSeverity,

@@ -153,7 +153,7 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
               </div>
             ) : (
               summary.actions.map((item) => (
-                <div key={`${item.tenantSoftwareId}-${item.tenantVulnerabilityId}`} className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-4">
+                <div key={`${item.tenantSoftwareId}-${item.vulnerabilityId}`} className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -208,7 +208,7 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                         Open remediation task
                       </Button>
                     )}
-                    <Button size="sm" variant="outline" render={<Link to="/vulnerabilities/$id" params={{ id: item.tenantVulnerabilityId }} />}>
+                    <Button size="sm" variant="outline" render={<Link to="/vulnerabilities/$id" params={{ id: item.vulnerabilityId }} />}>
                       Vulnerability detail
                     </Button>
                   </div>

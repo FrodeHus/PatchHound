@@ -14,11 +14,11 @@ public class RemediationWorkflowAuthorizationService(
 {
     public async Task<Result<bool>> EnsureCanAddRecommendationAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid remediationCaseId,
         CancellationToken ct
     )
     {
-        var workflow = await GetActiveWorkflowAsync(tenantId, tenantSoftwareId, ct);
+        var workflow = await GetActiveWorkflowAsync(tenantId, remediationCaseId, ct);
         if (workflow is null)
             return EnsureSecurityAnalysisRole();
 
@@ -56,11 +56,11 @@ public class RemediationWorkflowAuthorizationService(
 
     public async Task<Result<bool>> EnsureCanCreateDecisionAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid remediationCaseId,
         CancellationToken ct
     )
     {
-        var workflow = await GetActiveWorkflowAsync(tenantId, tenantSoftwareId, ct);
+        var workflow = await GetActiveWorkflowAsync(tenantId, remediationCaseId, ct);
         if (workflow is null)
             return Result<bool>.Failure("No active remediation workflow exists for this software.");
 
@@ -185,13 +185,13 @@ public class RemediationWorkflowAuthorizationService(
 
     private Task<RemediationWorkflow?> GetActiveWorkflowAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid remediationCaseId,
         CancellationToken ct
     ) =>
         dbContext.RemediationWorkflows.AsNoTracking()
             .FirstOrDefaultAsync(workflow =>
                 workflow.TenantId == tenantId
-                && workflow.TenantSoftwareId == tenantSoftwareId
+                && workflow.RemediationCaseId == remediationCaseId
                 && workflow.Status == RemediationWorkflowStatus.Active,
                 ct);
 

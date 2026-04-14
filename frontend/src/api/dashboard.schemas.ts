@@ -35,7 +35,7 @@ export const dashboardSummarySchema = z.object({
     appearedCount: z.number(),
     resolvedCount: z.number(),
     appeared: z.array(z.object({
-      tenantVulnerabilityId: z.string().uuid(),
+      vulnerabilityId: z.string().uuid(),
       externalId: z.string(),
       title: z.string(),
       severity: z.string(),
@@ -43,7 +43,7 @@ export const dashboardSummarySchema = z.object({
       changedAt: z.string(),
     })),
     resolved: z.array(z.object({
-      tenantVulnerabilityId: z.string().uuid(),
+      vulnerabilityId: z.string().uuid(),
       externalId: z.string(),
       title: z.string(),
       severity: z.string(),
@@ -153,7 +153,7 @@ export const ownerAssetSummarySchema = z.object({
 
 export const ownerActionSchema = z.object({
   tenantSoftwareId: z.string().uuid(),
-  tenantVulnerabilityId: z.string().uuid(),
+  vulnerabilityId: z.string().uuid(),
   taskId: z.string().uuid().nullable(),
   softwareName: z.string(),
   ownerTeamName: z.string(),
@@ -185,7 +185,7 @@ export type OwnerAssetSummary = z.infer<typeof ownerAssetSummarySchema>
 export const approvalAttentionTaskSchema = z.object({
   approvalTaskId: z.string().uuid(),
   remediationDecisionId: z.string().uuid(),
-  tenantSoftwareId: z.string().uuid(),
+  remediationCaseId: z.string().uuid(),
   softwareName: z.string(),
   approvalType: z.string(),
   highestSeverity: z.string(),
@@ -198,7 +198,7 @@ export const approvalAttentionTaskSchema = z.object({
 
 export const approvedPolicyDecisionSchema = z.object({
   decisionId: z.string().uuid(),
-  tenantSoftwareId: z.string().uuid(),
+  remediationCaseId: z.string().uuid(),
   softwareName: z.string(),
   outcome: z.string(),
   justification: z.string().nullable(),
@@ -216,7 +216,7 @@ export const securityManagerDashboardSummarySchema = z.object({
 export const approvedPatchingTaskSchema = z.object({
   patchingTaskId: z.string().uuid(),
   remediationDecisionId: z.string().uuid(),
-  tenantSoftwareId: z.string().uuid(),
+  remediationCaseId: z.string().uuid(),
   softwareName: z.string(),
   ownerTeamName: z.string(),
   highestSeverity: z.string(),

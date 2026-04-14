@@ -102,8 +102,8 @@ export function TechnicalManagerOverview({ summary, isLoading }: Props) {
                         <span className="text-xs text-muted-foreground">{item.affectedDeviceCount} affected devices</span>
                       </div>
                       <Link
-                        to="/software/$id/remediation"
-                        params={{ id: item.tenantSoftwareId }}
+                        to="/remediation/cases/$caseId"
+                        params={{ caseId: item.remediationCaseId }}
                         className="mt-2 block text-base font-medium tracking-tight hover:text-primary"
                       >
                         {startCase(item.softwareName)}

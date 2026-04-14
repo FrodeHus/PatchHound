@@ -125,7 +125,7 @@ public record AssetRiskExplanationFactorDto(
 );
 
 public record AssetRiskDriverDto(
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     string ExternalId,
     string Title,
     string RiskBand,

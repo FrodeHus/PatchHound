@@ -27,37 +27,15 @@ public class PatchingTaskService(
 
     public async Task<int> EnsurePatchingTasksAsync(RemediationDecision decision, CancellationToken ct)
     {
-        var scopedInstallations = await dbContext.NormalizedSoftwareInstallations
-            .IgnoreQueryFilters()
-            .Where(item =>
-                item.TenantId == decision.TenantId
-                && item.TenantSoftwareId == decision.TenantSoftwareId
-                && item.IsActive)
-            .Select(item => new { item.DeviceAssetId })
-            .ToListAsync(ct);
-
-        if (scopedInstallations.Count == 0)
-            return 0;
-
-        var deviceAssetIds = scopedInstallations.Select(d => d.DeviceAssetId).Distinct().ToList();
+        // TODO Phase 5: group patching tasks by device owner team once DeviceVulnerabilityExposure
+        // is available for this case. For now, create a single patching task for the default team.
         var defaultTeamId = (await DefaultTeamHelper.EnsureDefaultTeamAsync(dbContext, decision.TenantId, ct)).Id;
-
-        var deviceTeams = await dbContext.Assets
-            .IgnoreQueryFilters()
-            .Where(a => deviceAssetIds.Contains(a.Id) && a.TenantId == decision.TenantId)
-            .Select(a => new { a.Id, a.OwnerTeamId, a.FallbackTeamId })
-            .ToListAsync(ct);
-
-        var teamGroups = deviceTeams
-            .GroupBy(device => device.OwnerTeamId ?? device.FallbackTeamId ?? defaultTeamId)
-            .ToDictionary(group => group.Key, group => group.Select(item => item.Id).Distinct().Count());
 
         var tenantSla = await dbContext.TenantSlaConfigurations
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(c => c.TenantId == decision.TenantId, ct);
 
         // Phase 2: canonical exposure data not yet available; default to Medium.
-        // Phase 3 will rewire via DeviceVulnerabilityExposure.
         var highestSeverity = Severity.Medium;
 
         var dueDate = slaService.CalculateDueDate(
@@ -66,71 +44,59 @@ public class PatchingTaskService(
             tenantSla
         );
 
-        var existingOpenTeamIds = await dbContext.PatchingTasks
+        var existingOpenForTeam = await dbContext.PatchingTasks
             .IgnoreQueryFilters()
-            .Where(task =>
+            .AnyAsync(task =>
                 task.TenantId == decision.TenantId
-                && task.TenantSoftwareId == decision.TenantSoftwareId
-                && task.Status != PatchingTaskStatus.Completed)
-            .Select(task => task.OwnerTeamId)
-            .Distinct()
-            .ToListAsync(ct);
+                && task.RemediationCaseId == decision.RemediationCaseId
+                && task.OwnerTeamId == defaultTeamId
+                && task.Status != PatchingTaskStatus.Completed,
+                ct);
 
-        var tasks = teamGroups.Keys
-            .Where(teamId => !existingOpenTeamIds.Contains(teamId))
-            .Select(teamId => PatchingTask.Create(
-                decision.TenantId,
-                decision.Id,
-                decision.TenantSoftwareId,
-                decision.SoftwareAssetId,
-                teamId,
-                dueDate
-            ))
-            .ToList();
-
-        if (tasks.Count == 0)
+        if (existingOpenForTeam)
             return 0;
 
-        foreach (var task in tasks)
-        {
-            await remediationWorkflowService.AttachPatchingTaskAsync(task, decision, ct);
-        }
+        var task = PatchingTask.Create(
+            decision.TenantId,
+            decision.RemediationCaseId,
+            decision.Id,
+            defaultTeamId,
+            dueDate
+        );
 
-        await dbContext.PatchingTasks.AddRangeAsync(tasks, ct);
+        await remediationWorkflowService.AttachPatchingTaskAsync(task, decision, ct);
+        await dbContext.PatchingTasks.AddAsync(task, ct);
         await dbContext.SaveChangesAsync(ct);
 
-        var softwareName = await dbContext.TenantSoftware
+        // Resolve software name via RemediationCase → SoftwareProduct
+        var softwareName = await dbContext.RemediationCases
             .IgnoreQueryFilters()
-            .Where(item => item.TenantId == decision.TenantId && item.Id == decision.TenantSoftwareId)
+            .Where(c => c.Id == decision.RemediationCaseId && c.TenantId == decision.TenantId)
             .Join(
-                dbContext.NormalizedSoftware.IgnoreQueryFilters(),
-                tenantSoftware => tenantSoftware.NormalizedSoftwareId,
-                normalizedSoftware => normalizedSoftware.Id,
-                (tenantSoftware, normalizedSoftware) => normalizedSoftware.CanonicalName
+                dbContext.SoftwareProducts,
+                c => c.SoftwareProductId,
+                sp => sp.Id,
+                (c, sp) => sp.Name
             )
             .FirstOrDefaultAsync(ct)
             ?? "Unknown software";
 
         var severityLabel = highestSeverity.ToString();
+        var maintenanceWindowText = decision.MaintenanceWindowDate is DateTimeOffset maintenanceWindowDate
+            ? $" Maintenance window: {maintenanceWindowDate:yyyy-MM-dd}."
+            : string.Empty;
 
-        foreach (var task in tasks)
-        {
-            var affectedDeviceCount = teamGroups.GetValueOrDefault(task.OwnerTeamId);
-            var maintenanceWindowText = decision.MaintenanceWindowDate is DateTimeOffset maintenanceWindowDate
-                ? $" Maintenance window: {maintenanceWindowDate:yyyy-MM-dd}."
-                : string.Empty;
-            await notificationService.SendToTeamAsync(
-                task.OwnerTeamId,
-                decision.TenantId,
-                NotificationType.TaskAssigned,
-                $"Remediation task assigned: {softwareName}",
-                $"Patch {softwareName}. Highest severity: {severityLabel}. Affected devices for your team: {affectedDeviceCount}.{maintenanceWindowText}",
-                "PatchingTask",
-                task.Id,
-                ct
-            );
-        }
+        await notificationService.SendToTeamAsync(
+            task.OwnerTeamId,
+            decision.TenantId,
+            NotificationType.TaskAssigned,
+            $"Remediation task assigned: {softwareName}",
+            $"Patch {softwareName}. Highest severity: {severityLabel}.{maintenanceWindowText}",
+            "PatchingTask",
+            task.Id,
+            ct
+        );
 
-        return tasks.Count;
+        return 1;
     }
 }

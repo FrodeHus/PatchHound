@@ -81,8 +81,7 @@ public class DevicesControllerTests : IDisposable
             patchingTaskService
         );
         var remediationTaskQueryService = new PatchHound.Api.Services.RemediationTaskQueryService(
-            _dbContext,
-            remediationDecisionService
+            _dbContext
         );
         var detailQueryService = new PatchHound.Api.Services.DeviceDetailQueryService(
             _dbContext,

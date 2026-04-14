@@ -62,7 +62,7 @@ public class RemediationAiWorker(
 
         try
         {
-            var generated = await queryService.GenerateAndStoreAiDraftsAsync(job.TenantId, job.TenantSoftwareId, ct);
+            var generated = await queryService.GenerateAndStoreAiDraftsAsync(job.TenantId, job.RemediationCaseId, ct);
             var trackedJob = await dbContext.RemediationAiJobs.IgnoreQueryFilters()
                 .FirstAsync(item => item.Id == job.Id, ct);
 
@@ -70,9 +70,9 @@ public class RemediationAiWorker(
             {
                 trackedJob.CompleteSucceeded(DateTimeOffset.UtcNow);
                 logger.LogInformation(
-                    "Completed remediation AI job {JobId} for tenant software {TenantSoftwareId}",
+                    "Completed remediation AI job {JobId} for remediation case {RemediationCaseId}",
                     trackedJob.Id,
-                    trackedJob.TenantSoftwareId
+                    trackedJob.RemediationCaseId
                 );
             }
             else

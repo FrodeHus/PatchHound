@@ -6,10 +6,9 @@ public class PatchingTask
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public Guid RemediationCaseId { get; private set; }
     public Guid? RemediationWorkflowId { get; private set; }
     public Guid RemediationDecisionId { get; private set; }
-    public Guid TenantSoftwareId { get; private set; }
-    public Guid SoftwareAssetId { get; private set; }
     public Guid OwnerTeamId { get; private set; }
     public PatchingTaskStatus Status { get; private set; }
     public DateTimeOffset DueDate { get; private set; }
@@ -17,6 +16,7 @@ public class PatchingTask
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
 
+    public RemediationCase RemediationCase { get; private set; } = null!;
     public RemediationDecision RemediationDecision { get; private set; } = null!;
     public RemediationWorkflow? RemediationWorkflow { get; private set; }
 
@@ -24,21 +24,20 @@ public class PatchingTask
 
     public static PatchingTask Create(
         Guid tenantId,
+        Guid remediationCaseId,
         Guid remediationDecisionId,
-        Guid tenantSoftwareId,
-        Guid softwareAssetId,
         Guid ownerTeamId,
-        DateTimeOffset dueDate
-    )
+        DateTimeOffset dueDate)
     {
+        if (tenantId == Guid.Empty) throw new ArgumentException("TenantId is required.");
+        if (remediationCaseId == Guid.Empty) throw new ArgumentException("RemediationCaseId is required.");
         var now = DateTimeOffset.UtcNow;
         return new PatchingTask
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
+            RemediationCaseId = remediationCaseId,
             RemediationDecisionId = remediationDecisionId,
-            TenantSoftwareId = tenantSoftwareId,
-            SoftwareAssetId = softwareAssetId,
             OwnerTeamId = ownerTeamId,
             Status = PatchingTaskStatus.Pending,
             DueDate = dueDate,
@@ -63,12 +62,6 @@ public class PatchingTask
     public void AttachToWorkflow(Guid remediationWorkflowId)
     {
         RemediationWorkflowId = remediationWorkflowId;
-        UpdatedAt = DateTimeOffset.UtcNow;
-    }
-
-    public void ReassignTenantSoftware(Guid newTenantSoftwareId)
-    {
-        TenantSoftwareId = newTenantSoftwareId;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

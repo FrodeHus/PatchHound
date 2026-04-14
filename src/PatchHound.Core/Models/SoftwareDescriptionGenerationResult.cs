@@ -1,8 +1,7 @@
 namespace PatchHound.Core.Models;
 
 public record SoftwareDescriptionGenerationResult(
-    Guid TenantSoftwareId,
-    Guid NormalizedSoftwareId,
+    Guid SoftwareProductId,
     string Description,
     string ProviderType,
     string ProfileName,

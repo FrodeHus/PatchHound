@@ -11,12 +11,19 @@ public class AnalystRecommendationConfiguration : IEntityTypeConfiguration<Analy
         builder.HasKey(ar => ar.Id);
 
         builder.HasIndex(ar => ar.TenantId);
-        builder.HasIndex(ar => new { ar.TenantId, ar.SoftwareAssetId });
         builder.HasIndex(ar => ar.RemediationWorkflowId);
+        builder.HasIndex(ar => new { ar.TenantId, ar.RemediationCaseId });
 
+        builder.Property(ar => ar.RemediationCaseId).IsRequired();
         builder.Property(ar => ar.RecommendedOutcome).HasConversion<string>().HasMaxLength(32);
         builder.Property(ar => ar.Rationale).HasColumnType("text").IsRequired();
         builder.Property(ar => ar.PriorityOverride).HasMaxLength(64);
+
+        builder
+            .HasOne(ar => ar.RemediationCase)
+            .WithMany()
+            .HasForeignKey(ar => ar.RemediationCaseId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder
             .HasOne(ar => ar.RemediationWorkflow)

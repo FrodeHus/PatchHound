@@ -15,6 +15,7 @@ export const tenantSoftwareVersionCohortSchema = z.object({
 export const tenantSoftwareDetailSchema = z.object({
   id: z.string().uuid(),
   normalizedSoftwareId: z.string().uuid(),
+  softwareProductId: z.string().uuid().nullable(),
   primarySoftwareAssetId: z.string().uuid().nullable(),
   canonicalName: z.string(),
   canonicalVendor: z.string().nullable(),
@@ -80,6 +81,7 @@ export const tenantSoftwareDetailSchema = z.object({
 export const tenantSoftwareListItemSchema = z.object({
   id: z.string().uuid(),
   normalizedSoftwareId: z.string().uuid(),
+  softwareProductId: z.string().uuid().nullable(),
   canonicalName: z.string(),
   canonicalVendor: z.string().nullable(),
   category: z.string().nullable().optional(),
@@ -132,7 +134,7 @@ export const tenantSoftwareVulnerabilityEvidenceSchema = z.object({
 })
 
 export const tenantSoftwareVulnerabilitySchema = z.object({
-  tenantVulnerabilityId: z.string().uuid(),
+  vulnerabilityId: z.string().uuid(),
   vulnerabilityDefinitionId: z.string().uuid(),
   externalId: z.string(),
   title: z.string(),
@@ -174,7 +176,7 @@ export const tenantSoftwareDescriptionSchema = z.object({
 
 export const tenantSoftwareDescriptionJobSchema = z.object({
   id: z.string().uuid(),
-  tenantSoftwareId: z.string().uuid(),
+  softwareProductId: z.string().uuid(),
   status: z.string(),
   error: z.string().nullable(),
   requestedAt: isoDateTimeSchema,

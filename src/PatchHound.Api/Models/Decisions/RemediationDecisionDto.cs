@@ -1,7 +1,7 @@
 namespace PatchHound.Api.Models.Decisions;
 
 public record DecisionContextDto(
-    Guid TenantSoftwareId,
+    Guid RemediationCaseId,
     string SoftwareName,
     string Criticality,
     DecisionSummaryDto Summary,
@@ -105,7 +105,7 @@ public record DecisionRejectionDto(
 
 public record VulnerabilityOverrideDto(
     Guid Id,
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     string Outcome,
     string Justification,
     DateTimeOffset CreatedAt
@@ -113,7 +113,7 @@ public record VulnerabilityOverrideDto(
 
 public record AnalystRecommendationDto(
     Guid Id,
-    Guid? TenantVulnerabilityId,
+    Guid? VulnerabilityId,
     string RecommendedOutcome,
     string Rationale,
     string? PriorityOverride,
@@ -123,7 +123,7 @@ public record AnalystRecommendationDto(
 );
 
 public record DecisionVulnDto(
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     Guid VulnerabilityDefinitionId,
     string ExternalId,
     string Title,
@@ -164,7 +164,7 @@ public record CreateDecisionRequest(
 );
 
 public record CreateOverrideRequest(
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     string Outcome,
     string Justification
 );
@@ -173,7 +173,7 @@ public record CreateRecommendationRequest(
     string RecommendedOutcome,
     string Rationale,
     string? PriorityOverride,
-    Guid? TenantVulnerabilityId
+    Guid? VulnerabilityId
 );
 
 public record VerifyRemediationRequest(

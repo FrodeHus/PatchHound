@@ -8,6 +8,7 @@ public class ApprovalTask
 
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public Guid RemediationCaseId { get; private set; }
     public Guid? RemediationWorkflowId { get; private set; }
     public Guid RemediationDecisionId { get; private set; }
     public ApprovalTaskType Type { get; private set; }
@@ -23,6 +24,7 @@ public class ApprovalTask
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? ReadAt { get; private set; }
 
+    public RemediationCase RemediationCase { get; private set; } = null!;
     public RemediationDecision RemediationDecision { get; private set; } = null!;
     public RemediationWorkflow? RemediationWorkflow { get; private set; }
 
@@ -30,6 +32,7 @@ public class ApprovalTask
 
     public static ApprovalTask Create(
         Guid tenantId,
+        Guid remediationCaseId,
         Guid remediationDecisionId,
         RemediationOutcome outcome,
         ApprovalTaskStatus? initialStatus,
@@ -60,6 +63,7 @@ public class ApprovalTask
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
+            RemediationCaseId = remediationCaseId,
             RemediationDecisionId = remediationDecisionId,
             Type = type,
             Status = status,

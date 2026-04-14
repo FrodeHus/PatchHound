@@ -8,7 +8,7 @@ public class RemediationWorkflow
 
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
-    public Guid TenantSoftwareId { get; private set; }
+    public Guid RemediationCaseId { get; private set; }
     public Guid SoftwareOwnerTeamId { get; private set; }
     public Guid? RecurrenceSourceWorkflowId { get; private set; }
     public RemediationWorkflowStage CurrentStage { get; private set; }
@@ -22,24 +22,29 @@ public class RemediationWorkflow
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    public RemediationCase RemediationCase { get; private set; } = null!;
     public IReadOnlyCollection<RemediationWorkflowStageRecord> StageRecords => _stageRecords.AsReadOnly();
 
     private RemediationWorkflow() { }
 
     public static RemediationWorkflow Create(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid remediationCaseId,
         Guid softwareOwnerTeamId,
         RemediationWorkflowStage initialStage = RemediationWorkflowStage.SecurityAnalysis,
-        Guid? recurrenceSourceWorkflowId = null
-    )
+        Guid? recurrenceSourceWorkflowId = null)
     {
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("TenantId is required.", nameof(tenantId));
+        if (remediationCaseId == Guid.Empty)
+            throw new ArgumentException("RemediationCaseId is required.", nameof(remediationCaseId));
+
         var now = DateTimeOffset.UtcNow;
         return new RemediationWorkflow
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            TenantSoftwareId = tenantSoftwareId,
+            RemediationCaseId = remediationCaseId,
             SoftwareOwnerTeamId = softwareOwnerTeamId,
             RecurrenceSourceWorkflowId = recurrenceSourceWorkflowId,
             CurrentStage = initialStage,
@@ -54,8 +59,7 @@ public class RemediationWorkflow
     public void SetDecisionContext(
         RemediationOutcome? proposedOutcome,
         RemediationWorkflowPriority? priority,
-        RemediationWorkflowApprovalMode approvalMode
-    )
+        RemediationWorkflowApprovalMode approvalMode)
     {
         ProposedOutcome = proposedOutcome;
         Priority = priority;
@@ -81,12 +85,6 @@ public class RemediationWorkflow
     {
         Status = RemediationWorkflowStatus.Cancelled;
         CancelledAt = DateTimeOffset.UtcNow;
-        UpdatedAt = DateTimeOffset.UtcNow;
-    }
-
-    public void ReassignTenantSoftware(Guid newTenantSoftwareId)
-    {
-        TenantSoftwareId = newTenantSoftwareId;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

@@ -39,10 +39,10 @@ public class RemediationTasksController(
         return Ok(result);
     }
 
-    [HttpGet("software/{tenantSoftwareId:guid}/team-statuses")]
+    [HttpGet("cases/{caseId:guid}/team-statuses")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
     public async Task<ActionResult<List<RemediationTaskTeamStatusDto>>> GetTeamStatusesForSoftware(
-        Guid tenantSoftwareId,
+        Guid caseId,
         CancellationToken ct
     )
     {
@@ -53,17 +53,17 @@ public class RemediationTasksController(
 
         var result = await remediationTaskQueryService.ListTeamStatusesForSoftwareAsync(
             tenantId,
-            tenantSoftwareId,
+            caseId,
             ct
         );
 
         return Ok(result);
     }
 
-    [HttpPost("software/{tenantSoftwareId:guid}")]
+    [HttpPost("cases/{caseId:guid}")]
     [Authorize(Policy = Policies.AssignTasks)]
     public async Task<ActionResult<RemediationTaskCreateResultDto>> CreateForSoftware(
-        Guid tenantSoftwareId,
+        Guid caseId,
         CancellationToken ct
     )
     {
@@ -79,7 +79,7 @@ public class RemediationTasksController(
 
         var result = await remediationTaskQueryService.CreateMissingTasksForSoftwareAsync(
             tenantId,
-            tenantSoftwareId,
+            caseId,
             tenantContext.CurrentUserId,
             ct
         );

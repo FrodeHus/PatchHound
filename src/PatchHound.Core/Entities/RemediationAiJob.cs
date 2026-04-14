@@ -6,7 +6,7 @@ public class RemediationAiJob
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
-    public Guid TenantSoftwareId { get; private set; }
+    public Guid RemediationCaseId { get; private set; }
     public RemediationAiJobStatus Status { get; private set; }
     public string InputHash { get; private set; } = string.Empty;
     public string Error { get; private set; } = string.Empty;
@@ -19,16 +19,15 @@ public class RemediationAiJob
 
     public static RemediationAiJob Create(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid remediationCaseId,
         string inputHash,
-        DateTimeOffset requestedAt
-    )
+        DateTimeOffset requestedAt)
     {
         return new RemediationAiJob
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            TenantSoftwareId = tenantSoftwareId,
+            RemediationCaseId = remediationCaseId,
             Status = RemediationAiJobStatus.Pending,
             InputHash = inputHash.Trim(),
             RequestedAt = requestedAt,

@@ -7,6 +7,7 @@ namespace PatchHound.Tests.Core;
 public class ApprovalTaskTests
 {
     private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid CaseId = Guid.NewGuid();
     private static readonly Guid DecisionId = Guid.NewGuid();
     private static readonly DateTimeOffset Expiry = DateTimeOffset.UtcNow.AddHours(24);
 
@@ -15,7 +16,7 @@ public class ApprovalTaskTests
     [InlineData(RemediationOutcome.AlternateMitigation)]
     public void Create_RiskAcceptanceOrAlternateMitigation_SetsPendingApproval(RemediationOutcome outcome)
     {
-        var task = ApprovalTask.Create(TenantId, DecisionId, outcome, null, Expiry);
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, outcome, null, Expiry);
 
         task.Id.Should().NotBeEmpty();
         task.TenantId.Should().Be(TenantId);
@@ -31,7 +32,7 @@ public class ApprovalTaskTests
     [Fact]
     public void Create_ApprovedForPatching_SetsPendingApproval_WhenExplicitlyRequired()
     {
-        var task = ApprovalTask.Create(TenantId, DecisionId, RemediationOutcome.ApprovedForPatching, ApprovalTaskStatus.Pending, Expiry);
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.ApprovedForPatching, ApprovalTaskStatus.Pending, Expiry);
 
         task.Type.Should().Be(ApprovalTaskType.PatchingApproved);
         task.Status.Should().Be(ApprovalTaskStatus.Pending);
@@ -42,7 +43,7 @@ public class ApprovalTaskTests
     [Fact]
     public void Create_PatchingDeferred_SetsAutoApproved()
     {
-        var task = ApprovalTask.Create(TenantId, DecisionId, RemediationOutcome.PatchingDeferred, null, Expiry);
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.PatchingDeferred, null, Expiry);
 
         task.Type.Should().Be(ApprovalTaskType.PatchingDeferred);
         task.Status.Should().Be(ApprovalTaskStatus.AutoApproved);
@@ -53,7 +54,7 @@ public class ApprovalTaskTests
     [Fact]
     public void Approve_PendingTask_WithJustification_SetsApproved()
     {
-        var task = ApprovalTask.Create(TenantId, DecisionId, RemediationOutcome.RiskAcceptance, null, Expiry);
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.RiskAcceptance, null, Expiry);
         var userId = Guid.NewGuid();
 
         task.Approve(userId, "Accepted per review meeting");
@@ -67,7 +68,7 @@ public class ApprovalTaskTests
     [Fact]
     public void Approve_PendingTask_RequiresJustification_ThrowsWhenMissing()
     {
-        var task = ApprovalTask.Create(TenantId, DecisionId, RemediationOutcome.RiskAcceptance, null, Expiry);
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.RiskAcceptance, null, Expiry);
 
         var act = () => task.Approve(Guid.NewGuid(), null);
 
@@ -77,7 +78,7 @@ public class ApprovalTaskTests
     [Fact]
     public void Approve_NonPendingTask_Throws()
     {
-        var task = ApprovalTask.Create(TenantId, DecisionId, RemediationOutcome.ApprovedForPatching, ApprovalTaskStatus.AutoApproved, Expiry);
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.ApprovedForPatching, ApprovalTaskStatus.AutoApproved, Expiry);
 
         var act = () => task.Approve(Guid.NewGuid(), "reason");
 
@@ -87,7 +88,7 @@ public class ApprovalTaskTests
     [Fact]
     public void Deny_PendingTask_WithJustification_SetsDenied()
     {
-        var task = ApprovalTask.Create(TenantId, DecisionId, RemediationOutcome.AlternateMitigation, null, Expiry);
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.AlternateMitigation, null, Expiry);
         var userId = Guid.NewGuid();
 
         task.Deny(userId, "Insufficient risk documentation");
@@ -100,7 +101,7 @@ public class ApprovalTaskTests
     [Fact]
     public void Deny_PendingTask_RequiresJustification_ThrowsWhenMissing()
     {
-        var task = ApprovalTask.Create(TenantId, DecisionId, RemediationOutcome.AlternateMitigation, null, Expiry);
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.AlternateMitigation, null, Expiry);
 
         var act = () => task.Deny(Guid.NewGuid(), "");
 
@@ -110,7 +111,7 @@ public class ApprovalTaskTests
     [Fact]
     public void Deny_NonPendingTask_Throws()
     {
-        var task = ApprovalTask.Create(TenantId, DecisionId, RemediationOutcome.RiskAcceptance, null, Expiry);
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.RiskAcceptance, null, Expiry);
         task.Approve(Guid.NewGuid(), "approved");
 
         var act = () => task.Deny(Guid.NewGuid(), "reason");
@@ -121,7 +122,7 @@ public class ApprovalTaskTests
     [Fact]
     public void AutoDeny_PendingTask_SetsAutoDenied()
     {
-        var task = ApprovalTask.Create(TenantId, DecisionId, RemediationOutcome.RiskAcceptance, null, Expiry);
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.RiskAcceptance, null, Expiry);
 
         task.AutoDeny();
 
@@ -133,7 +134,7 @@ public class ApprovalTaskTests
     [Fact]
     public void AutoDeny_NonPendingTask_Throws()
     {
-        var task = ApprovalTask.Create(TenantId, DecisionId, RemediationOutcome.ApprovedForPatching, ApprovalTaskStatus.AutoApproved, Expiry);
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.ApprovedForPatching, ApprovalTaskStatus.AutoApproved, Expiry);
 
         var act = () => task.AutoDeny();
 
@@ -143,7 +144,7 @@ public class ApprovalTaskTests
     [Fact]
     public void MarkAsRead_SetsReadAt()
     {
-        var task = ApprovalTask.Create(TenantId, DecisionId, RemediationOutcome.ApprovedForPatching, ApprovalTaskStatus.AutoApproved, Expiry);
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.ApprovedForPatching, ApprovalTaskStatus.AutoApproved, Expiry);
 
         task.MarkAsRead();
 

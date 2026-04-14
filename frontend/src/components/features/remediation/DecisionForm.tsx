@@ -14,8 +14,7 @@ import { createDecision } from '@/api/remediation.functions'
 import { outcomeLabel } from './remediation-utils'
 
 type DecisionFormProps = {
-  tenantSoftwareId: string
-  workflowId?: string | null
+  caseId: string
   queryKey: readonly unknown[]
   readOnly?: boolean
   initialOutcome?: string | null
@@ -50,8 +49,7 @@ const REQUIRES_EXPIRY = new Set<string>(['RiskAcceptance', 'AlternateMitigation'
 const REQUIRES_REEVALUATION = new Set<string>(['PatchingDeferred'])
 
 export function DecisionForm({
-  tenantSoftwareId,
-  workflowId,
+  caseId,
   queryKey,
   readOnly = false,
   initialOutcome = null,
@@ -117,10 +115,10 @@ export function DecisionForm({
     try {
       await createDecision({
         data: {
-          tenantSoftwareId,
-          workflowId,
+          caseId,
           outcome,
           justification: justification || undefined,
+          maintenanceWindowDate: undefined,
           expiryDate: needsExpiry && expiryMode === 'expires' ? toIsoDateBoundary(expiryDate) : undefined,
           reEvaluationDate: toIsoDateBoundary(reEvaluationDate),
         },

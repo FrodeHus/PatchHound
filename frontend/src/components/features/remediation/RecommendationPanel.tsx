@@ -16,8 +16,7 @@ import { formatDateTime } from '@/lib/formatting'
 import { outcomeLabel, outcomeTone } from './remediation-utils'
 
 type RecommendationPanelProps = {
-  tenantSoftwareId: string
-  workflowId?: string | null
+  caseId: string
   recommendations: AnalystRecommendation[]
   aiAnalystAssessment?: string | null
   aiRecommendedOutcome?: string | null
@@ -42,8 +41,7 @@ const OUTCOMES = [
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'] as const
 
 export function RecommendationPanel({
-  tenantSoftwareId,
-  workflowId,
+  caseId,
   recommendations,
   aiAnalystAssessment,
   aiRecommendedOutcome,
@@ -77,8 +75,7 @@ export function RecommendationPanel({
     try {
       await addRecommendation({
         data: {
-          tenantSoftwareId,
-          workflowId,
+          caseId,
           recommendedOutcome: outcome,
           rationale: rationale.trim(),
           priorityOverride: priorityOverride || undefined,

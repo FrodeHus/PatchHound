@@ -56,6 +56,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<Guid>("RemediationCaseId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("SystemPromptHash")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -71,16 +74,20 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("VulnerabilityId")
+                    b.Property<Guid?>("VulnerabilityId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RemediationCaseId");
 
                     b.HasIndex("TenantAiProfileId");
 
                     b.HasIndex("TenantId");
 
                     b.HasIndex("VulnerabilityId");
+
+                    b.HasIndex("TenantId", "RemediationCaseId", "GeneratedAt");
 
                     b.ToTable("AIReports");
                 });
@@ -154,25 +161,27 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
-                    b.Property<Guid?>("RemediationWorkflowId")
+                    b.Property<Guid>("RemediationCaseId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("SoftwareAssetId")
+                    b.Property<Guid?>("RemediationWorkflowId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("TenantVulnerabilityId")
+                    b.Property<Guid?>("VulnerabilityId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RemediationCaseId");
 
                     b.HasIndex("RemediationWorkflowId");
 
                     b.HasIndex("TenantId");
 
-                    b.HasIndex("TenantId", "SoftwareAssetId");
+                    b.HasIndex("TenantId", "RemediationCaseId");
 
                     b.ToTable("AnalystRecommendations");
                 });
@@ -191,6 +200,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.Property<DateTimeOffset?>("ReadAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RemediationCaseId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("RemediationDecisionId")
                         .HasColumnType("uuid");
@@ -230,6 +242,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("ExpiresAt");
 
+                    b.HasIndex("RemediationCaseId");
+
                     b.HasIndex("RemediationDecisionId");
 
                     b.HasIndex("RemediationWorkflowId");
@@ -239,6 +253,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantId", "RemediationDecisionId");
+
+                    b.HasIndex("TenantId", "RemediationCaseId", "Status");
 
                     b.ToTable("ApprovalTasks");
                 });
@@ -1853,6 +1869,73 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.ToTable("DeviceTags");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.DeviceVulnerabilityExposure", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("FirstObservedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("InstalledSoftwareId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("LastObservedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MatchSource")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("MatchedVersion")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SoftwareProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VulnerabilityId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId");
+
+                    b.HasIndex("InstalledSoftwareId");
+
+                    b.HasIndex("SoftwareProductId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("VulnerabilityId");
+
+                    b.HasIndex("TenantId", "Status");
+
+                    b.HasIndex("TenantId", "VulnerabilityId");
+
+                    b.HasIndex("TenantId", "DeviceId", "VulnerabilityId")
+                        .IsUnique();
+
+                    b.ToTable("DeviceVulnerabilityExposures");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.EnrichmentJob", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2049,6 +2132,83 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("EnrichmentSourceConfigurations");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.ExposureAssessment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("BaseCvss")
+                        .HasColumnType("numeric(4,2)");
+
+                    b.Property<DateTimeOffset>("CalculatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeviceVulnerabilityExposureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("EnvironmentalCvss")
+                        .HasColumnType("numeric(4,2)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid?>("SecurityProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceVulnerabilityExposureId");
+
+                    b.HasIndex("SecurityProfileId");
+
+                    b.HasIndex("TenantId", "DeviceVulnerabilityExposureId")
+                        .IsUnique();
+
+                    b.ToTable("ExposureAssessments");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.ExposureEpisode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeviceVulnerabilityExposureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EpisodeNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceVulnerabilityExposureId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "DeviceVulnerabilityExposureId", "EpisodeNumber")
+                        .IsUnique();
+
+                    b.ToTable("ExposureEpisodes");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.FeatureFlagOverride", b =>
@@ -2654,13 +2814,13 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("OwnerTeamId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("RemediationCaseId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("RemediationDecisionId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("RemediationWorkflowId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SoftwareAssetId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Status")
@@ -2671,15 +2831,14 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("TenantSoftwareId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerTeamId");
+
+                    b.HasIndex("RemediationCaseId");
 
                     b.HasIndex("RemediationDecisionId");
 
@@ -2689,7 +2848,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.HasIndex("TenantId", "TenantSoftwareId");
+                    b.HasIndex("TenantId", "RemediationCaseId", "Status");
 
                     b.ToTable("PatchingTasks");
                 });
@@ -2713,6 +2872,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<Guid>("RemediationCaseId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("RequestedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2727,9 +2889,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("TenantSoftwareId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2737,11 +2896,49 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.HasIndex("TenantId", "TenantSoftwareId", "RequestedAt");
+                    b.HasIndex("TenantId", "RemediationCaseId", "RequestedAt");
 
-                    b.HasIndex("TenantId", "TenantSoftwareId", "Status");
+                    b.HasIndex("TenantId", "RemediationCaseId", "Status");
 
                     b.ToTable("RemediationAiJobs");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.RemediationCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SoftwareProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SoftwareProductId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "SoftwareProductId")
+                        .IsUnique();
+
+                    b.ToTable("RemediationCases", (string)null);
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.RemediationDecision", b =>
@@ -2791,16 +2988,13 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("ReEvaluationDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("RemediationCaseId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("RemediationWorkflowId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("SoftwareAssetId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TenantSoftwareId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
@@ -2810,13 +3004,13 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("ApprovalStatus");
 
-                    b.HasIndex("RemediationWorkflowId");
+                    b.HasIndex("RemediationCaseId");
 
-                    b.HasIndex("SoftwareAssetId");
+                    b.HasIndex("RemediationWorkflowId");
 
                     b.HasIndex("TenantId");
 
-                    b.HasIndex("TenantId", "TenantSoftwareId");
+                    b.HasIndex("TenantId", "RemediationCaseId", "ApprovalStatus");
 
                     b.ToTable("RemediationDecisions");
                 });
@@ -2842,12 +3036,14 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("RemediationDecisionId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("TenantVulnerabilityId")
+                    b.Property<Guid>("VulnerabilityId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RemediationDecisionId", "TenantVulnerabilityId")
+                    b.HasIndex("VulnerabilityId");
+
+                    b.HasIndex("RemediationDecisionId", "VulnerabilityId")
                         .IsUnique();
 
                     b.ToTable("RemediationDecisionVulnerabilityOverrides");
@@ -2892,6 +3088,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid?>("RecurrenceSourceWorkflowId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("RemediationCaseId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("SoftwareOwnerTeamId")
                         .HasColumnType("uuid");
 
@@ -2903,9 +3102,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("TenantSoftwareId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2913,11 +3109,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("RecurrenceSourceWorkflowId");
 
+                    b.HasIndex("RemediationCaseId");
+
                     b.HasIndex("TenantId");
 
-                    b.HasIndex("TenantId", "Status");
-
-                    b.HasIndex("TenantId", "TenantSoftwareId");
+                    b.HasIndex("TenantId", "RemediationCaseId", "Status");
 
                     b.ToTable("RemediationWorkflows");
                 });
@@ -2992,9 +3188,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid?>("ApprovedBy")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AssetId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Conditions")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
@@ -3008,6 +3201,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.Property<DateTimeOffset?>("NextReviewDate")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RemediationCaseId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("RequestedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3026,16 +3222,18 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("TenantVulnerabilityId")
+                    b.Property<Guid?>("VulnerabilityId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RemediationCaseId");
 
                     b.HasIndex("Status");
 
                     b.HasIndex("TenantId");
 
-                    b.HasIndex("TenantVulnerabilityId");
+                    b.HasIndex("TenantId", "RemediationCaseId", "Status");
 
                     b.ToTable("RiskAcceptances");
                 });
@@ -3291,11 +3489,11 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
-                    b.Property<Guid>("NormalizedSoftwareId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("RequestedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SoftwareProductId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3311,9 +3509,6 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("TenantSoftwareId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -3321,9 +3516,7 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.HasIndex("TenantId", "TenantSoftwareId", "RequestedAt");
-
-                    b.HasIndex("TenantId", "TenantSoftwareId", "Status");
+                    b.HasIndex("TenantId", "SoftwareProductId", "Status");
 
                     b.ToTable("SoftwareDescriptionJobs");
                 });
@@ -4764,6 +4957,12 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("PatchHound.Core.Entities.AIReport", b =>
                 {
+                    b.HasOne("PatchHound.Core.Entities.RemediationCase", "RemediationCase")
+                        .WithMany()
+                        .HasForeignKey("RemediationCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("PatchHound.Core.Entities.TenantAiProfile", "TenantAiProfile")
                         .WithMany()
                         .HasForeignKey("TenantAiProfileId")
@@ -4773,8 +4972,9 @@ namespace PatchHound.Infrastructure.Data.Migrations
                     b.HasOne("PatchHound.Core.Entities.Vulnerability", "Vulnerability")
                         .WithMany()
                         .HasForeignKey("VulnerabilityId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("RemediationCase");
 
                     b.Navigation("TenantAiProfile");
 
@@ -4783,16 +4983,30 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("PatchHound.Core.Entities.AnalystRecommendation", b =>
                 {
+                    b.HasOne("PatchHound.Core.Entities.RemediationCase", "RemediationCase")
+                        .WithMany()
+                        .HasForeignKey("RemediationCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("PatchHound.Core.Entities.RemediationWorkflow", "RemediationWorkflow")
                         .WithMany()
                         .HasForeignKey("RemediationWorkflowId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("RemediationCase");
 
                     b.Navigation("RemediationWorkflow");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.ApprovalTask", b =>
                 {
+                    b.HasOne("PatchHound.Core.Entities.RemediationCase", "RemediationCase")
+                        .WithMany()
+                        .HasForeignKey("RemediationCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("PatchHound.Core.Entities.RemediationDecision", "RemediationDecision")
                         .WithMany()
                         .HasForeignKey("RemediationDecisionId")
@@ -4803,6 +5017,8 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .WithMany()
                         .HasForeignKey("RemediationWorkflowId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("RemediationCase");
 
                     b.Navigation("RemediationDecision");
 
@@ -4949,6 +5165,68 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.DeviceVulnerabilityExposure", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PatchHound.Core.Entities.InstalledSoftware", "InstalledSoftware")
+                        .WithMany()
+                        .HasForeignKey("InstalledSoftwareId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PatchHound.Core.Entities.SoftwareProduct", "SoftwareProduct")
+                        .WithMany()
+                        .HasForeignKey("SoftwareProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PatchHound.Core.Entities.Vulnerability", "Vulnerability")
+                        .WithMany()
+                        .HasForeignKey("VulnerabilityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+
+                    b.Navigation("InstalledSoftware");
+
+                    b.Navigation("SoftwareProduct");
+
+                    b.Navigation("Vulnerability");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.ExposureAssessment", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.DeviceVulnerabilityExposure", "Exposure")
+                        .WithMany()
+                        .HasForeignKey("DeviceVulnerabilityExposureId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PatchHound.Core.Entities.SecurityProfile", "SecurityProfile")
+                        .WithMany()
+                        .HasForeignKey("SecurityProfileId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Exposure");
+
+                    b.Navigation("SecurityProfile");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.ExposureEpisode", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.DeviceVulnerabilityExposure", "Exposure")
+                        .WithMany()
+                        .HasForeignKey("DeviceVulnerabilityExposureId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Exposure");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.FeatureFlagOverride", b =>
                 {
                     b.HasOne("PatchHound.Core.Entities.Tenant", "Tenant")
@@ -5038,6 +5316,12 @@ namespace PatchHound.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("PatchHound.Core.Entities.PatchingTask", b =>
                 {
+                    b.HasOne("PatchHound.Core.Entities.RemediationCase", "RemediationCase")
+                        .WithMany()
+                        .HasForeignKey("RemediationCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("PatchHound.Core.Entities.RemediationDecision", "RemediationDecision")
                         .WithMany()
                         .HasForeignKey("RemediationDecisionId")
@@ -5049,27 +5333,40 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .HasForeignKey("RemediationWorkflowId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.Navigation("RemediationCase");
+
                     b.Navigation("RemediationDecision");
 
                     b.Navigation("RemediationWorkflow");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.RemediationCase", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.SoftwareProduct", "SoftwareProduct")
+                        .WithMany()
+                        .HasForeignKey("SoftwareProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SoftwareProduct");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.RemediationDecision", b =>
                 {
+                    b.HasOne("PatchHound.Core.Entities.RemediationCase", "RemediationCase")
+                        .WithMany()
+                        .HasForeignKey("RemediationCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("PatchHound.Core.Entities.RemediationWorkflow", "RemediationWorkflow")
                         .WithMany()
                         .HasForeignKey("RemediationWorkflowId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("PatchHound.Core.Entities.Asset", "SoftwareAsset")
-                        .WithMany()
-                        .HasForeignKey("SoftwareAssetId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                    b.Navigation("RemediationCase");
 
                     b.Navigation("RemediationWorkflow");
-
-                    b.Navigation("SoftwareAsset");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.RemediationDecisionVulnerabilityOverride", b =>
@@ -5080,7 +5377,26 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("PatchHound.Core.Entities.Vulnerability", "Vulnerability")
+                        .WithMany()
+                        .HasForeignKey("VulnerabilityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("RemediationDecision");
+
+                    b.Navigation("Vulnerability");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.RemediationWorkflow", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.RemediationCase", "RemediationCase")
+                        .WithMany()
+                        .HasForeignKey("RemediationCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RemediationCase");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.RemediationWorkflowStageRecord", b =>
@@ -5092,6 +5408,17 @@ namespace PatchHound.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Workflow");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.RiskAcceptance", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.RemediationCase", "RemediationCase")
+                        .WithMany()
+                        .HasForeignKey("RemediationCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RemediationCase");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.SoftwareAlias", b =>

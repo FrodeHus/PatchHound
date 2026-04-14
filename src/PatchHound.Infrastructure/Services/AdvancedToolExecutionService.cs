@@ -242,7 +242,7 @@ public class AdvancedToolExecutionService(
         }
 
         // Phase-2: VulnerabilityAsset + SoftwareVulnerabilityMatch deleted. Return empty context.
-        var openVulnerabilityRows = new List<(Guid TenantVulnerabilityId, string ExternalId)>();
+        var openVulnerabilityRows = new List<(Guid VulnerabilityId, string ExternalId)>();
         var requestedIds = new HashSet<Guid>();
         var vulnerabilityRows = openVulnerabilityRows;
         var softwareEvidenceRows = new List<(string ExternalId, string? Metadata)>();
@@ -260,7 +260,7 @@ public class AdvancedToolExecutionService(
             {
                 evidenceByExternalId.TryGetValue(row.ExternalId, out var softwareEvidence);
                 return new AdvancedToolVulnerabilityContext(
-                    row.TenantVulnerabilityId,
+                    row.VulnerabilityId,
                     row.ExternalId,
                     softwareEvidence?.Vendor,
                     softwareEvidence?.Product,

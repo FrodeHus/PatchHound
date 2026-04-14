@@ -84,125 +84,55 @@ public class RemediationDecisionQueryService(
         CancellationToken ct
     )
     {
-        var activeSnapshotId = await snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
-        var tenantSoftwareQuery = dbContext.TenantSoftware.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.SnapshotId == activeSnapshotId);
+        var casesQuery = dbContext.RemediationCases.AsNoTracking()
+            .Where(c => c.TenantId == tenantId);
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var term = filter.Search.Trim().ToLower();
-            tenantSoftwareQuery = tenantSoftwareQuery.Where(item =>
-                item.NormalizedSoftware.CanonicalName.ToLower().Contains(term)
-                || (item.NormalizedSoftware.CanonicalVendor != null
-                    && item.NormalizedSoftware.CanonicalVendor.ToLower().Contains(term)));
+            casesQuery = casesQuery.Where(c =>
+                c.SoftwareProduct.Name.ToLower().Contains(term)
+                || (c.SoftwareProduct.Vendor != null && c.SoftwareProduct.Vendor.ToLower().Contains(term)));
         }
 
-        var tenantSoftwareRows = await tenantSoftwareQuery
-            .Select(item => new
+        var caseRows = await casesQuery
+            .Select(c => new
             {
-                item.Id,
-                Name = item.NormalizedSoftware.CanonicalName,
-                item.NormalizedSoftware.CanonicalVendor,
+                c.Id,
+                Name = c.SoftwareProduct.Name,
+                Vendor = c.SoftwareProduct.Vendor,
             })
-            .OrderBy(item => item.Name)
+            .OrderBy(c => c.Name)
             .ToListAsync(ct);
 
-        var tenantSoftwareIds = tenantSoftwareRows.Select(item => item.Id).ToList();
-        var activeInstallations = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.IsActive && tenantSoftwareIds.Contains(item.TenantSoftwareId))
-            .Select(item => new { item.TenantSoftwareId, item.SoftwareAssetId, item.DeviceAssetId })
-            .ToListAsync(ct);
-        var softwareAssetIds = activeInstallations.Select(item => item.SoftwareAssetId).Distinct().ToList();
-        var deviceAssetIds = activeInstallations.Select(item => item.DeviceAssetId).Distinct().ToList();
-        var softwareAssetNamesById = await dbContext.Assets.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && softwareAssetIds.Contains(item.Id))
-            .Select(item => new { item.Id, item.Name })
-            .ToDictionaryAsync(item => item.Id, item => item.Name, ct);
-        var deviceAssets = await dbContext.Assets.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && deviceAssetIds.Contains(item.Id))
-            .Select(item => new { item.Id, item.Criticality })
-            .ToListAsync(ct);
-        var deviceAssetsById = deviceAssets.ToDictionary(item => item.Id);
-        var representativeAssetByTenantSoftwareId = activeInstallations
-            .GroupBy(item => item.TenantSoftwareId)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(item => item.SoftwareAssetId).Distinct().OrderBy(id => id).FirstOrDefault()
-            );
-        var highestCriticalityByTenantSoftwareId = activeInstallations
-            .GroupBy(item => item.TenantSoftwareId)
-            .ToDictionary(
-                group => group.Key,
-                group => group
-                    .Select(item => deviceAssetsById.GetValueOrDefault(item.DeviceAssetId)?.Criticality ?? Criticality.Low)
-                    .DefaultIfEmpty(Criticality.Low)
-                    .Max()
-            );
-        var deviceCountByTenantSoftwareId = activeInstallations
-            .GroupBy(item => item.TenantSoftwareId)
-            .ToDictionary(group => group.Key, group => group.Select(item => item.DeviceAssetId).Distinct().Count());
-        var deviceIdsByTenantSoftwareId = activeInstallations
-            .GroupBy(item => item.TenantSoftwareId)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(item => item.DeviceAssetId).Distinct().ToHashSet()
-            );
+        var caseIds = caseRows.Select(c => c.Id).ToList();
 
         var decisionsLookup = await dbContext.RemediationDecisions.AsNoTracking()
             .Where(d => d.TenantId == tenantId
-                && tenantSoftwareIds.Contains(d.TenantSoftwareId)
+                && caseIds.Contains(d.RemediationCaseId)
                 && d.ApprovalStatus != DecisionApprovalStatus.Rejected
                 && d.ApprovalStatus != DecisionApprovalStatus.Expired)
-            .GroupBy(d => d.TenantSoftwareId)
+            .GroupBy(d => d.RemediationCaseId)
             .Select(g => g.OrderByDescending(d => d.CreatedAt).First())
-            .ToDictionaryAsync(d => d.TenantSoftwareId, ct);
+            .ToDictionaryAsync(d => d.RemediationCaseId, ct);
 
-        // Phase-2: SoftwareVulnerabilityMatch deleted.
-        var openMatchRows = new List<(Guid SoftwareAssetId, DateTimeOffset FirstSeenAt, Guid VulnerabilityDefinitionId, Severity VendorSeverity)>();
+        // TODO Phase 5: restore vulnerability counts from canonical vulnerability model.
+        var vulnCounts = new Dictionary<Guid, (int Total, int Critical, int High, DateTimeOffset EarliestFirstSeen, Severity HighestSeverity)>();
 
-        var tenantSoftwareIdBySoftwareAssetId = activeInstallations
-            .GroupBy(item => item.SoftwareAssetId)
-            .ToDictionary(group => group.Key, group => group.First().TenantSoftwareId);
-        var vulnerabilityDefinitionIdsByTenantSoftwareId = openMatchRows
-            .Where(item => tenantSoftwareIdBySoftwareAssetId.ContainsKey(item.SoftwareAssetId))
-            .GroupBy(item => tenantSoftwareIdBySoftwareAssetId[item.SoftwareAssetId])
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(item => item.VulnerabilityDefinitionId).Distinct().ToHashSet()
-            );
-
-        var vulnCounts = openMatchRows
-            .Where(item => tenantSoftwareIdBySoftwareAssetId.ContainsKey(item.SoftwareAssetId))
-            .GroupBy(item => tenantSoftwareIdBySoftwareAssetId[item.SoftwareAssetId])
-            .ToDictionary(
-                group => group.Key,
-                group => new
-                {
-                    Total = group.Select(item => item.VulnerabilityDefinitionId).Distinct().Count(),
-                    Critical = group.Where(item => item.VendorSeverity == Severity.Critical).Select(item => item.VulnerabilityDefinitionId).Distinct().Count(),
-                    High = group.Where(item => item.VendorSeverity == Severity.High).Select(item => item.VulnerabilityDefinitionId).Distinct().Count(),
-                    EarliestFirstSeen = group.Min(item => item.FirstSeenAt),
-                    HighestSeverity = group.Max(item => item.VendorSeverity),
-                });
-
-        var riskScoresByTsId = await dbContext.TenantSoftwareRiskScores.AsNoTracking()
-            .Where(r => r.TenantId == tenantId && tenantSoftwareIds.Contains(r.TenantSoftwareId))
-            .ToDictionaryAsync(r => r.TenantSoftwareId, ct);
+        // TODO Phase 5: restore risk scores keyed by RemediationCaseId.
+        var riskScoresByCaseId = new Dictionary<Guid, (decimal OverallScore, DateTimeOffset CalculatedAt)>();
 
         var tenantSla = await dbContext.TenantSlaConfigurations.AsNoTracking()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
 
         var items = new List<RemediationDecisionListItemDto>();
-        foreach (var software in tenantSoftwareRows)
+        foreach (var rc in caseRows)
         {
-            var activeVulnerabilityCount = vulnCounts.GetValueOrDefault(software.Id)?.Total ?? 0;
-            if (activeVulnerabilityCount == 0)
-            {
-                continue;
-            }
+            // TODO Phase 5: skip cases with no active vulnerabilities once vuln data is restored.
+            var activeVulnerabilityCount = 0;
 
-            if (!highestCriticalityByTenantSoftwareId.TryGetValue(software.Id, out var criticality))
-                criticality = Criticality.Low;
+            // TODO Phase 5: restore criticality from device-asset join.
+            var criticality = Criticality.Low;
 
             if (!string.IsNullOrWhiteSpace(filter.Criticality)
                 && Enum.TryParse<Criticality>(filter.Criticality, true, out var crit)
@@ -211,7 +141,7 @@ public class RemediationDecisionQueryService(
                 continue;
             }
 
-            decisionsLookup.TryGetValue(software.Id, out var decision);
+            decisionsLookup.TryGetValue(rc.Id, out var decision);
             if (string.Equals(filter.DecisionState, "WithDecision", StringComparison.OrdinalIgnoreCase)
                 && decision is null)
             {
@@ -239,8 +169,7 @@ public class RemediationDecisionQueryService(
             if (filter.MissedMaintenanceWindow == true)
             {
                 if (decision?.MaintenanceWindowDate is not DateTimeOffset maintenanceWindowDate
-                    || maintenanceWindowDate >= DateTimeOffset.UtcNow
-                    || activeVulnerabilityCount <= 0)
+                    || maintenanceWindowDate >= DateTimeOffset.UtcNow)
                 {
                     continue;
                 }
@@ -248,7 +177,7 @@ public class RemediationDecisionQueryService(
 
             string? riskBand = null;
             double? riskScore = null;
-            if (riskScoresByTsId.TryGetValue(software.Id, out var risk))
+            if (riskScoresByCaseId.TryGetValue(rc.Id, out var risk))
             {
                 riskScore = (double)risk.OverallScore;
                 riskBand = risk.OverallScore switch
@@ -263,22 +192,15 @@ public class RemediationDecisionQueryService(
 
             string? slaStatus = null;
             DateTimeOffset? slaDueDate = null;
-            if (tenantSla is not null && vulnCounts.TryGetValue(software.Id, out var vcForSla) && vcForSla.HighestSeverity != default)
+            if (tenantSla is not null && vulnCounts.TryGetValue(rc.Id, out var vcForSla) && vcForSla.HighestSeverity != default)
             {
                 slaDueDate = slaService.CalculateDueDate(vcForSla.HighestSeverity, vcForSla.EarliestFirstSeen, tenantSla);
                 slaStatus = slaService.GetSlaStatus(vcForSla.EarliestFirstSeen, slaDueDate.Value, DateTimeOffset.UtcNow).ToString();
             }
 
             items.Add(new RemediationDecisionListItemDto(
-                software.Id,
-                ResolveDisplaySoftwareName(
-                    software.Name,
-                    representativeAssetByTenantSoftwareId.TryGetValue(software.Id, out var representativeSoftwareAssetId)
-                        && representativeSoftwareAssetId != Guid.Empty
-                        && softwareAssetNamesById.TryGetValue(representativeSoftwareAssetId, out var representativeSoftwareName)
-                        ? representativeSoftwareName
-                        : null
-                ),
+                rc.Id,
+                ResolveDisplaySoftwareName(rc.Name, null),
                 criticality.ToString(),
                 decision?.Outcome.ToString(),
                 decision?.ApprovalStatus.ToString(),
@@ -286,13 +208,13 @@ public class RemediationDecisionQueryService(
                 decision?.MaintenanceWindowDate,
                 decision?.ExpiryDate,
                 activeVulnerabilityCount,
-                vulnCounts.GetValueOrDefault(software.Id)?.Critical ?? 0,
-                vulnCounts.GetValueOrDefault(software.Id)?.High ?? 0,
+                vulnCounts.GetValueOrDefault(rc.Id).Critical,
+                vulnCounts.GetValueOrDefault(rc.Id).High,
                 riskScore,
                 riskBand,
                 slaStatus,
                 slaDueDate,
-                deviceCountByTenantSoftwareId.GetValueOrDefault(software.Id),
+                0, // TODO Phase 5: restore device count from canonical device-asset join
                 BuildEmptyTrend()
             ));
         }
@@ -307,21 +229,6 @@ public class RemediationDecisionQueryService(
         var paged = items
             .Skip(pagination.Skip)
             .Take(pagination.BoundedPageSize)
-            .ToList();
-
-        var pagedEpisodeTrendBySoftwareId = await BuildOpenEpisodeTrendsBySoftwareAsync(
-            tenantId,
-            paged.Select(item => item.TenantSoftwareId).ToList(),
-            deviceIdsByTenantSoftwareId,
-            vulnerabilityDefinitionIdsByTenantSoftwareId,
-            ct
-        );
-
-        paged = paged
-            .Select(item => item with
-            {
-                OpenEpisodeTrend = pagedEpisodeTrendBySoftwareId.GetValueOrDefault(item.TenantSoftwareId) ?? BuildEmptyTrend()
-            })
             .ToList();
 
         var boundedPage = Math.Max(pagination.Page, 1);
@@ -344,71 +251,37 @@ public class RemediationDecisionQueryService(
         CancellationToken ct
     )
     {
-        var tenantSoftwareId = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.SoftwareAssetId == assetId && item.IsActive)
-            .Select(item => item.TenantSoftwareId)
-            .FirstOrDefaultAsync(ct);
-        if (tenantSoftwareId == Guid.Empty)
-            return null;
-
-        return await BuildByTenantSoftwareAsync(tenantId, tenantSoftwareId, false, ct);
+        // TODO Phase 5: resolve remediationCaseId from asset via NormalizedSoftwareInstallations → RemediationCase.
+        await Task.CompletedTask;
+        return null;
     }
 
-    public async Task<DecisionContextDto?> BuildByTenantSoftwareAsync(
+    public async Task<DecisionContextDto?> BuildByCaseIdAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid remediationCaseId,
         bool forceAiSummaryRefresh,
         CancellationToken ct
     )
     {
-        var tenantSoftwareMeta = await dbContext.TenantSoftware.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.Id == tenantSoftwareId)
-            .Select(item => new
+        var caseMeta = await dbContext.RemediationCases.AsNoTracking()
+            .Where(c => c.TenantId == tenantId && c.Id == remediationCaseId)
+            .Select(c => new
             {
-                Name = item.NormalizedSoftware.CanonicalName,
-                Vendor = item.NormalizedSoftware.CanonicalVendor,
+                Name = c.SoftwareProduct.Name,
+                Vendor = c.SoftwareProduct.Vendor,
             })
             .FirstOrDefaultAsync(ct);
 
-        var representativeAsset = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item =>
-                item.TenantId == tenantId
-                && item.TenantSoftwareId == tenantSoftwareId
-                && item.IsActive)
-            .Join(
-                dbContext.Assets.AsNoTracking(),
-                item => item.SoftwareAssetId,
-                asset => asset.Id,
-                (item, asset) => new { asset.Id, asset.Name, asset.Criticality }
-            )
-            .OrderBy(item => item.Id)
-            .FirstOrDefaultAsync(ct);
-
-        if (representativeAsset is null && tenantSoftwareMeta is null)
+        if (caseMeta is null)
             return null;
 
-        var assetId = representativeAsset?.Id ?? tenantSoftwareId;
-        var softwareName = ResolveDisplaySoftwareName(tenantSoftwareMeta?.Name, representativeAsset?.Name);
+        var softwareName = ResolveDisplaySoftwareName(caseMeta.Name, null);
 
-        var scopedSoftwareAssetIds = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
-            .Select(item => item.SoftwareAssetId)
-            .Distinct()
-            .ToListAsync(ct);
-        var scopedInstallations = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
-            .Select(item => new { item.DeviceAssetId })
-            .ToListAsync(ct);
-        var scopedDeviceAssetIds = scopedInstallations.Select(item => item.DeviceAssetId).Distinct().ToList();
-        var scopedDeviceCriticalityValues = await dbContext.NormalizedSoftwareInstallations.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId && item.IsActive)
-            .Join(
-                dbContext.Assets.AsNoTracking(),
-                item => item.DeviceAssetId,
-                asset => asset.Id,
-                (item, asset) => asset.Criticality
-            )
-            .ToListAsync(ct);
+        // TODO Phase 5: restore scopedDeviceAssetIds from NormalizedSoftwareInstallations via RemediationCase.
+        var scopedSoftwareAssetIds = new List<Guid>();
+        var scopedDeviceAssetIds = new List<Guid>();
+
+        var scopedDeviceCriticalityValues = new List<Criticality>();
         var assetCriticality = scopedDeviceCriticalityValues.Count > 0
             ? scopedDeviceCriticalityValues.Max()
             : Criticality.Low;
@@ -462,7 +335,7 @@ public class RemediationDecisionQueryService(
                 .Take(3)
                 .ToListAsync(ct);
         var patchingTaskCounts = await dbContext.PatchingTasks.AsNoTracking()
-            .Where(task => task.TenantId == tenantId && task.TenantSoftwareId == tenantSoftwareId)
+            .Where(task => task.TenantId == tenantId && task.RemediationCaseId == remediationCaseId)
             .GroupBy(_ => 1)
             .Select(group => new
             {
@@ -509,14 +382,14 @@ public class RemediationDecisionQueryService(
         var activeWorkflow = await dbContext.RemediationWorkflows.AsNoTracking()
             .Where(workflow =>
                 workflow.TenantId == tenantId
-                && workflow.TenantSoftwareId == tenantSoftwareId)
+                && workflow.RemediationCaseId == remediationCaseId)
             .OrderByDescending(workflow => workflow.CreatedAt)
             .FirstOrDefaultAsync(ct);
 
         // Current decision
         var decisionQuery = dbContext.RemediationDecisions.AsNoTracking()
             .Include(d => d.VulnerabilityOverrides)
-            .Where(d => d.TenantId == tenantId && d.TenantSoftwareId == tenantSoftwareId);
+            .Where(d => d.TenantId == tenantId && d.RemediationCaseId == remediationCaseId);
 
         var decision = activeWorkflow is not null
             ? await decisionQuery
@@ -532,8 +405,8 @@ public class RemediationDecisionQueryService(
 
         RemediationDecision? previousDecision = null;
 
-        var overridesByTenantVulnId = decision?.VulnerabilityOverrides
-            .ToDictionary(vo => vo.TenantVulnerabilityId);
+        var overridesByVulnerabilityId = decision?.VulnerabilityOverrides
+            .ToDictionary(vo => vo.VulnerabilityId);
 
         // Analyst recommendations
         var activeWorkflowId = activeWorkflow?.Id;
@@ -563,9 +436,9 @@ public class RemediationDecisionQueryService(
                 .FirstOrDefaultAsync(ct)
             : null;
 
-        // Asset risk score
-        var assetRiskScore = await dbContext.AssetRiskScores.AsNoTracking()
-            .FirstOrDefaultAsync(r => r.AssetId == assetId && r.TenantId == tenantId, ct);
+        // Asset risk score — TODO Phase 5: restore from canonical risk scores.
+        _ = await dbContext.AssetRiskScores.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.TenantId == tenantId, ct);
 
         // SLA configuration
         var tenantSla = await dbContext.TenantSlaConfigurations.AsNoTracking()
@@ -590,8 +463,8 @@ public class RemediationDecisionQueryService(
                 }
 
                 string? overrideOutcome = null;
-                if (overridesByTenantVulnId is not null && tvId != Guid.Empty
-                    && overridesByTenantVulnId.TryGetValue(tvId, out var vo))
+                if (overridesByVulnerabilityId is not null && tvId != Guid.Empty
+                    && overridesByVulnerabilityId.TryGetValue(tvId, out var vo))
                 {
                     overrideOutcome = vo.Outcome.ToString();
                 }
@@ -657,26 +530,8 @@ public class RemediationDecisionQueryService(
             }
         }
 
-        // Risk score
+        // Risk score — TODO Phase 5: restore from canonical risk model keyed by RemediationCaseId.
         DecisionRiskDto? riskDto = null;
-        var tenantSoftwareRisk = await dbContext.TenantSoftwareRiskScores.AsNoTracking()
-            .FirstOrDefaultAsync(r => r.TenantSoftwareId == tenantSoftwareId && r.TenantId == tenantId, ct);
-        if (tenantSoftwareRisk is not null)
-        {
-            var riskBand = tenantSoftwareRisk.OverallScore switch
-            {
-                >= 900m => "Critical",
-                >= 750m => "High",
-                >= 500m => "Medium",
-                > 0m => "Low",
-                _ => "None",
-            };
-            riskDto = new DecisionRiskDto(
-                (double)tenantSoftwareRisk.OverallScore,
-                riskBand,
-                tenantSoftwareRisk.CalculatedAt
-            );
-        }
 
         var remediationAiContext = BuildRemediationAiContext(
             scopedDeviceDetails,
@@ -716,7 +571,7 @@ public class RemediationDecisionQueryService(
                     : null,
                 decision.VulnerabilityOverrides.Select(vo => new VulnerabilityOverrideDto(
                     vo.Id,
-                    vo.TenantVulnerabilityId,
+                    vo.VulnerabilityId,
                     vo.Outcome.ToString(),
                     vo.Justification,
                     vo.CreatedAt
@@ -727,7 +582,7 @@ public class RemediationDecisionQueryService(
         // Recommendation DTOs
         var recommendationDtos = recommendations.Select(r => new AnalystRecommendationDto(
             r.Id,
-            r.TenantVulnerabilityId,
+            r.VulnerabilityId,
             r.RecommendedOutcome.ToString(),
             r.Rationale,
             r.PriorityOverride,
@@ -766,7 +621,7 @@ public class RemediationDecisionQueryService(
                 null,
                 previousDecision.VulnerabilityOverrides.Select(vo => new VulnerabilityOverrideDto(
                     vo.Id,
-                    vo.TenantVulnerabilityId,
+                    vo.VulnerabilityId,
                     vo.Outcome.ToString(),
                     vo.Justification,
                     vo.CreatedAt
@@ -823,22 +678,10 @@ public class RemediationDecisionQueryService(
             decision
         );
 
-        var aiSummary = await ResolveAiSummaryAsync(
-            tenantId,
-            tenantSoftwareId,
-            softwareName,
-            workflowState,
-            decisionDto,
-            recommendationDtos,
-            topVulns.Take(5).ToList(),
-            summary,
-            remediationAiContext,
-            forceRefresh: forceAiSummaryRefresh,
-            ct
-        );
+        var aiSummary = await ResolveAiSummaryAsync(ct);
 
         return new DecisionContextDto(
-            tenantSoftwareId,
+            remediationCaseId,
             softwareName,
             assetCriticality.ToString(),
             summary,
@@ -862,20 +705,20 @@ public class RemediationDecisionQueryService(
 
     public async Task<DecisionAiSummaryDto?> RefreshAiSummaryAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid remediationCaseId,
         CancellationToken ct
     )
     {
-        return (await BuildByTenantSoftwareAsync(tenantId, tenantSoftwareId, true, ct))?.AiSummary;
+        return (await BuildByCaseIdAsync(tenantId, remediationCaseId, true, ct))?.AiSummary;
     }
 
     public async Task<bool> GenerateAndStoreAiDraftsAsync(
         Guid tenantId,
-        Guid tenantSoftwareId,
+        Guid remediationCaseId,
         CancellationToken ct
     )
     {
-        var summary = await RefreshAiSummaryAsync(tenantId, tenantSoftwareId, ct);
+        var summary = await RefreshAiSummaryAsync(tenantId, remediationCaseId, ct);
         return summary is not null
             && (
                 !string.IsNullOrWhiteSpace(summary.Content)
@@ -1275,163 +1118,33 @@ public class RemediationDecisionQueryService(
         return new DateTimeOffset(utc.Year, utc.Month, utc.Day, 0, 0, 0, TimeSpan.Zero);
     }
 
-    private async Task<DecisionAiSummaryDto> ResolveAiSummaryAsync(
-        Guid tenantId,
-        Guid tenantSoftwareId,
-        string softwareName,
-        DecisionWorkflowStateDto workflowState,
-        RemediationDecisionDto? decisionDto,
-        List<AnalystRecommendationDto> recommendations,
-        List<DecisionVulnDto> topVulns,
-        DecisionSummaryDto summary,
-        RemediationAiContext remediationAiContext,
-        bool forceRefresh,
-        CancellationToken ct
-    )
+    // TODO Phase 5: restore AI summary from RemediationCase → SoftwareProduct once AI fields are migrated off TenantSoftware.
+    private static Task<DecisionAiSummaryDto> ResolveAiSummaryAsync(CancellationToken ct)
     {
-        var tenantSoftware = await dbContext.TenantSoftware
-            .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.Id == tenantSoftwareId, ct);
-        if (tenantSoftware is null)
-        {
-            return new DecisionAiSummaryDto(
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                "Unavailable",
-                false,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                false,
-                false,
-                null,
-                MissingAiProfileMessage
-            );
-        }
-
-        var latestJob = await dbContext.RemediationAiJobs.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.TenantSoftwareId == tenantSoftwareId)
-            .OrderByDescending(item => item.RequestedAt)
-            .FirstOrDefaultAsync(ct);
-        var reviewedByDisplayName = tenantSoftware.RemediationAiReviewedBy is Guid reviewedByUserId
-            ? await dbContext.Users.AsNoTracking()
-                .Where(user => user.Id == reviewedByUserId)
-                .Select(user => user.DisplayName)
-                .FirstOrDefaultAsync(ct)
-            : null;
-
-        var inputHash = HashAiSummaryInput(
-            softwareName,
-            workflowState,
-            decisionDto,
-            recommendations,
-            topVulns,
-            summary,
-            remediationAiContext
-        );
-
-        var hasEnabledDefaultProfile = await dbContext.TenantAiProfiles.AsNoTracking()
-            .AnyAsync(item => item.TenantId == tenantId && item.IsDefault && item.IsEnabled, ct);
-        var hasStoredGuidance = HasStoredAiGuidance(tenantSoftware);
-        var hasFreshGuidance = hasStoredGuidance
-            && string.Equals(tenantSoftware.RemediationAiSummaryInputHash, inputHash, StringComparison.Ordinal);
-
-        if (!forceRefresh && hasFreshGuidance)
-        {
-            return BuildAiSummaryDto(tenantSoftware, latestJob, hasEnabledDefaultProfile, false, null, reviewedByDisplayName);
-        }
-
-        if (!hasEnabledDefaultProfile)
-        {
-            return BuildAiSummaryDto(tenantSoftware, latestJob, false, hasStoredGuidance && !hasFreshGuidance, MissingAiProfileMessage, reviewedByDisplayName);
-        }
-
-        if (!forceRefresh)
-        {
-            return BuildAiSummaryDto(tenantSoftware, latestJob, true, hasStoredGuidance && !hasFreshGuidance, null, reviewedByDisplayName);
-        }
-
-        var generatedSummary = await GenerateAiNarrativeAsync(
-            tenantId,
-            softwareName,
-            summary,
-            topVulns,
-            remediationAiContext,
-            ct
-        );
-        if (!generatedSummary.IsSuccess)
-        {
-            return new DecisionAiSummaryDto(
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                "Failed",
-                false,
-                NullIfWhiteSpace(tenantSoftware.RemediationAiReviewStatus),
-                tenantSoftware.RemediationAiReviewedAt,
-                string.IsNullOrWhiteSpace(reviewedByDisplayName) ? null : reviewedByDisplayName,
-                null,
-                latestJob?.RequestedAt,
-                latestJob?.CompletedAt,
-                null,
-                null,
-                null,
-                true,
-                false,
-                generatedSummary.Error,
-                "AI input is available, but the summary could not be generated right now. Try Ask AI again."
-            );
-        }
-
-        tenantSoftware.StoreRemediationAiSummary(
-            generatedSummary.Value.Value.ExecutiveSummary,
-            generatedSummary.Value.Value.OwnerRecommendation,
-            generatedSummary.Value.Value.AnalystAssessment,
-            generatedSummary.Value.Value.ExceptionRecommendation,
-            generatedSummary.Value.Value.RecommendedOutcome,
-            generatedSummary.Value.Value.RecommendedPriority,
-            inputHash,
-            generatedSummary.Value.Metadata.ProviderType,
-            generatedSummary.Value.Metadata.ProfileName,
-            generatedSummary.Value.Metadata.Model
-        );
-        await dbContext.SaveChangesAsync(ct);
-
-        return new DecisionAiSummaryDto(
-            generatedSummary.Value.Value.ExecutiveSummary,
-            generatedSummary.Value.Value.OwnerRecommendation,
-            generatedSummary.Value.Value.AnalystAssessment,
-            generatedSummary.Value.Value.ExceptionRecommendation,
-            generatedSummary.Value.Value.RecommendedOutcome,
-            generatedSummary.Value.Value.RecommendedPriority,
-            "Ready",
+        _ = ct;
+        return Task.FromResult(new DecisionAiSummaryDto(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "Unavailable",
             false,
             null,
             null,
             null,
-            generatedSummary.Value.Metadata.GeneratedAt,
-            latestJob?.RequestedAt,
-            latestJob?.CompletedAt,
-            generatedSummary.Value.Metadata.ProviderType,
-            generatedSummary.Value.Metadata.ProfileName,
-            generatedSummary.Value.Metadata.Model,
-            true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
             false,
             null,
-            null
-        );
+            "AI summary not available in Phase 4. TODO Phase 5."
+        ));
     }
 
     private DecisionAiSummaryDto BuildAiSummaryDto(
@@ -1697,7 +1410,7 @@ public class RemediationDecisionQueryService(
                 $"{item.Id}:{item.RecommendedOutcome}:{item.Rationale}:{item.PriorityOverride}:{item.CreatedAt:O}"
             )),
             string.Join(";", topVulns.Select(item =>
-                $"{item.TenantVulnerabilityId}:{item.ExternalId}:{item.EffectiveSeverity}:{item.EpisodeRiskScore}:{item.KnownExploited}:{item.PublicExploit}:{item.ActiveAlert}:{item.OverrideOutcome}"
+                $"{item.VulnerabilityId}:{item.ExternalId}:{item.EffectiveSeverity}:{item.EpisodeRiskScore}:{item.KnownExploited}:{item.PublicExploit}:{item.ActiveAlert}:{item.OverrideOutcome}"
             )),
             summary.TotalVulnerabilities,
             summary.CriticalCount,

@@ -4,23 +4,22 @@ import { createFileRoute } from '@tanstack/react-router'
 import { fetchDecisionContext } from '@/api/remediation.functions'
 import { SoftwareRemediationView } from '@/components/features/remediation/SoftwareRemediationView'
 import { useTenantScope } from '@/components/layout/tenant-scope'
-import { softwareQueryKeys } from '@/features/software/list-state'
 
-export const Route = createFileRoute('/_authed/software/$id_/remediation')({
-  loader: ({ params }) => fetchDecisionContext({ data: { tenantSoftwareId: params.id } }),
-  component: RemediationPage,
+export const Route = createFileRoute('/_authed/remediation/cases/$caseId')({
+  loader: ({ params }) => fetchDecisionContext({ data: { caseId: params.caseId } }),
+  component: RemediationCaseRoute,
 })
 
-function RemediationPage() {
+function RemediationCaseRoute() {
   const initialData = Route.useLoaderData()
-  const { id } = Route.useParams()
+  const { caseId } = Route.useParams()
   const { selectedTenantId } = useTenantScope()
   const [initialTenantId] = useState(selectedTenantId)
   const canUseInitialData = initialTenantId === selectedTenantId
 
   const query = useQuery({
-    queryKey: softwareQueryKeys.remediation(selectedTenantId, id),
-    queryFn: () => fetchDecisionContext({ data: { tenantSoftwareId: id } }),
+    queryKey: ['remediation-case', selectedTenantId, caseId],
+    queryFn: () => fetchDecisionContext({ data: { caseId } }),
     initialData: canUseInitialData ? initialData : undefined,
     refetchInterval: (currentQuery) => {
       const status = currentQuery.state.data?.aiSummary.status
@@ -38,5 +37,5 @@ function RemediationPage() {
     )
   }
 
-  return <SoftwareRemediationView data={data} tenantSoftwareId={id} />
+  return <SoftwareRemediationView data={data} caseId={caseId} />
 }

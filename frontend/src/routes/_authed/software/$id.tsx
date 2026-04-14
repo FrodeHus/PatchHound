@@ -7,7 +7,7 @@ import {
   fetchTenantSoftwareInstallations,
   fetchTenantSoftwareVulnerabilities,
 } from '@/api/software.functions'
-import { fetchDecisionContext } from '@/api/remediation.functions'
+import { fetchTenantSoftwareDecisionContext } from '@/api/remediation.functions'
 import { SoftwareDetailPage } from '@/components/features/software/SoftwareDetailPage'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { softwareQueryKeys } from '@/features/software/list-state'
@@ -100,7 +100,7 @@ function SoftwareDetailRoute() {
 
   const remediationQuery = useQuery({
     queryKey: softwareQueryKeys.remediation(selectedTenantId, id),
-    queryFn: () => fetchDecisionContext({ data: { tenantSoftwareId: id } }),
+    queryFn: () => fetchTenantSoftwareDecisionContext({ data: { tenantSoftwareId: id } }),
     enabled: canViewRemediation,
     refetchInterval: (currentQuery) => {
       const status = currentQuery.state.data?.aiSummary.status

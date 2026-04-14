@@ -2,7 +2,7 @@ namespace PatchHound.Api.Models.Vulnerabilities;
 
 public record AiReportDto(
     Guid Id,
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     string Content,
     string ProviderType,
     string ProfileName,

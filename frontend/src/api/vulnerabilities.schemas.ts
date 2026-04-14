@@ -124,7 +124,7 @@ export const vulnerabilityDetailSchema = z.object({
 
 export const aiReportSchema = z.object({
   id: z.string().uuid(),
-  tenantVulnerabilityId: z.string().uuid(),
+  vulnerabilityId: z.string().uuid(),
   content: z.string(),
   providerType: z.string(),
   profileName: z.string(),

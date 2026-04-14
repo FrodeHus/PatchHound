@@ -71,6 +71,7 @@ public class SoftwareController(
                 item.Id,
                 item.TenantId,
                 item.NormalizedSoftwareId,
+                item.NormalizedSoftware.CanonicalProductKey,
                 item.FirstSeenAt,
                 item.LastSeenAt,
                 item.NormalizedSoftware.CanonicalName,
@@ -103,6 +104,11 @@ public class SoftwareController(
         {
             return NotFound();
         }
+
+        var softwareProductId = await dbContext.SoftwareProducts.AsNoTracking()
+            .Where(item => item.CanonicalProductKey == tenantSoftware.CanonicalProductKey)
+            .Select(item => (Guid?)item.Id)
+            .FirstOrDefaultAsync(ct);
 
         var installations = await dbContext
             .NormalizedSoftwareInstallations.AsNoTracking()
@@ -167,6 +173,7 @@ public class SoftwareController(
             new TenantSoftwareDetailDto(
                 tenantSoftware.Id,
                 tenantSoftware.NormalizedSoftwareId,
+                softwareProductId,
                 softwareAssetIds.FirstOrDefault() is var primaryAssetId && primaryAssetId != Guid.Empty ? primaryAssetId : null,
                 tenantSoftware.CanonicalName,
                 tenantSoftware.CanonicalVendor,
@@ -306,7 +313,7 @@ public class SoftwareController(
         return Ok(
             new TenantSoftwareDescriptionJobDto(
                 result.Value.Id,
-                result.Value.TenantSoftwareId,
+                result.Value.SoftwareProductId,
                 result.Value.Status.ToString(),
                 string.IsNullOrWhiteSpace(result.Value.Error) ? null : result.Value.Error,
                 result.Value.RequestedAt,
@@ -337,7 +344,7 @@ public class SoftwareController(
         return Ok(
             new TenantSoftwareDescriptionJobDto(
                 job.Id,
-                job.TenantSoftwareId,
+                job.SoftwareProductId,
                 job.Status.ToString(),
                 string.IsNullOrWhiteSpace(job.Error) ? null : job.Error,
                 job.RequestedAt,
@@ -394,18 +401,10 @@ public class SoftwareController(
 
         if (filter.MissedMaintenanceWindow == true)
         {
-            var now = DateTimeOffset.UtcNow;
-            // Phase-2: NormalizedSoftwareVulnerabilityProjection deleted — filter returns no results.
-            query = query.Where(item =>
-                dbContext.RemediationDecisions.Any(decision =>
-                    decision.TenantId == currentTenantId
-                    && decision.TenantSoftwareId == item.Id
-                    && decision.MaintenanceWindowDate != null
-                    && decision.MaintenanceWindowDate < now
-                    && decision.ApprovalStatus != DecisionApprovalStatus.Rejected
-                    && decision.ApprovalStatus != DecisionApprovalStatus.Expired)
-                && false
-            );
+            // Phase 4 (#17): RemediationDecision no longer has TenantSoftwareId.
+            // MissedMaintenanceWindow filter stubbed — always returns no results.
+            // TODO Phase 5: re-implement via RemediationCase join.
+            query = query.Where(_ => false);
         }
 
         var totalCount = await query.CountAsync(ct);
@@ -414,6 +413,7 @@ public class SoftwareController(
             {
                 item.Id,
                 item.NormalizedSoftwareId,
+                CanonicalProductKey = item.NormalizedSoftware.CanonicalProductKey,
                 CanonicalName = item.NormalizedSoftware.CanonicalName,
                 CanonicalVendor = item.NormalizedSoftware.CanonicalVendor,
                 Category = item.NormalizedSoftware.Category,
@@ -461,15 +461,9 @@ public class SoftwareController(
                     )
                     .Select(installation => (DateTimeOffset?)installation.LastSeenAt)
                     .Max(),
-                MaintenanceWindowDate = dbContext.RemediationDecisions
-                    .Where(decision =>
-                        decision.TenantId == currentTenantId
-                        && decision.TenantSoftwareId == item.Id
-                        && decision.ApprovalStatus != DecisionApprovalStatus.Rejected
-                        && decision.ApprovalStatus != DecisionApprovalStatus.Expired)
-                    .OrderByDescending(decision => decision.DecidedAt)
-                    .Select(decision => decision.MaintenanceWindowDate)
-                    .FirstOrDefault(),
+                // Phase 4 (#17): RemediationDecision no longer has TenantSoftwareId.
+                // TODO Phase 5: re-implement via RemediationCase join (TenantSoftware → NormalizedSoftware.CanonicalProductKey → SoftwareProduct → RemediationCase).
+                MaintenanceWindowDate = (DateTimeOffset?)null,
                 ExposureImpactScore = dbContext
                     .NormalizedSoftwareInstallations
                     .Where(installation =>
@@ -489,17 +483,29 @@ public class SoftwareController(
             .Take(pagination.BoundedPageSize)
             .ToListAsync(ct);
 
+        var canonicalProductKeys = rows
+            .Select(item => item.CanonicalProductKey)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct()
+            .ToList();
+        var softwareProductIdsByKey = canonicalProductKeys.Count == 0
+            ? new Dictionary<string, Guid>()
+            : await dbContext.SoftwareProducts.AsNoTracking()
+                .Where(item => canonicalProductKeys.Contains(item.CanonicalProductKey))
+                .ToDictionaryAsync(item => item.CanonicalProductKey, item => item.Id, ct);
+
         return Ok(
             new PagedResponse<TenantSoftwareListItemDto>(
                 rows
                     .Select(item => new TenantSoftwareListItemDto(
-                    item.Id,
-                    item.NormalizedSoftwareId,
-                    item.CanonicalName,
-                    item.CanonicalVendor,
-                    item.Category,
-                    item.CurrentRiskScore,
-                    item.ActiveInstallCount,
+                        item.Id,
+                        item.NormalizedSoftwareId,
+                        softwareProductIdsByKey.GetValueOrDefault(item.CanonicalProductKey),
+                        item.CanonicalName,
+                        item.CanonicalVendor,
+                        item.Category,
+                        item.CurrentRiskScore,
+                        item.ActiveInstallCount,
                         item.UniqueDeviceCount,
                         item.ActiveVulnerabilityCount,
                         item.VersionCount,

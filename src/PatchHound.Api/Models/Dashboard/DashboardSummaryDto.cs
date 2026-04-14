@@ -69,7 +69,7 @@ public record DashboardRiskChangeBriefDto(
 );
 
 public record DashboardRiskChangeItemDto(
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     string ExternalId,
     string Title,
     string Severity,
@@ -162,7 +162,7 @@ public record OwnerAssetSummaryDto(
 
 public record OwnerActionDto(
     Guid TenantSoftwareId,
-    Guid TenantVulnerabilityId,
+    Guid VulnerabilityId,
     Guid? TaskId,
     string SoftwareName,
     string OwnerTeamName,
@@ -180,7 +180,7 @@ public record OwnerActionDto(
 public record ApprovalAttentionTaskDto(
     Guid ApprovalTaskId,
     Guid RemediationDecisionId,
-    Guid TenantSoftwareId,
+    Guid RemediationCaseId,
     string SoftwareName,
     string ApprovalType,
     string HighestSeverity,
@@ -193,7 +193,7 @@ public record ApprovalAttentionTaskDto(
 
 public record ApprovedPolicyDecisionDto(
     Guid DecisionId,
-    Guid TenantSoftwareId,
+    Guid RemediationCaseId,
     string SoftwareName,
     string Outcome,
     string? Justification,
@@ -211,7 +211,7 @@ public record SecurityManagerDashboardSummaryDto(
 public record ApprovedPatchingTaskDto(
     Guid PatchingTaskId,
     Guid RemediationDecisionId,
-    Guid TenantSoftwareId,
+    Guid RemediationCaseId,
     string SoftwareName,
     string OwnerTeamName,
     string HighestSeverity,
