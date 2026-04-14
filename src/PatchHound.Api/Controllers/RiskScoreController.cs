@@ -62,19 +62,22 @@ public class RiskScoreController : ControllerBase
             .ToDictionaryAsync(item => item.Id, item => item.Name, ct);
         var episodeDrivers = await _dbContext.ExposureAssessments.AsNoTracking()
             .Where(item => item.TenantId == tenantId && assetIds.Contains(item.Exposure.DeviceId))
-            .Select(item => new AssetRiskEpisodeDriverDto(
-                item.Exposure.VulnerabilityId,
-                item.Exposure.Vulnerability.ExternalId,
-                item.Exposure.Vulnerability.Title,
-                item.EnvironmentalCvss >= 9.0m ? "Critical" : item.EnvironmentalCvss >= 7.0m ? "High" : item.EnvironmentalCvss >= 4.0m ? "Medium" : "Low",
-                item.EnvironmentalCvss,
-                _dbContext.ThreatAssessments
-                    .Where(t => t.VulnerabilityId == item.Exposure.VulnerabilityId)
-                    .Select(t => t.ThreatScore)
-                    .FirstOrDefault(),
-                item.EnvironmentalCvss,
-                0m
-            ))
+            .Select(item => new
+            {
+                DeviceId = item.Exposure.DeviceId,
+                Driver = new AssetRiskEpisodeDriverDto(
+                    item.Exposure.VulnerabilityId,
+                    item.Exposure.Vulnerability.ExternalId,
+                    item.Exposure.Vulnerability.Title,
+                    item.EnvironmentalCvss >= 9.0m ? "Critical" : item.EnvironmentalCvss >= 7.0m ? "High" : item.EnvironmentalCvss >= 4.0m ? "Medium" : "Low",
+                    item.EnvironmentalCvss,
+                    _dbContext.ThreatAssessments
+                        .Where(t => t.VulnerabilityId == item.Exposure.VulnerabilityId)
+                        .Select(t => t.ThreatScore)
+                        .FirstOrDefault(),
+                    item.EnvironmentalCvss,
+                    0m)
+            })
             .ToListAsync(ct);
 
         var history = hasFilters
@@ -103,7 +106,8 @@ public class RiskScoreController : ControllerBase
                 item.LowCount,
                 item.OpenEpisodeCount,
                 episodeDrivers
-                    .Where(driver => driver.TenantVulnerabilityId == item.AssetId || assetIds.Contains(item.AssetId))
+                    .Where(driver => driver.DeviceId == item.AssetId)
+                    .Select(driver => driver.Driver)
                     .Take(3)
                     .ToList()
             )).ToList(),

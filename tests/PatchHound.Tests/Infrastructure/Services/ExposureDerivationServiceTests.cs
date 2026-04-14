@@ -119,6 +119,58 @@ public class ExposureDerivationServiceTests
         exposure.MatchSource.Should().Be(ExposureMatchSource.Cpe);
     }
 
+    [Fact]
+    public async Task Re_running_ingestion_does_not_duplicate_exposures()
+    {
+        var tenantId = Guid.NewGuid();
+        await using var db = await CreateTenantDbAsync(tenantId);
+        await SeedProductKeyedExposureAsync(db, tenantId);
+
+        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
+
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await db.SaveChangesAsync();
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(1), CancellationToken.None);
+        await db.SaveChangesAsync();
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow.AddMinutes(2), CancellationToken.None);
+        await db.SaveChangesAsync();
+
+        (await db.DeviceVulnerabilityExposures.ToListAsync()).Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task Source_collision_same_external_id_different_source_produces_two_devices_and_two_exposures()
+    {
+        var tenantId = Guid.NewGuid();
+        await using var db = await CreateTenantDbAsync(tenantId);
+
+        var srcA = SourceSystem.Create("defender", "Defender");
+        var srcB = SourceSystem.Create("tanium", "Tanium");
+        db.SourceSystems.AddRange(srcA, srcB);
+
+        var deviceA = Device.Create(tenantId, srcA.Id, "same-external-id", "Defender Device", Criticality.Medium);
+        var deviceB = Device.Create(tenantId, srcB.Id, "same-external-id", "Tanium Device", Criticality.Medium);
+        db.Devices.AddRange(deviceA, deviceB);
+
+        var product = SoftwareProduct.Create("Acme", "Widget", "cpe:2.3:a:acme:widget:*:*:*:*:*:*:*:*");
+        db.SoftwareProducts.Add(product);
+        var vuln = Vulnerability.Create("nvd", "CVE-2026-COLL", "t", "d", Severity.High, 7m, "v", DateTimeOffset.UtcNow);
+        db.Vulnerabilities.Add(vuln);
+        db.VulnerabilityApplicabilities.Add(VulnerabilityApplicability.Create(vuln.Id, product.Id, null, true, null, null, null, null));
+
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, deviceA.Id, product.Id, srcA.Id, "1.0", DateTimeOffset.UtcNow));
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, deviceB.Id, product.Id, srcB.Id, "1.0", DateTimeOffset.UtcNow));
+        await db.SaveChangesAsync();
+
+        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await db.SaveChangesAsync();
+
+        var exposures = await db.DeviceVulnerabilityExposures.ToListAsync();
+        exposures.Should().HaveCount(2);
+        exposures.Select(e => e.DeviceId).Distinct().Should().HaveCount(2);
+    }
+
     private static async Task<(SoftwareProduct Product, Vulnerability Vulnerability, Device Device, InstalledSoftware InstalledSoftware)> SeedProductKeyedExposureAsync(
         PatchHoundDbContext db,
         Guid tenantId)
