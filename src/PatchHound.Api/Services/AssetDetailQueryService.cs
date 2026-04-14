@@ -289,9 +289,9 @@ public class AssetDetailQueryService(
             .Select(t => t.Tag)
             .ToArrayAsync(ct);
 
-        var assetRiskScore = await dbContext.AssetRiskScores
+        var assetRiskScore = await dbContext.DeviceRiskScores
             .AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.AssetId == assetId)
+            .Where(item => item.TenantId == tenantId && item.DeviceId == assetId)
             .Select(item => new
             {
                 item.OverallScore,
