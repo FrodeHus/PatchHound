@@ -92,6 +92,7 @@ public static class DependencyInjection
         services.AddScoped<TeamMembershipRuleFilterBuilder>();
         services.AddScoped<TeamMembershipRuleService>();
         services.AddScoped<SlaService>();
+        services.AddScoped<RemediationCaseService>();
         services.AddScoped<RemediationWorkflowService>();
         services.AddScoped<PatchingTaskService>();
         services.AddScoped<ApprovalTaskService>();
