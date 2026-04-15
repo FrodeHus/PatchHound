@@ -29,7 +29,7 @@ public class AiReportServiceTests
         _service = new AiReportService(new[] { _azureProvider }, _resolver);
     }
 
-    [Fact(Skip = "Phase-2: legacy entity deleted. Rewrite in Phase 3.")]
+    [Fact]
     public async Task GenerateReport_DefaultProfileFound_ReturnsAIReport()
     {
         var vulnerability = Vulnerability.Create(
@@ -97,7 +97,7 @@ public class AiReportServiceTests
         result.Value.GeneratedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5));
     }
 
-    [Fact(Skip = "Phase-2: legacy entity deleted. Rewrite in Phase 3.")]
+    [Fact]
     public async Task GenerateReport_NoDefaultProfileConfigured_ReturnsFailure()
     {
         var vulnerability = Vulnerability.Create(
@@ -129,7 +129,7 @@ public class AiReportServiceTests
         result.Error.Should().Contain("No enabled default AI profile");
     }
 
-    [Fact(Skip = "Phase-2: legacy entity deleted. Rewrite in Phase 3.")]
+    [Fact]
     public async Task GenerateReport_WhenProviderThrows_ReturnsFailure()
     {
         var vulnerability = Vulnerability.Create(
@@ -176,7 +176,7 @@ public class AiReportServiceTests
         result.Error.Should().Be("AI report generation failed: API key is required for Azure OpenAI.");
     }
 
-    [Fact(Skip = "Phase-2: legacy entity deleted. Rewrite in Phase 3.")]
+    [Fact]
     public async Task GenerateReport_ProfileOverride_SelectsRequestedProfile()
     {
         var vulnerability = Vulnerability.Create(

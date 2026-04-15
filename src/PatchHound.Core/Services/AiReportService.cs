@@ -68,8 +68,8 @@ public class AiReportService
         }
 
         var report = AIReport.Create(
-            vulnerabilityId,
             tenantId,
+            vulnerabilityId,
             resolvedProfile.Profile.Id,
             content,
             resolvedProfile.Profile.ProviderType.ToString(),
