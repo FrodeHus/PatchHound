@@ -274,7 +274,7 @@ export function SoftwareTable({
           <Button
             type="button"
             variant={missedMaintenanceWindow ? "default" : "outline"}
-            className="h-10 rounded-xl px-4"
+            className="h-10 rounded-xl px-4 hidden"
             onClick={() => onMissedMaintenanceWindowChange(!missedMaintenanceWindow)}
           >
             Missed maintenance
@@ -350,7 +350,7 @@ export function SoftwareTable({
             <span>Vulnerable only</span>
           </label>
 
-          <label className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-3 text-sm">
+          <label className="hidden items-center gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-3 text-sm">
             <Checkbox
               checked={draftFilters.missedMaintenanceWindow}
               onCheckedChange={(checked) => {

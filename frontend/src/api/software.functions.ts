@@ -87,3 +87,18 @@ export const fetchTenantSoftwareDescriptionStatus = createServerFn({ method: 'GE
     const data = await apiGet(`/software/${id}/description-status`, context)
     return z.nullable(tenantSoftwareDescriptionJobSchema).parse(data)
   })
+
+export const fetchDeviceSoftware = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      deviceId: z.string(),
+      page: z.number().optional(),
+      pageSize: z.number().optional(),
+    }),
+  )
+  .handler(async ({ context, data: { deviceId, ...query } }) => {
+    const params = buildFilterParams(query, { pageSize: 25 })
+    const data = await apiGet(`/devices/${deviceId}/software?${params.toString()}`, context)
+    return pagedTenantSoftwareInstallationsSchema.parse(data)
+  })

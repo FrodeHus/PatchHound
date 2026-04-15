@@ -30,6 +30,7 @@ public class IngestionService
     private readonly ExposureEpisodeService _exposureEpisodeService;
     private readonly ExposureAssessmentService _exposureAssessmentService;
     private readonly RiskScoreService _riskScoreService;
+    private readonly VulnerabilityResolver _vulnerabilityResolver;
     private readonly RemediationDecisionService? _remediationDecisionService;
     private readonly ILogger<IngestionService> _logger;
 
@@ -57,6 +58,35 @@ public class IngestionService
             exposureEpisodeService,
             exposureAssessmentService,
             riskScoreService,
+            new VulnerabilityResolver(dbContext),
+            remediationDecisionService: null,
+            logger
+        ) { }
+
+    public IngestionService(
+        PatchHoundDbContext dbContext,
+        IEnumerable<IVulnerabilitySource> sources,
+        EnrichmentJobEnqueuer enrichmentJobEnqueuer,
+        IStagedDeviceMergeService stagedDeviceMergeService,
+        IDeviceRuleEvaluationService deviceRuleEvaluationService,
+        ExposureDerivationService exposureDerivationService,
+        ExposureEpisodeService exposureEpisodeService,
+        ExposureAssessmentService exposureAssessmentService,
+        RiskScoreService riskScoreService,
+        VulnerabilityResolver vulnerabilityResolver,
+        ILogger<IngestionService> logger
+    )
+        : this(
+            dbContext,
+            sources,
+            enrichmentJobEnqueuer,
+            stagedDeviceMergeService,
+            deviceRuleEvaluationService,
+            exposureDerivationService,
+            exposureEpisodeService,
+            exposureAssessmentService,
+            riskScoreService,
+            vulnerabilityResolver,
             remediationDecisionService: null,
             logger
         ) { }
@@ -74,6 +104,35 @@ public class IngestionService
         RemediationDecisionService? remediationDecisionService,
         ILogger<IngestionService> logger
     )
+        : this(
+            dbContext,
+            sources,
+            enrichmentJobEnqueuer,
+            stagedDeviceMergeService,
+            deviceRuleEvaluationService,
+            exposureDerivationService,
+            exposureEpisodeService,
+            exposureAssessmentService,
+            riskScoreService,
+            new VulnerabilityResolver(dbContext),
+            remediationDecisionService,
+            logger
+        ) { }
+
+    public IngestionService(
+        PatchHoundDbContext dbContext,
+        IEnumerable<IVulnerabilitySource> sources,
+        EnrichmentJobEnqueuer enrichmentJobEnqueuer,
+        IStagedDeviceMergeService stagedDeviceMergeService,
+        IDeviceRuleEvaluationService deviceRuleEvaluationService,
+        ExposureDerivationService exposureDerivationService,
+        ExposureEpisodeService exposureEpisodeService,
+        ExposureAssessmentService exposureAssessmentService,
+        RiskScoreService riskScoreService,
+        VulnerabilityResolver vulnerabilityResolver,
+        RemediationDecisionService? remediationDecisionService,
+        ILogger<IngestionService> logger
+    )
     {
         _dbContext = dbContext;
         _sources = sources;
@@ -84,6 +143,7 @@ public class IngestionService
         _exposureEpisodeService = exposureEpisodeService;
         _exposureAssessmentService = exposureAssessmentService;
         _riskScoreService = riskScoreService;
+        _vulnerabilityResolver = vulnerabilityResolver;
         _remediationDecisionService = remediationDecisionService;
         _logger = logger;
     }
@@ -2042,15 +2102,188 @@ public class IngestionService
         CancellationToken ct
     )
     {
-        // phase-3: re-introduce staged vulnerability merge against DeviceVulnerabilityExposure
-        // (StagedVulnerabilityMergeService deleted in Phase 2)
-        var stagedCount = await _dbContext
+        var now = DateTimeOffset.UtcNow;
+
+        // ── Step 1: Load and upsert staged vulnerabilities into Vulnerability table ──
+        var stagedVulns = await _dbContext
             .StagedVulnerabilities.IgnoreQueryFilters()
-            .CountAsync(item => item.IngestionRunId == ingestionRunId, ct);
+            .Where(item => item.IngestionRunId == ingestionRunId)
+            .ToListAsync(ct);
 
-        await UpdateVulnerabilityMergeProgressAsync(stagedCount, 0, ct);
+        var stagedVulnCount = stagedVulns.Count;
+        var persistedVulnCount = 0;
 
-        return new StagedVulnerabilityMergeSummary(stagedCount, 0, 0, 0, 0, 0);
+        // Resolve (upsert) in batches of VulnerabilityBatchSize
+        var vulnExternalIdToId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < stagedVulns.Count; i += VulnerabilityBatchSize)
+        {
+            var batch = stagedVulns.Skip(i).Take(VulnerabilityBatchSize);
+            foreach (var staged in batch)
+            {
+                IngestionResult? payload = null;
+                if (!string.IsNullOrWhiteSpace(staged.PayloadJson))
+                {
+                    try
+                    {
+                        payload = JsonSerializer.Deserialize<IngestionResult>(staged.PayloadJson);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to deserialize PayloadJson for staged vulnerability {Id}", staged.Id);
+                    }
+                }
+
+                var input = new VulnerabilityResolveInput(
+                    Source: staged.SourceKey,
+                    ExternalId: staged.ExternalId,
+                    Title: payload?.Title ?? staged.Title,
+                    Description: payload?.Description ?? string.Empty,
+                    VendorSeverity: staged.VendorSeverity,
+                    CvssScore: payload?.CvssScore,
+                    CvssVector: payload?.CvssVector,
+                    PublishedDate: payload?.PublishedDate,
+                    References: payload?.References?
+                        .Select(r => new VulnerabilityReferenceInput(r.Url, r.Source, r.Tags))
+                        .ToList() ?? [],
+                    Applicabilities: []
+                );
+
+                var vuln = await _vulnerabilityResolver.ResolveAsync(input, ct);
+                vulnExternalIdToId[staged.ExternalId] = vuln.Id;
+                persistedVulnCount++;
+            }
+
+            await _dbContext.SaveChangesAsync(ct);
+            await UpdateVulnerabilityMergeProgressAsync(stagedVulnCount, persistedVulnCount, ct);
+        }
+
+        // ── Step 2: Load staged exposures and build device ExternalId → Id map ──
+        var stagedExposures = await _dbContext
+            .StagedVulnerabilityExposures.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == ingestionRunId)
+            .ToListAsync(ct);
+
+        var stagedExposureCount = stagedExposures.Count;
+
+        var assetExternalIds = stagedExposures
+            .Select(e => e.AssetExternalId)
+            .Distinct()
+            .ToList();
+
+        var deviceIdByExternalId = await _dbContext.Devices
+            .Where(d => d.TenantId == tenantId && assetExternalIds.Contains(d.ExternalId))
+            .Select(d => new { d.ExternalId, d.Id })
+            .ToDictionaryAsync(d => d.ExternalId, d => d.Id, ct);
+
+        // ── Step 3: Load existing DeviceVulnerabilityExposures for this tenant (for upsert) ──
+        var existing = await _dbContext.DeviceVulnerabilityExposures
+            .Where(e => e.TenantId == tenantId)
+            .ToListAsync(ct);
+        var existingByPair = existing.ToDictionary(e => (e.DeviceId, e.VulnerabilityId));
+
+        // Track active pairs from this ingestion run (for resolving stale exposures)
+        var activePairs = new HashSet<(Guid DeviceId, Guid VulnerabilityId)>();
+
+        var mergedExposureCount = 0;
+        var openedCount = 0;
+        var resolvedCount = 0;
+
+        // ── Step 4: Upsert exposures in batches ──
+        for (var i = 0; i < stagedExposures.Count; i += VulnerabilityBatchSize)
+        {
+            var batch = stagedExposures.Skip(i).Take(VulnerabilityBatchSize);
+            foreach (var exposure in batch)
+            {
+                if (!vulnExternalIdToId.TryGetValue(exposure.VulnerabilityExternalId, out var vulnerabilityId))
+                {
+                    // Vulnerability wasn't staged in this run — try to look it up directly
+                    var directLookup = await _dbContext.Vulnerabilities
+                        .Where(v => v.Source == sourceKey && v.ExternalId == exposure.VulnerabilityExternalId)
+                        .Select(v => v.Id)
+                        .FirstOrDefaultAsync(ct);
+
+                    if (directLookup == Guid.Empty)
+                    {
+                        _logger.LogDebug(
+                            "Skipping exposure for unknown vulnerability {ExternalId}",
+                            exposure.VulnerabilityExternalId);
+                        continue;
+                    }
+
+                    vulnerabilityId = directLookup;
+                }
+
+                if (!deviceIdByExternalId.TryGetValue(exposure.AssetExternalId, out var deviceId))
+                {
+                    _logger.LogDebug(
+                        "Skipping exposure for unknown device external id {ExternalId}",
+                        exposure.AssetExternalId);
+                    continue;
+                }
+
+                var pair = (deviceId, vulnerabilityId);
+                activePairs.Add(pair);
+
+                if (existingByPair.TryGetValue(pair, out var existingExposure))
+                {
+                    if (existingExposure.Status == ExposureStatus.Resolved)
+                    {
+                        existingExposure.Reopen(now);
+                        openedCount++;
+                    }
+                    else
+                    {
+                        existingExposure.Reobserve(now);
+                    }
+                }
+                else
+                {
+                    var fresh = DeviceVulnerabilityExposure.Observe(
+                        tenantId,
+                        deviceId,
+                        vulnerabilityId,
+                        softwareProductId: null,
+                        installedSoftwareId: null,
+                        matchedVersion: string.Empty,
+                        ExposureMatchSource.Product,
+                        now);
+
+                    _dbContext.DeviceVulnerabilityExposures.Add(fresh);
+                    existingByPair[pair] = fresh;
+                    openedCount++;
+                }
+
+                mergedExposureCount++;
+            }
+
+            await _dbContext.SaveChangesAsync(ct);
+        }
+
+        // ── Step 5: Resolve exposures absent from this ingestion run ──
+        foreach (var exp in existing)
+        {
+            var pair = (exp.DeviceId, exp.VulnerabilityId);
+            if (activePairs.Contains(pair) || exp.Status == ExposureStatus.Resolved)
+                continue;
+
+            exp.Resolve(now);
+            resolvedCount++;
+        }
+
+        if (resolvedCount > 0)
+        {
+            await _dbContext.SaveChangesAsync(ct);
+        }
+
+        await UpdateVulnerabilityMergeProgressAsync(stagedVulnCount, persistedVulnCount, ct);
+
+        return new StagedVulnerabilityMergeSummary(
+            stagedVulnCount,
+            persistedVulnCount,
+            stagedExposureCount,
+            mergedExposureCount,
+            openedCount,
+            resolvedCount);
 
         async Task UpdateVulnerabilityMergeProgressAsync(
             int stagedVulnerabilityCount,

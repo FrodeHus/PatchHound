@@ -12,6 +12,7 @@ import {
 } from '@/api/devices.functions'
 import { fetchBusinessLabels } from '@/api/business-labels.functions'
 import { fetchSecurityProfiles } from '@/api/security-profiles.functions'
+import { fetchDeviceSoftware } from '@/api/software.functions'
 import { DeviceDetailPageView } from '@/components/features/devices/DeviceDetailPageView'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { deviceQueryKeys } from '@/features/devices/list-state'
@@ -47,6 +48,10 @@ function DeviceDetailPage() {
   const businessLabelsQuery = useQuery({
     queryKey: ['business-labels', selectedTenantId],
     queryFn: () => fetchBusinessLabels({ data: {} }),
+  })
+  const softwareQuery = useQuery({
+    queryKey: ['device-software', selectedTenantId, id],
+    queryFn: () => fetchDeviceSoftware({ data: { deviceId: id, page: 1, pageSize: 50 } }),
   })
   const securityProfileMutation = useMutation({
     mutationFn: async (securityProfileId: string | null) => {
@@ -113,6 +118,8 @@ function DeviceDetailPage() {
         || (user.activeRoles ?? []).includes('SecurityManager')
       }
       exposures={exposuresQuery.data?.items ?? []}
+      software={softwareQuery.data?.items ?? []}
+      isSoftwareLoading={softwareQuery.isLoading}
       securityProfiles={securityProfilesQuery.data?.items ?? []}
       availableBusinessLabels={businessLabelsQuery.data ?? []}
       isAssigningSecurityProfile={securityProfileMutation.isPending}

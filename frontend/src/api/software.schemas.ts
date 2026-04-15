@@ -14,7 +14,6 @@ export const tenantSoftwareVersionCohortSchema = z.object({
 
 export const tenantSoftwareDetailSchema = z.object({
   id: z.string().uuid(),
-  normalizedSoftwareId: z.string().uuid(),
   softwareProductId: z.string().uuid().nullable(),
   primarySoftwareAssetId: z.string().uuid().nullable(),
   canonicalName: z.string(),
@@ -80,7 +79,6 @@ export const tenantSoftwareDetailSchema = z.object({
 
 export const tenantSoftwareListItemSchema = z.object({
   id: z.string().uuid(),
-  normalizedSoftwareId: z.string().uuid(),
   softwareProductId: z.string().uuid().nullable(),
   canonicalName: z.string(),
   canonicalVendor: z.string().nullable(),
@@ -166,7 +164,6 @@ export const tenantSoftwareAiReportSchema = z.object({
 
 export const tenantSoftwareDescriptionSchema = z.object({
   tenantSoftwareId: z.string().uuid(),
-  normalizedSoftwareId: z.string().uuid(),
   description: z.string(),
   providerType: z.string(),
   profileName: z.string(),

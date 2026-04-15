@@ -5,6 +5,7 @@ using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Assets;
 using PatchHound.Api.Models.Devices;
+using PatchHound.Api.Models.Software;
 using PatchHound.Api.Services;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
@@ -577,5 +578,86 @@ public class DevicesController : ControllerBase
         }
 
         return Ok(new BulkAssignDevicesResponse(result.Value));
+    }
+
+    [HttpGet("{id:guid}/software")]
+    [Authorize(Policy = Policies.ViewVulnerabilities)]
+    public async Task<ActionResult<PagedResponse<TenantSoftwareInstallationDto>>> GetSoftware(
+        Guid id,
+        [FromQuery] PaginationQuery pagination,
+        CancellationToken ct
+    )
+    {
+        if (_tenantContext.CurrentTenantId is not Guid currentTenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var deviceExists = await _dbContext.Devices.AsNoTracking()
+            .AnyAsync(d => d.Id == id && d.TenantId == currentTenantId, ct);
+        if (!deviceExists)
+            return NotFound();
+
+        var query = _dbContext.InstalledSoftware.AsNoTracking()
+            .Where(i => i.TenantId == currentTenantId && i.DeviceId == id);
+
+        var totalCount = await query.CountAsync(ct);
+
+        var rows = await query
+            .OrderByDescending(i => i.LastSeenAt)
+            .Skip(pagination.Skip)
+            .Take(pagination.BoundedPageSize)
+            .Join(
+                _dbContext.SoftwareProducts.AsNoTracking(),
+                i => i.SoftwareProductId,
+                p => p.Id,
+                (i, p) => new
+                {
+                    InstalledSoftwareId = i.Id,
+                    SoftwareProductId = p.Id,
+                    SoftwareName = p.Name,
+                    i.Version,
+                    i.FirstSeenAt,
+                    i.LastSeenAt,
+                    OpenVulnerabilityCount = _dbContext.DeviceVulnerabilityExposures
+                        .Where(e =>
+                            e.TenantId == currentTenantId
+                            && e.DeviceId == id
+                            && e.SoftwareProductId == p.Id
+                            && e.Status == ExposureStatus.Open)
+                        .Select(e => e.VulnerabilityId)
+                        .Distinct()
+                        .Count(),
+                })
+            .ToListAsync(ct);
+
+        var device = await _dbContext.Devices.AsNoTracking()
+            .Where(d => d.Id == id)
+            .Select(d => new { DeviceName = d.ComputerDnsName ?? d.Name, d.Criticality })
+            .FirstOrDefaultAsync(ct);
+
+        return Ok(new PagedResponse<TenantSoftwareInstallationDto>(
+            rows.Select(row => new TenantSoftwareInstallationDto(
+                TenantSoftwareId: row.SoftwareProductId,
+                DeviceAssetId: id,
+                DeviceName: device?.DeviceName ?? string.Empty,
+                DeviceCriticality: device?.Criticality.ToString() ?? string.Empty,
+                SoftwareAssetId: row.InstalledSoftwareId,
+                SoftwareAssetName: row.SoftwareName,
+                Version: string.IsNullOrEmpty(row.Version) ? null : row.Version,
+                FirstSeenAt: row.FirstSeenAt,
+                LastSeenAt: row.LastSeenAt,
+                RemovedAt: null,
+                IsActive: true,
+                CurrentEpisodeNumber: 0,
+                SecurityProfileName: null,
+                OwnerUserId: null,
+                OwnerUserName: null,
+                OwnerTeamId: null,
+                OwnerTeamName: null,
+                OpenVulnerabilityCount: row.OpenVulnerabilityCount
+            )).ToList(),
+            totalCount,
+            pagination.Page,
+            pagination.BoundedPageSize
+        ));
     }
 }
