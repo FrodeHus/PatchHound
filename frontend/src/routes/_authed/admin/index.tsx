@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Bell, Bot, Braces, Building2, ChevronRight, DatabaseZap, Flag, GitBranchPlus, Plug, ScanSearch, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
+import { Bell, Bot, Braces, Building2, ChevronRight, DatabaseZap, Flag, GitBranchPlus, Globe, Plug, ScanSearch, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({
@@ -22,21 +22,22 @@ type AdminArea = {
   title: string
   description: string
   to:
-    | '/admin/users'
     | '/admin/teams'
     | '/admin/tenants'
     | '/admin/sources'
-    | '/admin/security-profiles'
     | '/admin/business-labels'
     | '/admin/device-rules'
     | '/admin/workflows'
-    | '/admin/integrations'
-    | '/admin/advanced-tools'
     | '/admin/maintenance'
     | '/admin/authenticated-scans'
     | '/admin/platform/ai'
     | '/admin/platform/notifications'
     | '/admin/platform/feature-flags'
+    | '/admin/platform/integrations'
+    | '/admin/platform/advanced-tools'
+    | '/admin/platform/access'
+    | '/admin/platform/security-profiles'
+    | '/admin/platform/enrichment'
   roles: AdminRole[]
   icon: typeof Users
   featureFlag?: string
@@ -84,27 +85,7 @@ const adminSections: AdminSection[] = [
     ],
   },
   {
-    title: 'Users and access',
-    description: 'Control who can operate in the tenant and how ownership groups are structured.',
-    areas: [
-      {
-        title: 'Users',
-        description: 'Review role assignments, tenant access, and who can operate across environments.',
-        to: '/admin/users',
-        roles: ['GlobalAdmin', 'CustomerAdmin'],
-        icon: Users,
-      },
-      {
-        title: 'Assignment groups',
-        description: 'Manage ownership groups used for asset assignment and fallback routing.',
-        to: '/admin/teams',
-        roles: ['GlobalAdmin', 'SecurityManager', 'SecurityAnalyst', 'AssetOwner', 'TechnicalManager', 'Auditor', 'Stakeholder'],
-        icon: ShieldCheck,
-      },
-    ],
-  },
-  {
-    title: 'Workflows and ownership',
+    title: 'Workflows',
     description: 'Configure the logic that shapes triage, ownership, and approval flow.',
     areas: [
       {
@@ -116,38 +97,18 @@ const adminSections: AdminSection[] = [
         featureFlag: 'Workflows',
       },
       {
-        title: 'Security profiles',
-        description: 'Create device environment profiles that influence effective vulnerability severity.',
-        to: '/admin/security-profiles',
-        roles: ['GlobalAdmin', 'SecurityManager'],
-        icon: ShieldEllipsis,
+        title: 'Assignment groups',
+        description: 'Manage ownership groups used for asset assignment and fallback routing.',
+        to: '/admin/teams',
+        roles: ['GlobalAdmin', 'SecurityManager', 'SecurityAnalyst', 'AssetOwner', 'TechnicalManager', 'Auditor', 'Stakeholder'],
+        icon: ShieldCheck,
       },
-    ],
-  },
-  {
-    title: 'Integrations and automation',
-    description: 'Operate ingestion sources, enrichment, and downstream connector integrations.',
-    areas: [
       {
         title: 'Sources',
         description: 'Configure tenant data sources and enrichment providers such as Defender and NVD.',
         to: '/admin/sources',
         roles: ['GlobalAdmin', 'SecurityManager'],
         icon: DatabaseZap,
-      },
-      {
-        title: 'Integrations',
-        description: 'Manage external service connectors such as Microsoft Sentinel.',
-        to: '/admin/integrations',
-        roles: ['GlobalAdmin'],
-        icon: Plug,
-      },
-      {
-        title: 'Advanced tools',
-        description: 'Create reusable Defender KQL tools that operators can run from supported asset detail views.',
-        to: '/admin/advanced-tools',
-        roles: ['GlobalAdmin', 'SecurityManager'],
-        icon: Braces,
       },
       {
         title: 'Authenticated scans',
@@ -160,8 +121,43 @@ const adminSections: AdminSection[] = [
   },
   {
     title: 'Platform configuration',
-    description: 'MSSP-only platform capabilities for AI and outbound delivery.',
+    description: 'Installation-wide controls for access, integrations, enrichment, and MSSP platform capabilities.',
     areas: [
+      {
+        title: 'Access control',
+        description: 'Review role assignments, tenant access, and who can operate across environments.',
+        to: '/admin/platform/access',
+        roles: ['GlobalAdmin', 'CustomerAdmin'],
+        icon: Users,
+      },
+      {
+        title: 'Security profiles',
+        description: 'Create device environment profiles that influence effective vulnerability severity.',
+        to: '/admin/platform/security-profiles',
+        roles: ['GlobalAdmin', 'SecurityManager'],
+        icon: ShieldEllipsis,
+      },
+      {
+        title: 'Enrichment sources',
+        description: 'Configure shared global enrichment providers such as NVD applied across all tenants.',
+        to: '/admin/platform/enrichment',
+        roles: ['GlobalAdmin'],
+        icon: Globe,
+      },
+      {
+        title: 'Integrations',
+        description: 'Manage external service connectors such as Microsoft Sentinel.',
+        to: '/admin/platform/integrations',
+        roles: ['GlobalAdmin'],
+        icon: Plug,
+      },
+      {
+        title: 'Advanced tools',
+        description: 'Create reusable Defender KQL tools that operators can run from supported asset detail views.',
+        to: '/admin/platform/advanced-tools',
+        roles: ['GlobalAdmin', 'SecurityManager'],
+        icon: Braces,
+      },
       {
         title: 'AI settings',
         description: 'Manage tenant AI profiles, prompts, runtime controls, and default models.',

@@ -25,6 +25,10 @@ const segmentLabels: Record<string, string> = {
   'business-labels': 'Business Labels',
   changes: 'Changes',
   new: 'New',
+  access: 'Access Control',
+  enrichment: 'Enrichment Sources',
+  'advanced-tools': 'Advanced Tools',
+  'feature-flags': 'Feature Flags',
 }
 
 const layoutRouteIds = new Set(['__root__', '/_authed'])

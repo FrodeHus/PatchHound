@@ -56,9 +56,14 @@ import { Route as AuthedAdminWorkflowsNewRouteImport } from './routes/_authed/ad
 import { Route as AuthedAdminWorkflowsIdRouteImport } from './routes/_authed/admin/workflows/$id'
 import { Route as AuthedAdminTenantsIdRouteImport } from './routes/_authed/admin/tenants/$id'
 import { Route as AuthedAdminTeamsIdRouteImport } from './routes/_authed/admin/teams/$id'
+import { Route as AuthedAdminPlatformSecurityProfilesRouteImport } from './routes/_authed/admin/platform/security-profiles'
 import { Route as AuthedAdminPlatformNotificationsRouteImport } from './routes/_authed/admin/platform/notifications'
+import { Route as AuthedAdminPlatformIntegrationsRouteImport } from './routes/_authed/admin/platform/integrations'
 import { Route as AuthedAdminPlatformFeatureFlagsRouteImport } from './routes/_authed/admin/platform/feature-flags'
+import { Route as AuthedAdminPlatformEnrichmentRouteImport } from './routes/_authed/admin/platform/enrichment'
 import { Route as AuthedAdminPlatformAiRouteImport } from './routes/_authed/admin/platform/ai'
+import { Route as AuthedAdminPlatformAdvancedToolsRouteImport } from './routes/_authed/admin/platform/advanced-tools'
+import { Route as AuthedAdminPlatformAccessRouteImport } from './routes/_authed/admin/platform/access'
 import { Route as AuthedAdminDeviceRulesNewRouteImport } from './routes/_authed/admin/device-rules/new'
 import { Route as AuthedAdminDeviceRulesIdRouteImport } from './routes/_authed/admin/device-rules/$id'
 
@@ -310,10 +315,22 @@ const AuthedAdminTeamsIdRoute = AuthedAdminTeamsIdRouteImport.update({
   path: '/admin/teams/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAdminPlatformSecurityProfilesRoute =
+  AuthedAdminPlatformSecurityProfilesRouteImport.update({
+    id: '/admin/platform/security-profiles',
+    path: '/admin/platform/security-profiles',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAdminPlatformNotificationsRoute =
   AuthedAdminPlatformNotificationsRouteImport.update({
     id: '/admin/platform/notifications',
     path: '/admin/platform/notifications',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAdminPlatformIntegrationsRoute =
+  AuthedAdminPlatformIntegrationsRouteImport.update({
+    id: '/admin/platform/integrations',
+    path: '/admin/platform/integrations',
     getParentRoute: () => AuthedRoute,
   } as any)
 const AuthedAdminPlatformFeatureFlagsRoute =
@@ -322,11 +339,29 @@ const AuthedAdminPlatformFeatureFlagsRoute =
     path: '/admin/platform/feature-flags',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedAdminPlatformEnrichmentRoute =
+  AuthedAdminPlatformEnrichmentRouteImport.update({
+    id: '/admin/platform/enrichment',
+    path: '/admin/platform/enrichment',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAdminPlatformAiRoute = AuthedAdminPlatformAiRouteImport.update({
   id: '/admin/platform/ai',
   path: '/admin/platform/ai',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAdminPlatformAdvancedToolsRoute =
+  AuthedAdminPlatformAdvancedToolsRouteImport.update({
+    id: '/admin/platform/advanced-tools',
+    path: '/admin/platform/advanced-tools',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAdminPlatformAccessRoute =
+  AuthedAdminPlatformAccessRouteImport.update({
+    id: '/admin/platform/access',
+    path: '/admin/platform/access',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAdminDeviceRulesNewRoute =
   AuthedAdminDeviceRulesNewRouteImport.update({
     id: '/admin/device-rules/new',
@@ -377,9 +412,14 @@ export interface FileRoutesByFullPath {
   '/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/admin/device-rules/$id': typeof AuthedAdminDeviceRulesIdRoute
   '/admin/device-rules/new': typeof AuthedAdminDeviceRulesNewRoute
+  '/admin/platform/access': typeof AuthedAdminPlatformAccessRoute
+  '/admin/platform/advanced-tools': typeof AuthedAdminPlatformAdvancedToolsRoute
   '/admin/platform/ai': typeof AuthedAdminPlatformAiRoute
+  '/admin/platform/enrichment': typeof AuthedAdminPlatformEnrichmentRoute
   '/admin/platform/feature-flags': typeof AuthedAdminPlatformFeatureFlagsRoute
+  '/admin/platform/integrations': typeof AuthedAdminPlatformIntegrationsRoute
   '/admin/platform/notifications': typeof AuthedAdminPlatformNotificationsRoute
+  '/admin/platform/security-profiles': typeof AuthedAdminPlatformSecurityProfilesRoute
   '/admin/teams/$id': typeof AuthedAdminTeamsIdRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
   '/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
@@ -430,9 +470,14 @@ export interface FileRoutesByTo {
   '/vulnerabilities': typeof AuthedVulnerabilitiesIndexRoute
   '/admin/device-rules/$id': typeof AuthedAdminDeviceRulesIdRoute
   '/admin/device-rules/new': typeof AuthedAdminDeviceRulesNewRoute
+  '/admin/platform/access': typeof AuthedAdminPlatformAccessRoute
+  '/admin/platform/advanced-tools': typeof AuthedAdminPlatformAdvancedToolsRoute
   '/admin/platform/ai': typeof AuthedAdminPlatformAiRoute
+  '/admin/platform/enrichment': typeof AuthedAdminPlatformEnrichmentRoute
   '/admin/platform/feature-flags': typeof AuthedAdminPlatformFeatureFlagsRoute
+  '/admin/platform/integrations': typeof AuthedAdminPlatformIntegrationsRoute
   '/admin/platform/notifications': typeof AuthedAdminPlatformNotificationsRoute
+  '/admin/platform/security-profiles': typeof AuthedAdminPlatformSecurityProfilesRoute
   '/admin/teams/$id': typeof AuthedAdminTeamsIdRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
   '/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
@@ -485,9 +530,14 @@ export interface FileRoutesById {
   '/_authed/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/_authed/admin/device-rules/$id': typeof AuthedAdminDeviceRulesIdRoute
   '/_authed/admin/device-rules/new': typeof AuthedAdminDeviceRulesNewRoute
+  '/_authed/admin/platform/access': typeof AuthedAdminPlatformAccessRoute
+  '/_authed/admin/platform/advanced-tools': typeof AuthedAdminPlatformAdvancedToolsRoute
   '/_authed/admin/platform/ai': typeof AuthedAdminPlatformAiRoute
+  '/_authed/admin/platform/enrichment': typeof AuthedAdminPlatformEnrichmentRoute
   '/_authed/admin/platform/feature-flags': typeof AuthedAdminPlatformFeatureFlagsRoute
+  '/_authed/admin/platform/integrations': typeof AuthedAdminPlatformIntegrationsRoute
   '/_authed/admin/platform/notifications': typeof AuthedAdminPlatformNotificationsRoute
+  '/_authed/admin/platform/security-profiles': typeof AuthedAdminPlatformSecurityProfilesRoute
   '/_authed/admin/teams/$id': typeof AuthedAdminTeamsIdRoute
   '/_authed/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
   '/_authed/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
@@ -540,9 +590,14 @@ export interface FileRouteTypes {
     | '/vulnerabilities/'
     | '/admin/device-rules/$id'
     | '/admin/device-rules/new'
+    | '/admin/platform/access'
+    | '/admin/platform/advanced-tools'
     | '/admin/platform/ai'
+    | '/admin/platform/enrichment'
     | '/admin/platform/feature-flags'
+    | '/admin/platform/integrations'
     | '/admin/platform/notifications'
+    | '/admin/platform/security-profiles'
     | '/admin/teams/$id'
     | '/admin/tenants/$id'
     | '/admin/workflows/$id'
@@ -593,9 +648,14 @@ export interface FileRouteTypes {
     | '/vulnerabilities'
     | '/admin/device-rules/$id'
     | '/admin/device-rules/new'
+    | '/admin/platform/access'
+    | '/admin/platform/advanced-tools'
     | '/admin/platform/ai'
+    | '/admin/platform/enrichment'
     | '/admin/platform/feature-flags'
+    | '/admin/platform/integrations'
     | '/admin/platform/notifications'
+    | '/admin/platform/security-profiles'
     | '/admin/teams/$id'
     | '/admin/tenants/$id'
     | '/admin/workflows/$id'
@@ -647,9 +707,14 @@ export interface FileRouteTypes {
     | '/_authed/vulnerabilities/'
     | '/_authed/admin/device-rules/$id'
     | '/_authed/admin/device-rules/new'
+    | '/_authed/admin/platform/access'
+    | '/_authed/admin/platform/advanced-tools'
     | '/_authed/admin/platform/ai'
+    | '/_authed/admin/platform/enrichment'
     | '/_authed/admin/platform/feature-flags'
+    | '/_authed/admin/platform/integrations'
     | '/_authed/admin/platform/notifications'
+    | '/_authed/admin/platform/security-profiles'
     | '/_authed/admin/teams/$id'
     | '/_authed/admin/tenants/$id'
     | '/_authed/admin/workflows/$id'
@@ -1007,11 +1072,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminTeamsIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/platform/security-profiles': {
+      id: '/_authed/admin/platform/security-profiles'
+      path: '/admin/platform/security-profiles'
+      fullPath: '/admin/platform/security-profiles'
+      preLoaderRoute: typeof AuthedAdminPlatformSecurityProfilesRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/admin/platform/notifications': {
       id: '/_authed/admin/platform/notifications'
       path: '/admin/platform/notifications'
       fullPath: '/admin/platform/notifications'
       preLoaderRoute: typeof AuthedAdminPlatformNotificationsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/admin/platform/integrations': {
+      id: '/_authed/admin/platform/integrations'
+      path: '/admin/platform/integrations'
+      fullPath: '/admin/platform/integrations'
+      preLoaderRoute: typeof AuthedAdminPlatformIntegrationsRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/admin/platform/feature-flags': {
@@ -1021,11 +1100,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminPlatformFeatureFlagsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/platform/enrichment': {
+      id: '/_authed/admin/platform/enrichment'
+      path: '/admin/platform/enrichment'
+      fullPath: '/admin/platform/enrichment'
+      preLoaderRoute: typeof AuthedAdminPlatformEnrichmentRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/admin/platform/ai': {
       id: '/_authed/admin/platform/ai'
       path: '/admin/platform/ai'
       fullPath: '/admin/platform/ai'
       preLoaderRoute: typeof AuthedAdminPlatformAiRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/admin/platform/advanced-tools': {
+      id: '/_authed/admin/platform/advanced-tools'
+      path: '/admin/platform/advanced-tools'
+      fullPath: '/admin/platform/advanced-tools'
+      preLoaderRoute: typeof AuthedAdminPlatformAdvancedToolsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/admin/platform/access': {
+      id: '/_authed/admin/platform/access'
+      path: '/admin/platform/access'
+      fullPath: '/admin/platform/access'
+      preLoaderRoute: typeof AuthedAdminPlatformAccessRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/admin/device-rules/new': {
@@ -1089,9 +1189,14 @@ interface AuthedRouteChildren {
   AuthedVulnerabilitiesIndexRoute: typeof AuthedVulnerabilitiesIndexRoute
   AuthedAdminDeviceRulesIdRoute: typeof AuthedAdminDeviceRulesIdRoute
   AuthedAdminDeviceRulesNewRoute: typeof AuthedAdminDeviceRulesNewRoute
+  AuthedAdminPlatformAccessRoute: typeof AuthedAdminPlatformAccessRoute
+  AuthedAdminPlatformAdvancedToolsRoute: typeof AuthedAdminPlatformAdvancedToolsRoute
   AuthedAdminPlatformAiRoute: typeof AuthedAdminPlatformAiRoute
+  AuthedAdminPlatformEnrichmentRoute: typeof AuthedAdminPlatformEnrichmentRoute
   AuthedAdminPlatformFeatureFlagsRoute: typeof AuthedAdminPlatformFeatureFlagsRoute
+  AuthedAdminPlatformIntegrationsRoute: typeof AuthedAdminPlatformIntegrationsRoute
   AuthedAdminPlatformNotificationsRoute: typeof AuthedAdminPlatformNotificationsRoute
+  AuthedAdminPlatformSecurityProfilesRoute: typeof AuthedAdminPlatformSecurityProfilesRoute
   AuthedAdminTeamsIdRoute: typeof AuthedAdminTeamsIdRoute
   AuthedAdminTenantsIdRoute: typeof AuthedAdminTenantsIdRoute
   AuthedAdminWorkflowsIdRoute: typeof AuthedAdminWorkflowsIdRoute
@@ -1134,9 +1239,15 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedVulnerabilitiesIndexRoute: AuthedVulnerabilitiesIndexRoute,
   AuthedAdminDeviceRulesIdRoute: AuthedAdminDeviceRulesIdRoute,
   AuthedAdminDeviceRulesNewRoute: AuthedAdminDeviceRulesNewRoute,
+  AuthedAdminPlatformAccessRoute: AuthedAdminPlatformAccessRoute,
+  AuthedAdminPlatformAdvancedToolsRoute: AuthedAdminPlatformAdvancedToolsRoute,
   AuthedAdminPlatformAiRoute: AuthedAdminPlatformAiRoute,
+  AuthedAdminPlatformEnrichmentRoute: AuthedAdminPlatformEnrichmentRoute,
   AuthedAdminPlatformFeatureFlagsRoute: AuthedAdminPlatformFeatureFlagsRoute,
+  AuthedAdminPlatformIntegrationsRoute: AuthedAdminPlatformIntegrationsRoute,
   AuthedAdminPlatformNotificationsRoute: AuthedAdminPlatformNotificationsRoute,
+  AuthedAdminPlatformSecurityProfilesRoute:
+    AuthedAdminPlatformSecurityProfilesRoute,
   AuthedAdminTeamsIdRoute: AuthedAdminTeamsIdRoute,
   AuthedAdminTenantsIdRoute: AuthedAdminTenantsIdRoute,
   AuthedAdminWorkflowsIdRoute: AuthedAdminWorkflowsIdRoute,
