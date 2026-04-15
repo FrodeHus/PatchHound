@@ -17,7 +17,6 @@ namespace PatchHound.Api.Services;
 
 public class RemediationDecisionQueryService(
     PatchHoundDbContext dbContext,
-    TenantSnapshotResolver snapshotResolver,
     SlaService slaService,
     TenantAiTextGenerationService aiTextGenerationService,
     ITenantContext tenantContext
@@ -245,17 +244,6 @@ public class RemediationDecisionQueryService(
         );
     }
 
-    public async Task<DecisionContextDto?> BuildAsync(
-        Guid tenantId,
-        Guid assetId,
-        CancellationToken ct
-    )
-    {
-        // TODO Phase 5: resolve remediationCaseId from asset via NormalizedSoftwareInstallations → RemediationCase.
-        await Task.CompletedTask;
-        return null;
-    }
-
     public async Task<DecisionContextDto?> BuildByCaseIdAsync(
         Guid tenantId,
         Guid remediationCaseId,
@@ -267,6 +255,7 @@ public class RemediationDecisionQueryService(
             .Where(c => c.TenantId == tenantId && c.Id == remediationCaseId)
             .Select(c => new
             {
+                c.SoftwareProductId,
                 Name = c.SoftwareProduct.Name,
                 Vendor = c.SoftwareProduct.Vendor,
             })
@@ -276,10 +265,15 @@ public class RemediationDecisionQueryService(
             return null;
 
         var softwareName = ResolveDisplaySoftwareName(caseMeta.Name, null);
+        var softwareProductId = caseMeta.SoftwareProductId;
 
-        // TODO Phase 5: restore scopedDeviceAssetIds from NormalizedSoftwareInstallations via RemediationCase.
-        var scopedSoftwareAssetIds = new List<Guid>();
-        var scopedDeviceAssetIds = new List<Guid>();
+        var scopedDeviceAssetIds = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(e => e.TenantId == tenantId
+                && e.SoftwareProductId == softwareProductId
+                && e.Status == ExposureStatus.Open)
+            .Select(e => e.DeviceId)
+            .Distinct()
+            .ToListAsync(ct);
 
         var scopedDeviceCriticalityValues = new List<Criticality>();
         var assetCriticality = scopedDeviceCriticalityValues.Count > 0
@@ -349,35 +343,47 @@ public class RemediationDecisionQueryService(
             })
             .FirstOrDefaultAsync(ct);
 
-        var activeSnapshotId = await snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
+        var matches = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(e => e.TenantId == tenantId
+                && e.SoftwareProductId == softwareProductId
+                && e.Status == ExposureStatus.Open)
+            .GroupBy(e => e.VulnerabilityId)
+            .Select(g => new
+            {
+                Id = g.Key,
+                g.First().Vulnerability.ExternalId,
+                g.First().Vulnerability.Title,
+                VendorSeverity = g.First().Vulnerability.VendorSeverity,
+                VendorScore = g.First().Vulnerability.CvssScore,
+                g.First().Vulnerability.CvssVector,
+                FirstSeenAt = g.Min(e => e.FirstObservedAt),
+            })
+            .ToListAsync(ct);
 
-        // SoftwareVulnerabilityMatch removed — vulnerability list populated via DeviceVulnerabilityExposure in Phase 5.
-        var matches = new List<(Guid Id, string ExternalId, string Title, Severity VendorSeverity, double? VendorScore, string? CvssVector, DateTimeOffset FirstSeenAt)>();
+        var vulnDefIds = matches.Select(m => m.Id).ToList();
 
-        var vulnDefIds = matches.Select(m => m.Id).Distinct().ToList();
+        var threats = vulnDefIds.Count == 0
+            ? new Dictionary<Guid, ThreatAssessment>()
+            : await dbContext.ThreatAssessments.AsNoTracking()
+                .Where(t => vulnDefIds.Contains(t.VulnerabilityId))
+                .ToDictionaryAsync(t => t.VulnerabilityId, ct);
 
-        // VulnerabilityThreatAssessment removed — threat data populated via canonical model in Phase 5.
-        var threats = new Dictionary<Guid, ThreatAssessment>();
+        var environmentalScoresByVulnId = vulnDefIds.Count == 0
+            ? new Dictionary<Guid, decimal>()
+            : await dbContext.ExposureAssessments.AsNoTracking()
+                .Where(a => a.TenantId == tenantId
+                    && a.Exposure.SoftwareProductId == softwareProductId
+                    && a.Exposure.Status == ExposureStatus.Open)
+                .GroupBy(a => a.Exposure.VulnerabilityId)
+                .Select(g => new { VulnerabilityId = g.Key, MaxEnv = g.Max(a => a.EnvironmentalCvss) })
+                .ToDictionaryAsync(x => x.VulnerabilityId, x => x.MaxEnv, ct);
 
-        // TenantVulnerability removed — lookup replaced by DeviceVulnerabilityExposure in Phase 5.
-        var tenantVulnLookup = new List<(Guid Id, Guid VulnerabilityDefinitionId)>();
-
-        var tenantVulnIdByDefId = tenantVulnLookup
-            .GroupBy(x => x.VulnerabilityDefinitionId)
-            .ToDictionary(g => g.Key, g => g.First().Id);
-        var allTenantVulnIds = tenantVulnLookup.Select(x => x.Id).ToList();
         var openEpisodeTrend = await BuildOpenEpisodeTrendForScopeAsync(
             tenantId,
             scopedDeviceAssetIds,
             vulnDefIds,
             ct
         );
-
-        // VulnerabilityAssetAssessment removed — assessment data populated via canonical model in Phase 5.
-        var assessmentsByTenantVulnId = new Dictionary<Guid, object?>();
-
-        // VulnerabilityEpisodeRiskAssessment removed — episode risk populated via canonical model in Phase 5.
-        var episodeRiskScores = new Dictionary<Guid, object?>();
 
         var activeWorkflow = await dbContext.RemediationWorkflows.AsNoTracking()
             .Where(workflow =>
@@ -444,50 +450,43 @@ public class RemediationDecisionQueryService(
         var tenantSla = await dbContext.TenantSlaConfigurations.AsNoTracking()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
 
-        // Build top vulnerabilities
         var topVulns = matches
             .Select(m =>
             {
                 threats.TryGetValue(m.Id, out var threat);
-                tenantVulnIdByDefId.TryGetValue(m.Id, out var tvId);
+                environmentalScoresByVulnId.TryGetValue(m.Id, out var envScore);
 
-                string? effectiveSeverity = m.VendorSeverity.ToString();
-                double? effectiveScore = m.VendorScore;
-                double? episodeScore = null;
-
-                if (tvId != Guid.Empty)
-                {
-                    // VulnerabilityAssetAssessment + VulnerabilityEpisodeRiskAssessment removed — data sourced from canonical model in Phase 5.
-                    _ = assessmentsByTenantVulnId.TryGetValue(tvId, out _);
-                    _ = episodeRiskScores.TryGetValue(tvId, out _);
-                }
+                double? effectiveScore = envScore > 0m
+                    ? (double)envScore
+                    : (m.VendorScore.HasValue ? (double?)((double)m.VendorScore.Value) : null);
+                string effectiveSeverity = m.VendorSeverity.ToString();
 
                 string? overrideOutcome = null;
-                if (overridesByVulnerabilityId is not null && tvId != Guid.Empty
-                    && overridesByVulnerabilityId.TryGetValue(tvId, out var vo))
+                if (overridesByVulnerabilityId is not null
+                    && overridesByVulnerabilityId.TryGetValue(m.Id, out var vo))
                 {
                     overrideOutcome = vo.Outcome.ToString();
                 }
 
                 return new DecisionVulnDto(
-                    tvId,
+                    m.Id,
                     m.Id,
                     m.ExternalId,
                     m.Title,
                     m.VendorSeverity.ToString(),
-                    m.VendorScore,
+                    m.VendorScore.HasValue ? (double?)((double)m.VendorScore.Value) : null,
                     effectiveSeverity,
                     effectiveScore,
                     m.CvssVector,
                     threat?.KnownExploited ?? false,
                     threat?.PublicExploit ?? false,
                     threat?.ActiveAlert ?? false,
-                    threat is not null ? threat.EpssScore.HasValue ? (double?)((double)threat.EpssScore.Value) : null : null,
-                    episodeScore,
+                    threat?.EpssScore is decimal epss ? (double?)((double)epss) : null,
+                    null,
                     overrideOutcome
                 );
             })
-            .OrderByDescending(v => v.EpisodeRiskScore ?? v.EffectiveScore ?? 0)
+            .OrderByDescending(v => v.EffectiveScore ?? 0)
             .ToList();
 
         // Summary
@@ -1056,9 +1055,22 @@ public class RemediationDecisionQueryService(
         CancellationToken ct
     )
     {
-        // VulnerabilityAssetEpisode + TenantVulnerability removed — episode data populated via DeviceVulnerabilityExposure in Phase 5.
-        await Task.CompletedTask;
-        return [];
+        if (deviceAssetIds.Count == 0 || vulnerabilityDefinitionIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.ExposureEpisodes.AsNoTracking()
+            .Where(ep => ep.TenantId == tenantId
+                && deviceAssetIds.Contains(ep.Exposure.DeviceId)
+                && vulnerabilityDefinitionIds.Contains(ep.Exposure.VulnerabilityId))
+            .Select(ep => new OpenEpisodeRow(
+                ep.Exposure.DeviceId,
+                ep.Exposure.VulnerabilityId,
+                ep.FirstSeenAt,
+                ep.ClosedAt
+            ))
+            .ToListAsync(ct);
     }
 
     private static List<OpenEpisodeTrendPointDto> BuildOpenEpisodeTrend(
