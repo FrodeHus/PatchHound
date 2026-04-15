@@ -10,6 +10,7 @@
 
 ## Reference
 
+- [Database diagram](database-diagram.md)
 - [Risk score calculation](risk-score-calculation.md)
 - [Testing conventions](testing-conventions.md)
 - [Ingestion flow](../INGESTION_FLOW.md)
