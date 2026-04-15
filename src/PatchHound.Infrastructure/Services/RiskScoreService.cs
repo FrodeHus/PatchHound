@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Infrastructure.Services;
@@ -12,6 +13,15 @@ public class RiskScoreService(
 )
 {
     public const string CalculationVersion = "1";
+
+    /// <summary>
+    /// Multiplier applied to an exposure's environmental CVSS when an active, approved
+    /// remediation decision reduces its risk (<see cref="RemediationOutcome.AlternateMitigation"/>
+    /// or <see cref="RemediationOutcome.ApprovedForPatching"/> within the maintenance window).
+    /// A value of 0.5 represents a 50 % score reduction.
+    /// </summary>
+    public const decimal RemediationAdjustmentFactor = 0.5m;
+
     private readonly record struct RiskFactor(string Name, string Description, decimal Impact);
 
     public record AssetRiskResult(
@@ -417,12 +427,41 @@ public class RiskScoreService(
 
     private async Task<List<AssetRiskResult>> CalculateAssetScoresAsync(Guid tenantId, CancellationToken ct)
     {
+        var now = DateTimeOffset.UtcNow;
+
+        // Load active (Approved) remediation decisions for this tenant and join to the
+        // software products they cover.  We materialise only the columns we need.
+        var activeDecisions = await dbContext.RemediationDecisions.AsNoTracking()
+            .Where(d => d.TenantId == tenantId && d.ApprovalStatus == DecisionApprovalStatus.Approved)
+            .Select(d => new
+            {
+                SoftwareProductId = d.RemediationCase.SoftwareProductId,
+                d.Outcome,
+                d.MaintenanceWindowDate,
+            })
+            .ToListAsync(ct);
+
+        // Build a set of software product ids for which remediation actively lowers risk.
+        // Rules:
+        //   AlternateMitigation  → always reduces (while Approved)
+        //   ApprovedForPatching  → reduces only when maintenance window has NOT been missed
+        //   RiskAcceptance       → no change (visibility only)
+        //   PatchingDeferred     → no change (administrative only)
+        var reducedSoftwareProductIds = activeDecisions
+            .Where(d =>
+                d.Outcome == RemediationOutcome.AlternateMitigation
+                || (d.Outcome == RemediationOutcome.ApprovedForPatching
+                    && !(d.MaintenanceWindowDate.HasValue && d.MaintenanceWindowDate.Value < now)))
+            .Select(d => d.SoftwareProductId)
+            .ToHashSet();
+
         var episodeScores = await dbContext.ExposureAssessments.AsNoTracking()
             .Where(item => item.TenantId == tenantId)
             .Select(item => new
             {
                 AssetId = item.Exposure.DeviceId,
                 EpisodeRiskScore = item.EnvironmentalCvss,
+                SoftwareProductId = item.Exposure.SoftwareProductId,
                 RiskBand = item.EnvironmentalCvss >= 9.0m
                     ? "Critical"
                     : item.EnvironmentalCvss >= 7.0m
@@ -433,13 +472,30 @@ public class RiskScoreService(
             })
             .ToListAsync(ct);
 
+        // Apply the remediation adjustment to episodes covered by an active decision.
+        var adjusted = episodeScores.Select(item =>
+        {
+            var score = item.EpisodeRiskScore;
+            var hasReduction = item.SoftwareProductId.HasValue
+                               && reducedSoftwareProductIds.Contains(item.SoftwareProductId.Value);
+            if (hasReduction)
+                score = Math.Round(score * RemediationAdjustmentFactor, 2);
+
+            var band = score >= 9.0m ? "Critical"
+                : score >= 7.0m ? "High"
+                : score >= 4.0m ? "Medium"
+                : "Low";
+
+            return (item.AssetId, EpisodeRiskScore: score, RiskBand: band, HasReduction: hasReduction);
+        });
+
         return BuildAssetRiskResults(
-            episodeScores.Select(item => (item.AssetId, item.EpisodeRiskScore, item.RiskBand))
+            adjusted.Select(item => (item.AssetId, item.EpisodeRiskScore, item.RiskBand, item.HasReduction))
         );
     }
 
     private static List<AssetRiskResult> BuildAssetRiskResults(
-        IEnumerable<(Guid AssetId, decimal EpisodeRiskScore, string RiskBand)> episodeScores
+        IEnumerable<(Guid AssetId, decimal EpisodeRiskScore, string RiskBand, bool HasReduction)> episodeScores
     )
     {
         return episodeScores
@@ -456,6 +512,7 @@ public class RiskScoreService(
                 var highCount = group.Count(item => item.RiskBand == "High");
                 var mediumCount = group.Count(item => item.RiskBand == "Medium");
                 var lowCount = group.Count(item => item.RiskBand == "Low");
+                var reducedCount = group.Count(item => item.HasReduction);
 
                 var overallScore = Math.Clamp(
                     Math.Round(
@@ -469,7 +526,7 @@ public class RiskScoreService(
                     0m,
                     1000m);
 
-                var factorsJson = JsonSerializer.Serialize(new List<RiskFactor>
+                var factors = new List<RiskFactor>
                 {
                     new("MaxEpisodeRisk", "Highest unresolved episode risk on the asset.", maxEpisodeRisk),
                     new("TopThreeAverage", "Average of the top three unresolved episode risks.", Math.Round(topThreeAverage, 2)),
@@ -477,7 +534,14 @@ public class RiskScoreService(
                     new("HighEpisodes", $"{highCount} high-risk episodes.", Math.Min(highCount * 15m, 60m)),
                     new("MediumEpisodes", $"{mediumCount} medium-risk episodes.", Math.Min(mediumCount * 5m, 20m)),
                     new("LowEpisodes", $"{lowCount} low-risk episodes.", Math.Min(lowCount * 1m, 5m)),
-                });
+                };
+
+                if (reducedCount > 0)
+                    factors.Add(new("RemediationReduction",
+                        $"{reducedCount} episode(s) score reduced by active remediation decision (factor {RemediationAdjustmentFactor}).",
+                        -reducedCount));
+
+                var factorsJson = JsonSerializer.Serialize(factors);
 
                 return new AssetRiskResult(
                     group.Key,
