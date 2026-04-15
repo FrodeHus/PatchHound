@@ -699,6 +699,8 @@ public class IngestionService
                             );
                         }
 
+                        await _exposureAssessmentService.AssessForTenantAsync(tenantId, DateTimeOffset.UtcNow, ct);
+                        await _dbContext.SaveChangesAsync(ct);
                         await _riskScoreService.RecalculateForTenantAsync(tenantId, ct);
                         _logger.LogInformation(
                             "Vulnerability merge for {Source} tenant {TenantId}: stagedVulnerabilities={StagedVulnerabilityCount} persistedVulnerabilities={PersistedVulnerabilityCount}",
