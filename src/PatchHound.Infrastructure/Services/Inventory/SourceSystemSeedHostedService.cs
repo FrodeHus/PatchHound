@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Infrastructure.Services.Inventory;
 
@@ -14,7 +15,7 @@ public class SourceSystemSeedHostedService(
 {
     private static readonly (string Key, string DisplayName)[] BuiltInSourceSystems =
     [
-        ("defender", "Microsoft Defender for Endpoint"),
+        (TenantSourceCatalog.DefenderSourceKey, "Microsoft Defender for Endpoint"),
         ("authenticated-scan", "Authenticated Scan"),
     ];
 
