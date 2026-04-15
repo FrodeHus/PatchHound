@@ -16,7 +16,6 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
-using PatchHound.Infrastructure.Services.Inventory;
 
 var builder = WebApplication.CreateBuilder(args);
 var azureAdConfig = builder.Configuration.GetSection("AzureAd");
@@ -412,9 +411,6 @@ builder.Services.AddPatchHoundInfrastructure(builder.Configuration);
 
 // Tenant context (scoped - one per request)
 builder.Services.AddScoped<ITenantContext, TenantContext>();
-builder.Services.AddScoped<ISoftwareProductResolver, SoftwareProductResolver>();
-builder.Services.AddScoped<IDeviceResolver, DeviceResolver>();
-builder.Services.AddScoped<IStagedDeviceMergeService, StagedDeviceMergeService>();
 builder.Services.AddScoped<PatchHound.Api.Services.TenantSoftwareAliasResolver>();
 builder.Services.AddScoped<PatchHound.Api.Services.DashboardQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.VulnerabilityDetailQueryService>();

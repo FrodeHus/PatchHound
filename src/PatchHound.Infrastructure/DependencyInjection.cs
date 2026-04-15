@@ -185,6 +185,11 @@ public static class DependencyInjection
         services.AddScoped<DeviceRuleFilterBuilder>();
         services.AddScoped<IDeviceRuleEvaluationService, DeviceRuleEvaluationService>();
 
+        // Inventory resolvers & staged-device merge (needed by IngestionService + AuthenticatedScanIngestionService)
+        services.AddScoped<ISoftwareProductResolver, PatchHound.Infrastructure.Services.Inventory.SoftwareProductResolver>();
+        services.AddScoped<IDeviceResolver, PatchHound.Infrastructure.Services.Inventory.DeviceResolver>();
+        services.AddScoped<IStagedDeviceMergeService, StagedDeviceMergeService>();
+
         // Ingestion
         services.AddScoped<IngestionService>();
 
