@@ -2115,6 +2115,28 @@ public class IngestionService
             .Select(d => new { d.ExternalId, d.Id })
             .ToDictionaryAsync(d => d.ExternalId, d => d.Id, ct);
 
+        // ── Step 2b: Build a (DeviceId, CanonicalProductKey) → InstalledSoftware lookup ──
+        // Used below to populate SoftwareProductId/InstalledSoftwareId on new exposures.
+        var deviceIds = deviceIdByExternalId.Values.ToList();
+        var installedSoftwareLookup = await _dbContext.InstalledSoftware
+            .Where(i => i.TenantId == tenantId && deviceIds.Contains(i.DeviceId))
+            .Select(i => new
+            {
+                i.DeviceId,
+                i.SoftwareProductId,
+                i.Id,
+                ProductKey = _dbContext.SoftwareProducts
+                    .Where(p => p.Id == i.SoftwareProductId)
+                    .Select(p => p.CanonicalProductKey)
+                    .FirstOrDefault()
+            })
+            .ToListAsync(ct);
+        var installedByDeviceAndProduct = installedSoftwareLookup
+            .Where(i => i.ProductKey != null)
+            .ToDictionary(
+                i => (i.DeviceId, i.ProductKey!),
+                i => (i.SoftwareProductId, i.Id));
+
         // ── Step 3: Load existing DeviceVulnerabilityExposures for this tenant (for upsert) ──
         var existing = await _dbContext.DeviceVulnerabilityExposures
             .Where(e => e.TenantId == tenantId)
@@ -2178,12 +2200,37 @@ public class IngestionService
                 }
                 else
                 {
+                    // Attempt to resolve the software product for this exposure from the staged payload.
+                    Guid? softwareProductId = null;
+                    Guid? installedSoftwareId = null;
+                    IngestionAffectedAsset? affectedAssetPayload = null;
+                    if (!string.IsNullOrWhiteSpace(exposure.PayloadJson))
+                    {
+                        try
+                        {
+                            affectedAssetPayload = JsonSerializer.Deserialize<IngestionAffectedAsset>(
+                                exposure.PayloadJson, StagingSerializerOptions.Instance);
+                        }
+                        catch (JsonException) { /* best-effort */ }
+                    }
+
+                    if (affectedAssetPayload is { ProductVendor: not null, ProductName: not null })
+                    {
+                        var canonicalKey =
+                            $"{affectedAssetPayload.ProductVendor.Trim().ToLowerInvariant()}::{affectedAssetPayload.ProductName.Trim().ToLowerInvariant()}";
+                        if (installedByDeviceAndProduct.TryGetValue((deviceId, canonicalKey), out var swInfo))
+                        {
+                            softwareProductId = swInfo.SoftwareProductId;
+                            installedSoftwareId = swInfo.Id;
+                        }
+                    }
+
                     var fresh = DeviceVulnerabilityExposure.Observe(
                         tenantId,
                         deviceId,
                         vulnerabilityId,
-                        softwareProductId: null,
-                        installedSoftwareId: null,
+                        softwareProductId: softwareProductId,
+                        installedSoftwareId: installedSoftwareId,
                         matchedVersion: string.Empty,
                         ExposureMatchSource.Product,
                         now);
