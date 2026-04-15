@@ -113,20 +113,33 @@ public class SoftwareController(
         var activeInstallations = installations.Where(item => item.IsActive).ToList();
         var softwareAssetIds = installations.Select(item => item.SoftwareAssetId).Distinct().ToList();
 
-        // Phase-2: SoftwareVulnerabilityMatch deleted.
-        var openMatches = new List<(Guid SoftwareAssetId, Guid VulnerabilityDefinitionId)>();
-        var openMatchSoftwareAssetIds = new HashSet<Guid>();
+        var openExposures = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(e => e.TenantId == currentTenantId
+                && e.SoftwareProductId == tenantSoftware.SoftwareProductId
+                && e.Status == ExposureStatus.Open)
+            .Select(e => new { e.DeviceId, e.VulnerabilityId })
+            .ToListAsync(ct);
+        var openDeviceIds = openExposures.Select(e => e.DeviceId).ToHashSet();
+        var openMatchDeviceSoftwareAssetIds = activeInstallations
+            .Where(item => openDeviceIds.Contains(item.DeviceAssetId))
+            .Select(item => item.SoftwareAssetId)
+            .ToHashSet();
 
         var versionCohorts = activeInstallations
             .GroupBy(item => NormalizeVersionKey(item.DetectedVersion))
             .Select(group =>
             {
-                var groupSoftwareAssetIds = group.Select(item => item.SoftwareAssetId).ToHashSet();
+                var groupDeviceIds = group.Select(item => item.DeviceAssetId).ToHashSet();
+                var cohortVulnCount = openExposures
+                    .Where(e => groupDeviceIds.Contains(e.DeviceId))
+                    .Select(e => e.VulnerabilityId)
+                    .Distinct()
+                    .Count();
                 return new TenantSoftwareVersionCohortDto(
                     RestoreVersion(group.Key),
                     group.Count(),
-                    group.Select(item => item.DeviceAssetId).Distinct().Count(),
-                    openMatches.Count(item => groupSoftwareAssetIds.Contains(item.SoftwareAssetId)),
+                    groupDeviceIds.Count,
+                    cohortVulnCount,
                     group.Min(item => item.FirstSeenAt),
                     group.Max(item => item.LastSeenAt)
                 );
@@ -136,8 +149,11 @@ public class SoftwareController(
             .ThenBy(item => item.Version ?? string.Empty, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // Phase-2: NormalizedSoftwareVulnerabilityProjection deleted.
-        var openVulnerabilityRows = new List<ExposureImpactVulnerabilityRow>();
+        var openVulnerabilityIds = openExposures.Select(e => e.VulnerabilityId).Distinct().ToList();
+        var openVulnerabilityRows = await dbContext.Vulnerabilities.AsNoTracking()
+            .Where(v => openVulnerabilityIds.Contains(v.Id))
+            .Select(v => new ExposureImpactVulnerabilityRow(v.ExternalId, v.VendorSeverity, v.CvssScore))
+            .ToListAsync(ct);
 
         var activeDeviceIds = activeInstallations
             .Select(item => item.DeviceAssetId)
@@ -182,7 +198,7 @@ public class SoftwareController(
                 activeInstallations.Count,
                 activeInstallations.Select(item => item.DeviceAssetId).Distinct().Count(),
                 activeInstallations.Count(item =>
-                    openMatchSoftwareAssetIds.Contains(item.SoftwareAssetId)
+                    openMatchDeviceSoftwareAssetIds.Contains(item.SoftwareAssetId)
                 ),
                 openVulnerabilityRows.Count,
                 versionCohorts.Count,
@@ -389,15 +405,15 @@ public class SoftwareController(
 
         if (filter.VulnerableOnly == true)
         {
-            // Phase-2: NormalizedSoftwareVulnerabilityProjection deleted — filter returns no results.
-            query = query.Where(_ => false);
+            query = query.Where(item => dbContext.DeviceVulnerabilityExposures.Any(e =>
+                e.TenantId == currentTenantId
+                && e.SoftwareProductId == item.SoftwareProductId
+                && e.Status == ExposureStatus.Open));
         }
 
         if (filter.MissedMaintenanceWindow == true)
         {
-            // Phase 4 (#17): RemediationDecision no longer has TenantSoftwareId.
-            // MissedMaintenanceWindow filter stubbed — always returns no results.
-            // TODO Phase 5: re-implement via RemediationCase join.
+            // Maintenance-window semantics are not yet represented on RemediationCase; filter intentionally no-ops.
             query = query.Where(_ => false);
         }
 
@@ -430,8 +446,14 @@ public class SoftwareController(
                     .Select(installation => installation.DeviceAssetId)
                     .Distinct()
                     .Count(),
-                // Phase-2: NormalizedSoftwareVulnerabilityProjection deleted.
-                ActiveVulnerabilityCount = 0,
+                ActiveVulnerabilityCount = dbContext.DeviceVulnerabilityExposures
+                    .Where(e =>
+                        e.TenantId == currentTenantId
+                        && e.SoftwareProductId == item.SoftwareProductId
+                        && e.Status == ExposureStatus.Open)
+                    .Select(e => e.VulnerabilityId)
+                    .Distinct()
+                    .Count(),
                 VersionCount = dbContext
                     .SoftwareProductInstallations
                     .Where(installation =>
@@ -450,8 +472,7 @@ public class SoftwareController(
                     )
                     .Select(installation => (DateTimeOffset?)installation.LastSeenAt)
                     .Max(),
-                // Phase 4 (#17): RemediationDecision no longer has TenantSoftwareId.
-                // TODO Phase 5: re-implement via RemediationCase join (TenantSoftware → NormalizedSoftware.CanonicalProductKey → SoftwareProduct → RemediationCase).
+                // Maintenance-window semantics not yet modeled on RemediationCase; surfaces null until feature returns.
                 MaintenanceWindowDate = (DateTimeOffset?)null,
                 ExposureImpactScore = dbContext
                     .SoftwareProductInstallations
@@ -585,7 +606,15 @@ public class SoftwareController(
                     )
                     .Select(profile => profile.Name)
                     .FirstOrDefault(),
-                OpenVulnerabilityCount = 0, // Phase-2: VulnerabilityAsset deleted.
+                OpenVulnerabilityCount = dbContext.DeviceVulnerabilityExposures
+                    .Where(e =>
+                        e.TenantId == currentTenantId
+                        && e.DeviceId == item.DeviceAssetId
+                        && e.SoftwareProductId == item.TenantSoftware.SoftwareProductId
+                        && e.Status == ExposureStatus.Open)
+                    .Select(e => e.VulnerabilityId)
+                    .Distinct()
+                    .Count(),
             })
             .ToListAsync(ct);
 
@@ -648,8 +677,99 @@ public class SoftwareController(
             return NotFound();
         }
 
-        // Phase-2: SoftwareVulnerabilityMatch + TenantVulnerability deleted.
-        return Ok(Array.Empty<TenantSoftwareVulnerabilityDto>());
+        var productId = await dbContext.SoftwareTenantRecords.AsNoTracking()
+            .Where(item => item.Id == tenantSoftware.Id)
+            .Select(item => item.SoftwareProductId)
+            .FirstAsync(ct);
+
+        var exposures = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(e => e.TenantId == currentTenantId && e.SoftwareProductId == productId)
+            .Select(e => new
+            {
+                e.VulnerabilityId,
+                e.DeviceId,
+                e.InstalledSoftwareId,
+                e.MatchedVersion,
+                e.MatchSource,
+                e.Status,
+                e.FirstObservedAt,
+                e.LastObservedAt,
+                e.ResolvedAt,
+            })
+            .ToListAsync(ct);
+
+        if (exposures.Count == 0)
+        {
+            return Ok(Array.Empty<TenantSoftwareVulnerabilityDto>());
+        }
+
+        var vulnIds = exposures.Select(e => e.VulnerabilityId).Distinct().ToList();
+        var vulnRows = await dbContext.Vulnerabilities.AsNoTracking()
+            .Where(v => vulnIds.Contains(v.Id))
+            .Select(v => new
+            {
+                v.Id,
+                v.ExternalId,
+                v.Title,
+                v.Description,
+                v.VendorSeverity,
+                v.CvssScore,
+                v.PublishedDate,
+                v.Source,
+            })
+            .ToListAsync(ct);
+
+        var results = vulnRows
+            .Select(v =>
+            {
+                var rows = exposures.Where(e => e.VulnerabilityId == v.Id).ToList();
+                var versions = rows
+                    .Select(r => r.MatchedVersion)
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                var bestMatchSource = rows
+                    .OrderByDescending(r => r.MatchSource == ExposureMatchSource.Cpe)
+                    .Select(r => r.MatchSource)
+                    .First();
+                var evidence = rows
+                    .GroupBy(r => r.MatchSource)
+                    .Select(g => new TenantSoftwareVulnerabilityEvidenceDto(
+                        g.Key.ToString(),
+                        "Observed",
+                        $"{g.Count()} exposure(s)",
+                        g.Min(r => r.FirstObservedAt),
+                        g.Max(r => r.LastObservedAt),
+                        g.Any(r => r.ResolvedAt is null) ? null : g.Max(r => r.ResolvedAt)))
+                    .ToList();
+                return new TenantSoftwareVulnerabilityDto(
+                    v.Id,
+                    v.Id,
+                    v.ExternalId,
+                    v.Title,
+                    v.Description,
+                    v.VendorSeverity.ToString(),
+                    v.CvssScore,
+                    v.PublishedDate,
+                    v.Source,
+                    bestMatchSource.ToString(),
+                    "Observed",
+                    rows.Count,
+                    rows.Select(r => r.DeviceId).Distinct().Count(),
+                    versions.Count,
+                    versions,
+                    rows.Min(r => r.FirstObservedAt),
+                    rows.Max(r => r.LastObservedAt),
+                    rows.Any(r => r.ResolvedAt is null) ? null : rows.Max(r => r.ResolvedAt),
+                    evidence);
+            })
+            .OrderByDescending(item => item.CvssScore ?? 0m)
+            .ThenByDescending(item => item.AffectedDeviceCount)
+            .ThenBy(item => item.ExternalId)
+            .ToList();
+
+        return Ok(results);
     }
 
     [HttpPost("{id:guid}/ai-report")]
@@ -728,11 +848,51 @@ public class SoftwareController(
             })
             .ToListAsync(ct);
 
-        // Phase-2: TenantVulnerability + SoftwareVulnerabilityMatch deleted — stub out.
         var activeInstallations = installations.Where(item => item.IsActive).ToList();
         var uniqueDeviceCount = activeInstallations.Select(item => item.DeviceAssetId).Distinct().Count();
-        var vulnerabilityExternalIds = Array.Empty<string>();
-        var vulnerabilityPayload = Array.Empty<object?>();
+
+        var productExposures = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(e => e.TenantId == currentTenantId
+                && e.SoftwareProductId == tenantSoftware.SoftwareProductId
+                && e.Status == ExposureStatus.Open)
+            .Select(e => new { e.DeviceId, e.VulnerabilityId, e.MatchedVersion })
+            .ToListAsync(ct);
+
+        var aiVulnIds = productExposures.Select(e => e.VulnerabilityId).Distinct().ToList();
+        var aiVulnRows = aiVulnIds.Count == 0
+            ? []
+            : await dbContext.Vulnerabilities.AsNoTracking()
+                .Where(v => aiVulnIds.Contains(v.Id))
+                .Select(v => new
+                {
+                    v.Id,
+                    v.ExternalId,
+                    v.Title,
+                    v.VendorSeverity,
+                    v.CvssScore,
+                    v.PublishedDate,
+                })
+                .ToListAsync(ct);
+
+        var vulnerabilityExternalIds = aiVulnRows.Select(v => v.ExternalId).ToArray();
+        var vulnerabilityPayload = aiVulnRows
+            .Select(v =>
+            {
+                var rows = productExposures.Where(e => e.VulnerabilityId == v.Id).ToList();
+                return (object?)new
+                {
+                    v.ExternalId,
+                    v.Title,
+                    Severity = v.VendorSeverity.ToString(),
+                    v.CvssScore,
+                    v.PublishedDate,
+                    AffectedDeviceCount = rows.Select(r => r.DeviceId).Distinct().Count(),
+                    AffectedInstallCount = rows.Count,
+                };
+            })
+            .ToArray();
+        var vulnerableInstallCount = activeInstallations.Count(item =>
+            productExposures.Any(e => e.DeviceId == item.DeviceAssetId));
 
         var versionSummary = activeInstallations
             .GroupBy(item => string.IsNullOrWhiteSpace(item.DetectedVersion) ? "Unknown" : item.DetectedVersion!)
@@ -772,7 +932,7 @@ public class SoftwareController(
                 tenantSoftware.LastSeenAt,
                 ActiveInstallCount = activeInstallations.Count,
                 UniqueDeviceCount = uniqueDeviceCount,
-                VulnerableInstallCount = 0, // Phase-2: SoftwareVulnerabilityMatch deleted.
+                VulnerableInstallCount = vulnerableInstallCount,
                 ActiveVulnerabilityCount = vulnerabilityPayload.Length,
             },
             aliases,

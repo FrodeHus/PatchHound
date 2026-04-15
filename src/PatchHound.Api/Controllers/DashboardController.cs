@@ -492,7 +492,7 @@ public class DashboardController : ControllerBase
 
         var ownerActions = ownerActionRows
             .Select(item => new OwnerActionDto(
-                item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
+                item.RemediationCaseId,
                 item.VulnerabilityId,
                 item.TaskId,
                 item.AssetName,
@@ -731,7 +731,7 @@ public class DashboardController : ControllerBase
                 var stats = policySoftwareStats.GetValueOrDefault(item.RemediationCaseId);
                 return new ApprovedPolicyDecisionDto(
                     item.Id,
-                    item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
+                    item.RemediationCaseId,
                     item.SoftwareName,
                     item.Outcome,
                     string.IsNullOrWhiteSpace(item.Justification) ? null : item.Justification,
@@ -773,7 +773,7 @@ public class DashboardController : ControllerBase
             {
                 task.Id,
                 task.RemediationDecisionId,
-                RemediationCaseId = task.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
+                RemediationCaseId = task.RemediationCaseId,
                 SoftwareName = sp.Name,
                 OwnerTeamName = ownerTeam.Name,
                 task.DueDate,
@@ -860,7 +860,7 @@ public class DashboardController : ControllerBase
                 return new ApprovedPatchingTaskDto(
                     item.Id,
                     item.RemediationDecisionId,
-                    item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId; DTO field kept for API compat
+                    item.RemediationCaseId,
                     item.SoftwareName,
                     item.OwnerTeamName,
                     stats?.HighestSeverity ?? "Unknown",
@@ -1078,7 +1078,7 @@ public class DashboardController : ControllerBase
             {
                 task.Id,
                 task.RemediationDecisionId,
-                RemediationCaseId = decision.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
+                RemediationCaseId = decision.RemediationCaseId,
                 SoftwareName = sp.Name,
                 ApprovalType = task.Type.ToString(),
                 task.ExpiresAt,
@@ -1107,7 +1107,7 @@ public class DashboardController : ControllerBase
             return new ApprovalAttentionTaskDto(
                 item.Id,
                 item.RemediationDecisionId,
-                item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId; DTO field kept for API compat
+                item.RemediationCaseId,
                 item.SoftwareName,
                 item.ApprovalType,
                 stats?.HighestSeverity ?? "Unknown",

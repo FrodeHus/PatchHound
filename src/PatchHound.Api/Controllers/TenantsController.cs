@@ -456,8 +456,6 @@ public class TenantsController : ControllerBase
         await DeleteEntitiesAsync(_dbContext.TeamRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.TenantRiskScoreSnapshots.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.OrganizationalSeverities.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        // Phase-2: VulnerabilityEpisodeRiskAssessment, VulnerabilityAssetAssessment, VulnerabilityAssetEpisode,
-        //          TenantVulnerability, NormalizedSoftwareVulnerabilityProjection, SoftwareVulnerabilityMatch deleted.
         await DeleteEntitiesAsync(_dbContext.DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.DeviceSoftwareInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.SoftwareProductInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
