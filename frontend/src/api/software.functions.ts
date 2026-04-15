@@ -9,6 +9,7 @@ import {
   tenantSoftwareVulnerabilitySchema,
   pagedTenantSoftwareSchema,
   pagedTenantSoftwareInstallationsSchema,
+  pagedDeviceSoftwareSchema,
 } from './software.schemas'
 import { buildFilterParams } from './utils'
 
@@ -100,5 +101,5 @@ export const fetchDeviceSoftware = createServerFn({ method: 'GET' })
   .handler(async ({ context, data: { deviceId, ...query } }) => {
     const params = buildFilterParams(query, { pageSize: 25 })
     const data = await apiGet(`/devices/${deviceId}/software?${params.toString()}`, context)
-    return pagedTenantSoftwareInstallationsSchema.parse(data)
+    return pagedDeviceSoftwareSchema.parse(data)
   })

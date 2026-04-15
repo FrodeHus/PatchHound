@@ -582,7 +582,7 @@ public class DevicesController : ControllerBase
 
     [HttpGet("{id:guid}/software")]
     [Authorize(Policy = Policies.ViewVulnerabilities)]
-    public async Task<ActionResult<PagedResponse<TenantSoftwareInstallationDto>>> GetSoftware(
+    public async Task<ActionResult<PagedResponse<DeviceSoftwareItemDto>>> GetSoftware(
         Guid id,
         [FromQuery] PaginationQuery pagination,
         CancellationToken ct
@@ -596,68 +596,54 @@ public class DevicesController : ControllerBase
         if (!deviceExists)
             return NotFound();
 
-        var query = _dbContext.InstalledSoftware.AsNoTracking()
-            .Where(i => i.TenantId == currentTenantId && i.DeviceId == id);
-
-        var totalCount = await query.CountAsync(ct);
-
-        var rows = await query
-            .OrderByDescending(i => i.LastSeenAt)
-            .Skip(pagination.Skip)
-            .Take(pagination.BoundedPageSize)
-            .Join(
-                _dbContext.SoftwareProducts.AsNoTracking(),
-                i => i.SoftwareProductId,
-                p => p.Id,
-                (i, p) => new
-                {
-                    InstalledSoftwareId = i.Id,
-                    SoftwareProductId = p.Id,
-                    SoftwareName = p.Name,
-                    i.Version,
-                    i.FirstSeenAt,
-                    i.LastSeenAt,
-                    OpenVulnerabilityCount = _dbContext.DeviceVulnerabilityExposures
-                        .Where(e =>
-                            e.TenantId == currentTenantId
-                            && e.DeviceId == id
-                            && e.SoftwareProductId == p.Id
-                            && e.Status == ExposureStatus.Open)
-                        .Select(e => e.VulnerabilityId)
-                        .Distinct()
-                        .Count(),
-                })
+        // Group InstalledSoftware by SoftwareProductId to get one row per product.
+        var grouped = await _dbContext.InstalledSoftware.AsNoTracking()
+            .Where(i => i.TenantId == currentTenantId && i.DeviceId == id)
+            .GroupBy(i => i.SoftwareProductId)
+            .Select(g => new
+            {
+                SoftwareProductId = g.Key,
+                LastSeenAt = g.Max(i => i.LastSeenAt),
+            })
             .ToListAsync(ct);
 
-        var device = await _dbContext.Devices.AsNoTracking()
-            .Where(d => d.Id == id)
-            .Select(d => new { DeviceName = d.ComputerDnsName ?? d.Name, d.Criticality })
-            .FirstOrDefaultAsync(ct);
+        var totalCount = grouped.Count;
 
-        return Ok(new PagedResponse<TenantSoftwareInstallationDto>(
-            rows.Select(row => new TenantSoftwareInstallationDto(
-                TenantSoftwareId: row.SoftwareProductId,
-                DeviceAssetId: id,
-                DeviceName: device?.DeviceName ?? string.Empty,
-                DeviceCriticality: device?.Criticality.ToString() ?? string.Empty,
-                SoftwareAssetId: row.InstalledSoftwareId,
-                SoftwareAssetName: row.SoftwareName,
-                Version: string.IsNullOrEmpty(row.Version) ? null : row.Version,
-                FirstSeenAt: row.FirstSeenAt,
-                LastSeenAt: row.LastSeenAt,
-                RemovedAt: null,
-                IsActive: true,
-                CurrentEpisodeNumber: 0,
-                SecurityProfileName: null,
-                OwnerUserId: null,
-                OwnerUserName: null,
-                OwnerTeamId: null,
-                OwnerTeamName: null,
-                OpenVulnerabilityCount: row.OpenVulnerabilityCount
-            )).ToList(),
-            totalCount,
-            pagination.Page,
-            pagination.BoundedPageSize
-        ));
+        var page = grouped
+            .OrderByDescending(g => g.LastSeenAt)
+            .Skip(pagination.Skip)
+            .Take(pagination.BoundedPageSize)
+            .ToList();
+
+        var productIds = page.Select(g => g.SoftwareProductId).ToList();
+
+        var productNames = await _dbContext.SoftwareProducts.AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.Name })
+            .ToListAsync(ct);
+
+        var nameById = productNames.ToDictionary(p => p.Id, p => p.Name);
+
+        var openVulnCounts = await _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(e =>
+                e.TenantId == currentTenantId
+                && e.DeviceId == id
+                && e.Status == ExposureStatus.Open
+                && e.SoftwareProductId != null
+                && productIds.Contains(e.SoftwareProductId.Value))
+            .GroupBy(e => e.SoftwareProductId!.Value)
+            .Select(g => new { SoftwareProductId = g.Key, Count = g.Select(e => e.VulnerabilityId).Distinct().Count() })
+            .ToListAsync(ct);
+
+        var vulnCountById = openVulnCounts.ToDictionary(v => v.SoftwareProductId, v => v.Count);
+
+        var items = page.Select(g => new DeviceSoftwareItemDto(
+            SoftwareProductId: g.SoftwareProductId,
+            SoftwareName: nameById.GetValueOrDefault(g.SoftwareProductId, string.Empty),
+            LastSeenAt: g.LastSeenAt,
+            OpenVulnerabilityCount: vulnCountById.GetValueOrDefault(g.SoftwareProductId, 0)
+        )).ToList();
+
+        return Ok(new PagedResponse<DeviceSoftwareItemDto>(items, totalCount, pagination.Page, pagination.BoundedPageSize));
     }
 }

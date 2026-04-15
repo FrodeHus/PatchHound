@@ -5,7 +5,7 @@ import type { DeviceDetail } from '@/api/devices.schemas'
 import type { DeviceExposure } from '@/api/devices.schemas'
 import type { BusinessLabel } from '@/api/business-labels.schemas'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
-import type { TenantSoftwareInstallation } from '@/api/software.schemas'
+import type { DeviceSoftwareItem } from '@/api/software.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -26,7 +26,7 @@ const criticalityOptions = ['Low', 'Medium', 'High', 'Critical']
 type DeviceDetailPageViewProps = {
   device: DeviceDetail
   exposures: DeviceExposure[]
-  software?: TenantSoftwareInstallation[]
+  software?: DeviceSoftwareItem[]
   isSoftwareLoading?: boolean
   canUseAdvancedTools: boolean
   securityProfiles: SecurityProfile[]
@@ -422,33 +422,27 @@ export function DeviceDetailPageView({
                       <thead>
                         <tr className="text-left text-xs uppercase tracking-[0.16em] text-muted-foreground">
                           <th className="px-3 py-2">Software</th>
-                          <th className="px-3 py-2">Version</th>
                           <th className="px-3 py-2">Open vulns</th>
-                          <th className="px-3 py-2">First seen</th>
                           <th className="px-3 py-2">Last seen</th>
                         </tr>
                       </thead>
                       <tbody>
                         {software.map((install) => (
                           <tr
-                            key={install.softwareAssetId}
+                            key={install.softwareProductId}
                             className="rounded-xl border border-border/70 bg-card"
                           >
                             <td className="px-3 py-3 font-medium">
                               <Link
                                 to="/software/$id"
-                                params={{ id: install.tenantSoftwareId }}
+                                params={{ id: install.softwareProductId }}
                                 search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
                                 className="text-primary hover:underline"
                               >
-                                {install.softwareAssetName}
+                                {install.softwareName}
                               </Link>
                             </td>
-                            <td className="px-3 py-3 text-muted-foreground">
-                              {install.version ?? '—'}
-                            </td>
                             <td className="px-3 py-3">{install.openVulnerabilityCount}</td>
-                            <td className="px-3 py-3">{formatDateTime(install.firstSeenAt)}</td>
                             <td className="px-3 py-3">{formatDateTime(install.lastSeenAt)}</td>
                           </tr>
                         ))}

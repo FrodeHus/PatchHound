@@ -190,3 +190,17 @@ export type TenantSoftwareVulnerability = z.infer<typeof tenantSoftwareVulnerabi
 export type TenantSoftwareAiReport = z.infer<typeof tenantSoftwareAiReportSchema>
 export type TenantSoftwareDescription = z.infer<typeof tenantSoftwareDescriptionSchema>
 export type TenantSoftwareDescriptionJob = z.infer<typeof tenantSoftwareDescriptionJobSchema>
+
+export const deviceSoftwareItemSchema = z.object({
+  softwareProductId: z.string().uuid(),
+  softwareName: z.string(),
+  lastSeenAt: isoDateTimeSchema,
+  openVulnerabilityCount: z.number(),
+})
+
+export const pagedDeviceSoftwareSchema = pagedResponseMetaSchema.extend({
+  items: z.array(deviceSoftwareItemSchema),
+})
+
+export type DeviceSoftwareItem = z.infer<typeof deviceSoftwareItemSchema>
+export type PagedDeviceSoftware = z.infer<typeof pagedDeviceSoftwareSchema>

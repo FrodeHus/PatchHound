@@ -101,7 +101,14 @@ public record TenantSoftwareInstallationDto(
     Guid? OwnerUserId,
     string? OwnerUserName,
     Guid? OwnerTeamId,
-    string? OwnerTeamName,
+     string? OwnerTeamName,
+    int OpenVulnerabilityCount
+);
+
+public record DeviceSoftwareItemDto(
+    Guid SoftwareProductId,
+    string SoftwareName,
+    DateTimeOffset LastSeenAt,
     int OpenVulnerabilityCount
 );
 
