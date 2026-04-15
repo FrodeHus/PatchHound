@@ -203,6 +203,12 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<DeviceVulnerabilityExposure>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
+            .Entity<ExposureEpisode>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<ExposureAssessment>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
             .Entity<TeamMembershipRule>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
