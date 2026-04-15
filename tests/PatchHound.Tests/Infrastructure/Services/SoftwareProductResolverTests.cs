@@ -106,4 +106,46 @@ public class SoftwareProductResolverTests : IAsyncLifetime
         allAliases.Select(a => a.ExternalId).Should().BeEquivalentTo(new[] { "sw-A", "sw-B" });
         allAliases.Should().OnlyContain(a => a.SoftwareProductId == first.Id);
     }
+
+    [Fact]
+    public async Task Resolve_derives_primary_cpe_from_vendor_and_name()
+    {
+        var observation = new SoftwareObservation(
+            SourceSystemId: _sourceSystem.Id,
+            ExternalId: "sw-003",
+            Vendor: "Microsoft",
+            Name: "Edge");
+
+        var product = await _sut.ResolveAsync(observation, CancellationToken.None);
+
+        product.PrimaryCpe23Uri.Should().Be("cpe:2.3:a:microsoft:edge:*:*:*:*:*:*:*:*");
+    }
+
+    [Fact]
+    public async Task Resolve_reuses_existing_product_cpe_unchanged_on_second_observation()
+    {
+        // First observation creates the product with a derived CPE.
+        var observation = new SoftwareObservation(
+            SourceSystemId: _sourceSystem.Id,
+            ExternalId: "sw-004",
+            Vendor: "Google",
+            Name: "Chrome");
+
+        var first = await _sut.ResolveAsync(observation, CancellationToken.None);
+        first.PrimaryCpe23Uri.Should().Be("cpe:2.3:a:google:chrome:*:*:*:*:*:*:*:*");
+
+        // Second observation should return the same product without overwriting the CPE.
+        var second = await _sut.ResolveAsync(observation, CancellationToken.None);
+        second.Id.Should().Be(first.Id);
+        second.PrimaryCpe23Uri.Should().Be("cpe:2.3:a:google:chrome:*:*:*:*:*:*:*:*");
+    }
+
+    [Theory]
+    [InlineData("Microsoft", "Edge", "cpe:2.3:a:microsoft:edge:*:*:*:*:*:*:*:*")]
+    [InlineData("mozilla", "firefox", "cpe:2.3:a:mozilla:firefox:*:*:*:*:*:*:*:*")]
+    [InlineData("  Acme Corp  ", "  My App  ", "cpe:2.3:a:acme corp:my app:*:*:*:*:*:*:*:*")]
+    public void DeriveCpe_normalises_vendor_and_name(string vendor, string name, string expected)
+    {
+        SoftwareProductResolver.DeriveCpe(vendor, name).Should().Be(expected);
+    }
 }

@@ -24,7 +24,8 @@ public class SoftwareProductResolver(PatchHoundDbContext db) : ISoftwareProductR
         var product = await db.SoftwareProducts.FirstOrDefaultAsync(p => p.CanonicalProductKey == canonicalKey, ct);
         if (product is null)
         {
-            product = SoftwareProduct.Create(observation.Vendor, observation.Name, primaryCpe23Uri: null);
+            var derivedCpe = DeriveCpe(observation.Vendor, observation.Name);
+            product = SoftwareProduct.Create(observation.Vendor, observation.Name, primaryCpe23Uri: derivedCpe);
             db.SoftwareProducts.Add(product);
         }
 
@@ -37,5 +38,19 @@ public class SoftwareProductResolver(PatchHoundDbContext db) : ISoftwareProductR
         db.SoftwareAliases.Add(newAlias);
         await db.SaveChangesAsync(ct);
         return product;
+    }
+
+    /// <summary>
+    /// Derives a CPE 2.3 URI from vendor and product name using the same normalisation
+    /// as <c>DefenderVulnerabilitySource.BuildCpeCriteria</c>. This lets
+    /// <see cref="ExposureDerivationService"/> match CPE-keyed
+    /// <c>VulnerabilityApplicability</c> rows against installed software products
+    /// even when <c>SoftwareProductId</c> is not yet set on those rows.
+    /// </summary>
+    internal static string DeriveCpe(string vendor, string name)
+    {
+        var v = string.IsNullOrWhiteSpace(vendor) ? "*" : vendor.Trim().ToLowerInvariant();
+        var n = string.IsNullOrWhiteSpace(name) ? "*" : name.Trim().ToLowerInvariant();
+        return $"cpe:2.3:a:{v}:{n}:*:*:*:*:*:*:*:*";
     }
 }
