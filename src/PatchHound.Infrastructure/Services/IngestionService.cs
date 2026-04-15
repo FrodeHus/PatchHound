@@ -2133,9 +2133,10 @@ public class IngestionService
             .ToListAsync(ct);
         var installedByDeviceAndProduct = installedSoftwareLookup
             .Where(i => i.ProductKey != null)
+            .GroupBy(i => (i.DeviceId, i.ProductKey!))
             .ToDictionary(
-                i => (i.DeviceId, i.ProductKey!),
-                i => (i.SoftwareProductId, i.Id));
+                g => g.Key,
+                g => (g.First().SoftwareProductId, g.First().Id));
 
         // ── Step 3: Load existing DeviceVulnerabilityExposures for this tenant (for upsert) ──
         var existing = await _dbContext.DeviceVulnerabilityExposures
