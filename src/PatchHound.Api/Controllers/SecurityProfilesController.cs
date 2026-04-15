@@ -181,16 +181,10 @@ public class SecurityProfilesController : ControllerBase
             .Select(device => device.Id)
             .ToListAsync(ct);
 
-        foreach (var assetId in affectedAssetIds)
-        {
-            // phase-5: re-introduce per-asset assessment recalculation via DeviceVulnerabilityExposure
-            _ = assetId;
-        }
-
         await _riskRefreshService.RefreshForAssetsAsync(
             profile.TenantId,
             affectedAssetIds,
-            recalculateAssessments: false,
+            recalculateAssessments: true,
             ct
         );
 

@@ -6,6 +6,7 @@ namespace PatchHound.Infrastructure.Services;
 
 public class RiskRefreshService(
     PatchHoundDbContext dbContext,
+    ExposureAssessmentService exposureAssessmentService,
     RiskScoreService riskScoreService
 )
 {
@@ -19,13 +20,6 @@ public class RiskRefreshService(
         await RefreshForAssetsAsync(tenantId, [assetId], recalculateAssessments, ct);
     }
 
-    // Phase 1 canonical cleanup (Task 13): Device-keyed entry point for the
-    // risk refresh pipeline. Until Phase 5 rewires the vulnerability-episode
-    // tables off the Asset navigation, this method delegates to the asset
-    // path using the device id as the semantic asset id. This works for test
-    // seeds that pair Asset + Device rows with synchronized ids (via the
-    // `ForceId` reflection helper) and is a documented no-op for canonical
-    // devices with no paired Asset row — the full rewire is Phase 5's scope.
     public async Task RefreshForDeviceAsync(
         Guid tenantId,
         Guid deviceId,
@@ -59,8 +53,10 @@ public class RiskRefreshService(
             return;
         }
 
-        // phase-5: re-introduce per-asset episode risk assessment using DeviceVulnerabilityExposure
-        // (VulnerabilityAssessmentService and VulnerabilityEpisodeRiskAssessmentService removed in Phase 2)
+        if (recalculateAssessments)
+        {
+            await exposureAssessmentService.AssessForTenantAsync(tenantId, DateTimeOffset.UtcNow, ct);
+        }
 
         await riskScoreService.RecalculateForTenantAsync(tenantId, ct);
         await dbContext.SaveChangesAsync(ct);
@@ -74,7 +70,11 @@ public class RiskRefreshService(
         CancellationToken ct
     )
     {
-        // phase-5: re-introduce per-pair episode risk assessment using DeviceVulnerabilityExposure
+        if (recalculateAssessments)
+        {
+            await exposureAssessmentService.AssessForTenantAsync(tenantId, DateTimeOffset.UtcNow, ct);
+        }
+
         await riskScoreService.RecalculateForTenantAsync(tenantId, ct);
         await dbContext.SaveChangesAsync(ct);
     }
@@ -86,7 +86,11 @@ public class RiskRefreshService(
         CancellationToken ct
     )
     {
-        // phase-5: re-introduce per-vulnerability episode risk assessment using DeviceVulnerabilityExposure
+        if (recalculateAssessments)
+        {
+            await exposureAssessmentService.AssessForTenantAsync(tenantId, DateTimeOffset.UtcNow, ct);
+        }
+
         await riskScoreService.RecalculateForTenantAsync(tenantId, ct);
         await dbContext.SaveChangesAsync(ct);
     }
@@ -97,7 +101,11 @@ public class RiskRefreshService(
         CancellationToken ct
     )
     {
-        // phase-5: re-introduce asset-keyed episode risk assessment using DeviceVulnerabilityExposure
+        if (recalculateAssessments)
+        {
+            await exposureAssessmentService.AssessForTenantAsync(tenantId, DateTimeOffset.UtcNow, ct);
+        }
+
         await riskScoreService.RecalculateForTenantAsync(tenantId, ct);
         await dbContext.SaveChangesAsync(ct);
     }

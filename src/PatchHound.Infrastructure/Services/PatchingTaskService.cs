@@ -35,8 +35,22 @@ public class PatchingTaskService(
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(c => c.TenantId == decision.TenantId, ct);
 
-        // Phase 2: canonical exposure data not yet available; default to Medium.
-        var highestSeverity = Severity.Medium;
+        // Determine highest severity from open DeviceVulnerabilityExposures for this remediation case.
+        var softwareProductId = await dbContext.RemediationCases
+            .IgnoreQueryFilters()
+            .Where(c => c.Id == decision.RemediationCaseId && c.TenantId == decision.TenantId)
+            .Select(c => (Guid?)c.SoftwareProductId)
+            .FirstOrDefaultAsync(ct);
+
+        var highestSeverity = softwareProductId.HasValue
+            ? await dbContext.DeviceVulnerabilityExposures
+                .AsNoTracking()
+                .Where(e => e.TenantId == decision.TenantId
+                    && e.SoftwareProductId == softwareProductId
+                    && e.Status == ExposureStatus.Open)
+                .Select(e => (Severity?)e.Vulnerability.VendorSeverity)
+                .MaxAsync(ct) ?? Severity.Medium
+            : Severity.Medium;
 
         var dueDate = slaService.CalculateDueDate(
             highestSeverity,

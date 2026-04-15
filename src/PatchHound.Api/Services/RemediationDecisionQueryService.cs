@@ -115,11 +115,65 @@ public class RemediationDecisionQueryService(
             .Select(g => g.OrderByDescending(d => d.CreatedAt).First())
             .ToDictionaryAsync(d => d.RemediationCaseId, ct);
 
-        // TODO Phase 5: restore vulnerability counts from canonical vulnerability model.
-        var vulnCounts = new Dictionary<Guid, (int Total, int Critical, int High, DateTimeOffset EarliestFirstSeen, Severity HighestSeverity)>();
+        // Load SoftwareProductId for each RemediationCase to join with risk scores and exposures.
+        var caseToProduct = await dbContext.RemediationCases.AsNoTracking()
+            .Where(c => c.TenantId == tenantId && caseIds.Contains(c.Id))
+            .Select(c => new { c.Id, c.SoftwareProductId })
+            .ToDictionaryAsync(c => c.Id, c => c.SoftwareProductId, ct);
 
-        // TODO Phase 5: restore risk scores keyed by RemediationCaseId.
+        var productIds = caseToProduct.Values.Distinct().ToList();
+
+        // Vulnerability counts and risk scores from the computed SoftwareRiskScore table.
+        var softwareRiskScores = await dbContext.SoftwareRiskScores.AsNoTracking()
+            .Where(s => s.TenantId == tenantId && productIds.Contains(s.SoftwareProductId))
+            .ToDictionaryAsync(s => s.SoftwareProductId, ct);
+
+        // EarliestFirstSeen and HighestSeverity from open exposures.
+        var exposureSummaryByProduct = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(e => e.TenantId == tenantId
+                && e.SoftwareProductId != null
+                && productIds.Contains(e.SoftwareProductId!.Value)
+                && e.Status == ExposureStatus.Open)
+            .GroupBy(e => e.SoftwareProductId!.Value)
+            .Select(g => new
+            {
+                SoftwareProductId = g.Key,
+                EarliestFirstSeen = g.Min(e => e.FirstObservedAt),
+                HighestSeverity = (Severity)g.Max(e => (int)e.Vulnerability.VendorSeverity),
+            })
+            .ToDictionaryAsync(x => x.SoftwareProductId, ct);
+
+        // Highest criticality of any device exposed via this software product.
+        var criticalityByProduct = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(e => e.TenantId == tenantId
+                && e.SoftwareProductId != null
+                && productIds.Contains(e.SoftwareProductId!.Value)
+                && e.Status == ExposureStatus.Open)
+            .GroupBy(e => e.SoftwareProductId!.Value)
+            .Select(g => new
+            {
+                SoftwareProductId = g.Key,
+                MaxCriticality = (Criticality)g.Max(e => (int)e.Device.Criticality),
+            })
+            .ToDictionaryAsync(x => x.SoftwareProductId, ct);
+
+        // Build vulnCounts and riskScoresByCaseId keyed by RemediationCaseId.
+        var vulnCounts = new Dictionary<Guid, (int Total, int Critical, int High, DateTimeOffset EarliestFirstSeen, Severity HighestSeverity)>();
         var riskScoresByCaseId = new Dictionary<Guid, (decimal OverallScore, DateTimeOffset CalculatedAt)>();
+        foreach (var (caseId, productId) in caseToProduct)
+        {
+            if (softwareRiskScores.TryGetValue(productId, out var srs))
+            {
+                riskScoresByCaseId[caseId] = (srs.OverallScore, srs.CalculatedAt);
+            }
+            if (exposureSummaryByProduct.TryGetValue(productId, out var expSummary))
+            {
+                var critical = softwareRiskScores.TryGetValue(productId, out var srs2) ? srs2.CriticalExposureCount : 0;
+                var high = softwareRiskScores.TryGetValue(productId, out var srs3) ? srs3.HighExposureCount : 0;
+                var total = softwareRiskScores.TryGetValue(productId, out var srs4) ? srs4.OpenExposureCount : 0;
+                vulnCounts[caseId] = (total, critical, high, expSummary.EarliestFirstSeen, expSummary.HighestSeverity);
+            }
+        }
 
         var tenantSla = await dbContext.TenantSlaConfigurations.AsNoTracking()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
@@ -127,11 +181,12 @@ public class RemediationDecisionQueryService(
         var items = new List<RemediationDecisionListItemDto>();
         foreach (var rc in caseRows)
         {
-            // TODO Phase 5: skip cases with no active vulnerabilities once vuln data is restored.
-            var activeVulnerabilityCount = 0;
+            vulnCounts.TryGetValue(rc.Id, out var vc);
+            var activeVulnerabilityCount = vc.Total;
 
-            // TODO Phase 5: restore criticality from device-asset join.
-            var criticality = Criticality.Low;
+            var productId = caseToProduct.TryGetValue(rc.Id, out var pid) ? pid : Guid.Empty;
+            criticalityByProduct.TryGetValue(productId, out var critEntry);
+            var criticality = critEntry?.MaxCriticality ?? Criticality.Low;
 
             if (!string.IsNullOrWhiteSpace(filter.Criticality)
                 && Enum.TryParse<Criticality>(filter.Criticality, true, out var crit)
@@ -213,7 +268,7 @@ public class RemediationDecisionQueryService(
                 riskBand,
                 slaStatus,
                 slaDueDate,
-                0, // TODO Phase 5: restore device count from canonical device-asset join
+                softwareRiskScores.TryGetValue(productId, out var srsForCount) ? srsForCount.AffectedDeviceCount : 0,
                 BuildEmptyTrend()
             ));
         }

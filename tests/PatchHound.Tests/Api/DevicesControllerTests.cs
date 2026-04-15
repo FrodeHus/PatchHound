@@ -54,6 +54,7 @@ public class DevicesControllerTests : IDisposable
         var snapshotResolver = new TenantSnapshotResolver(_dbContext);
         var riskRefreshService = new RiskRefreshService(
             _dbContext,
+            new ExposureAssessmentService(_dbContext, new EnvironmentalSeverityCalculator()),
             new RiskScoreService(
                 _dbContext,
                 Substitute.For<Microsoft.Extensions.Logging.ILogger<RiskScoreService>>()

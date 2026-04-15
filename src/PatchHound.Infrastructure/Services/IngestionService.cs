@@ -636,9 +636,12 @@ public class IngestionService
                                 ct
                             );
                             var softwareMatchStartedAt = DateTimeOffset.UtcNow;
-                            // phase-3: re-introduce SoftwareVulnerabilityMatchService once DeviceVulnerabilityExposure is in place
                             await ExecuteWithConcurrencyRetryAsync(
-                                () => Task.FromResult(true),
+                                async () =>
+                                {
+                                    await RunExposureDerivationAsync(tenantId, ct);
+                                    return true;
+                                },
                                 source.SourceName,
                                 tenantId,
                                 ct
@@ -2027,71 +2030,6 @@ public class IngestionService
                 normalizedSoftwareIds,
                 ct
             );
-        }
-    }
-
-    internal async Task ProcessResultsAsync(
-        Guid tenantId,
-        string sourceName,
-        IReadOnlyList<IngestionResult> results,
-        CancellationToken ct
-    )
-    {
-        var run = IngestionRun.Start(
-            tenantId,
-            sourceName.Trim().ToLowerInvariant(),
-            DateTimeOffset.UtcNow
-        );
-        await _dbContext.IngestionRuns.AddAsync(run, ct);
-        await _dbContext.SaveChangesAsync(ct);
-
-        var normalizedResults = NormalizeResults(results);
-        await StageVulnerabilitiesAsync(run.Id, tenantId, run.SourceKey, normalizedResults, 0, ct);
-        await CommitCheckpointAsync(
-            run.Id,
-            tenantId,
-            run.SourceKey,
-            "vulnerability-staging",
-            0,
-            null,
-            normalizedResults.Count,
-            "Staged",
-            ct
-        );
-        await ProcessStagedResultsAsync(run.Id, tenantId, run.SourceKey, null, sourceName, ct);
-
-        await CommitCheckpointAsync(
-            run.Id,
-            tenantId,
-            run.SourceKey,
-            "vulnerability-merge",
-            0,
-            null,
-            normalizedResults.Sum(item => item.AffectedAssets.Count),
-            "Completed",
-            ct
-        );
-        if (SupportsSoftwareSnapshots(run.SourceKey))
-        {
-            var softwareSnapshot = await GetOrCreateBuildingSoftwareSnapshotAsync(
-                tenantId,
-                run.SourceKey,
-                run.Id,
-                ct
-            );
-            await ProcessStagedAssetsAsync(
-                run.Id,
-                tenantId,
-                run.SourceKey,
-                softwareSnapshot.Id,
-                ct
-            );
-            // phase-3: re-introduce SoftwareVulnerabilityMatchService once DeviceVulnerabilityExposure is in place
-            await PublishSnapshotAsync(tenantId, run.SourceKey, softwareSnapshot.Id, ct);
-        }
-        else
-        {
-            // phase-3: re-introduce SoftwareVulnerabilityMatchService once DeviceVulnerabilityExposure is in place
         }
     }
 
