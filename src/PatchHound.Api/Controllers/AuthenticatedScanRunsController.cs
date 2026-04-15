@@ -98,7 +98,7 @@ public class AuthenticatedScanRunsController(
             .ToListAsync(ct);
 
         var deviceIds = jobs.Select(j => j.DeviceId).Distinct().ToList();
-        var deviceNames = await db.Assets.AsNoTracking()
+        var deviceNames = await db.Devices.AsNoTracking()
             .Where(a => deviceIds.Contains(a.Id))
             .ToDictionaryAsync(a => a.Id, a => a.Name, ct);
 

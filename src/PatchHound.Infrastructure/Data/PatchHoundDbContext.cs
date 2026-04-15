@@ -41,7 +41,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<StagedVulnerability> StagedVulnerabilities => Set<StagedVulnerability>();
     public DbSet<StagedVulnerabilityExposure> StagedVulnerabilityExposures =>
         Set<StagedVulnerabilityExposure>();
-    public DbSet<StagedAsset> StagedAssets => Set<StagedAsset>();
+    public DbSet<StagedDevice> StagedDevices => Set<StagedDevice>();
     public DbSet<StagedDeviceSoftwareInstallation> StagedDeviceSoftwareInstallations =>
         Set<StagedDeviceSoftwareInstallation>();
     public DbSet<EnrichmentSourceConfiguration> EnrichmentSourceConfigurations =>
@@ -55,10 +55,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<TeamMembershipRule> TeamMembershipRules => Set<TeamMembershipRule>();
-    public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<BusinessLabel> BusinessLabels => Set<BusinessLabel>();
-    public DbSet<AssetBusinessLabel> AssetBusinessLabels => Set<AssetBusinessLabel>();
-    public DbSet<AssetSecurityProfile> AssetSecurityProfiles => Set<AssetSecurityProfile>();
     public DbSet<SoftwareCpeBinding> SoftwareCpeBindings => Set<SoftwareCpeBinding>();
     public DbSet<SoftwareTenantRecord> SoftwareTenantRecords => Set<SoftwareTenantRecord>();
     public DbSet<SoftwareProductAlias> SoftwareProductAliases =>
@@ -97,8 +94,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<AIReport> AIReports => Set<AIReport>();
     public DbSet<SoftwareDescriptionJob> SoftwareDescriptionJobs => Set<SoftwareDescriptionJob>();
     public DbSet<RemediationAiJob> RemediationAiJobs => Set<RemediationAiJob>();
-    public DbSet<AssetTag> AssetTags => Set<AssetTag>();
-    public DbSet<AssetRule> AssetRules => Set<AssetRule>();
     public DbSet<DeviceGroupRiskScore> DeviceGroupRiskScores => Set<DeviceGroupRiskScore>();
     public DbSet<SoftwareRiskScore> SoftwareRiskScores => Set<SoftwareRiskScore>();
     public DbSet<TeamRiskScore> TeamRiskScores => Set<TeamRiskScore>();
@@ -179,15 +174,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         // Global query filters for tenant isolation.
         // Referencing the instance property ensures EF Core re-evaluates per query.
         modelBuilder
-            .Entity<Asset>()
-            .HasQueryFilter(e =>
-                IsSystemContext
-                || (
-                    AccessibleTenantIds.Contains(e.TenantId)
-                    && (e.AssetType != AssetType.Device || e.DeviceActiveInTenant)
-                )
-            );
-        modelBuilder
             .Entity<Device>()
             .HasQueryFilter(e =>
                 IsSystemContext
@@ -217,27 +203,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<DeviceVulnerabilityExposure>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
-            .Entity<ExposureEpisode>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<ExposureAssessment>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<AssetSecurityProfile>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<BusinessLabel>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<AssetBusinessLabel>()
-            .HasQueryFilter(e =>
-                IsSystemContext
-                || (
-                    AccessibleTenantIds.Contains(e.Asset.TenantId)
-                    && AccessibleTenantIds.Contains(e.BusinessLabel.TenantId)
-                )
-            );
-        modelBuilder
             .Entity<TeamMembershipRule>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
@@ -247,19 +212,19 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<SoftwareProductInstallation>()
             .HasQueryFilter(e =>
                 IsSystemContext
-                || (AccessibleTenantIds.Contains(e.TenantId) && e.DeviceAsset.DeviceActiveInTenant)
+                || (AccessibleTenantIds.Contains(e.TenantId) && e.DeviceAsset.ActiveInTenant)
             );
         modelBuilder
             .Entity<DeviceSoftwareInstallation>()
             .HasQueryFilter(e =>
                 IsSystemContext
-                || (AccessibleTenantIds.Contains(e.TenantId) && e.DeviceAsset.DeviceActiveInTenant)
+                || (AccessibleTenantIds.Contains(e.TenantId) && e.DeviceAsset.ActiveInTenant)
             );
         modelBuilder
             .Entity<DeviceSoftwareInstallationEpisode>()
             .HasQueryFilter(e =>
                 IsSystemContext
-                || (AccessibleTenantIds.Contains(e.TenantId) && e.DeviceAsset.DeviceActiveInTenant)
+                || (AccessibleTenantIds.Contains(e.TenantId) && e.DeviceAsset.ActiveInTenant)
             );
         modelBuilder
             .Entity<Comment>()
@@ -323,16 +288,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<StagedVulnerabilityExposure>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
-            .Entity<StagedAsset>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
             .Entity<StagedDeviceSoftwareInstallation>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<AssetTag>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<AssetRule>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<DeviceGroupRiskScore>()

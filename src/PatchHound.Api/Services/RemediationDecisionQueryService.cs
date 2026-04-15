@@ -287,27 +287,27 @@ public class RemediationDecisionQueryService(
             : Criticality.Low;
         var scopedDeviceDetails = scopedDeviceAssetIds.Count == 0
             ? []
-            : await dbContext.Assets.AsNoTracking()
-                .Where(asset => asset.TenantId == tenantId && scopedDeviceAssetIds.Contains(asset.Id))
+            : await dbContext.Devices.AsNoTracking()
+                .Where(device => device.TenantId == tenantId && scopedDeviceAssetIds.Contains(device.Id))
                 .GroupJoin(
-                    dbContext.AssetSecurityProfiles.AsNoTracking(),
-                    asset => asset.SecurityProfileId,
+                    dbContext.SecurityProfiles.AsNoTracking(),
+                    device => device.SecurityProfileId,
                     profile => profile.Id,
-                    (asset, profiles) => new { asset, profile = profiles.FirstOrDefault() }
+                    (device, profiles) => new { device, profile = profiles.FirstOrDefault() }
                 )
                 .Select(item => new RemediationDeviceContextRow(
-                    item.asset.Id,
-                    item.asset.Criticality,
-                    item.asset.DeviceValue,
-                    item.asset.DeviceExposureLevel,
+                    item.device.Id,
+                    item.device.Criticality,
+                    item.device.DeviceValue,
+                    item.device.ExposureLevel,
                     item.profile != null ? item.profile.EnvironmentClass : null,
                     item.profile != null ? item.profile.InternetReachability : null
                 ))
                 .ToListAsync(ct);
         var affectedOwnerTeamIds = scopedDeviceAssetIds.Count > 0
-            ? await dbContext.Assets.AsNoTracking()
-                .Where(asset => asset.TenantId == tenantId && scopedDeviceAssetIds.Contains(asset.Id))
-                .Select(asset => asset.OwnerTeamId ?? asset.FallbackTeamId)
+            ? await dbContext.Devices.AsNoTracking()
+                .Where(device => device.TenantId == tenantId && scopedDeviceAssetIds.Contains(device.Id))
+                .Select(device => device.OwnerTeamId ?? device.FallbackTeamId)
                 .Where(teamId => teamId != null)
                 .Distinct()
                 .Select(teamId => teamId!.Value)
@@ -324,9 +324,9 @@ public class RemediationDecisionQueryService(
                 .ToListAsync(ct);
         var businessLabelSummary = scopedDeviceAssetIds.Count == 0
             ? []
-            : await dbContext.AssetBusinessLabels.AsNoTracking()
-                .Where(link => scopedDeviceAssetIds.Contains(link.AssetId))
-                .Select(link => new { link.AssetId, link.BusinessLabel.Name })
+            : await dbContext.DeviceBusinessLabels.AsNoTracking()
+                .Where(link => scopedDeviceAssetIds.Contains(link.DeviceId))
+                .Select(link => new { link.DeviceId, link.BusinessLabel.Name })
                 .Distinct()
                 .GroupBy(item => item.Name)
                 .OrderByDescending(group => group.Count())
@@ -351,15 +351,15 @@ public class RemediationDecisionQueryService(
 
         var activeSnapshotId = await snapshotResolver.ResolveActiveVulnerabilitySnapshotIdAsync(tenantId, ct);
 
-        // Phase-2: SoftwareVulnerabilityMatch deleted.
+        // SoftwareVulnerabilityMatch removed — vulnerability list populated via DeviceVulnerabilityExposure in Phase 5.
         var matches = new List<(Guid Id, string ExternalId, string Title, Severity VendorSeverity, double? VendorScore, string? CvssVector, DateTimeOffset FirstSeenAt)>();
 
         var vulnDefIds = matches.Select(m => m.Id).Distinct().ToList();
 
-        // Phase-2: VulnerabilityThreatAssessment deleted.
+        // VulnerabilityThreatAssessment removed — threat data populated via canonical model in Phase 5.
         var threats = new Dictionary<Guid, ThreatAssessment>();
 
-        // Phase-2: TenantVulnerability deleted.
+        // TenantVulnerability removed — lookup replaced by DeviceVulnerabilityExposure in Phase 5.
         var tenantVulnLookup = new List<(Guid Id, Guid VulnerabilityDefinitionId)>();
 
         var tenantVulnIdByDefId = tenantVulnLookup
@@ -373,10 +373,10 @@ public class RemediationDecisionQueryService(
             ct
         );
 
-        // Phase-2: VulnerabilityAssetAssessment deleted.
+        // VulnerabilityAssetAssessment removed — assessment data populated via canonical model in Phase 5.
         var assessmentsByTenantVulnId = new Dictionary<Guid, object?>();
 
-        // Phase-2: VulnerabilityEpisodeRiskAssessment deleted.
+        // VulnerabilityEpisodeRiskAssessment removed — episode risk populated via canonical model in Phase 5.
         var episodeRiskScores = new Dictionary<Guid, object?>();
 
         var activeWorkflow = await dbContext.RemediationWorkflows.AsNoTracking()
@@ -457,7 +457,7 @@ public class RemediationDecisionQueryService(
 
                 if (tvId != Guid.Empty)
                 {
-                    // Phase-2: VulnerabilityAssetAssessment + VulnerabilityEpisodeRiskAssessment deleted.
+                    // VulnerabilityAssetAssessment + VulnerabilityEpisodeRiskAssessment removed — data sourced from canonical model in Phase 5.
                     _ = assessmentsByTenantVulnId.TryGetValue(tvId, out _);
                     _ = episodeRiskScores.TryGetValue(tvId, out _);
                 }
@@ -658,9 +658,9 @@ public class RemediationDecisionQueryService(
             : null;
 
         var executionTeamIds = scopedDeviceAssetIds.Count > 0
-            ? await dbContext.Assets.AsNoTracking()
-                .Where(asset => asset.TenantId == tenantId && scopedDeviceAssetIds.Contains(asset.Id))
-                .Select(asset => asset.OwnerTeamId ?? asset.FallbackTeamId)
+            ? await dbContext.Devices.AsNoTracking()
+                .Where(device => device.TenantId == tenantId && scopedDeviceAssetIds.Contains(device.Id))
+                .Select(device => device.OwnerTeamId ?? device.FallbackTeamId)
                 .Where(teamId => teamId != null)
                 .Select(teamId => teamId!.Value)
                 .Distinct()
@@ -1056,7 +1056,7 @@ public class RemediationDecisionQueryService(
         CancellationToken ct
     )
     {
-        // Phase-2: VulnerabilityAssetEpisode + TenantVulnerability deleted.
+        // VulnerabilityAssetEpisode + TenantVulnerability removed — episode data populated via DeviceVulnerabilityExposure in Phase 5.
         await Task.CompletedTask;
         return [];
     }

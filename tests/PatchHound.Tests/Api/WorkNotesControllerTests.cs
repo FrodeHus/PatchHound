@@ -56,14 +56,14 @@ public class WorkNotesControllerTests : IDisposable
         var result = action.Result.Should().BeOfType<CreatedResult>().Subject;
         var dto = result.Value.Should().BeOfType<WorkNoteDto>().Subject;
 
-        dto.EntityType.Should().Be(nameof(Asset));
+        dto.EntityType.Should().Be(nameof(Device));
         dto.EntityId.Should().Be(asset.Id);
         dto.AuthorId.Should().Be(_authorId);
         dto.CanEdit.Should().BeTrue();
         dto.CanDelete.Should().BeTrue();
 
         var stored = await _dbContext.Comments.SingleAsync();
-        stored.EntityType.Should().Be(nameof(Asset));
+        stored.EntityType.Should().Be(nameof(Device));
         stored.EntityId.Should().Be(asset.Id);
         stored.Content.Should().Be("Needs owner follow-up");
         stored.DeletedAt.Should().BeNull();
@@ -77,14 +77,14 @@ public class WorkNotesControllerTests : IDisposable
 
         var visibleNote = Comment.Create(
             _tenantId,
-            nameof(Asset),
+            nameof(Device),
             asset.Id,
             _authorId,
             "Visible note"
         );
         var deletedNote = Comment.Create(
             _tenantId,
-            nameof(Asset),
+            nameof(Device),
             asset.Id,
             _authorId,
             "Deleted note"
@@ -157,30 +157,30 @@ public class WorkNotesControllerTests : IDisposable
         await _dbContext.SaveChangesAsync();
     }
 
-    private async Task<Asset> SeedAssetAsync()
+    private async Task<Device> SeedAssetAsync()
     {
-        var asset = Asset.Create(
+        var device = Device.Create(
             _tenantId,
+            Guid.NewGuid(),
             "device-001",
-            AssetType.Device,
             "Workstation 01",
             Criticality.Medium
         );
 
-        await _dbContext.Assets.AddAsync(asset);
+        await _dbContext.Devices.AddAsync(device);
         await _dbContext.SaveChangesAsync();
-        return asset;
+        return device;
     }
 
     private async Task<Comment> SeedAuthorNoteAsync()
     {
-        var asset = await SeedAssetAsync();
+        var device = await SeedAssetAsync();
         await SeedUsersAsync();
 
         var note = Comment.Create(
             _tenantId,
-            nameof(Asset),
-            asset.Id,
+            nameof(Device),
+            device.Id,
             _authorId,
             "Original note"
         );

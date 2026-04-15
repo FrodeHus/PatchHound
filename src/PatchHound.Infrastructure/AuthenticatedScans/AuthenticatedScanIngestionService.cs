@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Entities.AuthenticatedScans;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
 
@@ -11,7 +12,7 @@ namespace PatchHound.Infrastructure.AuthenticatedScans;
 public class AuthenticatedScanIngestionService(
     PatchHoundDbContext dbContext,
     AuthenticatedScanOutputValidator validator,
-    StagedAssetMergeService stagedAssetMergeService,
+    IStagedDeviceMergeService stagedDeviceMergeService,
     NormalizedSoftwareProjectionService projectionService)
 {
     private const string SourceKey = "authenticated-scan";
@@ -45,12 +46,12 @@ public class AuthenticatedScanIngestionService(
             return;
         }
 
-        // Stage assets and device-software links into the existing pipeline
+        // Stage software records and device-software links into the ingestion pipeline
         var ingestionRunId = Guid.NewGuid();
         var stagedAt = DateTimeOffset.UtcNow;
         var deviceExternalId = await GetDeviceExternalId(job.DeviceId, ct);
 
-        var softwareAssets = new List<StagedAsset>();
+        var stagedSoftware = new List<StagedDevice>();
         var softwareLinks = new List<StagedDeviceSoftwareInstallation>();
 
         foreach (var entry in validation.ValidEntries)
@@ -74,7 +75,7 @@ public class AuthenticatedScanIngestionService(
                 Metadata = metadata,
             };
 
-            softwareAssets.Add(StagedAsset.Create(
+            stagedSoftware.Add(StagedDevice.Create(
                 ingestionRunId,
                 job.TenantId,
                 SourceKey,
@@ -102,14 +103,13 @@ public class AuthenticatedScanIngestionService(
             ));
         }
 
-        await dbContext.StagedAssets.AddRangeAsync(softwareAssets, ct);
+        await dbContext.StagedDevices.AddRangeAsync(stagedSoftware, ct);
         await dbContext.StagedDeviceSoftwareInstallations.AddRangeAsync(softwareLinks, ct);
         await dbContext.SaveChangesAsync(ct);
         dbContext.ChangeTracker.Clear();
 
-        // Merge + resolve + project through the existing pipeline
-        await stagedAssetMergeService.ProcessAsync(
-            ingestionRunId, job.TenantId, SourceKey, null, ct);
+        // Merge + resolve + project through the canonical pipeline
+        await stagedDeviceMergeService.MergeAsync(ingestionRunId, job.TenantId, ct);
         await projectionService.SyncTenantAsync(job.TenantId, null, ct);
 
         job = await dbContext.ScanJobs.FirstAsync(j => j.Id == scanJobId, ct);
@@ -119,8 +119,8 @@ public class AuthenticatedScanIngestionService(
 
     private async Task<string> GetDeviceExternalId(Guid deviceId, CancellationToken ct)
     {
-        var asset = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == deviceId, ct);
-        return asset?.ExternalId ?? deviceId.ToString();
+        var device = await dbContext.Devices.IgnoreQueryFilters().FirstOrDefaultAsync(d => d.Id == deviceId, ct);
+        return device?.ExternalId ?? deviceId.ToString();
     }
 
     private static string BuildSoftwareExternalId(Guid tenantId, ValidatedSoftwareEntry entry)
@@ -137,3 +137,4 @@ public class AuthenticatedScanIngestionService(
         await dbContext.ScanJobValidationIssues.AddRangeAsync(entities, ct);
     }
 }
+

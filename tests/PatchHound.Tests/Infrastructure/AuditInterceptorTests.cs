@@ -119,7 +119,7 @@ public class AuditInterceptorTests : IDisposable
             "asset-staging",
             DateTimeOffset.UtcNow
         );
-        var stagedAsset = StagedAsset.Create(
+        var stagedAsset = StagedDevice.Create(
             run.Id,
             _tenantId,
             "test-source",
@@ -132,7 +132,7 @@ public class AuditInterceptorTests : IDisposable
 
         _dbContext.IngestionRuns.Add(run);
         _dbContext.IngestionCheckpoints.Add(checkpoint);
-        _dbContext.StagedAssets.Add(stagedAsset);
+        _dbContext.StagedDevices.Add(stagedAsset);
         await _dbContext.SaveChangesAsync();
 
         _dbContext.AuditLogEntries.RemoveRange(_dbContext.AuditLogEntries.IgnoreQueryFilters());
@@ -140,7 +140,7 @@ public class AuditInterceptorTests : IDisposable
 
         _dbContext.IngestionRuns.Remove(run);
         _dbContext.IngestionCheckpoints.Remove(checkpoint);
-        _dbContext.StagedAssets.Remove(stagedAsset);
+        _dbContext.StagedDevices.Remove(stagedAsset);
         await _dbContext.SaveChangesAsync();
 
         var auditEntries = await _dbContext.AuditLogEntries.IgnoreQueryFilters().ToListAsync();

@@ -50,9 +50,9 @@ public class AuthenticatedScanRunsControllerTests : IAsyncLifetime
         _completedRun.Complete(1, 1, 5, DateTimeOffset.UtcNow);
         _db.AuthenticatedScanRuns.Add(_completedRun);
 
-        var device1 = Asset.Create(_tenantId, "ext-1", AssetType.Device, "server-1", Criticality.Medium);
-        var device2 = Asset.Create(_tenantId, "ext-2", AssetType.Device, "server-2", Criticality.Medium);
-        _db.Assets.AddRange(device1, device2);
+        var device1 = Device.Create(_tenantId, Guid.NewGuid(), "ext-1", "server-1", Criticality.Medium);
+        var device2 = Device.Create(_tenantId, Guid.NewGuid(), "ext-2", "server-2", Criticality.Medium);
+        _db.Devices.AddRange(device1, device2);
 
         var job1 = ScanJob.Create(_tenantId, _completedRun.Id, runner.Id, device1.Id, conn.Id, "[]");
         job1.Dispatch(DateTimeOffset.UtcNow.AddMinutes(10));

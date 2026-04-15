@@ -26,11 +26,5 @@ public class DeviceSoftwareInstallationEpisodeConfiguration
             .WithMany()
             .HasForeignKey(episode => episode.DeviceAssetId)
             .OnDelete(DeleteBehavior.Cascade);
-
-        builder
-            .HasOne(episode => episode.SoftwareAsset)
-            .WithMany()
-            .HasForeignKey(episode => episode.SoftwareAssetId)
-            .OnDelete(DeleteBehavior.Cascade);
     }
 }

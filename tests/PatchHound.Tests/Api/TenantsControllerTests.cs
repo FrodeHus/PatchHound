@@ -245,7 +245,7 @@ public class TenantsControllerTests : IDisposable
         await _dbContext.UserTenantRoles.AddAsync(UserTenantRole.Create(customerUser.Id, tenant.Id, RoleName.CustomerViewer));
         await _dbContext.Teams.AddAsync(defaultTeam);
         await _dbContext.TeamMembers.AddAsync(TeamMember.Create(defaultTeam.Id, customerUser.Id));
-        await _dbContext.AssetRules.AddAsync(AssetRule.Create(
+        await _dbContext.DeviceRules.AddAsync(DeviceRule.Create(
             tenant.Id,
             "Default rule",
             null,
@@ -267,7 +267,7 @@ public class TenantsControllerTests : IDisposable
         (await _dbContext.TenantSlaConfigurations.IgnoreQueryFilters().AnyAsync(item => item.TenantId == tenant.Id)).Should().BeFalse();
         (await _dbContext.UserTenantRoles.IgnoreQueryFilters().AnyAsync(item => item.TenantId == tenant.Id)).Should().BeFalse();
         (await _dbContext.Teams.IgnoreQueryFilters().AnyAsync(item => item.TenantId == tenant.Id)).Should().BeFalse();
-        (await _dbContext.AssetRules.IgnoreQueryFilters().AnyAsync(item => item.TenantId == tenant.Id)).Should().BeFalse();
+        (await _dbContext.DeviceRules.IgnoreQueryFilters().AnyAsync(item => item.TenantId == tenant.Id)).Should().BeFalse();
         (await _dbContext.Users.IgnoreQueryFilters().AnyAsync(item => item.Id == customerUser.Id)).Should().BeFalse();
 
         await _secretStore.Received(1).DeleteSecretPathAsync(source.SecretRef, Arg.Any<CancellationToken>());
@@ -390,8 +390,8 @@ public class TenantsControllerTests : IDisposable
             DateTimeOffset.UtcNow.AddMinutes(-9)
         );
         await _dbContext.IngestionCheckpoints.AddAsync(checkpoint);
-        await _dbContext.StagedAssets.AddAsync(
-            StagedAsset.Create(
+        await _dbContext.StagedDevices.AddAsync(
+            StagedDevice.Create(
                 run.Id,
                 tenant.Id,
                 source.SourceKey,
@@ -460,7 +460,7 @@ public class TenantsControllerTests : IDisposable
         (await _dbContext.IngestionCheckpoints.AnyAsync(item => item.IngestionRunId == run.Id))
             .Should()
             .BeFalse();
-        (await _dbContext.StagedAssets.AnyAsync(item => item.IngestionRunId == run.Id)).Should().BeFalse();
+        (await _dbContext.StagedDevices.AnyAsync(item => item.IngestionRunId == run.Id)).Should().BeFalse();
         (await _dbContext.StagedVulnerabilities.AnyAsync(item => item.IngestionRunId == run.Id))
             .Should()
             .BeFalse();

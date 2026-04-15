@@ -7,6 +7,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.AuthenticatedScans;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Services.Inventory;
 using PatchHound.Tests.TestData;
 using Xunit;
 
@@ -39,9 +40,12 @@ public class BackendEndToEndTests : IAsyncLifetime
     [Fact]
     public async Task Full_backend_flow_dispatches_and_ingests_software()
     {
-        // Arrange: seed device asset
-        var device = Asset.Create(_tenantId, "ext-host-1", AssetType.Device, "host-1", Criticality.Medium);
-        _db.Assets.Add(device);
+        // Arrange: seed device
+        var sourceSystem = SourceSystem.Create("authenticated-scan", "Authenticated Scan");
+        _db.SourceSystems.Add(sourceSystem);
+        await _db.SaveChangesAsync();
+        var device = Device.Create(_tenantId, sourceSystem.Id, "ext-host-1", "host-1", Criticality.Medium);
+        _db.Devices.Add(device);
 
         var conn = ConnectionProfile.Create(_tenantId, "conn", "", "host.example.com", 22, "user", "password", "secret/path", null);
         var runner = ScanRunner.Create(_tenantId, "runner", "", "hash");
@@ -77,11 +81,13 @@ public class BackendEndToEndTests : IAsyncLifetime
         // Act 2: simulate runner posting results — ingestion service processes them
         var rawOutput = """{"software":[{"name":"nginx","vendor":"nginx","version":"1.24.0"},{"name":"openssl","version":"3.0.2"}]}""";
 
-        var stagedAssetMerge = new StagedAssetMergeService(_db);
+        var deviceResolver = new DeviceResolver(_db);
+        var softwareResolver = new SoftwareProductResolver(_db);
+        var stagedDeviceMerge = new StagedDeviceMergeService(_db, deviceResolver, softwareResolver);
         var resolver = new NormalizedSoftwareResolver(_db);
         var projectionService = new NormalizedSoftwareProjectionService(_db, resolver);
         var validator = new AuthenticatedScanOutputValidator();
-        var ingestionService = new AuthenticatedScanIngestionService(_db, validator, stagedAssetMerge, projectionService);
+        var ingestionService = new AuthenticatedScanIngestionService(_db, validator, stagedDeviceMerge, projectionService);
 
         await ingestionService.ProcessJobResultAsync(job.Id, rawOutput, "", CancellationToken.None);
 
@@ -93,10 +99,10 @@ public class BackendEndToEndTests : IAsyncLifetime
         // Assert: result stored
         Assert.True(await _db.ScanJobResults.AnyAsync(r => r.ScanJobId == job.Id));
 
-        // Assert: software assets created via staging pipeline
-        var softwareAssets = await _db.Assets
-            .Where(a => a.TenantId == _tenantId && a.AssetType == AssetType.Software && a.SourceKey == "authenticated-scan")
+        // Assert: software staged rows created via ingestion pipeline
+        var stagedSoftware = await _db.StagedDevices
+            .Where(s => s.TenantId == _tenantId && s.AssetType == AssetType.Software && s.SourceKey == "authenticated-scan")
             .ToListAsync();
-        Assert.Equal(2, softwareAssets.Count);
+        Assert.Equal(2, stagedSoftware.Count);
     }
 }

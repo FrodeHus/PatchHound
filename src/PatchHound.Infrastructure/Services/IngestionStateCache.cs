@@ -52,7 +52,7 @@ public class IngestionStateCache
     }
 
     public async Task PreWarmAssetsAsync(
-        IReadOnlyList<Asset> items,
+        IReadOnlyList<Device> items,
         CancellationToken ct)
     {
         if (!IsAvailable) return;

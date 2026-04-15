@@ -13,37 +13,6 @@ public class EnvironmentalSeverityCalculator
         Device device,
         SecurityProfile? profile)
     {
-        var asset = Asset.Create(device.TenantId, device.ExternalId, AssetType.Device, device.Name, device.Criticality);
-        var assetProfile = profile is null
-            ? null
-            : AssetSecurityProfile.Create(
-                profile.TenantId,
-                profile.Name,
-                profile.Description,
-                profile.EnvironmentClass,
-                profile.InternetReachability,
-                profile.ConfidentialityRequirement,
-                profile.IntegrityRequirement,
-                profile.AvailabilityRequirement,
-                profile.ModifiedAttackVector,
-                profile.ModifiedAttackComplexity,
-                profile.ModifiedPrivilegesRequired,
-                profile.ModifiedUserInteraction,
-                profile.ModifiedScope,
-                profile.ModifiedConfidentialityImpact,
-                profile.ModifiedIntegrityImpact,
-                profile.ModifiedAvailabilityImpact
-            );
-
-        return Calculate(vulnerability, asset, assetProfile);
-    }
-
-    public EnvironmentalSeverityCalculationResult Calculate(
-        Vulnerability vulnerability,
-        Asset asset,
-        AssetSecurityProfile? profile
-    )
-    {
         if (vulnerability.CvssScore is null || string.IsNullOrWhiteSpace(vulnerability.CvssVector))
         {
             return EnvironmentalSeverityCalculationResult.FromBaseSeverity(
@@ -74,7 +43,7 @@ public class EnvironmentalSeverityCalculator
                 vulnerability.VendorSeverity.ToString(),
                 "Vendor/base severity from the source feed."
             ),
-            new("AssetCriticality", asset.Criticality.ToString(), "Current asset criticality."),
+            new("DeviceCriticality", device.Criticality.ToString(), "Current device criticality."),
         };
 
         if (profile is null)
@@ -270,7 +239,7 @@ public class EnvironmentalSeverityCalculator
     private static string BuildReasonSummary(
         Severity baseSeverity,
         Severity effectiveSeverity,
-        AssetSecurityProfile profile,
+        SecurityProfile profile,
         AttackVector modifiedAttackVector,
         AttackVector baseAttackVector,
         AttackComplexity modifiedAttackComplexity,
@@ -412,7 +381,7 @@ public class EnvironmentalSeverityCalculator
     public sealed record AssessmentFactor(string Key, string Value, string Explanation);
 
     public sealed record EnvironmentalSeverityCalculationResult(
-        Guid? AssetSecurityProfileId,
+        Guid? SecurityProfileId,
         Severity BaseSeverity,
         decimal? BaseScore,
         string? BaseVector,
@@ -427,13 +396,13 @@ public class EnvironmentalSeverityCalculator
             Severity baseSeverity,
             decimal? baseScore,
             string? baseVector,
-            Guid? assetSecurityProfileId,
+            Guid? securityProfileId,
             string reasonSummary,
             IReadOnlyList<AssessmentFactor>? factors = null
         )
         {
             return new EnvironmentalSeverityCalculationResult(
-                assetSecurityProfileId,
+                securityProfileId,
                 baseSeverity,
                 baseScore,
                 baseVector,

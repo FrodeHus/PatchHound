@@ -118,8 +118,8 @@ public class TeamsController : ControllerBase
             .Select(tenant => tenant.Name)
             .FirstOrDefaultAsync(ct);
         var assignedAssetCount = await _dbContext
-            .Assets.AsNoTracking()
-            .CountAsync(asset => asset.OwnerTeamId == team.Id || asset.FallbackTeamId == team.Id, ct);
+            .Devices.AsNoTracking()
+            .CountAsync(device => device.OwnerTeamId == team.Id || device.FallbackTeamId == team.Id, ct);
         var currentRiskScore = await _dbContext.TeamRiskScores.AsNoTracking()
             .Where(score => score.TeamId == team.Id)
             .Select(score => new
@@ -141,17 +141,15 @@ public class TeamsController : ControllerBase
         var topRiskAssets = await _dbContext.DeviceRiskScores.AsNoTracking()
             .Where(score => score.TenantId == team.TenantId)
             .Join(
-                _dbContext.Assets.AsNoTracking()
-                    .Where(asset => asset.OwnerTeamId == team.Id || asset.FallbackTeamId == team.Id),
+                _dbContext.Devices.AsNoTracking()
+                    .Where(device => device.OwnerTeamId == team.Id || device.FallbackTeamId == team.Id),
                 score => score.DeviceId,
-                asset => asset.Id,
-                (score, asset) => new
+                device => device.Id,
+                (score, device) => new
                 {
-                    asset.Id,
-                    AssetName = asset.AssetType == PatchHound.Core.Enums.AssetType.Device
-                        ? asset.DeviceComputerDnsName ?? asset.Name
-                        : asset.Name,
-                    AssetType = asset.AssetType.ToString(),
+                    device.Id,
+                    AssetName = device.ComputerDnsName ?? device.Name,
+                    AssetType = "Device",
                     CurrentRiskScore = score.OverallScore,
                     score.MaxEpisodeRiskScore,
                     score.OpenEpisodeCount

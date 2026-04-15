@@ -89,9 +89,9 @@ public class TeamsControllerTests : IDisposable
     {
         var tenant = Tenant.Create("Contoso", "entra-contoso");
         var team = Team.Create(_tenantId, "Operations");
-        var asset = Asset.Create(_tenantId, "device-1", AssetType.Device, "Device 1", Criticality.High);
-        asset.AssignTeamOwner(team.Id);
-        asset.UpdateDeviceDetails(
+        var device = Device.Create(_tenantId, Guid.NewGuid(), "device-1", "Device 1", Criticality.High);
+        device.AssignTeamOwner(team.Id);
+        device.UpdateInventoryDetails(
             "device-1.contoso.local",
             "Active",
             "Windows",
@@ -105,8 +105,8 @@ public class TeamsControllerTests : IDisposable
         await _dbContext.AddRangeAsync(
             tenant,
             team,
-            asset,
-            DeviceRiskScore.Create(_tenantId, asset.Id, 710m, 680m, 0, 1, 0, 0, 1, "[]", "1"),
+            device,
+            DeviceRiskScore.Create(_tenantId, device.Id, 710m, 680m, 0, 1, 0, 0, 1, "[]", "1"),
             TeamRiskScore.Create(_tenantId, team.Id, 640m, 620m, 0, 1, 0, 0, 1, 1, "[]", "1")
         );
         await _dbContext.SaveChangesAsync();
@@ -120,7 +120,7 @@ public class TeamsControllerTests : IDisposable
         payload.AssignedAssetCount.Should().Be(1);
         payload.CurrentRiskScore.Should().Be(640m);
         payload.TopRiskAssets.Should().ContainSingle();
-        payload.TopRiskAssets[0].AssetId.Should().Be(asset.Id);
+        payload.TopRiskAssets[0].AssetId.Should().Be(device.Id);
         payload.TopRiskAssets[0].CurrentRiskScore.Should().Be(710m);
     }
 

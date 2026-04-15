@@ -221,18 +221,11 @@ public class AdvancedToolExecutionService(
         CancellationToken ct
     )
     {
-        var asset = await dbContext.Assets.AsNoTracking()
+        var asset = await dbContext.Devices.AsNoTracking()
             .FirstOrDefaultAsync(item => item.Id == assetId && item.TenantId == tenantId, ct);
         if (asset is null)
         {
             throw new InvalidOperationException("Asset was not found.");
-        }
-
-        if (asset.AssetType != Core.Enums.AssetType.Device)
-        {
-            throw new InvalidOperationException(
-                "Advanced tools are only available for Defender-backed device assets."
-            );
         }
 
         // Source open vulnerability context from canonical DeviceVulnerabilityExposures.
@@ -269,11 +262,11 @@ public class AdvancedToolExecutionService(
             ))
             .ToList();
 
-        var deviceName = asset.DeviceComputerDnsName ?? asset.Name;
+        var deviceName = asset.ComputerDnsName ?? asset.Name;
         return new AdvancedToolExecutionContext(
             tenantId,
             assetId,
-            asset.AssetType.ToString(),
+            "Device",
             asset.ExternalId,
             deviceName,
             vulnerabilities

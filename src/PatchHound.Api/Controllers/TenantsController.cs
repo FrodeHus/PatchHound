@@ -445,13 +445,13 @@ public class TenantsController : ControllerBase
         await DeleteEntitiesAsync(_dbContext.Notifications.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.AIReports.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.SoftwareDescriptionJobs.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.AssetTags.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.DeviceTags.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(
-            _dbContext.AssetBusinessLabels.IgnoreQueryFilters().Where(item => item.BusinessLabel.TenantId == id),
+            _dbContext.DeviceBusinessLabels.IgnoreQueryFilters().Where(item => item.TenantId == id),
             ct
         );
         await DeleteEntitiesAsync(_dbContext.BusinessLabels.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.AssetRules.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.DeviceRules.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.DeviceGroupRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.TeamRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.TenantRiskScoreSnapshots.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
@@ -462,8 +462,8 @@ public class TenantsController : ControllerBase
         await DeleteEntitiesAsync(_dbContext.DeviceSoftwareInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.SoftwareProductInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.SoftwareTenantRecords.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.AssetSecurityProfiles.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.Assets.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.SecurityProfiles.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.Devices.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.TeamMembershipRules.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.Teams.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.UserTenantRoles.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
@@ -471,7 +471,7 @@ public class TenantsController : ControllerBase
         await DeleteEntitiesAsync(_dbContext.TenantSlaConfigurations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.EnrichmentJobs.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.StagedDeviceSoftwareInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.StagedAssets.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.StagedDevices.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.StagedVulnerabilityExposures.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.StagedVulnerabilities.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.IngestionCheckpoints.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
@@ -737,8 +737,8 @@ public class TenantsController : ControllerBase
         var stagedVulnerabilityExposures = await _dbContext
             .StagedVulnerabilityExposures.Where(item => item.IngestionRunId == runId)
             .ToListAsync(ct);
-        var stagedAssets = await _dbContext
-            .StagedAssets.Where(item => item.IngestionRunId == runId)
+        var stagedDevices = await _dbContext
+            .StagedDevices.Where(item => item.IngestionRunId == runId)
             .ToListAsync(ct);
         var stagedInstallations = await _dbContext
             .StagedDeviceSoftwareInstallations.Where(item => item.IngestionRunId == runId)
@@ -747,7 +747,7 @@ public class TenantsController : ControllerBase
         _dbContext.IngestionCheckpoints.RemoveRange(checkpoints);
         _dbContext.StagedVulnerabilities.RemoveRange(stagedVulnerabilities);
         _dbContext.StagedVulnerabilityExposures.RemoveRange(stagedVulnerabilityExposures);
-        _dbContext.StagedAssets.RemoveRange(stagedAssets);
+        _dbContext.StagedDevices.RemoveRange(stagedDevices);
         _dbContext.StagedDeviceSoftwareInstallations.RemoveRange(stagedInstallations);
         _dbContext.IngestionRuns.Remove(run);
 
@@ -897,24 +897,21 @@ public class TenantsController : ControllerBase
 
         var tenant = await tenantQuery.SingleAsync(t => t.Id == tenantId, ct);
 
-        var assetsQuery = _dbContext.Assets.AsNoTracking();
+        var assetsQuery = _dbContext.Devices.AsNoTracking();
         if (ignoreQueryFilters)
         {
             assetsQuery = assetsQuery.IgnoreQueryFilters();
         }
 
-        var assetCounts = await assetsQuery
-            .Where(asset => asset.TenantId == tenantId)
-            .GroupBy(asset => asset.AssetType)
-            .Select(group => new { AssetType = group.Key, Count = group.Count() })
-            .ToListAsync(ct);
+        var deviceCount = await assetsQuery
+            .Where(device => device.TenantId == tenantId)
+            .CountAsync(ct);
 
         var assetSummary = new TenantAssetSummaryDto(
-            assetCounts.Sum(item => item.Count),
-            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.Device)?.Count ?? 0,
-            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.Software)?.Count ?? 0,
-            assetCounts.FirstOrDefault(item => item.AssetType == AssetType.CloudResource)?.Count
-                ?? 0
+            deviceCount,
+            deviceCount,
+            0,
+            0
         );
         var slaQuery = _dbContext.TenantSlaConfigurations.AsNoTracking();
         if (ignoreQueryFilters)

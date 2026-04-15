@@ -111,7 +111,7 @@ public class NormalizedSoftwareProjectionService(
         CancellationToken ct
     )
     {
-        // Phase-2: SoftwareVulnerabilityMatch deleted. No-op — projections will be rebuilt in Phase 3.
+        // SoftwareVulnerabilityMatch removed — vulnerability projections will be rebuilt in Phase 5 against DeviceVulnerabilityExposure.
         await Task.CompletedTask;
     }
 

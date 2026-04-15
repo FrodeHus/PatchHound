@@ -145,7 +145,7 @@ public class SoftwareController(
             .ToList();
         var highValueDeviceCount = activeDeviceIds.Count == 0
             ? 0
-            : await dbContext.Assets.AsNoTracking()
+            : await dbContext.Devices.AsNoTracking()
                 .Where(asset => activeDeviceIds.Contains(asset.Id))
                 .CountAsync(asset =>
                     asset.Criticality == Criticality.High || asset.Criticality == Criticality.Critical,
@@ -460,7 +460,7 @@ public class SoftwareController(
                         && installation.SnapshotId == activeSnapshotId
                         && installation.IsActive
                     )
-                    .Select(installation => installation.SoftwareAsset.ExposureImpactScore)
+                    .Select(installation => installation.DeviceAsset.ExposureImpactScore)
                     .Max(),
             })
             .OrderByDescending(item => item.CurrentRiskScore ?? 0m)
@@ -559,10 +559,10 @@ public class SoftwareController(
             .Select(item => new
             {
                 item.DeviceAssetId,
-                DeviceName = item.DeviceAsset.DeviceComputerDnsName ?? item.DeviceAsset.Name,
+                DeviceName = item.DeviceAsset.ComputerDnsName ?? item.DeviceAsset.Name,
                 DeviceCriticality = item.DeviceAsset.Criticality.ToString(),
                 item.SoftwareAssetId,
-                SoftwareAssetName = item.SoftwareAsset.Name,
+                SoftwareAssetName = item.TenantSoftware.SoftwareProduct.Name,
                 item.DetectedVersion,
                 item.FirstSeenAt,
                 item.LastSeenAt,
@@ -580,7 +580,7 @@ public class SoftwareController(
                     .Select(team => team.Name)
                     .FirstOrDefault(),
                 SecurityProfileName = dbContext
-                    .AssetSecurityProfiles.Where(profile =>
+                    .SecurityProfiles.Where(profile =>
                         profile.Id == item.DeviceAsset.SecurityProfileId
                     )
                     .Select(profile => profile.Name)
@@ -715,10 +715,10 @@ public class SoftwareController(
             .Select(item => new
             {
                 item.DeviceAssetId,
-                DeviceName = item.DeviceAsset.DeviceComputerDnsName ?? item.DeviceAsset.Name,
+                DeviceName = item.DeviceAsset.ComputerDnsName ?? item.DeviceAsset.Name,
                 DeviceCriticality = item.DeviceAsset.Criticality.ToString(),
                 item.SoftwareAssetId,
-                SoftwareAssetName = item.SoftwareAsset.Name,
+                SoftwareAssetName = item.TenantSoftware.SoftwareProduct.Name,
                 item.DetectedVersion,
                 item.FirstSeenAt,
                 item.LastSeenAt,

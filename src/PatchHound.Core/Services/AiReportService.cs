@@ -24,7 +24,7 @@ public class AiReportService
     public async Task<Result<AIReport>> GenerateReportAsync(
         Vulnerability vulnerabilityDefinition,
         Guid vulnerabilityId,
-        IReadOnlyList<Asset> affectedAssets,
+        IReadOnlyList<Device> affectedAssets,
         Guid tenantId,
         Guid userId,
         Guid? tenantAiProfileId,

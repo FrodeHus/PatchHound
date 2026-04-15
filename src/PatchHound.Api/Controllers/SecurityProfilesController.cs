@@ -177,8 +177,8 @@ public class SecurityProfilesController : ControllerBase
         );
 
         var affectedAssetIds = await _dbContext
-            .Assets.Where(asset => asset.SecurityProfileId == id)
-            .Select(asset => asset.Id)
+            .Devices.Where(device => device.SecurityProfileId == id)
+            .Select(device => device.Id)
             .ToListAsync(ct);
 
         foreach (var assetId in affectedAssetIds)
@@ -212,7 +212,7 @@ public class SecurityProfilesController : ControllerBase
             return Forbid();
 
         var assignedAssetCount = await _dbContext
-            .Assets.CountAsync(asset => asset.SecurityProfileId == id, ct);
+            .Devices.CountAsync(device => device.SecurityProfileId == id, ct);
 
         if (assignedAssetCount > 0)
         {

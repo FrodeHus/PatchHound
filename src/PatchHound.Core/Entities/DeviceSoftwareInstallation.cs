@@ -9,8 +9,7 @@ public class DeviceSoftwareInstallation
     public DateTimeOffset LastSeenAt { get; private set; }
     public int MissingSyncCount { get; private set; }
 
-    public Asset DeviceAsset { get; private set; } = null!;
-    public Asset SoftwareAsset { get; private set; } = null!;
+    public Device DeviceAsset { get; private set; } = null!;
 
     private DeviceSoftwareInstallation() { }
 

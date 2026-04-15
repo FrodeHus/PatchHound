@@ -43,9 +43,9 @@ public class AiReportServiceTests
             null
         );
 
-        var assets = new List<Asset>
+        var assets = new List<Device>
         {
-            Asset.Create(_tenantId, "asset-1", AssetType.Device, "web-server-01", Criticality.High),
+            Device.Create(_tenantId, Guid.NewGuid(), "asset-1", "web-server-01", Criticality.High),
         };
 
         var profile = TenantAiProfileFactory.Create(

@@ -19,11 +19,5 @@ public class DeviceSoftwareInstallationConfiguration
             .WithMany()
             .HasForeignKey(link => link.DeviceAssetId)
             .OnDelete(DeleteBehavior.Cascade);
-
-        builder
-            .HasOne(link => link.SoftwareAsset)
-            .WithMany()
-            .HasForeignKey(link => link.SoftwareAssetId)
-            .OnDelete(DeleteBehavior.Cascade);
     }
 }
