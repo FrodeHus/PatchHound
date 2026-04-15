@@ -12,7 +12,6 @@ using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.VulnerabilitySources;
 using PatchHound.Tests.TestData;
 
-#pragma warning disable CS0618 // Phase-2: [Skip] tests reference obsolete AffectedAssets stub
 
 namespace PatchHound.Tests.Api;
 

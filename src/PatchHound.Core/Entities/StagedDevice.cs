@@ -2,7 +2,7 @@ using PatchHound.Core.Enums;
 
 namespace PatchHound.Core.Entities;
 
-public class StagedAsset
+public class StagedDevice
 {
     public Guid Id { get; private set; }
     public Guid IngestionRunId { get; private set; }
@@ -15,9 +15,9 @@ public class StagedAsset
     public string PayloadJson { get; private set; } = string.Empty;
     public DateTimeOffset StagedAt { get; private set; }
 
-    private StagedAsset() { }
+    private StagedDevice() { }
 
-    public static StagedAsset Create(
+    public static StagedDevice Create(
         Guid ingestionRunId,
         Guid tenantId,
         string sourceKey,
@@ -29,7 +29,7 @@ public class StagedAsset
         int batchNumber = 0
     )
     {
-        return new StagedAsset
+        return new StagedDevice
         {
             Id = Guid.NewGuid(),
             IngestionRunId = ingestionRunId,

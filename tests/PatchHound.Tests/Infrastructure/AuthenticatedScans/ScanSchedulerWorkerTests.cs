@@ -55,8 +55,8 @@ public class ScanSchedulerWorkerTests : IAsyncLifetime
         _db.ScanProfileTools.Add(ScanProfileTool.Create(profile.Id,
             (await _db.ScanningTools.FirstAsync()).Id, 0));
 
-        var device = Asset.Create(_tenantId, "ext-d1", AssetType.Device, "d1", Criticality.Medium);
-        _db.Assets.Add(device);
+        var device = Device.Create(_tenantId, Guid.NewGuid(), "ext-d1", "d1", Criticality.Medium);
+        _db.Devices.Add(device);
         _db.DeviceScanProfileAssignments.Add(DeviceScanProfileAssignment.Create(_tenantId, device.Id, profile.Id, null));
 
         // Force LastRunStartedAt to 2 minutes ago
@@ -102,8 +102,8 @@ public class ScanSchedulerWorkerTests : IAsyncLifetime
         run.MarkRunning(1);
         _db.AuthenticatedScanRuns.Add(run);
 
-        var device = Asset.Create(_tenantId, "ext-d2", AssetType.Device, "d2", Criticality.Medium);
-        _db.Assets.Add(device);
+        var device = Device.Create(_tenantId, Guid.NewGuid(), "ext-d2", "d2", Criticality.Medium);
+        _db.Devices.Add(device);
         var job = ScanJob.Create(_tenantId, run.Id, _runner.Id, device.Id, _conn.Id, "[]");
         _db.ScanJobs.Add(job);
         await _db.SaveChangesAsync();
@@ -133,8 +133,8 @@ public class ScanSchedulerWorkerTests : IAsyncLifetime
         run.MarkRunning(1);
         _db.AuthenticatedScanRuns.Add(run);
 
-        var device = Asset.Create(_tenantId, "ext-d3", AssetType.Device, "d3", Criticality.Medium);
-        _db.Assets.Add(device);
+        var device = Device.Create(_tenantId, Guid.NewGuid(), "ext-d3", "d3", Criticality.Medium);
+        _db.Devices.Add(device);
         var job = ScanJob.Create(_tenantId, run.Id, _runner.Id, device.Id, _conn.Id, "[]");
         _db.ScanJobs.Add(job);
         await _db.SaveChangesAsync();
@@ -174,8 +174,8 @@ public class ScanSchedulerWorkerTests : IAsyncLifetime
         run.MarkRunning(1);
         _db.AuthenticatedScanRuns.Add(run);
 
-        var device = Asset.Create(_tenantId, "ext-d4", AssetType.Device, "d4", Criticality.Medium);
-        _db.Assets.Add(device);
+        var device = Device.Create(_tenantId, Guid.NewGuid(), "ext-d4", "d4", Criticality.Medium);
+        _db.Devices.Add(device);
         var job = ScanJob.Create(_tenantId, run.Id, _runner.Id, device.Id, _conn.Id, "[]");
         _db.ScanJobs.Add(job);
         await _db.SaveChangesAsync();

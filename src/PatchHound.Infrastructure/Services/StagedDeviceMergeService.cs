@@ -34,7 +34,7 @@ public class StagedDeviceMergeService(
 
         // 1. Load device-type staged rows for this run+tenant.
         var stagedDevices = await db
-            .StagedAssets.IgnoreQueryFilters()
+            .StagedDevices.IgnoreQueryFilters()
             .Where(s =>
                 s.IngestionRunId == ingestionRunId
                 && s.TenantId == tenantId
@@ -50,7 +50,7 @@ public class StagedDeviceMergeService(
         // 2. Load software-type staged rows for this run+tenant so we can look
         //    up vendor/name/version by software external id.
         var stagedSoftware = await db
-            .StagedAssets.IgnoreQueryFilters()
+            .StagedDevices.IgnoreQueryFilters()
             .Where(s =>
                 s.IngestionRunId == ingestionRunId
                 && s.TenantId == tenantId
@@ -93,7 +93,7 @@ public class StagedDeviceMergeService(
             if (payload is null)
             {
                 throw new InvalidOperationException(
-                    $"StagedAsset {stagedDevice.Id} has null payload."
+                    $"StagedDevice {stagedDevice.Id} has null payload."
                 );
             }
 
@@ -236,13 +236,13 @@ public class StagedDeviceMergeService(
 
     /// <summary>
     /// Extracts vendor / product name / version from a software-type
-    /// <see cref="StagedAsset"/>. Defender ingestion stores these as fields
+    /// <see cref="StagedDevice"/>. Defender ingestion stores these as fields
     /// in the <see cref="IngestionAsset.Metadata"/> JSON blob (see
     /// <c>DefenderVulnerabilitySource.NormalizeSoftwareAsset</c>).
     /// Falls back to the raw asset name when metadata is unavailable.
     /// </summary>
     private static (string Vendor, string Name, string? Version) ExtractSoftwareIdentity(
-        StagedAsset stagedSoftware
+        StagedDevice stagedSoftware
     )
     {
         string vendor = "unknown";

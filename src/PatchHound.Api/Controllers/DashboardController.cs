@@ -221,7 +221,7 @@ public class DashboardController : ControllerBase
 
         var recurrence = await _dashboardQueryService.GetRecurrenceDataAsync(tenantId, ct);
 
-        // Phase-2: VulnerabilityAssetEpisode deleted — simplified vulnsByDeviceGroup from risk scores only.
+        // Vulnerability exposure by device group — derived from DeviceGroupRiskScores (canonical).
         var vulnsByDeviceGroup = await _dbContext.DeviceGroupRiskScores.AsNoTracking()
             .Where(score => score.TenantId == tenantId)
             .OrderByDescending(score => score.OverallScore)
@@ -241,9 +241,9 @@ public class DashboardController : ControllerBase
 
         // Device health breakdown — NOT affected by vulnerability filters
         var deviceHealthRows = await _dbContext
-            .Assets.AsNoTracking()
-            .Where(a => a.TenantId == tenantId && a.AssetType == AssetType.Device && a.DeviceHealthStatus != null)
-            .GroupBy(a => a.DeviceHealthStatus!)
+            .Devices.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && a.HealthStatus != null)
+            .GroupBy(a => a.HealthStatus!)
             .Select(g => new { HealthStatus = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 
@@ -251,9 +251,9 @@ public class DashboardController : ControllerBase
 
         // Device onboarding status breakdown — NOT affected by vulnerability filters
         var deviceOnboardingRows = await _dbContext
-            .Assets.AsNoTracking()
-            .Where(a => a.TenantId == tenantId && a.AssetType == AssetType.Device && a.DeviceOnboardingStatus != null)
-            .GroupBy(a => a.DeviceOnboardingStatus!)
+            .Devices.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && a.OnboardingStatus != null)
+            .GroupBy(a => a.OnboardingStatus!)
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 
@@ -492,7 +492,7 @@ public class DashboardController : ControllerBase
 
         var ownerActions = ownerActionRows
             .Select(item => new OwnerActionDto(
-                item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
+                item.RemediationCaseId,
                 item.VulnerabilityId,
                 item.TaskId,
                 item.AssetName,
@@ -551,7 +551,7 @@ public class DashboardController : ControllerBase
                 new BadRequestObjectResult(new ProblemDetails { Title = "No active tenant is selected." }),
                 Guid.Empty,
                 [],
-                _dbContext.Assets.AsNoTracking().Where(_ => false));
+                _dbContext.Devices.AsNoTracking().Where(_ => false));
         }
 
         var currentUserId = _tenantContext.CurrentUserId;
@@ -561,7 +561,7 @@ public class DashboardController : ControllerBase
                 new UnauthorizedResult(),
                 Guid.Empty,
                 [],
-                _dbContext.Assets.AsNoTracking().Where(_ => false));
+                _dbContext.Devices.AsNoTracking().Where(_ => false));
         }
 
         var ownerTeamIds = await _dbContext.TeamMembers.AsNoTracking()
@@ -569,13 +569,13 @@ public class DashboardController : ControllerBase
             .Select(item => item.TeamId)
             .ToListAsync(ct);
 
-        var ownedAssetsQuery = _dbContext.Assets.AsNoTracking()
-            .Where(asset =>
-                asset.TenantId == tenantId
+        var ownedAssetsQuery = _dbContext.Devices.AsNoTracking()
+            .Where(device =>
+                device.TenantId == tenantId
                 && (
-                    asset.OwnerUserId == currentUserId
-                    || (asset.OwnerTeamId != null && ownerTeamIds.Contains(asset.OwnerTeamId.Value))
-                    || (asset.FallbackTeamId != null && ownerTeamIds.Contains(asset.FallbackTeamId.Value))
+                    device.OwnerUserId == currentUserId
+                    || (device.OwnerTeamId != null && ownerTeamIds.Contains(device.OwnerTeamId.Value))
+                    || (device.FallbackTeamId != null && ownerTeamIds.Contains(device.FallbackTeamId.Value))
                 )
             );
 
@@ -584,7 +584,7 @@ public class DashboardController : ControllerBase
 
     private async Task<List<OwnerAssetSummaryDto>> BuildOwnerAssetSummariesAsync(
         Guid tenantId,
-        IQueryable<Asset> ownedAssetsQuery,
+        IQueryable<Device> ownedAssetsQuery,
         int? take,
         bool attentionOnly,
         CancellationToken ct)
@@ -597,10 +597,8 @@ public class DashboardController : ControllerBase
             select new
             {
                 asset.Id,
-                AssetName = asset.AssetType == AssetType.Device
-                    ? asset.DeviceComputerDnsName ?? asset.Name
-                    : asset.Name,
-                asset.DeviceGroupName,
+                AssetName = asset.ComputerDnsName ?? asset.Name,
+                asset.GroupName,
                 Criticality = asset.Criticality.ToString(),
                 CurrentRiskScore = score != null ? (decimal?)score.OverallScore : null,
                 OpenEpisodeCount = score != null ? score.OpenEpisodeCount : 0,
@@ -657,7 +655,7 @@ public class DashboardController : ControllerBase
                 return new OwnerAssetSummaryDto(
                     item.Id,
                     item.AssetName,
-                    item.DeviceGroupName,
+                    item.GroupName,
                     item.Criticality,
                     item.CurrentRiskScore,
                     topDriver?.RiskBand,
@@ -680,7 +678,7 @@ public class DashboardController : ControllerBase
         ActionResult? Result,
         Guid TenantId,
         List<Guid> OwnerTeamIds,
-        IQueryable<Asset> OwnedAssetsQuery);
+        IQueryable<Device> OwnedAssetsQuery);
 
     [HttpGet("security-manager-summary")]
     [Authorize(Policy = Policies.ConfigureTenant)]
@@ -733,7 +731,7 @@ public class DashboardController : ControllerBase
                 var stats = policySoftwareStats.GetValueOrDefault(item.RemediationCaseId);
                 return new ApprovedPolicyDecisionDto(
                     item.Id,
-                    item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
+                    item.RemediationCaseId,
                     item.SoftwareName,
                     item.Outcome,
                     string.IsNullOrWhiteSpace(item.Justification) ? null : item.Justification,
@@ -775,7 +773,7 @@ public class DashboardController : ControllerBase
             {
                 task.Id,
                 task.RemediationDecisionId,
-                RemediationCaseId = task.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
+                RemediationCaseId = task.RemediationCaseId,
                 SoftwareName = sp.Name,
                 OwnerTeamName = ownerTeam.Name,
                 task.DueDate,
@@ -862,7 +860,7 @@ public class DashboardController : ControllerBase
                 return new ApprovedPatchingTaskDto(
                     item.Id,
                     item.RemediationDecisionId,
-                    item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId; DTO field kept for API compat
+                    item.RemediationCaseId,
                     item.SoftwareName,
                     item.OwnerTeamName,
                     stats?.HighestSeverity ?? "Unknown",
@@ -909,7 +907,7 @@ public class DashboardController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        // Phase-2: VulnerabilityAssetEpisode deleted — return empty heatmap.
+        // Heatmap not yet implemented — returns empty list.
         _ = tenantId;
         return Ok(new List<HeatmapRowDto>());
     }
@@ -1042,16 +1040,16 @@ public class DashboardController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        var platforms = await _dbContext.Assets.AsNoTracking()
-            .Where(a => a.TenantId == tenantId && a.AssetType == AssetType.Device && a.DeviceOsPlatform != null)
-            .Select(a => a.DeviceOsPlatform!)
+        var platforms = await _dbContext.Devices.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && a.OsPlatform != null)
+            .Select(a => a.OsPlatform!)
             .Distinct()
             .OrderBy(p => p)
             .ToArrayAsync(ct);
 
-        var deviceGroups = await _dbContext.Assets.AsNoTracking()
-            .Where(a => a.TenantId == tenantId && a.AssetType == AssetType.Device && a.DeviceGroupName != null)
-            .Select(a => a.DeviceGroupName!)
+        var deviceGroups = await _dbContext.Devices.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && a.GroupName != null)
+            .Select(a => a.GroupName!)
             .Distinct()
             .OrderBy(g => g)
             .ToArrayAsync(ct);
@@ -1080,7 +1078,7 @@ public class DashboardController : ControllerBase
             {
                 task.Id,
                 task.RemediationDecisionId,
-                RemediationCaseId = decision.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId
+                RemediationCaseId = decision.RemediationCaseId,
                 SoftwareName = sp.Name,
                 ApprovalType = task.Type.ToString(),
                 task.ExpiresAt,
@@ -1109,7 +1107,7 @@ public class DashboardController : ControllerBase
             return new ApprovalAttentionTaskDto(
                 item.Id,
                 item.RemediationDecisionId,
-                item.RemediationCaseId, // Phase 4 (#17): was TenantSoftwareId; DTO field kept for API compat
+                item.RemediationCaseId,
                 item.SoftwareName,
                 item.ApprovalType,
                 stats?.HighestSeverity ?? "Unknown",
@@ -1191,12 +1189,12 @@ public class DashboardController : ControllerBase
         IQueryable<Guid>? filteredAssetIdQuery = null;
         if (!string.IsNullOrEmpty(filter.Platform) || !string.IsNullOrEmpty(filter.DeviceGroup))
         {
-            var assetQuery = _dbContext.Assets.AsNoTracking()
-                .Where(a => a.TenantId == tenantId && a.AssetType == AssetType.Device);
+            var assetQuery = _dbContext.Devices.AsNoTracking()
+                .Where(a => a.TenantId == tenantId);
             if (!string.IsNullOrEmpty(filter.Platform))
-                assetQuery = assetQuery.Where(a => a.DeviceOsPlatform == filter.Platform);
+                assetQuery = assetQuery.Where(a => a.OsPlatform == filter.Platform);
             if (!string.IsNullOrEmpty(filter.DeviceGroup))
-                assetQuery = assetQuery.Where(a => a.DeviceGroupName == filter.DeviceGroup);
+                assetQuery = assetQuery.Where(a => a.GroupName == filter.DeviceGroup);
             filteredAssetIdQuery = assetQuery.Select(a => a.Id);
         }
 

@@ -114,8 +114,16 @@ of the model that `Initial` builds.
 > `SoftwareTenantRecords`), `NormalizedSoftwareAlias` → `SoftwareProductAlias`
 > (table: `SoftwareProductAliases`), and `NormalizedSoftwareInstallation` →
 > `SoftwareProductInstallation` (table: `SoftwareProductInstallations`). The
-> `Initial` migration was regenerated against the fully canonical model. This
-> change closes issue #17 — the canonical baseline now truly is canonical.
+> `Initial` migration was regenerated against the fully canonical model.
+>
+> **Phase 7c (2026-04-15):** The legacy `Asset` entity and all five satellite
+> entities (`AssetBusinessLabel`, `AssetRule`, `AssetSecurityProfile`,
+> `AssetTag`, `StagedAsset`) were deleted. All consumers were rewritten against
+> the canonical `Device`, `DeviceTag`, `DeviceBusinessLabel`,
+> `SecurityProfile`, and `StagedDevice` entities. The backing services
+> (`AssetService`, `AssetRepository`, `StagedAssetMergeService`) and their
+> interfaces/configurations were also removed. This change closes issue #17 —
+> the canonical baseline now truly is canonical.
 
 To create a fresh dev database:
 

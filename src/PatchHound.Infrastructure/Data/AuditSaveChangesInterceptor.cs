@@ -51,7 +51,7 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
     {
         nameof(IngestionRun),
         nameof(IngestionCheckpoint),
-        nameof(StagedAsset),
+        nameof(StagedDevice),
         nameof(StagedVulnerability),
         nameof(StagedVulnerabilityExposure),
         nameof(StagedDeviceSoftwareInstallation),

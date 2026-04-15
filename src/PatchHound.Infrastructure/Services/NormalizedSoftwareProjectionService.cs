@@ -19,8 +19,6 @@ public class NormalizedSoftwareProjectionService(
         var resolutions = await resolver.SyncTenantAsync(tenantId, ct);
         await RebuildInstallationProjectionAsync(tenantId, snapshotId, resolutions, ct);
         await dbContext.SaveChangesAsync(ct);
-        await RebuildVulnerabilityProjectionAsync(tenantId, snapshotId, resolutions, ct);
-        await dbContext.SaveChangesAsync(ct);
     }
 
     private async Task RebuildInstallationProjectionAsync(
@@ -102,17 +100,6 @@ public class NormalizedSoftwareProjectionService(
         {
             await dbContext.SoftwareProductInstallations.AddRangeAsync(rows, ct);
         }
-    }
-
-    private async Task RebuildVulnerabilityProjectionAsync(
-        Guid tenantId,
-        Guid? snapshotId,
-        IReadOnlyDictionary<Guid, NormalizedSoftwareResolver.ResolutionResult> resolutions,
-        CancellationToken ct
-    )
-    {
-        // Phase-2: SoftwareVulnerabilityMatch deleted. No-op — projections will be rebuilt in Phase 3.
-        await Task.CompletedTask;
     }
 
     private async Task<Dictionary<Guid, SoftwareTenantRecord>> UpsertTenantSoftwareAsync(

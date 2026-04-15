@@ -34,10 +34,11 @@ public class ExposureEpisodeServiceTests
     {
         var tenantId = Guid.NewGuid();
         await using var db = await CreateTenantDbAsync(tenantId);
-        var exposure = await SeedOpenExposureAsync(db, tenantId, DateTimeOffset.UtcNow);
+        var openedAt = new DateTimeOffset(2026, 4, 14, 0, 0, 0, TimeSpan.Zero);
+        var exposure = await SeedOpenExposureAsync(db, tenantId, openedAt);
 
         var svc = new ExposureEpisodeService(db);
-        await svc.SyncEpisodesForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await svc.SyncEpisodesForTenantAsync(tenantId, openedAt, CancellationToken.None);
         await db.SaveChangesAsync();
 
         var resolvedAt = new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero);

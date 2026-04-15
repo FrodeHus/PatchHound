@@ -23,8 +23,8 @@ public class WorkNotesController : ControllerBase
         ["vulnerabilities"] = "TenantVulnerability",
         ["software"] = "TenantSoftware",
         ["remediations"] = "TenantSoftwareRemediation",
-        ["assets"] = nameof(Asset),
-        ["devices"] = nameof(Asset),
+        ["assets"] = nameof(Device),
+        ["devices"] = nameof(Device),
     };
 
     private readonly PatchHoundDbContext _dbContext;
@@ -206,10 +206,10 @@ public class WorkNotesController : ControllerBase
                 .Where(s => s.Id == entityId)
                 .Select(s => (Guid?)s.TenantId)
                 .FirstOrDefaultAsync(ct),
-            nameof(Asset) => await _dbContext.Assets
+            nameof(Device) => await _dbContext.Devices
                 .IgnoreQueryFilters()
-                .Where(a => a.Id == entityId)
-                .Select(a => (Guid?)a.TenantId)
+                .Where(d => d.Id == entityId)
+                .Select(d => (Guid?)d.TenantId)
                 .FirstOrDefaultAsync(ct),
             _ => null,
         };

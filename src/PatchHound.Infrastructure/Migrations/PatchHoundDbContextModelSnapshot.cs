@@ -283,391 +283,6 @@ namespace PatchHound.Infrastructure.Migrations
                     b.ToTable("ApprovalTaskVisibleRoles");
                 });
 
-            modelBuilder.Entity("PatchHound.Core.Entities.Asset", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AssetType")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("BaselineCriticality")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("Criticality")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("CriticalityReason")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<Guid?>("CriticalityRuleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CriticalitySource")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<DateTimeOffset?>("CriticalityUpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
-
-                    b.Property<string>("DeviceAadDeviceId")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<bool>("DeviceActiveInTenant")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<string>("DeviceComputerDnsName")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<string>("DeviceExposureLevel")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("DeviceGroupId")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<string>("DeviceGroupName")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<string>("DeviceHealthStatus")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<bool?>("DeviceIsAadJoined")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("DeviceLastIpAddress")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<DateTimeOffset?>("DeviceLastSeenAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DeviceOnboardingStatus")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("DeviceOsPlatform")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<string>("DeviceOsVersion")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<string>("DeviceRiskScore")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("DeviceValue")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<decimal?>("ExposureImpactScore")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("ExternalId")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<Guid?>("FallbackTeamId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("FallbackTeamRuleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Metadata")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<Guid?>("OwnerTeamId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("OwnerType")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<Guid?>("OwnerUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("SecurityProfileId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("SecurityProfileRuleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SourceKey")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasDefaultValue("defender");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SecurityProfileId");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("TenantId", "ExternalId")
-                        .IsUnique();
-
-                    b.HasIndex("TenantId", "AssetType", "DeviceActiveInTenant");
-
-                    b.ToTable("Assets");
-                });
-
-            modelBuilder.Entity("PatchHound.Core.Entities.AssetBusinessLabel", b =>
-                {
-                    b.Property<Guid>("AssetId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("BusinessLabelId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SourceKey")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTimeOffset>("AssignedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("AssignedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("AssignedByRuleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SourceType")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.HasKey("AssetId", "BusinessLabelId", "SourceKey");
-
-                    b.HasIndex("AssignedByRuleId");
-
-                    b.HasIndex("BusinessLabelId");
-
-                    b.ToTable("AssetBusinessLabels");
-                });
-
-            modelBuilder.Entity("PatchHound.Core.Entities.AssetRule", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("FilterDefinition")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset?>("LastExecutedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("LastMatchCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<string>("Operations")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Priority")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("TenantId", "Priority")
-                        .IsUnique();
-
-                    b.ToTable("AssetRules");
-                });
-
-            modelBuilder.Entity("PatchHound.Core.Entities.AssetSecurityProfile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AvailabilityRequirement")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ConfidentialityRequirement")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
-
-                    b.Property<string>("EnvironmentClass")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("IntegrityRequirement")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("InternetReachability")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ModifiedAttackComplexity")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ModifiedAttackVector")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ModifiedAvailabilityImpact")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ModifiedConfidentialityImpact")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ModifiedIntegrityImpact")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ModifiedPrivilegesRequired")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ModifiedScope")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ModifiedUserInteraction")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("TenantId", "Name")
-                        .IsUnique();
-
-                    b.ToTable("AssetSecurityProfiles");
-                });
-
-            modelBuilder.Entity("PatchHound.Core.Entities.AssetTag", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AssetId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("Tag")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AssetId", "Tag")
-                        .IsUnique();
-
-                    b.HasIndex("TenantId", "Tag");
-
-                    b.ToTable("AssetTags");
-                });
-
             modelBuilder.Entity("PatchHound.Core.Entities.AuditLogEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1721,8 +1336,6 @@ namespace PatchHound.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("SoftwareAssetId");
-
                     b.HasIndex("TenantId");
 
                     b.HasIndex("DeviceAssetId", "SoftwareAssetId")
@@ -1762,8 +1375,6 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("SoftwareAssetId");
 
                     b.HasIndex("TenantId");
 
@@ -3631,7 +3242,7 @@ namespace PatchHound.Infrastructure.Migrations
                     b.ToTable("SourceSystems");
                 });
 
-            modelBuilder.Entity("PatchHound.Core.Entities.StagedAsset", b =>
+            modelBuilder.Entity("PatchHound.Core.Entities.StagedDevice", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3681,7 +3292,7 @@ namespace PatchHound.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "SourceKey", "ExternalId");
 
-                    b.ToTable("StagedAssets");
+                    b.ToTable("StagedDevices", (string)null);
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.StagedDeviceSoftwareInstallation", b =>
@@ -4918,42 +4529,6 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Navigation("ApprovalTask");
                 });
 
-            modelBuilder.Entity("PatchHound.Core.Entities.Asset", b =>
-                {
-                    b.HasOne("PatchHound.Core.Entities.AssetSecurityProfile", null)
-                        .WithMany()
-                        .HasForeignKey("SecurityProfileId")
-                        .OnDelete(DeleteBehavior.SetNull);
-                });
-
-            modelBuilder.Entity("PatchHound.Core.Entities.AssetBusinessLabel", b =>
-                {
-                    b.HasOne("PatchHound.Core.Entities.Asset", "Asset")
-                        .WithMany()
-                        .HasForeignKey("AssetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PatchHound.Core.Entities.BusinessLabel", "BusinessLabel")
-                        .WithMany()
-                        .HasForeignKey("BusinessLabelId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Asset");
-
-                    b.Navigation("BusinessLabel");
-                });
-
-            modelBuilder.Entity("PatchHound.Core.Entities.AssetTag", b =>
-                {
-                    b.HasOne("PatchHound.Core.Entities.Asset", null)
-                        .WithMany()
-                        .HasForeignKey("AssetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("PatchHound.Core.Entities.Device", b =>
                 {
                     b.HasOne("PatchHound.Core.Entities.SourceSystem", null)
@@ -4991,40 +4566,24 @@ namespace PatchHound.Infrastructure.Migrations
 
             modelBuilder.Entity("PatchHound.Core.Entities.DeviceSoftwareInstallation", b =>
                 {
-                    b.HasOne("PatchHound.Core.Entities.Asset", "DeviceAsset")
+                    b.HasOne("PatchHound.Core.Entities.Device", "DeviceAsset")
                         .WithMany()
                         .HasForeignKey("DeviceAssetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("PatchHound.Core.Entities.Asset", "SoftwareAsset")
-                        .WithMany()
-                        .HasForeignKey("SoftwareAssetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("DeviceAsset");
-
-                    b.Navigation("SoftwareAsset");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.DeviceSoftwareInstallationEpisode", b =>
                 {
-                    b.HasOne("PatchHound.Core.Entities.Asset", "DeviceAsset")
+                    b.HasOne("PatchHound.Core.Entities.Device", "DeviceAsset")
                         .WithMany()
                         .HasForeignKey("DeviceAssetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("PatchHound.Core.Entities.Asset", "SoftwareAsset")
-                        .WithMany()
-                        .HasForeignKey("SoftwareAssetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("DeviceAsset");
-
-                    b.Navigation("SoftwareAsset");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.DeviceTag", b =>
@@ -5293,15 +4852,9 @@ namespace PatchHound.Infrastructure.Migrations
 
             modelBuilder.Entity("PatchHound.Core.Entities.SoftwareProductInstallation", b =>
                 {
-                    b.HasOne("PatchHound.Core.Entities.Asset", "DeviceAsset")
+                    b.HasOne("PatchHound.Core.Entities.Device", "DeviceAsset")
                         .WithMany()
                         .HasForeignKey("DeviceAssetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PatchHound.Core.Entities.Asset", "SoftwareAsset")
-                        .WithMany()
-                        .HasForeignKey("SoftwareAssetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -5312,8 +4865,6 @@ namespace PatchHound.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("DeviceAsset");
-
-                    b.Navigation("SoftwareAsset");
 
                     b.Navigation("TenantSoftware");
                 });

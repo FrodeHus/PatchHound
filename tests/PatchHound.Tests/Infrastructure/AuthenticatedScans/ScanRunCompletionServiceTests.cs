@@ -51,9 +51,9 @@ public class ScanRunCompletionServiceTests : IAsyncLifetime
 
     private ScanJob CreateJob(Guid runId, Guid runnerId)
     {
-        var asset = Asset.Create(_tenantId, $"ext-{Guid.NewGuid()}", AssetType.Device, "host", Criticality.Medium);
-        _db.Assets.Add(asset);
-        var job = ScanJob.Create(_tenantId, runId, runnerId, asset.Id, _profile.ConnectionProfileId, "[]");
+        var device = Device.Create(_tenantId, Guid.NewGuid(), $"ext-{Guid.NewGuid()}", "host", Criticality.Medium);
+        _db.Devices.Add(device);
+        var job = ScanJob.Create(_tenantId, runId, runnerId, device.Id, _profile.ConnectionProfileId, "[]");
         _db.ScanJobs.Add(job);
         return job;
     }

@@ -171,7 +171,7 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
     [Fact]
     public async Task EvaluateRulesAsync_AssignSecurityProfileOperation_TracksAndReconcilesRuleOwnership()
     {
-        var profile = AssetSecurityProfile.Create(
+        var profile = SecurityProfile.Create(
             _tenantId,
             "Production",
             null,

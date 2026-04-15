@@ -22,15 +22,16 @@ public class EnvironmentalSeverityCalculatorTests
             "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
             null
         );
-        var asset = Asset.Create(
+        var tenantId = Guid.NewGuid();
+        var device = Device.Create(
+            tenantId,
             Guid.NewGuid(),
             "device-1",
-            AssetType.Device,
             "Device",
             Criticality.High
         );
-        var profile = AssetSecurityProfile.Create(
-            asset.TenantId,
+        var profile = SecurityProfile.Create(
+            tenantId,
             "Isolated device",
             null,
             EnvironmentClass.OT,
@@ -40,7 +41,7 @@ public class EnvironmentalSeverityCalculatorTests
             SecurityRequirementLevel.Medium
         );
 
-        var result = _calculator.Calculate(vulnerability, asset, profile);
+        var result = _calculator.Calculate(vulnerability, device, profile);
 
         result.EffectiveScore.Should().BeLessThan(vulnerability.CvssScore!.Value);
         result.EffectiveSeverity.Should().NotBe(Severity.Critical);
@@ -60,15 +61,16 @@ public class EnvironmentalSeverityCalculatorTests
             "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:L",
             null
         );
-        var asset = Asset.Create(
+        var tenantId = Guid.NewGuid();
+        var device = Device.Create(
+            tenantId,
             Guid.NewGuid(),
             "device-2",
-            AssetType.Device,
             "Device",
             Criticality.High
         );
-        var profile = AssetSecurityProfile.Create(
-            asset.TenantId,
+        var profile = SecurityProfile.Create(
+            tenantId,
             "High trust system",
             null,
             EnvironmentClass.Server,
@@ -78,7 +80,7 @@ public class EnvironmentalSeverityCalculatorTests
             SecurityRequirementLevel.High
         );
 
-        var result = _calculator.Calculate(vulnerability, asset, profile);
+        var result = _calculator.Calculate(vulnerability, device, profile);
 
         result.EffectiveScore.Should().BeGreaterThan(vulnerability.CvssScore!.Value);
         result
@@ -99,15 +101,16 @@ public class EnvironmentalSeverityCalculatorTests
             "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
             null
         );
-        var asset = Asset.Create(
+        var tenantId = Guid.NewGuid();
+        var device = Device.Create(
+            tenantId,
             Guid.NewGuid(),
             "device-3",
-            AssetType.Device,
             "Device",
             Criticality.High
         );
-        var profile = AssetSecurityProfile.Create(
-            asset.TenantId,
+        var profile = SecurityProfile.Create(
+            tenantId,
             "Locked down device",
             null,
             EnvironmentClass.Server,
@@ -125,7 +128,7 @@ public class EnvironmentalSeverityCalculatorTests
             CvssModifiedImpact.Low
         );
 
-        var result = _calculator.Calculate(vulnerability, asset, profile);
+        var result = _calculator.Calculate(vulnerability, device, profile);
 
         result.EffectiveVector.Should().Contain("MAV:L");
         result.EffectiveVector.Should().Contain("MAC:H");
@@ -149,14 +152,14 @@ public class EnvironmentalSeverityCalculatorTests
             "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
             null
         );
-        var asset = Asset.Create(
+        var device = Device.Create(
             tenantId,
+            Guid.NewGuid(),
             "device-4",
-            AssetType.Device,
             "Device",
             Criticality.High
         );
-        var profile = AssetSecurityProfile.Create(
+        var profile = SecurityProfile.Create(
             tenantId,
             "Constrained network",
             null,
@@ -167,9 +170,9 @@ public class EnvironmentalSeverityCalculatorTests
             SecurityRequirementLevel.High
         );
 
-        var result = _calculator.Calculate(vulnerability, asset, profile);
+        var result = _calculator.Calculate(vulnerability, device, profile);
 
-        result.AssetSecurityProfileId.Should().Be(profile.Id);
+        result.SecurityProfileId.Should().Be(profile.Id);
         result.EffectiveScore.Should().NotBeNull();
         result.EffectiveScore.Should().NotBe(vulnerability.CvssScore);
         result.EffectiveVector.Should().NotBe(vulnerability.CvssVector);

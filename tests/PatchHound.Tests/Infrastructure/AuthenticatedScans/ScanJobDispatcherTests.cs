@@ -59,10 +59,10 @@ public class ScanJobDispatcherTests : IAsyncLifetime
 
     private async Task<Guid> SeedDeviceAsync(string name)
     {
-        var asset = Asset.Create(_tenantId, $"ext-{name}", AssetType.Device, name, Criticality.Medium);
-        _db.Assets.Add(asset);
+        var device = Device.Create(_tenantId, Guid.NewGuid(), $"ext-{name}", name, Criticality.Medium);
+        _db.Devices.Add(device);
         await _db.SaveChangesAsync();
-        return asset.Id;
+        return device.Id;
     }
 
     [Fact]

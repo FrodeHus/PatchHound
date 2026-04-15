@@ -57,7 +57,7 @@ public class RiskScoreController : ControllerBase
             .ToList();
 
         var assetIds = topRiskAssets.Select(item => item.AssetId).ToHashSet();
-        var assetNames = await _dbContext.Assets
+        var assetNames = await _dbContext.Devices
             .Where(item => assetIds.Contains(item.Id))
             .Select(item => new { item.Id, item.Name })
             .ToDictionaryAsync(item => item.Id, item => item.Name, ct);

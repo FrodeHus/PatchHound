@@ -19,8 +19,7 @@ public class SoftwareProductInstallation
     public int CurrentEpisodeNumber { get; private set; }
 
     public SoftwareTenantRecord TenantSoftware { get; private set; } = null!;
-    public Asset SoftwareAsset { get; private set; } = null!;
-    public Asset DeviceAsset { get; private set; } = null!;
+    public Device DeviceAsset { get; private set; } = null!;
 
     private SoftwareProductInstallation() { }
 

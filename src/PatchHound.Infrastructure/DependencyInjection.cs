@@ -61,7 +61,6 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<PatchHoundDbContext>());
 
         // Repositories
-        services.AddScoped<IAssetRepository, AssetRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITeamRepository, TeamRepository>();
@@ -85,7 +84,6 @@ public static class DependencyInjection
         >();
 
         // Application services
-        services.AddScoped<AssetService>();
         services.AddScoped<DeviceService>();
         services.AddScoped<UserService>();
         services.AddScoped<TeamService>();
@@ -104,7 +102,6 @@ public static class DependencyInjection
         services.AddScoped<NormalizedSoftwareProjectionService>();
         services.AddScoped<CycloneDxSupplyChainImportService>();
         services.AddScoped<EnrichmentJobEnqueuer>();
-        services.AddScoped<StagedAssetMergeService>();
         services.AddScoped<IngestionStateCache>();
         services.AddScoped<TenantSnapshotResolver>();
         services.AddScoped<NvdVulnerabilityEnrichmentRunner>();
@@ -187,10 +184,6 @@ public static class DependencyInjection
         // Device Rules
         services.AddScoped<DeviceRuleFilterBuilder>();
         services.AddScoped<IDeviceRuleEvaluationService, DeviceRuleEvaluationService>();
-        // AssetRuleFilterBuilder is still consumed directly by AssetRulesController for
-        // its legacy Asset-scoped preview/reset paths; the registration is dropped in
-        // Task 14 alongside the controller rename.
-        services.AddScoped<AssetRuleFilterBuilder>();
 
         // Ingestion
         services.AddScoped<IngestionService>();

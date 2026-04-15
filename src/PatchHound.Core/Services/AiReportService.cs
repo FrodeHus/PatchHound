@@ -24,7 +24,7 @@ public class AiReportService
     public async Task<Result<AIReport>> GenerateReportAsync(
         Vulnerability vulnerabilityDefinition,
         Guid vulnerabilityId,
-        IReadOnlyList<Asset> affectedAssets,
+        IReadOnlyList<Device> affectedAssets,
         Guid tenantId,
         Guid userId,
         Guid? tenantAiProfileId,
@@ -68,8 +68,8 @@ public class AiReportService
         }
 
         var report = AIReport.Create(
-            vulnerabilityId,
             tenantId,
+            vulnerabilityId,
             resolvedProfile.Profile.Id,
             content,
             resolvedProfile.Profile.ProviderType.ToString(),

@@ -177,7 +177,7 @@ public class ScanProfilesController(
             .ToListAsync(ct);
 
         var deviceIds = assignments.Select(a => a.DeviceId).Distinct().ToList();
-        var deviceNames = await db.Assets.AsNoTracking()
+        var deviceNames = await db.Devices.AsNoTracking()
             .Where(a => deviceIds.Contains(a.Id))
             .ToDictionaryAsync(a => a.Id, a => a.Name, ct);
 

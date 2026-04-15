@@ -28,7 +28,7 @@ internal static class AiProviderPromptBuilder
         foreach (var asset in request.AffectedAssets.Take(50))
         {
             builder.AppendLine(
-                $"- {asset.Name} | Type: {asset.AssetType} | Criticality: {asset.Criticality}"
+                $"- {asset.Name} | Type: Device | Criticality: {asset.Criticality}"
             );
         }
 

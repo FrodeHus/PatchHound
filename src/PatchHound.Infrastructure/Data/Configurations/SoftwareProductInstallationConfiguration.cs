@@ -45,12 +45,6 @@ public class SoftwareProductInstallationConfiguration
             .OnDelete(DeleteBehavior.Cascade);
 
         builder
-            .HasOne(item => item.SoftwareAsset)
-            .WithMany()
-            .HasForeignKey(item => item.SoftwareAssetId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder
             .HasOne(item => item.DeviceAsset)
             .WithMany()
             .HasForeignKey(item => item.DeviceAssetId)

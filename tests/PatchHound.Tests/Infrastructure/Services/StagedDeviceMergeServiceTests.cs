@@ -205,7 +205,7 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
             DeviceAadDeviceId: Guid.NewGuid().ToString()
         );
         var devicePayloadJson = JsonSerializer.Serialize(deviceAsset);
-        var stagedDevice = StagedAsset.Create(
+        var stagedDevice = StagedDevice.Create(
             ingestionRunId: runId,
             tenantId: tenantId,
             sourceKey: "defender",
@@ -215,7 +215,7 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
             payloadJson: devicePayloadJson,
             stagedAt: DateTimeOffset.UtcNow
         );
-        _db.StagedAssets.Add(stagedDevice);
+        _db.StagedDevices.Add(stagedDevice);
 
         var softwareMetadata = JsonSerializer.Serialize(
             new
@@ -235,7 +235,7 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
             Metadata: softwareMetadata
         );
         var softwarePayloadJson = JsonSerializer.Serialize(softwareAsset);
-        var stagedSoftware = StagedAsset.Create(
+        var stagedSoftware = StagedDevice.Create(
             ingestionRunId: runId,
             tenantId: tenantId,
             sourceKey: "defender",
@@ -245,7 +245,7 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
             payloadJson: softwarePayloadJson,
             stagedAt: DateTimeOffset.UtcNow
         );
-        _db.StagedAssets.Add(stagedSoftware);
+        _db.StagedDevices.Add(stagedSoftware);
 
         var link = new IngestionDeviceSoftwareLink(
             DeviceExternalId: deviceExternalId,

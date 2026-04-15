@@ -381,7 +381,7 @@ public class IngestionService
                         else if (assetStagingCompleted)
                         {
                             fetchedAssetCount = await _dbContext
-                                .StagedAssets.IgnoreQueryFilters()
+                                .StagedDevices.IgnoreQueryFilters()
                                 .CountAsync(item => item.IngestionRunId == run.Id, ct);
                             fetchedSoftwareInstallationCount = await _dbContext
                                 .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
@@ -768,16 +768,16 @@ public class IngestionService
     private async Task<int> RefreshDeviceActivityForTenantAsync(Guid tenantId, CancellationToken ct)
     {
         var cutoff = DateTimeOffset.UtcNow.Subtract(DeviceInactiveThreshold);
-        var devices = await _dbContext.Assets
+        var devices = await _dbContext.Devices
             .IgnoreQueryFilters()
-            .Where(asset => asset.TenantId == tenantId && asset.AssetType == AssetType.Device)
+            .Where(d => d.TenantId == tenantId)
             .ToListAsync(ct);
         var deactivatedCount = 0;
 
         foreach (var device in devices)
         {
-            var isActive = device.DeviceLastSeenAt.HasValue && device.DeviceLastSeenAt.Value >= cutoff;
-            device.SetDeviceActiveInTenant(isActive);
+            var isActive = device.LastSeenAt.HasValue && device.LastSeenAt.Value >= cutoff;
+            device.SetActiveInTenant(isActive);
             if (!isActive)
             {
                 deactivatedCount++;
@@ -1495,8 +1495,8 @@ public class IngestionService
                 .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
                 .Where(item => expiredRunIds.Contains(item.IngestionRunId))
                 .ToListAsync(ct);
-            var stagedAssets = await _dbContext
-                .StagedAssets.IgnoreQueryFilters()
+            var stagedDeviceRows = await _dbContext
+                .StagedDevices.IgnoreQueryFilters()
                 .Where(item => expiredRunIds.Contains(item.IngestionRunId))
                 .ToListAsync(ct);
             var checkpoints = await _dbContext
@@ -1511,7 +1511,7 @@ public class IngestionService
             _dbContext.StagedVulnerabilityExposures.RemoveRange(stagedExposures);
             _dbContext.StagedVulnerabilities.RemoveRange(stagedVulnerabilities);
             _dbContext.StagedDeviceSoftwareInstallations.RemoveRange(stagedSoftwareLinks);
-            _dbContext.StagedAssets.RemoveRange(stagedAssets);
+            _dbContext.StagedDevices.RemoveRange(stagedDeviceRows);
             _dbContext.IngestionCheckpoints.RemoveRange(checkpoints);
             _dbContext.IngestionRuns.RemoveRange(runs);
             await _dbContext.SaveChangesAsync(ct);
@@ -1520,7 +1520,7 @@ public class IngestionService
                 runs.Count,
                 stagedVulnerabilities.Count,
                 stagedExposures.Count,
-                stagedAssets.Count,
+                stagedDeviceRows.Count,
                 stagedSoftwareLinks.Count
             );
         }
@@ -1538,7 +1538,7 @@ public class IngestionService
             .Where(item => expiredRunIds.Contains(item.IngestionRunId))
             .ExecuteDeleteAsync(ct);
         var prunedAssetCount = await _dbContext
-            .StagedAssets.IgnoreQueryFilters()
+            .StagedDevices.IgnoreQueryFilters()
             .Where(item => expiredRunIds.Contains(item.IngestionRunId))
             .ExecuteDeleteAsync(ct);
         await _dbContext
@@ -1618,15 +1618,15 @@ public class IngestionService
                 .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
                 .Where(item => item.IngestionRunId == ingestionRunId)
                 .ToListAsync(ct);
-            var stagedAssets = await _dbContext
-                .StagedAssets.IgnoreQueryFilters()
+            var stagedDevices = await _dbContext
+                .StagedDevices.IgnoreQueryFilters()
                 .Where(item => item.IngestionRunId == ingestionRunId)
                 .ToListAsync(ct);
 
             _dbContext.StagedVulnerabilityExposures.RemoveRange(stagedExposures);
             _dbContext.StagedVulnerabilities.RemoveRange(stagedVulnerabilities);
             _dbContext.StagedDeviceSoftwareInstallations.RemoveRange(stagedSoftwareLinks);
-            _dbContext.StagedAssets.RemoveRange(stagedAssets);
+            _dbContext.StagedDevices.RemoveRange(stagedDevices);
             await _dbContext.SaveChangesAsync(ct);
             return;
         }
@@ -1644,7 +1644,7 @@ public class IngestionService
             .Where(item => item.IngestionRunId == ingestionRunId)
             .ExecuteDeleteAsync(ct);
         await _dbContext
-            .StagedAssets.IgnoreQueryFilters()
+            .StagedDevices.IgnoreQueryFilters()
             .Where(item => item.IngestionRunId == ingestionRunId)
             .ExecuteDeleteAsync(ct);
     }
@@ -1876,8 +1876,8 @@ public class IngestionService
 
         if (snapshot.Assets.Count > 0)
         {
-            var stagedAssets = snapshot.Assets.Select(asset =>
-                StagedAsset.Create(
+            var stagedDeviceRecords = snapshot.Assets.Select(asset =>
+                StagedDevice.Create(
                     ingestionRunId,
                     tenantId,
                     normalizedSourceKey,
@@ -1889,7 +1889,7 @@ public class IngestionService
                     batchNumber
                 )
             );
-            await _dbContext.StagedAssets.AddRangeAsync(stagedAssets, ct);
+            await _dbContext.StagedDevices.AddRangeAsync(stagedDeviceRecords, ct);
         }
 
         if (snapshot.DeviceSoftwareLinks.Count > 0)
@@ -2233,7 +2233,7 @@ public class IngestionService
         }
 
         totalSoftware = await _dbContext
-            .StagedAssets.IgnoreQueryFilters()
+            .StagedDevices.IgnoreQueryFilters()
             .Where(
                 item =>
                     item.IngestionRunId == ingestionRunId
@@ -2269,10 +2269,8 @@ public class IngestionService
     )
     {
         // Canonical merge: writes Device + InstalledSoftware directly via resolvers.
-        // The legacy StagedAssetMergeService / NormalizedSoftwareProjectionService path
-        // is no longer invoked here. Those services remain for other consumers
-        // (AuthenticatedScanIngestionService, AssetsController, SoftwareVulnerabilityMatchService)
-        // until Task 10b deletes them.
+        // The legacy NormalizedSoftwareProjectionService path is invoked after merge
+        // for software projection.
         var canonicalSummary = await _stagedDeviceMergeService.MergeAsync(
             ingestionRunId,
             tenantId,
@@ -2751,4 +2749,21 @@ internal sealed record StagedVulnerabilityMergeSummary(
     int MergedExposureCount,
     int OpenedProjectionCount,
     int ResolvedProjectionCount
+);
+
+// Moved here after StagedAssetMergeService was deleted in Phase 7c.
+public sealed record StagedAssetMergeSummary(
+    int StagedMachineCount,
+    int StagedSoftwareCount,
+    int MergedAssetCount,
+    int PersistedMachineCount,
+    int PersistedSoftwareCount,
+    int StagedSoftwareLinkCount,
+    int ResolvedSoftwareLinkCount,
+    int InstallationsCreated,
+    int InstallationsTouched,
+    int EpisodesOpened,
+    int EpisodesSeen,
+    int StaleInstallationsMarked,
+    int InstallationsRemoved
 );

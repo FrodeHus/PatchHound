@@ -41,17 +41,19 @@ public class NotificationsController(
                 item.ReadAt,
                 item.RelatedEntityType,
                 item.RelatedEntityId,
-                item.RelatedEntityType == "Asset" && item.RelatedEntityId != null
-                    ? $"/assets/{item.RelatedEntityId}"
-                    : item.RelatedEntityType == "TenantVulnerability" && item.RelatedEntityId != null
-                        ? $"/vulnerabilities/{item.RelatedEntityId}"
-                        : item.RelatedEntityType == "ApprovalTask" && item.RelatedEntityId != null
-                            ? $"/approvals/{item.RelatedEntityId}"
-                            : item.RelatedEntityType == "PatchingTask"
-                                ? "/remediation"
-                                : item.RelatedEntityType == "RemediationTask"
+                item.RelatedEntityType == "Device" && item.RelatedEntityId != null
+                    ? $"/devices/{item.RelatedEntityId}"
+                    : item.RelatedEntityType == "Asset" && item.RelatedEntityId != null
+                        ? $"/devices/{item.RelatedEntityId}"
+                        : item.RelatedEntityType == "TenantVulnerability" && item.RelatedEntityId != null
+                            ? $"/vulnerabilities/{item.RelatedEntityId}"
+                            : item.RelatedEntityType == "ApprovalTask" && item.RelatedEntityId != null
+                                ? $"/approvals/{item.RelatedEntityId}"
+                                : item.RelatedEntityType == "PatchingTask"
                                     ? "/remediation"
-                                : null
+                                    : item.RelatedEntityType == "RemediationTask"
+                                        ? "/remediation"
+                                    : null
             ))
             .ToListAsync(ct);
 

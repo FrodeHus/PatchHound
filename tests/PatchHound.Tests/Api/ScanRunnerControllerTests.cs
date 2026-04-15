@@ -15,6 +15,7 @@ using PatchHound.Infrastructure.AuthenticatedScans;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Services.Inventory;
 using PatchHound.Tests.TestData;
 using Xunit;
 
@@ -29,7 +30,7 @@ public class ScanRunnerControllerTests : IAsyncLifetime
     private ScanRunner _runner = null!;
     private ConnectionProfile _conn = null!;
     private ScanProfile _profile = null!;
-    private Asset _device = null!;
+    private Device _device = null!;
 
     public async Task InitializeAsync()
     {
@@ -57,8 +58,11 @@ public class ScanRunnerControllerTests : IAsyncLifetime
         _db.ScanningToolVersions.Add(version);
         _db.ScanProfileTools.Add(ScanProfileTool.Create(_profile.Id, tool.Id, 0));
 
-        _device = Asset.Create(_tenantId, "ext-device-1", AssetType.Device, "device-1", Criticality.Medium);
-        _db.Assets.Add(_device);
+        var sourceSystem = SourceSystem.Create("authenticated-scan", "Authenticated Scan");
+        _db.SourceSystems.Add(sourceSystem);
+        await _db.SaveChangesAsync();
+        _device = Device.Create(_tenantId, sourceSystem.Id, "ext-device-1", "device-1", Criticality.Medium);
+        _db.Devices.Add(_device);
         _db.DeviceScanProfileAssignments.Add(DeviceScanProfileAssignment.Create(_tenantId, _device.Id, _profile.Id, null));
         await _db.SaveChangesAsync();
 
@@ -66,11 +70,13 @@ public class ScanRunnerControllerTests : IAsyncLifetime
         _secretStore.GetSecretAsync(Arg.Any<string>(), "password", Arg.Any<CancellationToken>())
             .Returns("s3cret");
 
-        var stagedAssetMerge = new StagedAssetMergeService(_db);
+        var deviceResolver = new DeviceResolver(_db);
+        var softwareResolver = new SoftwareProductResolver(_db);
+        var stagedDeviceMerge = new StagedDeviceMergeService(_db, deviceResolver, softwareResolver);
         var resolver = new NormalizedSoftwareResolver(_db);
         var projectionService = new NormalizedSoftwareProjectionService(_db, resolver);
         var validator = new AuthenticatedScanOutputValidator();
-        var ingestionService = new AuthenticatedScanIngestionService(_db, validator, stagedAssetMerge, projectionService);
+        var ingestionService = new AuthenticatedScanIngestionService(_db, validator, stagedDeviceMerge, projectionService);
         var completionService = new ScanRunCompletionService(_db);
 
         _sut = new ScanRunnerController(_db, _secretStore, ingestionService, completionService);

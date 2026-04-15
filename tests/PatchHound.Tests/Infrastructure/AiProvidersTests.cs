@@ -247,7 +247,7 @@ public class AiProvidersTests
                 null,
                 null
             ),
-            [Asset.Create(tenantId, "asset-1", AssetType.Device, "srv-01", Criticality.High)]
+            [Device.Create(tenantId, Guid.NewGuid(), "asset-1", "srv-01", Criticality.High)]
         );
 
     private sealed class RecordingHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responder)
