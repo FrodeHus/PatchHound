@@ -12,6 +12,27 @@ internal static class ExternalHttpResiliencePolicies
     private const int DefenderRetryCount = 6;
     private static readonly TimeSpan DefaultMaxRetryDelay = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// Request timeout for general external endpoints (NVD, EndOfLife, SupplyChain, etc.).
+    /// Chosen to be well above normal response times (~1-5 s) while cutting the
+    /// 100-second .NET default that causes ingestion to stall on a single slow request.
+    /// </summary>
+    internal static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(20);
+
+    /// <summary>
+    /// Request timeout for the Microsoft Defender API.
+    /// Some Defender pages (advanced hunting, large inventory) legitimately take 10-20 s,
+    /// so a more generous limit is used here.
+    /// </summary>
+    internal static readonly TimeSpan DefenderRequestTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// TCP connect timeout applied to <see cref="SocketsHttpHandler"/>.
+    /// A host that simply doesn't respond will block a connection attempt for up to
+    /// this long before a <see cref="TimeoutException"/> is raised.
+    /// </summary>
+    private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(10);
+
     public static IHttpClientBuilder AddExternalHttpPolicies(
         this IHttpClientBuilder builder,
         int maxConnectionsPerServer
@@ -25,8 +46,10 @@ internal static class ExternalHttpResiliencePolicies
                         DecompressionMethods.GZip | DecompressionMethods.Deflate,
                     MaxConnectionsPerServer = maxConnectionsPerServer,
                     PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+                    ConnectTimeout = ConnectTimeout,
                 }
             )
+            .ConfigureHttpClient(client => client.Timeout = DefaultRequestTimeout)
             .AddPolicyHandler(
                 (serviceProvider, _) =>
                 {
@@ -50,8 +73,10 @@ internal static class ExternalHttpResiliencePolicies
                     // Keep parallelism tight and honor Retry-After for backoff.
                     MaxConnectionsPerServer = 2,
                     PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+                    ConnectTimeout = ConnectTimeout,
                 }
             )
+            .ConfigureHttpClient(client => client.Timeout = DefenderRequestTimeout)
             .AddPolicyHandler(
                 (serviceProvider, _) =>
                 {
