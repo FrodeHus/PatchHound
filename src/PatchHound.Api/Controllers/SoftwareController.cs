@@ -60,7 +60,7 @@ public class SoftwareController(
         var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
 
         var tenantSoftware = await dbContext
-            .TenantSoftware.AsNoTracking()
+            .SoftwareTenantRecords.AsNoTracking()
             .Where(item =>
                 item.Id == id
                 && item.TenantId == currentTenantId
@@ -106,7 +106,7 @@ public class SoftwareController(
         }
 
         var installations = await dbContext
-            .NormalizedSoftwareInstallations.AsNoTracking()
+            .SoftwareProductInstallations.AsNoTracking()
             .Where(item => item.TenantSoftwareId == id && item.SnapshotId == activeSnapshotId)
             .ToListAsync(ct);
 
@@ -235,7 +235,7 @@ public class SoftwareController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        var tenantSoftware = await dbContext.TenantSoftware.FirstOrDefaultAsync(
+        var tenantSoftware = await dbContext.SoftwareTenantRecords.FirstOrDefaultAsync(
             item => item.Id == id && item.TenantId == currentTenantId,
             ct
         );
@@ -280,7 +280,7 @@ public class SoftwareController(
 
         var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
         var tenantSoftwareExists = await dbContext
-            .TenantSoftware.AsNoTracking()
+            .SoftwareTenantRecords.AsNoTracking()
             .AnyAsync(
                 item =>
                     item.Id == id
@@ -362,7 +362,7 @@ public class SoftwareController(
         }
 
         var query = dbContext
-            .TenantSoftware.AsNoTracking()
+            .SoftwareTenantRecords.AsNoTracking()
             .Where(item => item.TenantId == currentTenantId);
 
         var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
@@ -413,7 +413,7 @@ public class SoftwareController(
                 Category = item.SoftwareProduct.Category,
                 CurrentRiskScore = (decimal?)null,
                 ActiveInstallCount = dbContext
-                    .NormalizedSoftwareInstallations
+                    .SoftwareProductInstallations
                     .Where(installation =>
                         installation.TenantSoftwareId == item.Id
                         && installation.SnapshotId == activeSnapshotId
@@ -421,7 +421,7 @@ public class SoftwareController(
                     )
                     .Count(),
                 UniqueDeviceCount = dbContext
-                    .NormalizedSoftwareInstallations
+                    .SoftwareProductInstallations
                     .Where(installation =>
                         installation.TenantSoftwareId == item.Id
                         && installation.SnapshotId == activeSnapshotId
@@ -433,7 +433,7 @@ public class SoftwareController(
                 // Phase-2: NormalizedSoftwareVulnerabilityProjection deleted.
                 ActiveVulnerabilityCount = 0,
                 VersionCount = dbContext
-                    .NormalizedSoftwareInstallations
+                    .SoftwareProductInstallations
                     .Where(installation =>
                         installation.TenantSoftwareId == item.Id
                         && installation.SnapshotId == activeSnapshotId
@@ -443,7 +443,7 @@ public class SoftwareController(
                     .Distinct()
                     .Count(version => version != string.Empty),
                 LastSeenAt = dbContext
-                    .NormalizedSoftwareInstallations
+                    .SoftwareProductInstallations
                     .Where(installation =>
                         installation.TenantSoftwareId == item.Id
                         && installation.SnapshotId == activeSnapshotId
@@ -454,7 +454,7 @@ public class SoftwareController(
                 // TODO Phase 5: re-implement via RemediationCase join (TenantSoftware → NormalizedSoftware.CanonicalProductKey → SoftwareProduct → RemediationCase).
                 MaintenanceWindowDate = (DateTimeOffset?)null,
                 ExposureImpactScore = dbContext
-                    .NormalizedSoftwareInstallations
+                    .SoftwareProductInstallations
                     .Where(installation =>
                         installation.TenantSoftwareId == item.Id
                         && installation.SnapshotId == activeSnapshotId
@@ -515,7 +515,7 @@ public class SoftwareController(
         var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
 
         var tenantSoftware = await dbContext
-            .TenantSoftware.AsNoTracking()
+            .SoftwareTenantRecords.AsNoTracking()
             .Where(item =>
                 item.Id == id
                 && item.TenantId == currentTenantId
@@ -528,7 +528,7 @@ public class SoftwareController(
             return NotFound();
         }
         var installationsQuery = dbContext
-            .NormalizedSoftwareInstallations.AsNoTracking()
+            .SoftwareProductInstallations.AsNoTracking()
             .Where(item => item.TenantSoftwareId == id && item.SnapshotId == activeSnapshotId);
 
         if (query.ActiveOnly)
@@ -635,7 +635,7 @@ public class SoftwareController(
         var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
 
         var tenantSoftware = await dbContext
-            .TenantSoftware.AsNoTracking()
+            .SoftwareTenantRecords.AsNoTracking()
             .Where(item =>
                 item.Id == id
                 && item.TenantId == currentTenantId
@@ -668,7 +668,7 @@ public class SoftwareController(
         var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
 
         var tenantSoftware = await dbContext
-            .TenantSoftware.AsNoTracking()
+            .SoftwareTenantRecords.AsNoTracking()
             .Where(item =>
                 item.Id == id
                 && item.TenantId == currentTenantId
@@ -694,7 +694,7 @@ public class SoftwareController(
         }
 
         var aliases = await dbContext
-            .NormalizedSoftwareAliases.AsNoTracking()
+            .SoftwareProductAliases.AsNoTracking()
             .Where(item => item.SoftwareProductId == tenantSoftware.SoftwareProductId)
             .OrderBy(item => item.SourceSystem)
             .ThenBy(item => item.ExternalSoftwareId)
@@ -710,7 +710,7 @@ public class SoftwareController(
             })
             .ToListAsync(ct);
         var installations = await dbContext
-            .NormalizedSoftwareInstallations.AsNoTracking()
+            .SoftwareProductInstallations.AsNoTracking()
             .Where(item => item.TenantSoftwareId == id && item.SnapshotId == activeSnapshotId)
             .Select(item => new
             {

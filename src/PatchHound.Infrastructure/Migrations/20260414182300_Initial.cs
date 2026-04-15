@@ -1040,33 +1040,6 @@ namespace PatchHound.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "NormalizedSoftwareAliases",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    SoftwareProductId = table.Column<Guid>(type: "uuid", nullable: false),
-                    SourceSystem = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    ExternalSoftwareId = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    RawName = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    RawVendor = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    RawVersion = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    AliasConfidence = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    MatchReason = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_NormalizedSoftwareAliases", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_NormalizedSoftwareAliases_SoftwareProducts_SoftwareProductId",
-                        column: x => x.SoftwareProductId,
-                        principalTable: "SoftwareProducts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "RemediationCases",
                 columns: table => new
                 {
@@ -1117,6 +1090,33 @@ namespace PatchHound.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "SoftwareProductAliases",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    SoftwareProductId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SourceSystem = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ExternalSoftwareId = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    RawName = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    RawVendor = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    RawVersion = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    AliasConfidence = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    MatchReason = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SoftwareProductAliases", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_SoftwareProductAliases_SoftwareProducts_SoftwareProductId",
+                        column: x => x.SoftwareProductId,
+                        principalTable: "SoftwareProducts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "SoftwareRiskScores",
                 columns: table => new
                 {
@@ -1147,7 +1147,7 @@ namespace PatchHound.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "TenantSoftware",
+                name: "SoftwareTenantRecords",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
@@ -1175,9 +1175,9 @@ namespace PatchHound.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_TenantSoftware", x => x.Id);
+                    table.PrimaryKey("PK_SoftwareTenantRecords", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_TenantSoftware_SoftwareProducts_SoftwareProductId",
+                        name: "FK_SoftwareTenantRecords_SoftwareProducts_SoftwareProductId",
                         column: x => x.SoftwareProductId,
                         principalTable: "SoftwareProducts",
                         principalColumn: "Id",
@@ -1774,7 +1774,7 @@ namespace PatchHound.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "NormalizedSoftwareInstallations",
+                name: "SoftwareProductInstallations",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
@@ -1793,23 +1793,23 @@ namespace PatchHound.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_NormalizedSoftwareInstallations", x => x.Id);
+                    table.PrimaryKey("PK_SoftwareProductInstallations", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_NormalizedSoftwareInstallations_Assets_DeviceAssetId",
+                        name: "FK_SoftwareProductInstallations_Assets_DeviceAssetId",
                         column: x => x.DeviceAssetId,
                         principalTable: "Assets",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_NormalizedSoftwareInstallations_Assets_SoftwareAssetId",
+                        name: "FK_SoftwareProductInstallations_Assets_SoftwareAssetId",
                         column: x => x.SoftwareAssetId,
                         principalTable: "Assets",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_NormalizedSoftwareInstallations_TenantSoftware_TenantSoftwa~",
+                        name: "FK_SoftwareProductInstallations_SoftwareTenantRecords_TenantSo~",
                         column: x => x.TenantSoftwareId,
-                        principalTable: "TenantSoftware",
+                        principalTable: "SoftwareTenantRecords",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -2862,53 +2862,6 @@ namespace PatchHound.Infrastructure.Migrations
                 columns: new[] { "TenantId", "SoftwareProductId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareAliases_SoftwareProductId",
-                table: "NormalizedSoftwareAliases",
-                column: "SoftwareProductId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareAliases_SourceSystem_ExternalSoftwareId",
-                table: "NormalizedSoftwareAliases",
-                columns: new[] { "SourceSystem", "ExternalSoftwareId" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareInstallations_DeviceAssetId",
-                table: "NormalizedSoftwareInstallations",
-                column: "DeviceAssetId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareInstallations_SnapshotId",
-                table: "NormalizedSoftwareInstallations",
-                column: "SnapshotId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareInstallations_SoftwareAssetId",
-                table: "NormalizedSoftwareInstallations",
-                column: "SoftwareAssetId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareInstallations_TenantId",
-                table: "NormalizedSoftwareInstallations",
-                column: "TenantId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareInstallations_TenantId_SnapshotId_Softwar~",
-                table: "NormalizedSoftwareInstallations",
-                columns: new[] { "TenantId", "SnapshotId", "SoftwareAssetId", "DeviceAssetId" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareInstallations_TenantId_SnapshotId_TenantS~",
-                table: "NormalizedSoftwareInstallations",
-                columns: new[] { "TenantId", "SnapshotId", "TenantSoftwareId", "DetectedVersion", "LastSeenAt" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NormalizedSoftwareInstallations_TenantSoftwareId",
-                table: "NormalizedSoftwareInstallations",
-                column: "TenantSoftwareId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Notifications_TenantId",
                 table: "Notifications",
                 column: "TenantId");
@@ -3170,6 +3123,53 @@ namespace PatchHound.Infrastructure.Migrations
                 columns: new[] { "TenantId", "SoftwareProductId", "Status" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_SoftwareProductAliases_SoftwareProductId",
+                table: "SoftwareProductAliases",
+                column: "SoftwareProductId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareProductAliases_SourceSystem_ExternalSoftwareId",
+                table: "SoftwareProductAliases",
+                columns: new[] { "SourceSystem", "ExternalSoftwareId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareProductInstallations_DeviceAssetId",
+                table: "SoftwareProductInstallations",
+                column: "DeviceAssetId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareProductInstallations_SnapshotId",
+                table: "SoftwareProductInstallations",
+                column: "SnapshotId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareProductInstallations_SoftwareAssetId",
+                table: "SoftwareProductInstallations",
+                column: "SoftwareAssetId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareProductInstallations_TenantId",
+                table: "SoftwareProductInstallations",
+                column: "TenantId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareProductInstallations_TenantId_SnapshotId_SoftwareAs~",
+                table: "SoftwareProductInstallations",
+                columns: new[] { "TenantId", "SnapshotId", "SoftwareAssetId", "DeviceAssetId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareProductInstallations_TenantId_SnapshotId_TenantSoft~",
+                table: "SoftwareProductInstallations",
+                columns: new[] { "TenantId", "SnapshotId", "TenantSoftwareId", "DetectedVersion", "LastSeenAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareProductInstallations_TenantSoftwareId",
+                table: "SoftwareProductInstallations",
+                column: "TenantSoftwareId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SoftwareProducts_CanonicalProductKey",
                 table: "SoftwareProducts",
                 column: "CanonicalProductKey",
@@ -3189,6 +3189,27 @@ namespace PatchHound.Infrastructure.Migrations
                 name: "IX_SoftwareRiskScores_TenantId_SoftwareProductId",
                 table: "SoftwareRiskScores",
                 columns: new[] { "TenantId", "SoftwareProductId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareTenantRecords_SnapshotId",
+                table: "SoftwareTenantRecords",
+                column: "SnapshotId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareTenantRecords_SoftwareProductId",
+                table: "SoftwareTenantRecords",
+                column: "SoftwareProductId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareTenantRecords_TenantId",
+                table: "SoftwareTenantRecords",
+                column: "TenantId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SoftwareTenantRecords_TenantId_SnapshotId_SoftwareProductId",
+                table: "SoftwareTenantRecords",
+                columns: new[] { "TenantId", "SnapshotId", "SoftwareProductId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -3337,27 +3358,6 @@ namespace PatchHound.Infrastructure.Migrations
                 name: "IX_Tenants_EntraTenantId",
                 table: "Tenants",
                 column: "EntraTenantId",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TenantSoftware_SnapshotId",
-                table: "TenantSoftware",
-                column: "SnapshotId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TenantSoftware_SoftwareProductId",
-                table: "TenantSoftware",
-                column: "SoftwareProductId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TenantSoftware_TenantId",
-                table: "TenantSoftware",
-                column: "TenantId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TenantSoftware_TenantId_SnapshotId_SoftwareProductId",
-                table: "TenantSoftware",
-                columns: new[] { "TenantId", "SnapshotId", "SoftwareProductId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -3583,12 +3583,6 @@ namespace PatchHound.Infrastructure.Migrations
                 name: "IngestionSnapshots");
 
             migrationBuilder.DropTable(
-                name: "NormalizedSoftwareAliases");
-
-            migrationBuilder.DropTable(
-                name: "NormalizedSoftwareInstallations");
-
-            migrationBuilder.DropTable(
                 name: "Notifications");
 
             migrationBuilder.DropTable(
@@ -3644,6 +3638,12 @@ namespace PatchHound.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "SoftwareDescriptionJobs");
+
+            migrationBuilder.DropTable(
+                name: "SoftwareProductAliases");
+
+            migrationBuilder.DropTable(
+                name: "SoftwareProductInstallations");
 
             migrationBuilder.DropTable(
                 name: "SoftwareRiskScores");
@@ -3718,7 +3718,7 @@ namespace PatchHound.Infrastructure.Migrations
                 name: "Assets");
 
             migrationBuilder.DropTable(
-                name: "TenantSoftware");
+                name: "SoftwareTenantRecords");
 
             migrationBuilder.DropTable(
                 name: "Teams");

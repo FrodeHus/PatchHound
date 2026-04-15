@@ -107,14 +107,15 @@ of the model that `Initial` builds.
 > remaining legacy entities (`AssetRiskScore`, `TenantSoftwareRiskScore`,
 > `NormalizedSoftware`) were deleted and their consumers rewritten against the
 > canonical model. The migration no longer contains `AssetRiskScores`,
-> `TenantSoftwareRiskScores`, or `NormalizedSoftware` tables. This change
-> closes issue #17 — the canonical baseline now truly is canonical.
+> `TenantSoftwareRiskScores`, or `NormalizedSoftware` tables.
 >
-> Note: `NormalizedSoftwareAlias`, `NormalizedSoftwareInstallation`, and
-> `NormalizedSoftwareProjectionService` are retained as operational
-> infrastructure for the software alias resolution pipeline. The class/table
-> names are historical; their FK `SoftwareProductId` points to the canonical
-> `SoftwareProduct` entity.
+> **Phase 7b (2026-04-14):** The last three legacy-named entities were renamed
+> to canonical names: `TenantSoftware` → `SoftwareTenantRecord` (table:
+> `SoftwareTenantRecords`), `NormalizedSoftwareAlias` → `SoftwareProductAlias`
+> (table: `SoftwareProductAliases`), and `NormalizedSoftwareInstallation` →
+> `SoftwareProductInstallation` (table: `SoftwareProductInstallations`). The
+> `Initial` migration was regenerated against the fully canonical model. This
+> change closes issue #17 — the canonical baseline now truly is canonical.
 
 To create a fresh dev database:
 

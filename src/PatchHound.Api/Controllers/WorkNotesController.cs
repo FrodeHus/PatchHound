@@ -201,7 +201,7 @@ public class WorkNotesController : ControllerBase
                 .Where(v => v.Id == entityId)
                 .Select(_ => (Guid?)_tenantContext.CurrentTenantId)
                 .FirstOrDefaultAsync(ct),
-            "TenantSoftware" or "TenantSoftwareRemediation" => await _dbContext.TenantSoftware
+            "TenantSoftware" or "TenantSoftwareRemediation" => await _dbContext.SoftwareTenantRecords
                 .IgnoreQueryFilters()
                 .Where(s => s.Id == entityId)
                 .Select(s => (Guid?)s.TenantId)

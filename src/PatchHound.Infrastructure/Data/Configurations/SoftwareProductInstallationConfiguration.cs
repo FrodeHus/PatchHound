@@ -4,10 +4,10 @@ using PatchHound.Core.Entities;
 
 namespace PatchHound.Infrastructure.Data.Configurations;
 
-public class NormalizedSoftwareInstallationConfiguration
-    : IEntityTypeConfiguration<NormalizedSoftwareInstallation>
+public class SoftwareProductInstallationConfiguration
+    : IEntityTypeConfiguration<SoftwareProductInstallation>
 {
-    public void Configure(EntityTypeBuilder<NormalizedSoftwareInstallation> builder)
+    public void Configure(EntityTypeBuilder<SoftwareProductInstallation> builder)
     {
         builder.HasKey(item => item.Id);
 

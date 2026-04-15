@@ -57,7 +57,6 @@ public class DashboardController : ControllerBase
             ct
         );
 
-        // Phase-2: TenantVulnerability + related legacy entities deleted — stub vulnerability counts.
         var ageBucketDefinitions = new (string Label, int MinDays, int MaxDays)[]
         {
             ("0-7 days", 0, 7),
@@ -66,18 +65,139 @@ public class DashboardController : ControllerBase
             ("91-180 days", 91, 180),
             ("180+ days", 181, int.MaxValue),
         };
-        var vulnsBySeverity = Enum.GetValues<Severity>().ToDictionary(s => s.ToString(), _ => 0);
+
+        // Vulnerability counts from canonical DeviceVulnerabilityExposures
+        var now = DateTimeOffset.UtcNow;
+        var exposureBaseQuery = _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(e => e.TenantId == tenantId);
+        if (filteredAssetIds != null)
+            exposureBaseQuery = exposureBaseQuery.Where(e => filteredAssetIds.Contains(e.DeviceId));
+        if (minPublishedDate.HasValue)
+            exposureBaseQuery = exposureBaseQuery.Where(e => e.Vulnerability.PublishedDate >= minPublishedDate.Value);
+
+        var exposureSeverityCounts = await exposureBaseQuery
+            .GroupBy(e => new { e.Status, e.Vulnerability.VendorSeverity })
+            .Select(g => new { g.Key.Status, g.Key.VendorSeverity, Count = g.Select(e => e.VulnerabilityId).Distinct().Count() })
+            .ToListAsync(ct);
+
+        var vulnsBySeverity = Enum.GetValues<Severity>().ToDictionary(
+            s => s.ToString(),
+            s => exposureSeverityCounts.Where(r => r.Status == ExposureStatus.Open && r.VendorSeverity == s).Sum(r => r.Count));
+        var openCount = exposureSeverityCounts.Where(r => r.Status == ExposureStatus.Open).Sum(r => r.Count);
+        var resolvedCount = exposureSeverityCounts.Where(r => r.Status == ExposureStatus.Resolved).Sum(r => r.Count);
         var vulnsByStatus = new Dictionary<string, int>
         {
-            [nameof(VulnerabilityStatus.Open)] = 0,
-            [nameof(VulnerabilityStatus.Resolved)] = 0,
+            [nameof(VulnerabilityStatus.Open)] = openCount,
+            [nameof(VulnerabilityStatus.Resolved)] = resolvedCount,
         };
-        var topVulns = new List<TopVulnerabilityDto>();
-        var latestUnhandled = new List<UnhandledVulnerabilityDto>();
-        var avgRemediationDays = 0m;
+
+        // Top critical vulnerabilities
+        var topVulnRows = await exposureBaseQuery
+            .Where(e => e.Status == ExposureStatus.Open
+                && (e.Vulnerability.VendorSeverity == Severity.Critical || e.Vulnerability.VendorSeverity == Severity.High))
+            .GroupBy(e => e.VulnerabilityId)
+            .Select(g => new
+            {
+                VulnerabilityId = g.Key,
+                ExternalId = g.First().Vulnerability.ExternalId,
+                Title = g.First().Vulnerability.Title,
+                VendorSeverity = g.First().Vulnerability.VendorSeverity,
+                CvssScore = g.First().Vulnerability.CvssScore,
+                PublishedDate = g.First().Vulnerability.PublishedDate,
+                AffectedAssetCount = g.Select(e => e.DeviceId).Distinct().Count(),
+            })
+            .OrderByDescending(r => r.VendorSeverity)
+            .ThenByDescending(r => r.AffectedAssetCount)
+            .Take(10)
+            .ToListAsync(ct);
+
+        var topVulns = topVulnRows.Select(r => new TopVulnerabilityDto(
+            r.VulnerabilityId, r.ExternalId, r.Title,
+            r.VendorSeverity.ToString(), r.CvssScore,
+            r.AffectedAssetCount,
+            r.PublishedDate.HasValue ? (int)(now - r.PublishedDate.Value).TotalDays : 0
+        )).ToList();
+
+        // Latest unhandled (open, no remediation case)
+        var latestUnhandledRows = await (
+            from e in exposureBaseQuery
+            where e.Status == ExposureStatus.Open
+            join rc in _dbContext.RemediationCases.AsNoTracking()
+                on e.SoftwareProductId equals rc.SoftwareProductId into rcJoin
+            from rc in rcJoin.DefaultIfEmpty()
+            where rc == null || rc.TenantId != tenantId
+            group e by e.VulnerabilityId into g
+            select new
+            {
+                VulnerabilityId = g.Key,
+                ExternalId = g.First().Vulnerability.ExternalId,
+                Title = g.First().Vulnerability.Title,
+                VendorSeverity = g.First().Vulnerability.VendorSeverity,
+                CvssScore = g.First().Vulnerability.CvssScore,
+                PublishedDate = g.First().Vulnerability.PublishedDate,
+                AffectedAssetCount = g.Select(e => e.DeviceId).Distinct().Count(),
+                LatestSeenAt = g.Max(e => e.LastObservedAt),
+            }
+        ).OrderByDescending(r => r.LatestSeenAt).Take(10).ToListAsync(ct);
+
+        var latestUnhandled = latestUnhandledRows.Select(r => new UnhandledVulnerabilityDto(
+            r.VulnerabilityId, r.ExternalId, r.Title,
+            r.VendorSeverity.ToString(), r.CvssScore,
+            r.AffectedAssetCount,
+            r.PublishedDate.HasValue ? (int)(now - r.PublishedDate.Value).TotalDays : 0,
+            r.LatestSeenAt
+        )).ToList();
+
+        // MTTR: average days from first episode open to close for resolved exposures
+        var closedEpisodes = await _dbContext.ExposureEpisodes.AsNoTracking()
+            .Where(ep => ep.TenantId == tenantId && ep.ClosedAt != null
+                && exposureBaseQuery.Select(e => e.Id).Contains(ep.DeviceVulnerabilityExposureId))
+            .Select(ep => new
+            {
+                ep.FirstSeenAt,
+                ep.ClosedAt,
+                ep.Exposure.Vulnerability.VendorSeverity,
+            })
+            .ToListAsync(ct);
+
+        var avgRemediationDays = closedEpisodes.Count > 0
+            ? Math.Round((decimal)closedEpisodes.Average(ep => (ep.ClosedAt!.Value - ep.FirstSeenAt).TotalDays), 1)
+            : 0m;
+        var mttrBySeverity = Enum.GetValues<Severity>().Select(s =>
+        {
+            var episodes = closedEpisodes.Where(ep => ep.VendorSeverity == s).ToList();
+            return new MttrBySeverityDto(
+                s.ToString(),
+                episodes.Count > 0 ? Math.Round((decimal)episodes.Average(ep => (ep.ClosedAt!.Value - ep.FirstSeenAt).TotalDays), 1) : 0m,
+                null);
+        }).ToList();
+
+        // Age buckets for open exposures
+        var openEpisodeAges = await _dbContext.ExposureEpisodes.AsNoTracking()
+            .Where(ep => ep.TenantId == tenantId && ep.ClosedAt == null
+                && exposureBaseQuery.Select(e => e.Id).Contains(ep.DeviceVulnerabilityExposureId))
+            .Select(ep => new
+            {
+                AgeDays = (int)((now - ep.FirstSeenAt).TotalDays),
+                ep.Exposure.Vulnerability.VendorSeverity,
+            })
+            .ToListAsync(ct);
+
+        var ageBuckets = ageBucketDefinitions.Select(b =>
+        {
+            var inBucket = openEpisodeAges.Where(e =>
+                e.AgeDays >= b.MinDays && (b.MaxDays == int.MaxValue || e.AgeDays <= b.MaxDays)).ToList();
+            return new VulnerabilityAgeBucketDto(
+                b.Label,
+                inBucket.Count,
+                inBucket.Count(e => e.VendorSeverity == Severity.Critical),
+                inBucket.Count(e => e.VendorSeverity == Severity.High),
+                inBucket.Count(e => e.VendorSeverity == Severity.Medium),
+                inBucket.Count(e => e.VendorSeverity == Severity.Low)
+            );
+        }).ToList();
+
         var exposureScore = 0m;
-        var ageBuckets = ageBucketDefinitions.Select(b => new VulnerabilityAgeBucketDto(b.Label, 0, 0, 0, 0, 0)).ToList();
-        var mttrBySeverity = Enum.GetValues<Severity>().Select(s => new MttrBySeverityDto(s.ToString(), 0m, null)).ToList();
 
         // SLA compliance and remediation metrics — tenant-wide, NOT affected by dashboard filters
         var patchingTasks = await _dbContext
@@ -92,7 +212,6 @@ public class DashboardController : ControllerBase
             })
             .ToListAsync(ct);
 
-        var now = DateTimeOffset.UtcNow;
         var overdueCount = patchingTasks.Count(t =>
             t.Status != PatchingTaskStatus.Completed && t.DueDate < now);
         var slaPercent = patchingTasks.Count == 0
@@ -807,9 +926,53 @@ public class DashboardController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        // Phase-2: VulnerabilityAssetEpisode + TenantVulnerability deleted — return empty trends.
-        _ = tenantId;
-        return Ok(new TrendDataDto(new List<TrendItem>()));
+        var (trendFilteredAssetIds, trendMinPublishedDate) = BuildFilterContext(tenantId, filter);
+        var trendWindowEnd = DateTimeOffset.UtcNow;
+        var trendWindowStart = trendWindowEnd.AddDays(-89); // 90-day rolling window
+
+        var episodeRows = await _dbContext.ExposureEpisodes.AsNoTracking()
+            .Where(ep => ep.TenantId == tenantId
+                && ep.FirstSeenAt <= trendWindowEnd
+                && (ep.ClosedAt == null || ep.ClosedAt >= trendWindowStart))
+            .Select(ep => new
+            {
+                ep.FirstSeenAt,
+                ep.ClosedAt,
+                ep.Exposure.Vulnerability.VendorSeverity,
+                DeviceId = ep.Exposure.DeviceId,
+                PublishedDate = ep.Exposure.Vulnerability.PublishedDate,
+            })
+            .ToListAsync(ct);
+
+        // Apply filters in-memory after projection
+        if (trendFilteredAssetIds != null)
+        {
+            var filteredDeviceIds = await trendFilteredAssetIds.ToListAsync(ct);
+            var filteredSet = filteredDeviceIds.ToHashSet();
+            episodeRows = episodeRows.Where(r => filteredSet.Contains(r.DeviceId)).ToList();
+        }
+        if (trendMinPublishedDate.HasValue)
+            episodeRows = episodeRows.Where(r => r.PublishedDate >= trendMinPublishedDate.Value).ToList();
+
+        var trendItems = new List<TrendItem>();
+        for (var dayOffset = 89; dayOffset >= 0; dayOffset--)
+        {
+            var day = DateOnly.FromDateTime(trendWindowEnd.AddDays(-dayOffset).DateTime);
+            var dayInstant = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            var dayEndInstant = dayInstant.AddDays(1);
+
+            foreach (var severity in Enum.GetValues<Severity>())
+            {
+                var openOnDay = episodeRows.Count(ep =>
+                    ep.VendorSeverity == severity
+                    && ep.FirstSeenAt < dayEndInstant
+                    && (ep.ClosedAt == null || ep.ClosedAt >= dayInstant));
+                if (openOnDay > 0)
+                    trendItems.Add(new TrendItem(day, severity.ToString(), openOnDay));
+            }
+        }
+
+        return Ok(new TrendDataDto(trendItems));
     }
 
     [HttpGet("burndown")]
@@ -824,9 +987,50 @@ public class DashboardController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        // Phase-2: VulnerabilityAssetEpisode deleted — return empty burndown.
-        _ = tenantId;
-        return Ok(new BurndownTrendDto(new List<BurndownPointDto>()));
+        var (burnFilteredAssetIds, burnMinPublishedDate) = BuildFilterContext(tenantId, filter);
+        var burnEnd = DateTimeOffset.UtcNow;
+        var burnStart = burnEnd.AddDays(-89);
+
+        var burnEpisodeRows = await _dbContext.ExposureEpisodes.AsNoTracking()
+            .Where(ep => ep.TenantId == tenantId
+                && ep.FirstSeenAt <= burnEnd
+                && (ep.ClosedAt == null || ep.ClosedAt >= burnStart))
+            .Select(ep => new
+            {
+                ep.FirstSeenAt,
+                ep.ClosedAt,
+                DeviceId = ep.Exposure.DeviceId,
+                PublishedDate = ep.Exposure.Vulnerability.PublishedDate,
+            })
+            .ToListAsync(ct);
+
+        if (burnFilteredAssetIds != null)
+        {
+            var filteredDeviceIds = await burnFilteredAssetIds.ToListAsync(ct);
+            var filteredSet = filteredDeviceIds.ToHashSet();
+            burnEpisodeRows = burnEpisodeRows.Where(r => filteredSet.Contains(r.DeviceId)).ToList();
+        }
+        if (burnMinPublishedDate.HasValue)
+            burnEpisodeRows = burnEpisodeRows.Where(r => r.PublishedDate >= burnMinPublishedDate.Value).ToList();
+
+        var burndownItems = new List<BurndownPointDto>();
+        for (var dayOffset = 89; dayOffset >= 0; dayOffset--)
+        {
+            var day = DateOnly.FromDateTime(burnEnd.AddDays(-dayOffset).DateTime);
+            var dayInstant = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            var dayEndInstant = dayInstant.AddDays(1);
+
+            var discovered = burnEpisodeRows.Count(ep =>
+                ep.FirstSeenAt >= dayInstant && ep.FirstSeenAt < dayEndInstant);
+            var resolved = burnEpisodeRows.Count(ep =>
+                ep.ClosedAt >= dayInstant && ep.ClosedAt < dayEndInstant);
+            var netOpen = burnEpisodeRows.Count(ep =>
+                ep.FirstSeenAt < dayEndInstant && (ep.ClosedAt == null || ep.ClosedAt >= dayInstant));
+
+            burndownItems.Add(new BurndownPointDto(day, discovered, resolved, netOpen));
+        }
+
+        return Ok(new BurndownTrendDto(burndownItems));
     }
 
     [HttpGet("filter-options")]

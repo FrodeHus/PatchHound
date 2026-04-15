@@ -33,12 +33,12 @@ public class NormalizedSoftwareProjectionService(
         var tenantSoftwareRows = await UpsertTenantSoftwareAsync(tenantId, snapshotId, resolutions, ct);
 
         var existingInstallations = await dbContext
-            .NormalizedSoftwareInstallations.IgnoreQueryFilters()
+            .SoftwareProductInstallations.IgnoreQueryFilters()
             .Where(item => item.TenantId == tenantId && item.SnapshotId == snapshotId)
             .ToListAsync(ct);
         if (existingInstallations.Count > 0)
         {
-            dbContext.NormalizedSoftwareInstallations.RemoveRange(existingInstallations);
+            dbContext.SoftwareProductInstallations.RemoveRange(existingInstallations);
         }
 
         if (resolutions.Count == 0)
@@ -81,7 +81,7 @@ public class NormalizedSoftwareProjectionService(
                 var resolution = resolutions[episode.SoftwareAssetId];
                 var tenantSoftware = tenantSoftwareRows[resolution.SoftwareProductId];
 
-                return NormalizedSoftwareInstallation.Create(
+                return SoftwareProductInstallation.Create(
                     tenantId,
                     snapshotId,
                     tenantSoftware.Id,
@@ -100,7 +100,7 @@ public class NormalizedSoftwareProjectionService(
 
         if (rows.Count > 0)
         {
-            await dbContext.NormalizedSoftwareInstallations.AddRangeAsync(rows, ct);
+            await dbContext.SoftwareProductInstallations.AddRangeAsync(rows, ct);
         }
     }
 
@@ -115,7 +115,7 @@ public class NormalizedSoftwareProjectionService(
         await Task.CompletedTask;
     }
 
-    private async Task<Dictionary<Guid, TenantSoftware>> UpsertTenantSoftwareAsync(
+    private async Task<Dictionary<Guid, SoftwareTenantRecord>> UpsertTenantSoftwareAsync(
         Guid tenantId,
         Guid? snapshotId,
         IReadOnlyDictionary<Guid, NormalizedSoftwareResolver.ResolutionResult> resolutions,
@@ -128,20 +128,20 @@ public class NormalizedSoftwareProjectionService(
             .ToList();
 
         var existingRows = await dbContext
-            .TenantSoftware.IgnoreQueryFilters()
+            .SoftwareTenantRecords.IgnoreQueryFilters()
             .Where(item => item.TenantId == tenantId && item.SnapshotId == snapshotId)
             .ToListAsync(ct);
 
         var existingBySoftwareProductId = existingRows.ToDictionary(item => item.SoftwareProductId);
-        var rowsBySoftwareProductId = new Dictionary<Guid, TenantSoftware>();
+        var rowsBySoftwareProductId = new Dictionary<Guid, SoftwareTenantRecord>();
         var now = DateTimeOffset.UtcNow;
 
         foreach (var softwareProductId in softwareProductIds)
         {
             if (!existingBySoftwareProductId.TryGetValue(softwareProductId, out var row))
             {
-                row = TenantSoftware.Create(tenantId, snapshotId, softwareProductId, now, now);
-                await dbContext.TenantSoftware.AddAsync(row, ct);
+                row = SoftwareTenantRecord.Create(tenantId, snapshotId, softwareProductId, now, now);
+                await dbContext.SoftwareTenantRecords.AddAsync(row, ct);
             }
             else
             {
@@ -157,7 +157,7 @@ public class NormalizedSoftwareProjectionService(
             .ToList();
         if (staleRows.Count > 0)
         {
-            dbContext.TenantSoftware.RemoveRange(staleRows);
+            dbContext.SoftwareTenantRecords.RemoveRange(staleRows);
         }
 
         await dbContext.SaveChangesAsync(ct);

@@ -460,8 +460,8 @@ public class TenantsController : ControllerBase
         //          TenantVulnerability, NormalizedSoftwareVulnerabilityProjection, SoftwareVulnerabilityMatch deleted.
         await DeleteEntitiesAsync(_dbContext.DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.DeviceSoftwareInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.NormalizedSoftwareInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
-        await DeleteEntitiesAsync(_dbContext.TenantSoftware.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.SoftwareProductInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.SoftwareTenantRecords.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.AssetSecurityProfiles.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.Assets.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.TeamMembershipRules.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
@@ -576,7 +576,7 @@ public class TenantsController : ControllerBase
         }
 
         var normalizedSoftwareIds = await _dbContext
-            .TenantSoftware.IgnoreQueryFilters()
+            .SoftwareTenantRecords.IgnoreQueryFilters()
             .AsNoTracking()
             .Where(ts => ts.TenantId == id)
             .Select(ts => ts.SoftwareProductId)

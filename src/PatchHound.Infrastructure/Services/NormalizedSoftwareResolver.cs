@@ -52,7 +52,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             .ToListAsync(ct);
 
         var aliases = await dbContext
-            .NormalizedSoftwareAliases.IgnoreQueryFilters()
+            .SoftwareProductAliases.IgnoreQueryFilters()
             .ToListAsync(ct);
         var aliasesBySourceKey = aliases.ToDictionary(
             alias => BuildAliasKey(alias.SourceSystem, alias.ExternalSoftwareId),
@@ -140,7 +140,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
 
             if (existingAlias is null)
             {
-                existingAlias = NormalizedSoftwareAlias.Create(
+                existingAlias = SoftwareProductAlias.Create(
                     product.Id,
                     identity.SourceSystem,
                     identity.ExternalSoftwareId,
@@ -151,7 +151,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
                     identity.MatchReason,
                     now
                 );
-                await dbContext.NormalizedSoftwareAliases.AddAsync(existingAlias, ct);
+                await dbContext.SoftwareProductAliases.AddAsync(existingAlias, ct);
                 aliasesBySourceKey[aliasKey] = existingAlias;
             }
             else
@@ -183,7 +183,7 @@ public class NormalizedSoftwareResolver(PatchHoundDbContext dbContext)
             .ToList();
         if (staleAliases.Count > 0)
         {
-            dbContext.NormalizedSoftwareAliases.RemoveRange(staleAliases);
+            dbContext.SoftwareProductAliases.RemoveRange(staleAliases);
         }
 
         await dbContext.SaveChangesAsync(ct);

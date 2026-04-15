@@ -60,11 +60,11 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<AssetBusinessLabel> AssetBusinessLabels => Set<AssetBusinessLabel>();
     public DbSet<AssetSecurityProfile> AssetSecurityProfiles => Set<AssetSecurityProfile>();
     public DbSet<SoftwareCpeBinding> SoftwareCpeBindings => Set<SoftwareCpeBinding>();
-    public DbSet<TenantSoftware> TenantSoftware => Set<TenantSoftware>();
-    public DbSet<NormalizedSoftwareAlias> NormalizedSoftwareAliases =>
-        Set<NormalizedSoftwareAlias>();
-    public DbSet<NormalizedSoftwareInstallation> NormalizedSoftwareInstallations =>
-        Set<NormalizedSoftwareInstallation>();
+    public DbSet<SoftwareTenantRecord> SoftwareTenantRecords => Set<SoftwareTenantRecord>();
+    public DbSet<SoftwareProductAlias> SoftwareProductAliases =>
+        Set<SoftwareProductAlias>();
+    public DbSet<SoftwareProductInstallation> SoftwareProductInstallations =>
+        Set<SoftwareProductInstallation>();
     public DbSet<DeviceSoftwareInstallation> DeviceSoftwareInstallations =>
         Set<DeviceSoftwareInstallation>();
     public DbSet<DeviceSoftwareInstallationEpisode> DeviceSoftwareInstallationEpisodes =>
@@ -241,10 +241,10 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .Entity<TeamMembershipRule>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
-            .Entity<TenantSoftware>()
+            .Entity<SoftwareTenantRecord>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
-            .Entity<NormalizedSoftwareInstallation>()
+            .Entity<SoftwareProductInstallation>()
             .HasQueryFilter(e =>
                 IsSystemContext
                 || (AccessibleTenantIds.Contains(e.TenantId) && e.DeviceAsset.DeviceActiveInTenant)
