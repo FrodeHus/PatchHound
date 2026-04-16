@@ -156,7 +156,7 @@ export const updateEnrichmentSources = createServerFn({ method: 'POST' })
     refreshTtlHours: z.number().int().nullable(),
     credentials: z.object({
       secret: z.string(),
-      apiBaseUrl: z.string().min(1),
+      apiBaseUrl: z.string(),
     }),
   })))
   .handler(async ({ context, data }) => {
