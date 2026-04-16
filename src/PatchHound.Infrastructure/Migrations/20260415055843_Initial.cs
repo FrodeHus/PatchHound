@@ -3172,13 +3172,13 @@ namespace PatchHound.Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_Vulnerabilities_ExternalId",
                 table: "Vulnerabilities",
-                column: "ExternalId");
+                column: "ExternalId",
+                unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Vulnerabilities_Source_ExternalId",
+                name: "IX_Vulnerabilities_Source",
                 table: "Vulnerabilities",
-                columns: new[] { "Source", "ExternalId" },
-                unique: true);
+                column: "Source");
 
             migrationBuilder.CreateIndex(
                 name: "IX_VulnerabilityApplicabilities_SoftwareProductId",

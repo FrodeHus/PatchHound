@@ -4142,10 +4142,10 @@ namespace PatchHound.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ExternalId");
-
-                    b.HasIndex("Source", "ExternalId")
+                    b.HasIndex("ExternalId")
                         .IsUnique();
+
+                    b.HasIndex("Source");
 
                     b.ToTable("Vulnerabilities");
                 });
