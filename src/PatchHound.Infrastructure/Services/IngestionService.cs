@@ -7,6 +7,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services.Inventory;
 using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Infrastructure.Services;
@@ -2044,6 +2045,18 @@ public class IngestionService
     {
         var now = DateTimeOffset.UtcNow;
 
+        // ── Step 0: Load staged exposures up front so we can derive applicabilities
+        //            per vulnerability before resolving vulnerabilities in Step 1.
+        //            Without this, VulnerabilityApplicability rows would stay empty
+        //            and ExposureDerivationService would resolve every exposure the
+        //            downstream Step 4 creates.
+        var stagedExposures = await _dbContext
+            .StagedVulnerabilityExposures.IgnoreQueryFilters()
+            .Where(item => item.IngestionRunId == ingestionRunId)
+            .ToListAsync(ct);
+
+        var applicabilitiesByVulnExternalId = BuildApplicabilityInputsFromStagedExposures(stagedExposures);
+
         // ── Step 1: Load and upsert staged vulnerabilities into Vulnerability table ──
         var stagedVulns = await _dbContext
             .StagedVulnerabilities.IgnoreQueryFilters()
@@ -2073,6 +2086,11 @@ public class IngestionService
                     }
                 }
 
+                var applicabilities = applicabilitiesByVulnExternalId.TryGetValue(
+                    staged.ExternalId, out var apps)
+                    ? apps
+                    : (IReadOnlyList<VulnerabilityApplicabilityInput>)[];
+
                 var input = new VulnerabilityResolveInput(
                     Source: staged.SourceKey,
                     ExternalId: staged.ExternalId,
@@ -2085,7 +2103,7 @@ public class IngestionService
                     References: payload?.References?
                         .Select(r => new VulnerabilityReferenceInput(r.Url, r.Source, r.Tags))
                         .ToList() ?? [],
-                    Applicabilities: []
+                    Applicabilities: applicabilities
                 );
 
                 var vuln = await _vulnerabilityResolver.ResolveAsync(input, ct);
@@ -2097,12 +2115,7 @@ public class IngestionService
             await UpdateVulnerabilityMergeProgressAsync(stagedVulnCount, persistedVulnCount, ct);
         }
 
-        // ── Step 2: Load staged exposures and build device ExternalId → Id map ──
-        var stagedExposures = await _dbContext
-            .StagedVulnerabilityExposures.IgnoreQueryFilters()
-            .Where(item => item.IngestionRunId == ingestionRunId)
-            .ToListAsync(ct);
-
+        // ── Step 2: Build device ExternalId → Id map from the staged exposures loaded in Step 0 ──
         var stagedExposureCount = stagedExposures.Count;
 
         var assetExternalIds = stagedExposures
@@ -2899,6 +2912,71 @@ public class IngestionService
             ", ",
             ex.Entries.Select(entry => entry.Metadata.Name).Distinct(StringComparer.Ordinal)
         );
+    }
+
+    /// <summary>
+    /// Derives one <see cref="VulnerabilityApplicabilityInput"/> per unique
+    /// (vendor, product, version) triple present in the staged exposure payloads,
+    /// keyed by vulnerability external id. CPE is built with
+    /// <see cref="SoftwareProductResolver.DeriveCpe"/> so it matches the CPE assigned
+    /// to <see cref="SoftwareProduct"/> rows created from observed software, letting
+    /// <see cref="ExposureDerivationService"/> join installs ↔ applicabilities.
+    /// </summary>
+    private static IReadOnlyDictionary<string, IReadOnlyList<VulnerabilityApplicabilityInput>>
+        BuildApplicabilityInputsFromStagedExposures(IReadOnlyList<StagedVulnerabilityExposure> stagedExposures)
+    {
+        var byVuln = new Dictionary<string, Dictionary<(string Cpe, string? Version), VulnerabilityApplicabilityInput>>(
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var staged in stagedExposures)
+        {
+            if (string.IsNullOrWhiteSpace(staged.PayloadJson))
+            {
+                continue;
+            }
+
+            IngestionAffectedAsset? asset;
+            try
+            {
+                asset = JsonSerializer.Deserialize<IngestionAffectedAsset>(staged.PayloadJson);
+            }
+            catch (JsonException)
+            {
+                continue;
+            }
+
+            if (asset is null || string.IsNullOrWhiteSpace(asset.ProductName))
+            {
+                continue;
+            }
+
+            var cpe = SoftwareProductResolver.DeriveCpe(asset.ProductVendor ?? string.Empty, asset.ProductName);
+            var version = string.IsNullOrWhiteSpace(asset.ProductVersion) ? null : asset.ProductVersion;
+            var key = (cpe, version);
+
+            if (!byVuln.TryGetValue(staged.VulnerabilityExternalId, out var perVuln))
+            {
+                perVuln = new Dictionary<(string, string?), VulnerabilityApplicabilityInput>();
+                byVuln[staged.VulnerabilityExternalId] = perVuln;
+            }
+
+            if (!perVuln.ContainsKey(key))
+            {
+                perVuln[key] = new VulnerabilityApplicabilityInput(
+                    SoftwareProductId: null,
+                    CpeCriteria: cpe,
+                    Vulnerable: true,
+                    VersionStartIncluding: null,
+                    VersionStartExcluding: null,
+                    VersionEndIncluding: version,
+                    VersionEndExcluding: null);
+            }
+        }
+
+        return byVuln.ToDictionary(
+            kvp => kvp.Key,
+            kvp => (IReadOnlyList<VulnerabilityApplicabilityInput>)kvp.Value.Values.ToList(),
+            StringComparer.OrdinalIgnoreCase);
     }
 }
 

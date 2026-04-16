@@ -203,6 +203,93 @@ public class IngestionServicePhase3Tests
         exposures[0].InstalledSoftwareId.Should().BeNull();
     }
 
+    /// <summary>
+    /// Regression test for the Phase 3 refactor gap: when a source stages a vulnerability
+    /// with per-device <see cref="IngestionAffectedAsset"/> payload carrying ProductVendor
+    /// and ProductName, <see cref="IngestionService.ProcessStagedResultsAsync"/> must
+    /// populate a <see cref="VulnerabilityApplicability"/> row so that
+    /// <see cref="ExposureDerivationService"/> can match installed software against the
+    /// vulnerability. Without this, the applicabilities table stays empty and every
+    /// exposure produced by ProcessStagedResults gets immediately resolved by the
+    /// derivation pass.
+    /// </summary>
+    [Fact]
+    public async Task ProcessStagedResultsAsync_creates_applicability_from_staged_payload_and_enables_exposure_derivation()
+    {
+        var tenantId = Guid.NewGuid();
+        await using var db = await CreateTenantDbAsync(tenantId);
+
+        var product = SoftwareProduct.Create(
+            "Microsoft", "Edge", "cpe:2.3:a:microsoft:edge:*:*:*:*:*:*:*:*");
+        db.SoftwareProducts.Add(product);
+
+        var sourceSystem = SourceSystem.Create("microsoft-defender", "Defender");
+        db.SourceSystems.Add(sourceSystem);
+
+        var profile = SecurityProfile.Create(
+            tenantId,
+            "Default",
+            null,
+            EnvironmentClass.Server,
+            InternetReachability.Internet,
+            SecurityRequirementLevel.High,
+            SecurityRequirementLevel.High,
+            SecurityRequirementLevel.High);
+        db.SecurityProfiles.Add(profile);
+
+        var device = Device.Create(tenantId, sourceSystem.Id, "machine-1", "Machine 1", Criticality.High);
+        device.AssignSecurityProfile(profile.Id);
+        db.Devices.Add(device);
+
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(
+            tenantId, device.Id, product.Id, sourceSystem.Id, "120.0", DateTimeOffset.UtcNow));
+
+        var run = IngestionRun.Start(tenantId, "microsoft-defender", DateTimeOffset.UtcNow);
+        db.IngestionRuns.Add(run);
+
+        db.StagedVulnerabilities.Add(StagedVulnerability.Create(
+            run.Id, tenantId, "microsoft-defender",
+            "CVE-2026-APPL", "Edge vuln", Severity.High, "{}", DateTimeOffset.UtcNow));
+
+        var affectedAsset = new IngestionAffectedAsset(
+            ExternalAssetId: "machine-1",
+            AssetName: "Machine 1",
+            AssetType: AssetType.Device,
+            ProductVendor: "Microsoft",
+            ProductName: "Edge",
+            ProductVersion: "120.0");
+
+        db.StagedVulnerabilityExposures.Add(StagedVulnerabilityExposure.Create(
+            run.Id, tenantId, "microsoft-defender",
+            "CVE-2026-APPL", "machine-1", "Machine 1",
+            AssetType.Device,
+            JsonSerializer.Serialize(affectedAsset),
+            DateTimeOffset.UtcNow));
+
+        await db.SaveChangesAsync();
+
+        var ingestion = CreateIngestionService(db);
+
+        await ingestion.ProcessStagedResultsAsync(
+            run.Id, tenantId, "microsoft-defender", snapshotId: null, "Defender", CancellationToken.None);
+
+        var apps = await db.VulnerabilityApplicabilities.ToListAsync();
+        apps.Should().ContainSingle("staged payload's vendor/product should produce one applicability");
+        apps[0].CpeCriteria.Should().Be("cpe:2.3:a:microsoft:edge:*:*:*:*:*:*:*:*");
+        apps[0].Vulnerable.Should().BeTrue();
+        apps[0].VersionEndIncluding.Should().Be("120.0",
+            "applicability should carry the observed product version as the end-including predicate");
+
+        await ingestion.RunExposureDerivationAsync(tenantId, CancellationToken.None);
+
+        var exposures = await db.DeviceVulnerabilityExposures
+            .Where(e => e.Status != ExposureStatus.Resolved)
+            .ToListAsync();
+        exposures.Should().ContainSingle(
+            "derivation must produce one live exposure from the installed software × new applicability match");
+        exposures[0].DeviceId.Should().Be(device.Id);
+    }
+
     private static IngestionService CreateIngestionService(PatchHoundDbContext db) =>
         new(
             db,
