@@ -263,7 +263,7 @@ public class IngestionServicePhase3Tests
             run.Id, tenantId, "microsoft-defender",
             "CVE-2026-APPL", "machine-1", "Machine 1",
             AssetType.Device,
-            JsonSerializer.Serialize(affectedAsset),
+            JsonSerializer.Serialize(affectedAsset, StagingSerializerOptions.Instance),
             DateTimeOffset.UtcNow));
 
         await db.SaveChangesAsync();

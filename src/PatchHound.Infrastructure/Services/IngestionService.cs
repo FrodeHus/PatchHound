@@ -2938,7 +2938,7 @@ public class IngestionService
             IngestionAffectedAsset? asset;
             try
             {
-                asset = JsonSerializer.Deserialize<IngestionAffectedAsset>(staged.PayloadJson);
+                asset = JsonSerializer.Deserialize<IngestionAffectedAsset>(staged.PayloadJson, StagingSerializerOptions.Instance);
             }
             catch (JsonException)
             {
