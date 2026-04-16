@@ -158,6 +158,7 @@ public class IngestionService
         await _dbContext.SaveChangesAsync(ct);
         await _exposureAssessmentService.AssessForTenantAsync(tenantId, now, ct);
         await _dbContext.SaveChangesAsync(ct);
+        await new RemediationCaseService(_dbContext).EnsureCasesForOpenExposuresAsync(tenantId, ct);
     }
 
     public async Task<bool> RunIngestionAsync(Guid tenantId, CancellationToken ct)

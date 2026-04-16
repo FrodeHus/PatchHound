@@ -290,6 +290,43 @@ public class IngestionServicePhase3Tests
         exposures[0].DeviceId.Should().Be(device.Id);
     }
 
+    [Fact]
+    public async Task RunExposureDerivationAsync_materializes_remediation_case_for_each_product_with_open_exposure()
+    {
+        var tenantId = Guid.NewGuid();
+        await using var db = await CreateTenantDbAsync(tenantId);
+
+        var product = SoftwareProduct.Create("Acme", "Widget", "cpe:2.3:a:acme:widget:*:*:*:*:*:*:*:*");
+        var vulnerability = Vulnerability.Create(
+            "nvd", "CVE-2026-CASE", "t", "d", Severity.High, 7.5m, "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L",
+            DateTimeOffset.UtcNow);
+        db.SoftwareProducts.Add(product);
+        db.Vulnerabilities.Add(vulnerability);
+        db.VulnerabilityApplicabilities.Add(VulnerabilityApplicability.Create(
+            vulnerability.Id, product.Id, null, true, null, null, null, null));
+
+        var sourceSystem = SourceSystem.Create("test-source", "Test");
+        db.SourceSystems.Add(sourceSystem);
+        var device = Device.Create(tenantId, sourceSystem.Id, "dev-1", "Device 1", Criticality.Medium);
+        db.Devices.Add(device);
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(
+            tenantId, device.Id, product.Id, sourceSystem.Id, "1.0", DateTimeOffset.UtcNow));
+        await db.SaveChangesAsync();
+
+        var ingestion = CreateIngestionService(db);
+        await ingestion.RunExposureDerivationAsync(tenantId, CancellationToken.None);
+
+        var cases = await db.RemediationCases.ToListAsync();
+        cases.Should().ContainSingle("an open exposure on the product must auto-create a remediation case");
+        cases[0].TenantId.Should().Be(tenantId);
+        cases[0].SoftwareProductId.Should().Be(product.Id);
+
+        // Running twice must not duplicate.
+        await ingestion.RunExposureDerivationAsync(tenantId, CancellationToken.None);
+        (await db.RemediationCases.ToListAsync()).Should().ContainSingle(
+            "re-running derivation must be idempotent for case creation");
+    }
+
     private static IngestionService CreateIngestionService(PatchHoundDbContext db) =>
         new(
             db,
