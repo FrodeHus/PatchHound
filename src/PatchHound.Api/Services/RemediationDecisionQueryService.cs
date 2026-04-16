@@ -128,34 +128,40 @@ public class RemediationDecisionQueryService(
             .Where(s => s.TenantId == tenantId && productIds.Contains(s.SoftwareProductId))
             .ToDictionaryAsync(s => s.SoftwareProductId, ct);
 
-        // EarliestFirstSeen and HighestSeverity from open exposures.
-        var exposureSummaryByProduct = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+        // VendorSeverity and Device.Criticality are stored as strings (HasConversion<string>),
+        // so SQL-side Max((int)column) is impossible — Postgres would try to cast 'High' to
+        // integer. Materialize the open-exposure rows and compute the Max enum values in
+        // memory, which uses the natural int ordering of the enum.
+        var openExposureRows = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
             .Where(e => e.TenantId == tenantId
                 && e.SoftwareProductId != null
                 && productIds.Contains(e.SoftwareProductId!.Value)
                 && e.Status == ExposureStatus.Open)
-            .GroupBy(e => e.SoftwareProductId!.Value)
-            .Select(g => new
+            .Select(e => new
+            {
+                SoftwareProductId = e.SoftwareProductId!.Value,
+                e.FirstObservedAt,
+                Severity = e.Vulnerability.VendorSeverity,
+                Criticality = e.Device.Criticality,
+            })
+            .ToListAsync(ct);
+
+        var exposureSummaryByProduct = openExposureRows
+            .GroupBy(e => e.SoftwareProductId)
+            .ToDictionary(g => g.Key, g => new
             {
                 SoftwareProductId = g.Key,
                 EarliestFirstSeen = g.Min(e => e.FirstObservedAt),
-                HighestSeverity = (Severity)g.Max(e => (int)e.Vulnerability.VendorSeverity),
-            })
-            .ToDictionaryAsync(x => x.SoftwareProductId, ct);
+                HighestSeverity = g.Max(e => e.Severity),
+            });
 
-        // Highest criticality of any device exposed via this software product.
-        var criticalityByProduct = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
-            .Where(e => e.TenantId == tenantId
-                && e.SoftwareProductId != null
-                && productIds.Contains(e.SoftwareProductId!.Value)
-                && e.Status == ExposureStatus.Open)
-            .GroupBy(e => e.SoftwareProductId!.Value)
-            .Select(g => new
+        var criticalityByProduct = openExposureRows
+            .GroupBy(e => e.SoftwareProductId)
+            .ToDictionary(g => g.Key, g => new
             {
                 SoftwareProductId = g.Key,
-                MaxCriticality = (Criticality)g.Max(e => (int)e.Device.Criticality),
-            })
-            .ToDictionaryAsync(x => x.SoftwareProductId, ct);
+                MaxCriticality = g.Max(e => e.Criticality),
+            });
 
         // Build vulnCounts and riskScoresByCaseId keyed by RemediationCaseId.
         var vulnCounts = new Dictionary<Guid, (int Total, int Critical, int High, DateTimeOffset EarliestFirstSeen, Severity HighestSeverity)>();
