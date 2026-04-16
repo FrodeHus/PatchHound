@@ -13,5 +13,29 @@ export const Route = createFileRoute('/_authed/admin/platform/ai')({
     mode: z.enum(['new', 'edit']).optional(),
     profileId: z.string().optional(),
   }),
-  component: TenantAiSettingsPage,
+  component: AiSettingsRoute,
 })
+
+function AiSettingsRoute() {
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
+
+  return (
+    <TenantAiSettingsPage
+      mode={search.mode ?? null}
+      profileId={search.profileId ?? null}
+      onSearchChange={(patch) => {
+        void navigate({
+          search: (prev) => ({
+            ...prev,
+            mode: patch.mode as 'edit' | 'new' | undefined,
+            profileId: patch.profileId,
+          }),
+        })
+      }}
+      onClearSearch={() => {
+        void navigate({ search: {} })
+      }}
+    />
+  )
+}

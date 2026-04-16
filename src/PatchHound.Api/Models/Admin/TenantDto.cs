@@ -4,13 +4,15 @@ public record TenantListItemDto(
     Guid Id,
     string Name,
     string EntraTenantId,
-    int ConfiguredIngestionSourceCount
+    int ConfiguredIngestionSourceCount,
+    bool IsPrimary
 );
 
 public record TenantDetailDto(
     Guid Id,
     string Name,
     string EntraTenantId,
+    bool IsPrimary,
     TenantAssetSummaryDto Assets,
     TenantSlaConfigurationDto Sla,
     IReadOnlyList<TenantIngestionSourceDto> IngestionSources

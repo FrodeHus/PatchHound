@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Building2, ChevronRight, Plus } from 'lucide-react'
+import { Building2, ChevronRight, Plus, ShieldCheck } from 'lucide-react'
 import type { TenantListItem } from '@/api/settings.schemas'
 import { Badge } from '@/components/ui/badge'
 import { SortableColumnHeader } from '@/components/ui/sortable-column-header'
@@ -65,12 +65,22 @@ export function TenantAdministrationList({
             className="group flex items-center gap-3"
           >
             <div className="flex size-9 items-center justify-center rounded-lg border border-border/70 bg-muted/50">
-              <Building2 className="size-4 text-muted-foreground" />
+              {row.original.isPrimary
+                ? <ShieldCheck className="size-4 text-primary" />
+                : <Building2 className="size-4 text-muted-foreground" />
+              }
             </div>
             <div className="min-w-0">
-              <p className="truncate font-medium tracking-tight group-hover:text-primary transition-colors">
-                {row.original.name}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="truncate font-medium tracking-tight group-hover:text-primary transition-colors">
+                  {row.original.name}
+                </p>
+                {row.original.isPrimary && (
+                  <Badge variant="secondary" className="rounded-full text-[11px] px-2 py-0">
+                    Primary
+                  </Badge>
+                )}
+              </div>
               <p className="truncate font-mono text-[11px] text-muted-foreground">{row.original.entraTenantId}</p>
             </div>
           </Link>

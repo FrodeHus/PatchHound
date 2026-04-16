@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Bell, Bot, Braces, Building2, ChevronRight, DatabaseZap, Flag, GitBranchPlus, Globe, Plug, ScanSearch, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
+import { Bell, Bot, Braces, Building2, ChevronRight, Flag, GitBranchPlus, Globe, Plug, ScanSearch, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({
@@ -24,7 +24,6 @@ type AdminArea = {
   to:
     | '/admin/teams'
     | '/admin/tenants'
-    | '/admin/sources'
     | '/admin/business-labels'
     | '/admin/device-rules'
     | '/admin/workflows'
@@ -56,7 +55,7 @@ const adminSections: AdminSection[] = [
     areas: [
       {
         title: 'Tenants',
-        description: 'Maintain tenant records, review tenant detail, and manage irreversible tenant operations.',
+        description: 'Manage tenant identity, sources, AI settings, device rules, workflows, and business labels — all from one place.',
         to: '/admin/tenants',
         roles: ['GlobalAdmin', 'SecurityManager'],
         icon: Building2,
@@ -102,13 +101,6 @@ const adminSections: AdminSection[] = [
         to: '/admin/teams',
         roles: ['GlobalAdmin', 'SecurityManager', 'SecurityAnalyst', 'AssetOwner', 'TechnicalManager', 'Auditor', 'Stakeholder'],
         icon: ShieldCheck,
-      },
-      {
-        title: 'Sources',
-        description: 'Configure tenant data sources and enrichment providers such as Defender and NVD.',
-        to: '/admin/sources',
-        roles: ['GlobalAdmin', 'SecurityManager'],
-        icon: DatabaseZap,
       },
       {
         title: 'Authenticated scans',
@@ -160,7 +152,7 @@ const adminSections: AdminSection[] = [
       },
       {
         title: 'AI settings',
-        description: 'Manage tenant AI profiles, prompts, runtime controls, and default models.',
+        description: 'Platform-level AI settings. Per-tenant AI profiles are managed via the Tenants hub.',
         to: '/admin/platform/ai',
         roles: ['GlobalAdmin', 'SecurityManager'],
         icon: Bot,

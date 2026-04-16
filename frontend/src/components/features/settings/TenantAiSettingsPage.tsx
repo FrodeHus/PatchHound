@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -24,7 +24,6 @@ import {
 } from '@/api/ai-settings.functions'
 import type { SaveTenantAiProfile, TenantAiProfile } from '@/api/ai-settings.schemas'
 import { useTenantScope } from '@/components/layout/tenant-scope'
-import { Route } from '@/routes/_authed/admin/platform/ai'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -175,18 +174,48 @@ function extractMissingOllamaModel(errorMessage: string, model: string) {
   return errorMessage.toLowerCase().includes('not found') && errorMessage.includes(model) ? model : null
 }
 
-export function TenantAiSettingsPage() {
+type TenantAiSettingsPageProps = {
+  /** When provided, uses this tenantId directly instead of `useTenantScope()`. */
+  tenantId?: string
+  /** Display name for the tenant — used when `tenantId` is provided as a prop. */
+  tenantName?: string
+  /** Controlled search state — when provided, the component is controlled. */
+  mode?: string | null
+  profileId?: string | null
+  /** Called instead of router navigation when the component is embedded. */
+  onSearchChange?: (patch: { mode?: string; profileId?: string }) => void
+  onClearSearch?: () => void
+}
+
+export function TenantAiSettingsPage({
+  tenantId: tenantIdProp,
+  tenantName: tenantNameProp,
+  mode: modeProp,
+  profileId: profileIdProp,
+  onSearchChange,
+  onClearSearch,
+}: TenantAiSettingsPageProps = {}) {
   const navigate = useNavigate()
-  const search = Route.useSearch()
   const queryClient = useQueryClient()
-  const { selectedTenantId, tenants } = useTenantScope()
+  const { selectedTenantId: scopeTenantId, tenants } = useTenantScope()
+
+  const selectedTenantId = tenantIdProp ?? scopeTenantId
+
+  const selectedTenantName = useMemo(
+    () => tenantNameProp ?? tenants.find((item) => item.id === selectedTenantId)?.name ?? 'Current tenant',
+    [tenantNameProp, selectedTenantId, tenants],
+  )
+
   const [draft, setDraft] = useState<SaveTenantAiProfile>(createEmptyProfile)
   const [saveBanner, setSaveBanner] = useState<string | null>(null)
 
-  const selectedTenantName = useMemo(
-    () => tenants.find((item) => item.id === selectedTenantId)?.name ?? 'Current tenant',
-    [selectedTenantId, tenants],
-  )
+  // Route-based search state used only when not controlled via props
+  const isControlled = onSearchChange !== undefined
+  const [localMode, setLocalMode] = useState<string | undefined>(undefined)
+  const [localProfileId, setLocalProfileId] = useState<string | undefined>(undefined)
+
+  const effectiveMode = isControlled ? (modeProp ?? null) : localMode
+  const effectiveProfileId = isControlled ? (profileIdProp ?? null) : localProfileId
 
   const profilesQuery = useQuery({
     queryKey: ['tenant-ai-profiles', selectedTenantId],
@@ -195,8 +224,8 @@ export function TenantAiSettingsPage() {
   })
 
   const profiles = profilesQuery.data ?? EMPTY_PROFILES
-  const editingProfileId = search.mode === 'edit' ? search.profileId ?? null : null
-  const isCreateMode = search.mode === 'new'
+  const editingProfileId = effectiveMode === 'edit' ? effectiveProfileId ?? null : null
+  const isCreateMode = effectiveMode === 'new'
   const isEditorOpen = isCreateMode || !!editingProfileId
   const editingProfile = useMemo(
     () => profiles.find((item) => item.id === editingProfileId) ?? null,
@@ -210,13 +239,12 @@ export function TenantAiSettingsPage() {
       await queryClient.invalidateQueries({ queryKey: ['tenant-ai-profiles', selectedTenantId] })
       setSaveBanner('Profile saved successfully.')
       setDraft(toDraft(savedProfile))
-      await navigate({
-        to: '/admin/platform/ai',
-        search: {
-          mode: 'edit',
-          profileId: savedProfile.id,
-        },
-      })
+      if (isControlled) {
+        onSearchChange({ mode: 'edit', profileId: savedProfile.id })
+      } else {
+        setLocalMode('edit')
+        setLocalProfileId(savedProfile.id)
+      }
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, 'Failed to save AI profile'))
@@ -259,32 +287,36 @@ export function TenantAiSettingsPage() {
   function openNewProfile() {
     setDraft(createEmptyProfile())
     setSaveBanner(null)
-    void navigate({
-      to: '/admin/platform/ai',
-      search: {
-        mode: 'new',
-      },
-    })
+    if (isControlled) {
+      onSearchChange({ mode: 'new' })
+    } else {
+      setLocalMode('new')
+      setLocalProfileId(undefined)
+      void navigate({ to: '/admin/platform/ai', search: { mode: 'new' } })
+    }
   }
 
   function openProfile(profile: TenantAiProfile) {
     setDraft(toDraft(profile))
     setSaveBanner(null)
-    void navigate({
-      to: '/admin/platform/ai',
-      search: {
-        mode: 'edit',
-        profileId: profile.id,
-      },
-    })
+    if (isControlled) {
+      onSearchChange({ mode: 'edit', profileId: profile.id })
+    } else {
+      setLocalMode('edit')
+      setLocalProfileId(profile.id)
+      void navigate({ to: '/admin/platform/ai', search: { mode: 'edit', profileId: profile.id } })
+    }
   }
 
   function closeEditor() {
     setSaveBanner(null)
-    void navigate({
-      to: '/admin/platform/ai',
-      search: {},
-    })
+    if (isControlled) {
+      onClearSearch?.()
+    } else {
+      setLocalMode(undefined)
+      setLocalProfileId(undefined)
+      void navigate({ to: '/admin/platform/ai', search: {} })
+    }
   }
 
   return (
@@ -512,14 +544,14 @@ function AiProfileEditorPage({
   return (
     <div className="space-y-5">
       <div className="space-y-3">
-        <Link
-          to="/admin/platform/ai"
-          search={{}}
+        <button
+          type="button"
+          onClick={onBack}
           className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
           Back to AI profiles
-        </Link>
+        </button>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight">

@@ -71,12 +71,14 @@ export const tenantListItemSchema = z.object({
   name: z.string(),
   entraTenantId: z.string(),
   configuredIngestionSourceCount: z.number(),
+  isPrimary: z.boolean(),
 })
 
 export const tenantDetailSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   entraTenantId: z.string(),
+  isPrimary: z.boolean(),
   assets: z.object({
     totalCount: z.number(),
     deviceCount: z.number(),

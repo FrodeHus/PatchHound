@@ -57,6 +57,7 @@ public class TenantsController : ControllerBase
                 t.Id,
                 t.Name,
                 t.EntraTenantId,
+                t.IsPrimary,
             })
             .ToListAsync(ct);
 
@@ -76,7 +77,8 @@ public class TenantsController : ControllerBase
                         sourceCounts.Count(source =>
                             source.TenantId == t.Id
                             && TenantSourceCatalog.HasConfiguredCredentials(source)
-                        )
+                        ),
+                        t.IsPrimary
                     ))
                     .ToList(),
                 totalCount,
@@ -1031,6 +1033,7 @@ public class TenantsController : ControllerBase
             tenant.Id,
             tenant.Name,
             tenant.EntraTenantId,
+            tenant.IsPrimary,
             assetSummary,
             slaDto,
             sources
