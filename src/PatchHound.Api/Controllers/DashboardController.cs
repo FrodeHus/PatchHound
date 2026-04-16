@@ -386,16 +386,49 @@ public class DashboardController : ControllerBase
                 SoftwareProductId = rc.SoftwareProductId,
                 SoftwareProductName = sp.Name,
                 OwnerTeamName = ownerTeam.Name,
-                PatchingTaskId = pt.Id,
-                pt.DueDate,
+                PatchingTaskId = (Guid?)pt.Id,
+                DueDate = (DateTimeOffset?)pt.DueDate,
                 ActionState = pt.Status.ToString(),
             }
         )
             .OrderBy(item => item.DueDate)
             .ToListAsync(ct);
 
+        // Workflows at the RemediationDecision stage where the owner team must make a decision.
+        // These have no PatchingTask yet and would otherwise be invisible to the asset owner.
+        var ownerDecisionRows = await (
+            from wf in _dbContext.RemediationWorkflows.AsNoTracking()
+            join rc in _dbContext.RemediationCases.AsNoTracking()
+                on wf.RemediationCaseId equals rc.Id
+            join sp in _dbContext.SoftwareProducts.AsNoTracking()
+                on rc.SoftwareProductId equals sp.Id
+            join ownerTeam in _dbContext.Teams.AsNoTracking()
+                on wf.SoftwareOwnerTeamId equals ownerTeam.Id
+            where wf.TenantId == tenantId
+                  && ownerScope.OwnerTeamIds.Contains(wf.SoftwareOwnerTeamId)
+                  && wf.CurrentStage == RemediationWorkflowStage.RemediationDecision
+                  && wf.Status == RemediationWorkflowStatus.Active
+            select new
+            {
+                RemediationCaseId = rc.Id,
+                SoftwareProductId = rc.SoftwareProductId,
+                SoftwareProductName = sp.Name,
+                OwnerTeamName = ownerTeam.Name,
+                PatchingTaskId = (Guid?)null,
+                DueDate = (DateTimeOffset?)null,
+                ActionState = "AwaitingDecision",
+            }
+        ).ToListAsync(ct);
+
+        // Merge patching tasks + awaiting-decision workflows, deduplicate by RemediationCaseId
+        // (a case shouldn't appear twice even if a workflow and a task both match).
+        var existingCaseIds = ownerPatchingRows.Select(r => r.RemediationCaseId).ToHashSet();
+        var combinedRows = ownerPatchingRows
+            .Concat(ownerDecisionRows.Where(r => !existingCaseIds.Contains(r.RemediationCaseId)))
+            .ToList();
+
         // Build owner actions from patching tasks — use the top vulnerability per software asset
-        var patchingSoftwareProductIds = ownerPatchingRows
+        var patchingSoftwareProductIds = combinedRows
             .Select(p => p.SoftwareProductId)
             .Distinct()
             .ToList();
@@ -429,7 +462,7 @@ public class DashboardController : ControllerBase
                 g => g.First()
             );
 
-        var ownerActionRows = ownerPatchingRows.Select(p =>
+        var ownerActionRows = combinedRows.Select(p =>
         {
             var topVuln = topVulnBySoftware.GetValueOrDefault(p.SoftwareProductId);
             var episodeRiskScore = topVuln?.EnvironmentalCvss;

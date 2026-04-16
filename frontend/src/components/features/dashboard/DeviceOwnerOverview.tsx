@@ -67,9 +67,16 @@ function actionStateTone(value: string) {
       return 'bg-blue-50 text-blue-700 border-blue-200'
     case 'Pending':
       return 'bg-amber-50 text-amber-700 border-amber-200'
+    case 'AwaitingDecision':
+      return 'bg-orange-50 text-orange-700 border-orange-200'
     default:
       return 'bg-muted text-muted-foreground border-border'
   }
+}
+
+function actionStateLabel(value: string) {
+  if (value === 'AwaitingDecision') return 'Decision needed'
+  return value
 }
 
 type ActionSort = 'urgency' | 'severity' | 'team'
@@ -264,7 +271,7 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                           {item.ownerTeamName}
                         </Badge>
                         <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${actionStateTone(item.actionState)}`}>
-                          {item.actionState}
+                          {actionStateLabel(item.actionState)}
                         </span>
                         {item.episodeRiskBand ? (
                           <span className="text-xs text-muted-foreground">{item.episodeRiskBand} risk</span>
