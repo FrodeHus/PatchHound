@@ -178,6 +178,163 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
         installed.Select(i => i.SoftwareProductId).Distinct().Should().ContainSingle();
     }
 
+    [Fact]
+    public async Task Merge_skips_new_stale_inactive_device()
+    {
+        var runId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+
+        await SeedStagedDeviceAsync(
+            runId: runId,
+            tenantId: tenantId,
+            deviceExternalId: "stale-new",
+            deviceName: "ghost-device",
+            healthStatus: "Inactive",
+            lastSeenAt: DateTimeOffset.UtcNow.AddDays(-45)
+        );
+
+        var summary = await _sut.MergeAsync(runId, tenantId, CancellationToken.None);
+
+        summary.DevicesSkipped.Should().Be(1);
+        summary.DevicesCreated.Should().Be(0);
+        summary.DevicesDeactivated.Should().Be(0);
+
+        var devices = await _db.Devices.IgnoreQueryFilters().ToListAsync();
+        devices.Should().BeEmpty("stale inactive new devices must not be created");
+    }
+
+    [Fact]
+    public async Task Merge_deactivates_existing_stale_inactive_device()
+    {
+        var tenantId = Guid.NewGuid();
+        var run1Id = Guid.NewGuid();
+        var run2Id = Guid.NewGuid();
+
+        // First run: device is active and healthy.
+        await SeedStagedDeviceAsync(
+            runId: run1Id,
+            tenantId: tenantId,
+            deviceExternalId: "dev-goes-stale",
+            deviceName: "retiring-host",
+            healthStatus: "Active",
+            lastSeenAt: DateTimeOffset.UtcNow.AddMinutes(-10)
+        );
+        await _sut.MergeAsync(run1Id, tenantId, CancellationToken.None);
+
+        var deviceAfterFirstRun = await _db.Devices.IgnoreQueryFilters()
+            .SingleAsync(d => d.ExternalId == "dev-goes-stale");
+        deviceAfterFirstRun.ActiveInTenant.Should().BeTrue();
+
+        // Second run: same device is now stale+inactive.
+        await SeedStagedDeviceAsync(
+            runId: run2Id,
+            tenantId: tenantId,
+            deviceExternalId: "dev-goes-stale",
+            deviceName: "retiring-host",
+            healthStatus: "Inactive",
+            lastSeenAt: DateTimeOffset.UtcNow.AddDays(-60)
+        );
+        var summary = await _sut.MergeAsync(run2Id, tenantId, CancellationToken.None);
+
+        summary.DevicesDeactivated.Should().Be(1);
+        summary.DevicesCreated.Should().Be(0);
+        summary.DevicesTouched.Should().Be(0);
+
+        var deviceAfterSecondRun = await _db.Devices.IgnoreQueryFilters()
+            .SingleAsync(d => d.ExternalId == "dev-goes-stale");
+        deviceAfterSecondRun.ActiveInTenant.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Merge_reactivates_device_when_seen_again_after_being_inactive()
+    {
+        var tenantId = Guid.NewGuid();
+        var run1Id = Guid.NewGuid();
+        var run2Id = Guid.NewGuid();
+        var run3Id = Guid.NewGuid();
+
+        // Run 1: active.
+        await SeedStagedDeviceAsync(
+            runId: run1Id,
+            tenantId: tenantId,
+            deviceExternalId: "dev-revives",
+            deviceName: "returning-host",
+            healthStatus: "Active",
+            lastSeenAt: DateTimeOffset.UtcNow.AddMinutes(-5)
+        );
+        await _sut.MergeAsync(run1Id, tenantId, CancellationToken.None);
+
+        // Run 2: stale+inactive → deactivated.
+        await SeedStagedDeviceAsync(
+            runId: run2Id,
+            tenantId: tenantId,
+            deviceExternalId: "dev-revives",
+            deviceName: "returning-host",
+            healthStatus: "Inactive",
+            lastSeenAt: DateTimeOffset.UtcNow.AddDays(-45)
+        );
+        await _sut.MergeAsync(run2Id, tenantId, CancellationToken.None);
+
+        var afterDeactivation = await _db.Devices.IgnoreQueryFilters()
+            .SingleAsync(d => d.ExternalId == "dev-revives");
+        afterDeactivation.ActiveInTenant.Should().BeFalse();
+
+        // Run 3: device shows up as active again → should be reactivated.
+        await SeedStagedDeviceAsync(
+            runId: run3Id,
+            tenantId: tenantId,
+            deviceExternalId: "dev-revives",
+            deviceName: "returning-host",
+            healthStatus: "Active",
+            lastSeenAt: DateTimeOffset.UtcNow.AddMinutes(-2)
+        );
+        var summary = await _sut.MergeAsync(run3Id, tenantId, CancellationToken.None);
+
+        summary.DevicesTouched.Should().Be(1);
+        summary.DevicesDeactivated.Should().Be(0);
+
+        var afterReactivation = await _db.Devices.IgnoreQueryFilters()
+            .SingleAsync(d => d.ExternalId == "dev-revives");
+        afterReactivation.ActiveInTenant.Should().BeTrue();
+    }
+
+    private async Task SeedStagedDeviceAsync(
+        Guid runId,
+        Guid tenantId,
+        string deviceExternalId,
+        string deviceName,
+        string healthStatus,
+        DateTimeOffset lastSeenAt
+    )
+    {
+        var deviceAsset = new IngestionAsset(
+            ExternalId: deviceExternalId,
+            Name: deviceName,
+            AssetType: AssetType.Device,
+            Description: null,
+            DeviceComputerDnsName: $"{deviceName}.contoso.local",
+            DeviceHealthStatus: healthStatus,
+            DeviceOsPlatform: "Windows11",
+            DeviceOsVersion: "10.0.22631",
+            DeviceRiskScore: "Medium",
+            DeviceLastSeenAt: lastSeenAt,
+            DeviceLastIpAddress: "10.0.0.5",
+            DeviceAadDeviceId: Guid.NewGuid().ToString()
+        );
+        var stagedDevice = StagedDevice.Create(
+            ingestionRunId: runId,
+            tenantId: tenantId,
+            sourceKey: "defender",
+            externalId: deviceExternalId,
+            name: deviceName,
+            assetType: AssetType.Device,
+            payloadJson: JsonSerializer.Serialize(deviceAsset),
+            stagedAt: DateTimeOffset.UtcNow
+        );
+        _db.StagedDevices.Add(stagedDevice);
+        await _db.SaveChangesAsync();
+    }
+
     private async Task SeedStagedDeviceWithSoftwareAsync(
         Guid runId,
         Guid tenantId,

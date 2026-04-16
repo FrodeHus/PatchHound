@@ -31,6 +31,8 @@ public class StagedDeviceMergeService(
         var devicesTouched = 0;
         var installedCreated = 0;
         var installedTouched = 0;
+        var devicesSkipped = 0;
+        var devicesDeactivated = 0;
 
         // 1. Load device-type staged rows for this run+tenant.
         var stagedDevices = await db
@@ -44,7 +46,7 @@ public class StagedDeviceMergeService(
 
         if (stagedDevices.Count == 0)
         {
-            return new StagedDeviceMergeSummary(0, 0, 0, 0);
+            return new StagedDeviceMergeSummary(DevicesCreated: 0, DevicesTouched: 0, InstalledSoftwareCreated: 0, InstalledSoftwareTouched: 0);
         }
 
         // 2. Load software-type staged rows for this run+tenant so we can look
@@ -97,7 +99,8 @@ public class StagedDeviceMergeService(
                 );
             }
 
-            // Pre-check to track created vs touched counts.
+            // Pre-check to track created vs touched counts, and to determine
+            // whether a stale+inactive device is new (skip) or existing (deactivate).
             var deviceBefore = await db
                 .Devices.IgnoreQueryFilters()
                 .FirstOrDefaultAsync(
@@ -107,6 +110,37 @@ public class StagedDeviceMergeService(
                         && d.ExternalId == stagedDevice.ExternalId,
                     ct
                 );
+
+            if (IsStaleAndInactive(payload))
+            {
+                if (deviceBefore is null)
+                {
+                    // New device that is already stale — do not create it.
+                    devicesSkipped++;
+                    continue;
+                }
+
+                // Existing device that has gone stale — update inventory and deactivate.
+                deviceBefore.UpdateInventoryDetails(
+                    computerDnsName: payload.DeviceComputerDnsName,
+                    healthStatus: payload.DeviceHealthStatus,
+                    osPlatform: payload.DeviceOsPlatform,
+                    osVersion: payload.DeviceOsVersion,
+                    externalRiskLabel: payload.DeviceRiskScore,
+                    lastSeenAt: payload.DeviceLastSeenAt,
+                    lastIpAddress: payload.DeviceLastIpAddress,
+                    aadDeviceId: payload.DeviceAadDeviceId,
+                    groupId: payload.DeviceGroupId,
+                    groupName: payload.DeviceGroupName,
+                    exposureLevel: payload.DeviceExposureLevel,
+                    isAadJoined: payload.DeviceIsAadJoined,
+                    onboardingStatus: payload.DeviceOnboardingStatus,
+                    deviceValue: payload.DeviceValue
+                );
+                deviceBefore.SetActiveInTenant(false);
+                devicesDeactivated++;
+                continue;
+            }
 
             var device = await deviceResolver.ResolveAsync(
                 new DeviceObservation(
@@ -230,8 +264,26 @@ public class StagedDeviceMergeService(
             DevicesCreated: devicesCreated,
             DevicesTouched: devicesTouched,
             InstalledSoftwareCreated: installedCreated,
-            InstalledSoftwareTouched: installedTouched
+            InstalledSoftwareTouched: installedTouched,
+            DevicesSkipped: devicesSkipped,
+            DevicesDeactivated: devicesDeactivated
         );
+    }
+
+    /// <summary>
+    /// Returns true if the device payload indicates it is stale (last seen over
+    /// 30 days ago) AND the source system has already marked it Inactive.
+    /// Stale+inactive new devices are skipped; existing ones are deactivated.
+    /// </summary>
+    private static bool IsStaleAndInactive(IngestionAsset payload)
+    {
+        if (!string.Equals(payload.DeviceHealthStatus, "Inactive", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-30);
+        return payload.DeviceLastSeenAt.HasValue && payload.DeviceLastSeenAt.Value < cutoff;
     }
 
     /// <summary>
