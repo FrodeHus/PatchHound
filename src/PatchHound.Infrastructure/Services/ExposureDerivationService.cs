@@ -55,10 +55,11 @@ public class ExposureDerivationService(
             foreach (var install in installs)
             {
                 var matchingApps = apps.Where(app =>
-                    (app.SoftwareProductId == install.SoftwareProductId)
-                    || (app.SoftwareProductId == null
-                        && !string.IsNullOrWhiteSpace(app.CpeCriteria)
-                        && string.Equals(app.CpeCriteria, install.ProductCpe, StringComparison.OrdinalIgnoreCase)));
+                    ((app.SoftwareProductId == install.SoftwareProductId)
+                        || (app.SoftwareProductId == null
+                            && !string.IsNullOrWhiteSpace(app.CpeCriteria)
+                            && string.Equals(app.CpeCriteria, install.ProductCpe, StringComparison.OrdinalIgnoreCase)))
+                    && VersionMatches(install.MatchedVersion, app));
 
                 foreach (var app in matchingApps)
                 {
@@ -114,5 +115,61 @@ public class ExposureDerivationService(
             resolved);
 
         return new ExposureDerivationResult(inserted, reobserved, resolved);
+    }
+
+    /// <summary>
+    /// Returns true when the installed version satisfies every present predicate on
+    /// the applicability. Unparseable versions (either side) fall back to a match
+    /// so we don't silently drop a known-vulnerable product because of a non-numeric
+    /// version string.
+    /// </summary>
+    internal static bool VersionMatches(string? installedVersion, VulnerabilityApplicability app)
+    {
+        var hasPredicate =
+            !string.IsNullOrWhiteSpace(app.VersionStartIncluding)
+            || !string.IsNullOrWhiteSpace(app.VersionStartExcluding)
+            || !string.IsNullOrWhiteSpace(app.VersionEndIncluding)
+            || !string.IsNullOrWhiteSpace(app.VersionEndExcluding);
+
+        if (!hasPredicate)
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(installedVersion)
+            || !Version.TryParse(installedVersion, out var installed))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(app.VersionStartIncluding)
+            && Version.TryParse(app.VersionStartIncluding, out var startInc)
+            && installed < startInc)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(app.VersionStartExcluding)
+            && Version.TryParse(app.VersionStartExcluding, out var startExc)
+            && installed <= startExc)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(app.VersionEndIncluding)
+            && Version.TryParse(app.VersionEndIncluding, out var endInc)
+            && installed > endInc)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(app.VersionEndExcluding)
+            && Version.TryParse(app.VersionEndExcluding, out var endExc)
+            && installed >= endExc)
+        {
+            return false;
+        }
+
+        return true;
     }
 }

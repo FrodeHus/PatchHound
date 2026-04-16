@@ -171,6 +171,64 @@ public class ExposureDerivationServiceTests
         exposures.Select(e => e.DeviceId).Distinct().Should().HaveCount(2);
     }
 
+    [Fact]
+    public async Task Skips_exposure_when_installed_version_is_above_version_end_including()
+    {
+        var tenantId = Guid.NewGuid();
+        await using var db = await CreateTenantDbAsync(tenantId);
+
+        var product = SoftwareProduct.Create("Acme", "Widget", "cpe:2.3:a:acme:widget:*:*:*:*:*:*:*:*");
+        var vuln = Vulnerability.Create("nvd", "CVE-2026-VER1", "t", "d", Severity.High, 7.5m, "v", DateTimeOffset.UtcNow);
+        db.SoftwareProducts.Add(product);
+        db.Vulnerabilities.Add(vuln);
+        // "versions <= 120.0 are vulnerable"
+        db.VulnerabilityApplicabilities.Add(VulnerabilityApplicability.Create(
+            vuln.Id, product.Id, null, true, null, null, "120.0", null));
+
+        var src = SourceSystem.Create("test", "Test");
+        db.SourceSystems.Add(src);
+        var device = Device.Create(tenantId, src.Id, "dev-1", "Device", Criticality.Medium);
+        db.Devices.Add(device);
+        // Installed 121.0 is NEWER than end-including predicate, so must not match
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "121.0", DateTimeOffset.UtcNow));
+        await db.SaveChangesAsync();
+
+        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await db.SaveChangesAsync();
+
+        (await db.DeviceVulnerabilityExposures.ToListAsync()).Should().BeEmpty(
+            "installed version 121.0 is outside the applicability's 'up to 120.0' range");
+    }
+
+    [Fact]
+    public async Task Derives_exposure_when_installed_version_is_inside_version_range()
+    {
+        var tenantId = Guid.NewGuid();
+        await using var db = await CreateTenantDbAsync(tenantId);
+
+        var product = SoftwareProduct.Create("Acme", "Widget", "cpe:2.3:a:acme:widget:*:*:*:*:*:*:*:*");
+        var vuln = Vulnerability.Create("nvd", "CVE-2026-VER2", "t", "d", Severity.High, 7.5m, "v", DateTimeOffset.UtcNow);
+        db.SoftwareProducts.Add(product);
+        db.Vulnerabilities.Add(vuln);
+        // "1.5 <= versions < 2.0 are vulnerable"
+        db.VulnerabilityApplicabilities.Add(VulnerabilityApplicability.Create(
+            vuln.Id, product.Id, null, true, "1.5", null, null, "2.0"));
+
+        var src = SourceSystem.Create("test", "Test");
+        db.SourceSystems.Add(src);
+        var device = Device.Create(tenantId, src.Id, "dev-1", "Device", Criticality.Medium);
+        db.Devices.Add(device);
+        db.InstalledSoftware.Add(InstalledSoftware.Observe(tenantId, device.Id, product.Id, src.Id, "1.7", DateTimeOffset.UtcNow));
+        await db.SaveChangesAsync();
+
+        var svc = new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance);
+        await svc.DeriveForTenantAsync(tenantId, DateTimeOffset.UtcNow, CancellationToken.None);
+        await db.SaveChangesAsync();
+
+        (await db.DeviceVulnerabilityExposures.ToListAsync()).Should().ContainSingle();
+    }
+
     private static async Task<(SoftwareProduct Product, Vulnerability Vulnerability, Device Device, InstalledSoftware InstalledSoftware)> SeedProductKeyedExposureAsync(
         PatchHoundDbContext db,
         Guid tenantId)
