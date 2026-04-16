@@ -75,6 +75,14 @@ public class VulnerabilitiesController : ControllerBase
             query = query.Where(v =>
                 _dbContext.ThreatAssessments.Any(a => a.VulnerabilityId == v.Id && a.ActiveAlert)
             );
+        if (filter.PresentOnly == true)
+            query = query.Where(v =>
+                _dbContext.DeviceVulnerabilityExposures.Any(e =>
+                    e.TenantId == _tenantContext.CurrentTenantId!.Value
+                    && e.VulnerabilityId == v.Id
+                    && e.Status == ExposureStatus.Open
+                )
+            );
 
         var total = await query.CountAsync(ct);
 

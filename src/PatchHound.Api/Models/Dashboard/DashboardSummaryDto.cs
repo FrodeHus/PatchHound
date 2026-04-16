@@ -158,7 +158,12 @@ public record OwnerAssetSummaryDto(
     string? RiskBand,
     int OpenEpisodeCount,
     string? TopDriverTitle,
-    string? TopDriverSummary
+    string? TopDriverSummary,
+    DateTimeOffset? LastSeenAt = null,
+    int CriticalCount = 0,
+    int HighCount = 0,
+    int MediumCount = 0,
+    int LowCount = 0
 );
 
 public record OwnerActionDto(

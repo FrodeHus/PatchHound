@@ -13,6 +13,7 @@ describe('buildVulnerabilitiesListRequest', () => {
         publicExploitOnly: true,
         knownExploitedOnly: false,
         activeAlertOnly: true,
+        presentOnly: false,
         page: 2,
         pageSize: 50,
       }),
@@ -38,6 +39,7 @@ describe('vulnerabilityQueryKeys', () => {
       publicExploitOnly: false,
       knownExploitedOnly: false,
       activeAlertOnly: false,
+      presentOnly: false,
       page: 1,
       pageSize: 25,
     })
@@ -52,6 +54,7 @@ describe('vulnerabilityQueryKeys', () => {
       '',
       '',
       '',
+      false,
       false,
       false,
       false,

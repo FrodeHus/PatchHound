@@ -23,6 +23,7 @@ export const fetchVulnerabilities = createServerFn({ method: 'GET' })
       publicExploitOnly: z.boolean().optional(),
       knownExploitedOnly: z.boolean().optional(),
       activeAlertOnly: z.boolean().optional(),
+      presentOnly: z.boolean().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
     }),

@@ -151,6 +151,11 @@ export const ownerAssetSummarySchema = z.object({
   openEpisodeCount: z.number(),
   topDriverTitle: z.string().nullable(),
   topDriverSummary: z.string().nullable(),
+  lastSeenAt: z.string().datetime({ offset: true }).nullable().optional(),
+  criticalCount: z.number().optional().default(0),
+  highCount: z.number().optional().default(0),
+  mediumCount: z.number().optional().default(0),
+  lowCount: z.number().optional().default(0),
 })
 
 export const ownerActionSchema = z.object({
@@ -183,6 +188,7 @@ export type DashboardFilterOptions = z.infer<typeof dashboardFilterOptionsSchema
 export type DeviceGroupVulnerability = z.infer<typeof dashboardSummarySchema>['vulnerabilitiesByDeviceGroup'][number]
 export type OwnerDashboardSummary = z.infer<typeof ownerDashboardSummarySchema>
 export type OwnerAssetSummary = z.infer<typeof ownerAssetSummarySchema>
+export type OwnerAction = z.infer<typeof ownerActionSchema>
 
 export const approvalAttentionTaskSchema = z.object({
   approvalTaskId: z.string().uuid(),

@@ -18,6 +18,7 @@ const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
   publicExploitOnly: searchBooleanSchema,
   knownExploitedOnly: searchBooleanSchema,
   activeAlertOnly: searchBooleanSchema,
+  presentOnly: searchBooleanSchema,
 })
 
 export const Route = createFileRoute('/_authed/vulnerabilities/')({
@@ -63,6 +64,7 @@ function VulnerabilitiesPage() {
         publicExploitOnly={search.publicExploitOnly}
         knownExploitedOnly={search.knownExploitedOnly}
         activeAlertOnly={search.activeAlertOnly}
+        presentOnly={search.presentOnly}
         onSearchChange={(value) => {
           searchActions.updateField('search', value)
         }}
@@ -93,6 +95,9 @@ function VulnerabilitiesPage() {
         onActiveAlertOnlyChange={(value) => {
           searchActions.updateField('activeAlertOnly', value)
         }}
+        onPresentOnlyChange={(value) => {
+          searchActions.updateField('presentOnly', value)
+        }}
         onApplyStructuredFilters={(filters) => {
           searchActions.updateFields({
             severity: filters.severity,
@@ -102,6 +107,7 @@ function VulnerabilitiesPage() {
             publicExploitOnly: filters.publicExploitOnly,
             knownExploitedOnly: filters.knownExploitedOnly,
             activeAlertOnly: filters.activeAlertOnly,
+            presentOnly: filters.presentOnly,
           })
         }}
         onClearFilters={() => {
@@ -114,6 +120,7 @@ function VulnerabilitiesPage() {
             publicExploitOnly: false,
             knownExploitedOnly: false,
             activeAlertOnly: false,
+            presentOnly: false,
           })
         }}
       />

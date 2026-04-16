@@ -364,60 +364,7 @@ public class DashboardController : ControllerBase
 
         var topOwnedAssets = ownedAssetIds.Count == 0
             ? []
-            : await BuildOwnerAssetSummariesAsync(tenantId, ownedAssetsQuery, take: 6, attentionOnly: false, ct);
-
-        var topAssetIds = topOwnedAssets.Select(item => item.AssetId).ToList();
-        var topDriverRows = topAssetIds.Count == 0
-            ? []
-            : await (
-                from assessment in _dbContext.ExposureAssessments.AsNoTracking()
-                where assessment.TenantId == tenantId
-                      && topAssetIds.Contains(assessment.Exposure.DeviceId)
-                      && assessment.Exposure.Status == ExposureStatus.Open
-                orderby assessment.EnvironmentalCvss descending
-                select new OwnerTopDriverRow(
-                    assessment.Exposure.DeviceId,
-                    assessment.EnvironmentalCvss,
-                    assessment.EnvironmentalCvss >= 9.0m ? "Critical"
-                        : assessment.EnvironmentalCvss >= 7.0m ? "High"
-                        : assessment.EnvironmentalCvss >= 4.0m ? "Medium" : "Low",
-                    assessment.Exposure.Vulnerability.ExternalId,
-                    assessment.Exposure.Vulnerability.Title,
-                    assessment.Exposure.Vulnerability.Description,
-                    assessment.EnvironmentalCvss >= 9.0m ? Severity.Critical
-                        : assessment.EnvironmentalCvss >= 7.0m ? Severity.High
-                        : assessment.EnvironmentalCvss >= 4.0m ? Severity.Medium : Severity.Low
-                )
-            ).ToArrayAsync(ct);
-
-        var ownerAssets = topOwnedAssets
-            .Select(item =>
-            {
-                var topDriver = topDriverRows
-                    .Where(driver => driver.AssetId == item.AssetId)
-                    .OrderByDescending(driver => driver.EpisodeRiskScore)
-                    .FirstOrDefault();
-
-                return new OwnerAssetSummaryDto(
-                    item.AssetId,
-                    item.AssetName,
-                    item.DeviceGroupName,
-                    item.Criticality,
-                    item.CurrentRiskScore,
-                    topDriver?.RiskBand,
-                    item.OpenEpisodeCount,
-                    topDriver?.Title,
-                    topDriver is null
-                        ? null
-                        : OwnerFacingIssueSummaryFormatter.BuildIssueSummary(
-                            null,
-                            topDriver.Title,
-                            topDriver.Description,
-                            topDriver.Severity
-                        )
-                );
-            })
-            .ToList();
+            : await BuildOwnerAssetSummariesAsync(tenantId, ownedAssetsQuery, take: null, attentionOnly: false, ct);
 
         // Patching tasks targeting teams that own the user's devices
         var ownerPatchingRows = await (
@@ -445,7 +392,6 @@ public class DashboardController : ControllerBase
             }
         )
             .OrderBy(item => item.DueDate)
-            .Take(10)
             .ToListAsync(ct);
 
         // Build owner actions from patching tasks — use the top vulnerability per software asset
@@ -454,18 +400,44 @@ public class DashboardController : ControllerBase
             .Distinct()
             .ToList();
 
-        var topVulnPerSoftwareProduct = Array.Empty<OwnerTopVulnRow>();
+        var topVulnPerSoftwareProduct = patchingSoftwareProductIds.Count == 0
+            ? []
+            : await (
+                from assessment in _dbContext.ExposureAssessments.AsNoTracking()
+                where assessment.TenantId == tenantId
+                      && assessment.Exposure.SoftwareProductId != null
+                      && patchingSoftwareProductIds.Contains(assessment.Exposure.SoftwareProductId!.Value)
+                      && assessment.Exposure.Status == ExposureStatus.Open
+                orderby assessment.EnvironmentalCvss descending
+                select new OwnerTopVulnRow(
+                    assessment.Exposure.SoftwareProductId!.Value,
+                    assessment.Exposure.VulnerabilityId,
+                    assessment.Exposure.Vulnerability.ExternalId,
+                    assessment.Exposure.Vulnerability.Title,
+                    assessment.Exposure.Vulnerability.Description,
+                    assessment.EnvironmentalCvss >= 9.0m ? Severity.Critical
+                        : assessment.EnvironmentalCvss >= 7.0m ? Severity.High
+                        : assessment.EnvironmentalCvss >= 4.0m ? Severity.Medium : Severity.Low,
+                    assessment.EnvironmentalCvss
+                )
+            ).ToArrayAsync(ct);
 
         var topVulnBySoftware = topVulnPerSoftwareProduct
             .GroupBy(v => v.SoftwareProductId)
             .ToDictionary(
                 g => g.Key,
-                g => g.OrderByDescending(v => v.Severity).First()
+                g => g.First()
             );
 
         var ownerActionRows = ownerPatchingRows.Select(p =>
         {
             var topVuln = topVulnBySoftware.GetValueOrDefault(p.SoftwareProductId);
+            var episodeRiskScore = topVuln?.EnvironmentalCvss;
+            var episodeRiskBand = episodeRiskScore.HasValue
+                ? episodeRiskScore >= 9.0m ? "Critical"
+                    : episodeRiskScore >= 7.0m ? "High"
+                    : episodeRiskScore >= 4.0m ? "Medium" : "Low"
+                : (string?)null;
             return new
             {
                 RemediationCaseId = p.RemediationCaseId,
@@ -478,8 +450,8 @@ public class DashboardController : ControllerBase
                 Title = topVuln?.Title ?? "Patching required",
                 Description = topVuln?.Description ?? "",
                 Severity = topVuln?.Severity ?? Severity.Medium,
-                EpisodeRiskScore = (decimal?)null,
-                EpisodeRiskBand = (string?)null,
+                EpisodeRiskScore = episodeRiskScore,
+                EpisodeRiskBand = episodeRiskBand,
                 DueDate = p.DueDate,
                 ActionState = p.ActionState,
             };
@@ -519,7 +491,7 @@ public class DashboardController : ControllerBase
             assetsNeedingAttention,
             ownerActions.Count,
             ownerActions.Count(item => item.DueDate.HasValue && item.DueDate.Value < DateTimeOffset.UtcNow),
-            ownerAssets,
+            topOwnedAssets,
             ownerActions
         ));
     }
@@ -603,7 +575,10 @@ public class DashboardController : ControllerBase
                 CurrentRiskScore = score != null ? (decimal?)score.OverallScore : null,
                 OpenEpisodeCount = score != null ? score.OpenEpisodeCount : 0,
                 CriticalCount = score != null ? score.CriticalCount : 0,
-                HighCount = score != null ? score.HighCount : 0
+                HighCount = score != null ? score.HighCount : 0,
+                MediumCount = score != null ? score.MediumCount : 0,
+                LowCount = score != null ? score.LowCount : 0,
+                asset.LastSeenAt,
             };
 
         if (attentionOnly)
@@ -668,7 +643,12 @@ public class DashboardController : ControllerBase
                             topDriver.Title,
                             topDriver.Description,
                             topDriver.Severity
-                        )
+                        ),
+                    item.LastSeenAt,
+                    item.CriticalCount,
+                    item.HighCount,
+                    item.MediumCount,
+                    item.LowCount
                 );
             })
             .ToList();
@@ -1244,7 +1224,8 @@ public class DashboardController : ControllerBase
         string ExternalId,
         string Title,
         string? Description,
-        Severity Severity
+        Severity Severity,
+        decimal EnvironmentalCvss
     );
 
 }

@@ -7,6 +7,7 @@ type VulnerabilitiesListSearch = {
   publicExploitOnly: boolean
   knownExploitedOnly: boolean
   activeAlertOnly: boolean
+  presentOnly: boolean
   page: number
   pageSize: number
 }
@@ -21,6 +22,7 @@ export function buildVulnerabilitiesListRequest(search: VulnerabilitiesListSearc
     ...(search.publicExploitOnly ? { publicExploitOnly: true } : {}),
     ...(search.knownExploitedOnly ? { knownExploitedOnly: true } : {}),
     ...(search.activeAlertOnly ? { activeAlertOnly: true } : {}),
+    ...(search.presentOnly ? { presentOnly: true } : {}),
     page: search.page,
     pageSize: search.pageSize,
   }
@@ -40,6 +42,7 @@ export const vulnerabilityQueryKeys = {
     search.publicExploitOnly,
     search.knownExploitedOnly,
     search.activeAlertOnly,
+    search.presentOnly,
     search.page,
     search.pageSize,
   ] as const,
