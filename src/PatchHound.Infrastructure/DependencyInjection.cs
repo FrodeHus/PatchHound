@@ -104,8 +104,8 @@ public static class DependencyInjection
         services.AddScoped<EnrichmentJobEnqueuer>();
         services.AddScoped<IngestionStateCache>();
         services.AddScoped<TenantSnapshotResolver>();
-        services.AddScoped<NvdVulnerabilityEnrichmentRunner>();
-        services.AddScoped<DefenderVulnerabilityEnrichmentRunner>();
+        services.AddScoped<IEnrichmentSourceRunner, NvdVulnerabilityEnrichmentRunner>();
+        services.AddScoped<IEnrichmentSourceRunner, DefenderVulnerabilityEnrichmentRunner>();
         services.AddScoped<IEnrichmentSourceRunner, EndOfLifeSoftwareEnrichmentRunner>();
         services.AddScoped<IEnrichmentSourceRunner, SupplyChainEvidenceEnrichmentRunner>();
         services.AddScoped<AiReportService>();
