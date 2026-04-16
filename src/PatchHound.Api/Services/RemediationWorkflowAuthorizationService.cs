@@ -64,8 +64,9 @@ public class RemediationWorkflowAuthorizationService(
         if (workflow is null)
             return Result<bool>.Failure("No active remediation workflow exists for this software.");
 
-        if (workflow.CurrentStage != RemediationWorkflowStage.RemediationDecision)
-            return Result<bool>.Failure($"A remediation decision can only be created during the Remediation Decision stage. Current stage: {workflow.CurrentStage}.");
+        if (workflow.CurrentStage is not RemediationWorkflowStage.RemediationDecision
+            and not RemediationWorkflowStage.SecurityAnalysis)
+            return Result<bool>.Failure($"A remediation decision cannot be created while the workflow is in the {workflow.CurrentStage} stage.");
 
         return await EnsureSoftwareOwnerDecisionAccessAsync(tenantId, workflow, ct);
     }

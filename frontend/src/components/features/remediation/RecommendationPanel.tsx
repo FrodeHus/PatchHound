@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { AnalystRecommendation } from '@/api/remediation.schemas'
 import { addRecommendation } from '@/api/remediation.functions'
+import { getApiErrorMessage } from '@/lib/api-errors'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -57,6 +58,7 @@ export function RecommendationPanel({
   const [rationale, setRationale] = useState(currentRecommendation?.rationale ?? '')
   const [priorityOverride, setPriorityOverride] = useState(currentRecommendation?.priorityOverride ?? '')
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!recommendationSeed) {
@@ -72,6 +74,7 @@ export function RecommendationPanel({
   async function handleSubmit() {
     if (!outcome || !rationale.trim()) return
     setSubmitting(true)
+    setSubmitError(null)
     try {
       await addRecommendation({
         data: {
@@ -86,6 +89,8 @@ export function RecommendationPanel({
       setRationale('')
       setPriorityOverride('')
       setShowForm(false)
+    } catch (error) {
+      setSubmitError(getApiErrorMessage(error, 'Unable to save the analyst recommendation.'))
     } finally {
       setSubmitting(false)
     }
@@ -189,6 +194,14 @@ export function RecommendationPanel({
               </SelectContent>
             </Select>
           </div>
+          {submitError ? (
+            <p
+              role="alert"
+              className="rounded-md border border-tone-danger/40 bg-tone-danger/5 px-3 py-2 text-sm text-tone-danger-foreground"
+            >
+              {submitError}
+            </p>
+          ) : null}
           <div className="flex gap-2">
             <Button
               onClick={handleSubmit}
@@ -202,6 +215,7 @@ export function RecommendationPanel({
               size="sm"
               onClick={() => {
                 setShowForm(false)
+                setSubmitError(null)
                 setOutcome(currentRecommendation?.recommendedOutcome ?? '')
                 setRationale(currentRecommendation?.rationale ?? '')
                 setPriorityOverride(currentRecommendation?.priorityOverride ?? '')

@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createDecision } from '@/api/remediation.functions'
+import { getApiErrorMessage } from '@/lib/api-errors'
 import { outcomeLabel } from './remediation-utils'
 
 type DecisionFormProps = {
@@ -67,6 +68,7 @@ export function DecisionForm({
   const [expiryMode, setExpiryMode] = useState<'permanent' | 'expires'>('permanent')
   const [reEvaluationDate, setReEvaluationDate] = useState(toDateInputValue(initialReEvaluationDate))
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const needsJustification = REQUIRES_JUSTIFICATION.has(outcome)
   const needsExpiry = REQUIRES_EXPIRY.has(outcome)
@@ -112,6 +114,7 @@ export function DecisionForm({
   async function handleSubmit() {
     if (!canSubmit) return
     setSubmitting(true)
+    setSubmitError(null)
     try {
       await createDecision({
         data: {
@@ -129,6 +132,8 @@ export function DecisionForm({
       setExpiryDate('')
       setExpiryMode('permanent')
       setReEvaluationDate('')
+    } catch (error) {
+      setSubmitError(getApiErrorMessage(error, 'Unable to save the remediation decision.'))
     } finally {
       setSubmitting(false)
     }
@@ -222,6 +227,15 @@ export function DecisionForm({
             When this deferred patch decision must be revisited.
           </p>
         </div>
+      ) : null}
+
+      {submitError ? (
+        <p
+          role="alert"
+          className="rounded-md border border-tone-danger/40 bg-tone-danger/5 px-3 py-2 text-sm text-tone-danger-foreground"
+        >
+          {submitError}
+        </p>
       ) : null}
 
       <div className="pt-1">
