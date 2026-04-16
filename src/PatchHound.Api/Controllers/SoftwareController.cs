@@ -438,7 +438,10 @@ public class SoftwareController(
                 CanonicalName = item.Name,
                 CanonicalVendor = item.Vendor,
                 item.Category,
-                CurrentRiskScore = (decimal?)null,
+                CurrentRiskScore = dbContext.SoftwareRiskScores
+                    .Where(score => score.TenantId == currentTenantId && score.SoftwareProductId == item.Id)
+                    .Select(score => (decimal?)score.OverallScore)
+                    .FirstOrDefault(),
                 ActiveInstallCount = dbContext.InstalledSoftware
                     .Count(i => i.TenantId == currentTenantId && i.SoftwareProductId == item.Id),
                 UniqueDeviceCount = dbContext.InstalledSoftware
@@ -463,14 +466,10 @@ public class SoftwareController(
                     .Where(i => i.TenantId == currentTenantId && i.SoftwareProductId == item.Id)
                     .Max(i => (DateTimeOffset?)i.LastSeenAt),
                 MaintenanceWindowDate = (DateTimeOffset?)null,
-                ExposureImpactScore = dbContext.InstalledSoftware
-                    .Where(i => i.TenantId == currentTenantId && i.SoftwareProductId == item.Id)
-                    .Join(
-                        dbContext.Devices.AsNoTracking(),
-                        ins => ins.DeviceId,
-                        dev => dev.Id,
-                        (ins, dev) => dev.ExposureImpactScore)
-                    .Max(),
+                ExposureImpactScore = dbContext.SoftwareRiskScores
+                    .Where(score => score.TenantId == currentTenantId && score.SoftwareProductId == item.Id)
+                    .Select(score => (decimal?)score.MaxExposureScore)
+                    .FirstOrDefault(),
             })
             .OrderByDescending(item => item.ActiveVulnerabilityCount)
             .ThenByDescending(item => item.ActiveInstallCount)
