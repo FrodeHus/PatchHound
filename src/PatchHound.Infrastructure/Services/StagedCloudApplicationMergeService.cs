@@ -80,8 +80,11 @@ public class StagedCloudApplicationMergeService(
                     tenantId,
                     sourceSystem.Id,
                     stagedApp.ExternalId,
+                    payload.AppId,
                     stagedApp.Name,
-                    stagedApp.Description
+                    stagedApp.Description,
+                    payload.IsFallbackPublicClient,
+                    payload.RedirectUris
                 );
                 db.CloudApplications.Add(existing);
                 await db.SaveChangesAsync(ct);
@@ -89,7 +92,7 @@ public class StagedCloudApplicationMergeService(
             }
             else
             {
-                existing.Update(stagedApp.Name, stagedApp.Description);
+                existing.Update(stagedApp.Name, stagedApp.Description, payload.AppId, payload.IsFallbackPublicClient, payload.RedirectUris);
                 existing.SetActiveInTenant(true);
                 applicationsTouched++;
             }

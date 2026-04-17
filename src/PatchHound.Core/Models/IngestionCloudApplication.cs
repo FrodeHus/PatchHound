@@ -4,6 +4,9 @@ public record IngestionCloudApplication(
     string ExternalId,
     string Name,
     string? Description,
+    string? AppId,
+    bool IsFallbackPublicClient,
+    IReadOnlyList<string> RedirectUris,
     IReadOnlyList<IngestionCloudApplicationCredential> Credentials
 );
 

@@ -15,6 +15,7 @@ type DataTableProps<TData extends RowData, TValue> = {
   data: TData[]
   emptyState?: ReactNode
   getRowId?: (originalRow: TData, index: number, parent?: unknown) => string
+  onRowClick?: (row: TData) => void
   className?: string
 }
 
@@ -23,6 +24,7 @@ export function DataTable<TData extends RowData, TValue>({
   data,
   emptyState,
   getRowId,
+  onRowClick,
   className,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
@@ -54,7 +56,11 @@ export function DataTable<TData extends RowData, TValue>({
         <TableBody>
           {table.getRowModel().rows.length ? (
             table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} className="border-border/60">
+              <TableRow
+                key={row.id}
+                className={`border-border/60 ${onRowClick ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="px-4 py-3">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

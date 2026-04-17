@@ -21,7 +21,7 @@ const applicationsSearchSchema = baseListSearchSchema.extend({
 
 type ApplicationsSearch = z.infer<typeof applicationsSearchSchema>
 
-export const Route = createFileRoute('/_authed/assets/applications')({
+export const Route = createFileRoute('/_authed/assets/applications/')({
   validateSearch: applicationsSearchSchema,
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) =>
@@ -220,6 +220,8 @@ function ApplicationsPage() {
         columns={columns}
         data={items}
         getRowId={(row) => row.id}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onRowClick={(row) => navigate({ to: '/assets/applications/$id', params: { id: row.id } } as any)}
         emptyState={
           <div className="py-12 text-center text-sm text-muted-foreground">
             {activeFilter

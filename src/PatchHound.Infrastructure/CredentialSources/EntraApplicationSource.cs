@@ -71,10 +71,19 @@ public class EntraApplicationSource(
             ));
         }
 
+        var redirectUris = (app.Web?.RedirectUris ?? [])
+            .Concat(app.Spa?.RedirectUris ?? [])
+            .Concat(app.PublicClient?.RedirectUris ?? [])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         return new IngestionCloudApplication(
             ExternalId: app.Id!,
             Name: app.DisplayName ?? app.Id!,
             Description: app.Description,
+            AppId: app.AppId,
+            IsFallbackPublicClient: app.IsFallbackPublicClient ?? false,
+            RedirectUris: redirectUris,
             Credentials: credentials
         );
     }

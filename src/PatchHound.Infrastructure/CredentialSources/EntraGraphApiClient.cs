@@ -21,7 +21,7 @@ public class EntraGraphApiClient
         CancellationToken ct
     )
     {
-        const string select = "id,displayName,description,passwordCredentials,keyCredentials";
+        const string select = "id,appId,displayName,description,isFallbackPublicClient,web,spa,publicClient,passwordCredentials,keyCredentials";
         var path = $"/v1.0/applications?$select={select}";
         var results = new List<GraphApplication>();
 
@@ -103,17 +103,38 @@ public class GraphApplication
     [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;
 
+    [JsonPropertyName("appId")]
+    public string? AppId { get; set; }
+
     [JsonPropertyName("displayName")]
     public string? DisplayName { get; set; }
 
     [JsonPropertyName("description")]
     public string? Description { get; set; }
 
+    [JsonPropertyName("isFallbackPublicClient")]
+    public bool? IsFallbackPublicClient { get; set; }
+
+    [JsonPropertyName("web")]
+    public GraphApplicationPlatform? Web { get; set; }
+
+    [JsonPropertyName("spa")]
+    public GraphApplicationPlatform? Spa { get; set; }
+
+    [JsonPropertyName("publicClient")]
+    public GraphApplicationPlatform? PublicClient { get; set; }
+
     [JsonPropertyName("passwordCredentials")]
     public List<GraphPasswordCredential> PasswordCredentials { get; set; } = [];
 
     [JsonPropertyName("keyCredentials")]
     public List<GraphKeyCredential> KeyCredentials { get; set; } = [];
+}
+
+public class GraphApplicationPlatform
+{
+    [JsonPropertyName("redirectUris")]
+    public List<string> RedirectUris { get; set; } = [];
 }
 
 public class GraphPasswordCredential

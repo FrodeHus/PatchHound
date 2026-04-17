@@ -1,8 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { authMiddleware } from '@/server/middleware'
-import { apiGet } from '@/server/api'
-import { pagedCloudApplicationsSchema } from './cloud-applications.schemas'
+import { apiGet, apiPut } from '@/server/api'
+import { cloudApplicationDetailSchema, pagedCloudApplicationsSchema } from './cloud-applications.schemas'
 
 export const fetchCloudApplications = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
@@ -22,4 +22,19 @@ export const fetchCloudApplications = createServerFn({ method: 'GET' })
     params.set('pageSize', String(data.pageSize ?? 25))
     const result = await apiGet(`/cloud-applications?${params}`, context)
     return pagedCloudApplicationsSchema.parse(result)
+  })
+
+export const fetchCloudApplicationDetail = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ context, data: { id } }) => {
+    const result = await apiGet(`/cloud-applications/${id}`, context)
+    return cloudApplicationDetailSchema.parse(result)
+  })
+
+export const assignCloudApplicationOwner = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ id: z.string().uuid(), teamId: z.string().uuid().nullable() }))
+  .handler(async ({ context, data: { id, teamId } }) => {
+    await apiPut(`/cloud-applications/${id}/owner`, context, { teamId })
   })
