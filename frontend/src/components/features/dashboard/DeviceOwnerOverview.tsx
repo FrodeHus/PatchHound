@@ -311,8 +311,16 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                         Open remediation task
                       </Button>
                     ) : (
-                      <Button size="sm" disabled>
-                        Open remediation task
+                      <Button
+                        size="sm"
+                        render={
+                          <Link
+                            to="/remediation/cases/$caseId"
+                            params={{ caseId: item.tenantSoftwareId }}
+                          />
+                        }
+                      >
+                        Open remediation case
                       </Button>
                     )}
                     <Button size="sm" variant="outline" render={<Link to="/vulnerabilities/$id" params={{ id: item.vulnerabilityId }} />}>

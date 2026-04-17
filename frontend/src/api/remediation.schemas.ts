@@ -177,6 +177,7 @@ export const decisionListItemSchema = z.object({
     day: z.string(),
     openEpisodeCount: z.number(),
   })),
+  workflowStage: z.string().nullable().optional(),
 })
 
 export const decisionListSummarySchema = z.object({

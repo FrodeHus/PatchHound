@@ -265,9 +265,29 @@ public class RemediationDecisionService(
             .Distinct()
             .ToList();
 
-        // Phase 2: canonical exposure data not yet available via DeviceVulnerabilityExposure.
-        // Return empty — no open exposure means all active workflows are eligible to close.
-        var unresolvedCaseIds = new List<Guid>();
+        var caseSoftwareProductIds = await dbContext.RemediationCases
+            .Where(c => remediationCaseIds.Contains(c.Id))
+            .Select(c => new { c.Id, c.SoftwareProductId })
+            .ToListAsync(ct);
+
+        var softwareProductIds = caseSoftwareProductIds.Select(c => c.SoftwareProductId).Distinct().ToList();
+
+        var softwareProductsWithOpenExposures = softwareProductIds.Count == 0
+            ? []
+            : await dbContext.DeviceVulnerabilityExposures
+                .Where(e =>
+                    e.TenantId == tenantId
+                    && e.Status == ExposureStatus.Open
+                    && e.SoftwareProductId != null
+                    && softwareProductIds.Contains(e.SoftwareProductId.Value))
+                .Select(e => e.SoftwareProductId!.Value)
+                .Distinct()
+                .ToListAsync(ct);
+
+        var unresolvedCaseIds = caseSoftwareProductIds
+            .Where(c => softwareProductsWithOpenExposures.Contains(c.SoftwareProductId))
+            .Select(c => c.Id)
+            .ToList();
 
         var workflowsToClose = activeWorkflows
             .Where(workflow => !unresolvedCaseIds.Contains(workflow.RemediationCaseId))

@@ -14,6 +14,7 @@ import {
   outcomeTone,
   riskBandTone,
   severityTone,
+  workflowStageLabel,
 } from './remediation-utils'
 
 type Filters = {
@@ -290,7 +291,7 @@ export function RemediationWorkbench({
             <thead className="bg-muted/30 text-left text-xs uppercase tracking-[0.14em] text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Software</th>
-                <th className="px-4 py-3">Decision</th>
+                <th className="px-4 py-3">State</th>
                 <th className="px-4 py-3">Vulnerabilities</th>
                 <th className="px-4 py-3">Risk</th>
                 <th className="px-4 py-3">SLA</th>
@@ -355,18 +356,32 @@ export function RemediationWorkbench({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {item.outcome ? (
+                      {!item.workflowStage ? (
+                        <span className="text-xs text-muted-foreground">
+                          Attention needed
+                        </span>
+                      ) : item.outcome ? (
                         <div className="space-y-1">
-                          <span
-                            className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(outcomeTone(item.outcome))}`}
-                          >
-                            {outcomeLabel(item.outcome)}
-                          </span>
-                          <span
-                            className={`ml-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(approvalStatusTone(item.approvalStatus!))}`}
-                          >
-                            {approvalStatusLabel(item.approvalStatus!)}
-                          </span>
+                          {item.approvalStatus === 'PendingApproval' ? (
+                            <>
+                              <span
+                                className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge('warning')}`}
+                              >
+                                Proposed: {outcomeLabel(item.outcome)}
+                              </span>
+                              <span
+                                className={`ml-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(approvalStatusTone('PendingApproval'))}`}
+                              >
+                                Pending approval
+                              </span>
+                            </>
+                          ) : (
+                            <span
+                              className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(outcomeTone(item.outcome))}`}
+                            >
+                              {outcomeLabel(item.outcome)}
+                            </span>
+                          )}
                           {item.decidedAt ? (
                             <p className="text-[10px] text-muted-foreground">
                               {formatDate(item.decidedAt)}
@@ -389,7 +404,7 @@ export function RemediationWorkbench({
                         </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          No decision
+                          {workflowStageLabel(item.workflowStage)}
                         </span>
                       )}
                     </td>

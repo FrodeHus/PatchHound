@@ -143,6 +143,8 @@ public class RemediationDecisionQueryService(
                 e.FirstObservedAt,
                 Severity = e.Vulnerability.VendorSeverity,
                 Criticality = e.Device.Criticality,
+                DeviceId = e.DeviceId,
+                VulnerabilityId = e.VulnerabilityId,
             })
             .ToListAsync(ct);
 
@@ -162,6 +164,27 @@ public class RemediationDecisionQueryService(
                 SoftwareProductId = g.Key,
                 MaxCriticality = g.Max(e => e.Criticality),
             });
+
+        var deviceIdsByProduct = openExposureRows
+            .GroupBy(e => e.SoftwareProductId)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.DeviceId).ToHashSet());
+        var vulnerabilityIdsByProduct = openExposureRows
+            .GroupBy(e => e.SoftwareProductId)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.VulnerabilityId).ToHashSet());
+        var trendsByProduct = await BuildOpenEpisodeTrendsBySoftwareAsync(
+            tenantId,
+            productIds,
+            deviceIdsByProduct,
+            vulnerabilityIdsByProduct,
+            ct
+        );
+
+        var activeWorkflowStages = await dbContext.RemediationWorkflows.AsNoTracking()
+            .Where(w => w.TenantId == tenantId
+                && caseIds.Contains(w.RemediationCaseId)
+                && w.Status == RemediationWorkflowStatus.Active)
+            .Select(w => new { w.RemediationCaseId, w.CurrentStage })
+            .ToDictionaryAsync(w => w.RemediationCaseId, w => w.CurrentStage, ct);
 
         // Build vulnCounts and riskScoresByCaseId keyed by RemediationCaseId.
         var vulnCounts = new Dictionary<Guid, (int Total, int Critical, int High, DateTimeOffset EarliestFirstSeen, Severity HighestSeverity)>();
@@ -258,6 +281,8 @@ public class RemediationDecisionQueryService(
                 slaStatus = slaService.GetSlaStatus(vcForSla.EarliestFirstSeen, slaDueDate.Value, DateTimeOffset.UtcNow).ToString();
             }
 
+            var workflowStage = activeWorkflowStages.TryGetValue(rc.Id, out var stage) ? stage.ToString() : null;
+
             items.Add(new RemediationDecisionListItemDto(
                 rc.Id,
                 ResolveDisplaySoftwareName(rc.Name, null),
@@ -275,7 +300,8 @@ public class RemediationDecisionQueryService(
                 slaStatus,
                 slaDueDate,
                 softwareRiskScores.TryGetValue(productId, out var srsForCount) ? srsForCount.AffectedDeviceCount : 0,
-                BuildEmptyTrend()
+                trendsByProduct.TryGetValue(productId, out var trend) ? trend : BuildEmptyTrend(),
+                workflowStage
             ));
         }
 

@@ -17,7 +17,8 @@ public record RemediationDecisionListItemDto(
     string? SlaStatus,
     DateTimeOffset? SlaDueDate,
     int AffectedDeviceCount,
-    List<OpenEpisodeTrendPointDto> OpenEpisodeTrend
+    List<OpenEpisodeTrendPointDto> OpenEpisodeTrend,
+    string? WorkflowStage
 );
 
 public record RemediationDecisionListSummaryDto(

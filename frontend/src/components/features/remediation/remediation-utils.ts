@@ -49,6 +49,18 @@ export function outcomeLabel(outcome: string): string {
   }
 }
 
+export function workflowStageLabel(stage: string): string {
+  switch (stage) {
+    case 'SecurityAnalysis': return 'Security analysis'
+    case 'Verification': return 'Verification'
+    case 'RemediationDecision': return 'Awaiting decision'
+    case 'Approval': return 'Awaiting approval'
+    case 'Execution': return 'In execution'
+    case 'Closure': return 'Closing'
+    default: return stage
+  }
+}
+
 export function riskBandTone(band: string): Tone {
   switch (band) {
     case 'Critical': return 'danger'
