@@ -983,6 +983,19 @@ public class TenantsController : ControllerBase
             .Where(source => source.TenantId == tenantId)
             .OrderBy(source => source.DisplayName)
             .ToListAsync(ct);
+
+        var existingSourceKeys = sources.Select(s => s.SourceKey).ToHashSet();
+        var missingDefaults = TenantSourceCatalog.CreateDefaults(tenantId)
+            .Where(d => !existingSourceKeys.Contains(d.SourceKey))
+            .ToList();
+        if (missingDefaults.Count > 0)
+        {
+            await _dbContext.TenantSourceConfigurations.AddRangeAsync(missingDefaults, ct);
+            await _dbContext.SaveChangesAsync(ct);
+            sources.AddRange(missingDefaults);
+            sources.Sort((a, b) => string.Compare(a.DisplayName, b.DisplayName, StringComparison.Ordinal));
+        }
+
         var sourceKeys = sources.Select(source => source.SourceKey).ToList();
         var activeRunIds = sources
             .Where(source => source.ActiveIngestionRunId.HasValue)
