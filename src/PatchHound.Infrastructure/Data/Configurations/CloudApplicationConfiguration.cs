@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PatchHound.Core.Entities;
+using System.Text.Json;
 
 namespace PatchHound.Infrastructure.Data.Configurations;
 
@@ -19,9 +20,10 @@ public class CloudApplicationConfiguration : IEntityTypeConfiguration<CloudAppli
         builder.Property(x => x.Description).HasColumnType("text");
         builder.Property(x => x.RedirectUris)
             .HasColumnType("jsonb")
+            .HasDefaultValueSql("'[]'::jsonb")
             .HasConversion(
-                v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
-                v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<string>()
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => DeserializeRedirectUris(v)
             );
         builder.Property(x => x.OwnerTeamId);
 
@@ -33,5 +35,20 @@ public class CloudApplicationConfiguration : IEntityTypeConfiguration<CloudAppli
         builder.HasQueryFilter(x => x.ActiveInTenant);
 
         builder.ToTable("CloudApplications");
+    }
+
+    internal static List<string> DeserializeRedirectUris(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return [];
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 }
