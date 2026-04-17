@@ -1,7 +1,7 @@
-import { Link } from '@tanstack/react-router'
-import { Clock3, ShieldAlert, Wrench } from 'lucide-react'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { Clock3, KeyRound, ShieldAlert, Wrench } from 'lucide-react'
 import { useState } from 'react'
-import type { OwnerAction, OwnerAssetSummary, OwnerDashboardSummary } from '@/api/dashboard.schemas'
+import type { OwnerAction, OwnerAssetSummary, OwnerCloudAppAction, OwnerDashboardSummary } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -83,20 +83,48 @@ type ActionSort = 'urgency' | 'severity' | 'team'
 type ActionFilter = 'all' | 'overdue'
 type DeviceSort = 'risk' | 'name' | 'criticality'
 
-function sortActions(items: OwnerAction[], sort: ActionSort): OwnerAction[] {
+type CombinedAction =
+  | { kind: 'remediation'; item: OwnerAction }
+  | { kind: 'cloudApp'; item: OwnerCloudAppAction }
+
+function combinedIsOverdue(a: CombinedAction): boolean {
+  if (a.kind === 'remediation') return !!a.item.dueDate && new Date(a.item.dueDate) < new Date()
+  return a.item.expiredCredentialCount > 0
+}
+
+function combinedDueDate(a: CombinedAction): string | null {
+  if (a.kind === 'remediation') return a.item.dueDate
+  return a.item.nearestExpiryAt
+}
+
+function combinedTeamName(a: CombinedAction): string {
+  return a.kind === 'remediation' ? a.item.ownerTeamName : a.item.ownerTeamName
+}
+
+function sortCombined(items: CombinedAction[], sort: ActionSort): CombinedAction[] {
   const severityRank = (s: string) => ({ Critical: 4, High: 3, Medium: 2, Low: 1 })[s] ?? 0
   return [...items].sort((a, b) => {
     if (sort === 'urgency') {
-      const aOverdue = !!a.dueDate && new Date(a.dueDate) < new Date()
-      const bOverdue = !!b.dueDate && new Date(b.dueDate) < new Date()
+      const aOverdue = combinedIsOverdue(a)
+      const bOverdue = combinedIsOverdue(b)
       if (aOverdue !== bOverdue) return aOverdue ? -1 : 1
-      if (a.dueDate && b.dueDate) return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-      if (a.dueDate) return -1
-      if (b.dueDate) return 1
-      return severityRank(b.severity) - severityRank(a.severity)
+      const aDate = combinedDueDate(a)
+      const bDate = combinedDueDate(b)
+      if (aDate && bDate) return new Date(aDate).getTime() - new Date(bDate).getTime()
+      if (aDate) return -1
+      if (bDate) return 1
+      if (a.kind === 'remediation' && b.kind === 'remediation')
+        return severityRank(b.item.severity) - severityRank(a.item.severity)
+      return 0
     }
-    if (sort === 'severity') return severityRank(b.severity) - severityRank(a.severity)
-    if (sort === 'team') return a.ownerTeamName.localeCompare(b.ownerTeamName)
+    if (sort === 'severity') {
+      if (a.kind === 'remediation' && b.kind === 'remediation')
+        return severityRank(b.item.severity) - severityRank(a.item.severity)
+      if (a.kind === 'remediation') return -1
+      if (b.kind === 'remediation') return 1
+      return 0
+    }
+    if (sort === 'team') return combinedTeamName(a).localeCompare(combinedTeamName(b))
     return 0
   })
 }
@@ -114,11 +142,17 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
   const [actionSort, setActionSort] = useState<ActionSort>('urgency')
   const [actionFilter, setActionFilter] = useState<ActionFilter>('all')
   const [deviceSort, setDeviceSort] = useState<DeviceSort>('risk')
+  const navigate = useNavigate()
 
-  const visibleActions = sortActions(
+  const allCombined: CombinedAction[] = [
+    ...summary.actions.map(item => ({ kind: 'remediation' as const, item })),
+    ...(summary.cloudAppActions ?? []).map(item => ({ kind: 'cloudApp' as const, item })),
+  ]
+
+  const visibleActions = sortCombined(
     actionFilter === 'overdue'
-      ? summary.actions.filter(a => !!a.dueDate && new Date(a.dueDate) < new Date())
-      : summary.actions,
+      ? allCombined.filter(combinedIsOverdue)
+      : allCombined,
     actionSort
   )
 
@@ -254,11 +288,70 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
               <div className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-10 text-center text-sm text-muted-foreground">
                 {actionFilter === 'overdue'
                   ? 'No overdue actions.'
-                  : 'No open software remediation actions are assigned to devices you own right now.'}
+                  : 'No open remediation or credential actions are assigned to your teams right now.'}
               </div>
             ) : (
-              visibleActions.map((item) => {
-                const isOverdue = !!item.dueDate && new Date(item.dueDate) < new Date()
+              visibleActions.map((combined) => {
+                const isOverdue = combinedIsOverdue(combined)
+                if (combined.kind === 'cloudApp') {
+                  const app = combined.item
+                  return (
+                    <button
+                      key={`cloudapp-${app.cloudApplicationId}`}
+                      type="button"
+                      onClick={() =>
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        navigate({ to: '/assets/applications/$id', params: { id: app.cloudApplicationId } } as any)
+                      }
+                      className={`w-full text-left rounded-[1.2rem] border px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isOverdue ? 'border-destructive/30 bg-destructive/5' : 'border-amber-500/30 bg-amber-500/5'}`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                              <KeyRound className="size-3" />
+                              Credential expiry
+                            </span>
+                            <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
+                              {app.ownerTeamName}
+                            </Badge>
+                            {app.expiredCredentialCount > 0 && (
+                              <span className="rounded-full border border-destructive/30 bg-destructive/8 px-2 py-0.5 text-[11px] font-medium text-destructive">
+                                {app.expiredCredentialCount} expired
+                              </span>
+                            )}
+                            {app.expiringCredentialCount > 0 && (
+                              <span className="rounded-full border border-amber-500/40 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                                {app.expiringCredentialCount} expiring soon
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2 text-base font-medium tracking-tight">
+                            {app.appName}
+                          </div>
+                          {app.appId && (
+                            <div className="mt-0.5 font-mono text-xs text-muted-foreground">{app.appId}</div>
+                          )}
+                          <div className="mt-1 text-sm text-muted-foreground">
+                            {app.expiredCredentialCount > 0
+                              ? 'This application has expired credentials that need to be rotated.'
+                              : 'This application has credentials expiring within the next 7 days.'}
+                          </div>
+                        </div>
+                        <div className="text-right text-sm text-muted-foreground shrink-0">
+                          {app.nearestExpiryAt && (
+                            <div className={isOverdue ? 'font-medium text-destructive' : 'font-medium text-amber-600'}>
+                              {isOverdue ? 'Expired' : 'Expires'} {formatDueDate(app.nearestExpiryAt)}
+                            </div>
+                          )}
+                          <div className="mt-1">Assigned to {app.ownerTeamName}</div>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                }
+
+                const item = combined.item
                 return (
                 <div key={`${item.tenantSoftwareId}-${item.vulnerabilityId}`} className={`rounded-[1.2rem] border px-4 py-4 ${isOverdue ? 'border-destructive/30 bg-destructive/5' : 'border-border/60 bg-background/35'}`}>
                   <div className="flex flex-wrap items-start justify-between gap-3">

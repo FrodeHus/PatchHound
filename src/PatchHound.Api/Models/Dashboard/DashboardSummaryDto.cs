@@ -146,7 +146,8 @@ public record OwnerDashboardSummaryDto(
     int OpenActionCount,
     int OverdueActionCount,
     List<OwnerAssetSummaryDto> TopOwnedAssets,
-    List<OwnerActionDto> Actions
+    List<OwnerActionDto> Actions,
+    List<OwnerCloudAppActionDto> CloudAppActions
 );
 
 public record OwnerAssetSummaryDto(
@@ -181,6 +182,16 @@ public record OwnerActionDto(
     string? EpisodeRiskBand,
     DateTimeOffset? DueDate,
     string ActionState
+);
+
+public record OwnerCloudAppActionDto(
+    Guid CloudApplicationId,
+    string AppName,
+    string? AppId,
+    string OwnerTeamName,
+    int ExpiredCredentialCount,
+    int ExpiringCredentialCount,
+    DateTimeOffset? NearestExpiryAt
 );
 
 public record ApprovalAttentionTaskDto(

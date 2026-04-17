@@ -519,13 +519,48 @@ public class DashboardController : ControllerBase
             ))
             .ToList();
 
+        // Cloud application credential actions — apps owned by the user's teams
+        // with credentials expiring within 7 days or already expired.
+        var credentialSoonThreshold = DateTimeOffset.UtcNow.AddDays(7);
+        var now = DateTimeOffset.UtcNow;
+
+        var cloudAppActions = ownerScope.OwnerTeamIds.Count == 0
+            ? []
+            : await (
+                from app in _dbContext.CloudApplications.AsNoTracking().IgnoreQueryFilters()
+                join team in _dbContext.Teams.AsNoTracking() on app.OwnerTeamId equals team.Id
+                where app.TenantId == tenantId
+                      && app.ActiveInTenant
+                      && app.OwnerTeamId != null
+                      && ownerScope.OwnerTeamIds.Contains(app.OwnerTeamId!.Value)
+                      && app.Credentials.Any(c => c.ExpiresAt <= credentialSoonThreshold)
+                select new OwnerCloudAppActionDto(
+                    app.Id,
+                    app.Name,
+                    app.AppId,
+                    team.Name,
+                    app.Credentials.Count(c => c.ExpiresAt < now),
+                    app.Credentials.Count(c => c.ExpiresAt >= now && c.ExpiresAt <= credentialSoonThreshold),
+                    app.Credentials
+                        .Where(c => c.ExpiresAt <= credentialSoonThreshold)
+                        .OrderBy(c => c.ExpiresAt)
+                        .Select(c => (DateTimeOffset?)c.ExpiresAt)
+                        .FirstOrDefault()
+                )
+            ).ToListAsync(ct);
+
+        var totalOpenCount = ownerActions.Count + cloudAppActions.Count;
+        var totalOverdueCount = ownerActions.Count(item => item.DueDate.HasValue && item.DueDate.Value < now)
+            + cloudAppActions.Count(item => item.ExpiredCredentialCount > 0);
+
         return Ok(new OwnerDashboardSummaryDto(
             ownedAssetIds.Count,
             assetsNeedingAttention,
-            ownerActions.Count,
-            ownerActions.Count(item => item.DueDate.HasValue && item.DueDate.Value < DateTimeOffset.UtcNow),
+            totalOpenCount,
+            totalOverdueCount,
             topOwnedAssets,
-            ownerActions
+            ownerActions,
+            cloudAppActions
         ));
     }
 

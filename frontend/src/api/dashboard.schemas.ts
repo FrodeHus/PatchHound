@@ -175,6 +175,16 @@ export const ownerActionSchema = z.object({
   actionState: z.string(),
 })
 
+export const ownerCloudAppActionSchema = z.object({
+  cloudApplicationId: z.string().uuid(),
+  appName: z.string(),
+  appId: z.string().nullable(),
+  ownerTeamName: z.string(),
+  expiredCredentialCount: z.number(),
+  expiringCredentialCount: z.number(),
+  nearestExpiryAt: z.string().datetime({ offset: true }).nullable(),
+})
+
 export const ownerDashboardSummarySchema = z.object({
   ownedAssetCount: z.number(),
   assetsNeedingAttention: z.number(),
@@ -182,6 +192,7 @@ export const ownerDashboardSummarySchema = z.object({
   overdueActionCount: z.number(),
   topOwnedAssets: z.array(ownerAssetSummarySchema),
   actions: z.array(ownerActionSchema),
+  cloudAppActions: z.array(ownerCloudAppActionSchema),
 })
 
 export type DashboardFilterOptions = z.infer<typeof dashboardFilterOptionsSchema>
@@ -189,6 +200,7 @@ export type DeviceGroupVulnerability = z.infer<typeof dashboardSummarySchema>['v
 export type OwnerDashboardSummary = z.infer<typeof ownerDashboardSummarySchema>
 export type OwnerAssetSummary = z.infer<typeof ownerAssetSummarySchema>
 export type OwnerAction = z.infer<typeof ownerActionSchema>
+export type OwnerCloudAppAction = z.infer<typeof ownerCloudAppActionSchema>
 
 export const approvalAttentionTaskSchema = z.object({
   approvalTaskId: z.string().uuid(),

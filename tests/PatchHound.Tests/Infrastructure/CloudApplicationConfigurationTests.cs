@@ -1,3 +1,4 @@
+using FluentAssertions;
 using PatchHound.Infrastructure.Data.Configurations;
 
 namespace PatchHound.Tests.Infrastructure;

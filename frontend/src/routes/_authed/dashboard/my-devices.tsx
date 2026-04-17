@@ -27,6 +27,7 @@ function MyDevicesDashboardPage() {
         overdueActionCount: 0,
         topOwnedAssets: [],
         actions: [],
+        cloudAppActions: [],
       }}
       isLoading={ownerSummaryQuery.isPending || ownerSummaryQuery.isFetching}
     />
