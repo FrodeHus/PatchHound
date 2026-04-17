@@ -22,15 +22,16 @@ This document reflects the remediation workflow as it is implemented today in Pa
 
 ## At a Glance
 
-- Remediation is scoped to `TenantSoftwareId`.
+- Remediation is scoped to a `RemediationCase`, which is keyed to a `SoftwareProductId`. One active `RemediationWorkflow` exists per case.
 - A persisted `RemediationWorkflow` is the source of truth for stage, ownership, and progression.
 - `Exposure` is shared evidence, not a workflow stage.
 - First-time exposure starts in `Security Analysis`.
 - Recurring exposure starts in `Verification` only when there is a prior closed workflow with an approved posture.
-- Workflow writes are stage-specific and workflow-scoped under `/api/remediation/{workflowId}/...`.
-- A software-scoped bootstrap endpoint creates or resolves the active workflow: `POST /api/software/{tenantSoftwareId}/remediation/workflow`.
+- Workflow writes are stage-specific and case-scoped under `/api/remediation/cases/{caseId}/...`.
+- The bootstrap endpoint creates or resolves the active workflow: `POST /api/remediation/cases/{caseId}/workflow`.
 - `ApprovedForPatching` can move into `Execution`; `RiskAcceptance` and `AlternateMitigation` require approval; normal-priority `PatchingDeferred` auto-approves.
 - For approved patching, the system auto-closes the workflow when no unresolved exposure remains.
+- AI drafts are auto-enqueued after most stage actions.
 
 ## How to Read This Document
 
@@ -60,7 +61,7 @@ This is the `Exposure` view in the UI. It supports every stage, but it does not 
 
 ### Persisted Workflow Model
 
-The backend stores one active remediation workflow per `TenantSoftwareId`.
+The backend stores one active remediation workflow per `RemediationCase` (which maps to a `SoftwareProductId`).
 
 Key points:
 
@@ -75,15 +76,23 @@ Key points:
 
 The UI resolves or creates the active workflow explicitly through:
 
-- `POST /api/software/{tenantSoftwareId}/remediation/workflow`
+- `POST /api/remediation/cases/{caseId}/workflow`
 
-All stage actions then target workflow-scoped routes:
+All stage actions then target case-scoped routes (the active workflow is resolved server-side):
 
-- `POST /api/remediation/{workflowId}/analysis`
-- `POST /api/remediation/{workflowId}/verification`
-- `POST /api/remediation/{workflowId}/decision`
-- `POST /api/remediation/{workflowId}/approval`
-- `POST /api/remediation/{workflowId}/decision/{decisionId}/cancel`
+- `POST /api/remediation/cases/{caseId}/analysis`
+- `POST /api/remediation/cases/{caseId}/verification`
+- `POST /api/remediation/cases/{caseId}/decision`
+- `POST /api/remediation/cases/{caseId}/approval`
+- `POST /api/remediation/cases/{caseId}/decision/{decisionId}/cancel`
+
+Additional case-scoped endpoints:
+
+- `GET  /api/remediation/cases/{caseId}/decision-context`
+- `GET  /api/remediation/cases/{caseId}/recommendations`
+- `GET  /api/remediation/cases/{caseId}/audit-trail`
+- `POST /api/remediation/cases/{caseId}/ai-summary`
+- `POST /api/remediation/cases/{caseId}/decisions/{decisionId}/overrides`
 
 ### Server-side enforcement
 
@@ -337,8 +346,8 @@ sequenceDiagram
     participant Approval as Approval Task Service
     participant Patch as Patching Tasks
 
-    Ingestion->>Workflow: Exposure refresh for tenant software
-    Workflow->>Workflow: Find active workflow
+    Ingestion->>Workflow: RunExposureDerivationAsync\nEnsureCasesForOpenExposuresAsync
+    Workflow->>Workflow: Find active workflow for case
     alt No active workflow and no prior approved closed workflow
         Workflow->>Workflow: Create workflow in SecurityAnalysis
     else No active workflow and prior approved closed workflow exists
@@ -348,37 +357,37 @@ sequenceDiagram
         Workflow-->>Ingestion: Keep current workflow
     end
 
-    UI->>API: POST /software/{tenantSoftwareId}/remediation/workflow
-    API->>Workflow: Get or create active workflow
+    UI->>API: POST /api/remediation/cases/{caseId}/workflow
+    API->>Workflow: GetOrCreateActiveWorkflowAsync
     Workflow-->>API: workflowId + current stage
-    API-->>UI: decision context + workflow state
+    API-->>UI: EnsureRemediationWorkflowResponse(workflowId)
 
     alt Current stage is Security Analysis
-        UI->>API: POST /api/remediation/{workflowId}/analysis
-        API->>Workflow: Authorize stage + role
-        API->>Workflow: Attach recommendation
+        UI->>API: POST /api/remediation/cases/{caseId}/analysis
+        API->>Workflow: EnsureCanAddRecommendationAsync
+        API->>Workflow: AttachRecommendationAsync
         Workflow->>Workflow: Complete SecurityAnalysis
         Workflow->>Workflow: Open RemediationDecision
         API-->>UI: recommendation recorded
     else Current stage is Verification
-        alt User chooses Keep current decision
-            UI->>API: POST /api/remediation/{workflowId}/verification
-            API->>Workflow: Authorize stage + role
-            API->>Decision: Carry forward prior approved decision
+        alt User chooses keepCurrentDecision
+            UI->>API: POST /api/remediation/cases/{caseId}/verification
+            API->>Workflow: EnsureCanVerifyAsync
+            API->>Decision: VerifyAndCarryForwardDecisionAsync
             Decision->>Workflow: Advance to Approval or Execution
             API-->>UI: workflow advanced
-        else User chooses Choose new decision
-            UI->>API: POST /api/remediation/{workflowId}/verification
-            API->>Workflow: Authorize stage + role
-            API->>Workflow: Complete Verification
+        else User chooses chooseNewDecision
+            UI->>API: POST /api/remediation/cases/{caseId}/verification
+            API->>Workflow: EnsureCanVerifyAsync
+            API->>Decision: VerifyAndRequireNewDecisionAsync
             Workflow->>Workflow: Open RemediationDecision
             API-->>UI: workflow advanced
         end
     end
 
-    UI->>API: POST /api/remediation/{workflowId}/decision
-    API->>Workflow: Authorize stage + team
-    API->>Decision: Create remediation decision
+    UI->>API: POST /api/remediation/cases/{caseId}/decision
+    API->>Workflow: EnsureCanCreateDecisionAsync
+    API->>Decision: CreateDecisionForCaseAsync
     Decision->>Workflow: Set proposed outcome + approval mode
     alt Decision requires approval
         Decision->>Approval: Create approval task
@@ -392,11 +401,11 @@ sequenceDiagram
     API-->>UI: decision recorded
 
     alt Approval stage is active
-        UI->>API: POST /api/remediation/{workflowId}/approval
-        API->>Workflow: Authorize stage + approver role
-        API->>Approval: Approve or deny task
+        UI->>API: POST /api/remediation/cases/{caseId}/approval
+        API->>Workflow: EnsureCanApproveOrRejectDecisionAsync
+        API->>Approval: ApproveAsync or DenyAsync
         alt Approved for patching
-            Approval->>Patch: Ensure patching tasks
+            Approval->>Patch: EnsurePatchingTasksAsync
             Workflow->>Workflow: Open Execution
         else Approved exception / mitigation / defer
             Workflow->>Workflow: Return to active RemediationDecision posture
@@ -406,11 +415,11 @@ sequenceDiagram
         API-->>UI: approval resolved
     end
 
-    loop Exposure refresh continues
-        Ingestion->>Decision: Reconcile resolved software remediations
+    loop Ingestion pipeline (after each run)
+        Ingestion->>Decision: ReconcileResolvedSoftwareRemediationsAsync
         alt Approved patching and no unresolved exposure remains
             Decision->>Patch: Complete open patching tasks
-            Decision->>Workflow: Complete workflow in Closure
+            Decision->>Workflow: MarkWorkflowClosedForResolvedExposureAsync
         end
     end
 ```
@@ -433,9 +442,12 @@ Verification events are semantic, for example:
 
 ## Current Implementation Notes
 
-- remediation is software-wide, not per version cohort
+- remediation is scoped to a `RemediationCase` (per `SoftwareProductId`), not per version cohort
+- all API routes are case-scoped (`/api/remediation/cases/{caseId}/...`); the active workflow is resolved server-side from the case
+- `RemediationCase` is the top-level entity; `RemediationWorkflow` is the active progression record under it
 - software owner team decides the remediation posture
 - device owner teams execute approved patching
 - fallback ownership is `Infrastructure`
 - email delivery is best-effort and must not block remediation progression
-- old software-scoped write shims have been retired in favor of explicit workflow bootstrap plus stage-specific workflow routes
+- AI drafts (`RemediationAiJobService.EnqueueAsync`) are auto-queued after analysis, verification, decision, approval, and cancellation actions
+- `RemediationDecisionService.ReconcileResolvedSoftwareRemediationsAsync` is called by the ingestion pipeline to auto-close patching workflows when no unresolved exposure remains
