@@ -6,6 +6,7 @@ public class Tenant
     public string Name { get; private set; } = null!;
     public string EntraTenantId { get; private set; } = null!;
     public bool IsPrimary { get; private set; }
+    public bool IsPendingDeletion { get; private set; }
 
     private Tenant() { }
 
@@ -23,5 +24,10 @@ public class Tenant
     public void UpdateName(string name)
     {
         Name = name;
+    }
+
+    public void MarkPendingDeletion()
+    {
+        IsPendingDeletion = true;
     }
 }
