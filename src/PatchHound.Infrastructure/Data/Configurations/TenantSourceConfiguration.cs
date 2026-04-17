@@ -26,6 +26,7 @@ public class TenantSourceConfigurationConfiguration
         builder.Property(source => source.BuildingSnapshotId);
         builder.Property(source => source.LeaseAcquiredAt);
         builder.Property(source => source.LeaseExpiresAt);
+        builder.Property(source => source.LinkedSourceKey).HasMaxLength(128);
         builder.Property(source => source.LastStatus).HasMaxLength(64).IsRequired();
         builder.Property(source => source.LastError).HasMaxLength(512).IsRequired();
 

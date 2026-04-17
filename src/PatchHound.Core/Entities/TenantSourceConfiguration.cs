@@ -13,6 +13,7 @@ public class TenantSourceConfiguration
     public string SecretRef { get; private set; } = string.Empty;
     public string ApiBaseUrl { get; private set; } = string.Empty;
     public string TokenScope { get; private set; } = string.Empty;
+    public string? LinkedSourceKey { get; private set; }
     public DateTimeOffset? ManualRequestedAt { get; private set; }
     public DateTimeOffset? LastStartedAt { get; private set; }
     public DateTimeOffset? LastCompletedAt { get; private set; }
@@ -37,7 +38,8 @@ public class TenantSourceConfiguration
         string clientId = "",
         string secretRef = "",
         string apiBaseUrl = "",
-        string tokenScope = ""
+        string tokenScope = "",
+        string? linkedSourceKey = null
     )
     {
         return new TenantSourceConfiguration
@@ -53,6 +55,7 @@ public class TenantSourceConfiguration
             SecretRef = secretRef,
             ApiBaseUrl = apiBaseUrl,
             TokenScope = tokenScope,
+            LinkedSourceKey = linkedSourceKey,
         };
     }
 
@@ -64,7 +67,8 @@ public class TenantSourceConfiguration
         string clientId,
         string secretRef,
         string apiBaseUrl,
-        string tokenScope
+        string tokenScope,
+        string? linkedSourceKey = null
     )
     {
         DisplayName = displayName;
@@ -75,6 +79,7 @@ public class TenantSourceConfiguration
         SecretRef = secretRef;
         ApiBaseUrl = apiBaseUrl;
         TokenScope = tokenScope;
+        LinkedSourceKey = string.IsNullOrWhiteSpace(linkedSourceKey) ? null : linkedSourceKey;
     }
 
     public void UpdateRuntime(

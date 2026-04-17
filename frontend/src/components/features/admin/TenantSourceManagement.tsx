@@ -29,6 +29,7 @@ type TenantSourceManagementProps = {
 type TenantIngestionSourceDraft = Omit<TenantIngestionSource, 'credentials'> & {
   credentials: TenantIngestionSource['credentials'] & {
     secret: string
+    linkedSourceKey?: string | null
   }
 }
 
@@ -75,6 +76,7 @@ export function TenantSourceManagement({
               secret: source.credentials.secret,
               apiBaseUrl: source.credentials.apiBaseUrl,
               tokenScope: source.credentials.tokenScope,
+              linkedSourceKey: source.credentials.linkedSourceKey ?? null,
             },
           })),
         },
@@ -570,45 +572,104 @@ function TenantSourceEditorPage({
                     This source automatically uses the selected tenant&apos;s Entra tenant ID:{' '}
                     <span className="font-medium text-foreground">{tenant.entraTenantId}</span>.
                   </InsetPanel>
-                  <FieldBlock
-                    label="Client ID"
-                    tooltip="Application client identifier used to authenticate against the source."
-                    control={(
-                      <Input
-                        value={source.credentials.clientId}
-                        onChange={(event) => {
-                          onUpdateSource(source.key, (current) => ({
-                            ...current,
-                            credentials: { ...current.credentials, clientId: event.target.value },
-                          }))
-                        }}
-                        className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)]"
+
+                  {source.key === 'entra-applications' && (() => {
+                    const defenderSource = tenant.ingestionSources.find(s => s.key === 'microsoft-defender')
+                    const isLinked = source.credentials.linkedSourceKey === 'microsoft-defender'
+                    return defenderSource ? (
+                      <div className="md:col-span-2">
+                        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3 transition-colors hover:bg-muted/40">
+                          <input
+                            type="checkbox"
+                            checked={isLinked}
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                onUpdateSource(source.key, (current) => ({
+                                  ...current,
+                                  credentials: {
+                                    ...current.credentials,
+                                    linkedSourceKey: 'microsoft-defender',
+                                    clientId: '',
+                                    secret: '',
+                                    apiBaseUrl: 'https://graph.microsoft.com',
+                                    tokenScope: 'https://graph.microsoft.com/.default',
+                                  },
+                                }))
+                              } else {
+                                onUpdateSource(source.key, (current) => ({
+                                  ...current,
+                                  credentials: {
+                                    ...current.credentials,
+                                    linkedSourceKey: null,
+                                    clientId: '',
+                                    secret: '',
+                                  },
+                                }))
+                              }
+                            }}
+                          />
+                          <div className="space-y-0.5">
+                            <p className="text-sm font-medium text-foreground">Re-use Defender app registration</p>
+                            <p className="text-xs text-muted-foreground">
+                              Uses the same identity as Microsoft Defender. The app registration must also have{' '}
+                              <span className="font-mono text-foreground">Application.Read.All</span> permission on Microsoft Graph.
+                            </p>
+                            {isLinked && defenderSource.credentials.clientId ? (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Client ID: <span className="font-mono text-foreground">{defenderSource.credentials.clientId}</span>
+                              </p>
+                            ) : null}
+                          </div>
+                        </label>
+                      </div>
+                    ) : null
+                  })()}
+
+                  {source.credentials.linkedSourceKey !== 'microsoft-defender' ? (
+                    <>
+                      <FieldBlock
+                        label="Client ID"
+                        tooltip="Application client identifier used to authenticate against the source."
+                        control={(
+                          <Input
+                            value={source.credentials.clientId}
+                            onChange={(event) => {
+                              onUpdateSource(source.key, (current) => ({
+                                ...current,
+                                credentials: { ...current.credentials, clientId: event.target.value },
+                              }))
+                            }}
+                            className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)]"
+                          />
+                        )}
                       />
-                    )}
-                  />
-                  <FieldBlock
-                    label="Client Secret"
-                    tooltip="Stored securely after save. Enter a new value only when rotating credentials."
-                    className="md:col-span-2"
-                    control={(
-                      <Input
-                        type="password"
-                        value={source.credentials.secret}
-                        placeholder={source.credentials.hasSecret ? 'Stored in OpenBao. Enter a new value to rotate.' : 'Not configured'}
-                        onChange={(event) => {
-                          onUpdateSource(source.key, (current) => ({
-                            ...current,
-                            credentials: {
-                              ...current.credentials,
-                              secret: event.target.value,
-                              hasSecret: current.credentials.hasSecret || event.target.value.trim().length > 0,
-                            },
-                          }))
-                        }}
-                        className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)]"
+                      <FieldBlock
+                        label="Client Secret"
+                        tooltip="Stored securely after save. Enter a new value only when rotating credentials."
+                        className="md:col-span-2"
+                        control={(
+                          <Input
+                            type="password"
+                            value={source.credentials.secret}
+                            placeholder={source.credentials.hasSecret ? 'Stored in OpenBao. Enter a new value to rotate.' : 'Not configured'}
+                            onChange={(event) => {
+                              onUpdateSource(source.key, (current) => ({
+                                ...current,
+                                credentials: {
+                                  ...current.credentials,
+                                  secret: event.target.value,
+                                  hasSecret: current.credentials.hasSecret || event.target.value.trim().length > 0,
+                                },
+                              }))
+                            }}
+                            className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)]"
+                          />
+                        )}
                       />
-                    )}
-                  />
+                    </>
+                  ) : null}
+
                   <FieldBlock
                     label="API Base URL"
                     tooltip="Base endpoint used for provider API requests."
@@ -942,6 +1003,7 @@ function mapSourceToDraft(source: TenantIngestionSource): TenantIngestionSourceD
     credentials: {
       ...source.credentials,
       secret: '',
+      linkedSourceKey: source.credentials.linkedSourceKey ?? null,
     },
   }
 }

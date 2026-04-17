@@ -7,6 +7,7 @@ export const tenantCredentialsSchema = z.object({
   hasSecret: z.boolean(),
   apiBaseUrl: z.string(),
   tokenScope: z.string(),
+  linkedSourceKey: z.string().nullable().optional(),
 })
 
 export const tenantIngestionRuntimeSchema = z.object({

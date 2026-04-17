@@ -5,4 +5,5 @@ public enum AssetType
     Device,
     Software,
     CloudResource,
+    Application,
 }

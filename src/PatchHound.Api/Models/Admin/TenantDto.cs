@@ -48,7 +48,8 @@ public record TenantSourceCredentialsDto(
     string ClientId,
     bool HasSecret,
     string ApiBaseUrl,
-    string TokenScope
+    string TokenScope,
+    string? LinkedSourceKey
 );
 
 public record TenantIngestionRuntimeDto(
@@ -123,5 +124,6 @@ public record UpdateTenantSourceCredentialsRequest(
     string ClientId,
     string Secret,
     string ApiBaseUrl,
-    string TokenScope
+    string TokenScope,
+    string? LinkedSourceKey = null
 );

@@ -18,6 +18,7 @@ const updateTenantIngestionSourceSchema = z.object({
     secret: z.string(),
     apiBaseUrl: z.string(),
     tokenScope: z.string(),
+    linkedSourceKey: z.string().nullable().optional(),
   }),
 })
 

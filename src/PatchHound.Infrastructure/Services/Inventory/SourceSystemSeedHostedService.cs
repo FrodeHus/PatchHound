@@ -16,6 +16,7 @@ public class SourceSystemSeedHostedService(
     private static readonly (string Key, string DisplayName)[] BuiltInSourceSystems =
     [
         (TenantSourceCatalog.DefenderSourceKey, "Microsoft Defender for Endpoint"),
+        (TenantSourceCatalog.EntraApplicationsSourceKey, "Microsoft Entra Applications"),
         ("authenticated-scan", "Authenticated Scan"),
     ];
 

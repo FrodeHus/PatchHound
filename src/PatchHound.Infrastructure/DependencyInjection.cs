@@ -14,6 +14,7 @@ using PatchHound.Infrastructure.Services;
 using PatchHound.Infrastructure.Services.Inventory;
 using PatchHound.Infrastructure.Services.Workflows;
 using PatchHound.Infrastructure.Tenants;
+using PatchHound.Infrastructure.CredentialSources;
 using PatchHound.Infrastructure.VulnerabilitySources;
 
 namespace PatchHound.Infrastructure;
@@ -160,6 +161,7 @@ public static class DependencyInjection
 
         // Vulnerability Sources
         services.AddScoped<IVulnerabilitySource, DefenderVulnerabilitySource>();
+        services.AddScoped<IVulnerabilitySource, EntraApplicationSource>();
         services.AddScoped<NvdVulnerabilitySource>();
         services
             .AddHttpClient<DefenderApiClient>()
@@ -174,6 +176,10 @@ public static class DependencyInjection
             .AddHttpClient<ISecretStore, OpenBaoSecretStore>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
         services.AddScoped<DefenderTenantConfigurationProvider>();
+        services.AddScoped<EntraApplicationsConfigurationProvider>();
+        services
+            .AddHttpClient<EntraGraphApiClient>()
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services.AddScoped<NvdGlobalConfigurationProvider>();
         services
             .AddOptions<OpenBaoOptions>()

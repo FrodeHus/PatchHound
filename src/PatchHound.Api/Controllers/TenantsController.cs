@@ -247,6 +247,45 @@ public class TenantsController : ControllerBase
         foreach (var source in request.IngestionSources)
         {
             existingSources.TryGetValue(source.Key, out var existingSource);
+            var linkedSourceKey = string.IsNullOrWhiteSpace(source.Credentials.LinkedSourceKey)
+                ? null
+                : source.Credentials.LinkedSourceKey.Trim();
+
+            // When linking to another source, skip credential fields — credentials come from the linked source at runtime
+            if (linkedSourceKey is not null)
+            {
+                if (existingSource is null)
+                {
+                    var created = TenantSourceConfiguration.Create(
+                        tenant.Id,
+                        source.Key,
+                        source.DisplayName,
+                        source.Enabled,
+                        source.SyncSchedule,
+                        apiBaseUrl: source.Credentials.ApiBaseUrl,
+                        tokenScope: source.Credentials.TokenScope,
+                        linkedSourceKey: linkedSourceKey
+                    );
+                    await _dbContext.TenantSourceConfigurations.AddAsync(created, ct);
+                    existingSources[source.Key] = created;
+                }
+                else
+                {
+                    existingSource.UpdateConfiguration(
+                        source.DisplayName,
+                        source.Enabled,
+                        source.SyncSchedule,
+                        credentialTenantId: string.Empty,
+                        clientId: string.Empty,
+                        secretRef: string.Empty,
+                        source.Credentials.ApiBaseUrl,
+                        source.Credentials.TokenScope,
+                        linkedSourceKey: linkedSourceKey
+                    );
+                }
+                continue;
+            }
+
             var secretRef = existingSource?.SecretRef ?? string.Empty;
             var secretValue = source.Credentials.Secret.Trim();
 
@@ -463,6 +502,12 @@ public class TenantsController : ControllerBase
         await DeleteEntitiesAsync(_dbContext.SoftwareProductInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.SoftwareTenantRecords.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.SecurityProfiles.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        // ExposureAssessments and ExposureEpisodes must go before DeviceVulnerabilityExposures;
+        // DeviceVulnerabilityExposures and DeviceRiskScores must go before Devices (Restrict FK).
+        await DeleteEntitiesAsync(_dbContext.ExposureAssessments.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.ExposureEpisodes.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.DeviceVulnerabilityExposures.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.DeviceRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.Devices.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.TeamMembershipRules.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.Teams.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
@@ -841,7 +886,8 @@ public class TenantsController : ControllerBase
                 source.ClientId,
                 !string.IsNullOrWhiteSpace(source.SecretRef),
                 source.ApiBaseUrl,
-                source.TokenScope
+                source.TokenScope,
+                source.LinkedSourceKey
             ),
             new TenantIngestionRuntimeDto(
                 source.ManualRequestedAt,
