@@ -19,6 +19,10 @@ public class RemediationWorkflowConfiguration : IEntityTypeConfiguration<Remedia
             .HasForeignKey(workflow => workflow.RemediationCaseId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(workflow => new { workflow.TenantId, workflow.RemediationCaseId, workflow.Status });
+        builder.HasIndex(workflow => new { workflow.TenantId, workflow.RemediationCaseId })
+            .IsUnique()
+            .HasFilter("\"Status\" = 'Active'")
+            .HasDatabaseName("IX_RemediationWorkflows_ActivePerCase");
 
         builder.Property(workflow => workflow.CurrentStage).HasConversion<string>().HasMaxLength(32);
         builder.Property(workflow => workflow.Status).HasConversion<string>().HasMaxLength(32);

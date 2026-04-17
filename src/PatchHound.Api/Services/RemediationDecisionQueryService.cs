@@ -179,12 +179,15 @@ public class RemediationDecisionQueryService(
             ct
         );
 
-        var activeWorkflowStages = await dbContext.RemediationWorkflows.AsNoTracking()
+        var activeWorkflowRows = await dbContext.RemediationWorkflows.AsNoTracking()
             .Where(w => w.TenantId == tenantId
                 && caseIds.Contains(w.RemediationCaseId)
                 && w.Status == RemediationWorkflowStatus.Active)
-            .Select(w => new { w.RemediationCaseId, w.CurrentStage })
-            .ToDictionaryAsync(w => w.RemediationCaseId, w => w.CurrentStage, ct);
+            .Select(w => new { w.RemediationCaseId, w.CurrentStage, w.UpdatedAt })
+            .ToListAsync(ct);
+        var activeWorkflowStages = activeWorkflowRows
+            .GroupBy(w => w.RemediationCaseId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(w => w.UpdatedAt).First().CurrentStage);
 
         // Build vulnCounts and riskScoresByCaseId keyed by RemediationCaseId.
         var vulnCounts = new Dictionary<Guid, (int Total, int Critical, int High, DateTimeOffset EarliestFirstSeen, Severity HighestSeverity)>();
