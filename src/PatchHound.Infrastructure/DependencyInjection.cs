@@ -160,8 +160,8 @@ public static class DependencyInjection
         services.AddScoped<IAiReportProvider>(sp => sp.GetRequiredService<OpenAiProvider>());
 
         // Vulnerability Sources
-        services.AddScoped<IVulnerabilitySource, DefenderVulnerabilitySource>();
-        services.AddScoped<IVulnerabilitySource, EntraApplicationSource>();
+        services.AddScoped<IIngestionSource, DefenderVulnerabilitySource>();
+        services.AddScoped<IIngestionSource, EntraApplicationSource>();
         services.AddScoped<NvdVulnerabilitySource>();
         services
             .AddHttpClient<DefenderApiClient>()
@@ -195,6 +195,7 @@ public static class DependencyInjection
         services.AddScoped<ISoftwareProductResolver, PatchHound.Infrastructure.Services.Inventory.SoftwareProductResolver>();
         services.AddScoped<IDeviceResolver, PatchHound.Infrastructure.Services.Inventory.DeviceResolver>();
         services.AddScoped<IStagedDeviceMergeService, StagedDeviceMergeService>();
+        services.AddScoped<IStagedCloudApplicationMergeService, StagedCloudApplicationMergeService>();
 
         // Ingestion
         services.AddScoped<IngestionService>();

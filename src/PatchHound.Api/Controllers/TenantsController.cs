@@ -517,6 +517,9 @@ public class TenantsController : ControllerBase
         await DeleteEntitiesAsync(_dbContext.EnrichmentJobs.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.StagedDeviceSoftwareInstallations.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.StagedDevices.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.StagedCloudApplications.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.CloudApplicationCredentialMetadata.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
+        await DeleteEntitiesAsync(_dbContext.CloudApplications.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.StagedVulnerabilityExposures.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.StagedVulnerabilities.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);
         await DeleteEntitiesAsync(_dbContext.IngestionCheckpoints.IgnoreQueryFilters().Where(item => item.TenantId == id), ct);

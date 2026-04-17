@@ -145,7 +145,8 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
                 source.TokenScope,
                 source.SyncSchedule,
                 source.ManualRequestedAt,
-                source.LastStartedAt
+                source.LastStartedAt,
+                source.LinkedSourceKey
             ))
             .ToList();
     }
@@ -210,19 +211,16 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
 
     private static bool HasConfiguredCredentials(ScheduledSource source)
     {
+        if (!string.IsNullOrWhiteSpace(source.LinkedSourceKey))
+            return true;
+
         return !string.IsNullOrWhiteSpace(source.CredentialTenantId)
             && !string.IsNullOrWhiteSpace(source.ClientId)
             && !string.IsNullOrWhiteSpace(source.SecretRef);
     }
 
-    private static bool SupportsManualSync(ScheduledSource source)
-    {
-        return string.Equals(
-            source.SourceKey,
-            TenantSourceCatalog.DefenderSourceKey,
-            StringComparison.OrdinalIgnoreCase
-        );
-    }
+    private static bool SupportsManualSync(ScheduledSource source) =>
+        TenantSourceCatalog.SupportsManualSync(source.SourceKey);
 
     private static bool IsDue(ScheduledSource source, DateTimeOffset nowUtc)
     {
@@ -269,6 +267,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
         string TokenScope,
         string SyncSchedule,
         DateTimeOffset? ManualRequestedAt,
-        DateTimeOffset? LastStartedAt
+        DateTimeOffset? LastStartedAt,
+        string? LinkedSourceKey = null
     );
 }

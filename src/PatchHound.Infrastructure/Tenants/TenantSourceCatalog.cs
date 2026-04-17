@@ -57,15 +57,18 @@ public static class TenantSourceCatalog
             && !string.IsNullOrWhiteSpace(source.SecretRef);
     }
 
-    public static bool SupportsScheduling(TenantSourceConfiguration source)
-    {
-        return source.SourceKey is DefenderSourceKey or EntraApplicationsSourceKey;
-    }
+    public static bool SupportsScheduling(TenantSourceConfiguration source) =>
+        SupportsScheduling(source.SourceKey);
 
-    public static bool SupportsManualSync(TenantSourceConfiguration source)
-    {
-        return SupportsScheduling(source);
-    }
+    public static bool SupportsScheduling(string sourceKey) =>
+        string.Equals(sourceKey, DefenderSourceKey, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(sourceKey, EntraApplicationsSourceKey, StringComparison.OrdinalIgnoreCase);
+
+    public static bool SupportsManualSync(TenantSourceConfiguration source) =>
+        SupportsScheduling(source.SourceKey);
+
+    public static bool SupportsManualSync(string sourceKey) =>
+        SupportsScheduling(sourceKey);
 
     public static string GetSecretKeyName(string sourceKey)
     {

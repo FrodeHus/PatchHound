@@ -44,6 +44,10 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<StagedDevice> StagedDevices => Set<StagedDevice>();
     public DbSet<StagedDeviceSoftwareInstallation> StagedDeviceSoftwareInstallations =>
         Set<StagedDeviceSoftwareInstallation>();
+    public DbSet<StagedCloudApplication> StagedCloudApplications => Set<StagedCloudApplication>();
+    public DbSet<CloudApplication> CloudApplications => Set<CloudApplication>();
+    public DbSet<CloudApplicationCredentialMetadata> CloudApplicationCredentialMetadata =>
+        Set<CloudApplicationCredentialMetadata>();
     public DbSet<EnrichmentSourceConfiguration> EnrichmentSourceConfigurations =>
         Set<EnrichmentSourceConfiguration>();
     public DbSet<EnrichmentJob> EnrichmentJobs => Set<EnrichmentJob>();

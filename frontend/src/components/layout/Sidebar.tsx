@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
   Laptop,
+  AppWindow,
   Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -104,6 +105,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: "/devices", label: "Devices", icon: Laptop },
       { to: "/software", label: "Software", icon: Boxes },
+      { to: "/assets/applications", label: "Applications", icon: AppWindow },
     ],
   },
 ];
@@ -135,7 +137,7 @@ export function Sidebar({
   const showLabels = compact || !collapsed;
   const dashboardsGroupActive = pathname.startsWith('/dashboard/')
   const assetsGroupActive =
-    pathname.startsWith('/devices') || pathname.startsWith('/software') || pathname.startsWith('/remediation')
+    pathname.startsWith('/devices') || pathname.startsWith('/software') || pathname.startsWith('/remediation') || pathname.startsWith('/assets')
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     Dashboards: dashboardsGroupActive || !collapsed,
     Assets: assetsGroupActive || !collapsed,

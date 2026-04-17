@@ -36,6 +36,7 @@ import { Route as AuthedDashboardTechnicalRouteImport } from './routes/_authed/d
 import { Route as AuthedDashboardSecurityRouteImport } from './routes/_authed/dashboard/security'
 import { Route as AuthedDashboardMyDevicesRouteImport } from './routes/_authed/dashboard/my-devices'
 import { Route as AuthedDashboardExecutiveRouteImport } from './routes/_authed/dashboard/executive'
+import { Route as AuthedAssetsApplicationsRouteImport } from './routes/_authed/assets/applications'
 import { Route as AuthedApprovalsIdRouteImport } from './routes/_authed/approvals/$id'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
 import { Route as AuthedAdminSourcesRouteImport } from './routes/_authed/admin/sources'
@@ -204,6 +205,12 @@ const AuthedDashboardExecutiveRoute =
   AuthedDashboardExecutiveRouteImport.update({
     id: '/dashboard/executive',
     path: '/dashboard/executive',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAssetsApplicationsRoute =
+  AuthedAssetsApplicationsRouteImport.update({
+    id: '/assets/applications',
+    path: '/assets/applications',
     getParentRoute: () => AuthedRoute,
   } as any)
 const AuthedApprovalsIdRoute = AuthedApprovalsIdRouteImport.update({
@@ -391,6 +398,7 @@ export interface FileRoutesByFullPath {
   '/admin/sources': typeof AuthedAdminSourcesRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/approvals/$id': typeof AuthedApprovalsIdRoute
+  '/assets/applications': typeof AuthedAssetsApplicationsRoute
   '/dashboard/executive': typeof AuthedDashboardExecutiveRoute
   '/dashboard/my-devices': typeof AuthedDashboardMyDevicesRouteWithChildren
   '/dashboard/security': typeof AuthedDashboardSecurityRoute
@@ -449,6 +457,7 @@ export interface FileRoutesByTo {
   '/admin/sources': typeof AuthedAdminSourcesRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/approvals/$id': typeof AuthedApprovalsIdRoute
+  '/assets/applications': typeof AuthedAssetsApplicationsRoute
   '/dashboard/executive': typeof AuthedDashboardExecutiveRoute
   '/dashboard/my-devices': typeof AuthedDashboardMyDevicesRouteWithChildren
   '/dashboard/security': typeof AuthedDashboardSecurityRoute
@@ -509,6 +518,7 @@ export interface FileRoutesById {
   '/_authed/admin/sources': typeof AuthedAdminSourcesRoute
   '/_authed/admin/users': typeof AuthedAdminUsersRoute
   '/_authed/approvals/$id': typeof AuthedApprovalsIdRoute
+  '/_authed/assets/applications': typeof AuthedAssetsApplicationsRoute
   '/_authed/dashboard/executive': typeof AuthedDashboardExecutiveRoute
   '/_authed/dashboard/my-devices': typeof AuthedDashboardMyDevicesRouteWithChildren
   '/_authed/dashboard/security': typeof AuthedDashboardSecurityRoute
@@ -569,6 +579,7 @@ export interface FileRouteTypes {
     | '/admin/sources'
     | '/admin/users'
     | '/approvals/$id'
+    | '/assets/applications'
     | '/dashboard/executive'
     | '/dashboard/my-devices'
     | '/dashboard/security'
@@ -627,6 +638,7 @@ export interface FileRouteTypes {
     | '/admin/sources'
     | '/admin/users'
     | '/approvals/$id'
+    | '/assets/applications'
     | '/dashboard/executive'
     | '/dashboard/my-devices'
     | '/dashboard/security'
@@ -686,6 +698,7 @@ export interface FileRouteTypes {
     | '/_authed/admin/sources'
     | '/_authed/admin/users'
     | '/_authed/approvals/$id'
+    | '/_authed/assets/applications'
     | '/_authed/dashboard/executive'
     | '/_authed/dashboard/my-devices'
     | '/_authed/dashboard/security'
@@ -932,6 +945,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedDashboardExecutiveRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/assets/applications': {
+      id: '/_authed/assets/applications'
+      path: '/assets/applications'
+      fullPath: '/assets/applications'
+      preLoaderRoute: typeof AuthedAssetsApplicationsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/approvals/$id': {
       id: '/_authed/approvals/$id'
       path: '/approvals/$id'
@@ -1169,6 +1189,7 @@ interface AuthedRouteChildren {
   AuthedAdminSourcesRoute: typeof AuthedAdminSourcesRoute
   AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
   AuthedApprovalsIdRoute: typeof AuthedApprovalsIdRoute
+  AuthedAssetsApplicationsRoute: typeof AuthedAssetsApplicationsRoute
   AuthedDashboardExecutiveRoute: typeof AuthedDashboardExecutiveRoute
   AuthedDashboardMyDevicesRoute: typeof AuthedDashboardMyDevicesRouteWithChildren
   AuthedDashboardSecurityRoute: typeof AuthedDashboardSecurityRoute
@@ -1219,6 +1240,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminSourcesRoute: AuthedAdminSourcesRoute,
   AuthedAdminUsersRoute: AuthedAdminUsersRoute,
   AuthedApprovalsIdRoute: AuthedApprovalsIdRoute,
+  AuthedAssetsApplicationsRoute: AuthedAssetsApplicationsRoute,
   AuthedDashboardExecutiveRoute: AuthedDashboardExecutiveRoute,
   AuthedDashboardMyDevicesRoute: AuthedDashboardMyDevicesRouteWithChildren,
   AuthedDashboardSecurityRoute: AuthedDashboardSecurityRoute,

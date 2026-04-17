@@ -49,9 +49,10 @@ public class IngestionServicePhase3Tests
 
         var ingestion = new IngestionService(
             db,
-            Enumerable.Empty<IVulnerabilitySource>(),
+            Enumerable.Empty<IIngestionSource>(),
             new EnrichmentJobEnqueuer(db, NullLogger<EnrichmentJobEnqueuer>.Instance),
             Substitute.For<IStagedDeviceMergeService>(),
+            Substitute.For<IStagedCloudApplicationMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
             new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance),
             new ExposureEpisodeService(db),
@@ -330,9 +331,10 @@ public class IngestionServicePhase3Tests
     private static IngestionService CreateIngestionService(PatchHoundDbContext db) =>
         new(
             db,
-            Enumerable.Empty<IVulnerabilitySource>(),
+            Enumerable.Empty<IIngestionSource>(),
             new EnrichmentJobEnqueuer(db, NullLogger<EnrichmentJobEnqueuer>.Instance),
             Substitute.For<IStagedDeviceMergeService>(),
+            Substitute.For<IStagedCloudApplicationMergeService>(),
             Substitute.For<IDeviceRuleEvaluationService>(),
             new ExposureDerivationService(db, NullLogger<ExposureDerivationService>.Instance),
             new ExposureEpisodeService(db),

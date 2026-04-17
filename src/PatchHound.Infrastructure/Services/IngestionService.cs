@@ -23,9 +23,10 @@ public class IngestionService
     private static readonly TimeSpan IngestionArtifactRetention = TimeSpan.FromDays(7);
     private static readonly TimeSpan FailedIngestionRetention = TimeSpan.FromHours(24);
     private readonly PatchHoundDbContext _dbContext;
-    private readonly IEnumerable<IVulnerabilitySource> _sources;
+    private readonly IEnumerable<IIngestionSource> _sources;
     private readonly EnrichmentJobEnqueuer _enrichmentJobEnqueuer;
     private readonly IStagedDeviceMergeService _stagedDeviceMergeService;
+    private readonly IStagedCloudApplicationMergeService _stagedCloudApplicationMergeService;
     private readonly IDeviceRuleEvaluationService _deviceRuleEvaluationService;
     private readonly ExposureDerivationService _exposureDerivationService;
     private readonly ExposureEpisodeService _exposureEpisodeService;
@@ -39,9 +40,10 @@ public class IngestionService
 
     public IngestionService(
         PatchHoundDbContext dbContext,
-        IEnumerable<IVulnerabilitySource> sources,
+        IEnumerable<IIngestionSource> sources,
         EnrichmentJobEnqueuer enrichmentJobEnqueuer,
         IStagedDeviceMergeService stagedDeviceMergeService,
+        IStagedCloudApplicationMergeService stagedCloudApplicationMergeService,
         IDeviceRuleEvaluationService deviceRuleEvaluationService,
         ExposureDerivationService exposureDerivationService,
         ExposureEpisodeService exposureEpisodeService,
@@ -54,6 +56,7 @@ public class IngestionService
             sources,
             enrichmentJobEnqueuer,
             stagedDeviceMergeService,
+            stagedCloudApplicationMergeService,
             deviceRuleEvaluationService,
             exposureDerivationService,
             exposureEpisodeService,
@@ -66,9 +69,10 @@ public class IngestionService
 
     public IngestionService(
         PatchHoundDbContext dbContext,
-        IEnumerable<IVulnerabilitySource> sources,
+        IEnumerable<IIngestionSource> sources,
         EnrichmentJobEnqueuer enrichmentJobEnqueuer,
         IStagedDeviceMergeService stagedDeviceMergeService,
+        IStagedCloudApplicationMergeService stagedCloudApplicationMergeService,
         IDeviceRuleEvaluationService deviceRuleEvaluationService,
         ExposureDerivationService exposureDerivationService,
         ExposureEpisodeService exposureEpisodeService,
@@ -82,6 +86,7 @@ public class IngestionService
             sources,
             enrichmentJobEnqueuer,
             stagedDeviceMergeService,
+            stagedCloudApplicationMergeService,
             deviceRuleEvaluationService,
             exposureDerivationService,
             exposureEpisodeService,
@@ -94,9 +99,10 @@ public class IngestionService
 
     public IngestionService(
         PatchHoundDbContext dbContext,
-        IEnumerable<IVulnerabilitySource> sources,
+        IEnumerable<IIngestionSource> sources,
         EnrichmentJobEnqueuer enrichmentJobEnqueuer,
         IStagedDeviceMergeService stagedDeviceMergeService,
+        IStagedCloudApplicationMergeService stagedCloudApplicationMergeService,
         IDeviceRuleEvaluationService deviceRuleEvaluationService,
         ExposureDerivationService exposureDerivationService,
         ExposureEpisodeService exposureEpisodeService,
@@ -110,6 +116,7 @@ public class IngestionService
             sources,
             enrichmentJobEnqueuer,
             stagedDeviceMergeService,
+            stagedCloudApplicationMergeService,
             deviceRuleEvaluationService,
             exposureDerivationService,
             exposureEpisodeService,
@@ -122,9 +129,10 @@ public class IngestionService
 
     public IngestionService(
         PatchHoundDbContext dbContext,
-        IEnumerable<IVulnerabilitySource> sources,
+        IEnumerable<IIngestionSource> sources,
         EnrichmentJobEnqueuer enrichmentJobEnqueuer,
         IStagedDeviceMergeService stagedDeviceMergeService,
+        IStagedCloudApplicationMergeService stagedCloudApplicationMergeService,
         IDeviceRuleEvaluationService deviceRuleEvaluationService,
         ExposureDerivationService exposureDerivationService,
         ExposureEpisodeService exposureEpisodeService,
@@ -139,6 +147,7 @@ public class IngestionService
         _sources = sources;
         _enrichmentJobEnqueuer = enrichmentJobEnqueuer;
         _stagedDeviceMergeService = stagedDeviceMergeService;
+        _stagedCloudApplicationMergeService = stagedCloudApplicationMergeService;
         _deviceRuleEvaluationService = deviceRuleEvaluationService;
         _exposureDerivationService = exposureDerivationService;
         _exposureEpisodeService = exposureEpisodeService;
@@ -505,6 +514,50 @@ public class IngestionService
                             );
                         }
 
+                        if (source is ICloudApplicationSource cloudAppSource)
+                        {
+                            await ThrowIfAbortRequestedAsync(run.Id, ct);
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.Staging,
+                                ct
+                            );
+                            var appSnapshot = await cloudAppSource.FetchCloudApplicationsAsync(tenantId, ct);
+                            foreach (var app in appSnapshot.Applications)
+                            {
+                                var payloadJson = JsonSerializer.Serialize(app);
+                                _dbContext.StagedCloudApplications.Add(
+                                    StagedCloudApplication.Create(
+                                        ingestionRunId: run.Id,
+                                        tenantId: tenantId,
+                                        sourceKey: source.SourceKey,
+                                        externalId: app.ExternalId,
+                                        name: app.Name,
+                                        description: app.Description,
+                                        payloadJson: payloadJson,
+                                        stagedAt: DateTimeOffset.UtcNow
+                                    )
+                                );
+                            }
+                            await _dbContext.SaveChangesAsync(ct);
+
+                            await UpdateActiveRunStatusAsync(
+                                run.Id,
+                                tenantId,
+                                source.SourceKey,
+                                IngestionRunStatuses.Merging,
+                                ct
+                            );
+                            await _stagedCloudApplicationMergeService.MergeAsync(run.Id, tenantId, ct);
+                            _logger.LogInformation(
+                                "Cloud application merge completed for ingestion run {IngestionRunId}: {Count} applications staged.",
+                                run.Id,
+                                appSnapshot.Applications.Count
+                            );
+                        }
+
                         if (!vulnerabilityStagingCompleted && source is IVulnerabilityBatchSource batchSource)
                         {
                             await ThrowIfAbortRequestedAsync(run.Id, ct);
@@ -524,7 +577,7 @@ public class IngestionService
                             );
                             vulnerabilityStagingCompleted = true;
                         }
-                        else if (!vulnerabilityStagingCompleted)
+                        else if (!vulnerabilityStagingCompleted && source is IVulnerabilitySource vulnSource)
                         {
                             await ThrowIfAbortRequestedAsync(run.Id, ct);
                             await UpdateActiveRunStatusAsync(
@@ -534,7 +587,7 @@ public class IngestionService
                                 IngestionRunStatuses.Staging,
                                 ct
                             );
-                            var results = await source.FetchVulnerabilitiesAsync(tenantId, ct);
+                            var results = await vulnSource.FetchVulnerabilitiesAsync(tenantId, ct);
                             fetchedVulnerabilityCount = results.Count;
                             var normalizedResults = NormalizeResults(results);
                             await StageVulnerabilitiesAsync(
