@@ -84,7 +84,8 @@ function ApplicationDetailPage() {
 
   const teamsQuery = useQuery({
     queryKey: ['teams', selectedTenantId],
-    queryFn: () => fetchTeams({ data: {} }),
+    queryFn: () => fetchTeams({ data: { tenantId: selectedTenantId ?? undefined } }),
+    enabled: Boolean(selectedTenantId),
   })
 
   const ownerMutation = useMutation({
@@ -230,7 +231,12 @@ function ApplicationDetailPage() {
                 disabled={ownerMutation.isPending}
               >
                 <SelectTrigger className="w-48 h-8 text-sm">
-                  <SelectValue placeholder="Unassigned" />
+                  <SelectValue placeholder="Unassigned">
+                    {app.ownerTeamId
+                      ? (teams.find(t => t.id === app.ownerTeamId)?.name ?? app.ownerTeamName ?? '…')
+                      : <span className="text-muted-foreground">Unassigned</span>
+                    }
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">
