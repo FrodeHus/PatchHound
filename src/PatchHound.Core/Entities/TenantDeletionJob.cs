@@ -58,6 +58,8 @@ public class TenantDeletionJob
     {
         if (requestedByUserId == Guid.Empty)
             throw new ArgumentException("RequestedByUserId is required.", nameof(requestedByUserId));
+        if (Status == TenantDeletionJobStatus.Running)
+            throw new InvalidOperationException("Cannot reset a job that is currently running.");
 
         RequestedByUserId = requestedByUserId;
         Status = TenantDeletionJobStatus.Pending;

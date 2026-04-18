@@ -86,6 +86,15 @@ public class TenantDeletionJobTests
     }
 
     [Fact]
+    public void Reset_throws_when_job_is_Running()
+    {
+        var job = TenantDeletionJob.Create(TenantId, UserId);
+        job.MarkRunning();
+        var act = () => job.Reset(Guid.NewGuid());
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
     public void Reset_restores_Pending_and_clears_run_fields()
     {
         var job = TenantDeletionJob.Create(TenantId, UserId);

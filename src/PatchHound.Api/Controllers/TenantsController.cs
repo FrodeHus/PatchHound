@@ -407,6 +407,8 @@ public class TenantsController : ControllerBase
 
         if (existingJob is not null)
         {
+            if (existingJob.Status == TenantDeletionJobStatus.Running)
+                return Conflict(new { errorCode = "tenant_deletion_in_progress" });
             existingJob.Reset(_tenantContext.CurrentUserId);
         }
         else
@@ -796,19 +798,6 @@ public class TenantsController : ControllerBase
             ),
             recentRuns
         );
-    }
-
-    private async Task DeleteEntitiesAsync<TEntity>(
-        IQueryable<TEntity> query,
-        CancellationToken ct) where TEntity : class
-    {
-        var items = await query.ToListAsync(ct);
-        if (items.Count == 0)
-        {
-            return;
-        }
-
-        _dbContext.RemoveRange(items);
     }
 
     private async Task<TenantDetailDto> BuildTenantDetailDto(
