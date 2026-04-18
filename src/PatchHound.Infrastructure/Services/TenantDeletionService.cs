@@ -156,11 +156,12 @@ public class TenantDeletionService(
         }
 
         dbContext.Tenants.Remove(tenant);
+        await dbContext.SaveChangesAsync(ct);
+
         await dbContext.TenantDeletionJobs
             .IgnoreQueryFilters()
             .Where(j => j.TenantId == tenantId)
             .ExecuteDeleteAsync(ct);
-        await dbContext.SaveChangesAsync(ct);
 
         logger.LogInformation("Completed background deletion of tenant {TenantId}", tenantId);
     }
