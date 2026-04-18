@@ -82,15 +82,7 @@ public class TenantDeletionWorker(
         try
         {
             var deletionService = scope.ServiceProvider.GetRequiredService<TenantDeletionService>();
-            await deletionService.DeleteAsync(tenantId, ct);
-
-            await dbContext.TenantDeletionJobs
-                .IgnoreQueryFilters()
-                .Where(j => j.Id == pendingJob.Id)
-                .ExecuteUpdateAsync(
-                    s => s.SetProperty(j => j.Status, TenantDeletionJobStatus.Completed)
-                          .SetProperty(j => j.CompletedAt, DateTimeOffset.UtcNow),
-                    ct);
+            await deletionService.DeleteAsync(tenantId, ct);  // also deletes the job row
 
             logger.LogInformation("Tenant {TenantId} deleted successfully", tenantId);
             await eventPusher.PushAsync(
