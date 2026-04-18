@@ -17,6 +17,11 @@ public class TenantDeletionJob
 
     public static TenantDeletionJob Create(Guid tenantId, Guid requestedByUserId)
     {
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("TenantId is required.", nameof(tenantId));
+        if (requestedByUserId == Guid.Empty)
+            throw new ArgumentException("RequestedByUserId is required.", nameof(requestedByUserId));
+
         return new TenantDeletionJob
         {
             Id = Guid.NewGuid(),
@@ -41,6 +46,9 @@ public class TenantDeletionJob
 
     public void MarkFailed(string error)
     {
+        if (string.IsNullOrWhiteSpace(error))
+            throw new ArgumentException("An error message is required.", nameof(error));
+
         Status = TenantDeletionJobStatus.Failed;
         Error = error;
         CompletedAt = DateTimeOffset.UtcNow;
@@ -48,6 +56,9 @@ public class TenantDeletionJob
 
     public void Reset(Guid requestedByUserId)
     {
+        if (requestedByUserId == Guid.Empty)
+            throw new ArgumentException("RequestedByUserId is required.", nameof(requestedByUserId));
+
         RequestedByUserId = requestedByUserId;
         Status = TenantDeletionJobStatus.Pending;
         StartedAt = null;

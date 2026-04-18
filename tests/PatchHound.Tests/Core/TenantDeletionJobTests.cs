@@ -64,6 +64,28 @@ public class TenantDeletionJobTests
     }
 
     [Fact]
+    public void Create_throws_when_tenantId_is_empty()
+    {
+        var act = () => TenantDeletionJob.Create(Guid.Empty, UserId);
+        act.Should().Throw<ArgumentException>().WithParameterName("tenantId");
+    }
+
+    [Fact]
+    public void Create_throws_when_requestedByUserId_is_empty()
+    {
+        var act = () => TenantDeletionJob.Create(TenantId, Guid.Empty);
+        act.Should().Throw<ArgumentException>().WithParameterName("requestedByUserId");
+    }
+
+    [Fact]
+    public void Reset_throws_when_requestedByUserId_is_empty()
+    {
+        var job = TenantDeletionJob.Create(TenantId, UserId);
+        var act = () => job.Reset(Guid.Empty);
+        act.Should().Throw<ArgumentException>().WithParameterName("requestedByUserId");
+    }
+
+    [Fact]
     public void Reset_restores_Pending_and_clears_run_fields()
     {
         var job = TenantDeletionJob.Create(TenantId, UserId);
