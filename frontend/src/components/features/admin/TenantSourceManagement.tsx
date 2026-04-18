@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useRouter } from '@tanstack/react-router'
+import { useRouter } from "@tanstack/react-router";
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, CircleHelp, Clock, PenSquare, RotateCw, Square, X } from 'lucide-react'
@@ -187,9 +187,7 @@ export function TenantSourceManagement({
                   <TableHead className="h-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                     Last run
                   </TableHead>
-                  <TableHead className="h-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                    Credentials
-                  </TableHead>
+
                   <TableHead className="h-9 pr-4 text-right text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                     Actions
                   </TableHead>
@@ -220,9 +218,6 @@ export function TenantSourceManagement({
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-foreground">
                             {source.displayName}
-                          </span>
-                          <span className="rounded-full border border-border/60 bg-muted/30 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                            {source.key}
                           </span>
                           {!source.enabled ? (
                             <Badge variant="outline" className="text-[11px]">
@@ -264,20 +259,6 @@ export function TenantSourceManagement({
                             {source.runtime.lastError}
                           </p>
                         ) : null}
-                      </TableCell>
-
-                      {/* Credentials */}
-                      <TableCell className="py-3">
-                        <div className="space-y-1">
-                          <CredentialDot
-                            label="Client ID"
-                            ok={Boolean(source.credentials.clientId)}
-                          />
-                          <CredentialDot
-                            label="Secret"
-                            ok={source.credentials.hasSecret}
-                          />
-                        </div>
                       </TableCell>
 
                       {/* Actions */}
@@ -369,7 +350,6 @@ export function TenantSourceManagement({
           >
             {editingSource ? (
               <TenantSourceEditorSheetContent
-                tenant={tenant}
                 source={editingSource}
                 isSaving={mutation.isPending}
                 saveState={saveState}
@@ -392,7 +372,6 @@ export function TenantSourceManagement({
 // ─── Editor sheet content ───────────────────────────────────────────────────
 
 function TenantSourceEditorSheetContent({
-  tenant,
   source,
   isSaving,
   saveState,
@@ -401,17 +380,16 @@ function TenantSourceEditorSheetContent({
   onUpdateSource,
   onViewHistory,
 }: {
-  tenant: TenantDetail
-  source: TenantIngestionSourceDraft
-  isSaving: boolean
-  saveState: 'idle' | 'saved' | 'error'
-  onSave: () => void
-  onClose: () => void
+  source: TenantIngestionSourceDraft;
+  isSaving: boolean;
+  saveState: "idle" | "saved" | "error";
+  onSave: () => void;
+  onClose: () => void;
   onUpdateSource: (
     key: string,
     mutate: (current: TenantIngestionSourceDraft) => TenantIngestionSourceDraft,
-  ) => void
-  onViewHistory: () => void
+  ) => void;
+  onViewHistory: () => void;
 }) {
   return (
     <>
@@ -542,12 +520,6 @@ function TenantSourceEditorSheetContent({
 
           <FormSection title="Credentials">
             <div className="space-y-4">
-              <div className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                Uses tenant Entra ID:{" "}
-                <span className="font-medium text-foreground">
-                  {tenant.entraTenantId}
-                </span>
-              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <FieldBlock
                   label="Client ID"
@@ -684,19 +656,12 @@ function TenantSourceHistoryPage({
   return (
     <div className="space-y-5">
       <div className="space-y-3">
-        <Link
-          to="/admin/sources"
-          search={{ activeView: 'tenant' }}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Back to tenant sources
-        </Link>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
             <h2 className="text-2xl font-semibold tracking-tight">{`${source.displayName} history`}</h2>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Review ingestion batches, merge progress, and failure posture for this source.
+              Review ingestion batches, merge progress, and failure posture for
+              this source.
             </p>
           </div>
           <Button type="button" variant="outline" onClick={onBack}>
@@ -723,16 +688,28 @@ function TenantSourceHistoryPage({
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <InsetPanel emphasis="subtle" className="px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Current status</p>
-                <p className="mt-1 font-medium text-foreground">{source.runtime.lastStatus ?? 'Unknown'}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Current status
+                </p>
+                <p className="mt-1 font-medium text-foreground">
+                  {source.runtime.lastStatus ?? "Unknown"}
+                </p>
               </InsetPanel>
               <InsetPanel emphasis="subtle" className="px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Last run</p>
-                <p className="mt-1 font-medium text-foreground">{formatTimestamp(source.runtime.lastCompletedAt)}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Last run
+                </p>
+                <p className="mt-1 font-medium text-foreground">
+                  {formatTimestamp(source.runtime.lastCompletedAt)}
+                </p>
               </InsetPanel>
               <InsetPanel emphasis="subtle" className="px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Last success</p>
-                <p className="mt-1 font-medium text-foreground">{formatTimestamp(source.runtime.lastSucceededAt)}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Last success
+                </p>
+                <p className="mt-1 font-medium text-foreground">
+                  {formatTimestamp(source.runtime.lastSucceededAt)}
+                </p>
               </InsetPanel>
               {source.runtime.lastError ? (
                 <InsetPanel className="px-4 py-3 text-sm text-destructive">
@@ -747,9 +724,15 @@ function TenantSourceHistoryPage({
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <InsetPanel emphasis="subtle" className="px-4 py-3">
-                Use the source list for operational overview, then open full history here when you need batch-level or failure-level detail.
+                Use the source list for operational overview, then open full
+                history here when you need batch-level or failure-level detail.
               </InsetPanel>
-              <Button type="button" variant="outline" className="w-full justify-start" onClick={onBack}>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start"
+                onClick={onBack}
+              >
                 <ArrowLeft className="size-4" />
                 Back to source list
               </Button>
@@ -758,24 +741,11 @@ function TenantSourceHistoryPage({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Shared small components ────────────────────────────────────────────────
 
-function CredentialDot({ label, ok }: { label: string; ok: boolean }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span
-        className={cn(
-          'size-1.5 rounded-full',
-          ok ? 'bg-tone-success-foreground' : 'bg-destructive/70',
-        )}
-      />
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-    </div>
-  )
-}
 
 function PostureRow({ label, value }: { label: string; value: string }) {
   return (
