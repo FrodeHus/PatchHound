@@ -88,7 +88,7 @@ export function TenantScopeProvider({ user, children }: TenantScopeProviderProps
 
   useSSE('TenantDeleted', (data) => {
     const payload = data as { tenantId?: string }
-    queryClient.invalidateQueries({ queryKey: ['tenant-scope', 'tenants'] })
+    void queryClient.invalidateQueries({ queryKey: ['tenant-scope', 'tenants'] })
     if (payload?.tenantId === effectiveSelectedTenantId) {
       setTenantPendingDeletion(true)
     } else {
@@ -98,7 +98,7 @@ export function TenantScopeProvider({ user, children }: TenantScopeProviderProps
 
   useSSE('TenantDeletionFailed', (data) => {
     const payload = data as { tenantId?: string }
-    queryClient.invalidateQueries({ queryKey: ['tenant-scope', 'tenants'] })
+    void queryClient.invalidateQueries({ queryKey: ['tenant-scope', 'tenants'] })
     if (payload?.tenantId === effectiveSelectedTenantId) {
       toast.error('Tenant deletion failed. Please contact an administrator.')
     }
