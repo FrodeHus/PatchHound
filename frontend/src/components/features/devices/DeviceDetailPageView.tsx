@@ -61,6 +61,7 @@ export function DeviceDetailPageView({
   onAssignBusinessLabels,
 }: DeviceDetailPageViewProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('overview')
+  const [showOpenVulnsOnly, setShowOpenVulnsOnly] = useState(true)
   const [securityProfileSheetOpen, setSecurityProfileSheetOpen] = useState(false)
   const [criticalitySheetOpen, setCriticalitySheetOpen] = useState(false)
   const [businessLabelsSheetOpen, setBusinessLabelsSheetOpen] = useState(false)
@@ -406,50 +407,70 @@ export function DeviceDetailPageView({
 
             {activeTab === 'software' ? (
               <section className="rounded-2xl border border-border/70 bg-background p-4">
-                <SectionHeader
-                  title="Installed software"
-                  description="Software products observed on this device from the canonical ingestion pipeline."
-                />
+                <div className="flex items-start justify-between gap-4">
+                  <SectionHeader
+                    title="Installed software"
+                    description="Software products observed on this device from the canonical ingestion pipeline."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOpenVulnsOnly((v) => !v)}
+                    className={
+                      showOpenVulnsOnly
+                        ? 'shrink-0 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary'
+                        : 'shrink-0 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/20'
+                    }
+                  >
+                    Open vulns only
+                  </button>
+                </div>
                 {isSoftwareLoading ? (
                   <p className="mt-4 text-sm text-muted-foreground">Loading...</p>
-                ) : software.length === 0 ? (
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    No software installations recorded for this device.
-                  </p>
-                ) : (
-                  <div className="mt-4 overflow-x-auto">
-                    <table className="min-w-full border-separate border-spacing-y-2 text-sm">
-                      <thead>
-                        <tr className="text-left text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                          <th className="px-3 py-2">Software</th>
-                          <th className="px-3 py-2">Open vulns</th>
-                          <th className="px-3 py-2">Last seen</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {software.map((install) => (
-                          <tr
-                            key={install.softwareProductId}
-                            className="rounded-xl border border-border/70 bg-card"
-                          >
-                            <td className="px-3 py-3 font-medium">
-                              <Link
-                                to="/software/$id"
-                                params={{ id: install.softwareProductId }}
-                                search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
-                                className="text-primary hover:underline"
-                              >
-                                {install.softwareName}
-                              </Link>
-                            </td>
-                            <td className="px-3 py-3">{install.openVulnerabilityCount}</td>
-                            <td className="px-3 py-3">{formatDateTime(install.lastSeenAt)}</td>
+                ) : (() => {
+                  const visibleSoftware = showOpenVulnsOnly
+                    ? software.filter((s) => s.openVulnerabilityCount > 0)
+                    : software
+                  return visibleSoftware.length === 0 ? (
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      {showOpenVulnsOnly
+                        ? 'No software with open vulnerabilities on this device.'
+                        : 'No software installations recorded for this device.'}
+                    </p>
+                  ) : (
+                    <div className="mt-4 overflow-x-auto">
+                      <table className="min-w-full border-separate border-spacing-y-2 text-sm">
+                        <thead>
+                          <tr className="text-left text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                            <th className="px-3 py-2">Software</th>
+                            <th className="px-3 py-2">Open vulns</th>
+                            <th className="px-3 py-2">Last seen</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        </thead>
+                        <tbody>
+                          {visibleSoftware.map((install) => (
+                            <tr
+                              key={install.softwareProductId}
+                              className="rounded-xl border border-border/70 bg-card"
+                            >
+                              <td className="px-3 py-3 font-medium">
+                                <Link
+                                  to="/software/$id"
+                                  params={{ id: install.softwareProductId }}
+                                  search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
+                                  className="text-primary hover:underline"
+                                >
+                                  {install.softwareName}
+                                </Link>
+                              </td>
+                              <td className="px-3 py-3">{install.openVulnerabilityCount}</td>
+                              <td className="px-3 py-3">{formatDateTime(install.lastSeenAt)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                })()}
               </section>
             ) : null}
 

@@ -13,3 +13,8 @@ export const searchBooleanSchema = z
   .union([z.boolean(), z.enum(['true', 'false'])])
   .transform((value) => value === true || value === 'true')
   .catch(false)
+
+export const searchBooleanTrueSchema = z
+  .union([z.boolean(), z.enum(['true', 'false'])])
+  .transform((value) => value === true || value === 'true')
+  .catch(true)
