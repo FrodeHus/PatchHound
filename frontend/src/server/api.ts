@@ -34,6 +34,13 @@ export class ForbiddenApiError extends ApiRequestError {
   }
 }
 
+export class TenantPendingDeletionError extends ApiRequestError {
+  constructor(statusText: string, bodyText: string | null) {
+    super('TENANT_PENDING_DELETION', 410, statusText, bodyText)
+    this.name = 'TenantPendingDeletionError'
+  }
+}
+
 export class ValidationApiError extends ApiRequestError {
   constructor(status: number, statusText: string, bodyText: string | null) {
     super(
@@ -95,6 +102,14 @@ async function ensureOk(response: Response): Promise<void> {
   }
 
   const bodyText = (await response.text()).trim() || null
+
+  if (response.status === 410) {
+    let errorCode: string | null = null
+    try { errorCode = bodyText ? (JSON.parse(bodyText) as { errorCode?: string }).errorCode ?? null : null } catch { /* ignore */ }
+    if (errorCode === 'tenant_pending_deletion') {
+      throw new TenantPendingDeletionError(response.statusText, bodyText)
+    }
+  }
 
   if (response.status === 401) {
     throw new UnauthenticatedApiError(response.statusText, bodyText)
