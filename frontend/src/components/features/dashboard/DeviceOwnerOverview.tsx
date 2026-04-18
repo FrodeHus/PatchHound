@@ -1,11 +1,16 @@
 import { Link, useNavigate } from '@tanstack/react-router'
-import { Clock3, KeyRound, ShieldAlert, Wrench } from 'lucide-react'
+import { KeyRound } from "lucide-react";
 import { useState } from 'react'
 import type { OwnerAction, OwnerAssetSummary, OwnerCloudAppAction, OwnerDashboardSummary } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { MetricInfoTooltip } from '@/components/features/dashboard/MetricInfoTooltip'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 // Phase 1 canonical cleanup (Task 15): the dashboard summary schema is
 // still on the legacy asset-shaped contract (assetId/assetName/etc). The
@@ -164,7 +169,10 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
         <CardContent className="p-6 sm:p-8">
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(20rem,1fr)]">
             <div className="space-y-4">
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-primary">
+              <Badge
+                variant="outline"
+                className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-primary"
+              >
                 Device owner view
               </Badge>
               <div>
@@ -172,76 +180,16 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                   What needs your attention on the devices you own
                 </h1>
                 <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground">
-                  This view focuses only on the devices you are responsible for. It is written to answer three questions quickly: which software on your devices needs attention, what matters most, and what you need to do next.
+                  This view focuses only on the devices you are responsible for.
+                  It is written to answer three questions quickly: which
+                  software on your devices needs attention, what matters most,
+                  and what you need to do next.
                 </p>
-              </div>
-            </div>
-
-            <div className="rounded-[1.5rem] border border-border/70 bg-background/45 p-5 backdrop-blur-sm">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Your scope</div>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[1.2rem] border border-border/60 bg-card/70 px-4 py-4">
-                  <div className="flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                    Owned devices
-                    <MetricInfoTooltip content="Ownership means you are accountable for the device in PatchHound. The count shows the current device scope for that responsibility." />
-                  </div>
-                  <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{summary.ownedAssetCount}</div>
-                </div>
-                <Link
-                  to="/dashboard/my-devices/attention"
-                  className="block rounded-[1.2rem] border border-destructive/20 bg-destructive/8 px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <div className="flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-destructive">
-                    Need attention
-                    <MetricInfoTooltip content="Need attention means the owned device currently carries enough exposure or remediation pressure that it should be reviewed rather than left in routine monitoring." />
-                  </div>
-                  <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{summary.assetsNeedingAttention}</div>
-                </Link>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <Card className="rounded-[1.5rem] border-border/70">
-          <CardHeader>
-            <CardDescription className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em]">
-              <ShieldAlert className="size-3.5 text-primary" />
-              Open actions
-              <MetricInfoTooltip content="An open action is remediation work still awaiting follow-through. It tells the owner that something remains unresolved on software running on their devices." />
-            </CardDescription>
-            <CardTitle className="text-3xl tracking-[-0.05em]">{summary.openActionCount}</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 text-sm text-muted-foreground">
-            Software remediation actions already queued for the devices you own.
-          </CardContent>
-        </Card>
-        <Card className={`rounded-[1.5rem] ${summary.overdueActionCount > 0 ? 'border-destructive/30 bg-destructive/5' : 'border-border/70'}`}>
-          <CardHeader>
-            <CardDescription className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em]">
-              <Clock3 className="size-3.5 text-destructive" />
-              Overdue
-              <MetricInfoTooltip content="Overdue means the expected action window has passed. These items usually deserve first review because agreed timelines are already slipping." />
-            </CardDescription>
-            <CardTitle className={`text-3xl tracking-[-0.05em] ${summary.overdueActionCount > 0 ? 'text-destructive' : ''}`}>{summary.overdueActionCount}</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 text-sm text-muted-foreground">
-            Items that have passed their due date and should be reviewed first.
-          </CardContent>
-        </Card>
-        <Card className="rounded-[1.5rem] border-border/70">
-          <CardHeader>
-            <CardDescription className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em]">
-              <Wrench className="size-3.5 text-chart-3" />
-              Plain-language focus
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0 text-sm leading-6 text-muted-foreground">
-            Start with the action list below. It leads with the software and business impact on your device. Technical identifiers are still available, but they are secondary.
-          </CardContent>
-        </Card>
-      </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         <Card className="rounded-[1.6rem] border-border/70">
@@ -255,26 +203,28 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex rounded-lg border border-border/70 text-[11px]">
-                  {(['all', 'overdue'] as ActionFilter[]).map(f => (
+                  {(["all", "overdue"] as ActionFilter[]).map((f) => (
                     <button
                       key={f}
                       onClick={() => setActionFilter(f)}
-                      className={`px-3 py-1.5 capitalize first:rounded-l-lg last:rounded-r-lg transition ${actionFilter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-3 py-1.5 capitalize first:rounded-l-lg last:rounded-r-lg transition ${actionFilter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
                     >
-                      {f === 'all' ? 'All' : 'Overdue'}
+                      {f === "all" ? "All" : "Overdue"}
                     </button>
                   ))}
                 </div>
                 <div className="flex rounded-lg border border-border/70 text-[11px]">
-                  {(['urgency', 'severity', 'team'] as ActionSort[]).map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setActionSort(s)}
-                      className={`px-3 py-1.5 capitalize first:rounded-l-lg last:rounded-r-lg transition ${actionSort === s ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                      {s}
-                    </button>
-                  ))}
+                  {(["urgency", "severity", "team"] as ActionSort[]).map(
+                    (s) => (
+                      <button
+                        key={s}
+                        onClick={() => setActionSort(s)}
+                        className={`px-3 py-1.5 capitalize first:rounded-l-lg last:rounded-r-lg transition ${actionSort === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        {s}
+                      </button>
+                    ),
+                  )}
                 </div>
               </div>
             </div>
@@ -286,24 +236,27 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
               </div>
             ) : visibleActions.length === 0 ? (
               <div className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-10 text-center text-sm text-muted-foreground">
-                {actionFilter === 'overdue'
-                  ? 'No overdue actions.'
-                  : 'No open remediation or credential actions are assigned to your teams right now.'}
+                {actionFilter === "overdue"
+                  ? "No overdue actions."
+                  : "No open remediation or credential actions are assigned to your teams right now."}
               </div>
             ) : (
               visibleActions.map((combined) => {
-                const isOverdue = combinedIsOverdue(combined)
-                if (combined.kind === 'cloudApp') {
-                  const app = combined.item
+                const isOverdue = combinedIsOverdue(combined);
+                if (combined.kind === "cloudApp") {
+                  const app = combined.item;
                   return (
                     <button
                       key={`cloudapp-${app.cloudApplicationId}`}
                       type="button"
                       onClick={() =>
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        navigate({ to: '/assets/applications/$id', params: { id: app.cloudApplicationId } } as any)
+                        navigate({
+                          to: "/assets/applications/$id",
+                          params: { id: app.cloudApplicationId },
+                        } as any)
                       }
-                      className={`w-full text-left rounded-[1.2rem] border px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isOverdue ? 'border-destructive/30 bg-destructive/5' : 'border-amber-500/30 bg-amber-500/5'}`}
+                      className={`w-full text-left rounded-[1.2rem] border px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isOverdue ? "border-destructive/30 bg-destructive/5" : "border-amber-500/30 bg-amber-500/5"}`}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -312,7 +265,10 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                               <KeyRound className="size-3" />
                               Credential expiry
                             </span>
-                            <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
+                            <Badge
+                              variant="outline"
+                              className="rounded-full px-2 py-0.5 text-[11px]"
+                            >
                               {app.ownerTeamName}
                             </Badge>
                             {app.expiredCredentialCount > 0 && (
@@ -330,104 +286,146 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                             {app.appName}
                           </div>
                           {app.appId && (
-                            <div className="mt-0.5 font-mono text-xs text-muted-foreground">{app.appId}</div>
+                            <div className="mt-0.5 font-mono text-xs text-muted-foreground">
+                              {app.appId}
+                            </div>
                           )}
                           <div className="mt-1 text-sm text-muted-foreground">
                             {app.expiredCredentialCount > 0
-                              ? 'This application has expired credentials that need to be rotated.'
-                              : 'This application has credentials expiring within the next 7 days.'}
+                              ? "This application has expired credentials that need to be rotated."
+                              : "This application has credentials expiring within the next 7 days."}
                           </div>
                         </div>
                         <div className="text-right text-sm text-muted-foreground shrink-0">
                           {app.nearestExpiryAt && (
-                            <div className={isOverdue ? 'font-medium text-destructive' : 'font-medium text-amber-600'}>
-                              {isOverdue ? 'Expired' : 'Expires'} {formatDueDate(app.nearestExpiryAt)}
+                            <div
+                              className={
+                                isOverdue
+                                  ? "font-medium text-destructive"
+                                  : "font-medium text-amber-600"
+                              }
+                            >
+                              {isOverdue ? "Expired" : "Expires"}{" "}
+                              {formatDueDate(app.nearestExpiryAt)}
                             </div>
                           )}
-                          <div className="mt-1">Assigned to {app.ownerTeamName}</div>
+                          <div className="mt-1">
+                            Assigned to {app.ownerTeamName}
+                          </div>
                         </div>
                       </div>
                     </button>
-                  )
+                  );
                 }
 
-                const item = combined.item
+                const item = combined.item;
                 return (
-                <div key={`${item.tenantSoftwareId}-${item.vulnerabilityId}`} className={`rounded-[1.2rem] border px-4 py-4 ${isOverdue ? 'border-destructive/30 bg-destructive/5' : 'border-border/60 bg-background/35'}`}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
-                          {item.severity}
-                        </Badge>
-                        <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
-                          {item.ownerTeamName}
-                        </Badge>
-                        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${actionStateTone(item.actionState)}`}>
-                          {actionStateLabel(item.actionState)}
-                        </span>
-                        {item.episodeRiskBand ? (
-                          <span className="text-xs text-muted-foreground">{item.episodeRiskBand} risk</span>
-                        ) : null}
-                      </div>
-                      <div className="mt-2 text-base font-medium tracking-tight">
-                        {buildActionHeadline(item.softwareName, item.softwareNames)}
-                      </div>
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        {item.ownerSummary}
-                      </div>
-                      {item.softwareNames.length > 0 ? (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          Software covered by this remediation: {item.softwareNames.join(', ')}
+                  <div
+                    key={`${item.tenantSoftwareId}-${item.vulnerabilityId}`}
+                    className={`rounded-[1.2rem] border px-4 py-4 ${isOverdue ? "border-destructive/30 bg-destructive/5" : "border-border/60 bg-background/35"}`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className="rounded-full px-2 py-0.5 text-[11px]"
+                          >
+                            {item.severity}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className="rounded-full px-2 py-0.5 text-[11px]"
+                          >
+                            {item.ownerTeamName}
+                          </Badge>
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${actionStateTone(item.actionState)}`}
+                          >
+                            {actionStateLabel(item.actionState)}
+                          </span>
+                          {item.episodeRiskBand ? (
+                            <span className="text-xs text-muted-foreground">
+                              {item.episodeRiskBand} risk
+                            </span>
+                          ) : null}
                         </div>
-                      ) : null}
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        Technical reference: {item.externalId}
+                        <div className="mt-2 text-base font-medium tracking-tight">
+                          {buildActionHeadline(
+                            item.softwareName,
+                            item.softwareNames,
+                          )}
+                        </div>
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          {item.ownerSummary}
+                        </div>
+                        {item.softwareNames.length > 0 ? (
+                          <div className="mt-2 text-sm text-muted-foreground">
+                            Software covered by this remediation:{" "}
+                            {item.softwareNames.join(", ")}
+                          </div>
+                        ) : null}
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          Technical reference: {item.externalId}
+                        </div>
+                      </div>
+                      <div className="text-right text-sm text-muted-foreground">
+                        <div>Due {formatDueDate(item.dueDate)}</div>
+                        <div className="mt-1">
+                          Assigned to {item.ownerTeamName}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right text-sm text-muted-foreground">
-                      <div>Due {formatDueDate(item.dueDate)}</div>
-                      <div className="mt-1">Assigned to {item.ownerTeamName}</div>
+                    <div className="mt-3 flex gap-2">
+                      {item.taskId ? (
+                        <Button
+                          size="sm"
+                          render={
+                            <Link
+                              to="/remediation/task/$id"
+                              params={{ id: item.taskId }}
+                            />
+                          }
+                        >
+                          Open remediation task
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          render={
+                            <Link
+                              to="/remediation/cases/$caseId"
+                              params={{ caseId: item.tenantSoftwareId }}
+                            />
+                          }
+                        >
+                          Open remediation case
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        render={
+                          <Link
+                            to="/vulnerabilities/$id"
+                            params={{ id: item.vulnerabilityId }}
+                          />
+                        }
+                      >
+                        Vulnerability detail
+                      </Button>
                     </div>
                   </div>
-                  <div className="mt-3 flex gap-2">
-                    {item.taskId ? (
-                      <Button
-                        size="sm"
-                        render={
-                          <Link
-                            to="/remediation/task/$id"
-                            params={{ id: item.taskId }}
-                          />
-                        }
-                      >
-                        Open remediation task
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        render={
-                          <Link
-                            to="/remediation/cases/$caseId"
-                            params={{ caseId: item.tenantSoftwareId }}
-                          />
-                        }
-                      >
-                        Open remediation case
-                      </Button>
-                    )}
-                    <Button size="sm" variant="outline" render={<Link to="/vulnerabilities/$id" params={{ id: item.vulnerabilityId }} />}>
-                      Vulnerability detail
-                    </Button>
-                  </div>
-                </div>
-              )
+                );
               })
             )}
           </CardContent>
         </Card>
 
-        <Card id="owned-devices-needing-attention" className="rounded-[1.6rem] border-border/70">
+        <Card
+          id="owned-devices-needing-attention"
+          className="rounded-[1.6rem] border-border/70"
+        >
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -437,11 +435,11 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                 </CardDescription>
               </div>
               <div className="flex rounded-lg border border-border/70 text-[11px]">
-                {(['risk', 'name', 'criticality'] as DeviceSort[]).map(s => (
+                {(["risk", "name", "criticality"] as DeviceSort[]).map((s) => (
                   <button
                     key={s}
                     onClick={() => setDeviceSort(s)}
-                    className={`px-3 py-1.5 capitalize first:rounded-l-lg last:rounded-r-lg transition ${deviceSort === s ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`px-3 py-1.5 capitalize first:rounded-l-lg last:rounded-r-lg transition ${deviceSort === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
                   >
                     {s}
                   </button>
@@ -451,26 +449,42 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
           </CardHeader>
           <CardContent className="space-y-3">
             {visibleDevices.map((item) => (
-              <div key={item.assetId} className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-4">
+              <div
+                key={item.assetId}
+                className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-4"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-medium tracking-tight">{item.assetName}</div>
+                    <div className="font-medium tracking-tight">
+                      {item.assetName}
+                    </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
+                      <Badge
+                        variant="outline"
+                        className="rounded-full px-2 py-0.5 text-[11px]"
+                      >
                         {item.criticality}
                       </Badge>
-                      <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
-                        {item.deviceGroupName || 'Ungrouped'}
+                      <Badge
+                        variant="outline"
+                        className="rounded-full px-2 py-0.5 text-[11px]"
+                      >
+                        {item.deviceGroupName || "Ungrouped"}
                       </Badge>
                       {item.riskBand ? (
-                        <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
+                        <Badge
+                          variant="outline"
+                          className="rounded-full px-2 py-0.5 text-[11px]"
+                        >
                           {item.riskBand}
                         </Badge>
                       ) : null}
                     </div>
                     <div className="mt-2 text-sm text-muted-foreground">
                       {item.openEpisodeCount} open exposure items
-                      {formatLastSeen(item.lastSeenAt) ? ` · ${formatLastSeen(item.lastSeenAt)}` : ''}
+                      {formatLastSeen(item.lastSeenAt)
+                        ? ` · ${formatLastSeen(item.lastSeenAt)}`
+                        : ""}
                     </div>
                     <SeverityBar
                       critical={item.criticalCount ?? 0}
@@ -481,12 +495,20 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-semibold tracking-[-0.05em]">
-                      {item.currentRiskScore ? Math.round(item.currentRiskScore) : 0}
+                      {item.currentRiskScore
+                        ? Math.round(item.currentRiskScore)
+                        : 0}
                     </div>
                   </div>
                 </div>
                 <div className="mt-3">
-                  <Button size="sm" variant="outline" render={<Link to="/devices/$id" params={{ id: item.assetId }} />}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    render={
+                      <Link to="/devices/$id" params={{ id: item.assetId }} />
+                    }
+                  >
                     Review device
                   </Button>
                 </div>
@@ -502,5 +524,5 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
         </Card>
       </div>
     </section>
-  )
+  );
 }
