@@ -10,7 +10,13 @@ type TenantUnavailableDialogProps = {
 
 export function TenantUnavailableDialog({ open, tenants, onSelectTenant }: TenantUnavailableDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={() => { /* non-dismissable */ }} dismissible={false}>
+    <Dialog
+      open={open}
+      disablePointerDismissal
+      onOpenChange={(_open, eventDetails) => {
+        eventDetails.cancel()
+      }}
+    >
       <DialogContent
         className="max-w-sm"
         showCloseButton={false}
