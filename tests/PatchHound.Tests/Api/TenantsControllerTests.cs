@@ -229,12 +229,15 @@ public class TenantsControllerTests : IDisposable
     [Fact]
     public async Task Delete_WhenJobAlreadyExists_ResetsExistingJob()
     {
-        var userId = Guid.NewGuid();
-        _tenantContext.CurrentUserId.Returns(userId);
+        var originalUserId = Guid.NewGuid();
+        var newUserId = Guid.NewGuid();
+        _tenantContext.CurrentUserId.Returns(newUserId);
 
         var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");
         tenant.MarkPendingDeletion();
-        var existingJob = TenantDeletionJob.Create(tenant.Id, userId);
+        var existingJob = TenantDeletionJob.Create(tenant.Id, originalUserId);
+        existingJob.MarkRunning();
+        existingJob.MarkFailed("previous error");
         await _dbContext.Tenants.AddAsync(tenant);
         await _dbContext.TenantDeletionJobs.AddAsync(existingJob);
         await _dbContext.SaveChangesAsync();
@@ -249,6 +252,10 @@ public class TenantsControllerTests : IDisposable
         jobCount.Should().Be(1);
         var job = await _dbContext.TenantDeletionJobs.IgnoreQueryFilters().SingleAsync(j => j.TenantId == tenant.Id);
         job.Status.Should().Be(TenantDeletionJobStatus.Pending);
+        job.RequestedByUserId.Should().Be(newUserId);
+        job.StartedAt.Should().BeNull();
+        job.CompletedAt.Should().BeNull();
+        job.Error.Should().BeNull();
     }
 
     [Fact]
