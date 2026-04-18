@@ -28,6 +28,15 @@ public class NvdCveCache
     {
         if (string.IsNullOrWhiteSpace(cveId))
             throw new ArgumentException("CveId is required.", nameof(cveId));
+        if (cveId.Length > 64)
+            throw new ArgumentException("CveId must not exceed 64 characters.", nameof(cveId));
+        if (cvssVector is not null && cvssVector.Length > 256)
+            throw new ArgumentException("CvssVector must not exceed 256 characters.", nameof(cvssVector));
+        if (referencesJson is null)
+            throw new ArgumentNullException(nameof(referencesJson));
+        if (configurationsJson is null)
+            throw new ArgumentNullException(nameof(configurationsJson));
+
         return new NvdCveCache
         {
             CveId = cveId,
@@ -51,6 +60,13 @@ public class NvdCveCache
         string referencesJson,
         string configurationsJson)
     {
+        if (cvssVector is not null && cvssVector.Length > 256)
+            throw new ArgumentException("CvssVector must not exceed 256 characters.", nameof(cvssVector));
+        if (referencesJson is null)
+            throw new ArgumentNullException(nameof(referencesJson));
+        if (configurationsJson is null)
+            throw new ArgumentNullException(nameof(configurationsJson));
+
         Description = description;
         CvssScore = cvssScore;
         CvssVector = cvssVector;
