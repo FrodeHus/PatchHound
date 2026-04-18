@@ -250,8 +250,8 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                       key={`cloudapp-${app.cloudApplicationId}`}
                       type="button"
                       onClick={() =>
-                        void navigate({
-                          to: '/assets/applications/$id' as never,
+                        void (navigate as unknown as (o: { to: string; params: Record<string, string> }) => Promise<void>)({
+                          to: '/assets/applications/$id',
                           params: { id: app.cloudApplicationId },
                         })
                       }

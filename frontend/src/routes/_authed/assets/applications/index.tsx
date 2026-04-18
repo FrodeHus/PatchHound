@@ -220,7 +220,7 @@ function ApplicationsPage() {
         columns={columns}
         data={items}
         getRowId={(row) => row.id}
-        onRowClick={(row) => void navigate({ to: '/assets/applications/$id' as never, params: { id: row.id } })}
+        onRowClick={(row) => void (navigate as unknown as (o: { to: string; params: Record<string, string> }) => Promise<void>)({ to: '/assets/applications/$id', params: { id: row.id } })}
         emptyState={
           <div className="py-12 text-center text-sm text-muted-foreground">
             {activeFilter

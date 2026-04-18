@@ -605,6 +605,10 @@ public class SoftwareController(
                     .Select(e => e.VulnerabilityId)
                     .Distinct()
                     .Count(),
+                CurrentRiskScore = dbContext.DeviceRiskScores
+                    .Where(r => r.TenantId == currentTenantId && r.DeviceId == item.DeviceId)
+                    .Select(r => (decimal?)r.OverallScore)
+                    .FirstOrDefault(),
             })
             .ToListAsync(ct);
 
@@ -629,7 +633,8 @@ public class SoftwareController(
                         item.OwnerUserName,
                         item.OwnerTeamId,
                         item.OwnerTeamName,
-                        item.OpenVulnerabilityCount
+                        item.OpenVulnerabilityCount,
+                        item.CurrentRiskScore
                     ))
                     .ToList(),
                 totalCount,

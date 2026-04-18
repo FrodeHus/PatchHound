@@ -101,8 +101,9 @@ public record TenantSoftwareInstallationDto(
     Guid? OwnerUserId,
     string? OwnerUserName,
     Guid? OwnerTeamId,
-     string? OwnerTeamName,
-    int OpenVulnerabilityCount
+    string? OwnerTeamName,
+    int OpenVulnerabilityCount,
+    decimal? CurrentRiskScore
 );
 
 public record DeviceSoftwareItemDto(

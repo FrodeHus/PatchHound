@@ -112,6 +112,7 @@ export const tenantSoftwareInstallationSchema = z.object({
   ownerTeamId: z.string().uuid().nullable(),
   ownerTeamName: z.string().nullable(),
   openVulnerabilityCount: z.number(),
+  currentRiskScore: z.number().nullable(),
 })
 
 export const pagedTenantSoftwareInstallationsSchema = pagedResponseMetaSchema.extend({

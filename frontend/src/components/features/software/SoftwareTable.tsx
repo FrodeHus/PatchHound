@@ -239,9 +239,8 @@ export function SoftwareTable({
 
   return (
     <DataTableWorkbench
-      title="Software"
+      title={`${totalCount} products`}
       description="Browse software prevalence, exposure, and remediation pressure."
-      totalCount={totalCount}
     >
       <DataTableToolbar>
         <DataTableToolbarRow>
@@ -251,7 +250,7 @@ export function SoftwareTable({
               <Input
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search normalized software"
+                placeholder="Search software"
                 className="pl-9"
               />
             </div>
@@ -265,23 +264,30 @@ export function SoftwareTable({
                 category: categoryFilter,
                 vulnerableOnly,
                 missedMaintenanceWindow,
-              })
-              setIsFilterDrawerOpen(true)
+              });
+              setIsFilterDrawerOpen(true);
             }}
           >
-            {activeStructuredFilterCount > 0 ? `Filters (${activeStructuredFilterCount})` : 'Filters...'}
+            {activeStructuredFilterCount > 0
+              ? `Filters (${activeStructuredFilterCount})`
+              : "Filters..."}
           </Button>
           <Button
             type="button"
             variant={missedMaintenanceWindow ? "default" : "outline"}
             className="h-10 rounded-xl px-4 hidden"
-            onClick={() => onMissedMaintenanceWindowChange(!missedMaintenanceWindow)}
+            onClick={() =>
+              onMissedMaintenanceWindowChange(!missedMaintenanceWindow)
+            }
           >
             Missed maintenance
           </Button>
         </DataTableToolbarRow>
         <DataTableToolbarRow>
-          <DataTableActiveFilters filters={activeFilters} onClearAll={onClearFilters} />
+          <DataTableActiveFilters
+            filters={activeFilters}
+            onClearAll={onClearFilters}
+          />
         </DataTableToolbarRow>
       </DataTableToolbar>
 
@@ -293,14 +299,14 @@ export function SoftwareTable({
         activeCount={activeStructuredFilterCount}
         onResetDraft={() => {
           setDraftFilters({
-            category: '',
+            category: "",
             vulnerableOnly: false,
             missedMaintenanceWindow: false,
-          })
+          });
         }}
         onApply={() => {
-          onApplyStructuredFilters(draftFilters)
-          setIsFilterDrawerOpen(false)
+          onApplyStructuredFilters(draftFilters);
+          setIsFilterDrawerOpen(false);
         }}
       >
         <WorkbenchFilterSection
@@ -309,13 +315,13 @@ export function SoftwareTable({
         >
           <DataTableField label="Category">
             <Select
-              value={draftFilters.category || 'all'}
+              value={draftFilters.category || "all"}
               onValueChange={(value) => {
-                const nextValue = value ?? 'all'
+                const nextValue = value ?? "all";
                 setDraftFilters((current) => ({
                   ...current,
-                  category: nextValue === 'all' ? '' : nextValue,
-                }))
+                  category: nextValue === "all" ? "" : nextValue,
+                }));
               }}
             >
               <SelectTrigger className="h-10 rounded-xl border-border/70 bg-background/80 px-3">
@@ -323,11 +329,13 @@ export function SoftwareTable({
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
                 <SelectItem value="all">Any category</SelectItem>
-                {categoryOptions.filter((option) => option !== 'All').map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
+                {categoryOptions
+                  .filter((option) => option !== "All")
+                  .map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </DataTableField>
@@ -344,7 +352,7 @@ export function SoftwareTable({
                 setDraftFilters((current) => ({
                   ...current,
                   vulnerableOnly: checked === true,
-                }))
+                }));
               }}
             />
             <span>Vulnerable only</span>
@@ -357,7 +365,7 @@ export function SoftwareTable({
                 setDraftFilters((current) => ({
                   ...current,
                   missedMaintenanceWindow: checked === true,
-                }))
+                }));
               }}
             />
             <span>Missed maintenance window</span>
@@ -375,7 +383,9 @@ export function SoftwareTable({
       )}
 
       <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">{totalCount} normalized software record{totalCount === 1 ? '' : 's'}</p>
+        <p className="text-sm text-muted-foreground">
+          {totalCount} normalized software record{totalCount === 1 ? "" : "s"}
+        </p>
         <PaginationControls
           page={page}
           pageSize={pageSize}
@@ -386,5 +396,5 @@ export function SoftwareTable({
         />
       </div>
     </DataTableWorkbench>
-  )
+  );
 }
