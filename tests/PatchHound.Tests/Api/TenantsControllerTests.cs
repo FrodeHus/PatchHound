@@ -204,74 +204,58 @@ public class TenantsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task Delete_RemovesTenantDataAndTenantOwnedSecrets()
+    public async Task Delete_EnqueuesDeletionJobAndMarksTenantPendingDeletion()
     {
         var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");
-        var source = TenantSourceConfiguration.Create(
-            tenant.Id,
-            "microsoft-defender",
-            "Microsoft Defender",
-            true,
-            "0 */6 * * *",
-            "entra-tenant",
-            "client-id",
-            $"tenants/{tenant.Id}/sources/microsoft-defender",
-            "https://api.securitycenter.microsoft.com",
-            "https://api.securitycenter.microsoft.com/.default"
-        );
-        var aiProfile = TenantAiProfile.Create(
-            tenant.Id,
-            "Default",
-            TenantAiProviderType.OpenAi,
-            true,
-            true,
-            "gpt-test",
-            "System prompt",
-            0.2m,
-            null,
-            1000,
-            30,
-            secretRef: $"tenants/{tenant.Id}/ai/default"
-        );
-        var customerUser = User.Create("customer@example.com", "Customer", Guid.NewGuid().ToString());
-        customerUser.SetAccessScope(UserAccessScope.Customer);
-        var defaultTeam = Team.CreateDefault(tenant.Id, DefaultTeamHelper.DefaultTeamName);
-
         await _dbContext.Tenants.AddAsync(tenant);
-        await _dbContext.TenantSourceConfigurations.AddAsync(source);
-        await _dbContext.TenantAiProfiles.AddAsync(aiProfile);
-        await _dbContext.TenantSlaConfigurations.AddAsync(TenantSlaConfiguration.CreateDefault(tenant.Id));
-        await _dbContext.Users.AddAsync(customerUser);
-        await _dbContext.UserTenantRoles.AddAsync(UserTenantRole.Create(customerUser.Id, tenant.Id, RoleName.CustomerViewer));
-        await _dbContext.Teams.AddAsync(defaultTeam);
-        await _dbContext.TeamMembers.AddAsync(TeamMember.Create(defaultTeam.Id, customerUser.Id));
-        await _dbContext.DeviceRules.AddAsync(DeviceRule.Create(
-            tenant.Id,
-            "Default rule",
-            null,
-            1,
-            new PatchHound.Core.Models.FilterGroup("AND", []),
-            []
-        ));
         await _dbContext.SaveChangesAsync();
 
-        _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
         _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
 
         var result = await _controller.Delete(tenant.Id, CancellationToken.None);
 
-        result.Should().BeOfType<NoContentResult>();
-        (await _dbContext.Tenants.IgnoreQueryFilters().AnyAsync(item => item.Id == tenant.Id)).Should().BeFalse();
-        (await _dbContext.TenantSourceConfigurations.IgnoreQueryFilters().AnyAsync(item => item.TenantId == tenant.Id)).Should().BeFalse();
-        (await _dbContext.TenantAiProfiles.IgnoreQueryFilters().AnyAsync(item => item.TenantId == tenant.Id)).Should().BeFalse();
-        (await _dbContext.TenantSlaConfigurations.IgnoreQueryFilters().AnyAsync(item => item.TenantId == tenant.Id)).Should().BeFalse();
-        (await _dbContext.UserTenantRoles.IgnoreQueryFilters().AnyAsync(item => item.TenantId == tenant.Id)).Should().BeFalse();
-        (await _dbContext.Teams.IgnoreQueryFilters().AnyAsync(item => item.TenantId == tenant.Id)).Should().BeFalse();
-        (await _dbContext.DeviceRules.IgnoreQueryFilters().AnyAsync(item => item.TenantId == tenant.Id)).Should().BeFalse();
-        (await _dbContext.Users.IgnoreQueryFilters().AnyAsync(item => item.Id == customerUser.Id)).Should().BeFalse();
+        result.Should().BeOfType<AcceptedResult>();
 
-        await _secretStore.Received(1).DeleteSecretPathAsync(source.SecretRef, Arg.Any<CancellationToken>());
-        await _secretStore.Received(1).DeleteSecretPathAsync(aiProfile.SecretRef, Arg.Any<CancellationToken>());
+        var updatedTenant = await _dbContext.Tenants.IgnoreQueryFilters().SingleAsync(t => t.Id == tenant.Id);
+        updatedTenant.IsPendingDeletion.Should().BeTrue();
+
+        var job = await _dbContext.TenantDeletionJobs.IgnoreQueryFilters().SingleAsync(j => j.TenantId == tenant.Id);
+        job.Status.Should().Be(TenantDeletionJobStatus.Pending);
+        job.RequestedByUserId.Should().Be(_tenantContext.CurrentUserId);
+
+        await _secretStore.DidNotReceiveWithAnyArgs().DeleteSecretPathAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Delete_WhenJobAlreadyExists_ResetsExistingJob()
+    {
+        var originalUserId = Guid.NewGuid();
+        var newUserId = Guid.NewGuid();
+        _tenantContext.CurrentUserId.Returns(newUserId);
+
+        var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");
+        tenant.MarkPendingDeletion();
+        var existingJob = TenantDeletionJob.Create(tenant.Id, originalUserId);
+        existingJob.MarkRunning();
+        existingJob.MarkFailed("previous error");
+        await _dbContext.Tenants.AddAsync(tenant);
+        await _dbContext.TenantDeletionJobs.AddAsync(existingJob);
+        await _dbContext.SaveChangesAsync();
+
+        _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
+
+        var result = await _controller.Delete(tenant.Id, CancellationToken.None);
+
+        result.Should().BeOfType<AcceptedResult>();
+
+        var jobCount = await _dbContext.TenantDeletionJobs.IgnoreQueryFilters().CountAsync(j => j.TenantId == tenant.Id);
+        jobCount.Should().Be(1);
+        var job = await _dbContext.TenantDeletionJobs.IgnoreQueryFilters().SingleAsync(j => j.TenantId == tenant.Id);
+        job.Status.Should().Be(TenantDeletionJobStatus.Pending);
+        job.RequestedByUserId.Should().Be(newUserId);
+        job.StartedAt.Should().BeNull();
+        job.CompletedAt.Should().BeNull();
+        job.Error.Should().BeNull();
     }
 
     [Fact]

@@ -1,9 +1,29 @@
 import { useState, type ReactNode } from 'react'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { TenantScopeProvider } from '@/components/layout/TenantScopeProvider'
+import { TenantUnavailableDialog } from '@/components/layout/TenantUnavailableDialog'
 import { TopNav } from '@/components/layout/TopNav'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import type { CurrentUser } from '@/server/auth.functions'
+
+function TenantGuard({ children }: { children: ReactNode }) {
+  const { tenantPendingDeletion, clearTenantPendingDeletion, tenants, selectedTenantId, setSelectedTenantId } = useTenantScope()
+  const availableTenants = tenants.filter(t => t.id !== selectedTenantId)
+  return (
+    <>
+      <TenantUnavailableDialog
+        open={tenantPendingDeletion}
+        tenants={availableTenants}
+        onSelectTenant={(id) => {
+          setSelectedTenantId(id)
+          clearTenantPendingDeletion()
+        }}
+      />
+      {children}
+    </>
+  )
+}
 
 const sidebarStorageKey = "patchhound:sidebar-collapsed";
 
@@ -37,6 +57,7 @@ export function AppShell({ user, children }: AppShellProps) {
 
   return (
     <TenantScopeProvider user={user}>
+      <TenantGuard>
       <div className="min-h-screen bg-background text-foreground">
         <div className="flex min-h-screen">
           <div className="sticky top-0 hidden h-screen md:block">
@@ -76,6 +97,7 @@ export function AppShell({ user, children }: AppShellProps) {
           </div>
         </div>
       </div>
+      </TenantGuard>
     </TenantScopeProvider>
   );
 }

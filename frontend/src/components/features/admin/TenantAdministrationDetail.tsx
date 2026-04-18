@@ -257,7 +257,7 @@ function OverviewTab({
       await deleteTenant({ data: { tenantId: tenant.id } })
     },
     onSuccess: async () => {
-      toast.success('Tenant deleted')
+      toast.success('Tenant deletion queued. You will be notified when complete.')
       setDeleteDialogOpen(false)
       setDeleteConfirmation('')
       await router.invalidate()
