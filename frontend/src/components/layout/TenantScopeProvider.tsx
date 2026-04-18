@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { fetchTenants } from '@/api/settings.functions'
 import type { TenantListItem } from '@/api/settings.schemas'
 import type { CurrentUser } from '@/server/auth.functions'
+import { useSSE } from '@/hooks/useSSE'
+import { isTenantPendingDeletion } from '@/lib/tenant-deletion'
 import {
   persistSelectedTenant,
   selectedTenantCookieKey,
@@ -50,6 +53,8 @@ type TenantScopeProviderProps = {
 
 export function TenantScopeProvider({ user, children }: TenantScopeProviderProps) {
   const [storedTenantId, setStoredTenantId] = useState<string | null>(getInitialTenantId)
+  const [tenantPendingDeletion, setTenantPendingDeletion] = useState(false)
+  const queryClient = useQueryClient()
   const tenantQuery = useQuery({
     queryKey: ['tenant-scope', 'tenants'],
     queryFn: () => fetchTenants({ data: { page: 1, pageSize: 100 } }),
@@ -71,6 +76,31 @@ export function TenantScopeProvider({ user, children }: TenantScopeProviderProps
     persistSelectedTenant(effectiveSelectedTenantId)
   }, [effectiveSelectedTenantId])
 
+  useEffect(() => {
+    return queryClient.getQueryCache().subscribe((event) => {
+      if (event.type === 'updated' && event.query.state.status === 'error') {
+        if (isTenantPendingDeletion(event.query.state.error)) {
+          setTenantPendingDeletion(true)
+        }
+      }
+    })
+  }, [queryClient])
+
+  useSSE('TenantDeleted', (data) => {
+    const payload = data as { tenantId?: string }
+    queryClient.invalidateQueries({ queryKey: ['tenant-scope', 'tenants'] })
+    if (payload?.tenantId === effectiveSelectedTenantId) {
+      setTenantPendingDeletion(true)
+    } else {
+      toast.success('Tenant deleted successfully.')
+    }
+  })
+
+  useSSE('TenantDeletionFailed', () => {
+    queryClient.invalidateQueries({ queryKey: ['tenant-scope', 'tenants'] })
+    toast.error('Tenant deletion failed. Please contact an administrator.')
+  })
+
   const value = useMemo<TenantScopeContextValue>(() => ({
     selectedTenantId: effectiveSelectedTenantId,
     tenants,
@@ -79,7 +109,9 @@ export function TenantScopeProvider({ user, children }: TenantScopeProviderProps
       setStoredTenantId(tenantId)
       persistSelectedTenant(tenantId)
     },
-  }), [effectiveSelectedTenantId, tenantQuery.isPending, tenants])
+    tenantPendingDeletion,
+    clearTenantPendingDeletion: () => setTenantPendingDeletion(false),
+  }), [effectiveSelectedTenantId, tenantQuery.isPending, tenants, tenantPendingDeletion])
 
   return (
     <TenantScopeContext.Provider value={value}>
