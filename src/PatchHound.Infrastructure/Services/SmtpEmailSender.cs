@@ -36,7 +36,7 @@ public class SmtpEmailSender : IEmailSender
 
         await client.ConnectAsync(_options.Host, _options.Port, secureSocketOptions, ct);
 
-        if (!string.IsNullOrEmpty(_options.Username))
+        if (!string.IsNullOrEmpty(_options.Username) && !string.IsNullOrEmpty(_options.Password))
         {
             await client.AuthenticateAsync(_options.Username, _options.Password, ct);
         }
