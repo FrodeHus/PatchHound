@@ -96,9 +96,12 @@ export function TenantScopeProvider({ user, children }: TenantScopeProviderProps
     }
   })
 
-  useSSE('TenantDeletionFailed', () => {
+  useSSE('TenantDeletionFailed', (data) => {
+    const payload = data as { tenantId?: string }
     queryClient.invalidateQueries({ queryKey: ['tenant-scope', 'tenants'] })
-    toast.error('Tenant deletion failed. Please contact an administrator.')
+    if (payload?.tenantId === effectiveSelectedTenantId) {
+      toast.error('Tenant deletion failed. Please contact an administrator.')
+    }
   })
 
   const value = useMemo<TenantScopeContextValue>(() => ({
