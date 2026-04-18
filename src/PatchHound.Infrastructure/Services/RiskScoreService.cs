@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Infrastructure.Services;
@@ -572,29 +573,45 @@ public class RiskScoreService(
                 item.DeviceId,
                 SoftwareProductId = item.SoftwareProductId!.Value,
                 item.Status,
-                Score = dbContext.ExposureAssessments
+                VulnId = item.VulnerabilityId,
+                VulnExternalId = item.Vulnerability.ExternalId,
+                VulnSeverity = item.Vulnerability.VendorSeverity,
+                VulnCvssScore = item.Vulnerability.CvssScore,
+                AssessmentScore = dbContext.ExposureAssessments
                     .Where(a => a.DeviceVulnerabilityExposureId == item.Id)
                     .Select(a => (decimal?)a.EnvironmentalCvss)
                     .FirstOrDefault(),
             })
             .ToListAsync(ct);
 
+        var allDeviceIds = exposures.Select(e => e.DeviceId).Distinct().ToList();
+        var highValueDeviceIds = (await dbContext.Devices.AsNoTracking()
+            .Where(d => allDeviceIds.Contains(d.Id)
+                && (d.Criticality == Criticality.High || d.Criticality == Criticality.Critical))
+            .Select(d => d.Id)
+            .ToListAsync(ct))
+            .ToHashSet();
+
         return exposures
             .GroupBy(item => item.SoftwareProductId)
             .Select(group =>
             {
-                var openExposures = group.Where(e => e.Status == Core.Enums.ExposureStatus.Open).ToList();
+                var openExposures = group.Where(e => e.Status == ExposureStatus.Open).ToList();
+
+                // Use assessment score; fall back to vulnerability CVSS when no assessment exists.
                 var scores = openExposures
-                    .Select(e => e.Score ?? 0m)
+                    .Select(e => e.AssessmentScore ?? e.VulnCvssScore ?? 0m)
                     .OrderByDescending(s => s)
                     .ToList();
                 var maxScore = scores.FirstOrDefault();
                 var topThreeAvg = scores.Take(3).DefaultIfEmpty(0m).Average();
-                var criticalCount = openExposures.Count(e => (e.Score ?? 0m) >= 9.0m);
-                var highCount = openExposures.Count(e => (e.Score ?? 0m) >= 7.0m && (e.Score ?? 0m) < 9.0m);
-                var mediumCount = openExposures.Count(e => (e.Score ?? 0m) >= 4.0m && (e.Score ?? 0m) < 7.0m);
-                var lowCount = openExposures.Count(e => (e.Score ?? 0m) > 0m && (e.Score ?? 0m) < 4.0m);
-                var affectedDeviceCount = openExposures.Select(e => e.DeviceId).Distinct().Count();
+                var criticalCount = openExposures.Count(e => (e.AssessmentScore ?? e.VulnCvssScore ?? 0m) >= 9.0m);
+                var highCount = openExposures.Count(e => { var s = e.AssessmentScore ?? e.VulnCvssScore ?? 0m; return s >= 7.0m && s < 9.0m; });
+                var mediumCount = openExposures.Count(e => { var s = e.AssessmentScore ?? e.VulnCvssScore ?? 0m; return s >= 4.0m && s < 7.0m; });
+                var lowCount = openExposures.Count(e => { var s = e.AssessmentScore ?? e.VulnCvssScore ?? 0m; return s > 0m && s < 4.0m; });
+                var affectedDeviceIds = openExposures.Select(e => e.DeviceId).Distinct().ToList();
+                var affectedDeviceCount = affectedDeviceIds.Count;
+                var highValueDeviceCount = affectedDeviceIds.Count(id => highValueDeviceIds.Contains(id));
 
                 var overallScore = Math.Clamp(
                     Math.Round(
@@ -607,6 +624,23 @@ public class RiskScoreService(
                         2),
                     0m,
                     1000m);
+
+                // Impact score uses the same ExposureImpactCalculator as the detail view,
+                // keyed on unique vulnerabilities so count/device weighting is consistent.
+                var uniqueVulns = openExposures
+                    .GroupBy(e => e.VulnId)
+                    .Select(g => new ExposureImpactCalculator.SoftwareVulnerabilityInput(
+                        g.First().VulnSeverity,
+                        g.First().VulnCvssScore,
+                        g.First().VulnExternalId))
+                    .ToList();
+                var impactScore = ExposureImpactCalculator.CalculateSoftwareImpact(
+                    new ExposureImpactCalculator.SoftwareImpactInput(
+                        group.Key,
+                        affectedDeviceCount,
+                        highValueDeviceCount,
+                        uniqueVulns))
+                    .ImpactScore;
 
                 var factorsJson = JsonSerializer.Serialize(new List<RiskFactor>
                 {
@@ -621,7 +655,7 @@ public class RiskScoreService(
                 return new SoftwareRiskResult(
                     group.Key,
                     overallScore,
-                    maxScore,
+                    impactScore,
                     criticalCount,
                     highCount,
                     mediumCount,
