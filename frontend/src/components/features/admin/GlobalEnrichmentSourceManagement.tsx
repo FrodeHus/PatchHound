@@ -1,24 +1,44 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ChevronDown, Sparkles } from 'lucide-react'
+import { Sparkles, X } from 'lucide-react'
 import {
   type EnrichmentSource,
   triggerEndOfLifeEnrichment,
   updateEnrichmentSources,
-} from "@/server/system.functions";
+} from '@/server/system.functions'
 import { EnrichmentRunHistorySheet } from '@/components/features/admin/EnrichmentRunHistorySheet'
-import { Badge } from '@/components/ui/badge'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { InsetPanel } from '@/components/ui/inset-panel'
+import { Separator } from '@/components/ui/separator'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { cn } from '@/lib/utils'
-import { useTenantScope } from "@/components/layout/tenant-scope";
 
 type GlobalEnrichmentSourceManagementProps = {
   sources: EnrichmentSource[]
   onSaved: () => Promise<void> | void
+}
+
+type EnrichmentSourceDraft = EnrichmentSource & {
+  credentials: EnrichmentSource['credentials'] & { secret: string }
 }
 
 export function GlobalEnrichmentSourceManagement({
@@ -27,28 +47,22 @@ export function GlobalEnrichmentSourceManagement({
 }: GlobalEnrichmentSourceManagementProps) {
   const [sources, setSources] = useState(() => initialSources.map(mapSourceToDraft))
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
-  const [expandedSourceKey, setExpandedSourceKey] = useState<string | null>(null)
+  const [editingSourceKey, setEditingSourceKey] = useState<string | null>(null)
   const [historySource, setHistorySource] = useState<{ key: string; displayName: string } | null>(null)
-  const { selectedTenantId } = useTenantScope();
+  const { selectedTenantId } = useTenantScope()
 
   const eolTriggerMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedTenantId) throw new Error("No tenant selected");
-      return triggerEndOfLifeEnrichment({
-        data: { tenantId: selectedTenantId },
-      });
+      if (!selectedTenantId) throw new Error('No tenant selected')
+      return triggerEndOfLifeEnrichment({ data: { tenantId: selectedTenantId } })
     },
     onSuccess: (result) => {
-      toast.success(
-        `EOL enrichment triggered for ${result.enqueuedCount} software items`,
-      );
+      toast.success(`EOL enrichment triggered for ${result.enqueuedCount} software items`)
     },
     onError: (error) => {
-      toast.error(
-        getApiErrorMessage(error, "Failed to trigger EOL enrichment"),
-      );
+      toast.error(getApiErrorMessage(error, 'Failed to trigger EOL enrichment'))
     },
-  });
+  })
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -76,547 +90,485 @@ export function GlobalEnrichmentSourceManagement({
     },
   })
 
-  function updateSource(
-    key: string,
-    mutate: (current: EnrichmentSourceDraft) => EnrichmentSourceDraft,
-  ) {
+  function updateSource(key: string, mutate: (current: EnrichmentSourceDraft) => EnrichmentSourceDraft) {
     setSaveState('idle')
     setSources((current) => current.map((source) => (source.key === key ? mutate(source) : source)))
   }
 
+  const editingSource = sources.find((s) => s.key === editingSourceKey) ?? null
+
   return (
-    <section className="space-y-5">
+    <section className="space-y-4">
       <EnrichmentRunHistorySheet
         sourceKey={historySource?.key ?? null}
         sourceDisplayName={historySource?.displayName ?? null}
         isOpen={historySource !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            setHistorySource(null);
-          }
+          if (!open) setHistorySource(null)
         }}
       />
 
-      <Card className="rounded-2xl border-border/70 bg-card/85 shadow-sm">
-        <CardHeader className="border-b border-border/60 pb-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-semibold tracking-[-0.04em]">
-                Global Enrichment
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Configure shared enrichment providers used across all tenants
-                during vulnerability processing.
-              </p>
-            </div>
-            <Button
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending}
-              className="rounded-full px-5"
-            >
-              {mutation.isPending ? "Saving..." : "Save enrichment changes"}
-            </Button>
-          </div>
-        </CardHeader>
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold">Global Enrichment</h2>
+        <p className="text-sm text-muted-foreground">
+          Shared enrichment providers used across all tenants during vulnerability processing.
+        </p>
+      </div>
 
-        <CardContent className="space-y-5 pt-5">
-          <div className="rounded-3xl border border-border/70 bg-background/30 p-4 sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold">
-                    Enrichment Providers
-                  </h3>
-                  <Badge
-                    variant="outline"
-                    className="rounded-full border-border/70 bg-background/50"
-                  >
-                    {sources.length}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  These providers are not tenant-specific. The worker invokes
-                  them while processing vulnerability ingestion.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                {saveState === "saved" ? (
-                  <p className="rounded-full border border-tone-success-border bg-tone-success px-3 py-1 text-tone-success-foreground">
-                    Configuration saved
-                  </p>
-                ) : null}
-                {saveState === "error" ? (
-                  <p className="rounded-full border border-destructive/25 bg-destructive/10 px-3 py-1 text-destructive">
-                    Save failed
-                  </p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="mt-5 space-y-4">
+      {sources.length ? (
+        <div className="overflow-hidden rounded-xl border border-border/70">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border/60 hover:bg-transparent">
+                <TableHead className="h-9 pl-4 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  Provider
+                </TableHead>
+                <TableHead className="h-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  Status
+                </TableHead>
+                <TableHead className="h-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  Queue
+                </TableHead>
+                <TableHead className="h-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  Last run
+                </TableHead>
+                <TableHead className="h-9 pr-4 text-right text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  Actions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {sources.map((source) => {
-                const isExpanded = expandedSourceKey === source.key;
+                const statusLabel = getProviderStatusLabel(source)
+                const statusTone = getProviderStatusTone(source)
 
                 return (
-                  <Card
+                  <TableRow
                     key={source.key}
-                    className="rounded-3xl border-border/70 bg-card/85 shadow-sm"
+                    className={cn(
+                      'border-border/50',
+                      editingSourceKey === source.key && 'bg-primary/[0.04]',
+                    )}
                   >
-                    <button
-                      type="button"
-                      className="flex w-full flex-wrap items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-background/30"
-                      onClick={() => {
-                        setExpandedSourceKey((current) =>
-                          current === source.key ? null : source.key,
-                        );
-                      }}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="flex size-8 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
-                            <Sparkles className="size-4" />
-                          </div>
-                          <CardTitle className="text-base">
-                            {source.displayName}
-                          </CardTitle>
-                          <Badge
-                            variant="outline"
-                            className="rounded-full border-border/70 bg-background/70"
-                          >
-                            {source.key}
-                          </Badge>
+                    {/* Provider */}
+                    <TableCell className="py-3 pl-4">
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-6 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                          <Sparkles className="size-3" />
                         </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span className="rounded-full border border-border/70 bg-background/50 px-3 py-1">
-                          Last run{" "}
-                          {formatTimestamp(source.runtime.lastCompletedAt)}
+                        <span className="font-medium text-foreground">{source.displayName}</span>
+                        <span className="rounded-full border border-border/60 bg-muted/30 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                          {source.key}
                         </span>
-                        <StatusBadge tone={getProviderStatusTone(source)}>
-                          {getProviderStatusLabel(source)}
-                        </StatusBadge>
-                        <span
-                          className={cn(
-                            "inline-flex size-8 items-center justify-center rounded-full border border-border/70 bg-background/50 transition-transform",
-                            isExpanded ? "rotate-180" : "",
-                          )}
+                      </div>
+                      {source.runtime.lastError ? (
+                        <p
+                          className="mt-0.5 max-w-[200px] truncate pl-8 text-[11px] text-destructive"
+                          title={source.runtime.lastError}
                         >
-                          <ChevronDown className="size-4" />
-                        </span>
+                          {source.runtime.lastError}
+                        </p>
+                      ) : null}
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell className="py-3">
+                      <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
+                    </TableCell>
+
+                    {/* Queue */}
+                    <TableCell className="py-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        {source.queue.pendingCount > 0 ? (
+                          <QueueChip label="Pending" value={source.queue.pendingCount} tone="warning" />
+                        ) : null}
+                        {source.queue.runningCount > 0 ? (
+                          <QueueChip label="Running" value={source.queue.runningCount} tone="info" />
+                        ) : null}
+                        {source.queue.failedCount > 0 ? (
+                          <QueueChip label="Failed" value={source.queue.failedCount} tone="error" />
+                        ) : null}
+                        {source.queue.pendingCount === 0 &&
+                          source.queue.runningCount === 0 &&
+                          source.queue.failedCount === 0 ? (
+                          <span className="text-[11px] text-muted-foreground">Idle</span>
+                        ) : null}
                       </div>
-                    </button>
+                    </TableCell>
 
-                    {isExpanded ? (
-                      <CardContent className="space-y-5 border-t border-border/60 pt-5">
-                        <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/30 px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={source.enabled}
-                            onChange={(event) =>
-                              updateSource(source.key, (current) => ({
-                                ...current,
-                                enabled: event.target.checked,
-                              }))
-                            }
-                          />
-                          <div>
-                            <p className="text-sm font-medium">
-                              Enable provider
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              When enabled, the worker will invoke this
-                              enrichment source during vulnerability processing.
-                            </p>
-                          </div>
-                        </label>
+                    {/* Last run */}
+                    <TableCell className="py-3">
+                      <p className="text-[13px]">{formatTimestamp(source.runtime.lastCompletedAt)}</p>
+                      {source.runtime.lastSucceededAt !== source.runtime.lastCompletedAt ? (
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          Last success {formatTimestamp(source.runtime.lastSucceededAt)}
+                        </p>
+                      ) : null}
+                    </TableCell>
 
-                        <div className="rounded-2xl border border-border/70 bg-background/30 px-4 py-3">
-                          <p className="text-sm font-medium">
-                            {getProviderStatusDescription(source)}
-                          </p>
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            Last success:{" "}
-                            {formatTimestamp(source.runtime.lastSucceededAt)}
-                          </p>
-                        </div>
-
-                        <div className="grid gap-3 sm:grid-cols-5">
-                          <QueueMetric
-                            label="Pending"
-                            value={source.queue.pendingCount}
-                            tone="warning"
-                          />
-                          <QueueMetric
-                            label="Retry"
-                            value={source.queue.retryScheduledCount}
-                            tone="warning"
-                          />
-                          <QueueMetric
-                            label="Running"
-                            value={source.queue.runningCount}
-                            tone="info"
-                          />
-                          <QueueMetric
-                            label="Failed"
-                            value={source.queue.failedCount}
-                            tone={
-                              source.queue.failedCount > 0 ? "error" : "neutral"
-                            }
-                          />
-                          <QueueMetric
-                            label="Oldest Due"
-                            value={formatTimestamp(
-                              source.queue.oldestPendingAt,
-                            )}
-                            tone="neutral"
-                          />
-                        </div>
-
-                        <div className="rounded-2xl border border-border/70 bg-background/30 p-4">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-medium">
-                                Recent enrichment runs
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Latest queue-processing outcomes for this
-                                provider.
-                              </p>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="rounded-full"
-                              onClick={() =>
-                                setHistorySource({
-                                  key: source.key,
-                                  displayName: source.displayName,
-                                })
-                              }
-                            >
-                              View full history
-                            </Button>
-                          </div>
-
-                          {source.recentRuns.length ? (
-                            <div className="mt-4 space-y-2">
-                              {source.recentRuns.map((run) => (
-                                <div
-                                  key={run.id}
-                                  className="grid gap-2 rounded-2xl border border-border/60 bg-background/30 px-4 py-3 text-xs text-muted-foreground sm:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]"
-                                >
-                                  <div>
-                                    <p className="font-medium text-foreground">
-                                      {run.status}
-                                    </p>
-                                    <p>
-                                      Started {formatTimestamp(run.startedAt)}
-                                    </p>
-                                  </div>
-                                  <RunStat
-                                    label="Claimed"
-                                    value={run.jobsClaimed}
-                                  />
-                                  <RunStat
-                                    label="Succeeded"
-                                    value={run.jobsSucceeded}
-                                  />
-                                  <RunStat
-                                    label="No Data"
-                                    value={run.jobsNoData}
-                                  />
-                                  <RunStat
-                                    label="Failed"
-                                    value={run.jobsFailed}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="mt-4 text-xs text-muted-foreground">
-                              No enrichment runs have been recorded yet.
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <label className="space-y-2">
-                            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                              Display Name
-                            </span>
-                            <Input
-                              value={source.displayName}
-                              onChange={(event) =>
-                                updateSource(source.key, (current) => ({
-                                  ...current,
-                                  displayName: event.target.value,
-                                }))
-                              }
-                            />
-                          </label>
-                          <label className="space-y-2">
-                            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                              API Base URL
-                            </span>
-                            <Input
-                              value={source.credentials.apiBaseUrl}
-                              onChange={(event) =>
-                                updateSource(source.key, (current) => ({
-                                  ...current,
-                                  credentials: {
-                                    ...current.credentials,
-                                    apiBaseUrl: event.target.value,
-                                  },
-                                }))
-                              }
-                            />
-                          </label>
-                          {source.key === "microsoft-defender" ? (
-                            <label className="space-y-2">
-                              <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                                Refresh TTL (hours)
-                              </span>
-                              <Input
-                                type="number"
-                                min={1}
-                                step={1}
-                                value={source.refreshTtlHours ?? ""}
-                                onChange={(event) =>
-                                  updateSource(source.key, (current) => ({
-                                    ...current,
-                                    refreshTtlHours:
-                                      event.target.value.trim() === ""
-                                        ? null
-                                        : Math.max(
-                                            1,
-                                            Number.parseInt(
-                                              event.target.value,
-                                              10,
-                                            ) || 1,
-                                          ),
-                                  }))
-                                }
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Defender CVE detail is refreshed asynchronously
-                                when stored detail is older than this threshold.
-                              </p>
-                            </label>
-                          ) : null}
-                        </div>
-
-                        {source.credentialMode === "global-secret" ? (
-                          <label className="space-y-2">
-                            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                              API Key
-                            </span>
-                            <Input
-                              type="password"
-                              placeholder={
-                                source.credentials.hasSecret
-                                  ? "API key stored. Enter a new key to replace it."
-                                  : "Enter API key"
-                              }
-                              value={source.credentials.secret}
-                              onChange={(event) =>
-                                updateSource(source.key, (current) => ({
-                                  ...current,
-                                  credentials: {
-                                    ...current.credentials,
-                                    secret: event.target.value,
-                                  },
-                                }))
-                              }
-                            />
-                          </label>
-                        ) : source.credentialMode === "no-credential" ? (
-                          <div className="rounded-2xl border border-border/70 bg-background/30 px-4 py-3">
-                            <p className="text-sm font-medium">
-                              No credentials required
-                            </p>
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              This provider uses a public API and does not
-                              require any API key or authentication.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="rounded-2xl border border-border/70 bg-background/30 px-4 py-3">
-                            <p className="text-sm font-medium">
-                              Credential source
-                            </p>
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              This provider reuses each tenant&apos;s Microsoft
-                              Defender credentials from the tenant source
-                              configuration in OpenBao. No global API key is
-                              required here.
-                            </p>
-                          </div>
-                        )}
-
-                        {source.key === "endoflife" && source.enabled ? (
-                          <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-background/30 px-4 py-3">
-                            <div>
-                              <p className="text-sm font-medium">Manual sync</p>
-                              <p className="text-xs text-muted-foreground">
-                                Queue end-of-life enrichment for all software in
-                                the current tenant.
-                              </p>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="rounded-full"
-                              disabled={
-                                eolTriggerMutation.isPending ||
-                                !selectedTenantId
-                              }
-                              onClick={() => eolTriggerMutation.mutate()}
-                            >
-                              {eolTriggerMutation.isPending
-                                ? "Triggering…"
-                                : "Trigger EOL sync"}
-                            </Button>
-                          </div>
-                        ) : null}
-
-                        {source.runtime.lastError ? (
-                          <div className="rounded-2xl border border-destructive/25 bg-destructive/8 px-4 py-3 text-xs text-destructive">
-                            Last error: {source.runtime.lastError}
-                          </div>
-                        ) : null}
-                      </CardContent>
-                    ) : null}
-                  </Card>
-                );
+                    {/* Actions */}
+                    <TableCell className="py-3 pr-4">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingSourceKey(source.key)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setHistorySource({ key: source.key, displayName: source.displayName })}
+                        >
+                          History
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
               })}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        <InsetPanel emphasis="subtle" className="border-dashed px-4 py-8 text-sm text-muted-foreground">
+          No enrichment providers are configured.
+        </InsetPanel>
+      )}
+
+      {/* Editor sheet */}
+      <Sheet
+        open={editingSource !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingSourceKey(null)
+        }}
+      >
+        <SheetContent
+          showCloseButton={false}
+          className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
+          side="right"
+        >
+          {editingSource ? (
+            <EnrichmentSourceEditorSheetContent
+              source={editingSource}
+              isSaving={mutation.isPending}
+              saveState={saveState}
+              selectedTenantId={selectedTenantId}
+              isEolTriggering={eolTriggerMutation.isPending}
+              onSave={() => mutation.mutate()}
+              onClose={() => setEditingSourceKey(null)}
+              onUpdateSource={updateSource}
+              onTriggerEol={() => eolTriggerMutation.mutate()}
+              onViewHistory={() => {
+                setEditingSourceKey(null)
+                setHistorySource({ key: editingSource.key, displayName: editingSource.displayName })
+              }}
+            />
+          ) : null}
+        </SheetContent>
+      </Sheet>
     </section>
-  );
+  )
 }
 
-function QueueMetric({
+// ─── Enrichment editor sheet content ────────────────────────────────────────
+
+function EnrichmentSourceEditorSheetContent({
+  source,
+  isSaving,
+  saveState,
+  selectedTenantId,
+  isEolTriggering,
+  onSave,
+  onClose,
+  onUpdateSource,
+  onTriggerEol,
+  onViewHistory,
+}: {
+  source: EnrichmentSourceDraft
+  isSaving: boolean
+  saveState: 'idle' | 'saved' | 'error'
+  selectedTenantId: string | null | undefined
+  isEolTriggering: boolean
+  onSave: () => void
+  onClose: () => void
+  onUpdateSource: (key: string, mutate: (current: EnrichmentSourceDraft) => EnrichmentSourceDraft) => void
+  onTriggerEol: () => void
+  onViewHistory: () => void
+}) {
+  return (
+    <>
+      <SheetHeader className="shrink-0 border-b border-border/60 p-5">
+        <div className="flex items-start justify-between gap-3 pr-1">
+          <div>
+            <SheetTitle>Edit {source.displayName}</SheetTitle>
+            <SheetDescription className="mt-1">
+              Configure this enrichment provider's credentials and behavior.
+            </SheetDescription>
+          </div>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} className="-mr-1 -mt-1 shrink-0">
+            <X className="size-4" />
+          </Button>
+        </div>
+      </SheetHeader>
+
+      <div className="flex-1 overflow-y-auto">
+        {/* Status / posture */}
+        <div className="space-y-3 border-b border-border/60 p-5">
+          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Provider posture</p>
+          <div className="divide-y divide-border/50 overflow-hidden rounded-lg border border-border/60">
+            <PostureRow label="Status" value={getProviderStatusLabel(source)} />
+            <PostureRow label="Last run" value={formatTimestamp(source.runtime.lastCompletedAt)} />
+            <PostureRow label="Last success" value={formatTimestamp(source.runtime.lastSucceededAt)} />
+          </div>
+          <p className="text-xs text-muted-foreground">{getProviderStatusDescription(source)}</p>
+          {source.runtime.lastError ? (
+            <p className="text-xs text-destructive">Error: {source.runtime.lastError}</p>
+          ) : null}
+
+          {/* Queue metrics */}
+          <div className="grid grid-cols-4 gap-2">
+            <QueueMetricBlock label="Pending" value={source.queue.pendingCount} tone="warning" />
+            <QueueMetricBlock label="Retry" value={source.queue.retryScheduledCount} tone="warning" />
+            <QueueMetricBlock label="Running" value={source.queue.runningCount} tone="info" />
+            <QueueMetricBlock
+              label="Failed"
+              value={source.queue.failedCount}
+              tone={source.queue.failedCount > 0 ? 'error' : 'neutral'}
+            />
+          </div>
+
+          <Button type="button" variant="outline" size="sm" className="w-full" onClick={onViewHistory}>
+            View full run history
+          </Button>
+        </div>
+
+        {/* EOL manual trigger (endoflife source only) */}
+        {source.key === 'endoflife' && source.enabled ? (
+          <div className="border-b border-border/60 p-5">
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 px-4 py-3">
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium">Manual sync</p>
+                <p className="text-xs text-muted-foreground">
+                  Queue end-of-life enrichment for all software in the current tenant.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isEolTriggering || !selectedTenantId}
+                onClick={onTriggerEol}
+              >
+                {isEolTriggering ? 'Triggering…' : 'Trigger EOL sync'}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Form */}
+        <div className="space-y-6 p-5">
+          <FormSection title="Runtime control">
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-border/60 px-4 py-3 transition-colors hover:bg-muted/20">
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium">Enable provider</p>
+                <p className="text-xs text-muted-foreground">
+                  When enabled, the worker will invoke this enrichment source during vulnerability processing.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={source.enabled}
+                onChange={(event) =>
+                  onUpdateSource(source.key, (current) => ({
+                    ...current,
+                    enabled: event.target.checked,
+                  }))
+                }
+              />
+            </label>
+          </FormSection>
+
+          <FormSection title="Configuration">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid content-start gap-2">
+                <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Display Name</span>
+                <Input
+                  value={source.displayName}
+                  onChange={(event) =>
+                    onUpdateSource(source.key, (current) => ({
+                      ...current,
+                      displayName: event.target.value,
+                    }))
+                  }
+                  className="h-10"
+                />
+              </div>
+              <div className="grid content-start gap-2">
+                <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">API Base URL</span>
+                <Input
+                  value={source.credentials.apiBaseUrl}
+                  onChange={(event) =>
+                    onUpdateSource(source.key, (current) => ({
+                      ...current,
+                      credentials: { ...current.credentials, apiBaseUrl: event.target.value },
+                    }))
+                  }
+                  className="h-10"
+                />
+              </div>
+              {source.key === 'microsoft-defender' ? (
+                <div className="grid content-start gap-2 sm:col-span-2">
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                    Refresh TTL (hours)
+                  </span>
+                  <Input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={source.refreshTtlHours ?? ''}
+                    onChange={(event) =>
+                      onUpdateSource(source.key, (current) => ({
+                        ...current,
+                        refreshTtlHours:
+                          event.target.value.trim() === ''
+                            ? null
+                            : Math.max(1, Number.parseInt(event.target.value, 10) || 1),
+                      }))
+                    }
+                    className="h-10"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Defender CVE detail is refreshed asynchronously when stored detail is older than this threshold.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          </FormSection>
+
+          <FormSection title="Credentials">
+            {source.credentialMode === 'global-secret' ? (
+              <div className="grid content-start gap-2">
+                <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">API Key</span>
+                <Input
+                  type="password"
+                  placeholder={
+                    source.credentials.hasSecret
+                      ? 'API key stored — enter a new key to replace it'
+                      : 'Enter API key'
+                  }
+                  value={source.credentials.secret}
+                  onChange={(event) =>
+                    onUpdateSource(source.key, (current) => ({
+                      ...current,
+                      credentials: { ...current.credentials, secret: event.target.value },
+                    }))
+                  }
+                  className="h-10"
+                />
+              </div>
+            ) : source.credentialMode === 'no-credential' ? (
+              <div className="rounded-lg border border-border/50 bg-muted/20 px-4 py-3">
+                <p className="text-sm font-medium">No credentials required</p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  This provider uses a public API and does not require any API key or authentication.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border/50 bg-muted/20 px-4 py-3">
+                <p className="text-sm font-medium">Credential source</p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  This provider reuses each tenant's Microsoft Defender credentials from the tenant source
+                  configuration in OpenBao. No global API key is required here.
+                </p>
+              </div>
+            )}
+          </FormSection>
+        </div>
+      </div>
+
+      <SheetFooter className="mt-0 shrink-0 flex-row items-center justify-between gap-3 border-t border-border/60 p-5">
+        <div className="text-xs">
+          {saveState === 'saved' ? (
+            <span className="text-tone-success-foreground">Configuration saved</span>
+          ) : null}
+          {saveState === 'error' ? (
+            <span className="text-destructive">Save failed — review and retry</span>
+          ) : null}
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Close
+          </Button>
+          <Button onClick={onSave} disabled={isSaving}>
+            {isSaving ? 'Saving…' : 'Save enrichment'}
+          </Button>
+        </div>
+      </SheetFooter>
+    </>
+  )
+}
+
+// ─── Small components ────────────────────────────────────────────────────────
+
+function QueueChip({
   label,
   value,
   tone,
 }: {
   label: string
-  value: string | number
+  value: number
+  tone: 'warning' | 'info' | 'error'
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+        tone === 'warning' && 'border-tone-warning-border bg-tone-warning text-tone-warning-foreground',
+        tone === 'info' && 'border-primary/20 bg-primary/10 text-primary',
+        tone === 'error' && 'border-destructive/25 bg-destructive/10 text-destructive',
+      )}
+    >
+      {value} {label}
+    </span>
+  )
+}
+
+function QueueMetricBlock({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: number
   tone: 'neutral' | 'warning' | 'error' | 'info'
 }) {
   return (
     <div
       className={cn(
-        'rounded-2xl border px-4 py-3',
+        'rounded-lg border px-2 py-2 text-center',
         tone === 'warning' && 'border-tone-warning-border bg-tone-warning',
         tone === 'error' && 'border-destructive/25 bg-destructive/10',
         tone === 'info' && 'border-primary/20 bg-primary/10',
-        tone === 'neutral' && 'border-border/70 bg-background/30',
+        tone === 'neutral' && 'border-border/60 bg-muted/20',
       )}
     >
-      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-foreground">{value}</p>
+      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
     </div>
   )
 }
 
-function RunStat({ label, value }: { label: string; value: number }) {
+function PostureRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-background/30 px-3 py-2 text-center">
-      <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
+    <div className="flex items-center justify-between gap-4 px-3 py-2.5">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-xs font-medium text-foreground">{value}</span>
     </div>
   )
-}
-
-type EnrichmentSourceDraft = EnrichmentSource & {
-  credentials: EnrichmentSource['credentials'] & { secret: string }
-}
-
-function mapSourceToDraft(source: EnrichmentSource): EnrichmentSourceDraft {
-  return {
-    ...source,
-    credentials: {
-      ...source.credentials,
-      secret: '',
-    },
-  }
-}
-
-function formatTimestamp(value: string | null) {
-  if (!value) {
-    return 'Never'
-  }
-
-  return new Date(value).toLocaleString()
-}
-
-function getProviderStatusLabel(source: EnrichmentSource) {
-  if (!source.enabled) {
-    return 'Inactive'
-  }
-
-  if (source.credentialMode === 'global-secret' && !source.credentials.hasSecret) {
-    return 'Needs credentials'
-  }
-
-  if (source.runtime.lastError) {
-    return 'Needs attention'
-  }
-
-  if (source.runtime.lastStatus?.toLowerCase() === 'running') {
-    return 'Running'
-  }
-
-  if (source.runtime.lastSucceededAt) {
-    return 'Healthy'
-  }
-
-  return 'Ready for first run'
-}
-
-function getProviderStatusDescription(source: EnrichmentSource) {
-  if (source.key === 'nvd') {
-    if (!source.enabled) {
-      return 'NVD enrichment is configured globally but currently inactive for worker processing.'
-    }
-
-    if (!source.credentials.hasSecret) {
-      return 'Add an NVD API key so the worker can enrich missing description, published date, CVSS score, and vector data.'
-    }
-
-    if (source.runtime.lastError) {
-      return 'The worker is attempting NVD enrichment, but the latest run failed and should be reviewed.'
-    }
-
-    return 'NVD is the global backfill source for missing vulnerability metadata when tenant ingestion does not provide it.'
-  }
-
-  if (source.key === 'microsoft-defender') {
-    if (!source.enabled) {
-      return 'Defender enrichment is configured globally but currently inactive for worker processing.'
-    }
-
-    return `Defender CVE detail is refreshed asynchronously after ${source.refreshTtlHours ?? 24} hour(s), instead of being refetched during every ingestion run.`
-  }
-
-  if (source.key === 'endoflife') {
-    if (!source.enabled) {
-      return 'Software end-of-life enrichment is configured but currently inactive.'
-    }
-
-    if (source.runtime.lastError) {
-      return 'The worker is attempting end-of-life enrichment, but the latest run failed and should be reviewed.'
-    }
-
-    return 'Enriches normalized software with end-of-life dates, latest version, LTS status, support dates, and discontinued status from endoflife.date.'
-  }
-
-  return source.enabled
-    ? 'This shared provider is available to enrich tenant vulnerability data during worker processing.'
-    : 'This shared provider is configured but not currently used by the worker.'
 }
 
 function StatusBadge({
@@ -629,30 +581,90 @@ function StatusBadge({
   return (
     <span
       className={cn(
-        'rounded-full border px-3 py-1 text-xs',
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium',
         tone === 'success' && 'border-tone-success-border bg-tone-success text-tone-success-foreground',
         tone === 'warning' && 'border-tone-warning-border bg-tone-warning text-tone-warning-foreground',
         tone === 'error' && 'border-destructive/25 bg-destructive/10 text-destructive',
         tone === 'neutral' && 'border-border/70 bg-background/50 text-muted-foreground',
       )}
     >
+      <span
+        className={cn(
+          'size-1.5 rounded-full',
+          tone === 'success' && 'bg-tone-success-foreground',
+          tone === 'warning' && 'bg-tone-warning-foreground',
+          tone === 'error' && 'bg-destructive',
+          tone === 'neutral' && 'bg-muted-foreground',
+        )}
+      />
       {children}
     </span>
   )
 }
 
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-4">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
+      {children}
+      <Separator className="opacity-50" />
+    </div>
+  )
+}
+
+// ─── Logic helpers ──────────────────────────────────────────────────────────
+
+function mapSourceToDraft(source: EnrichmentSource): EnrichmentSourceDraft {
+  return {
+    ...source,
+    credentials: { ...source.credentials, secret: '' },
+  }
+}
+
+function formatTimestamp(value: string | null) {
+  if (!value) return 'Never'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+}
+
+function getProviderStatusLabel(source: EnrichmentSource) {
+  if (!source.enabled) return 'Inactive'
+  if (source.credentialMode === 'global-secret' && !source.credentials.hasSecret) return 'Needs credentials'
+  if (source.runtime.lastError) return 'Needs attention'
+  if (source.runtime.lastStatus?.toLowerCase() === 'running') return 'Running'
+  if (source.runtime.lastSucceededAt) return 'Healthy'
+  return 'Ready'
+}
+
 function getProviderStatusTone(source: EnrichmentSource): 'neutral' | 'success' | 'warning' | 'error' {
-  if (source.runtime.lastError) {
-    return 'error'
-  }
-
-  if (source.runtime.lastStatus?.toLowerCase() === 'running') {
-    return 'warning'
-  }
-
-  if (source.runtime.lastSucceededAt) {
-    return 'success'
-  }
-
+  if (source.runtime.lastError) return 'error'
+  if (!source.enabled) return 'neutral'
+  if (source.credentialMode === 'global-secret' && !source.credentials.hasSecret) return 'warning'
+  if (source.runtime.lastStatus?.toLowerCase() === 'running') return 'warning'
+  if (source.runtime.lastSucceededAt) return 'success'
   return 'neutral'
+}
+
+function getProviderStatusDescription(source: EnrichmentSource) {
+  if (source.key === 'nvd') {
+    if (!source.enabled) return 'NVD enrichment is configured globally but currently inactive.'
+    if (!source.credentials.hasSecret) return 'Add an NVD API key so the worker can enrich missing description, CVSS score, and vector data.'
+    if (source.runtime.lastError) return 'The worker is attempting NVD enrichment, but the latest run failed and should be reviewed.'
+    return 'NVD is the global backfill source for missing vulnerability metadata when tenant ingestion does not provide it.'
+  }
+
+  if (source.key === 'microsoft-defender') {
+    if (!source.enabled) return 'Defender enrichment is configured globally but currently inactive.'
+    return `Defender CVE detail is refreshed asynchronously after ${source.refreshTtlHours ?? 24} hour(s), instead of being refetched during every ingestion run.`
+  }
+
+  if (source.key === 'endoflife') {
+    if (!source.enabled) return 'End-of-life enrichment is configured but currently inactive.'
+    return 'Enriches software items with end-of-life date and support status from the endoflife.date database.'
+  }
+
+  return source.enabled
+    ? 'This shared provider is available to enrich tenant vulnerability data during worker processing.'
+    : 'This shared provider is configured but not currently used by the worker.'
 }

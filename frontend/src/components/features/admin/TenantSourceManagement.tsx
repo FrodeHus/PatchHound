@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, CircleHelp, PenSquare, RotateCw, Square } from 'lucide-react'
+import { ArrowLeft, CircleHelp, Clock, PenSquare, RotateCw, Square, X } from 'lucide-react'
 import { abortTenantIngestionRun, triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
 import type { TenantDetail, TenantIngestionSource } from '@/api/settings.schemas'
 import { SourceRunHistoryView } from '@/components/features/admin/SourceRunHistorySheet'
@@ -12,6 +12,22 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Separator } from '@/components/ui/separator'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { cn } from '@/lib/utils'
@@ -29,7 +45,6 @@ type TenantSourceManagementProps = {
 type TenantIngestionSourceDraft = Omit<TenantIngestionSource, 'credentials'> & {
   credentials: TenantIngestionSource['credentials'] & {
     secret: string
-    linkedSourceKey?: string | null
   }
 }
 
@@ -47,8 +62,6 @@ export function TenantSourceManagement({
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
   const [syncingSourceKey, setSyncingSourceKey] = useState<string | null>(null)
   const [abortingRunId, setAbortingRunId] = useState<string | null>(null)
-  const [syncState, setSyncState] = useState<'idle' | 'success' | 'error'>('idle')
-  const [abortState, setAbortState] = useState<'idle' | 'success' | 'error'>('idle')
 
   const editingSource = useMemo(
     () => sources.find((source) => source.key === editingSourceKey) ?? null,
@@ -76,7 +89,6 @@ export function TenantSourceManagement({
               secret: source.credentials.secret,
               apiBaseUrl: source.credentials.apiBaseUrl,
               tokenScope: source.credentials.tokenScope,
-              linkedSourceKey: source.credentials.linkedSourceKey ?? null,
             },
           })),
         },
@@ -95,53 +107,35 @@ export function TenantSourceManagement({
 
   const syncMutation = useMutation({
     mutationFn: async (sourceKey: string) => {
-      await triggerTenantIngestionSync({
-        data: {
-          tenantId: tenant.id,
-          sourceKey,
-        },
-      })
+      await triggerTenantIngestionSync({ data: { tenantId: tenant.id, sourceKey } })
     },
     onMutate: (sourceKey) => {
       setSyncingSourceKey(sourceKey)
-      setSyncState('idle')
-      setAbortState('idle')
     },
     onSuccess: async () => {
-      setSyncState('success')
       toast.success('Sync queued')
       await router.invalidate()
     },
     onError: (error) => {
-      setSyncState('error')
       toast.error(getApiErrorMessage(error, 'Failed to start sync'))
     },
     onSettled: () => {
       setSyncingSourceKey(null)
     },
   })
+
   const abortMutation = useMutation({
     mutationFn: async ({ sourceKey, runId }: { sourceKey: string; runId: string }) => {
-      await abortTenantIngestionRun({
-        data: {
-          tenantId: tenant.id,
-          sourceKey,
-          runId,
-        },
-      })
+      await abortTenantIngestionRun({ data: { tenantId: tenant.id, sourceKey, runId } })
     },
     onMutate: ({ runId }) => {
       setAbortingRunId(runId)
-      setSyncState('idle')
-      setAbortState('idle')
     },
     onSuccess: async () => {
-      setAbortState('success')
       toast.success('Abort requested')
       await router.invalidate()
     },
     onError: (error) => {
-      setAbortState('error')
       toast.error(getApiErrorMessage(error, 'Failed to abort ingestion'))
     },
     onSettled: () => {
@@ -157,208 +151,446 @@ export function TenantSourceManagement({
     setSources((current) => current.map((source) => (source.key === key ? mutate(source) : source)))
   }
 
+  // Full-page history view takes over when open
+  if (historySource) {
+    return (
+      <TenantSourceHistoryPage
+        tenant={tenant}
+        source={historySource}
+        onBack={onCloseHistory}
+      />
+    )
+  }
+
   return (
     <TooltipProvider>
-      <section className="space-y-5">
-        {editingSource ? (
-          <TenantSourceEditorPage
-            tenant={tenant}
-            source={editingSource}
-            isSaving={mutation.isPending}
-            saveState={saveState}
-            onBack={onCloseEditor}
-            onSave={() => mutation.mutate()}
-            onUpdateSource={updateSource}
-          />
-        ) : null}
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold">Tenant Sources</h2>
+          <p className="text-sm text-muted-foreground">
+            Credentials and schedules used by the worker to collect inventory and vulnerability data.
+          </p>
+        </div>
 
-        {!editingSource && historySource ? (
-          <TenantSourceHistoryPage
-            tenant={tenant}
-            source={historySource}
-            onBack={onCloseHistory}
-          />
-        ) : null}
-
-        {!editingSource && !historySource ? (
-          <>
-        <Card className="rounded-2xl bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_94%,black),var(--card))] shadow-sm">
-          <CardHeader className="border-b border-border/60 pb-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="space-y-1">
-                <h2 className="text-2xl font-semibold tracking-[-0.04em]">Tenant Sources</h2>
-                <p className="text-sm text-muted-foreground">
-                  Review source status, run manual sync, and edit credentials or schedules in a side panel.
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-5 pt-5">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <InsetPanel className="p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Configured Sources</p>
-                <p className="mt-2 text-2xl font-semibold">
-                  {sources.filter((source) => source.credentials.clientId || source.credentials.hasSecret).length}
-                </p>
-              </InsetPanel>
-              <InsetPanel className="p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Enabled Sources</p>
-                <p className="mt-2 text-2xl font-semibold">{sources.filter((source) => source.enabled).length}</p>
-              </InsetPanel>
-              <InsetPanel className="p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Manual Sync</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Supported for {sources.filter((source) => source.supportsManualSync).length} source{sources.filter((source) => source.supportsManualSync).length === 1 ? '' : 's'}.
-                </p>
-              </InsetPanel>
-            </div>
-
-            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold">Tenant Sources</h3>
-                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
-                    {sources.length}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Credentials and schedules used by the worker to collect tenant inventory and vulnerability data.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                {saveState === 'saved' ? <StatusPill tone="success">Configuration saved</StatusPill> : null}
-                {saveState === 'error' ? <StatusPill tone="error">Save failed</StatusPill> : null}
-                {syncState === 'success' ? <StatusPill tone="success">Sync queued</StatusPill> : null}
-                {syncState === 'error' ? <StatusPill tone="error">Sync failed</StatusPill> : null}
-                {abortState === 'success' ? <StatusPill tone="success">Abort requested</StatusPill> : null}
-                {abortState === 'error' ? <StatusPill tone="error">Abort failed</StatusPill> : null}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {sources.length ? (
-                sources.map((source) => {
+        {sources.length ? (
+          <div className="overflow-hidden rounded-xl border border-border/70">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border/60 hover:bg-transparent">
+                  <TableHead className="h-9 pl-4 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    Source
+                  </TableHead>
+                  <TableHead className="h-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    Status
+                  </TableHead>
+                  <TableHead className="h-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    Last run
+                  </TableHead>
+                  <TableHead className="h-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    Credentials
+                  </TableHead>
+                  <TableHead className="h-9 pr-4 text-right text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    Actions
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sources.map((source) => {
                   const isConfigured = Boolean(source.credentials.clientId || source.credentials.hasSecret)
                   const statusTone = getSourceStatusTone(source)
                   const statusLabel = source.runtime.lastStatus ?? (isConfigured ? 'Configured' : 'Needs credentials')
-                  const activity = describeSourceActivity(source)
                   const recoverableFailure = isRecoverableFailure(source)
                   const activeRunId = source.runtime.activeIngestionRunId
 
                   return (
-                    <InsetPanel key={source.key} className="space-y-4 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-base font-semibold">{source.displayName}</p>
-                            <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
-                              {source.key}
-                            </Badge>
-                            {!source.enabled ? <Badge variant="outline">Disabled</Badge> : null}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <span>Last run {formatTimestamp(source.runtime.lastCompletedAt)}</span>
-                            <span>Last success {formatTimestamp(source.runtime.lastSucceededAt)}</span>
-                          </div>
+                    <TableRow
+                      key={source.key}
+                      className={cn(
+                        'border-border/50',
+                        editingSourceKey === source.key && 'bg-primary/[0.04]',
+                      )}
+                    >
+                      {/* Source name + key */}
+                      <TableCell className="py-3 pl-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-foreground">{source.displayName}</span>
+                          <span className="rounded-full border border-border/60 bg-muted/30 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                            {source.key}
+                          </span>
+                          {!source.enabled ? (
+                            <Badge variant="outline" className="text-[11px]">Disabled</Badge>
+                          ) : null}
                         </div>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {source.supportsScheduling ? source.syncSchedule : 'Worker-managed'}
+                        </p>
+                      </TableCell>
+
+                      {/* Status */}
+                      <TableCell className="py-3">
                         <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
-                      </div>
+                      </TableCell>
 
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <Metric label="Schedule" value={source.supportsScheduling ? source.syncSchedule : 'Worker-managed'} />
-                        <Metric label="Client ID" value={source.credentials.clientId ? 'Configured' : 'Missing'} />
-                        <Metric label="Secret" value={source.credentials.hasSecret ? 'Stored' : 'Missing'} />
-                      </div>
-
-                      <InsetPanel className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,160px))]">
-                        <div className="space-y-1">
-                          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                            Ingestion activity
+                      {/* Last run */}
+                      <TableCell className="py-3">
+                        <p className="text-[13px]">{formatTimestamp(source.runtime.lastCompletedAt)}</p>
+                        {source.runtime.lastSucceededAt !== source.runtime.lastCompletedAt ? (
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">
+                            Last success {formatTimestamp(source.runtime.lastSucceededAt)}
                           </p>
-                          <p className="text-sm font-medium text-foreground">{activity.title}</p>
-                          <p className="text-xs text-muted-foreground">{activity.description}</p>
-                          {activity.metricsSummary ? (
-                            <p className="text-xs text-muted-foreground">{activity.metricsSummary}</p>
-                          ) : null}
-                          {activity.snapshotSummary ? (
-                            <p className="text-xs text-muted-foreground">{activity.snapshotSummary}</p>
-                          ) : null}
+                        ) : null}
+                        {source.runtime.lastError ? (
+                          <p
+                            className="mt-0.5 max-w-[160px] truncate text-[11px] text-destructive"
+                            title={source.runtime.lastError}
+                          >
+                            {source.runtime.lastError}
+                          </p>
+                        ) : null}
+                      </TableCell>
+
+                      {/* Credentials */}
+                      <TableCell className="py-3">
+                        <div className="space-y-1">
+                          <CredentialDot label="Client ID" ok={Boolean(source.credentials.clientId)} />
+                          <CredentialDot label="Secret" ok={source.credentials.hasSecret} />
                         </div>
-                        <Metric label="Phase" value={activity.phase} compact />
-                        <Metric label="Batch" value={activity.batch} compact />
-                        <Metric label="Checkpoint" value={activity.checkpoint} compact />
-                      </InsetPanel>
+                      </TableCell>
 
-                      {source.runtime.lastError ? (
-                        <InsetPanel emphasis="subtle" className="px-4 py-3 text-sm text-destructive">
-                          Last error: {source.runtime.lastError}
-                        </InsetPanel>
-                      ) : null}
-
-                      <div className="flex flex-wrap gap-2">
-                        {activeRunId ? (
+                      {/* Actions */}
+                      <TableCell className="py-3 pr-4">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {activeRunId ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={abortMutation.isPending}
+                              onClick={() => abortMutation.mutate({ sourceKey: source.key, runId: activeRunId })}
+                            >
+                              <Square className="size-3" />
+                              {abortingRunId === activeRunId ? 'Aborting…' : 'Abort'}
+                            </Button>
+                          ) : null}
+                          {source.supportsManualSync && !activeRunId ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={syncMutation.isPending || !source.enabled}
+                              onClick={() => syncMutation.mutate(source.key)}
+                            >
+                              <RotateCw className="size-3" />
+                              {syncingSourceKey === source.key
+                                ? 'Syncing…'
+                                : recoverableFailure
+                                  ? 'Resume'
+                                  : 'Sync'}
+                            </Button>
+                          ) : null}
                           <Button
                             type="button"
                             variant="outline"
-                            disabled={abortMutation.isPending}
-                            onClick={() => abortMutation.mutate({ sourceKey: source.key, runId: activeRunId })}
+                            size="sm"
+                            onClick={() => onEditSource(source.key)}
                           >
-                            <Square className="size-4" />
-                            {abortingRunId === activeRunId ? 'Aborting...' : 'Abort ingestion'}
+                            <PenSquare className="size-3" />
+                            Edit
                           </Button>
-                        ) : null}
-                        {source.supportsManualSync ? (
                           <Button
                             type="button"
-                            variant="outline"
-                            disabled={syncMutation.isPending || abortMutation.isPending || !source.enabled || Boolean(activeRunId)}
-                            onClick={() => syncMutation.mutate(source.key)}
+                            variant="ghost"
+                            size="icon-sm"
+                            title="View run history"
+                            onClick={() => onOpenHistory(source.key)}
                           >
-                            <RotateCw className="size-4" />
-                            {syncingSourceKey === source.key
-                              ? recoverableFailure
-                                ? 'Resuming...'
-                                : 'Syncing...'
-                              : recoverableFailure
-                                ? 'Resume ingestion'
-                                : 'Manual sync'}
+                            <Clock className="size-3.5" />
                           </Button>
-                        ) : null}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => onEditSource(source.key)}
-                        >
-                          <PenSquare className="size-4" />
-                          Edit
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => onOpenHistory(source.key)}
-                        >
-                          View full history
-                        </Button>
-                      </div>
-                    </InsetPanel>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   )
-                })
-              ) : (
-                <InsetPanel emphasis="subtle" className="border-dashed px-4 py-8 text-sm text-muted-foreground">
-                  No sources are available for the selected tenant.
-                </InsetPanel>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <InsetPanel emphasis="subtle" className="border-dashed px-4 py-8 text-sm text-muted-foreground">
+            No sources are available for the selected tenant.
+          </InsetPanel>
+        )}
 
-          </>
-        ) : null}
+        {/* Editor sheet — open when editingSourceKey is set */}
+        <Sheet
+          open={editingSource !== null}
+          onOpenChange={(open) => {
+            if (!open) onCloseEditor()
+          }}
+        >
+          <SheetContent
+            showCloseButton={false}
+            className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
+            side="right"
+          >
+            {editingSource ? (
+              <TenantSourceEditorSheetContent
+                tenant={tenant}
+                source={editingSource}
+                isSaving={mutation.isPending}
+                saveState={saveState}
+                onSave={() => mutation.mutate()}
+                onClose={onCloseEditor}
+                onUpdateSource={updateSource}
+                onViewHistory={() => {
+                  onCloseEditor()
+                  onOpenHistory(editingSource.key)
+                }}
+              />
+            ) : null}
+          </SheetContent>
+        </Sheet>
       </section>
     </TooltipProvider>
   )
 }
+
+// ─── Editor sheet content ───────────────────────────────────────────────────
+
+function TenantSourceEditorSheetContent({
+  tenant,
+  source,
+  isSaving,
+  saveState,
+  onSave,
+  onClose,
+  onUpdateSource,
+  onViewHistory,
+}: {
+  tenant: TenantDetail
+  source: TenantIngestionSourceDraft
+  isSaving: boolean
+  saveState: 'idle' | 'saved' | 'error'
+  onSave: () => void
+  onClose: () => void
+  onUpdateSource: (
+    key: string,
+    mutate: (current: TenantIngestionSourceDraft) => TenantIngestionSourceDraft,
+  ) => void
+  onViewHistory: () => void
+}) {
+  return (
+    <>
+      <SheetHeader className="shrink-0 border-b border-border/60 p-5">
+        <div className="flex items-start justify-between gap-3 pr-1">
+          <div>
+            <SheetTitle>Edit {source.displayName}</SheetTitle>
+            <SheetDescription className="mt-1">
+              Update runtime control, scheduling, and credentials for this source.
+            </SheetDescription>
+          </div>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} className="-mr-1 -mt-1 shrink-0">
+            <X className="size-4" />
+          </Button>
+        </div>
+      </SheetHeader>
+
+      <div className="flex-1 overflow-y-auto">
+        {/* Posture summary */}
+        <div className="space-y-3 border-b border-border/60 p-5">
+          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Source posture</p>
+          <div className="divide-y divide-border/50 overflow-hidden rounded-lg border border-border/60">
+            <PostureRow label="Status" value={source.runtime.lastStatus ?? 'Unknown'} />
+            <PostureRow label="Last run" value={formatTimestamp(source.runtime.lastCompletedAt)} />
+            <PostureRow label="Last success" value={formatTimestamp(source.runtime.lastSucceededAt)} />
+          </div>
+          {source.runtime.lastError ? (
+            <p className="text-xs text-destructive">Error: {source.runtime.lastError}</p>
+          ) : null}
+          <Button type="button" variant="outline" size="sm" className="w-full" onClick={onViewHistory}>
+            <Clock className="size-3.5" />
+            View full run history
+          </Button>
+        </div>
+
+        {/* Form */}
+        <div className="space-y-6 p-5">
+          <FormSection title="Runtime control">
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-border/60 px-4 py-3 transition-colors hover:bg-muted/20">
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium">Enable source</p>
+                <p className="text-xs text-muted-foreground">
+                  Included in tenant ingestion schedule and credential validation.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={source.enabled}
+                onChange={(event) => {
+                  onUpdateSource(source.key, (current) => ({
+                    ...current,
+                    enabled: event.target.checked,
+                  }))
+                }}
+              />
+            </label>
+          </FormSection>
+
+          <FormSection title="Connection settings">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FieldBlock
+                label="Display Name"
+                tooltip="The operator-facing name shown for this source throughout the admin UI."
+                control={(
+                  <Input
+                    value={source.displayName}
+                    onChange={(event) => {
+                      onUpdateSource(source.key, (current) => ({
+                        ...current,
+                        displayName: event.target.value,
+                      }))
+                    }}
+                    className="h-10"
+                  />
+                )}
+              />
+              {source.supportsScheduling ? (
+                <FieldBlock
+                  label="Sync Schedule"
+                  tooltip="Cron expression used by the worker for recurring ingestion."
+                  control={(
+                    <Input
+                      value={source.syncSchedule}
+                      onChange={(event) => {
+                        onUpdateSource(source.key, (current) => ({
+                          ...current,
+                          syncSchedule: event.target.value,
+                        }))
+                      }}
+                      className="h-10"
+                    />
+                  )}
+                />
+              ) : (
+                <div className="flex items-center rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                  Schedule is worker-managed for this source.
+                </div>
+              )}
+            </div>
+          </FormSection>
+
+          <FormSection title="Credentials">
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                Uses tenant Entra ID:{' '}
+                <span className="font-medium text-foreground">{tenant.entraTenantId}</span>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FieldBlock
+                  label="Client ID"
+                  tooltip="Application client identifier used to authenticate against the source."
+                  control={(
+                    <Input
+                      value={source.credentials.clientId}
+                      onChange={(event) => {
+                        onUpdateSource(source.key, (current) => ({
+                          ...current,
+                          credentials: { ...current.credentials, clientId: event.target.value },
+                        }))
+                      }}
+                      className="h-10"
+                    />
+                  )}
+                />
+                <FieldBlock
+                  label="API Base URL"
+                  tooltip="Base endpoint used for provider API requests."
+                  control={(
+                    <Input
+                      value={source.credentials.apiBaseUrl}
+                      onChange={(event) => {
+                        onUpdateSource(source.key, (current) => ({
+                          ...current,
+                          credentials: { ...current.credentials, apiBaseUrl: event.target.value },
+                        }))
+                      }}
+                      className="h-10"
+                    />
+                  )}
+                />
+                <FieldBlock
+                  label="Token Scope"
+                  tooltip="OAuth scope requested when acquiring access tokens for this source."
+                  control={(
+                    <Input
+                      value={source.credentials.tokenScope}
+                      onChange={(event) => {
+                        onUpdateSource(source.key, (current) => ({
+                          ...current,
+                          credentials: { ...current.credentials, tokenScope: event.target.value },
+                        }))
+                      }}
+                      className="h-10"
+                    />
+                  )}
+                />
+                <FieldBlock
+                  label="Client Secret"
+                  tooltip="Stored securely after save. Enter a new value only when rotating credentials."
+                  className="sm:col-span-2"
+                  control={(
+                    <Input
+                      type="password"
+                      value={source.credentials.secret}
+                      placeholder={
+                        source.credentials.hasSecret
+                          ? 'Stored in OpenBao — enter a new value to rotate'
+                          : 'Not configured'
+                      }
+                      onChange={(event) => {
+                        onUpdateSource(source.key, (current) => ({
+                          ...current,
+                          credentials: {
+                            ...current.credentials,
+                            secret: event.target.value,
+                            hasSecret:
+                              current.credentials.hasSecret ||
+                              event.target.value.trim().length > 0,
+                          },
+                        }))
+                      }}
+                      className="h-10"
+                    />
+                  )}
+                />
+              </div>
+            </div>
+          </FormSection>
+        </div>
+      </div>
+
+      <SheetFooter className="mt-0 shrink-0 flex-row items-center justify-between gap-3 border-t border-border/60 p-5">
+        <div className="text-xs">
+          {saveState === 'saved' ? (
+            <span className="text-tone-success-foreground">Configuration saved</span>
+          ) : null}
+          {saveState === 'error' ? (
+            <span className="text-destructive">Save failed — review and retry</span>
+          ) : null}
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Close
+          </Button>
+          <Button onClick={onSave} disabled={isSaving}>
+            {isSaving ? 'Saving…' : `Save ${source.displayName}`}
+          </Button>
+        </div>
+      </SheetFooter>
+    </>
+  )
+}
+
+// ─── History full-page view ─────────────────────────────────────────────────
 
 function TenantSourceHistoryPage({
   tenant,
@@ -384,7 +616,7 @@ function TenantSourceHistoryPage({
           <div className="space-y-1">
             <h2 className="text-2xl font-semibold tracking-tight">{`${source.displayName} history`}</h2>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Review ingestion batches, merge progress, and failure posture for this source without squeezing the history into a narrow side panel.
+              Review ingestion batches, merge progress, and failure posture for this source.
             </p>
           </div>
           <Button type="button" variant="outline" onClick={onBack}>
@@ -429,7 +661,6 @@ function TenantSourceHistoryPage({
               ) : null}
             </CardContent>
           </Card>
-
           <Card className="rounded-2xl border-border/70 bg-card/75">
             <CardHeader>
               <h3 className="text-base font-medium">Navigation</h3>
@@ -450,358 +681,28 @@ function TenantSourceHistoryPage({
   )
 }
 
-function TenantSourceEditorPage({
-  tenant,
-  source,
-  isSaving,
-  saveState,
-  onSave,
-  onBack,
-  onUpdateSource,
-}: {
-  tenant: TenantDetail
-  source: TenantIngestionSourceDraft
-  isSaving: boolean
-  saveState: 'idle' | 'saved' | 'error'
-  onSave: () => void
-  onBack: () => void
-  onUpdateSource: (
-    key: string,
-    mutate: (current: TenantIngestionSourceDraft) => TenantIngestionSourceDraft,
-  ) => void
-}) {
+// ─── Shared small components ────────────────────────────────────────────────
+
+function CredentialDot({ label, ok }: { label: string; ok: boolean }) {
   return (
-    <div className="space-y-5">
-      <div className="space-y-3">
-        <Link
-          to="/admin/sources"
-          search={{ activeView: 'tenant' }}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Back to tenant sources
-        </Link>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-semibold tracking-tight">{`Edit ${source.displayName}`}</h2>
-            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Update runtime control, scheduling, and credentials for this ingestion source.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" onClick={onBack}>
-              Cancel
-            </Button>
-            <Button onClick={onSave} disabled={isSaving}>
-              {isSaving ? 'Saving...' : `Save ${source.displayName}`}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card className="rounded-2xl border-border/70 bg-card/85">
-          <CardContent className="space-y-6 p-5">
-              <FormSection title="Runtime control">
-                <InsetPanel className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Enable source</p>
-                    <p className="text-xs text-muted-foreground">
-                      Included in tenant ingestion schedule and credential validation.
-                    </p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={source.enabled}
-                    onChange={(event) => {
-                      onUpdateSource(source.key, (current) => ({
-                        ...current,
-                        enabled: event.target.checked,
-                      }))
-                    }}
-                  />
-                </InsetPanel>
-              </FormSection>
-
-              <FormSection title="Connection settings">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <FieldBlock
-                    label="Display Name"
-                    tooltip="The operator-facing name shown for this source throughout the admin UI."
-                    control={(
-                      <Input
-                        value={source.displayName}
-                        onChange={(event) => {
-                          onUpdateSource(source.key, (current) => ({
-                            ...current,
-                            displayName: event.target.value,
-                          }))
-                        }}
-                        className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)]"
-                      />
-                    )}
-                  />
-                  {source.supportsScheduling ? (
-                    <FieldBlock
-                      label="Sync Schedule"
-                      tooltip="Cron expression used by the worker for recurring ingestion."
-                      control={(
-                        <Input
-                          value={source.syncSchedule}
-                          onChange={(event) => {
-                            onUpdateSource(source.key, (current) => ({
-                              ...current,
-                              syncSchedule: event.target.value,
-                            }))
-                          }}
-                          className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)]"
-                        />
-                      )}
-                    />
-                  ) : (
-                    <InsetPanel emphasis="subtle" className="px-4 py-3 text-sm text-muted-foreground">
-                      This source does not currently support a dedicated schedule.
-                    </InsetPanel>
-                  )}
-                </div>
-              </FormSection>
-
-              <FormSection title="Credentials">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <InsetPanel emphasis="subtle" className="px-4 py-3 text-sm text-muted-foreground md:col-span-2">
-                    This source automatically uses the selected tenant&apos;s Entra tenant ID:{' '}
-                    <span className="font-medium text-foreground">{tenant.entraTenantId}</span>.
-                  </InsetPanel>
-
-                  {source.key === 'entra-applications' && (() => {
-                    const defenderSource = tenant.ingestionSources.find(s => s.key === 'microsoft-defender')
-                    const isLinked = source.credentials.linkedSourceKey === 'microsoft-defender'
-                    return defenderSource ? (
-                      <div className="md:col-span-2">
-                        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3 transition-colors hover:bg-muted/40">
-                          <input
-                            type="checkbox"
-                            checked={isLinked}
-                            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                onUpdateSource(source.key, (current) => ({
-                                  ...current,
-                                  credentials: {
-                                    ...current.credentials,
-                                    linkedSourceKey: 'microsoft-defender',
-                                    clientId: '',
-                                    secret: '',
-                                    apiBaseUrl: 'https://graph.microsoft.com',
-                                    tokenScope: 'https://graph.microsoft.com/.default',
-                                  },
-                                }))
-                              } else {
-                                onUpdateSource(source.key, (current) => ({
-                                  ...current,
-                                  credentials: {
-                                    ...current.credentials,
-                                    linkedSourceKey: null,
-                                    clientId: '',
-                                    secret: '',
-                                  },
-                                }))
-                              }
-                            }}
-                          />
-                          <div className="space-y-0.5">
-                            <p className="text-sm font-medium text-foreground">Re-use Defender app registration</p>
-                            <p className="text-xs text-muted-foreground">
-                              Uses the same identity as Microsoft Defender. The app registration must also have{' '}
-                              <span className="font-mono text-foreground">Application.Read.All</span> permission on Microsoft Graph.
-                            </p>
-                            {isLinked && defenderSource.credentials.clientId ? (
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                Client ID: <span className="font-mono text-foreground">{defenderSource.credentials.clientId}</span>
-                              </p>
-                            ) : null}
-                          </div>
-                        </label>
-                      </div>
-                    ) : null
-                  })()}
-
-                  {source.credentials.linkedSourceKey !== 'microsoft-defender' ? (
-                    <>
-                      <FieldBlock
-                        label="Client ID"
-                        tooltip="Application client identifier used to authenticate against the source."
-                        control={(
-                          <Input
-                            value={source.credentials.clientId}
-                            onChange={(event) => {
-                              onUpdateSource(source.key, (current) => ({
-                                ...current,
-                                credentials: { ...current.credentials, clientId: event.target.value },
-                              }))
-                            }}
-                            className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)]"
-                          />
-                        )}
-                      />
-                      <FieldBlock
-                        label="Client Secret"
-                        tooltip="Stored securely after save. Enter a new value only when rotating credentials."
-                        className="md:col-span-2"
-                        control={(
-                          <Input
-                            type="password"
-                            value={source.credentials.secret}
-                            placeholder={source.credentials.hasSecret ? 'Stored in OpenBao. Enter a new value to rotate.' : 'Not configured'}
-                            onChange={(event) => {
-                              onUpdateSource(source.key, (current) => ({
-                                ...current,
-                                credentials: {
-                                  ...current.credentials,
-                                  secret: event.target.value,
-                                  hasSecret: current.credentials.hasSecret || event.target.value.trim().length > 0,
-                                },
-                              }))
-                            }}
-                            className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)]"
-                          />
-                        )}
-                      />
-                    </>
-                  ) : null}
-
-                  <FieldBlock
-                    label="API Base URL"
-                    tooltip="Base endpoint used for provider API requests."
-                    control={(
-                      <Input
-                        value={source.credentials.apiBaseUrl}
-                        onChange={(event) => {
-                          onUpdateSource(source.key, (current) => ({
-                            ...current,
-                            credentials: { ...current.credentials, apiBaseUrl: event.target.value },
-                          }))
-                        }}
-                        className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)]"
-                      />
-                    )}
-                  />
-                  <FieldBlock
-                    label="Token Scope"
-                    tooltip="OAuth scope requested when acquiring access tokens for this source."
-                    control={(
-                      <Input
-                        value={source.credentials.tokenScope}
-                        onChange={(event) => {
-                          onUpdateSource(source.key, (current) => ({
-                            ...current,
-                            credentials: { ...current.credentials, tokenScope: event.target.value },
-                          }))
-                        }}
-                        className="h-11 rounded-lg border-border/90 bg-[color-mix(in_oklab,var(--background)_82%,black)]"
-                      />
-                    )}
-                  />
-                </div>
-              </FormSection>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          {saveState === 'saved' ? <StatusPanel tone="success" message="Source configuration saved." /> : null}
-          {saveState === 'error' ? <StatusPanel tone="error" message="Saving failed. Review the values and try again." /> : null}
-          <Card className="rounded-2xl border-border/70 bg-card/75">
-            <CardHeader>
-              <h3 className="text-base font-medium">Source posture</h3>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <InsetPanel emphasis="subtle" className="px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Last run</p>
-                <p className="mt-1 font-medium text-foreground">{formatTimestamp(source.runtime.lastCompletedAt)}</p>
-              </InsetPanel>
-              <InsetPanel emphasis="subtle" className="px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Last success</p>
-                <p className="mt-1 font-medium text-foreground">{formatTimestamp(source.runtime.lastSucceededAt)}</p>
-              </InsetPanel>
-              <InsetPanel emphasis="subtle" className="px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Status</p>
-                <p className="mt-1 font-medium text-foreground">{source.runtime.lastStatus ?? 'Unknown'}</p>
-              </InsetPanel>
-              {(source.runtime.activeSnapshotStatus || source.runtime.buildingSnapshotStatus) ? (
-                <InsetPanel emphasis="subtle" className="px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Snapshot state</p>
-                  <div className="mt-1 space-y-1">
-                    {source.runtime.activeSnapshotStatus ? (
-                      <p className="font-medium text-foreground">
-                        Active: {formatSnapshotStatus(source.runtime.activeSnapshotStatus)}
-                      </p>
-                    ) : null}
-                    {source.runtime.buildingSnapshotStatus ? (
-                      <p className="font-medium text-foreground">
-                        Building: {formatSnapshotStatus(source.runtime.buildingSnapshotStatus)}
-                      </p>
-                    ) : null}
-                  </div>
-                </InsetPanel>
-              ) : null}
-              {source.runtime.lastError ? (
-                <InsetPanel className="px-4 py-3 text-sm text-destructive">
-                  Last error: {source.runtime.lastError}
-                </InsetPanel>
-              ) : null}
-            </CardContent>
-          </Card>
-          <Card className="rounded-2xl border-border/70 bg-card/75">
-            <CardHeader>
-              <h3 className="text-base font-medium">Navigation</h3>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Save keeps you on this page so you can review status or continue refining the source settings.
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+    <div className="flex items-center gap-1.5">
+      <span
+        className={cn(
+          'size-1.5 rounded-full',
+          ok ? 'bg-tone-success-foreground' : 'bg-destructive/70',
+        )}
+      />
+      <span className="text-[11px] text-muted-foreground">{label}</span>
     </div>
   )
 }
 
-function StatusPanel({
-  tone,
-  message,
-}: {
-  tone: 'success' | 'error'
-  message: string
-}) {
+function PostureRow({ label, value }: { label: string; value: string }) {
   return (
-    <InsetPanel
-      className={cn(
-        'px-4 py-3 text-sm',
-        tone === 'success' ? 'text-tone-success-foreground' : 'text-destructive',
-      )}
-    >
-      {message}
-    </InsetPanel>
-  )
-}
-
-function StatusPill({
-  children,
-  tone,
-}: {
-  children: string
-  tone: 'success' | 'error'
-}) {
-  return (
-    <span
-      className={cn(
-        'rounded-full border px-3 py-1',
-        tone === 'success'
-          ? 'border-tone-success-border bg-tone-success text-tone-success-foreground'
-          : 'border-destructive/25 bg-destructive/10 text-destructive',
-      )}
-    >
-      {children}
-    </span>
+    <div className="flex items-center justify-between gap-4 px-3 py-2.5">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-xs font-medium text-foreground">{value}</span>
+    </div>
   )
 }
 
@@ -815,128 +716,33 @@ function StatusBadge({
   return (
     <span
       className={cn(
-        'rounded-full border px-3 py-1 text-xs',
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium',
         tone === 'success' && 'border-tone-success-border bg-tone-success text-tone-success-foreground',
         tone === 'warning' && 'border-tone-warning-border bg-tone-warning text-tone-warning-foreground',
         tone === 'error' && 'border-destructive/25 bg-destructive/10 text-destructive',
         tone === 'neutral' && 'border-border/70 bg-background/50 text-muted-foreground',
       )}
     >
+      <span
+        className={cn(
+          'size-1.5 rounded-full',
+          tone === 'success' && 'bg-tone-success-foreground',
+          tone === 'warning' && 'bg-tone-warning-foreground',
+          tone === 'error' && 'bg-destructive',
+          tone === 'neutral' && 'bg-muted-foreground',
+        )}
+      />
       {children}
     </span>
   )
 }
 
-function Metric({
-  label,
-  value,
-  compact = false,
-}: {
-  label: string
-  value: string
-  compact?: boolean
-}) {
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <InsetPanel emphasis="strong" className={cn('px-3 py-2', compact && 'min-h-0')}>
-      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
-    </InsetPanel>
-  )
-}
-
-function describeSourceActivity(source: TenantIngestionSourceDraft) {
-  const latestRun = source.recentRuns[0]
-  const activeSnapshotSummary = source.runtime.activeSnapshotStatus
-    ? `Active snapshot · ${formatSnapshotStatus(source.runtime.activeSnapshotStatus)}`
-    : null
-  const buildingSnapshotSummary = source.runtime.buildingSnapshotStatus
-    ? `Building snapshot · ${formatSnapshotStatus(source.runtime.buildingSnapshotStatus)}`
-    : null
-
-  if (source.runtime.activeIngestionRunId && source.runtime.activePhase) {
-    const runtimeStatus = source.runtime.lastStatus?.toLowerCase()
-    const title =
-      runtimeStatus === 'merging'
-        ? 'Merge in progress'
-        : runtimeStatus === 'mergepending'
-          ? 'Waiting to merge'
-          : 'Ingestion running'
-
-    return {
-      title,
-      description: `Lease active until ${formatTimestamp(source.runtime.leaseExpiresAt)}. Latest checkpoint ${formatTimestamp(source.runtime.activeCheckpointCommittedAt)}.`,
-      metricsSummary:
-        source.runtime.activeStagedVulnerabilityCount !== null &&
-        source.runtime.activePersistedVulnerabilityCount !== null
-          ? `${source.runtime.activePersistedVulnerabilityCount}/${source.runtime.activeStagedVulnerabilityCount} vulnerabilities merged`
-          : latestRun
-            ? `${latestRun.persistedVulnerabilityCount}/${latestRun.stagedVulnerabilityCount} vulnerabilities merged`
-            : null,
-      snapshotSummary: buildingSnapshotSummary ?? activeSnapshotSummary,
-      phase: formatPhase(source.runtime.activePhase),
-      batch:
-        source.runtime.activeBatchNumber !== null
-          ? String(source.runtime.activeBatchNumber)
-          : '—',
-      checkpoint: source.runtime.activeCheckpointStatus ?? 'Running',
-    }
-  }
-
-  const latestRunStatus = latestRun?.status.toLowerCase()
-  if (
-    latestRunStatus === 'failedrecoverable'
-    || latestRunStatus === 'failedterminal'
-    || latestRunStatus === 'failed'
-  ) {
-    return {
-      title:
-        latestRunStatus === 'failedrecoverable'
-          ? 'Recoverable failure'
-          : latestRunStatus === 'failedterminal'
-            ? 'Terminal failure'
-            : 'Last run failed',
-      description:
-        latestRunStatus === 'failedrecoverable'
-          ? 'Staged snapshots are retained for up to 24 hours and can resume from the last committed checkpoint.'
-          : latestRunStatus === 'failedterminal'
-            ? 'This run requires operator action before retrying, but failed staged data will still be discarded after 24 hours.'
-            : 'Failed staged snapshots are retained for up to 24 hours before they are discarded.',
-      metricsSummary: `${latestRun.stagedSoftwareCount} staged software · ${latestRun.persistedSoftwareCount} persisted software`,
-      snapshotSummary: latestRun.snapshotStatus
-        ? `Run snapshot · ${formatSnapshotStatus(latestRun.snapshotStatus)}`
-        : activeSnapshotSummary,
-      phase: formatPhase(latestRun.latestPhase),
-      batch:
-        latestRun.latestBatchNumber !== null ? String(latestRun.latestBatchNumber) : '—',
-      checkpoint: latestRun.latestCheckpointStatus ?? 'Failed',
-    }
-  }
-
-  return {
-    title: 'Idle',
-    description: `Last completed ${formatTimestamp(source.runtime.lastCompletedAt)}.`,
-    metricsSummary: latestRun
-      ? `${latestRun.stagedSoftwareCount} staged software · ${latestRun.persistedSoftwareCount} persisted software`
-      : null,
-    snapshotSummary: buildingSnapshotSummary ?? activeSnapshotSummary,
-    phase: 'Ready',
-    batch: '—',
-    checkpoint: source.runtime.lastStatus || 'Idle',
-  }
-}
-
-function FormSection({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="space-y-5">
-      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{title}</p>
+    <div className="space-y-4">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
       {children}
-      <Separator className="opacity-60" />
+      <Separator className="opacity-50" />
     </div>
   )
 }
@@ -955,10 +761,10 @@ function FieldBlock({
   return (
     <div className={cn('grid content-start gap-2', className)}>
       <div className="flex min-h-5 items-center gap-2">
-        <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
+        <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</span>
         {tooltip ? (
           <Tooltip>
-            <TooltipTrigger className="inline-flex items-center text-muted-foreground/80 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:text-foreground">
+            <TooltipTrigger className="inline-flex items-center text-muted-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:text-foreground">
               <CircleHelp className="size-3.5" />
             </TooltipTrigger>
             <TooltipContent
@@ -975,20 +781,17 @@ function FieldBlock({
   )
 }
 
+// ─── Logic helpers ──────────────────────────────────────────────────────────
+
 function getSourceStatusTone(source: TenantIngestionSourceDraft): 'neutral' | 'success' | 'warning' | 'error' {
-  if (source.runtime.lastError) {
-    return 'error'
-  }
+  if (source.runtime.lastError) return 'error'
 
   const normalizedStatus = source.runtime.lastStatus?.toLowerCase()
   if (normalizedStatus === 'staging' || normalizedStatus === 'mergepending' || normalizedStatus === 'merging') {
     return 'warning'
   }
 
-  if (source.runtime.lastSucceededAt) {
-    return 'success'
-  }
-
+  if (source.runtime.lastSucceededAt) return 'success'
   return 'neutral'
 }
 
@@ -1000,49 +803,13 @@ function isRecoverableFailure(source: TenantIngestionSourceDraft) {
 function mapSourceToDraft(source: TenantIngestionSource): TenantIngestionSourceDraft {
   return {
     ...source,
-    credentials: {
-      ...source.credentials,
-      secret: '',
-      linkedSourceKey: source.credentials.linkedSourceKey ?? null,
-    },
+    credentials: { ...source.credentials, secret: '' },
   }
 }
 
 function formatTimestamp(value: string | null) {
-  if (!value) {
-    return 'Never'
-  }
-
+  if (!value) return 'Never'
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return new Intl.DateTimeFormat('en', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
-}
-
-function formatPhase(value: string | null | undefined) {
-  if (!value) {
-    return '—'
-  }
-
-  return value
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-}
-
-function formatSnapshotStatus(value: string | null | undefined) {
-  if (!value) {
-    return '—'
-  }
-
-  return value
-    .split(/(?=[A-Z])|-/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
