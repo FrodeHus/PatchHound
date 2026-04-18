@@ -10,7 +10,7 @@ import {
   DatabaseZap,
   GitBranchPlus,
   Landmark,
-  Shield,
+  type Shield,
   Tags,
   Trash2,
   Workflow,
@@ -68,8 +68,6 @@ export function TenantAdministrationDetail({
   onTabChange,
   onSearchChange,
 }: TenantAdministrationDetailProps) {
-  const router = useRouter()
-
   return (
     <TooltipProvider>
       <section className="space-y-4 pb-4">

@@ -8,7 +8,6 @@ import { formatDate, startCase } from '@/lib/formatting'
 import { toneBadge } from '@/lib/tone-classes'
 import { OpenEpisodeSparkline } from './OpenEpisodeSparkline'
 import {
-  approvalStatusLabel,
   approvalStatusTone,
   outcomeLabel,
   outcomeTone,

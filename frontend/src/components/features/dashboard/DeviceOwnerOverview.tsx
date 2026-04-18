@@ -250,11 +250,10 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                       key={`cloudapp-${app.cloudApplicationId}`}
                       type="button"
                       onClick={() =>
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        navigate({
-                          to: "/assets/applications/$id",
+                        void navigate({
+                          to: '/assets/applications/$id' as never,
                           params: { id: app.cloudApplicationId },
-                        } as any)
+                        })
                       }
                       className={`w-full text-left rounded-[1.2rem] border px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isOverdue ? "border-destructive/30 bg-destructive/5" : "border-amber-500/30 bg-amber-500/5"}`}
                     >

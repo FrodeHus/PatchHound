@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import type { ColumnDef } from '@tanstack/react-table'
-import { z } from 'zod'
+import { type z } from 'zod'
 
 const applicationsSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
@@ -220,8 +220,7 @@ function ApplicationsPage() {
         columns={columns}
         data={items}
         getRowId={(row) => row.id}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        onRowClick={(row) => navigate({ to: '/assets/applications/$id', params: { id: row.id } } as any)}
+        onRowClick={(row) => void navigate({ to: '/assets/applications/$id' as never, params: { id: row.id } })}
         emptyState={
           <div className="py-12 text-center text-sm text-muted-foreground">
             {activeFilter

@@ -154,7 +154,7 @@ function AdvancedToolsPage() {
     ? null
     : 'No enabled default AI profile is configured for this tenant.'
 
-  const tools = toolsQuery.data?.tools ?? []
+  const tools = useMemo(() => toolsQuery.data?.tools ?? [], [toolsQuery.data?.tools])
   const parameters = toolsQuery.data?.availableParameters ?? []
   const selectedTool = useMemo(
     () => tools.find((tool) => tool.id === search.toolId) ?? null,
