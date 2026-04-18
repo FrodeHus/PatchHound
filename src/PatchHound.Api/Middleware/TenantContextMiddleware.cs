@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Services;
 using PatchHound.Core.Interfaces;
@@ -24,6 +25,26 @@ public class TenantContextMiddleware
                 var dbContext = context.RequestServices.GetRequiredService<PatchHoundDbContext>();
                 var teamMembershipRuleService = context.RequestServices.GetRequiredService<PatchHound.Infrastructure.Services.TeamMembershipRuleService>();
                 await tc.InitializeAsync(context, dbContext, teamMembershipRuleService);
+
+                var requestedTenantIdHeader = context.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+                if (Guid.TryParse(requestedTenantIdHeader, out var requestedTenantId))
+                {
+                    var isPendingDeletion = await dbContext.Tenants
+                        .IgnoreQueryFilters()
+                        .Where(t => t.Id == requestedTenantId && t.IsPendingDeletion)
+                        .AnyAsync(context.RequestAborted);
+
+                    if (isPendingDeletion)
+                    {
+                        context.Response.StatusCode = 410;
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsync(
+                            """{"errorCode":"tenant_pending_deletion"}""",
+                            context.RequestAborted
+                        );
+                        return;
+                    }
+                }
             }
         }
 
