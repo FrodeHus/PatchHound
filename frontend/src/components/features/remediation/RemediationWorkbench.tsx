@@ -418,35 +418,6 @@ export function RemediationWorkbench({
   );
 }
 
-function Metric({
-  label,
-  value,
-  active = false,
-  onClick,
-}: {
-  label: string
-  value: string
-  active?: boolean
-  onClick?: () => void
-}) {
-  const content = (
-    <div className={`rounded-2xl border px-4 py-3 transition ${active ? 'border-primary/40 bg-primary/10' : 'border-border/70 bg-background/70'}`}>
-      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-[-0.03em]">{value}</p>
-    </div>
-  )
-
-  if (!onClick) {
-    return content
-  }
-
-  return (
-    <button type="button" onClick={onClick} className="text-left">
-      {content}
-    </button>
-  )
-}
-
 function LabeledFilter({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="space-y-2">
