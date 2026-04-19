@@ -50,7 +50,7 @@ public class NvdFeedSyncService(
         var checkpoint = await db.NvdFeedCheckpoints.FirstOrDefaultAsync(c => c.FeedName == feedName, ct);
 
         var lastModStart = checkpoint?.FeedLastModified.AddMinutes(-15)
-            ?? DateTimeOffset.UtcNow.AddHours(-2);
+            ?? DateTimeOffset.UtcNow.AddHours(-13);
         var lastModEnd = DateTimeOffset.UtcNow;
 
         var apiKey = await GetApiKeyAsync(ct);
