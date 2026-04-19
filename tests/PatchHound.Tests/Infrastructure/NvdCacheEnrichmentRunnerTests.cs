@@ -58,6 +58,7 @@ public class NvdCacheEnrichmentRunnerTests
         var dbApps = await db.VulnerabilityApplicabilities.ToListAsync();
         dbApps.Should().ContainSingle(a =>
             a.CpeCriteria == "cpe:2.3:a:acme:widget:1.0:*:*:*:*:*:*:*:*");
+        dbApps.Single().SoftwareProductId.Should().BeNull("no alias exists for this CPE in the test data");
     }
 
     [Fact]
