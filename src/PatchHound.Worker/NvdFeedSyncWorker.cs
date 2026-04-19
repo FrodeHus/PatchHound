@@ -29,13 +29,12 @@ public class NvdFeedSyncWorker(
             "NvdFeedSyncWorker: starting initial sync for years {From}-{To} + modified",
             currentYear - 4, currentYear);
 
-        using var scope = scopeFactory.CreateScope();
-        var service = scope.ServiceProvider.GetRequiredService<NvdFeedSyncService>();
-
         for (var year = currentYear - 4; year <= currentYear; year++)
         {
             try
             {
+                using var scope = scopeFactory.CreateScope();
+                var service = scope.ServiceProvider.GetRequiredService<NvdFeedSyncService>();
                 await service.SyncYearFeedAsync(year, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -46,6 +45,8 @@ public class NvdFeedSyncWorker(
 
         try
         {
+            using var scope = scopeFactory.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<NvdFeedSyncService>();
             await service.SyncModifiedFeedAsync(ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
