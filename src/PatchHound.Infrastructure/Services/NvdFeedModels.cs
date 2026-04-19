@@ -2,55 +2,52 @@ using System.Text.Json.Serialization;
 
 namespace PatchHound.Infrastructure.Services;
 
-internal class NvdFeedResponse
+internal class NvdApiResponse
 {
-    [JsonPropertyName("CVE_Items")]
-    public List<NvdFeedItem> Items { get; set; } = [];
+    [JsonPropertyName("resultsPerPage")]
+    public int ResultsPerPage { get; set; }
+
+    [JsonPropertyName("startIndex")]
+    public int StartIndex { get; set; }
+
+    [JsonPropertyName("totalResults")]
+    public int TotalResults { get; set; }
+
+    [JsonPropertyName("vulnerabilities")]
+    public List<NvdApiVulnerabilityItem> Vulnerabilities { get; set; } = [];
 }
 
-internal class NvdFeedItem
+internal class NvdApiVulnerabilityItem
 {
     [JsonPropertyName("cve")]
-    public NvdFeedCveSection? Cve { get; set; }
-
-    [JsonPropertyName("configurations")]
-    public NvdFeedConfigurations? Configurations { get; set; }
-
-    [JsonPropertyName("impact")]
-    public NvdFeedImpact? Impact { get; set; }
-
-    [JsonPropertyName("publishedDate")]
-    public string? PublishedDate { get; set; }
-
-    [JsonPropertyName("lastModifiedDate")]
-    public string? LastModifiedDate { get; set; }
+    public NvdApiCve? Cve { get; set; }
 }
 
-internal class NvdFeedCveSection
+internal class NvdApiCve
 {
-    [JsonPropertyName("CVE_data_meta")]
-    public NvdFeedMeta? Meta { get; set; }
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
 
-    [JsonPropertyName("description")]
-    public NvdFeedDescriptionWrapper? Description { get; set; }
+    [JsonPropertyName("published")]
+    public string? Published { get; set; }
+
+    [JsonPropertyName("lastModified")]
+    public string? LastModified { get; set; }
+
+    [JsonPropertyName("descriptions")]
+    public List<NvdApiDescription> Descriptions { get; set; } = [];
+
+    [JsonPropertyName("metrics")]
+    public NvdApiMetrics? Metrics { get; set; }
 
     [JsonPropertyName("references")]
-    public NvdFeedReferencesWrapper? References { get; set; }
+    public List<NvdApiReference> References { get; set; } = [];
+
+    [JsonPropertyName("configurations")]
+    public List<NvdApiConfiguration> Configurations { get; set; } = [];
 }
 
-internal class NvdFeedMeta
-{
-    [JsonPropertyName("ID")]
-    public string Id { get; set; } = string.Empty;
-}
-
-internal class NvdFeedDescriptionWrapper
-{
-    [JsonPropertyName("description_data")]
-    public List<NvdFeedDescriptionItem> Data { get; set; } = [];
-}
-
-internal class NvdFeedDescriptionItem
+internal class NvdApiDescription
 {
     [JsonPropertyName("lang")]
     public string Lang { get; set; } = string.Empty;
@@ -59,46 +56,67 @@ internal class NvdFeedDescriptionItem
     public string Value { get; set; } = string.Empty;
 }
 
-internal class NvdFeedReferencesWrapper
+internal class NvdApiMetrics
 {
-    [JsonPropertyName("reference_data")]
-    public List<NvdFeedReferenceItem> Data { get; set; } = [];
+    [JsonPropertyName("cvssMetricV31")]
+    public List<NvdApiCvssMetric> CvssMetricV31 { get; set; } = [];
+
+    [JsonPropertyName("cvssMetricV30")]
+    public List<NvdApiCvssMetric> CvssMetricV30 { get; set; } = [];
 }
 
-internal class NvdFeedReferenceItem
+internal class NvdApiCvssMetric
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("cvssData")]
+    public NvdApiCvssData? CvssData { get; set; }
+}
+
+internal class NvdApiCvssData
+{
+    [JsonPropertyName("baseScore")]
+    public decimal BaseScore { get; set; }
+
+    [JsonPropertyName("vectorString")]
+    public string? VectorString { get; set; }
+}
+
+internal class NvdApiReference
 {
     [JsonPropertyName("url")]
     public string Url { get; set; } = string.Empty;
 
-    [JsonPropertyName("refsource")]
-    public string RefSource { get; set; } = string.Empty;
+    [JsonPropertyName("source")]
+    public string Source { get; set; } = string.Empty;
 
     [JsonPropertyName("tags")]
     public List<string> Tags { get; set; } = [];
 }
 
-internal class NvdFeedConfigurations
+internal class NvdApiConfiguration
 {
     [JsonPropertyName("nodes")]
-    public List<NvdFeedNode> Nodes { get; set; } = [];
+    public List<NvdApiNode> Nodes { get; set; } = [];
 }
 
-internal class NvdFeedNode
+internal class NvdApiNode
 {
-    [JsonPropertyName("cpe_match")]
-    public List<NvdFeedCpeMatch> CpeMatch { get; set; } = [];
+    [JsonPropertyName("cpeMatch")]
+    public List<NvdApiCpeMatch> CpeMatch { get; set; } = [];
 
-    [JsonPropertyName("children")]
-    public List<NvdFeedNode> Children { get; set; } = [];
+    [JsonPropertyName("nodes")]
+    public List<NvdApiNode> Children { get; set; } = [];
 }
 
-internal class NvdFeedCpeMatch
+internal class NvdApiCpeMatch
 {
     [JsonPropertyName("vulnerable")]
     public bool Vulnerable { get; set; }
 
-    [JsonPropertyName("cpe23Uri")]
-    public string Cpe23Uri { get; set; } = string.Empty;
+    [JsonPropertyName("criteria")]
+    public string Criteria { get; set; } = string.Empty;
 
     [JsonPropertyName("versionStartIncluding")]
     public string? VersionStartIncluding { get; set; }
@@ -111,25 +129,4 @@ internal class NvdFeedCpeMatch
 
     [JsonPropertyName("versionEndExcluding")]
     public string? VersionEndExcluding { get; set; }
-}
-
-internal class NvdFeedImpact
-{
-    [JsonPropertyName("baseMetricV3")]
-    public NvdFeedBaseMetricV3? BaseMetricV3 { get; set; }
-}
-
-internal class NvdFeedBaseMetricV3
-{
-    [JsonPropertyName("cvssV3")]
-    public NvdFeedCvssV3? CvssV3 { get; set; }
-}
-
-internal class NvdFeedCvssV3
-{
-    [JsonPropertyName("baseScore")]
-    public decimal BaseScore { get; set; }
-
-    [JsonPropertyName("vectorString")]
-    public string? VectorString { get; set; }
 }

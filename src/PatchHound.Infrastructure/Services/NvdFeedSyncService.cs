@@ -1,76 +1,114 @@
-using System.IO.Compression;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Secrets;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Infrastructure.Services;
 
 public class NvdFeedSyncService(
     HttpClient httpClient,
     PatchHoundDbContext db,
+    ISecretStore secretStore,
     ILogger<NvdFeedSyncService> logger)
 {
-    private const string FeedBaseUrl = "https://nvd.nist.gov/feeds/json/cve/1.1";
+    private const string ApiUrl = "https://services.nvd.nist.gov/rest/json/cves/2.0";
+    private const int PageSize = 2000;
+    private static readonly TimeSpan ApiKeyDelay = TimeSpan.FromMilliseconds(700);
+    private static readonly TimeSpan NoKeyDelay = TimeSpan.FromSeconds(7);
 
-    public Task SyncYearFeedAsync(int year, CancellationToken ct) =>
-        SyncFeedAsync(
-            feedName: year.ToString(),
-            feedUrl: $"{FeedBaseUrl}/nvdcve-1.1-{year}.json.gz",
-            ct);
-
-    public Task SyncModifiedFeedAsync(CancellationToken ct) =>
-        SyncFeedAsync(
-            feedName: "modified",
-            feedUrl: $"{FeedBaseUrl}/nvdcve-1.1-modified.json.gz",
-            ct);
-
-    private async Task SyncFeedAsync(string feedName, string feedUrl, CancellationToken ct)
+    public async Task SyncYearFeedAsync(int year, CancellationToken ct)
     {
-        var metaUrl = feedUrl.Replace(".json.gz", ".meta", StringComparison.OrdinalIgnoreCase);
-        var metaText = await httpClient.GetStringAsync(metaUrl, ct);
-        var feedLastModified = ParseMetaLastModified(metaText);
-
-        var checkpoint = await db.NvdFeedCheckpoints
-            .FirstOrDefaultAsync(c => c.FeedName == feedName, ct);
-
-        if (checkpoint is not null && checkpoint.FeedLastModified >= feedLastModified)
+        var feedName = year.ToString();
+        var checkpoint = await db.NvdFeedCheckpoints.FirstOrDefaultAsync(c => c.FeedName == feedName, ct);
+        if (checkpoint is not null)
         {
-            logger.LogDebug("NVD feed {FeedName} is up to date (last modified {LastModified})",
-                feedName, feedLastModified);
+            logger.LogDebug("NVD year feed {Year} already synced at {SyncedAt}, skipping.", year, checkpoint.SyncedAt);
             return;
         }
 
-        logger.LogInformation("Downloading NVD feed {FeedName} from {Url}", feedName, feedUrl);
+        var apiKey = await GetApiKeyAsync(ct);
+        logger.LogInformation("NVD: starting initial sync for year {Year}", year);
 
-        await using var responseStream = await httpClient.GetStreamAsync(feedUrl, ct);
-        await using var gz = new GZipStream(responseStream, CompressionMode.Decompress);
+        var startDate = new DateTimeOffset(year, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var endDate = new DateTimeOffset(year, 12, 31, 23, 59, 59, TimeSpan.Zero);
 
-        var feed = await JsonSerializer.DeserializeAsync<NvdFeedResponse>(gz,
-            cancellationToken: ct);
+        var count = await FetchAndUpsertAsync(
+            startIndex => $"{ApiUrl}?pubStartDate={FormatDate(startDate)}&pubEndDate={FormatDate(endDate)}&startIndex={startIndex}&resultsPerPage={PageSize}",
+            apiKey, ct);
 
-        if (feed is null)
-        {
-            logger.LogWarning("NVD feed {FeedName} returned null after deserialization", feedName);
-            return;
-        }
-
-        var upsertCount = await UpsertItemsAsync(feed.Items, ct);
-
-        if (checkpoint is null)
-            db.NvdFeedCheckpoints.Add(NvdFeedCheckpoint.Create(feedName, feedLastModified));
-        else
-            checkpoint.Update(feedLastModified);
-
+        db.NvdFeedCheckpoints.Add(NvdFeedCheckpoint.Create(feedName, DateTimeOffset.UtcNow));
         await db.SaveChangesAsync(ct);
-        logger.LogInformation("NVD feed {FeedName}: upserted {Count} CVEs", feedName, upsertCount);
+        logger.LogInformation("NVD year feed {Year}: upserted {Count} CVEs", year, count);
     }
 
-    private async Task<int> UpsertItemsAsync(List<NvdFeedItem> items, CancellationToken ct)
+    public async Task SyncModifiedFeedAsync(CancellationToken ct)
+    {
+        const string feedName = "modified";
+        var checkpoint = await db.NvdFeedCheckpoints.FirstOrDefaultAsync(c => c.FeedName == feedName, ct);
+
+        var lastModStart = checkpoint?.FeedLastModified.AddMinutes(-15)
+            ?? DateTimeOffset.UtcNow.AddHours(-2);
+        var lastModEnd = DateTimeOffset.UtcNow;
+
+        var apiKey = await GetApiKeyAsync(ct);
+
+        var count = await FetchAndUpsertAsync(
+            startIndex => $"{ApiUrl}?lastModStartDate={FormatDate(lastModStart)}&lastModEndDate={FormatDate(lastModEnd)}&startIndex={startIndex}&resultsPerPage={PageSize}",
+            apiKey, ct);
+
+        if (checkpoint is null)
+            db.NvdFeedCheckpoints.Add(NvdFeedCheckpoint.Create(feedName, lastModEnd));
+        else
+            checkpoint.Update(lastModEnd);
+
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("NVD modified feed: upserted {Count} CVEs (window: {Start} to {End})",
+            count, lastModStart, lastModEnd);
+    }
+
+    private async Task<int> FetchAndUpsertAsync(Func<int, string> urlBuilder, string? apiKey, CancellationToken ct)
+    {
+        var delay = apiKey is not null ? ApiKeyDelay : NoKeyDelay;
+        var totalCount = 0;
+        var startIndex = 0;
+
+        while (true)
+        {
+            var url = urlBuilder(startIndex);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            if (apiKey is not null)
+                request.Headers.Add("apiKey", apiKey);
+
+            var response = await httpClient.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
+
+            var page = await JsonSerializer.DeserializeAsync<NvdApiResponse>(
+                await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+
+            if (page is null || page.Vulnerabilities.Count == 0)
+                break;
+
+            totalCount += await UpsertItemsAsync(page.Vulnerabilities, ct);
+            await db.SaveChangesAsync(ct);
+            db.ChangeTracker.Clear();
+
+            if (startIndex + page.ResultsPerPage >= page.TotalResults)
+                break;
+
+            startIndex += page.ResultsPerPage;
+            await Task.Delay(delay, ct);
+        }
+
+        return totalCount;
+    }
+
+    private async Task<int> UpsertItemsAsync(List<NvdApiVulnerabilityItem> items, CancellationToken ct)
     {
         var cveIds = items
-            .Select(i => i.Cve?.Meta?.Id)
+            .Select(i => i.Cve?.Id)
             .Where(id => !string.IsNullOrEmpty(id))
             .Cast<string>()
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -82,93 +120,104 @@ public class NvdFeedSyncService(
         var count = 0;
         foreach (var item in items)
         {
-            var cveId = item.Cve?.Meta?.Id;
+            var cveId = item.Cve?.Id;
             if (string.IsNullOrEmpty(cveId)) continue;
 
-            var (description, cvssScore, cvssVector, publishedDate, feedLastMod,
-                refsJson, configsJson) = ExtractCveData(item);
+            var (description, cvssScore, cvssVector, publishedDate, lastMod, refsJson, configsJson) = ExtractCveData(item);
 
             if (string.IsNullOrWhiteSpace(description))
             {
-                logger.LogDebug("Skipping CVE {CveId} — no English description in feed item.", cveId);
+                logger.LogDebug("Skipping {CveId} — no English description.", cveId);
                 continue;
             }
 
             if (existing.TryGetValue(cveId, out var cached))
-                cached.Update(description, cvssScore, cvssVector, publishedDate,
-                    feedLastMod, refsJson, configsJson);
+                cached.Update(description, cvssScore, cvssVector, publishedDate, lastMod, refsJson, configsJson);
             else
                 db.NvdCveCache.Add(NvdCveCache.Create(cveId, description, cvssScore,
-                    cvssVector, publishedDate, feedLastMod, refsJson, configsJson));
-
+                    cvssVector, publishedDate, lastMod, refsJson, configsJson));
             count++;
         }
-
         return count;
     }
 
     private static (string? Description, decimal? CvssScore, string? CvssVector,
-        DateTimeOffset? PublishedDate, DateTimeOffset FeedLastModified,
-        string RefsJson, string ConfigsJson) ExtractCveData(NvdFeedItem item)
+        DateTimeOffset? PublishedDate, DateTimeOffset LastModified,
+        string RefsJson, string ConfigsJson) ExtractCveData(NvdApiVulnerabilityItem item)
     {
-        var description = item.Cve?.Description?.Data
+        var cve = item.Cve!;
+
+        var description = cve.Descriptions
             .FirstOrDefault(d => string.Equals(d.Lang, "en", StringComparison.OrdinalIgnoreCase))
             ?.Value;
 
-        var cvssV3 = item.Impact?.BaseMetricV3?.CvssV3;
-        decimal? cvssScore = cvssV3?.BaseScore;
-        string? cvssVector = cvssV3?.VectorString;
+        // Prefer CVSSv3.1 Primary, fall back to v3.0
+        var cvssMetric = cve.Metrics?.CvssMetricV31
+            .FirstOrDefault(m => string.Equals(m.Type, "Primary", StringComparison.OrdinalIgnoreCase))
+            ?? cve.Metrics?.CvssMetricV31.FirstOrDefault()
+            ?? cve.Metrics?.CvssMetricV30
+                .FirstOrDefault(m => string.Equals(m.Type, "Primary", StringComparison.OrdinalIgnoreCase))
+            ?? cve.Metrics?.CvssMetricV30.FirstOrDefault();
+
+        decimal? cvssScore = cvssMetric?.CvssData?.BaseScore;
+        string? cvssVector = cvssMetric?.CvssData?.VectorString;
 
         DateTimeOffset? publishedDate = null;
-        if (!string.IsNullOrEmpty(item.PublishedDate) &&
-            DateTimeOffset.TryParse(item.PublishedDate, out var pd))
+        if (!string.IsNullOrEmpty(cve.Published) && DateTimeOffset.TryParse(cve.Published, out var pd))
             publishedDate = pd;
 
-        var feedLastMod = DateTimeOffset.MinValue;
-        if (!string.IsNullOrEmpty(item.LastModifiedDate) &&
-            DateTimeOffset.TryParse(item.LastModifiedDate, out var lm))
-            feedLastMod = lm;
+        var lastMod = DateTimeOffset.MinValue;
+        if (!string.IsNullOrEmpty(cve.LastModified) && DateTimeOffset.TryParse(cve.LastModified, out var lm))
+            lastMod = lm;
 
-        var refs = (item.Cve?.References?.Data ?? [])
+        var refs = cve.References
             .Where(r => !string.IsNullOrWhiteSpace(r.Url))
-            .Select(r => new NvdCachedReference(r.Url, r.RefSource, r.Tags))
+            .Select(r => new NvdCachedReference(r.Url, r.Source, r.Tags))
             .ToList();
 
-        var configs = FlattenNodes(item.Configurations?.Nodes ?? [])
-            .Where(m => !string.IsNullOrWhiteSpace(m.Cpe23Uri))
-            .Select(m => new NvdCachedCpeMatch(m.Vulnerable, m.Cpe23Uri,
+        var configs = cve.Configurations
+            .SelectMany(c => FlattenNodes(c.Nodes))
+            .Where(m => !string.IsNullOrWhiteSpace(m.Criteria))
+            .Select(m => new NvdCachedCpeMatch(m.Vulnerable, m.Criteria,
                 m.VersionStartIncluding, m.VersionStartExcluding,
                 m.VersionEndIncluding, m.VersionEndExcluding))
             .ToList();
 
-        var refsJson = JsonSerializer.Serialize(refs);
-        var configsJson = JsonSerializer.Serialize(configs);
-
-        return (description, cvssScore, cvssVector, publishedDate, feedLastMod, refsJson, configsJson);
+        return (description, cvssScore, cvssVector, publishedDate, lastMod,
+            JsonSerializer.Serialize(refs), JsonSerializer.Serialize(configs));
     }
 
-    private static IEnumerable<NvdFeedCpeMatch> FlattenNodes(List<NvdFeedNode> nodes)
+    private static IEnumerable<NvdApiCpeMatch> FlattenNodes(List<NvdApiNode> nodes)
     {
         foreach (var node in nodes)
         {
-            foreach (var match in node.CpeMatch)
-                yield return match;
-            foreach (var match in FlattenNodes(node.Children))
-                yield return match;
+            foreach (var match in node.CpeMatch) yield return match;
+            foreach (var match in FlattenNodes(node.Children)) yield return match;
         }
     }
 
-    internal static DateTimeOffset ParseMetaLastModified(string metaText)
+    private async Task<string?> GetApiKeyAsync(CancellationToken ct)
     {
-        foreach (var line in metaText.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        try
         {
-            var trimmed = line.Trim();
-            if (!trimmed.StartsWith("lastModifiedDate:", StringComparison.OrdinalIgnoreCase))
-                continue;
-            var value = trimmed["lastModifiedDate:".Length..].Trim();
-            if (DateTimeOffset.TryParse(value, out var result))
-                return result.ToUniversalTime();
+            var source = await db.EnrichmentSourceConfigurations
+                .FirstOrDefaultAsync(s => s.SourceKey == EnrichmentSourceCatalog.NvdSourceKey, ct);
+
+            if (source is null || string.IsNullOrWhiteSpace(source.SecretRef))
+            {
+                logger.LogDebug("NVD source has no SecretRef configured; proceeding without API key.");
+                return null;
+            }
+
+            return await secretStore.GetSecretAsync(source.SecretRef, "apiKey", ct);
         }
-        return DateTimeOffset.MinValue;
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not resolve NVD API key; proceeding without key (rate limits apply).");
+            return null;
+        }
     }
+
+    private static string FormatDate(DateTimeOffset date) =>
+        date.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff");
 }

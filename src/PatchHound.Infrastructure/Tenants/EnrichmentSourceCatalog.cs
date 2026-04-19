@@ -8,7 +8,7 @@ public static class EnrichmentSourceCatalog
     public const string DefenderSourceKey = TenantSourceCatalog.DefenderSourceKey;
     public const string EndOfLifeSourceKey = "endoflife";
     public const string SupplyChainSourceKey = "supply-chain";
-    public const string DefaultNvdFeedBaseUrl = "https://nvd.nist.gov/feeds/json/cve/1.1";
+    public const string DefaultNvdApiBaseUrl = "https://services.nvd.nist.gov/rest/json/cves/2.0";
     public const string DefaultEndOfLifeApiBaseUrl = "https://endoflife.date";
     public const int DefaultDefenderRefreshTtlHours = 24;
     public const int DefaultSupplyChainRefreshTtlHours = 24;
@@ -33,9 +33,9 @@ public static class EnrichmentSourceCatalog
     {
         return EnrichmentSourceConfiguration.Create(
             NvdSourceKey,
-            "NVD (Feed Sync)",
+            "NVD API",
             false,
-            apiBaseUrl: DefaultNvdFeedBaseUrl
+            apiBaseUrl: DefaultNvdApiBaseUrl
         );
     }
 
