@@ -95,6 +95,40 @@ public class NvdFeedSyncServiceTests
 
         handler.FeedRequested.Should().BeFalse("feed should be skipped when checkpoint is current");
         (await db.NvdCveCache.CountAsync()).Should().Be(0);
+
+        var checkpoint = await db.NvdFeedCheckpoints.SingleAsync();
+        checkpoint.FeedLastModified.Should().Be(existingModified, "checkpoint should not be updated when feed is current");
+    }
+
+    [Fact]
+    public async Task SyncFeedAsync_skips_cve_with_no_english_description()
+    {
+        await using var db = await TestDbContextFactory.CreateAsync();
+        var feedJson = $$$"""
+            {
+              "CVE_Items": [{
+                "cve": {
+                  "CVE_data_meta": {"ID": "CVE-2024-9000"},
+                  "description": {"description_data": [{"lang": "es","value": "descripción en español"}]},
+                  "references": {"reference_data": []}
+                },
+                "configurations": {"nodes": []},
+                "impact": {},
+                "publishedDate": "2024-01-01T00:00Z",
+                "lastModifiedDate": "2024-01-10T00:00Z"
+              }]
+            }
+            """;
+        var metaContent = "lastModifiedDate:2024-01-10T00:00:00-04:00\nsha256:abc123";
+        var handler = new FakeFeedHttpHandler(feedJson, metaContent);
+        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://nvd.nist.gov") };
+        var service = new NvdFeedSyncService(httpClient, db,
+            NullLogger<NvdFeedSyncService>.Instance);
+
+        await service.SyncYearFeedAsync(2024, CancellationToken.None);
+
+        (await db.NvdCveCache.CountAsync()).Should().Be(0, "CVEs without English descriptions should be skipped");
+        (await db.NvdFeedCheckpoints.CountAsync()).Should().Be(1, "checkpoint should still be created");
     }
 
     private static string BuildFeedJson(

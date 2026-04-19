@@ -88,6 +88,12 @@ public class NvdFeedSyncService(
             var (description, cvssScore, cvssVector, publishedDate, feedLastMod,
                 refsJson, configsJson) = ExtractCveData(item);
 
+            if (string.IsNullOrWhiteSpace(description))
+            {
+                logger.LogDebug("Skipping CVE {CveId} — no English description in feed item.", cveId);
+                continue;
+            }
+
             if (existing.TryGetValue(cveId, out var cached))
                 cached.Update(description, cvssScore, cvssVector, publishedDate,
                     feedLastMod, refsJson, configsJson);
@@ -101,13 +107,13 @@ public class NvdFeedSyncService(
         return count;
     }
 
-    private static (string Description, decimal? CvssScore, string? CvssVector,
+    private static (string? Description, decimal? CvssScore, string? CvssVector,
         DateTimeOffset? PublishedDate, DateTimeOffset FeedLastModified,
         string RefsJson, string ConfigsJson) ExtractCveData(NvdFeedItem item)
     {
         var description = item.Cve?.Description?.Data
             .FirstOrDefault(d => string.Equals(d.Lang, "en", StringComparison.OrdinalIgnoreCase))
-            ?.Value ?? string.Empty;
+            ?.Value;
 
         var cvssV3 = item.Impact?.BaseMetricV3?.CvssV3;
         decimal? cvssScore = cvssV3?.BaseScore;
@@ -118,7 +124,7 @@ public class NvdFeedSyncService(
             DateTimeOffset.TryParse(item.PublishedDate, out var pd))
             publishedDate = pd;
 
-        var feedLastMod = DateTimeOffset.UtcNow;
+        var feedLastMod = DateTimeOffset.MinValue;
         if (!string.IsNullOrEmpty(item.LastModifiedDate) &&
             DateTimeOffset.TryParse(item.LastModifiedDate, out var lm))
             feedLastMod = lm;
