@@ -352,13 +352,4 @@ public class VulnerabilitiesControllerTests : IDisposable
     }
 
     public void Dispose() => _dbContext.Dispose();
-
-    private sealed class StubNvdApiClient(NvdCveResponse response) : NvdApiClient(new HttpClient())
-    {
-        public override Task<NvdCveResponse> GetCveAsync(
-            NvdClientConfiguration configuration,
-            string cveId,
-            CancellationToken ct
-        ) => Task.FromResult(response);
-    }
 }
