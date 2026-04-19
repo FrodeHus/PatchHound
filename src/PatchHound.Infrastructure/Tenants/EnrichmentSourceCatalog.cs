@@ -8,7 +8,7 @@ public static class EnrichmentSourceCatalog
     public const string DefenderSourceKey = TenantSourceCatalog.DefenderSourceKey;
     public const string EndOfLifeSourceKey = "endoflife";
     public const string SupplyChainSourceKey = "supply-chain";
-    public const string DefaultNvdApiBaseUrl = "https://services.nvd.nist.gov";
+    public const string DefaultNvdFeedBaseUrl = "https://nvd.nist.gov/feeds/json/cve/1.1";
     public const string DefaultEndOfLifeApiBaseUrl = "https://endoflife.date";
     public const int DefaultDefenderRefreshTtlHours = 24;
     public const int DefaultSupplyChainRefreshTtlHours = 24;
@@ -33,9 +33,9 @@ public static class EnrichmentSourceCatalog
     {
         return EnrichmentSourceConfiguration.Create(
             NvdSourceKey,
-            "NVD API",
+            "NVD (Feed Sync)",
             false,
-            apiBaseUrl: DefaultNvdApiBaseUrl
+            apiBaseUrl: DefaultNvdFeedBaseUrl
         );
     }
 
@@ -64,6 +64,7 @@ public static class EnrichmentSourceCatalog
     {
         if (
             string.Equals(source.SourceKey, DefenderSourceKey, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(source.SourceKey, NvdSourceKey, StringComparison.OrdinalIgnoreCase)
             || string.Equals(source.SourceKey, EndOfLifeSourceKey, StringComparison.OrdinalIgnoreCase)
             || string.Equals(source.SourceKey, SupplyChainSourceKey, StringComparison.OrdinalIgnoreCase)
         )
@@ -77,6 +78,7 @@ public static class EnrichmentSourceCatalog
     public static bool RequiresCredentials(string sourceKey)
     {
         return !string.Equals(sourceKey, DefenderSourceKey, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(sourceKey, NvdSourceKey, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(sourceKey, EndOfLifeSourceKey, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(sourceKey, SupplyChainSourceKey, StringComparison.OrdinalIgnoreCase);
     }
