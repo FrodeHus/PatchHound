@@ -9,7 +9,7 @@ public class NvdFeedSyncWorker(
     IServiceScopeFactory scopeFactory,
     ILogger<NvdFeedSyncWorker> logger) : BackgroundService
 {
-    private static readonly TimeSpan IncrementalInterval = TimeSpan.FromHours(2);
+    private static readonly TimeSpan IncrementalInterval = TimeSpan.FromHours(12);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

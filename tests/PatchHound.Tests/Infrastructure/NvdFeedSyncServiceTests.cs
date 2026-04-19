@@ -1,31 +1,39 @@
-using System.IO.Compression;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 using PatchHound.Core.Entities;
+using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Tests.Infrastructure;
 
 public class NvdFeedSyncServiceTests
 {
+    private static ISecretStore NullSecrets()
+    {
+        var store = Substitute.For<ISecretStore>();
+        store.GetSecretAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((string?)null);
+        return store;
+    }
+
     [Fact]
-    public async Task SyncFeedAsync_inserts_new_cve_entries()
+    public async Task SyncYearFeedAsync_inserts_new_cve_entries()
     {
         await using var db = await TestDbContextFactory.CreateAsync();
-        var feedJson = BuildFeedJson("CVE-2024-1234", "Test description", 7.5m,
+        var feedJson = BuildSinglePageResponse("CVE-2024-1234", "Test description", 7.5m,
             "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
-            "2024-01-01T00:00Z", "2024-01-10T00:00Z",
+            "2024-01-01T00:00:00.000", "2024-01-10T00:00:00.000",
             referenceUrl: "https://example.com/advisory",
             criteria: "cpe:2.3:a:acme:widget:1.0:*:*:*:*:*:*:*");
 
-        var metaContent = "lastModifiedDate:2024-01-10T00:00:00-04:00\nsha256:abc123";
-        var handler = new FakeFeedHttpHandler(feedJson, metaContent);
-        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://nvd.nist.gov") };
-        var service = new NvdFeedSyncService(httpClient, db,
+        var handler = new FakeApiHandler(feedJson);
+        var httpClient = new HttpClient(handler);
+        var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
             NullLogger<NvdFeedSyncService>.Instance);
 
         await service.SyncYearFeedAsync(2024, CancellationToken.None);
@@ -48,29 +56,27 @@ public class NvdFeedSyncServiceTests
     }
 
     [Fact]
-    public async Task SyncFeedAsync_updates_existing_cve_entry()
+    public async Task SyncYearFeedAsync_updates_existing_cve_entry()
     {
         await using var db = await TestDbContextFactory.CreateAsync();
         db.NvdCveCache.Add(NvdCveCache.Create("CVE-2024-1234", "old description",
-            null, null, null,
-            new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero),
-            "[]", "[]"));
+            null, null, null, DateTimeOffset.MinValue, "[]", "[]"));
         db.NvdFeedCheckpoints.Add(NvdFeedCheckpoint.Create("2024",
             new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)));
         await db.SaveChangesAsync();
 
-        var feedJson = BuildFeedJson("CVE-2024-1234", "updated description", 9.8m,
+        // Year feed is skipped when checkpoint exists — so we simulate a direct call via modified feed
+        var feedJson = BuildSinglePageResponse("CVE-2024-1234", "updated description", 9.8m,
             "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
-            "2024-01-01T00:00Z", "2024-01-15T00:00Z",
+            "2024-01-01T00:00:00.000", "2024-01-15T00:00:00.000",
             referenceUrl: null, criteria: "cpe:2.3:a:acme:widget:*:*:*:*:*:*:*:*");
 
-        var metaContent = "lastModifiedDate:2024-01-15T00:00:00-04:00\nsha256:def456";
-        var handler = new FakeFeedHttpHandler(feedJson, metaContent);
-        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://nvd.nist.gov") };
-        var service = new NvdFeedSyncService(httpClient, db,
+        var handler = new FakeApiHandler(feedJson);
+        var httpClient = new HttpClient(handler);
+        var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
             NullLogger<NvdFeedSyncService>.Instance);
 
-        await service.SyncYearFeedAsync(2024, CancellationToken.None);
+        await service.SyncModifiedFeedAsync(CancellationToken.None);
 
         var cached = await db.NvdCveCache.SingleAsync();
         cached.Description.Should().Be("updated description");
@@ -78,51 +84,49 @@ public class NvdFeedSyncServiceTests
     }
 
     [Fact]
-    public async Task SyncFeedAsync_skips_download_when_feed_not_modified()
+    public async Task SyncYearFeedAsync_skips_when_checkpoint_exists()
     {
         await using var db = await TestDbContextFactory.CreateAsync();
-        var existingModified = new DateTimeOffset(2024, 1, 10, 4, 0, 0, TimeSpan.Zero);
-        db.NvdFeedCheckpoints.Add(NvdFeedCheckpoint.Create("2024", existingModified));
+        db.NvdFeedCheckpoints.Add(NvdFeedCheckpoint.Create("2024", DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();
 
-        var metaContent = "lastModifiedDate:2024-01-10T00:00:00-04:00\nsha256:abc123";
-        var handler = new FakeFeedHttpHandler(feedJson: "should-not-be-fetched", metaContent);
-        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://nvd.nist.gov") };
-        var service = new NvdFeedSyncService(httpClient, db,
+        var handler = new FakeApiHandler("{}");
+        var httpClient = new HttpClient(handler);
+        var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
             NullLogger<NvdFeedSyncService>.Instance);
 
         await service.SyncYearFeedAsync(2024, CancellationToken.None);
 
-        handler.FeedRequested.Should().BeFalse("feed should be skipped when checkpoint is current");
+        handler.RequestCount.Should().Be(0, "no HTTP requests should be made when checkpoint exists");
         (await db.NvdCveCache.CountAsync()).Should().Be(0);
-
-        var checkpoint = await db.NvdFeedCheckpoints.SingleAsync();
-        checkpoint.FeedLastModified.Should().Be(existingModified, "checkpoint should not be updated when feed is current");
     }
 
     [Fact]
-    public async Task SyncFeedAsync_skips_cve_with_no_english_description()
+    public async Task SyncYearFeedAsync_skips_cve_with_no_english_description()
     {
         await using var db = await TestDbContextFactory.CreateAsync();
-        var feedJson = $$$"""
+        var feedJson = """
             {
-              "CVE_Items": [{
+              "resultsPerPage": 1,
+              "startIndex": 0,
+              "totalResults": 1,
+              "vulnerabilities": [{
                 "cve": {
-                  "CVE_data_meta": {"ID": "CVE-2024-9000"},
-                  "description": {"description_data": [{"lang": "es","value": "descripción en español"}]},
-                  "references": {"reference_data": []}
-                },
-                "configurations": {"nodes": []},
-                "impact": {},
-                "publishedDate": "2024-01-01T00:00Z",
-                "lastModifiedDate": "2024-01-10T00:00Z"
+                  "id": "CVE-2024-9000",
+                  "published": "2024-01-01T00:00:00.000",
+                  "lastModified": "2024-01-10T00:00:00.000",
+                  "descriptions": [{"lang": "es", "value": "descripción"}],
+                  "metrics": {},
+                  "references": [],
+                  "configurations": []
+                }
               }]
             }
             """;
-        var metaContent = "lastModifiedDate:2024-01-10T00:00:00-04:00\nsha256:abc123";
-        var handler = new FakeFeedHttpHandler(feedJson, metaContent);
-        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://nvd.nist.gov") };
-        var service = new NvdFeedSyncService(httpClient, db,
+
+        var handler = new FakeApiHandler(feedJson);
+        var httpClient = new HttpClient(handler);
+        var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
             NullLogger<NvdFeedSyncService>.Instance);
 
         await service.SyncYearFeedAsync(2024, CancellationToken.None);
@@ -131,78 +135,55 @@ public class NvdFeedSyncServiceTests
         (await db.NvdFeedCheckpoints.CountAsync()).Should().Be(1, "checkpoint should still be created");
     }
 
-    private static string BuildFeedJson(
+    private static string BuildSinglePageResponse(
         string cveId, string description, decimal baseScore, string vector,
         string publishedDate, string lastModifiedDate,
         string? referenceUrl, string criteria)
     {
         var refs = referenceUrl is null ? "[]"
-            : $@"[{{""url"":""{referenceUrl}"",""refsource"":""MISC"",""tags"":[]}}]";
+            : $$$"""[{"url":"{{{referenceUrl}}}","source":"MISC","tags":[]}]""";
         return $$$"""
             {
-              "CVE_Items": [{
+              "resultsPerPage": 1,
+              "startIndex": 0,
+              "totalResults": 1,
+              "vulnerabilities": [{
                 "cve": {
-                  "CVE_data_meta": {"ID": "{{{cveId}}}"},
-                  "description": {"description_data": [{"lang": "en","value": "{{{description}}}"}]},
-                  "references": {"reference_data": {{{refs}}}}
-                },
-                "configurations": {
-                  "nodes": [{"cpe_match": [{"vulnerable": true,"cpe23Uri": "{{{criteria}}}"}],"children": []}]
-                },
-                "impact": {
-                  "baseMetricV3": {"cvssV3": {"baseScore": {{{baseScore}}},"vectorString": "{{{vector}}}"}}
-                },
-                "publishedDate": "{{{publishedDate}}}",
-                "lastModifiedDate": "{{{lastModifiedDate}}}"
+                  "id": "{{{cveId}}}",
+                  "published": "{{{publishedDate}}}",
+                  "lastModified": "{{{lastModifiedDate}}}",
+                  "descriptions": [{"lang": "en", "value": "{{{description}}}"}],
+                  "metrics": {
+                    "cvssMetricV31": [{
+                      "type": "Primary",
+                      "cvssData": {"baseScore": {{{baseScore}}}, "vectorString": "{{{vector}}}"}
+                    }]
+                  },
+                  "references": {{{refs}}},
+                  "configurations": [{
+                    "nodes": [{"cpeMatch": [{"vulnerable": true, "criteria": "{{{criteria}}}"}], "nodes": []}]
+                  }]
+                }
               }]
             }
             """;
     }
 
-    internal sealed class FakeFeedHttpHandler : HttpMessageHandler
+    internal sealed class FakeApiHandler : HttpMessageHandler
     {
-        private readonly string _feedJson;
-        private readonly string _metaContent;
-        public bool FeedRequested { get; private set; }
+        private readonly string _responseJson;
+        public int RequestCount { get; private set; }
 
-        public FakeFeedHttpHandler(string feedJson, string metaContent)
-        {
-            _feedJson = feedJson;
-            _metaContent = metaContent;
-        }
+        public FakeApiHandler(string responseJson) => _responseJson = responseJson;
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken ct)
         {
-            var url = request.RequestUri!.ToString();
-            if (url.EndsWith(".meta", StringComparison.OrdinalIgnoreCase))
+            RequestCount++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(_metaContent),
-                });
-            }
-
-            FeedRequested = true;
-            var compressed = CompressJson(_feedJson);
-            var response = new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new ByteArrayContent(compressed),
-            };
-            response.Content.Headers.ContentType =
-                new System.Net.Http.Headers.MediaTypeHeaderValue("application/gzip");
-            return Task.FromResult(response);
-        }
-
-        private static byte[] CompressJson(string json)
-        {
-            using var ms = new MemoryStream();
-            using (var gz = new GZipStream(ms, CompressionMode.Compress))
-            {
-                var bytes = Encoding.UTF8.GetBytes(json);
-                gz.Write(bytes);
-            }
-            return ms.ToArray();
+                Content = new StringContent(_responseJson, Encoding.UTF8, "application/json"),
+            });
         }
     }
 }
