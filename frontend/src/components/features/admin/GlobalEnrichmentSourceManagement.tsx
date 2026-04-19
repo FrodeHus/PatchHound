@@ -146,9 +146,10 @@ export function GlobalEnrichmentSourceManagement({
                   <TableRow
                     key={source.key}
                     className={cn(
-                      'border-border/50',
+                      'cursor-pointer border-border/50',
                       editingSourceKey === source.key && 'bg-primary/[0.04]',
                     )}
+                    onClick={() => setEditingSourceKey(source.key)}
                   >
                     {/* Provider */}
                     <TableCell className="py-3 pl-4">
@@ -213,7 +214,10 @@ export function GlobalEnrichmentSourceManagement({
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => setEditingSourceKey(source.key)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingSourceKey(source.key)
+                          }}
                         >
                           Edit
                         </Button>
@@ -221,7 +225,10 @@ export function GlobalEnrichmentSourceManagement({
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => setHistorySource({ key: source.key, displayName: source.displayName })}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setHistorySource({ key: source.key, displayName: source.displayName })
+                          }}
                         >
                           History
                         </Button>
