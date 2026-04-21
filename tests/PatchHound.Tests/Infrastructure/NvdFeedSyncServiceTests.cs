@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -31,7 +32,7 @@ public class NvdFeedSyncServiceTests
             referenceUrl: "https://example.com/advisory",
             criteria: "cpe:2.3:a:acme:widget:1.0:*:*:*:*:*:*:*");
 
-        var handler = new FakeApiHandler(feedJson);
+        var handler = new GzipArchiveHandler(feedJson);
         var httpClient = new HttpClient(handler);
         var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
             NullLogger<NvdFeedSyncService>.Instance);
@@ -90,14 +91,14 @@ public class NvdFeedSyncServiceTests
         db.NvdFeedCheckpoints.Add(NvdFeedCheckpoint.Create("2024", DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();
 
-        var handler = new FakeApiHandler("{}");
+        var handler = new GzipArchiveHandler("{}");
         var httpClient = new HttpClient(handler);
         var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
             NullLogger<NvdFeedSyncService>.Instance);
 
         await service.SyncYearFeedAsync(2024, CancellationToken.None);
 
-        handler.RequestCount.Should().Be(0, "no HTTP requests should be made when checkpoint exists");
+        handler.RequestUris.Should().BeEmpty("no HTTP requests should be made when checkpoint exists");
         (await db.NvdCveCache.CountAsync()).Should().Be(0);
     }
 
@@ -124,7 +125,7 @@ public class NvdFeedSyncServiceTests
             }
             """;
 
-        var handler = new FakeApiHandler(feedJson);
+        var handler = new GzipArchiveHandler(feedJson);
         var httpClient = new HttpClient(handler);
         var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
             NullLogger<NvdFeedSyncService>.Instance);
@@ -135,38 +136,94 @@ public class NvdFeedSyncServiceTests
         (await db.NvdFeedCheckpoints.CountAsync()).Should().Be(1, "checkpoint should still be created");
     }
 
+    [Fact]
+    public async Task SyncYearFeedAsync_downloads_and_processes_compressed_year_archive()
+    {
+        await using var db = await TestDbContextFactory.CreateAsync();
+        var handler = new GzipArchiveHandler(BuildSinglePageResponse("CVE-2024-1234", "Window 1", 7.5m,
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+            "2024-01-01T00:00:00.000", "2024-01-10T00:00:00.000",
+            referenceUrl: null, criteria: "cpe:2.3:a:acme:widget:1.0:*:*:*:*:*:*:*"));
+        var httpClient = new HttpClient(handler);
+        var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
+            NullLogger<NvdFeedSyncService>.Instance);
+
+        await service.SyncYearFeedAsync(2024, CancellationToken.None);
+
+        handler.RequestUris.Should().ContainSingle();
+        handler.RequestUris[0].ToString().Should()
+            .Be("https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2024.json.gz");
+
+        var cachedIds = await db.NvdCveCache
+            .OrderBy(c => c.CveId)
+            .Select(c => c.CveId)
+            .ToListAsync();
+        cachedIds.Should().Equal("CVE-2024-1234");
+    }
+
     private static string BuildSinglePageResponse(
         string cveId, string description, decimal baseScore, string vector,
         string publishedDate, string lastModifiedDate,
         string? referenceUrl, string criteria)
     {
-        var refs = referenceUrl is null ? "[]"
-            : $$$"""[{"url":"{{{referenceUrl}}}","source":"MISC","tags":[]}]""";
-        return $$$"""
+        var payload = new
+        {
+            resultsPerPage = 1,
+            startIndex = 0,
+            totalResults = 1,
+            vulnerabilities = new[]
             {
-              "resultsPerPage": 1,
-              "startIndex": 0,
-              "totalResults": 1,
-              "vulnerabilities": [{
-                "cve": {
-                  "id": "{{{cveId}}}",
-                  "published": "{{{publishedDate}}}",
-                  "lastModified": "{{{lastModifiedDate}}}",
-                  "descriptions": [{"lang": "en", "value": "{{{description}}}"}],
-                  "metrics": {
-                    "cvssMetricV31": [{
-                      "type": "Primary",
-                      "cvssData": {"baseScore": {{{baseScore}}}, "vectorString": "{{{vector}}}"}
-                    }]
-                  },
-                  "references": {{{refs}}},
-                  "configurations": [{
-                    "nodes": [{"cpeMatch": [{"vulnerable": true, "criteria": "{{{criteria}}}"}], "nodes": []}]
-                  }]
+                new
+                {
+                    cve = new
+                    {
+                        id = cveId,
+                        published = publishedDate,
+                        lastModified = lastModifiedDate,
+                        descriptions = new[]
+                        {
+                            new { lang = "en", value = description }
+                        },
+                        metrics = new
+                        {
+                            cvssMetricV31 = new[]
+                            {
+                                new
+                                {
+                                    type = "Primary",
+                                    cvssData = new { baseScore, vectorString = vector }
+                                }
+                            }
+                        },
+                        references = referenceUrl is null
+                            ? Array.Empty<object>()
+                            : new object[]
+                            {
+                                new { url = referenceUrl, source = "MISC", tags = Array.Empty<string>() }
+                            },
+                        configurations = new[]
+                        {
+                            new
+                            {
+                                nodes = new[]
+                                {
+                                    new
+                                    {
+                                        cpeMatch = new[]
+                                        {
+                                            new { vulnerable = true, criteria }
+                                        },
+                                        nodes = Array.Empty<object>()
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-              }]
             }
-            """;
+        };
+
+        return JsonSerializer.Serialize(payload);
     }
 
     internal sealed class FakeApiHandler : HttpMessageHandler
@@ -184,6 +241,35 @@ public class NvdFeedSyncServiceTests
             {
                 Content = new StringContent(_responseJson, Encoding.UTF8, "application/json"),
             });
+        }
+    }
+
+    internal sealed class GzipArchiveHandler(string responseJson) : HttpMessageHandler
+    {
+        public List<Uri> RequestUris { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken ct)
+        {
+            RequestUris.Add(request.RequestUri!);
+            var body = Compress(responseJson);
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(body),
+            });
+        }
+
+        private static byte[] Compress(string value)
+        {
+            using var output = new MemoryStream();
+            using (var gzip = new GZipStream(output, CompressionLevel.SmallestSize, leaveOpen: true))
+            using (var writer = new StreamWriter(gzip, Encoding.UTF8, leaveOpen: true))
+            {
+                writer.Write(value);
+            }
+
+            return output.ToArray();
         }
     }
 }

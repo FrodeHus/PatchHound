@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,7 @@ public class NvdFeedSyncService(
     ISecretStore secretStore,
     ILogger<NvdFeedSyncService> logger)
 {
+    private const string FeedBaseUrl = "https://nvd.nist.gov/feeds/json/cve/2.0";
     private const string ApiUrl = "https://services.nvd.nist.gov/rest/json/cves/2.0";
     private const int PageSize = 2000;
     private static readonly TimeSpan ApiKeyDelay = TimeSpan.FromMilliseconds(700);
@@ -29,15 +31,9 @@ public class NvdFeedSyncService(
             return;
         }
 
-        var apiKey = await GetApiKeyAsync(ct);
         logger.LogInformation("NVD: starting initial sync for year {Year}", year);
 
-        var startDate = new DateTimeOffset(year, 1, 1, 0, 0, 0, TimeSpan.Zero);
-        var endDate = new DateTimeOffset(year, 12, 31, 23, 59, 59, TimeSpan.Zero);
-
-        var count = await FetchAndUpsertAsync(
-            startIndex => $"{ApiUrl}?pubStartDate={FormatDate(startDate)}&pubEndDate={FormatDate(endDate)}&startIndex={startIndex}&resultsPerPage={PageSize}",
-            apiKey, ct);
+        var count = await FetchAndUpsertYearArchiveAsync(year, ct);
 
         db.NvdFeedCheckpoints.Add(NvdFeedCheckpoint.Create(feedName, DateTimeOffset.UtcNow));
         await db.SaveChangesAsync(ct);
@@ -103,6 +99,25 @@ public class NvdFeedSyncService(
         }
 
         return totalCount;
+    }
+
+    private async Task<int> FetchAndUpsertYearArchiveAsync(int year, CancellationToken ct)
+    {
+        var url = $"{FeedBaseUrl}/nvdcve-2.0-{year}.json.gz";
+        using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+        response.EnsureSuccessStatusCode();
+
+        await using var compressed = await response.Content.ReadAsStreamAsync(ct);
+        await using var decompressed = new GZipStream(compressed, CompressionMode.Decompress);
+        var feed = await JsonSerializer.DeserializeAsync<NvdApiResponse>(decompressed, cancellationToken: ct);
+
+        if (feed is null || feed.Vulnerabilities.Count == 0)
+            return 0;
+
+        var count = await UpsertItemsAsync(feed.Vulnerabilities, ct);
+        await db.SaveChangesAsync(ct);
+        db.ChangeTracker.Clear();
+        return count;
     }
 
     private async Task<int> UpsertItemsAsync(List<NvdApiVulnerabilityItem> items, CancellationToken ct)
