@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost, apiPut } from '@/server/api'
 import { pagedTeamsSchema, teamDetailSchema, teamMembershipRulePreviewSchema } from './teams.schemas'
-import { buildFilterParams } from './utils'
+import { buildFilterParams, withTenantOverride } from './utils'
 import { z } from 'zod'
 import { filterNodeSchema } from './device-rules.schemas'
 
@@ -17,7 +17,7 @@ export const fetchTeams = createServerFn({ method: 'GET' })
   )
   .handler(async ({ context, data: filters }) => {
     const params = buildFilterParams(filters)
-    const data = await apiGet(`/teams?${params.toString()}`, context)
+    const data = await apiGet(`/teams?${params.toString()}`, withTenantOverride(context, filters.tenantId))
     return pagedTeamsSchema.parse(data)
   })
 

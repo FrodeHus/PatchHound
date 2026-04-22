@@ -1,3 +1,5 @@
+import type { ApiRequestContext } from '@/server/api'
+
 export function buildFilterParams(
   filters: Record<string, string | number | boolean | undefined>,
   defaults: { page?: number; pageSize?: number } = {},
@@ -14,4 +16,18 @@ export function buildFilterParams(
   params.set('page', String(page))
   params.set('pageSize', String(pageSize))
   return params
+}
+
+export function withTenantOverride(
+  context: ApiRequestContext,
+  tenantId?: string,
+): ApiRequestContext {
+  if (!tenantId) {
+    return context
+  }
+
+  return {
+    ...context,
+    tenantId,
+  }
 }

@@ -19,6 +19,7 @@ import { deleteTenant, fetchTenantDetail, updateTenant } from '@/api/settings.fu
 import type { TenantDetail } from '@/api/settings.schemas'
 import type { AuditLogItem } from '@/api/audit-log.schemas'
 import { TenantSourceManagement } from '@/components/features/admin/TenantSourceManagement'
+import { TenantDeviceRulesPanel } from '@/components/features/admin/device-rules/TenantDeviceRulesPanel'
 import { RecentAuditPanel } from '@/components/features/audit/RecentAuditPanel'
 import { TenantAiSettingsPage } from '@/components/features/settings/TenantAiSettingsPage'
 import { Badge } from '@/components/ui/badge'
@@ -47,6 +48,7 @@ type TabSearch = {
   mode?: string
   sourceKey?: string
   profileId?: string
+  ruleId?: string
 }
 
 type TenantAdministrationDetailProps = {
@@ -155,12 +157,12 @@ export function TenantAdministrationDetail({
           </TabsContent>
 
           <TabsContent value="device-rules" className="pt-4">
-            <LinkedTabStub
-              icon={GitBranchPlus}
-              title="Device Rules"
-              description="Automate ownership and security-profile assignment based on device conditions."
-              linkTo="/admin/device-rules"
-              linkLabel="Open device rules"
+            <TenantDeviceRulesPanel
+              tenantId={tenant.id}
+              tenantName={tenant.name}
+              mode={tabSearch.mode}
+              ruleId={tabSearch.ruleId}
+              onSearchChange={(patch) => onSearchChange?.({ mode: patch.mode, ruleId: patch.ruleId })}
             />
           </TabsContent>
 

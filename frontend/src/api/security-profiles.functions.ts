@@ -2,20 +2,24 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { authMiddleware } from '@/server/middleware'
 import { apiDelete, apiGet, apiPost, apiPut } from '@/server/api'
-import { buildFilterParams } from './utils'
+import { buildFilterParams, withTenantOverride } from './utils'
 import { pagedSecurityProfilesSchema } from './security-profiles.schemas'
 
 export const fetchSecurityProfiles = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(
     z.object({
+      tenantId: z.string().uuid().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
     }),
   )
   .handler(async ({ context, data: filters }) => {
     const params = buildFilterParams(filters)
-    const data = await apiGet(`/security-profiles?${params.toString()}`, context)
+    const data = await apiGet(
+      `/security-profiles?${params.toString()}`,
+      withTenantOverride(context, filters.tenantId),
+    )
     return pagedSecurityProfilesSchema.parse(data)
   })
 
