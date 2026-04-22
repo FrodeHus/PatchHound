@@ -28,6 +28,7 @@ namespace PatchHound.Api.Controllers;
 public class DeviceRulesController : ControllerBase
 {
     private const string DeviceAssetType = "Device";
+    private const string SoftwareAssetType = "Software";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -105,12 +106,12 @@ public class DeviceRulesController : ControllerBase
         var operations = DeserializeOperations(request.Operations);
 
         if (!IsSupportedAssetType(request.AssetType))
-            return BadRequest(new ProblemDetails { Title = "Only Device asset rules are supported in this slice." });
+            return BadRequest(new ProblemDetails { Title = "Unsupported asset type." });
 
         if (filter is null || operations is null)
             return BadRequest(new ProblemDetails { Title = "Invalid filter or operations JSON." });
 
-        var validationError = ValidateOperations(operations);
+        var validationError = ValidateOperations(request.AssetType, operations);
         if (validationError is not null)
             return BadRequest(new ProblemDetails { Title = validationError });
 
@@ -148,12 +149,12 @@ public class DeviceRulesController : ControllerBase
         var operations = DeserializeOperations(request.Operations);
 
         if (!IsSupportedAssetType(request.AssetType))
-            return BadRequest(new ProblemDetails { Title = "Only Device asset rules are supported in this slice." });
+            return BadRequest(new ProblemDetails { Title = "Unsupported asset type." });
 
         if (filter is null || operations is null)
             return BadRequest(new ProblemDetails { Title = "Invalid filter or operations JSON." });
 
-        var validationError = ValidateOperations(operations);
+        var validationError = ValidateOperations(request.AssetType, operations);
         if (validationError is not null)
             return BadRequest(new ProblemDetails { Title = validationError });
 
@@ -214,16 +215,33 @@ public class DeviceRulesController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
         if (!IsSupportedAssetType(request.AssetType))
-            return BadRequest(new ProblemDetails { Title = "Only Device asset rules are supported in this slice." });
+            return BadRequest(new ProblemDetails { Title = "Unsupported asset type." });
 
         var filter = DeserializeFilter(request.FilterDefinition);
         if (filter is null)
             return BadRequest(new ProblemDetails { Title = "Invalid filter JSON." });
 
-        var result = await _evaluationService.PreviewFilterAsync(tenantId, filter, ct);
+        if (string.Equals(request.AssetType, DeviceAssetType, StringComparison.OrdinalIgnoreCase))
+        {
+            var result = await _evaluationService.PreviewFilterAsync(tenantId, filter, ct);
+            return Ok(new DeviceRulePreviewDto(
+                result.Count,
+                result.Samples.Select(s => new DevicePreviewItemDto(s.Id, s.Name)).ToList()));
+        }
+
+        (int Count, List<(Guid Id, string Name)> Samples) softwarePreview;
+        try
+        {
+            softwarePreview = await PreviewSoftwareFilterAsync(tenantId, filter, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetails { Title = ex.Message });
+        }
+
         return Ok(new DeviceRulePreviewDto(
-            result.Count,
-            result.Samples.Select(s => new DevicePreviewItemDto(s.Id, s.Name)).ToList()));
+            softwarePreview.Count,
+            softwarePreview.Samples.Select(s => new DevicePreviewItemDto(s.Id, s.Name)).ToList()));
     }
 
     [HttpPost("run")]
@@ -267,7 +285,7 @@ public class DeviceRulesController : ControllerBase
 
     private static DeviceRuleDto ToDto(DeviceRule rule) => new(
         rule.Id,
-        DeviceAssetType,
+        rule.AssetType,
         rule.Name,
         rule.Description,
         rule.Priority,
@@ -281,7 +299,8 @@ public class DeviceRulesController : ControllerBase
     );
 
     private static bool IsSupportedAssetType(string assetType) =>
-        string.Equals(assetType, DeviceAssetType, StringComparison.OrdinalIgnoreCase);
+        string.Equals(assetType, DeviceAssetType, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(assetType, SoftwareAssetType, StringComparison.OrdinalIgnoreCase);
 
     private static FilterNode? DeserializeFilter(JsonElement element)
     {
@@ -307,8 +326,15 @@ public class DeviceRulesController : ControllerBase
         }
     }
 
-    private static string? ValidateOperations(IReadOnlyList<AssetRuleOperation> operations)
+    private static string? ValidateOperations(string assetType, IReadOnlyList<AssetRuleOperation> operations)
     {
+        if (string.Equals(assetType, SoftwareAssetType, StringComparison.OrdinalIgnoreCase))
+        {
+            return operations.Count == 0
+                ? null
+                : "Software asset rules do not support operations yet.";
+        }
+
         foreach (var operation in operations)
         {
             switch (operation.Type)
@@ -351,6 +377,109 @@ public class DeviceRulesController : ControllerBase
         }
 
         return null;
+    }
+
+    private async Task<(int Count, List<(Guid Id, string Name)> Samples)> PreviewSoftwareFilterAsync(
+        Guid tenantId,
+        FilterNode filter,
+        CancellationToken ct)
+    {
+        var query = _dbContext.SoftwareProducts
+            .AsNoTracking()
+            .Where(product => _dbContext.InstalledSoftware
+                .Any(install => install.TenantId == tenantId && install.SoftwareProductId == product.Id));
+
+        query = ApplySoftwareFilter(query, filter);
+
+        var count = await query.CountAsync(ct);
+        var samples = await query
+            .OrderBy(product => product.Name)
+            .ThenBy(product => product.Vendor)
+            .Take(5)
+            .Select(product => new ValueTuple<Guid, string>(
+                product.Id,
+                string.IsNullOrWhiteSpace(product.Vendor)
+                    ? product.Name
+                    : $"{product.Vendor} {product.Name}"))
+            .ToListAsync(ct);
+
+        return (count, samples);
+    }
+
+    private static IQueryable<SoftwareProduct> ApplySoftwareFilter(
+        IQueryable<SoftwareProduct> query,
+        FilterNode node)
+    {
+        return node switch
+        {
+            FilterGroup group => ApplySoftwareGroup(query, group),
+            FilterCondition condition => ApplySoftwareCondition(query, condition),
+            _ => throw new InvalidOperationException($"Unknown filter node type: {node.Type}")
+        };
+    }
+
+    private static IQueryable<SoftwareProduct> ApplySoftwareGroup(
+        IQueryable<SoftwareProduct> query,
+        FilterGroup group)
+    {
+        if (group.Conditions.Count == 0)
+            return query;
+
+        IQueryable<SoftwareProduct>? current = null;
+        foreach (var condition in group.Conditions)
+        {
+            var scoped = ApplySoftwareFilter(query, condition);
+            current = current is null
+                ? scoped
+                : group.Operator.Equals("OR", StringComparison.OrdinalIgnoreCase)
+                    ? current.Union(scoped)
+                    : current.Intersect(scoped);
+        }
+
+        return current ?? query;
+    }
+
+    private static IQueryable<SoftwareProduct> ApplySoftwareCondition(
+        IQueryable<SoftwareProduct> query,
+        FilterCondition condition)
+    {
+        return condition.Field switch
+        {
+            "Name" => ApplyStringComparison(query, nameof(SoftwareProduct.Name), condition),
+            "Vendor" => ApplyStringComparison(query, nameof(SoftwareProduct.Vendor), condition),
+            _ => throw new InvalidOperationException($"Unknown software filter field: {condition.Field}")
+        };
+    }
+
+    private static IQueryable<SoftwareProduct> ApplyStringComparison(
+        IQueryable<SoftwareProduct> query,
+        string propertyName,
+        FilterCondition condition)
+    {
+        var value = condition.Value;
+        return condition.Op switch
+        {
+            nameof(string.Equals) => query.Where(BuildStringPredicate(propertyName, value, nameof(string.Equals))),
+            nameof(string.StartsWith) => query.Where(BuildStringPredicate(propertyName, value, nameof(string.StartsWith))),
+            nameof(string.Contains) => query.Where(BuildStringPredicate(propertyName, value, nameof(string.Contains))),
+            nameof(string.EndsWith) => query.Where(BuildStringPredicate(propertyName, value, nameof(string.EndsWith))),
+            _ => throw new InvalidOperationException($"Unknown operator: {condition.Op}")
+        };
+    }
+
+    private static System.Linq.Expressions.Expression<Func<SoftwareProduct, bool>> BuildStringPredicate(
+        string propertyName,
+        string value,
+        string operation)
+    {
+        var parameter = System.Linq.Expressions.Expression.Parameter(typeof(SoftwareProduct), "product");
+        var property = System.Linq.Expressions.Expression.Property(parameter, propertyName);
+        var constant = System.Linq.Expressions.Expression.Constant(value);
+        var body = System.Linq.Expressions.Expression.Call(
+            property,
+            typeof(string).GetMethod(operation, [typeof(string)])!,
+            constant);
+        return System.Linq.Expressions.Expression.Lambda<Func<SoftwareProduct, bool>>(body, parameter);
     }
 
     private async Task<string?> ValidateOperationReferencesAsync(

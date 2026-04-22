@@ -129,7 +129,29 @@ public class DeviceRulesControllerTests : IDisposable
 
         var badRequest = action.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
         badRequest.Value.Should().BeOfType<ProblemDetails>()
-            .Subject.Title.Should().Be("Only Device asset rules are supported in this slice.");
+            .Subject.Title.Should().Be("Software asset rules do not support operations yet.");
+    }
+
+    [Fact]
+    public async Task Create_AllowsSoftwareRuleWithoutOperations()
+    {
+        var action = await _controller.Create(
+            new CreateDeviceRuleRequest(
+                "Browsers",
+                "Matches software by vendor",
+                "Software",
+                SerializeJson(BuildSoftwareFilter("Vendor", "Contoso")),
+                SerializeJson(new List<AssetRuleOperation>())
+            ),
+            CancellationToken.None
+        );
+
+        var created = action.Result.Should().BeOfType<CreatedAtActionResult>().Subject;
+        var dto = created.Value.Should().BeOfType<DeviceRuleDto>().Subject;
+        dto.AssetType.Should().Be("Software");
+
+        var stored = await _dbContext.DeviceRules.SingleAsync(r => r.Id == dto.Id);
+        stored.AssetType.Should().Be("Software");
     }
 
     [Fact]
@@ -192,6 +214,31 @@ public class DeviceRulesControllerTests : IDisposable
         var preview = ok.Value.Should().BeOfType<DeviceRulePreviewDto>().Subject;
         preview.Count.Should().Be(1);
         preview.Samples.Should().ContainSingle().Which.Id.Should().Be(matching.Id);
+    }
+
+    [Fact]
+    public async Task Preview_CountsMatchingTenantSoftwareProducts()
+    {
+        var device = CreateDevice("device-1", "Device-A", Criticality.Medium);
+        var matchingProduct = SoftwareProduct.Create("Contoso", "Browser", null);
+        var otherProduct = SoftwareProduct.Create("Fabrikam", "Agent", null);
+        await _dbContext.AddRangeAsync(
+            device,
+            matchingProduct,
+            otherProduct,
+            InstalledSoftware.Observe(_tenantId, device.Id, matchingProduct.Id, _sourceSystemId, "1.0.0", DateTimeOffset.UtcNow),
+            InstalledSoftware.Observe(_tenantId, device.Id, otherProduct.Id, _sourceSystemId, "2.0.0", DateTimeOffset.UtcNow));
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Preview(
+            new PreviewDeviceRuleFilterRequest("Software", SerializeJson(BuildSoftwareFilter("Vendor", "Contoso"))),
+            CancellationToken.None
+        );
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var preview = ok.Value.Should().BeOfType<DeviceRulePreviewDto>().Subject;
+        preview.Count.Should().Be(1);
+        preview.Samples.Should().ContainSingle().Which.Id.Should().Be(matchingProduct.Id);
     }
 
     [Fact]
@@ -300,6 +347,28 @@ public class DeviceRulesControllerTests : IDisposable
         action.Result.Should().BeOfType<NotFoundResult>();
     }
 
+    [Fact]
+    public async Task Run_IgnoresSoftwareRules()
+    {
+        var rule = DeviceRule.Create(
+            _tenantId,
+            "Software inventory",
+            null,
+            1,
+            "Software",
+            BuildSoftwareFilter("Vendor", "Contoso"),
+            new List<AssetRuleOperation>());
+        await _dbContext.DeviceRules.AddAsync(rule);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Run(CancellationToken.None);
+
+        action.Should().BeOfType<NoContentResult>();
+
+        var stored = await _dbContext.DeviceRules.SingleAsync(r => r.Id == rule.Id);
+        stored.LastExecutedAt.Should().BeNull();
+    }
+
     private Device CreateDevice(string externalId, string name, Criticality criticality)
     {
         return Device.Create(_tenantId, _sourceSystemId, externalId, name, criticality);
@@ -322,11 +391,17 @@ public class DeviceRulesControllerTests : IDisposable
     }
 
     private static FilterNode BuildNameFilter(string name) =>
+        BuildFilter("Name", name);
+
+    private static FilterNode BuildSoftwareFilter(string field, string value) =>
+        BuildFilter(field, value);
+
+    private static FilterNode BuildFilter(string field, string value) =>
         new FilterGroup(
             "AND",
             new List<FilterNode>
             {
-                new FilterCondition("Name", "Equals", name),
+                new FilterCondition(field, "Equals", value),
             }
         );
 

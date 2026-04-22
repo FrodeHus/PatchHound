@@ -11,6 +11,8 @@ namespace PatchHound.Infrastructure.Services.Inventory;
 
 public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
 {
+    private const string DeviceAssetType = "Device";
+
     private readonly PatchHoundDbContext _dbContext;
     private readonly DeviceRuleFilterBuilder _filterBuilder;
     private readonly ILogger<DeviceRuleEvaluationService> _logger;
@@ -28,7 +30,9 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
     public async Task EvaluateRulesAsync(Guid tenantId, CancellationToken ct)
     {
         var rules = await _dbContext.DeviceRules
-            .Where(r => r.TenantId == tenantId && r.Enabled)
+            .Where(r => r.TenantId == tenantId
+                && r.Enabled
+                && r.AssetType == DeviceAssetType)
             .OrderBy(r => r.Priority)
             .ToListAsync(ct);
 
@@ -125,7 +129,9 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
         }
 
         var rules = await _dbContext.DeviceRules
-            .Where(r => r.TenantId == tenantId && r.Enabled)
+            .Where(r => r.TenantId == tenantId
+                && r.Enabled
+                && r.AssetType == DeviceAssetType)
             .OrderBy(r => r.Priority)
             .ToListAsync(ct);
 

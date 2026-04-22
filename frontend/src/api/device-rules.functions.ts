@@ -4,6 +4,7 @@ import { authMiddleware } from '@/server/middleware'
 import { apiDelete, apiGet, apiPost, apiPut } from '@/server/api'
 import { buildFilterParams, withTenantOverride } from './utils'
 import {
+  assetRuleAssetTypeSchema,
   deviceRuleSchema,
   filterPreviewSchema,
   pagedDeviceRulesSchema,
@@ -41,7 +42,7 @@ export const createDeviceRule = createServerFn({ method: 'POST' })
   .inputValidator(
     z.object({
       tenantId: z.string().uuid().optional(),
-      assetType: z.literal('Device').optional(),
+      assetType: assetRuleAssetTypeSchema.optional(),
       name: z.string(),
       description: z.string().optional(),
       filterDefinition: z.any(),
@@ -62,7 +63,7 @@ export const updateDeviceRule = createServerFn({ method: 'POST' })
     z.object({
       tenantId: z.string().uuid().optional(),
       id: z.string().uuid(),
-      assetType: z.literal('Device').optional(),
+      assetType: assetRuleAssetTypeSchema.optional(),
       name: z.string(),
       description: z.string().optional(),
       enabled: z.boolean(),
@@ -91,7 +92,7 @@ export const deleteDeviceRule = createServerFn({ method: 'POST' })
 
 export const previewDeviceRuleFilter = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .inputValidator(z.object({ tenantId: z.string().uuid().optional(), assetType: z.literal('Device').optional(), filterDefinition: z.any() }))
+  .inputValidator(z.object({ tenantId: z.string().uuid().optional(), assetType: assetRuleAssetTypeSchema.optional(), filterDefinition: z.any() }))
   .handler(async ({ context, data }): Promise<FilterPreview> => {
     const result = await apiPost('/asset-rules/preview', withTenantOverride(context, data.tenantId), {
       ...data,

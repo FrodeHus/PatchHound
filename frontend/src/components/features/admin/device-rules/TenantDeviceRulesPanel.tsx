@@ -85,7 +85,7 @@ const columns: ColumnDef<DeviceRule>[] = [
     cell: ({ row }) => (
       <span className="text-sm">
         {row.original.lastMatchCount !== null
-          ? `${row.original.lastMatchCount} devices`
+          ? `${row.original.lastMatchCount} ${row.original.assetType === 'Software' ? 'software assets' : 'devices'}`
           : '-'}
       </span>
     ),
@@ -191,6 +191,7 @@ export function TenantDeviceRulesPanel({
         data: {
           tenantId,
           id: rule.id,
+          assetType: rule.assetType,
           name: rule.name,
           description: rule.description ?? undefined,
           enabled: !rule.enabled,
