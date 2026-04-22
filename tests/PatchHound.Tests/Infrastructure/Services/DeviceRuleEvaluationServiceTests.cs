@@ -54,6 +54,7 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
             "Tier 0 critical devices",
             "Promote tier 0 devices to critical.",
             1,
+            "Device",
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Tier0-"),
             [
                 new PatchHound.Core.Models.AssetRuleOperation(
@@ -90,6 +91,7 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
             "Tier 0 critical devices",
             null,
             1,
+            "Device",
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Tier0-"),
             [
                 new PatchHound.Core.Models.AssetRuleOperation(
@@ -120,6 +122,7 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
             "Tier 0 critical devices",
             null,
             1,
+            "Device",
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Tier0-"),
             [
                 new PatchHound.Core.Models.AssetRuleOperation(
@@ -148,6 +151,7 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
             "Tier 0 critical devices",
             null,
             1,
+            "Device",
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Tier0-"),
             [
                 new PatchHound.Core.Models.AssetRuleOperation(
@@ -187,6 +191,7 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
             "Assign production profile",
             null,
             1,
+            "Device",
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Prod-"),
             [
                 new PatchHound.Core.Models.AssetRuleOperation(
@@ -226,6 +231,7 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
             "Assign default team",
             null,
             1,
+            "Device",
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Ops-"),
             [
                 new PatchHound.Core.Models.AssetRuleOperation(
@@ -266,7 +272,7 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
         profileIdProp.SetValue(profile, scanProfileId);
 
         var rule = DeviceRule.Create(
-            _tenantId, "Assign scan profile", null, 1,
+            _tenantId, "Assign scan profile", null, 1, "Device",
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Server-"),
             [
                 new PatchHound.Core.Models.AssetRuleOperation(
@@ -297,7 +303,7 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
             .SetValue(profile, scanProfileId);
 
         var rule = DeviceRule.Create(
-            _tenantId, "Assign scan", null, 1,
+            _tenantId, "Assign scan", null, 1, "Device",
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Server-"),
             [
                 new PatchHound.Core.Models.AssetRuleOperation(
@@ -334,6 +340,7 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
             "Local tenant rule",
             null,
             1,
+            "Device",
             new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Shared-"),
             [
                 new PatchHound.Core.Models.AssetRuleOperation(

@@ -5,6 +5,7 @@ namespace PatchHound.Core.Entities;
 
 public class DeviceRule
 {
+    public const int AssetTypeMaxLength = 64;
     public const int NameMaxLength = 256;
     public const int DescriptionMaxLength = 2048;
 
@@ -15,6 +16,7 @@ public class DeviceRule
 
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public string AssetType { get; private set; } = null!;
     public string Name { get; private set; } = null!;
     public string? Description { get; private set; }
     public int Priority { get; private set; }
@@ -33,6 +35,7 @@ public class DeviceRule
         string name,
         string? description,
         int priority,
+        string assetType,
         FilterNode filter,
         List<AssetRuleOperation> operations)
     {
@@ -41,14 +44,15 @@ public class DeviceRule
             throw new ArgumentException("TenantId is required.", nameof(tenantId));
         }
 
-        var (normalizedName, normalizedDescription, filterDefinition, operationsJson) =
-            NormalizeAndValidate(name, description, filter, operations);
+        var (normalizedAssetType, normalizedName, normalizedDescription, filterDefinition, operationsJson) =
+            NormalizeAndValidate(assetType, name, description, filter, operations);
 
         var now = DateTimeOffset.UtcNow;
         return new DeviceRule
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
+            AssetType = normalizedAssetType,
             Name = normalizedName,
             Description = normalizedDescription,
             Priority = priority,
@@ -60,11 +64,12 @@ public class DeviceRule
         };
     }
 
-    public void Update(string name, string? description, bool enabled, FilterNode filter, List<AssetRuleOperation> operations)
+    public void Update(string name, string? description, bool enabled, string assetType, FilterNode filter, List<AssetRuleOperation> operations)
     {
-        var (normalizedName, normalizedDescription, filterDefinition, operationsJson) =
-            NormalizeAndValidate(name, description, filter, operations);
+        var (normalizedAssetType, normalizedName, normalizedDescription, filterDefinition, operationsJson) =
+            NormalizeAndValidate(assetType, name, description, filter, operations);
 
+        AssetType = normalizedAssetType;
         Name = normalizedName;
         Description = normalizedDescription;
         Enabled = enabled;
@@ -73,12 +78,17 @@ public class DeviceRule
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
-    private static (string name, string? description, string filterDefinition, string operationsJson) NormalizeAndValidate(
+    private static (string assetType, string name, string? description, string filterDefinition, string operationsJson) NormalizeAndValidate(
+        string assetType,
         string name,
         string? description,
         FilterNode filter,
         List<AssetRuleOperation> operations)
     {
+        if (string.IsNullOrWhiteSpace(assetType))
+        {
+            throw new ArgumentException("AssetType is required.", nameof(assetType));
+        }
         if (string.IsNullOrWhiteSpace(name))
         {
             throw new ArgumentException("Name is required.", nameof(name));
@@ -86,9 +96,16 @@ public class DeviceRule
         ArgumentNullException.ThrowIfNull(filter);
         ArgumentNullException.ThrowIfNull(operations);
 
+        var normalizedAssetType = assetType.Trim();
         var normalizedName = name.Trim();
         var normalizedDescription = description?.Trim();
 
+        if (normalizedAssetType.Length > AssetTypeMaxLength)
+        {
+            throw new ArgumentException(
+                $"Asset type must be {AssetTypeMaxLength} characters or fewer.",
+                nameof(assetType));
+        }
         if (normalizedName.Length > NameMaxLength)
         {
             throw new ArgumentException(
@@ -103,6 +120,7 @@ public class DeviceRule
         }
 
         return (
+            normalizedAssetType,
             normalizedName,
             normalizedDescription,
             JsonSerializer.Serialize(filter, JsonOptions),

@@ -122,7 +122,7 @@ public class DeviceRulesController : ControllerBase
             .Where(r => r.TenantId == tenantId)
             .MaxAsync(r => (int?)r.Priority, ct) ?? 0;
 
-        var rule = DeviceRule.Create(tenantId, request.Name, request.Description, maxPriority + 1, filter, operations);
+        var rule = DeviceRule.Create(tenantId, request.Name, request.Description, maxPriority + 1, request.AssetType, filter, operations);
         _dbContext.DeviceRules.Add(rule);
         await _dbContext.SaveChangesAsync(ct);
 
@@ -161,7 +161,7 @@ public class DeviceRulesController : ControllerBase
         if (referenceValidationError is not null)
             return BadRequest(new ProblemDetails { Title = referenceValidationError });
 
-        rule.Update(request.Name, request.Description, request.Enabled, filter, operations);
+        rule.Update(request.Name, request.Description, request.Enabled, request.AssetType, filter, operations);
         await _dbContext.SaveChangesAsync(ct);
 
         return Ok(ToDto(rule));

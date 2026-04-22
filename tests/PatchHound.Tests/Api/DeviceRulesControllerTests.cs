@@ -312,6 +312,7 @@ public class DeviceRulesControllerTests : IDisposable
             name,
             null,
             priority,
+            "Device",
             BuildNameFilter("unused"),
             new List<AssetRuleOperation>
             {

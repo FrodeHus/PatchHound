@@ -458,6 +458,7 @@ public class TenantIsolationEndToEndTests : IDisposable
             name: $"rule-{tenantId:N}",
             description: null,
             priority: 0,
+            assetType: "Device",
             filter: new FilterCondition("Name", "eq", "x"),
             operations: new List<AssetRuleOperation>()
         );
