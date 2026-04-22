@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { WorkNotesSheet } from '@/components/features/work-notes/WorkNotesSheet'
 import { DeviceAdvancedToolsPanel } from '@/components/features/devices/DeviceAdvancedToolsPanel'
 import { formatDateTime, formatUnknownValue, looksLikeOpaqueId, startCase } from '@/lib/formatting'
@@ -166,33 +167,21 @@ export function DeviceDetailPageView({
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
           <section className="rounded-3xl border border-border/70 bg-card p-4">
-            <div className="mb-4 flex flex-wrap gap-2">
-              <TabButton
-                label="Overview"
-                active={activeTab === 'overview'}
-                onClick={() => setActiveTab('overview')}
-              />
-              <TabButton
-                label="Exposures"
-                active={activeTab === 'exposures'}
-                onClick={() => setActiveTab('exposures')}
-              />
-              <TabButton
-                label="Software"
-                active={activeTab === 'software'}
-                onClick={() => setActiveTab('software')}
-              />
-              {canUseAdvancedTools ? (
-                <TabButton
-                  label="Advanced"
-                  active={activeTab === 'advanced'}
-                  onClick={() => setActiveTab('advanced')}
-                />
-              ) : null}
-            </div>
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) => setActiveTab(value as DetailTab)}
+              className="gap-4"
+            >
+              <TabsList className="h-10 w-full justify-start rounded-xl bg-muted/50 p-1">
+                <TabsTrigger value="overview" className="rounded-lg px-4 text-sm">Overview</TabsTrigger>
+                <TabsTrigger value="exposures" className="rounded-lg px-4 text-sm">Exposures</TabsTrigger>
+                <TabsTrigger value="software" className="rounded-lg px-4 text-sm">Software</TabsTrigger>
+                {canUseAdvancedTools ? (
+                  <TabsTrigger value="advanced" className="rounded-lg px-4 text-sm">Advanced</TabsTrigger>
+                ) : null}
+              </TabsList>
 
-            {activeTab === 'overview' ? (
-              <div className="space-y-5">
+              <TabsContent value="overview" className="space-y-5 pt-1">
                 {device.remediation ? (
                   <section className="rounded-2xl border border-border/70 bg-background p-4">
                     <SectionHeader
@@ -360,10 +349,10 @@ export function DeviceDetailPageView({
                     )}
                   </div>
                 </section>
-              </div>
-            ) : null}
+              </TabsContent>
 
-            {activeTab === 'exposures' ? (              <section className="rounded-2xl border border-border/70 bg-background p-4">
+              <TabsContent value="exposures" className="pt-1">
+                <section className="rounded-2xl border border-border/70 bg-background p-4">
                 <SectionHeader
                   title="Exposures"
                   description="Observed vulnerabilities linked to this device from the canonical exposure pipeline."
@@ -402,11 +391,11 @@ export function DeviceDetailPageView({
                     </table>
                   </div>
                 )}
-              </section>
-            ) : null}
+                </section>
+              </TabsContent>
 
-            {activeTab === 'software' ? (
-              <section className="rounded-2xl border border-border/70 bg-background p-4">
+              <TabsContent value="software" className="pt-1">
+                <section className="rounded-2xl border border-border/70 bg-background p-4">
                 <div className="flex items-start justify-between gap-4">
                   <SectionHeader
                     title="Installed software"
@@ -471,14 +460,15 @@ export function DeviceDetailPageView({
                     </div>
                   )
                 })()}
-              </section>
-            ) : null}
+                </section>
+              </TabsContent>
 
-            {activeTab === 'advanced' && canUseAdvancedTools ? (
-              <div className="space-y-5">
-                <DeviceAdvancedToolsPanel device={device} />
-              </div>
-            ) : null}
+              {canUseAdvancedTools ? (
+                <TabsContent value="advanced" className="space-y-5 pt-1">
+                  <DeviceAdvancedToolsPanel device={device} />
+                </TabsContent>
+              ) : null}
+            </Tabs>
           </section>
 
           <aside className="space-y-4">
@@ -808,30 +798,6 @@ function BusinessLabelBadge({ name, color }: { name: string; color: string | nul
       />
       {name}
     </Badge>
-  )
-}
-
-function TabButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        active
-          ? 'rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary'
-          : 'rounded-full border border-border/70 bg-background px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted/20'
-      }
-    >
-      {label}
-    </button>
   )
 }
 

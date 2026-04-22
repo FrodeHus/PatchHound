@@ -13,7 +13,7 @@ import { InsetPanel } from '@/components/ui/inset-panel'
 import { fetchEnrichmentSources } from '@/server/system.functions'
 import { ScanRunHistoryTab } from '@/components/features/admin/scan-runs/ScanRunHistoryTab'
 import { fetchScanRuns } from '@/api/authenticated-scans.functions'
-import { cn } from '@/lib/utils'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export const Route = createFileRoute('/_authed/admin/sources')({
   beforeLoad: ({ context }) => {
@@ -93,6 +93,26 @@ function SourcesAdministrationPage() {
   })
   const tenant = tenantQuery.data ?? null
   const enrichmentSources = enrichmentQuery.data ?? []
+  const handleViewChange = (nextView: 'tenant' | 'global-enrichment' | 'authenticated-scans') => {
+    if (nextView === 'authenticated-scans') {
+      void navigate({
+        to: '/admin/sources',
+        search: {
+          activeView: 'authenticated-scans',
+          page: 1,
+          pageSize: search.pageSize,
+        },
+      })
+      return
+    }
+
+    void navigate({
+      to: '/admin/sources',
+      search: {
+        activeView: nextView,
+      },
+    })
+  }
 
   return (
     <section className="space-y-6 pb-4">
@@ -107,56 +127,26 @@ function SourcesAdministrationPage() {
       </div>
 
       {(canManageEnrichment || canManageScans) ? (
-        <div className="inline-flex rounded-xl border border-border/70 bg-card/70 p-1">
-          <button
-            type="button"
-            className={viewToggleClassName(activeView === "tenant")}
-            onClick={() => {
-              void navigate({
-                to: '/admin/sources',
-                search: {
-                  activeView: 'tenant',
-                },
-              })
-            }}
-          >
-            Tenant Sources
-          </button>
-          {canManageEnrichment && (
-            <button
-              type="button"
-              className={viewToggleClassName(activeView === "global-enrichment")}
-              onClick={() => {
-                void navigate({
-                  to: '/admin/sources',
-                  search: {
-                    activeView: 'global-enrichment',
-                  },
-                })
-              }}
-            >
-              Global Enrichment
-            </button>
-          )}
-          {canManageScans && (
-            <button
-              type="button"
-              className={viewToggleClassName(activeView === "authenticated-scans")}
-              onClick={() => {
-                void navigate({
-                  to: '/admin/sources',
-                  search: {
-                    activeView: 'authenticated-scans',
-                    page: 1,
-                    pageSize: search.pageSize,
-                  },
-                })
-              }}
-            >
-              Authenticated Scans
-            </button>
-          )}
-        </div>
+        <Tabs
+          value={activeView}
+          onValueChange={(value) => handleViewChange(value as 'tenant' | 'global-enrichment' | 'authenticated-scans')}
+        >
+          <TabsList className="h-10 justify-start rounded-xl bg-card/70 p-1">
+            <TabsTrigger value="tenant" className="rounded-lg px-4 text-sm">
+              Tenant Sources
+            </TabsTrigger>
+            {canManageEnrichment ? (
+              <TabsTrigger value="global-enrichment" className="rounded-lg px-4 text-sm">
+                Global Enrichment
+              </TabsTrigger>
+            ) : null}
+            {canManageScans ? (
+              <TabsTrigger value="authenticated-scans" className="rounded-lg px-4 text-sm">
+                Authenticated Scans
+              </TabsTrigger>
+            ) : null}
+          </TabsList>
+        </Tabs>
       ) : null}
 
       {activeView === "tenant" ? (
@@ -352,13 +342,4 @@ function SourcesAdministrationPage() {
 
 function hasGlobalEnrichmentAccess(roles: string[]) {
   return roles.includes('GlobalAdmin')
-}
-
-function viewToggleClassName(isActive: boolean) {
-  return cn(
-    'rounded-2xl px-4 py-2 text-sm font-medium transition-colors',
-    isActive
-      ? 'bg-background text-foreground shadow-sm'
-      : 'text-muted-foreground hover:text-foreground',
-  )
 }
