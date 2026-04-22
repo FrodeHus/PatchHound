@@ -52,7 +52,7 @@ const tenantFixture: TenantDetail = {
 }
 
 describe('TenantAdministrationDetail device rules tab', () => {
-  it('renders the embedded tenant device rules panel instead of linking out', () => {
+  it('renders the embedded asset rules panel instead of linking out', () => {
     render(
       <TenantAdministrationDetail
         tenant={tenantFixture}
@@ -61,6 +61,7 @@ describe('TenantAdministrationDetail device rules tab', () => {
     )
 
     expect(screen.getByText('Embedded device rules for Contoso')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /asset rules/i })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /open device rules/i })).not.toBeInTheDocument()
   })
 })

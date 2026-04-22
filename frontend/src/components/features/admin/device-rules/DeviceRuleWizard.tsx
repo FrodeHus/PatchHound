@@ -8,6 +8,10 @@ import {
   previewDeviceRuleFilter,
   updateDeviceRule,
 } from '@/api/device-rules.functions'
+import {
+  assetRuleAssetTypeSchema,
+  type AssetRuleAssetType,
+} from '@/api/device-rules.schemas'
 import type {
   DeviceRule,
   DeviceRuleOperation,
@@ -63,6 +67,9 @@ export function DeviceRuleWizard({
 }: DeviceRuleWizardProps) {
   const router = useRouter()
   const [step, setStep] = useState(0)
+  const [assetType, setAssetType] = useState<AssetRuleAssetType>(
+    assetRuleAssetTypeSchema.parse(initialData?.assetType ?? 'Device'),
+  )
   const [name, setName] = useState(initialData?.name ?? '')
   const [description, setDescription] = useState(initialData?.description ?? '')
   const [filter, setFilter] = useState<FilterGroup>(
@@ -76,7 +83,7 @@ export function DeviceRuleWizard({
   const [preview, setPreview] = useState<FilterPreview | null>(null)
 
   const previewMutation = useMutation({
-    mutationFn: async () => previewDeviceRuleFilter({ data: { tenantId, filterDefinition: filter } }),
+    mutationFn: async () => previewDeviceRuleFilter({ data: { tenantId, assetType, filterDefinition: filter } }),
     onSuccess: (data) => setPreview(data),
   })
 
@@ -86,6 +93,7 @@ export function DeviceRuleWizard({
         return updateDeviceRule({
           data: {
             tenantId,
+            assetType,
             id: initialData.id,
             name,
             description: description || undefined,
@@ -98,6 +106,7 @@ export function DeviceRuleWizard({
       return createDeviceRule({
         data: {
           tenantId,
+          assetType,
           name,
           description: description || undefined,
           filterDefinition: filter,
@@ -167,6 +176,22 @@ export function DeviceRuleWizard({
           <CardContent className="space-y-4">
             <div className="grid gap-1.5">
               <label className="text-xs font-medium text-muted-foreground">
+                Asset type
+              </label>
+              <Select value={assetType} onValueChange={(value) => setAssetType(assetRuleAssetTypeSchema.parse(value))}>
+                <SelectTrigger className="rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Device">Device</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Asset rules are now typed, but this first slice only enables device rules.
+              </p>
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
                 Rule name
               </label>
               <Input
@@ -202,7 +227,7 @@ export function DeviceRuleWizard({
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <FilterBuilder value={filter} onChange={setFilter} />
+            <FilterBuilder assetType={assetType} value={filter} onChange={setFilter} />
 
             {filter.conditions.length > 0 && (
               <div className="space-y-3">
@@ -336,6 +361,13 @@ export function DeviceRuleWizard({
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
+            <InsetPanel className="space-y-2 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Asset type
+              </p>
+              <p className="text-sm font-medium">{assetType}</p>
+            </InsetPanel>
+
             <InsetPanel className="space-y-2 px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 Name

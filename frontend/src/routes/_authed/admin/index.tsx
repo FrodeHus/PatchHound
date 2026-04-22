@@ -55,7 +55,7 @@ const adminSections: AdminSection[] = [
     areas: [
       {
         title: 'Tenants',
-        description: 'Manage tenant identity, sources, AI settings, device rules, workflows, and business labels — all from one place.',
+        description: 'Manage tenant identity, sources, AI settings, asset rules, workflows, and business labels — all from one place.',
         to: '/admin/tenants',
         roles: ['GlobalAdmin', 'SecurityManager'],
         icon: Building2,
@@ -68,8 +68,8 @@ const adminSections: AdminSection[] = [
         icon: Tags,
       },
       {
-        title: 'Device rules',
-        description: 'Automate ownership and security-profile assignment based on tenant device conditions.',
+        title: 'Asset rules',
+        description: 'Automate ownership and security-profile assignment using the new asset-rule surface. This first slice targets devices.',
         to: '/admin/device-rules',
         roles: ['GlobalAdmin', 'SecurityManager'],
         icon: GitBranchPlus,

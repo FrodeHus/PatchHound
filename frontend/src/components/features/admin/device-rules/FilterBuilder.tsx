@@ -3,25 +3,23 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { FilterCondition, FilterGroup, FilterNode } from '@/api/device-rules.schemas'
-
-// Phase 1 canonical cleanup (Task 15): device-only filter builder.
-// The legacy AssetType / Software / CloudResource branch has been
-// removed alongside the AssetType abstraction — rules now target
-// devices exclusively.
+import type { AssetRuleAssetType, FilterCondition, FilterGroup, FilterNode } from '@/api/device-rules.schemas'
 
 type FilterBuilderProps = {
+  assetType: AssetRuleAssetType
   value: FilterGroup
   onChange: (value: FilterGroup) => void
 }
 
-const allFields = [
-  { value: 'Name', label: 'Name' },
-  { value: 'DeviceGroup', label: 'Device Group' },
-  { value: 'Platform', label: 'Platform' },
-  { value: 'Domain', label: 'Domain' },
-  { value: 'Tag', label: 'Tag' },
-] as const
+const fieldsByAssetType: Record<AssetRuleAssetType, ReadonlyArray<{ value: string; label: string }>> = {
+  Device: [
+    { value: 'Name', label: 'Name' },
+    { value: 'DeviceGroup', label: 'Device Group' },
+    { value: 'Platform', label: 'Platform' },
+    { value: 'Domain', label: 'Domain' },
+    { value: 'Tag', label: 'Tag' },
+  ],
+}
 
 const operators = [
   { value: 'Equals', label: 'Equals' },
@@ -30,9 +28,10 @@ const operators = [
   { value: 'EndsWith', label: 'Ends with' },
 ] as const
 
-export function FilterBuilder({ value, onChange }: FilterBuilderProps) {
+export function FilterBuilder({ assetType, value, onChange }: FilterBuilderProps) {
   return (
     <FilterGroupEditor
+      assetType={assetType}
       group={value}
       onChange={onChange}
       isRoot
@@ -41,16 +40,20 @@ export function FilterBuilder({ value, onChange }: FilterBuilderProps) {
 }
 
 function FilterGroupEditor({
+  assetType,
   group,
   onChange,
   onRemove,
   isRoot = false,
 }: {
+  assetType: AssetRuleAssetType
   group: FilterGroup
   onChange: (group: FilterGroup) => void
   onRemove?: () => void
   isRoot?: boolean
 }) {
+  const fields = fieldsByAssetType[assetType]
+
   const toggleOperator = () => {
     onChange({ ...group, operator: group.operator === 'AND' ? 'OR' : 'AND' })
   }
@@ -58,7 +61,7 @@ function FilterGroupEditor({
   const addCondition = () => {
     const newCondition: FilterCondition = {
       type: 'condition',
-      field: allFields[0].value,
+      field: fields[0].value,
       operator: 'Equals',
       value: '',
     }
@@ -115,6 +118,7 @@ function FilterGroupEditor({
           child.type === 'group' ? (
             <FilterGroupEditor
               key={index}
+              assetType={assetType}
               group={child}
               onChange={(updated) => updateChild(index, updated)}
               onRemove={() => removeChild(index)}
@@ -122,6 +126,7 @@ function FilterGroupEditor({
           ) : (
             <FilterConditionEditor
               key={index}
+              assetType={assetType}
               condition={child}
               onChange={(updated) => updateChild(index, updated)}
               onRemove={() => removeChild(index)}
@@ -145,14 +150,18 @@ function FilterGroupEditor({
 }
 
 function FilterConditionEditor({
+  assetType,
   condition,
   onChange,
   onRemove,
 }: {
+  assetType: AssetRuleAssetType
   condition: FilterCondition
   onChange: (condition: FilterCondition) => void
   onRemove: () => void
 }) {
+  const fields = fieldsByAssetType[assetType]
+
   return (
     <div className="flex items-center gap-2">
       <Select
@@ -166,7 +175,7 @@ function FilterConditionEditor({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {allFields.map((f) => (
+          {fields.map((f) => (
             <SelectItem key={f.value} value={f.value}>
               {f.label}
             </SelectItem>

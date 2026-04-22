@@ -22,10 +22,13 @@ namespace PatchHound.Api.Controllers;
 // DeviceBusinessLabel distinguishes rule-assigned from manual links
 // so delete/reorder can unwind only the rule's own effects.
 [ApiController]
+[Route("api/asset-rules")]
 [Route("api/device-rules")]
 [Authorize(Policy = Policies.ConfigureTenant)]
 public class DeviceRulesController : ControllerBase
 {
+    private const string DeviceAssetType = "Device";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -101,6 +104,9 @@ public class DeviceRulesController : ControllerBase
         var filter = DeserializeFilter(request.FilterDefinition);
         var operations = DeserializeOperations(request.Operations);
 
+        if (!IsSupportedAssetType(request.AssetType))
+            return BadRequest(new ProblemDetails { Title = "Only Device asset rules are supported in this slice." });
+
         if (filter is null || operations is null)
             return BadRequest(new ProblemDetails { Title = "Invalid filter or operations JSON." });
 
@@ -140,6 +146,9 @@ public class DeviceRulesController : ControllerBase
 
         var filter = DeserializeFilter(request.FilterDefinition);
         var operations = DeserializeOperations(request.Operations);
+
+        if (!IsSupportedAssetType(request.AssetType))
+            return BadRequest(new ProblemDetails { Title = "Only Device asset rules are supported in this slice." });
 
         if (filter is null || operations is null)
             return BadRequest(new ProblemDetails { Title = "Invalid filter or operations JSON." });
@@ -204,6 +213,9 @@ public class DeviceRulesController : ControllerBase
         if (_tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
+        if (!IsSupportedAssetType(request.AssetType))
+            return BadRequest(new ProblemDetails { Title = "Only Device asset rules are supported in this slice." });
+
         var filter = DeserializeFilter(request.FilterDefinition);
         if (filter is null)
             return BadRequest(new ProblemDetails { Title = "Invalid filter JSON." });
@@ -255,6 +267,7 @@ public class DeviceRulesController : ControllerBase
 
     private static DeviceRuleDto ToDto(DeviceRule rule) => new(
         rule.Id,
+        DeviceAssetType,
         rule.Name,
         rule.Description,
         rule.Priority,
@@ -266,6 +279,9 @@ public class DeviceRulesController : ControllerBase
         rule.LastExecutedAt,
         rule.LastMatchCount
     );
+
+    private static bool IsSupportedAssetType(string assetType) =>
+        string.Equals(assetType, DeviceAssetType, StringComparison.OrdinalIgnoreCase);
 
     private static FilterNode? DeserializeFilter(JsonElement element)
     {

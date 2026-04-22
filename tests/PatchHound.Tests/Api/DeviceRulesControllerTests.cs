@@ -90,6 +90,7 @@ public class DeviceRulesControllerTests : IDisposable
             new CreateDeviceRuleRequest(
                 "Critical workstations",
                 "Match anything named Device-A",
+                "Device",
                 SerializeJson(filter),
                 SerializeJson(operations)
             ),
@@ -98,11 +99,37 @@ public class DeviceRulesControllerTests : IDisposable
 
         var created = action.Result.Should().BeOfType<CreatedAtActionResult>().Subject;
         var dto = created.Value.Should().BeOfType<DeviceRuleDto>().Subject;
+        dto.AssetType.Should().Be("Device");
         dto.Name.Should().Be("Critical workstations");
         dto.Priority.Should().Be(1);
 
         var stored = await _dbContext.DeviceRules.SingleAsync(r => r.Id == dto.Id);
         stored.Name.Should().Be("Critical workstations");
+    }
+
+    [Fact]
+    public async Task Create_RejectsUnsupportedAssetType()
+    {
+        var filter = BuildNameFilter("Device-A");
+        var operations = new List<AssetRuleOperation>
+        {
+            new("SetCriticality", new Dictionary<string, string> { ["criticality"] = "High" }),
+        };
+
+        var action = await _controller.Create(
+            new CreateDeviceRuleRequest(
+                "Software rule",
+                "Not supported in the first slice",
+                "Software",
+                SerializeJson(filter),
+                SerializeJson(operations)
+            ),
+            CancellationToken.None
+        );
+
+        var badRequest = action.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        badRequest.Value.Should().BeOfType<ProblemDetails>()
+            .Subject.Title.Should().Be("Only Device asset rules are supported in this slice.");
     }
 
     [Fact]
@@ -121,6 +148,7 @@ public class DeviceRulesControllerTests : IDisposable
             new CreateDeviceRuleRequest(
                 "Bogus",
                 null,
+                "Device",
                 SerializeJson(filter),
                 SerializeJson(operations)
             ),
@@ -156,7 +184,7 @@ public class DeviceRulesControllerTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var action = await _controller.Preview(
-            new PreviewDeviceRuleFilterRequest(SerializeJson(BuildNameFilter("Device-A"))),
+            new PreviewDeviceRuleFilterRequest("Device", SerializeJson(BuildNameFilter("Device-A"))),
             CancellationToken.None
         );
 
@@ -183,7 +211,7 @@ public class DeviceRulesControllerTests : IDisposable
             ),
         };
         var createAction = await _controller.Create(
-            new CreateDeviceRuleRequest("Tag Device-A", null, SerializeJson(filter), SerializeJson(operations)),
+            new CreateDeviceRuleRequest("Tag Device-A", null, "Device", SerializeJson(filter), SerializeJson(operations)),
             CancellationToken.None
         );
         var createdRule = createAction.Result.Should().BeOfType<CreatedAtActionResult>()
@@ -228,7 +256,7 @@ public class DeviceRulesControllerTests : IDisposable
             ),
         };
         var createAction = await _controller.Create(
-            new CreateDeviceRuleRequest("Tag Device-A", null, SerializeJson(filter), SerializeJson(operations)),
+            new CreateDeviceRuleRequest("Tag Device-A", null, "Device", SerializeJson(filter), SerializeJson(operations)),
             CancellationToken.None
         );
         var createdRule = createAction.Result.Should().BeOfType<CreatedAtActionResult>()

@@ -24,7 +24,7 @@ export const fetchDeviceRules = createServerFn({ method: 'GET' })
   .handler(async ({ context, data: filters }): Promise<PagedDeviceRules> => {
     const requestContext = withTenantOverride(context, filters.tenantId)
     const params = buildFilterParams(filters)
-    const data = await apiGet(`/device-rules?${params.toString()}`, requestContext)
+    const data = await apiGet(`/asset-rules?${params.toString()}`, requestContext)
     return pagedDeviceRulesSchema.parse(data)
   })
 
@@ -32,7 +32,7 @@ export const fetchDeviceRule = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ id: z.string().uuid(), tenantId: z.string().uuid().optional() }))
   .handler(async ({ context, data: { id, tenantId } }): Promise<DeviceRule> => {
-    const data = await apiGet(`/device-rules/${id}`, withTenantOverride(context, tenantId))
+    const data = await apiGet(`/asset-rules/${id}`, withTenantOverride(context, tenantId))
     return deviceRuleSchema.parse(data)
   })
 
@@ -41,6 +41,7 @@ export const createDeviceRule = createServerFn({ method: 'POST' })
   .inputValidator(
     z.object({
       tenantId: z.string().uuid().optional(),
+      assetType: z.literal('Device').optional(),
       name: z.string(),
       description: z.string().optional(),
       filterDefinition: z.any(),
@@ -48,7 +49,10 @@ export const createDeviceRule = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ context, data }): Promise<DeviceRule> => {
-    const result = await apiPost('/device-rules', withTenantOverride(context, data.tenantId), data)
+    const result = await apiPost('/asset-rules', withTenantOverride(context, data.tenantId), {
+      ...data,
+      assetType: data.assetType ?? 'Device',
+    })
     return deviceRuleSchema.parse(result)
   })
 
@@ -58,6 +62,7 @@ export const updateDeviceRule = createServerFn({ method: 'POST' })
     z.object({
       tenantId: z.string().uuid().optional(),
       id: z.string().uuid(),
+      assetType: z.literal('Device').optional(),
       name: z.string(),
       description: z.string().optional(),
       enabled: z.boolean(),
@@ -67,9 +72,12 @@ export const updateDeviceRule = createServerFn({ method: 'POST' })
   )
   .handler(async ({ context, data: { id, ...payload } }): Promise<DeviceRule> => {
     const result = await apiPut(
-      `/device-rules/${id}`,
+      `/asset-rules/${id}`,
       withTenantOverride(context, payload.tenantId),
-      payload,
+      {
+        ...payload,
+        assetType: payload.assetType ?? 'Device',
+      },
     )
     return deviceRuleSchema.parse(result)
   })
@@ -78,14 +86,17 @@ export const deleteDeviceRule = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ id: z.string().uuid(), tenantId: z.string().uuid().optional() }))
   .handler(async ({ context, data: { id, tenantId } }) => {
-    await apiDelete(`/device-rules/${id}`, withTenantOverride(context, tenantId))
+    await apiDelete(`/asset-rules/${id}`, withTenantOverride(context, tenantId))
   })
 
 export const previewDeviceRuleFilter = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
-  .inputValidator(z.object({ tenantId: z.string().uuid().optional(), filterDefinition: z.any() }))
+  .inputValidator(z.object({ tenantId: z.string().uuid().optional(), assetType: z.literal('Device').optional(), filterDefinition: z.any() }))
   .handler(async ({ context, data }): Promise<FilterPreview> => {
-    const result = await apiPost('/device-rules/preview', withTenantOverride(context, data.tenantId), data)
+    const result = await apiPost('/asset-rules/preview', withTenantOverride(context, data.tenantId), {
+      ...data,
+      assetType: data.assetType ?? 'Device',
+    })
     return filterPreviewSchema.parse(result)
   })
 
@@ -93,12 +104,12 @@ export const runDeviceRules = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ tenantId: z.string().uuid().optional() }).optional())
   .handler(async ({ context, data }) => {
-    await apiPost('/device-rules/run', withTenantOverride(context, data?.tenantId))
+    await apiPost('/asset-rules/run', withTenantOverride(context, data?.tenantId))
   })
 
 export const reorderDeviceRules = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ tenantId: z.string().uuid().optional(), ruleIds: z.array(z.string().uuid()) }))
   .handler(async ({ context, data }) => {
-    await apiPut('/device-rules/reorder', withTenantOverride(context, data.tenantId), data)
+    await apiPut('/asset-rules/reorder', withTenantOverride(context, data.tenantId), data)
   })
