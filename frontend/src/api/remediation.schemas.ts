@@ -145,6 +145,7 @@ export const decisionContextSchema = z.object({
   softwareName: z.string(),
   softwareOwnerTeamId: z.string().uuid().nullable(),
   softwareOwnerTeamName: z.string().nullable(),
+  softwareOwnerAssignmentSource: z.string(),
   criticality: z.string(),
   summary: decisionSummarySchema,
   workflow: decisionWorkflowSummarySchema,

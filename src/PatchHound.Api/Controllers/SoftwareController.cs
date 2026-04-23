@@ -69,6 +69,11 @@ public class SoftwareController(
                 item.LastSeenAt,
                 item.OwnerTeamId,
                 OwnerTeamManagedByRule = item.OwnerTeamRuleId != null,
+                OwnerAssignmentSource = item.OwnerTeamId == null
+                    ? "Unassigned"
+                    : item.OwnerTeamRuleId != null
+                        ? "Rule"
+                        : "Manual",
                 OwnerTeamName = dbContext.Teams
                     .Where(team => team.Id == item.OwnerTeamId)
                     .Select(team => team.Name)
@@ -192,6 +197,7 @@ public class SoftwareController(
                 tenantSoftware.OwnerTeamId,
                 tenantSoftware.OwnerTeamName,
                 tenantSoftware.OwnerTeamManagedByRule,
+                tenantSoftware.OwnerAssignmentSource,
                 tenantSoftware.FirstSeenAt,
                 tenantSoftware.LastSeenAt,
                 installations.Count,
@@ -422,6 +428,11 @@ public class SoftwareController(
                 Category = item.SoftwareProduct.Category,
                 item.OwnerTeamId,
                 OwnerTeamManagedByRule = item.OwnerTeamRuleId != null,
+                OwnerAssignmentSource = item.OwnerTeamId == null
+                    ? "Unassigned"
+                    : item.OwnerTeamRuleId != null
+                        ? "Rule"
+                        : "Manual",
                 OwnerTeamName = dbContext.Teams
                     .Where(team => team.Id == item.OwnerTeamId)
                     .Select(team => team.Name)
@@ -486,7 +497,8 @@ public class SoftwareController(
                         item.MaintenanceWindowDate,
                         item.OwnerTeamId,
                         item.OwnerTeamName,
-                        item.OwnerTeamManagedByRule
+                        item.OwnerTeamManagedByRule,
+                        item.OwnerAssignmentSource
                     ))
                     .ToList(),
                 totalCount,

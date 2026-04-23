@@ -46,6 +46,7 @@ const detailFixture: TenantSoftwareDetail = {
   ownerTeamId: '44444444-4444-4444-4444-444444444444',
   ownerTeamName: 'Platform Engineering',
   ownerTeamManagedByRule: true,
+  ownerAssignmentSource: 'Rule',
   firstSeenAt: '2026-04-01T00:00:00Z',
   lastSeenAt: '2026-04-10T00:00:00Z',
   activeInstallCount: 3,
@@ -131,6 +132,6 @@ describe('SoftwareDetailPage tabs', () => {
     )
 
     expect(screen.getAllByText('Platform Engineering')).toHaveLength(2)
-    expect(screen.getByText(/rule managed/i)).toBeInTheDocument()
+    expect(screen.getByText('Rule')).toBeInTheDocument()
   })
 })

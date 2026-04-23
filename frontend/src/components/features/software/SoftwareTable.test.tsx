@@ -24,6 +24,7 @@ const itemFixture: TenantSoftwareListItem = {
   ownerTeamId: '33333333-3333-3333-3333-333333333333',
   ownerTeamName: 'Platform Engineering',
   ownerTeamManagedByRule: false,
+  ownerAssignmentSource: 'Manual',
 }
 
 describe('SoftwareTable', () => {
@@ -52,5 +53,6 @@ describe('SoftwareTable', () => {
     )
 
     expect(screen.getByText('Platform Engineering')).toBeInTheDocument()
+    expect(screen.getByText('Manual')).toBeInTheDocument()
   })
 })

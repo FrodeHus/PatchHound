@@ -209,9 +209,16 @@ export function SoftwareTable({
         accessorKey: 'ownerTeamName',
         header: ({ column }) => <SortableColumnHeader column={column} title="Owner team" />,
         cell: ({ row }) => (
-          <span className={row.original.ownerTeamName ? 'text-foreground' : 'text-muted-foreground'}>
-            {row.original.ownerTeamName ?? 'Unassigned'}
-          </span>
+          <div className="space-y-1">
+            <span className={row.original.ownerTeamName ? 'text-foreground' : 'text-muted-foreground'}>
+              {row.original.ownerTeamName ?? 'Unassigned'}
+            </span>
+            <div>
+              <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${ownerAssignmentTone(row.original.ownerAssignmentSource)}`}>
+                {row.original.ownerAssignmentSource}
+              </span>
+            </div>
+          </div>
         ),
       },
       {
@@ -406,4 +413,15 @@ export function SoftwareTable({
       </div>
     </DataTableWorkbench>
   );
+}
+
+function ownerAssignmentTone(source: string) {
+  switch (source) {
+    case 'Rule':
+      return 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300'
+    case 'Manual':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    default:
+      return 'border-border/70 bg-background/70 text-muted-foreground'
+  }
 }

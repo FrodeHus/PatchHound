@@ -482,6 +482,12 @@ public class RemediationDecisionQueryService(
             .OrderByDescending(workflow => workflow.CreatedAt)
             .FirstOrDefaultAsync(ct);
 
+        var tenantSoftware = await dbContext.SoftwareTenantRecords.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.SoftwareProductId == softwareProductId)
+            .OrderByDescending(item => item.LastSeenAt)
+            .ThenByDescending(item => item.UpdatedAt)
+            .FirstOrDefaultAsync(ct);
+
         // Current decision
         var decisionQuery = dbContext.RemediationDecisions.AsNoTracking()
             .Include(d => d.VulnerabilityOverrides)
@@ -738,6 +744,13 @@ public class RemediationDecisionQueryService(
         var currentUserTeamIds = currentUserTeams.Select(item => item.TeamId).ToList();
 
         var softwareOwnerTeamId = activeWorkflow?.SoftwareOwnerTeamId;
+        var softwareOwnerAssignmentSource = activeWorkflow is null
+            ? "Default"
+            : tenantSoftware?.OwnerTeamId == null
+                ? "Default"
+                : tenantSoftware.OwnerTeamRuleId != null
+                    ? "Rule"
+                    : "Manual";
         var softwareOwnerTeamName = softwareOwnerTeamId is Guid resolvedSoftwareOwnerTeamId
             && resolvedSoftwareOwnerTeamId != Guid.Empty
             ? await dbContext.Teams.AsNoTracking()
@@ -774,6 +787,7 @@ public class RemediationDecisionQueryService(
             softwareName,
             softwareOwnerTeamId,
             softwareOwnerTeamName,
+            softwareOwnerAssignmentSource,
             assetCriticality.ToString(),
             summary,
             new DecisionWorkflowSummaryDto(

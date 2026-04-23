@@ -5,6 +5,7 @@ public record DecisionContextDto(
     string SoftwareName,
     Guid? SoftwareOwnerTeamId,
     string? SoftwareOwnerTeamName,
+    string SoftwareOwnerAssignmentSource,
     string Criticality,
     DecisionSummaryDto Summary,
     DecisionWorkflowSummaryDto Workflow,

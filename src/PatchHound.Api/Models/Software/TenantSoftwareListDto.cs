@@ -16,7 +16,8 @@ public record TenantSoftwareListItemDto(
     DateTimeOffset? MaintenanceWindowDate,
     Guid? OwnerTeamId,
     string? OwnerTeamName,
-    bool OwnerTeamManagedByRule
+    bool OwnerTeamManagedByRule,
+    string OwnerAssignmentSource
 );
 
 public record TenantSoftwareFilterQuery(

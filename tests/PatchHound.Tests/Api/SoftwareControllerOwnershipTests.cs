@@ -75,6 +75,7 @@ public class SoftwareControllerOwnershipTests : IDisposable
         dto.OwnerTeamId.Should().Be(ownerTeam.Id);
         dto.OwnerTeamName.Should().Be("Platform Engineering");
         dto.OwnerTeamManagedByRule.Should().BeTrue();
+        dto.OwnerAssignmentSource.Should().Be("Rule");
     }
 
     [Fact]
@@ -112,6 +113,30 @@ public class SoftwareControllerOwnershipTests : IDisposable
 
         var storedWorkflow = await _dbContext.RemediationWorkflows.SingleAsync(item => item.Id == workflow.Id);
         storedWorkflow.SoftwareOwnerTeamId.Should().Be(nextTeam.Id);
+    }
+
+    [Fact]
+    public async Task Get_ReturnsManualOwnerAssignmentSource()
+    {
+        var ownerTeam = Team.Create(_tenantId, "Platform Engineering");
+        var product = SoftwareProduct.Create("Contoso Agent", "Contoso", null);
+        var tenantSoftware = SoftwareTenantRecord.Create(
+            _tenantId,
+            null,
+            product.Id,
+            DateTimeOffset.UtcNow.AddDays(-5),
+            DateTimeOffset.UtcNow.AddDays(-1)
+        );
+        tenantSoftware.AssignOwnerTeam(ownerTeam.Id);
+
+        await _dbContext.AddRangeAsync(ownerTeam, product, tenantSoftware);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Get(tenantSoftware.Id, CancellationToken.None);
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var dto = ok.Value.Should().BeOfType<TenantSoftwareDetailDto>().Subject;
+        dto.OwnerAssignmentSource.Should().Be("Manual");
     }
 
     public void Dispose()

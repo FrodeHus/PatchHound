@@ -161,9 +161,14 @@ export function SoftwareDetailPage({
                   <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                     Software owner
                   </p>
-                  <p className="text-sm font-medium text-foreground">
-                    {detail.ownerTeamName ?? 'Unassigned'}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium text-foreground">
+                      {detail.ownerTeamName ?? 'Unassigned'}
+                    </p>
+                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${ownerAssignmentTone(detail.ownerAssignmentSource)}`}>
+                      {detail.ownerAssignmentSource}
+                    </span>
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {detail.ownerTeamManagedByRule
                       ? 'Rule managed. Manual changes will override the current rule-owned assignment.'
@@ -904,6 +909,19 @@ function PageButton({
       {label}
     </button>
   )
+}
+
+function ownerAssignmentTone(source: string) {
+  switch (source) {
+    case 'Rule':
+      return 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300'
+    case 'Manual':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    case 'Default':
+      return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+    default:
+      return 'border-border/70 bg-background/70 text-muted-foreground'
+  }
 }
 
 function normalizeVersion(version: string | null) {

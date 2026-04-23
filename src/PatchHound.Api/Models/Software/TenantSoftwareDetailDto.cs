@@ -17,6 +17,7 @@ public record TenantSoftwareDetailDto(
     Guid? OwnerTeamId,
     string? OwnerTeamName,
     bool OwnerTeamManagedByRule,
+    string OwnerAssignmentSource,
     DateTimeOffset? FirstSeenAt,
     DateTimeOffset? LastSeenAt,
     int ActiveInstallCount,
