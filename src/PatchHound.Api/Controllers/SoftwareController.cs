@@ -6,6 +6,7 @@ using PatchHound.Api.Auth;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Software;
 using PatchHound.Api.Services;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
@@ -57,57 +58,53 @@ public class SoftwareController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        // id is the SoftwareProductId in the new pipeline
-        var softwareProduct = await dbContext.SoftwareProducts.AsNoTracking()
-            .Where(p => p.Id == id)
-            .Select(p => new
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+        var tenantSoftware = await BuildTenantSoftwareRecordsQuery(currentTenantId, activeSnapshotId)
+            .Where(item => item.Id == id)
+            .Select(item => new
             {
-                p.Id,
-                p.Name,
-                p.Vendor,
-                p.Category,
-                p.Description,
-                p.DescriptionGeneratedAt,
-                p.DescriptionProviderType,
-                p.DescriptionProfileName,
-                p.DescriptionModel,
-                p.EolProductSlug,
-                p.EolDate,
-                p.EolLatestVersion,
-                p.EolIsLts,
-                p.EolSupportEndDate,
-                p.EolIsDiscontinued,
-                p.EolEnrichedAt,
-                p.SupplyChainRemediationPath,
-                p.SupplyChainInsightConfidence,
-                p.SupplyChainSourceFormat,
-                p.SupplyChainPrimaryComponentName,
-                p.SupplyChainPrimaryComponentVersion,
-                p.SupplyChainFixedVersion,
-                p.SupplyChainAffectedVulnerabilityCount,
-                p.SupplyChainSummary,
-                p.SupplyChainEnrichedAt,
+                item.Id,
+                item.SoftwareProductId,
+                item.FirstSeenAt,
+                item.LastSeenAt,
+                item.OwnerTeamId,
+                Name = item.SoftwareProduct.Name,
+                Vendor = item.SoftwareProduct.Vendor,
+                Category = item.SoftwareProduct.Category,
+                Description = item.SoftwareProduct.Description,
+                DescriptionGeneratedAt = item.SoftwareProduct.DescriptionGeneratedAt,
+                DescriptionProviderType = item.SoftwareProduct.DescriptionProviderType,
+                DescriptionProfileName = item.SoftwareProduct.DescriptionProfileName,
+                DescriptionModel = item.SoftwareProduct.DescriptionModel,
+                EolProductSlug = item.SoftwareProduct.EolProductSlug,
+                EolDate = item.SoftwareProduct.EolDate,
+                EolLatestVersion = item.SoftwareProduct.EolLatestVersion,
+                EolIsLts = item.SoftwareProduct.EolIsLts,
+                EolSupportEndDate = item.SoftwareProduct.EolSupportEndDate,
+                EolIsDiscontinued = item.SoftwareProduct.EolIsDiscontinued,
+                EolEnrichedAt = item.SoftwareProduct.EolEnrichedAt,
+                SupplyChainRemediationPath = item.SoftwareProduct.SupplyChainRemediationPath,
+                SupplyChainInsightConfidence = item.SoftwareProduct.SupplyChainInsightConfidence,
+                SupplyChainSourceFormat = item.SoftwareProduct.SupplyChainSourceFormat,
+                SupplyChainPrimaryComponentName = item.SoftwareProduct.SupplyChainPrimaryComponentName,
+                SupplyChainPrimaryComponentVersion = item.SoftwareProduct.SupplyChainPrimaryComponentVersion,
+                SupplyChainFixedVersion = item.SoftwareProduct.SupplyChainFixedVersion,
+                SupplyChainAffectedVulnerabilityCount = item.SoftwareProduct.SupplyChainAffectedVulnerabilityCount,
+                SupplyChainSummary = item.SoftwareProduct.SupplyChainSummary,
+                SupplyChainEnrichedAt = item.SoftwareProduct.SupplyChainEnrichedAt,
             })
             .FirstOrDefaultAsync(ct);
-        if (softwareProduct is null)
+        if (tenantSoftware is null)
         {
             return NotFound();
         }
 
-        // Verify this software is actually installed in the current tenant
-        var hasTenantInstall = await dbContext.InstalledSoftware.AsNoTracking()
-            .AnyAsync(i => i.TenantId == currentTenantId && i.SoftwareProductId == id, ct);
-        if (!hasTenantInstall)
-        {
-            return NotFound();
-        }
-
-        var installations = await dbContext.InstalledSoftware.AsNoTracking()
-            .Where(i => i.TenantId == currentTenantId && i.SoftwareProductId == id)
+        var installations = await dbContext.SoftwareProductInstallations.AsNoTracking()
+            .Where(i => i.TenantId == currentTenantId && i.TenantSoftwareId == id && i.IsActive)
             .Select(i => new
             {
-                i.DeviceId,
-                i.Version,
+                DeviceId = i.DeviceAssetId,
+                Version = i.DetectedVersion,
                 i.FirstSeenAt,
                 i.LastSeenAt,
             })
@@ -115,7 +112,7 @@ public class SoftwareController(
 
         var openExposures = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
             .Where(e => e.TenantId == currentTenantId
-                && e.SoftwareProductId == id
+                && e.SoftwareProductId == tenantSoftware.SoftwareProductId
                 && e.Status == ExposureStatus.Open)
             .Select(e => new { e.DeviceId, e.VulnerabilityId })
             .ToListAsync(ct);
@@ -162,7 +159,7 @@ public class SoftwareController(
                     ct
                 );
         var impactBreakdown = BuildExposureImpactBreakdown(
-            id,
+            tenantSoftware.SoftwareProductId,
             activeDeviceIds.Count,
             highValueDeviceCount,
             openVulnerabilityRows
@@ -170,28 +167,25 @@ public class SoftwareController(
 
         var remediationSummary = await remediationTaskQueryService.BuildSoftwareSummaryAsync(
             currentTenantId,
-            id,
+            tenantSoftware.SoftwareProductId,
             ct
         );
 
-        var firstSeenAt = installations.Count == 0 ? (DateTimeOffset?)null : installations.Min(i => i.FirstSeenAt);
-        var lastSeenAt = installations.Count == 0 ? (DateTimeOffset?)null : installations.Max(i => i.LastSeenAt);
-
         return Ok(
             new TenantSoftwareDetailDto(
-                softwareProduct.Id,
-                softwareProduct.Id,
+                tenantSoftware.Id,
+                tenantSoftware.SoftwareProductId,
                 null, // PrimarySoftwareAssetId — not applicable in new pipeline
-                softwareProduct.Name,
-                softwareProduct.Vendor,
-                softwareProduct.Category,
-                softwareProduct.Description,
-                softwareProduct.DescriptionGeneratedAt,
-                softwareProduct.DescriptionProviderType,
-                softwareProduct.DescriptionProfileName,
-                softwareProduct.DescriptionModel,
-                firstSeenAt,
-                lastSeenAt,
+                tenantSoftware.Name,
+                tenantSoftware.Vendor,
+                tenantSoftware.Category,
+                tenantSoftware.Description,
+                tenantSoftware.DescriptionGeneratedAt,
+                tenantSoftware.DescriptionProviderType,
+                tenantSoftware.DescriptionProfileName,
+                tenantSoftware.DescriptionModel,
+                tenantSoftware.FirstSeenAt,
+                tenantSoftware.LastSeenAt,
                 installations.Count,
                 activeDeviceIds.Count,
                 vulnerableInstallCount,
@@ -205,28 +199,28 @@ public class SoftwareController(
                 ),
                 remediationSummary,
                 versionCohorts,
-                softwareProduct.EolEnrichedAt.HasValue
+                tenantSoftware.EolEnrichedAt.HasValue
                     ? new SoftwareLifecycleDto(
-                        softwareProduct.EolDate,
-                        softwareProduct.EolLatestVersion,
-                        softwareProduct.EolIsLts,
-                        softwareProduct.EolSupportEndDate,
-                        softwareProduct.EolIsDiscontinued,
-                        softwareProduct.EolEnrichedAt,
-                        softwareProduct.EolProductSlug
+                        tenantSoftware.EolDate,
+                        tenantSoftware.EolLatestVersion,
+                        tenantSoftware.EolIsLts,
+                        tenantSoftware.EolSupportEndDate,
+                        tenantSoftware.EolIsDiscontinued,
+                        tenantSoftware.EolEnrichedAt,
+                        tenantSoftware.EolProductSlug
                     )
                     : null,
-                softwareProduct.SupplyChainEnrichedAt.HasValue
+                tenantSoftware.SupplyChainEnrichedAt.HasValue
                     ? new SupplyChainInsightDto(
-                        softwareProduct.SupplyChainRemediationPath.ToString(),
-                        softwareProduct.SupplyChainInsightConfidence.ToString(),
-                        softwareProduct.SupplyChainSourceFormat,
-                        softwareProduct.SupplyChainPrimaryComponentName,
-                        softwareProduct.SupplyChainPrimaryComponentVersion,
-                        softwareProduct.SupplyChainFixedVersion,
-                        softwareProduct.SupplyChainAffectedVulnerabilityCount,
-                        softwareProduct.SupplyChainSummary ?? string.Empty,
-                        softwareProduct.SupplyChainEnrichedAt
+                        tenantSoftware.SupplyChainRemediationPath.ToString(),
+                        tenantSoftware.SupplyChainInsightConfidence.ToString(),
+                        tenantSoftware.SupplyChainSourceFormat,
+                        tenantSoftware.SupplyChainPrimaryComponentName,
+                        tenantSoftware.SupplyChainPrimaryComponentVersion,
+                        tenantSoftware.SupplyChainFixedVersion,
+                        tenantSoftware.SupplyChainAffectedVulnerabilityCount,
+                        tenantSoftware.SupplyChainSummary ?? string.Empty,
+                        tenantSoftware.SupplyChainEnrichedAt
                     )
                     : null
             )
@@ -289,17 +283,19 @@ public class SoftwareController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        // id is the SoftwareProductId in the new pipeline
-        var tenantSoftwareExists = await dbContext.InstalledSoftware.AsNoTracking()
-            .AnyAsync(i => i.TenantId == currentTenantId && i.SoftwareProductId == id, ct);
-        if (!tenantSoftwareExists)
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+        var tenantSoftware = await BuildTenantSoftwareRecordsQuery(currentTenantId, activeSnapshotId)
+            .Where(item => item.Id == id)
+            .Select(item => new { item.Id, item.SoftwareProductId })
+            .FirstOrDefaultAsync(ct);
+        if (tenantSoftware is null)
         {
             return NotFound(new ProblemDetails { Title = "Tenant software not found" });
         }
 
         var result = await softwareDescriptionJobService.EnqueueAsync(
             currentTenantId,
-            id,
+            tenantSoftware.SoftwareProductId,
             request.TenantAiProfileId,
             ct
         );
@@ -311,7 +307,7 @@ public class SoftwareController(
         return Ok(
             new TenantSoftwareDescriptionJobDto(
                 result.Value.Id,
-                result.Value.SoftwareProductId,
+                tenantSoftware.SoftwareProductId,
                 result.Value.Status.ToString(),
                 string.IsNullOrWhiteSpace(result.Value.Error) ? null : result.Value.Error,
                 result.Value.RequestedAt,
@@ -333,7 +329,17 @@ public class SoftwareController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        var job = await softwareDescriptionJobService.GetLatestAsync(currentTenantId, id, ct);
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+        var tenantSoftware = await BuildTenantSoftwareRecordsQuery(currentTenantId, activeSnapshotId)
+            .Where(item => item.Id == id)
+            .Select(item => new { item.SoftwareProductId })
+            .FirstOrDefaultAsync(ct);
+        if (tenantSoftware is null)
+        {
+            return Ok(null);
+        }
+
+        var job = await softwareDescriptionJobService.GetLatestAsync(currentTenantId, tenantSoftware.SoftwareProductId, ct);
         if (job is null)
         {
             return Ok(null);
@@ -365,37 +371,25 @@ public class SoftwareController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        // Base query: distinct software products seen in this tenant
-        var installedQuery = dbContext.InstalledSoftware.AsNoTracking()
-            .Where(i => i.TenantId == currentTenantId);
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+        var tenantSoftwareQuery = BuildTenantSoftwareRecordsQuery(currentTenantId, activeSnapshotId);
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
-            installedQuery = installedQuery.Where(i =>
-                i.SoftwareProductId == dbContext.SoftwareProducts
-                    .Where(p =>
-                        p.Name.Contains(filter.Search)
-                        || (p.Vendor != null && p.Vendor.Contains(filter.Search)))
-                    .Select(p => p.Id)
-                    .FirstOrDefault()
-                || dbContext.SoftwareProducts
-                    .Any(p =>
-                        p.Id == i.SoftwareProductId
-                        && (p.Name.Contains(filter.Search)
-                            || (p.Vendor != null && p.Vendor.Contains(filter.Search))))
-            );
+            tenantSoftwareQuery = tenantSoftwareQuery.Where(item =>
+                item.SoftwareProduct.Name.Contains(filter.Search)
+                || (item.SoftwareProduct.Vendor != null && item.SoftwareProduct.Vendor.Contains(filter.Search)));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Category))
         {
-            installedQuery = installedQuery.Where(i =>
-                dbContext.SoftwareProducts.Any(p =>
-                    p.Id == i.SoftwareProductId && p.Category == filter.Category));
+            tenantSoftwareQuery = tenantSoftwareQuery.Where(item =>
+                item.SoftwareProduct.Category == filter.Category);
         }
 
         if (filter.VulnerableOnly == true)
         {
-            installedQuery = installedQuery.Where(i =>
+            tenantSoftwareQuery = tenantSoftwareQuery.Where(i =>
                 dbContext.DeviceVulnerabilityExposures.Any(e =>
                     e.TenantId == currentTenantId
                     && e.SoftwareProductId == i.SoftwareProductId
@@ -405,69 +399,49 @@ public class SoftwareController(
         // MissedMaintenanceWindow semantics not yet modeled; filter intentionally no-ops.
         if (filter.MissedMaintenanceWindow == true)
         {
-            installedQuery = installedQuery.Where(_ => false);
+            tenantSoftwareQuery = tenantSoftwareQuery.Where(_ => false);
         }
 
-        // Distinct software product IDs matching the filters
-        var distinctProductIds = installedQuery
-            .Select(i => i.SoftwareProductId)
-            .Distinct();
+        var totalCount = await tenantSoftwareQuery.CountAsync(ct);
 
-        var totalCount = await distinctProductIds.CountAsync(ct);
-
-        var rows = await distinctProductIds
-            .Join(
-                dbContext.SoftwareProducts.AsNoTracking(),
-                productId => productId,
-                product => product.Id,
-                (productId, product) => new
-                {
-                    Id = productId,
-                    SoftwareProductId = productId,
-                    product.Name,
-                    product.Vendor,
-                    product.Category,
-                    product.EolEnrichedAt,
-                    product.SupplyChainEnrichedAt,
-                }
-            )
+        var rows = await tenantSoftwareQuery
             .Select(item => new
             {
                 item.Id,
                 item.SoftwareProductId,
-                CanonicalName = item.Name,
-                CanonicalVendor = item.Vendor,
-                item.Category,
+                CanonicalName = item.SoftwareProduct.Name,
+                CanonicalVendor = item.SoftwareProduct.Vendor,
+                Category = item.SoftwareProduct.Category,
                 CurrentRiskScore = dbContext.SoftwareRiskScores
-                    .Where(score => score.TenantId == currentTenantId && score.SoftwareProductId == item.Id)
+                    .Where(score => score.TenantId == currentTenantId && score.SoftwareProductId == item.SoftwareProductId)
                     .Select(score => (decimal?)score.OverallScore)
                     .FirstOrDefault(),
-                ActiveInstallCount = dbContext.InstalledSoftware
-                    .Count(i => i.TenantId == currentTenantId && i.SoftwareProductId == item.Id),
-                UniqueDeviceCount = dbContext.InstalledSoftware
-                    .Where(i => i.TenantId == currentTenantId && i.SoftwareProductId == item.Id)
-                    .Select(i => i.DeviceId)
+                ActiveInstallCount = dbContext.SoftwareProductInstallations
+                    .Count(i => i.TenantId == currentTenantId && i.TenantSoftwareId == item.Id && i.IsActive),
+                UniqueDeviceCount = dbContext.SoftwareProductInstallations
+                    .Where(i => i.TenantId == currentTenantId && i.TenantSoftwareId == item.Id && i.IsActive)
+                    .Select(i => i.DeviceAssetId)
                     .Distinct()
                     .Count(),
                 ActiveVulnerabilityCount = dbContext.DeviceVulnerabilityExposures
                     .Where(e =>
                         e.TenantId == currentTenantId
-                        && e.SoftwareProductId == item.Id
+                        && e.SoftwareProductId == item.SoftwareProductId
                         && e.Status == ExposureStatus.Open)
                     .Select(e => e.VulnerabilityId)
                     .Distinct()
                     .Count(),
-                VersionCount = dbContext.InstalledSoftware
-                    .Where(i => i.TenantId == currentTenantId && i.SoftwareProductId == item.Id && i.Version != "")
-                    .Select(i => i.Version)
+                VersionCount = dbContext.SoftwareProductInstallations
+                    .Where(i => i.TenantId == currentTenantId && i.TenantSoftwareId == item.Id && i.IsActive && i.DetectedVersion != null && i.DetectedVersion != "")
+                    .Select(i => i.DetectedVersion)
                     .Distinct()
                     .Count(),
-                LastSeenAt = (DateTimeOffset?)dbContext.InstalledSoftware
-                    .Where(i => i.TenantId == currentTenantId && i.SoftwareProductId == item.Id)
+                LastSeenAt = (DateTimeOffset?)dbContext.SoftwareProductInstallations
+                    .Where(i => i.TenantId == currentTenantId && i.TenantSoftwareId == item.Id && i.IsActive)
                     .Max(i => (DateTimeOffset?)i.LastSeenAt),
                 MaintenanceWindowDate = (DateTimeOffset?)null,
                 ExposureImpactScore = dbContext.SoftwareRiskScores
-                    .Where(score => score.TenantId == currentTenantId && score.SoftwareProductId == item.Id)
+                    .Where(score => score.TenantId == currentTenantId && score.SoftwareProductId == item.SoftwareProductId)
                     .Select(score => (decimal?)score.MaxExposureScore)
                     .FirstOrDefault(),
             })
@@ -519,37 +493,35 @@ public class SoftwareController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        // id is the SoftwareProductId in the new pipeline
-        var hasTenantInstall = await dbContext.InstalledSoftware.AsNoTracking()
-            .AnyAsync(i => i.TenantId == currentTenantId && i.SoftwareProductId == id, ct);
-        if (!hasTenantInstall)
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+        var tenantSoftware = await BuildTenantSoftwareRecordsQuery(currentTenantId, activeSnapshotId)
+            .Where(item => item.Id == id)
+            .Select(item => new { item.Id, item.SoftwareProductId, SoftwareName = item.SoftwareProduct.Name })
+            .FirstOrDefaultAsync(ct);
+        if (tenantSoftware is null)
         {
             return NotFound();
         }
 
-        var softwareName = await dbContext.SoftwareProducts.AsNoTracking()
-            .Where(p => p.Id == id)
-            .Select(p => p.Name)
-            .FirstOrDefaultAsync(ct) ?? string.Empty;
-
-        var installationsQuery = dbContext.InstalledSoftware.AsNoTracking()
-            .Where(i => i.TenantId == currentTenantId && i.SoftwareProductId == id);
+        var installationsQuery = dbContext.SoftwareProductInstallations.AsNoTracking()
+            .Where(i => i.TenantId == currentTenantId && i.TenantSoftwareId == id);
 
         if (query.Version is not null)
         {
             if (string.IsNullOrWhiteSpace(query.Version))
             {
-                installationsQuery = installationsQuery.Where(i => i.Version == "");
+                installationsQuery = installationsQuery.Where(i => i.DetectedVersion == null || i.DetectedVersion == "");
             }
             else
             {
                 var version = query.Version.Trim();
-                installationsQuery = installationsQuery.Where(i => i.Version == version);
+                installationsQuery = installationsQuery.Where(i => i.DetectedVersion == version);
             }
         }
-
-        // ActiveOnly has no meaning in InstalledSoftware (rows are always current observations)
-        // kept for API compatibility
+        if (query.ActiveOnly == true)
+        {
+            installationsQuery = installationsQuery.Where(i => i.IsActive);
+        }
 
         var totalCount = await installationsQuery.CountAsync(ct);
         var rows = await installationsQuery
@@ -558,17 +530,20 @@ public class SoftwareController(
             .Take(pagination.BoundedPageSize)
             .Join(
                 dbContext.Devices.AsNoTracking(),
-                i => i.DeviceId,
+                i => i.DeviceAssetId,
                 d => d.Id,
                 (i, d) => new
                 {
                     i.Id,
-                    DeviceId = i.DeviceId,
+                    DeviceId = i.DeviceAssetId,
                     DeviceName = d.ComputerDnsName ?? d.Name,
                     DeviceCriticality = d.Criticality.ToString(),
-                    i.Version,
+                    i.DetectedVersion,
                     i.FirstSeenAt,
                     i.LastSeenAt,
+                    i.RemovedAt,
+                    i.IsActive,
+                    i.CurrentEpisodeNumber,
                     d.OwnerUserId,
                     d.OwnerTeamId,
                     d.SecurityProfileId,
@@ -579,9 +554,12 @@ public class SoftwareController(
                 item.DeviceId,
                 item.DeviceName,
                 item.DeviceCriticality,
-                item.Version,
+                item.DetectedVersion,
                 item.FirstSeenAt,
                 item.LastSeenAt,
+                item.RemovedAt,
+                item.IsActive,
+                item.CurrentEpisodeNumber,
                 item.OwnerUserId,
                 item.OwnerTeamId,
                 OwnerUserName = dbContext.Users
@@ -600,7 +578,7 @@ public class SoftwareController(
                     .Where(e =>
                         e.TenantId == currentTenantId
                         && e.DeviceId == item.DeviceId
-                        && e.SoftwareProductId == id
+                        && e.SoftwareProductId == tenantSoftware.SoftwareProductId
                         && e.Status == ExposureStatus.Open)
                     .Select(e => e.VulnerabilityId)
                     .Distinct()
@@ -616,18 +594,18 @@ public class SoftwareController(
             new PagedResponse<TenantSoftwareInstallationDto>(
                 rows
                     .Select(item => new TenantSoftwareInstallationDto(
-                        id,
+                        tenantSoftware.Id,
                         item.DeviceId,
                         item.DeviceName,
                         item.DeviceCriticality,
                         item.Id,          // InstalledSoftware.Id as the "asset id"
-                        softwareName,
-                        string.IsNullOrEmpty(item.Version) ? null : item.Version,
+                        tenantSoftware.SoftwareName,
+                        string.IsNullOrEmpty(item.DetectedVersion) ? null : item.DetectedVersion,
                         item.FirstSeenAt,
                         item.LastSeenAt,
-                        null,             // RemovedAt — not tracked in new pipeline
-                        true,             // IsActive — presence in table means active
-                        0,                // CurrentEpisodeNumber — not tracked
+                        item.RemovedAt,
+                        item.IsActive,
+                        item.CurrentEpisodeNumber,
                         item.SecurityProfileName,
                         item.OwnerUserId,
                         item.OwnerUserName,
@@ -656,16 +634,18 @@ public class SoftwareController(
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        // id is the SoftwareProductId in the new pipeline
-        var hasTenantInstall = await dbContext.InstalledSoftware.AsNoTracking()
-            .AnyAsync(i => i.TenantId == currentTenantId && i.SoftwareProductId == id, ct);
-        if (!hasTenantInstall)
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+        var tenantSoftware = await BuildTenantSoftwareRecordsQuery(currentTenantId, activeSnapshotId)
+            .Where(item => item.Id == id)
+            .Select(item => new { item.SoftwareProductId })
+            .FirstOrDefaultAsync(ct);
+        if (tenantSoftware is null)
         {
             return NotFound();
         }
 
         var exposures = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
-            .Where(e => e.TenantId == currentTenantId && e.SoftwareProductId == id)
+            .Where(e => e.TenantId == currentTenantId && e.SoftwareProductId == tenantSoftware.SoftwareProductId)
             .Select(e => new
             {
                 e.VulnerabilityId,
@@ -768,7 +748,6 @@ public class SoftwareController(
         }
 
         var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
-
         var tenantSoftware = await dbContext
             .SoftwareTenantRecords.AsNoTracking()
             .Where(item =>
@@ -811,21 +790,21 @@ public class SoftwareController(
                 item.MatchReason,
             })
             .ToListAsync(ct);
-        var installations = await dbContext.InstalledSoftware.AsNoTracking()
-            .Where(i => i.TenantId == currentTenantId && i.SoftwareProductId == tenantSoftware.SoftwareProductId)
+        var installations = await dbContext.SoftwareProductInstallations.AsNoTracking()
+            .Where(i => i.TenantId == currentTenantId && i.TenantSoftwareId == tenantSoftware.Id && i.IsActive)
             .Join(
                 dbContext.Devices.AsNoTracking(),
-                i => i.DeviceId,
+                i => i.DeviceAssetId,
                 d => d.Id,
                 (i, d) => new
                 {
-                    DeviceAssetId = i.DeviceId,
+                    DeviceAssetId = i.DeviceAssetId,
                     DeviceName = d.ComputerDnsName ?? d.Name,
                     DeviceCriticality = d.Criticality.ToString(),
-                    i.Version,
+                    Version = i.DetectedVersion,
                     i.FirstSeenAt,
                     i.LastSeenAt,
-                    IsActive = true,
+                    i.IsActive,
                 })
             .ToListAsync(ct);
 
@@ -1151,5 +1130,25 @@ public class SoftwareController(
             )
             .Select(item => item.ActiveSnapshotId)
             .FirstOrDefaultAsync(ct);
+    }
+
+    private IQueryable<SoftwareTenantRecord> BuildTenantSoftwareRecordsQuery(
+        Guid tenantId,
+        Guid? activeSnapshotId
+    )
+    {
+        var query = dbContext.SoftwareTenantRecords.AsNoTracking()
+            .Where(item => item.TenantId == tenantId);
+
+        if (activeSnapshotId.HasValue)
+        {
+            query = query.Where(item => item.SnapshotId == activeSnapshotId);
+        }
+        else
+        {
+            query = query.Where(item => item.SnapshotId == null);
+        }
+
+        return query;
     }
 }

@@ -59,6 +59,8 @@ public class IngestionServicePhase3Tests
             new ExposureAssessmentService(db, new EnvironmentalSeverityCalculator()),
             new RiskScoreService(db, NullLogger<RiskScoreService>.Instance),
             new VulnerabilityResolver(db),
+            normalizedSoftwareProjectionService: null,
+            remediationDecisionService: null,
             NullLogger<IngestionService>.Instance);
 
         await ingestion.RunExposureDerivationAsync(tenantId, CancellationToken.None);

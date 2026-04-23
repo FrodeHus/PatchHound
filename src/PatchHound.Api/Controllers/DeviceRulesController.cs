@@ -39,6 +39,7 @@ public class DeviceRulesController : ControllerBase
     private readonly ITenantContext _tenantContext;
     private readonly IDeviceRuleEvaluationService _evaluationService;
     private readonly DeviceRuleFilterBuilder _filterBuilder;
+    private readonly SoftwareRuleFilterBuilder _softwareFilterBuilder;
     private readonly RiskRefreshService _riskRefreshService;
 
     public DeviceRulesController(
@@ -46,12 +47,14 @@ public class DeviceRulesController : ControllerBase
         ITenantContext tenantContext,
         IDeviceRuleEvaluationService evaluationService,
         DeviceRuleFilterBuilder filterBuilder,
+        SoftwareRuleFilterBuilder softwareFilterBuilder,
         RiskRefreshService riskRefreshService)
     {
         _dbContext = dbContext;
         _tenantContext = tenantContext;
         _evaluationService = evaluationService;
         _filterBuilder = filterBuilder;
+        _softwareFilterBuilder = softwareFilterBuilder;
         _riskRefreshService = riskRefreshService;
     }
 
@@ -180,7 +183,6 @@ public class DeviceRulesController : ControllerBase
         if (rule is null)
             return NotFound();
 
-        var affectedDeviceIds = await GetMatchingDeviceIdsAsync(rule, tenantId, ct);
         var operations = rule.ParseOperations();
 
         _dbContext.DeviceRules.Remove(rule);
@@ -196,7 +198,7 @@ public class DeviceRulesController : ControllerBase
             remaining[i].SetPriority(i + 1);
 
         await _dbContext.SaveChangesAsync(ct);
-        await ResetDeletedRuleEffectsAsync(tenantId, rule.Id, affectedDeviceIds, operations, ct);
+        await ResetDeletedRuleEffectsAsync(tenantId, rule, operations, ct);
         await _evaluationService.EvaluateRulesAsync(tenantId, ct);
         await _riskRefreshService.RefreshForTenantAsync(
             tenantId,
@@ -330,9 +332,23 @@ public class DeviceRulesController : ControllerBase
     {
         if (string.Equals(assetType, SoftwareAssetType, StringComparison.OrdinalIgnoreCase))
         {
-            return operations.Count == 0
-                ? null
-                : "Software asset rules do not support operations yet.";
+            foreach (var operation in operations)
+            {
+                switch (operation.Type)
+                {
+                    case "AssignOwnerTeam":
+                        if (!operation.Parameters.TryGetValue("teamId", out var softwareTeamId)
+                            || !Guid.TryParse(softwareTeamId, out _))
+                        {
+                            return "AssignOwnerTeam requires a valid teamId.";
+                        }
+                        break;
+                    default:
+                        return $"Unknown software rule operation type: {operation.Type}.";
+                }
+            }
+
+            return null;
         }
 
         foreach (var operation in operations)
@@ -352,6 +368,14 @@ public class DeviceRulesController : ControllerBase
                         || !Guid.TryParse(teamId, out _))
                     {
                         return "AssignTeam requires a valid teamId.";
+                    }
+                    break;
+
+                case "AssignOwnerTeam":
+                    if (!operation.Parameters.TryGetValue("teamId", out var ownerTeamId)
+                        || !Guid.TryParse(ownerTeamId, out _))
+                    {
+                        return "AssignOwnerTeam requires a valid teamId.";
                     }
                     break;
 
@@ -384,102 +408,25 @@ public class DeviceRulesController : ControllerBase
         FilterNode filter,
         CancellationToken ct)
     {
-        var query = _dbContext.SoftwareProducts
+        var predicate = _softwareFilterBuilder.Build(filter);
+        var query = _dbContext.SoftwareTenantRecords
             .AsNoTracking()
-            .Where(product => _dbContext.InstalledSoftware
-                .Any(install => install.TenantId == tenantId && install.SoftwareProductId == product.Id));
-
-        query = ApplySoftwareFilter(query, filter);
+            .Where(item => item.TenantId == tenantId)
+            .Where(predicate);
 
         var count = await query.CountAsync(ct);
         var samples = await query
-            .OrderBy(product => product.Name)
-            .ThenBy(product => product.Vendor)
+            .OrderBy(item => item.SoftwareProduct.Name)
+            .ThenBy(item => item.SoftwareProduct.Vendor)
             .Take(5)
-            .Select(product => new ValueTuple<Guid, string>(
-                product.Id,
-                string.IsNullOrWhiteSpace(product.Vendor)
-                    ? product.Name
-                    : $"{product.Vendor} {product.Name}"))
+            .Select(item => new ValueTuple<Guid, string>(
+                item.Id,
+                string.IsNullOrWhiteSpace(item.SoftwareProduct.Vendor)
+                    ? item.SoftwareProduct.Name
+                    : $"{item.SoftwareProduct.Vendor} {item.SoftwareProduct.Name}"))
             .ToListAsync(ct);
 
         return (count, samples);
-    }
-
-    private static IQueryable<SoftwareProduct> ApplySoftwareFilter(
-        IQueryable<SoftwareProduct> query,
-        FilterNode node)
-    {
-        return node switch
-        {
-            FilterGroup group => ApplySoftwareGroup(query, group),
-            FilterCondition condition => ApplySoftwareCondition(query, condition),
-            _ => throw new InvalidOperationException($"Unknown filter node type: {node.Type}")
-        };
-    }
-
-    private static IQueryable<SoftwareProduct> ApplySoftwareGroup(
-        IQueryable<SoftwareProduct> query,
-        FilterGroup group)
-    {
-        if (group.Conditions.Count == 0)
-            return query;
-
-        IQueryable<SoftwareProduct>? current = null;
-        foreach (var condition in group.Conditions)
-        {
-            var scoped = ApplySoftwareFilter(query, condition);
-            current = current is null
-                ? scoped
-                : group.Operator.Equals("OR", StringComparison.OrdinalIgnoreCase)
-                    ? current.Union(scoped)
-                    : current.Intersect(scoped);
-        }
-
-        return current ?? query;
-    }
-
-    private static IQueryable<SoftwareProduct> ApplySoftwareCondition(
-        IQueryable<SoftwareProduct> query,
-        FilterCondition condition)
-    {
-        return condition.Field switch
-        {
-            "Name" => ApplyStringComparison(query, nameof(SoftwareProduct.Name), condition),
-            "Vendor" => ApplyStringComparison(query, nameof(SoftwareProduct.Vendor), condition),
-            _ => throw new InvalidOperationException($"Unknown software filter field: {condition.Field}")
-        };
-    }
-
-    private static IQueryable<SoftwareProduct> ApplyStringComparison(
-        IQueryable<SoftwareProduct> query,
-        string propertyName,
-        FilterCondition condition)
-    {
-        var value = condition.Value;
-        return condition.Op switch
-        {
-            nameof(string.Equals) => query.Where(BuildStringPredicate(propertyName, value, nameof(string.Equals))),
-            nameof(string.StartsWith) => query.Where(BuildStringPredicate(propertyName, value, nameof(string.StartsWith))),
-            nameof(string.Contains) => query.Where(BuildStringPredicate(propertyName, value, nameof(string.Contains))),
-            nameof(string.EndsWith) => query.Where(BuildStringPredicate(propertyName, value, nameof(string.EndsWith))),
-            _ => throw new InvalidOperationException($"Unknown operator: {condition.Op}")
-        };
-    }
-
-    private static System.Linq.Expressions.Expression<Func<SoftwareProduct, bool>> BuildStringPredicate(
-        string propertyName,
-        string value,
-        string operation)
-    {
-        var parameter = System.Linq.Expressions.Expression.Parameter(typeof(SoftwareProduct), "product");
-        var property = System.Linq.Expressions.Expression.Property(parameter, propertyName);
-        var constant = System.Linq.Expressions.Expression.Constant(value);
-        var body = System.Linq.Expressions.Expression.Call(
-            property,
-            typeof(string).GetMethod(operation, [typeof(string)])!,
-            constant);
-        return System.Linq.Expressions.Expression.Lambda<Func<SoftwareProduct, bool>>(body, parameter);
     }
 
     private async Task<string?> ValidateOperationReferencesAsync(
@@ -503,13 +450,14 @@ public class DeviceRulesController : ControllerBase
                     break;
 
                 case "AssignTeam":
+                case "AssignOwnerTeam":
                     if (operation.Parameters.TryGetValue("teamId", out var teamId)
                         && Guid.TryParse(teamId, out var parsedTeamId))
                     {
                         var exists = await _dbContext.Teams
                             .AnyAsync(team => team.TenantId == tenantId && team.Id == parsedTeamId, ct);
                         if (!exists)
-                            return "AssignTeam references a team that does not belong to the active tenant.";
+                            return $"{operation.Type} references a team that does not belong to the active tenant.";
                     }
                     break;
 
@@ -550,15 +498,68 @@ public class DeviceRulesController : ControllerBase
         }
     }
 
+    private async Task<List<Guid>> GetMatchingSoftwareIdsAsync(
+        DeviceRule rule,
+        Guid tenantId,
+        CancellationToken ct)
+    {
+        try
+        {
+            var predicate = _softwareFilterBuilder.Build(rule.ParseFilter());
+            return await _dbContext.SoftwareTenantRecords
+                .AsNoTracking()
+                .Where(item => item.TenantId == tenantId)
+                .Where(predicate)
+                .Select(item => item.Id)
+                .ToListAsync(ct);
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     private async Task ResetDeletedRuleEffectsAsync(
         Guid tenantId,
-        Guid deletedRuleId,
-        IReadOnlyCollection<Guid> deviceIds,
+        DeviceRule deletedRule,
         IReadOnlyCollection<AssetRuleOperation> operations,
         CancellationToken ct)
     {
         if (operations.Count == 0)
             return;
+
+        if (string.Equals(deletedRule.AssetType, SoftwareAssetType, StringComparison.OrdinalIgnoreCase))
+        {
+            var softwareIds = await GetMatchingSoftwareIdsAsync(deletedRule, tenantId, ct);
+            foreach (var operation in operations)
+            {
+                if (operation.Type != "AssignOwnerTeam" || softwareIds.Count == 0)
+                {
+                    continue;
+                }
+
+                var records = await _dbContext.SoftwareTenantRecords
+                    .Where(item =>
+                        item.TenantId == tenantId
+                        && softwareIds.Contains(item.Id)
+                        && item.OwnerTeamRuleId == deletedRule.Id)
+                    .ToListAsync(ct);
+
+                foreach (var record in records)
+                {
+                    record.ClearRuleAssignedOwnerTeam(deletedRule.Id);
+                }
+
+                if (records.Count > 0)
+                {
+                    await _dbContext.SaveChangesAsync(ct);
+                }
+            }
+
+            return;
+        }
+
+        var deviceIds = await GetMatchingDeviceIdsAsync(deletedRule, tenantId, ct);
 
         foreach (var operation in operations)
         {
@@ -571,11 +572,11 @@ public class DeviceRulesController : ControllerBase
                             .Where(device =>
                                 device.TenantId == tenantId
                                 && deviceIds.Contains(device.Id)
-                                && device.SecurityProfileRuleId == deletedRuleId)
+                                && device.SecurityProfileRuleId == deletedRule.Id)
                             .ToListAsync(ct);
 
                         foreach (var device in devices)
-                            device.ClearRuleAssignedSecurityProfile(deletedRuleId);
+                            device.ClearRuleAssignedSecurityProfile(deletedRule.Id);
 
                         if (devices.Count > 0)
                             await _dbContext.SaveChangesAsync(ct);
@@ -589,11 +590,29 @@ public class DeviceRulesController : ControllerBase
                             .Where(device =>
                                 device.TenantId == tenantId
                                 && deviceIds.Contains(device.Id)
-                                && device.FallbackTeamRuleId == deletedRuleId)
+                                && device.FallbackTeamRuleId == deletedRule.Id)
                             .ToListAsync(ct);
 
                         foreach (var device in devices)
-                            device.ClearRuleAssignedFallbackTeam(deletedRuleId);
+                            device.ClearRuleAssignedFallbackTeam(deletedRule.Id);
+
+                        if (devices.Count > 0)
+                            await _dbContext.SaveChangesAsync(ct);
+                    }
+                    break;
+
+                case "AssignOwnerTeam":
+                    if (operation.Parameters.TryGetValue("teamId", out _) && deviceIds.Count > 0)
+                    {
+                        var devices = await _dbContext.Devices
+                            .Where(device =>
+                                device.TenantId == tenantId
+                                && deviceIds.Contains(device.Id)
+                                && device.OwnerTeamRuleId == deletedRule.Id)
+                            .ToListAsync(ct);
+
+                        foreach (var device in devices)
+                            device.ClearRuleAssignedOwnerTeam(deletedRule.Id);
 
                         if (devices.Count > 0)
                             await _dbContext.SaveChangesAsync(ct);
@@ -610,7 +629,7 @@ public class DeviceRulesController : ControllerBase
                             device.TenantId == tenantId
                             && deviceIds.Contains(device.Id)
                             && device.CriticalitySource == "Rule"
-                            && device.CriticalityRuleId == deletedRuleId)
+                            && device.CriticalityRuleId == deletedRule.Id)
                         .ToListAsync(ct);
 
                     foreach (var device in devices)
@@ -631,7 +650,7 @@ public class DeviceRulesController : ControllerBase
                         var existingAssignments = await _dbContext.DeviceBusinessLabels
                             .Where(link =>
                                 link.TenantId == tenantId
-                                && link.AssignedByRuleId == deletedRuleId
+                                && link.AssignedByRuleId == deletedRule.Id
                                 && link.SourceType == DeviceBusinessLabel.RuleSourceType)
                             .ToListAsync(ct);
 

@@ -42,6 +42,7 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
         new(
             _dbContext,
             new DeviceRuleFilterBuilder(_dbContext),
+            new SoftwareRuleFilterBuilder(),
             Substitute.For<ILogger<DeviceRuleEvaluationService>>()
         );
 
@@ -259,6 +260,87 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
         var reconciled = await _dbContext.Devices.SingleAsync(item => item.Id == device.Id);
         reconciled.FallbackTeamId.Should().BeNull();
         reconciled.FallbackTeamRuleId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task EvaluateRulesAsync_AssignOwnerTeamOperation_TracksAndReconcilesDeviceRuleOwnership()
+    {
+        var team = Team.Create(_tenantId, "Infrastructure Owners");
+        var device = CreateDevice("device-owner", "Ops-Server-01", Criticality.Medium);
+        var rule = DeviceRule.Create(
+            _tenantId,
+            "Assign owner team",
+            null,
+            1,
+            "Device",
+            new PatchHound.Core.Models.FilterCondition("Name", "StartsWith", "Ops-"),
+            [
+                new PatchHound.Core.Models.AssetRuleOperation(
+                    "AssignOwnerTeam",
+                    new Dictionary<string, string> { ["teamId"] = team.Id.ToString() }
+                )
+            ]
+        );
+
+        await _dbContext.AddRangeAsync(team, device, rule);
+        await _dbContext.SaveChangesAsync();
+
+        var service = CreateService();
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var assigned = await _dbContext.Devices.SingleAsync(item => item.Id == device.Id);
+        assigned.OwnerTeamId.Should().Be(team.Id);
+        assigned.OwnerTeamRuleId.Should().Be(rule.Id);
+
+        assigned.UpdateDetails("Laptop-01");
+        await _dbContext.SaveChangesAsync();
+
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var reconciled = await _dbContext.Devices.SingleAsync(item => item.Id == device.Id);
+        reconciled.OwnerTeamId.Should().BeNull();
+        reconciled.OwnerTeamRuleId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task EvaluateRulesAsync_AssignOwnerTeamOperation_TracksAndReconcilesSoftwareRuleOwnership()
+    {
+        var team = Team.Create(_tenantId, "Software Owners");
+        var product = SoftwareProduct.Create("Contoso", "Browser", null);
+        var software = SoftwareTenantRecord.Create(_tenantId, null, product.Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var rule = DeviceRule.Create(
+            _tenantId,
+            "Assign software owner team",
+            null,
+            1,
+            "Software",
+            new PatchHound.Core.Models.FilterCondition("Vendor", "Equals", "Contoso"),
+            [
+                new PatchHound.Core.Models.AssetRuleOperation(
+                    "AssignOwnerTeam",
+                    new Dictionary<string, string> { ["teamId"] = team.Id.ToString() }
+                )
+            ]
+        );
+
+        await _dbContext.AddRangeAsync(team, product, software, rule);
+        await _dbContext.SaveChangesAsync();
+
+        var service = CreateService();
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var assigned = await _dbContext.SoftwareTenantRecords.SingleAsync(item => item.Id == software.Id);
+        assigned.OwnerTeamId.Should().Be(team.Id);
+        assigned.OwnerTeamRuleId.Should().Be(rule.Id);
+
+        rule.Update(rule.Name, rule.Description, rule.Enabled, "Software", new PatchHound.Core.Models.FilterCondition("Vendor", "Equals", "Fabrikam"), rule.ParseOperations());
+        await _dbContext.SaveChangesAsync();
+
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var reconciled = await _dbContext.SoftwareTenantRecords.SingleAsync(item => item.Id == software.Id);
+        reconciled.OwnerTeamId.Should().BeNull();
+        reconciled.OwnerTeamRuleId.Should().BeNull();
     }
 
     [Fact]

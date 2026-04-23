@@ -65,6 +65,7 @@ public class DeviceRulesControllerTests : IDisposable
         var evaluationService = new DeviceRuleEvaluationService(
             _dbContext,
             filterBuilder,
+            new SoftwareRuleFilterBuilder(),
             Substitute.For<Microsoft.Extensions.Logging.ILogger<DeviceRuleEvaluationService>>()
         );
 
@@ -73,6 +74,7 @@ public class DeviceRulesControllerTests : IDisposable
             _tenantContext,
             evaluationService,
             filterBuilder,
+            new SoftwareRuleFilterBuilder(),
             riskRefreshService
         );
     }
@@ -129,19 +131,26 @@ public class DeviceRulesControllerTests : IDisposable
 
         var badRequest = action.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
         badRequest.Value.Should().BeOfType<ProblemDetails>()
-            .Subject.Title.Should().Be("Software asset rules do not support operations yet.");
+            .Subject.Title.Should().Be("Unknown software rule operation type: SetCriticality.");
     }
 
     [Fact]
-    public async Task Create_AllowsSoftwareRuleWithoutOperations()
+    public async Task Create_AllowsSoftwareRuleWithAssignOwnerTeamOperation()
     {
+        var team = Team.Create(_tenantId, "Software Owners");
+        await _dbContext.Teams.AddAsync(team);
+        await _dbContext.SaveChangesAsync();
+
         var action = await _controller.Create(
             new CreateDeviceRuleRequest(
                 "Browsers",
                 "Matches software by vendor",
                 "Software",
                 SerializeJson(BuildSoftwareFilter("Vendor", "Contoso")),
-                SerializeJson(new List<AssetRuleOperation>())
+                SerializeJson(new List<AssetRuleOperation>
+                {
+                    new("AssignOwnerTeam", new Dictionary<string, string> { ["teamId"] = team.Id.ToString() }),
+                })
             ),
             CancellationToken.None
         );
@@ -222,10 +231,14 @@ public class DeviceRulesControllerTests : IDisposable
         var device = CreateDevice("device-1", "Device-A", Criticality.Medium);
         var matchingProduct = SoftwareProduct.Create("Contoso", "Browser", null);
         var otherProduct = SoftwareProduct.Create("Fabrikam", "Agent", null);
+        var matchingTenantSoftware = SoftwareTenantRecord.Create(_tenantId, null, matchingProduct.Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var otherTenantSoftware = SoftwareTenantRecord.Create(_tenantId, null, otherProduct.Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
         await _dbContext.AddRangeAsync(
             device,
             matchingProduct,
             otherProduct,
+            matchingTenantSoftware,
+            otherTenantSoftware,
             InstalledSoftware.Observe(_tenantId, device.Id, matchingProduct.Id, _sourceSystemId, "1.0.0", DateTimeOffset.UtcNow),
             InstalledSoftware.Observe(_tenantId, device.Id, otherProduct.Id, _sourceSystemId, "2.0.0", DateTimeOffset.UtcNow));
         await _dbContext.SaveChangesAsync();
@@ -238,7 +251,7 @@ public class DeviceRulesControllerTests : IDisposable
         var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var preview = ok.Value.Should().BeOfType<DeviceRulePreviewDto>().Subject;
         preview.Count.Should().Be(1);
-        preview.Samples.Should().ContainSingle().Which.Id.Should().Be(matchingProduct.Id);
+        preview.Samples.Should().ContainSingle().Which.Id.Should().Be(matchingTenantSoftware.Id);
     }
 
     [Fact]
@@ -348,7 +361,7 @@ public class DeviceRulesControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task Run_IgnoresSoftwareRules()
+    public async Task Run_RecordsExecutionForSoftwareRules()
     {
         var rule = DeviceRule.Create(
             _tenantId,
@@ -366,7 +379,7 @@ public class DeviceRulesControllerTests : IDisposable
         action.Should().BeOfType<NoContentResult>();
 
         var stored = await _dbContext.DeviceRules.SingleAsync(r => r.Id == rule.Id);
-        stored.LastExecutedAt.Should().BeNull();
+        stored.LastExecutedAt.Should().NotBeNull();
     }
 
     private Device CreateDevice(string externalId, string name, Criticality criticality)

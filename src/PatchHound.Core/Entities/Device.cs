@@ -21,6 +21,7 @@ public class Device
     public OwnerType OwnerType { get; private set; }
     public Guid? OwnerUserId { get; private set; }
     public Guid? OwnerTeamId { get; private set; }
+    public Guid? OwnerTeamRuleId { get; private set; }
     public Guid? FallbackTeamId { get; private set; }
     public Guid? FallbackTeamRuleId { get; private set; }
 
@@ -111,6 +112,7 @@ public class Device
         OwnerType = OwnerType.User;
         OwnerUserId = userId;
         OwnerTeamId = null;
+        OwnerTeamRuleId = null;
     }
 
     public void AssignTeamOwner(Guid teamId)
@@ -118,6 +120,40 @@ public class Device
         OwnerType = OwnerType.Team;
         OwnerTeamId = teamId;
         OwnerUserId = null;
+        OwnerTeamRuleId = null;
+    }
+
+    public void AssignTeamOwnerFromRule(Guid? teamId, Guid ruleId)
+    {
+        if (teamId.HasValue)
+        {
+            OwnerType = OwnerType.Team;
+            OwnerTeamId = teamId;
+            OwnerUserId = null;
+            OwnerTeamRuleId = ruleId;
+            return;
+        }
+
+        if (OwnerTeamRuleId == ruleId)
+        {
+            OwnerType = OwnerType.User;
+            OwnerTeamId = null;
+            OwnerUserId = null;
+            OwnerTeamRuleId = null;
+        }
+    }
+
+    public void ClearRuleAssignedOwnerTeam(Guid ruleId)
+    {
+        if (OwnerTeamRuleId != ruleId)
+        {
+            return;
+        }
+
+        OwnerType = OwnerType.User;
+        OwnerTeamId = null;
+        OwnerUserId = null;
+        OwnerTeamRuleId = null;
     }
 
     public void SetFallbackTeamFromRule(Guid? teamId, Guid ruleId)

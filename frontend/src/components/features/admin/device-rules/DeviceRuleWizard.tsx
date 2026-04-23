@@ -198,7 +198,7 @@ export function DeviceRuleWizard({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Device rules support execution. Software rules support targeting and preview in this slice.
+                Device and software rules support owner-team assignment. Device-only operations remain available where applicable.
               </p>
             </div>
             <div className="grid gap-1.5">
@@ -299,21 +299,36 @@ export function DeviceRuleWizard({
 
       {step === 2 && (
         <Card className="rounded-2xl border-border/70">
-          <CardHeader>
-            <CardTitle>Operations</CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <CardHeader>
+              <CardTitle>Operations</CardTitle>
+              <p className="text-sm text-muted-foreground">
               {isSoftwareRule
-                ? 'Software rules do not apply operations yet. This slice stores and previews software targeting only.'
+                ? 'Select one or more operations to apply to matching tenant software records.'
                 : 'Select one or more operations to apply to matching devices.'}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
             {isSoftwareRule ? (
-              <InsetPanel className="px-4 py-3 text-sm text-muted-foreground">
-                Software rules can be saved and previewed, but execution stays device-only until software operations are introduced.
-              </InsetPanel>
+              <OperationEditor
+                type="AssignOwnerTeam"
+                label="Assign Owner Team"
+                description="Set the owning team on matching tenant software inventory records."
+                options={teams.map((t) => ({ value: t.id, label: t.name }))}
+                paramKey="teamId"
+                operations={operations}
+                onChange={setOperations}
+              />
             ) : (
               <>
+                <OperationEditor
+                  type="AssignOwnerTeam"
+                  label="Assign Owner Team"
+                  description="Set the owning team on matching devices."
+                  options={teams.map((t) => ({ value: t.id, label: t.name }))}
+                  paramKey="teamId"
+                  operations={operations}
+                  onChange={setOperations}
+                />
                 <OperationEditor
                   type="AssignSecurityProfile"
                   label="Assign Security Profile"
@@ -419,6 +434,8 @@ export function DeviceRuleWizard({
                         <Badge variant="outline" className="text-[10px]">
                           {op.type === "AssignSecurityProfile"
                             ? "Security Profile"
+                            : op.type === "AssignOwnerTeam"
+                              ? "Owner Team"
                             : op.type === "AssignTeam"
                               ? "Team"
                               : op.type === "AssignBusinessLabel"
@@ -440,7 +457,7 @@ export function DeviceRuleWizard({
               ) : (
                 <p className="text-sm text-muted-foreground">
                   {isSoftwareRule
-                    ? 'No software operations are available yet.'
+                    ? 'No operations selected.'
                     : 'No operations selected.'}
                 </p>
               )}
@@ -546,6 +563,8 @@ function buildOperationImpactLines(
     switch (operation.type) {
       case 'AssignSecurityProfile':
         return `set security profile to ${describeOperationTarget(operation, securityProfiles, businessLabels, teams, scanProfiles)}`
+      case 'AssignOwnerTeam':
+        return `assign owner team ${describeOperationTarget(operation, securityProfiles, businessLabels, teams, scanProfiles)}`
       case 'AssignTeam':
         return `assign fallback team ${describeOperationTarget(operation, securityProfiles, businessLabels, teams, scanProfiles)}`
       case 'AssignBusinessLabel':
@@ -573,6 +592,11 @@ function describeOperationTarget(
   }
 
   if (operation.type === 'AssignTeam') {
+    return teams.find((team) => team.id === operation.parameters.teamId)?.name
+      ?? operation.parameters.teamId
+  }
+
+  if (operation.type === 'AssignOwnerTeam') {
     return teams.find((team) => team.id === operation.parameters.teamId)?.name
       ?? operation.parameters.teamId
   }
