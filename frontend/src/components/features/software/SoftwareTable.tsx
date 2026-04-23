@@ -206,6 +206,15 @@ export function SoftwareTable({
         header: ({ column }) => <SortableColumnHeader column={column} title="Versions" />,
       },
       {
+        accessorKey: 'ownerTeamName',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Owner team" />,
+        cell: ({ row }) => (
+          <span className={row.original.ownerTeamName ? 'text-foreground' : 'text-muted-foreground'}>
+            {row.original.ownerTeamName ?? 'Unassigned'}
+          </span>
+        ),
+      },
+      {
         accessorKey: 'activeVulnerabilityCount',
         header: ({ column }) => <SortableColumnHeader column={column} title="Open vulns" />,
         cell: ({ row }) => (

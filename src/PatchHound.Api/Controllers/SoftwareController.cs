@@ -68,6 +68,11 @@ public class SoftwareController(
                 item.FirstSeenAt,
                 item.LastSeenAt,
                 item.OwnerTeamId,
+                OwnerTeamManagedByRule = item.OwnerTeamRuleId != null,
+                OwnerTeamName = dbContext.Teams
+                    .Where(team => team.Id == item.OwnerTeamId)
+                    .Select(team => team.Name)
+                    .FirstOrDefault(),
                 Name = item.SoftwareProduct.Name,
                 Vendor = item.SoftwareProduct.Vendor,
                 Category = item.SoftwareProduct.Category,
@@ -184,6 +189,9 @@ public class SoftwareController(
                 tenantSoftware.DescriptionProviderType,
                 tenantSoftware.DescriptionProfileName,
                 tenantSoftware.DescriptionModel,
+                tenantSoftware.OwnerTeamId,
+                tenantSoftware.OwnerTeamName,
+                tenantSoftware.OwnerTeamManagedByRule,
                 tenantSoftware.FirstSeenAt,
                 tenantSoftware.LastSeenAt,
                 installations.Count,
@@ -412,6 +420,12 @@ public class SoftwareController(
                 CanonicalName = item.SoftwareProduct.Name,
                 CanonicalVendor = item.SoftwareProduct.Vendor,
                 Category = item.SoftwareProduct.Category,
+                item.OwnerTeamId,
+                OwnerTeamManagedByRule = item.OwnerTeamRuleId != null,
+                OwnerTeamName = dbContext.Teams
+                    .Where(team => team.Id == item.OwnerTeamId)
+                    .Select(team => team.Name)
+                    .FirstOrDefault(),
                 CurrentRiskScore = dbContext.SoftwareRiskScores
                     .Where(score => score.TenantId == currentTenantId && score.SoftwareProductId == item.SoftwareProductId)
                     .Select(score => (decimal?)score.OverallScore)
@@ -469,7 +483,10 @@ public class SoftwareController(
                         item.VersionCount,
                         item.ExposureImpactScore,
                         item.LastSeenAt,
-                        item.MaintenanceWindowDate
+                        item.MaintenanceWindowDate,
+                        item.OwnerTeamId,
+                        item.OwnerTeamName,
+                        item.OwnerTeamManagedByRule
                     ))
                     .ToList(),
                 totalCount,
@@ -477,6 +494,66 @@ public class SoftwareController(
                 pagination.BoundedPageSize
             )
         );
+    }
+
+    [HttpPut("{id:guid}/owner")]
+    [Authorize(Policy = Policies.ModifyVulnerabilities)]
+    public async Task<IActionResult> AssignOwner(
+        Guid id,
+        [FromBody] AssignTenantSoftwareOwnerRequest request,
+        CancellationToken ct
+    )
+    {
+        if (tenantContext.CurrentTenantId is not Guid currentTenantId)
+        {
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+        }
+
+        var activeSnapshotId = await ResolveActiveSoftwareSnapshotIdAsync(currentTenantId, ct);
+        var tenantSoftware = await dbContext.SoftwareTenantRecords
+            .FirstOrDefaultAsync(
+                item =>
+                    item.Id == id
+                    && item.TenantId == currentTenantId
+                    && item.SnapshotId == activeSnapshotId,
+                ct
+            );
+        if (tenantSoftware is null)
+        {
+            return NotFound();
+        }
+
+        if (request.TeamId.HasValue)
+        {
+            var teamExists = await dbContext.Teams.AsNoTracking()
+                .AnyAsync(team => team.TenantId == currentTenantId && team.Id == request.TeamId.Value, ct);
+            if (!teamExists)
+            {
+                return BadRequest(new ProblemDetails { Title = "Team not found." });
+            }
+        }
+
+        tenantSoftware.AssignOwnerTeam(request.TeamId);
+
+        var workflowOwnerTeamId = request.TeamId
+            ?? (await DefaultTeamHelper.EnsureDefaultTeamAsync(dbContext, currentTenantId, ct)).Id;
+
+        var activeWorkflows = await dbContext.RemediationWorkflows
+            .Where(workflow =>
+                workflow.TenantId == currentTenantId
+                && workflow.Status == RemediationWorkflowStatus.Active
+                && dbContext.RemediationCases.Any(remediationCase =>
+                    remediationCase.Id == workflow.RemediationCaseId
+                    && remediationCase.SoftwareProductId == tenantSoftware.SoftwareProductId))
+            .ToListAsync(ct);
+
+        foreach (var workflow in activeWorkflows)
+        {
+            workflow.ReassignSoftwareOwnerTeam(workflowOwnerTeamId);
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        return NoContent();
     }
 
     [HttpGet("{id:guid}/installations")]

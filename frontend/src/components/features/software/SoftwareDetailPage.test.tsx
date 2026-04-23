@@ -43,6 +43,9 @@ const detailFixture: TenantSoftwareDetail = {
   descriptionProviderType: null,
   descriptionProfileName: null,
   descriptionModel: null,
+  ownerTeamId: '44444444-4444-4444-4444-444444444444',
+  ownerTeamName: 'Platform Engineering',
+  ownerTeamManagedByRule: true,
   firstSeenAt: '2026-04-01T00:00:00Z',
   lastSeenAt: '2026-04-10T00:00:00Z',
   activeInstallCount: 3,
@@ -98,11 +101,36 @@ describe('SoftwareDetailPage tabs', () => {
         canViewRemediation
         remediationData={null}
         tenantSoftwareId={detailFixture.id}
+        ownerTeams={[]}
+        onOwnerTeamChange={() => {}}
       />,
     )
 
     fireEvent.click(screen.getByRole('tab', { name: /AI Insights/i }))
 
     expect(onTabChange).toHaveBeenCalledWith('ai')
+  })
+
+  it('shows the software owner and rule-management state', () => {
+    render(
+      <SoftwareDetailPage
+        detail={detailFixture}
+        selectedVersion="1.0"
+        installations={installationsFixture}
+        vulnerabilities={vulnerabilitiesFixture}
+        activeTab="overview"
+        onTabChange={() => {}}
+        onSelectVersion={() => {}}
+        onPageChange={() => {}}
+        canViewRemediation
+        remediationData={null}
+        tenantSoftwareId={detailFixture.id}
+        ownerTeams={[]}
+        onOwnerTeamChange={() => {}}
+      />,
+    )
+
+    expect(screen.getAllByText('Platform Engineering')).toHaveLength(2)
+    expect(screen.getByText(/rule managed/i)).toBeInTheDocument()
   })
 })

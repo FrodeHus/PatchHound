@@ -772,6 +772,8 @@ public class RemediationDecisionQueryService(
         return new DecisionContextDto(
             remediationCaseId,
             softwareName,
+            softwareOwnerTeamId,
+            softwareOwnerTeamName,
             assetCriticality.ToString(),
             summary,
             new DecisionWorkflowSummaryDto(

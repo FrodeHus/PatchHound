@@ -320,6 +320,8 @@ export function SoftwareRemediationView({
               <p className="max-w-4xl text-sm leading-snug text-muted-foreground">
                 {data.summary.totalVulnerabilities.toLocaleString()} open vulnerabilities across active software scope
                 {' · '}
+                {`Owner team ${data.softwareOwnerTeamName ?? 'Default Team'}`}
+                {' · '}
                 {data.summary.withKnownExploit > 0
                   ? `${data.summary.withKnownExploit.toLocaleString()} known exploits`
                   : 'No known exploits'}

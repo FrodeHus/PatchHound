@@ -13,7 +13,10 @@ public record TenantSoftwareListItemDto(
     int VersionCount,
     decimal? ExposureImpactScore,
     DateTimeOffset? LastSeenAt,
-    DateTimeOffset? MaintenanceWindowDate
+    DateTimeOffset? MaintenanceWindowDate,
+    Guid? OwnerTeamId,
+    string? OwnerTeamName,
+    bool OwnerTeamManagedByRule
 );
 
 public record TenantSoftwareFilterQuery(

@@ -3,6 +3,8 @@ namespace PatchHound.Api.Models.Decisions;
 public record DecisionContextDto(
     Guid RemediationCaseId,
     string SoftwareName,
+    Guid? SoftwareOwnerTeamId,
+    string? SoftwareOwnerTeamName,
     string Criticality,
     DecisionSummaryDto Summary,
     DecisionWorkflowSummaryDto Workflow,

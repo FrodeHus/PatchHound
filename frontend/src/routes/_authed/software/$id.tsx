@@ -1,17 +1,20 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import {
+  assignTenantSoftwareOwner,
   fetchTenantSoftwareDetail,
   fetchTenantSoftwareInstallations,
   fetchTenantSoftwareVulnerabilities,
 } from '@/api/software.functions'
 import { fetchTenantSoftwareDecisionContext } from '@/api/remediation.functions'
+import { fetchTeams } from '@/api/teams.functions'
 import { SoftwareDetailPage } from '@/components/features/software/SoftwareDetailPage'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { softwareQueryKeys } from '@/features/software/list-state'
 import { baseListSearchSchema, searchStringSchema } from '@/routes/-list-search'
+import { toast } from 'sonner'
 
 const softwareDetailSearchSchema = baseListSearchSchema.extend({
   version: searchStringSchema,
@@ -51,6 +54,7 @@ function SoftwareDetailRoute() {
   const { selectedTenantId } = useTenantScope()
   const [initialTenantId] = useState(selectedTenantId)
   const canUseInitialData = initialTenantId === selectedTenantId
+  const queryClient = useQueryClient()
 
   const detailQuery = useQuery({
     queryKey: softwareQueryKeys.detail(selectedTenantId, id),
@@ -108,6 +112,26 @@ function SoftwareDetailRoute() {
     },
   })
 
+  const teamsQuery = useQuery({
+    queryKey: ['teams', selectedTenantId],
+    queryFn: () => fetchTeams({ data: { tenantId: selectedTenantId ?? undefined, pageSize: 200 } }),
+    enabled: Boolean(selectedTenantId),
+  })
+
+  const ownerMutation = useMutation({
+    mutationFn: (teamId: string | null) => assignTenantSoftwareOwner({ data: { id, teamId } }),
+    onSuccess: async () => {
+      toast.success('Software owner updated.')
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: softwareQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ['teams', selectedTenantId] }),
+      ])
+    },
+    onError: () => {
+      toast.error('Failed to update software owner.')
+    },
+  })
+
   if (!detail || !installations || !vulnerabilities) {
     return null
   }
@@ -149,6 +173,9 @@ function SoftwareDetailRoute() {
       isRemediationLoading={remediationQuery.isLoading || remediationQuery.isFetching}
       remediationError={remediationQuery.isError}
       tenantSoftwareId={id}
+      ownerTeams={teamsQuery.data?.items ?? []}
+      onOwnerTeamChange={(teamId) => ownerMutation.mutate(teamId)}
+      isOwnerTeamUpdating={ownerMutation.isPending}
     />
   )
 }

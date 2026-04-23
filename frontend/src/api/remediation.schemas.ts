@@ -143,6 +143,8 @@ export const decisionAiSummarySchema = z.object({
 export const decisionContextSchema = z.object({
   remediationCaseId: z.string().uuid(),
   softwareName: z.string(),
+  softwareOwnerTeamId: z.string().uuid().nullable(),
+  softwareOwnerTeamName: z.string().nullable(),
   criticality: z.string(),
   summary: decisionSummarySchema,
   workflow: decisionWorkflowSummarySchema,

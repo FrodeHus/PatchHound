@@ -6,12 +6,14 @@ import type {
   TenantSoftwareVulnerability,
   PagedTenantSoftwareInstallations,
 } from '@/api/software.schemas'
+import type { TeamItem } from '@/api/teams.schemas'
 import type { DecisionContext } from '@/api/remediation.schemas'
 import { SoftwareAiReportTab } from '@/components/features/software/SoftwareAiReportTab'
 import { SoftwareDescriptionPanel } from '@/components/features/software/SoftwareDescriptionPanel'
 import { VersionCohortChooser } from '@/components/features/software/VersionCohortChooser'
 import { SoftwareRemediationView } from '@/components/features/remediation/SoftwareRemediationView'
 import { WorkNotesSheet } from '@/components/features/work-notes/WorkNotesSheet'
+import { Button } from '@/components/ui/button'
 import {
   Popover,
   PopoverContent,
@@ -20,6 +22,13 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 import { toneBadge, toneText } from '@/lib/tone-classes'
@@ -45,6 +54,9 @@ type SoftwareDetailPageProps = {
   isRemediationLoading?: boolean
   remediationError?: boolean
   tenantSoftwareId: string
+  ownerTeams: TeamItem[]
+  onOwnerTeamChange: (teamId: string | null) => void
+  isOwnerTeamUpdating?: boolean
 }
 
 export function SoftwareDetailPage({
@@ -61,6 +73,9 @@ export function SoftwareDetailPage({
   isRemediationLoading = false,
   remediationError = false,
   tenantSoftwareId,
+  ownerTeams,
+  onOwnerTeamChange,
+  isOwnerTeamUpdating = false,
 }: SoftwareDetailPageProps) {
   const activeVersion =
     detail.versionCohorts.find(
@@ -139,6 +154,61 @@ export function SoftwareDetailPage({
                 value={detail.lastSeenAt ? formatDate(detail.lastSeenAt) : 'Unknown'}
               />
             </div>
+
+            <section className="rounded-[1.15rem] border border-border/70 bg-background/55 px-4 py-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Software owner
+                  </p>
+                  <p className="text-sm font-medium text-foreground">
+                    {detail.ownerTeamName ?? 'Unassigned'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {detail.ownerTeamManagedByRule
+                      ? 'Rule managed. Manual changes will override the current rule-owned assignment.'
+                      : 'Used for tenant-scoped ownership and remediation decision routing.'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={detail.ownerTeamId ?? 'none'}
+                    onValueChange={(value) => onOwnerTeamChange(value === 'none' ? null : value)}
+                    disabled={isOwnerTeamUpdating}
+                  >
+                    <SelectTrigger className="h-8 w-56 text-sm">
+                      <SelectValue placeholder="Unassigned">
+                        {detail.ownerTeamId
+                          ? (ownerTeams.find((team) => team.id === detail.ownerTeamId)?.name ?? detail.ownerTeamName ?? '…')
+                          : <span className="text-muted-foreground">Unassigned</span>}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        <span className="text-muted-foreground">Unassigned</span>
+                      </SelectItem>
+                      {ownerTeams.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {detail.ownerTeamId ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs text-muted-foreground"
+                      onClick={() => onOwnerTeamChange(null)}
+                      disabled={isOwnerTeamUpdating}
+                    >
+                      Clear
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </section>
 
             <div className="flex flex-wrap gap-2">
               <WorkNotesSheet

@@ -67,6 +67,15 @@ public class RemediationWorkflow
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    public void ReassignSoftwareOwnerTeam(Guid softwareOwnerTeamId)
+    {
+        if (softwareOwnerTeamId == Guid.Empty)
+            throw new ArgumentException("SoftwareOwnerTeamId is required.", nameof(softwareOwnerTeamId));
+
+        SoftwareOwnerTeamId = softwareOwnerTeamId;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
     public void MoveToStage(RemediationWorkflowStage stage)
     {
         CurrentStage = stage;
