@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { isoDateTimeSchema } from './common.schemas'
 import { pagedResponseMetaSchema } from './pagination.schemas'
 
-export const assetRuleAssetTypeSchema = z.enum(['Device', 'Software'])
+export const assetRuleAssetTypeSchema = z.enum(['Device', 'Software', 'Application'])
 export type AssetRuleAssetType = z.infer<typeof assetRuleAssetTypeSchema>
 
 // Phase 1 canonical cleanup (Task 15): schemas for /api/device-rules.

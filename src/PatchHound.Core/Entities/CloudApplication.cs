@@ -12,6 +12,7 @@ public class CloudApplication
     public bool IsFallbackPublicClient { get; private set; }
     public IReadOnlyList<string> RedirectUris { get; private set; } = [];
     public Guid? OwnerTeamId { get; private set; }
+    public Guid? OwnerTeamRuleId { get; private set; }
     public bool ActiveInTenant { get; private set; } = true;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -72,6 +73,26 @@ public class CloudApplication
     public void AssignOwnerTeam(Guid? teamId)
     {
         OwnerTeamId = teamId;
+        OwnerTeamRuleId = null;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void AssignOwnerTeamFromRule(Guid? teamId, Guid ruleId)
+    {
+        OwnerTeamId = teamId;
+        OwnerTeamRuleId = teamId.HasValue ? ruleId : null;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void ClearRuleAssignedOwnerTeam(Guid ruleId)
+    {
+        if (OwnerTeamRuleId != ruleId)
+        {
+            return;
+        }
+
+        OwnerTeamId = null;
+        OwnerTeamRuleId = null;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 

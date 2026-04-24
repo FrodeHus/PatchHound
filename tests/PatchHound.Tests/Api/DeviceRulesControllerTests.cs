@@ -164,6 +164,35 @@ public class DeviceRulesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_AllowsApplicationRuleWithAssignOwnerTeamOperation()
+    {
+        var team = Team.Create(_tenantId, "Application Owners");
+        await _dbContext.Teams.AddAsync(team);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Create(
+            new CreateDeviceRuleRequest(
+                "Portal ownership",
+                "Matches applications by display name",
+                "Application",
+                SerializeJson(BuildSoftwareFilter("Name", "Contoso Portal")),
+                SerializeJson(new List<AssetRuleOperation>
+                {
+                    new("AssignOwnerTeam", new Dictionary<string, string> { ["teamId"] = team.Id.ToString() }),
+                })
+            ),
+            CancellationToken.None
+        );
+
+        var created = action.Result.Should().BeOfType<CreatedAtActionResult>().Subject;
+        var dto = created.Value.Should().BeOfType<DeviceRuleDto>().Subject;
+        dto.AssetType.Should().Be("Application");
+
+        var stored = await _dbContext.DeviceRules.SingleAsync(r => r.Id == dto.Id);
+        stored.AssetType.Should().Be("Application");
+    }
+
+    [Fact]
     public async Task Create_RejectsUnknownBusinessLabel()
     {
         var filter = BuildNameFilter("Device-A");
@@ -252,6 +281,41 @@ public class DeviceRulesControllerTests : IDisposable
         var preview = ok.Value.Should().BeOfType<DeviceRulePreviewDto>().Subject;
         preview.Count.Should().Be(1);
         preview.Samples.Should().ContainSingle().Which.Id.Should().Be(matchingTenantSoftware.Id);
+    }
+
+    [Fact]
+    public async Task Preview_CountsMatchingCloudApplications()
+    {
+        var matching = CloudApplication.Create(
+            _tenantId,
+            _sourceSystemId,
+            "app-object-1",
+            "client-id-1",
+            "Contoso Portal",
+            null,
+            false,
+            []);
+        var other = CloudApplication.Create(
+            _tenantId,
+            _sourceSystemId,
+            "app-object-2",
+            "client-id-2",
+            "Fabrikam Portal",
+            null,
+            false,
+            []);
+        await _dbContext.AddRangeAsync(matching, other);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Preview(
+            new PreviewDeviceRuleFilterRequest("Application", SerializeJson(BuildSoftwareFilter("Name", "Contoso Portal"))),
+            CancellationToken.None
+        );
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var preview = ok.Value.Should().BeOfType<DeviceRulePreviewDto>().Subject;
+        preview.Count.Should().Be(1);
+        preview.Samples.Should().ContainSingle().Which.Id.Should().Be(matching.Id);
     }
 
     [Fact]

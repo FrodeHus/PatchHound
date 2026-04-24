@@ -26,6 +26,7 @@ public class CloudApplicationConfiguration : IEntityTypeConfiguration<CloudAppli
                 v => DeserializeRedirectUris(v)
             );
         builder.Property(x => x.OwnerTeamId);
+        builder.Property(x => x.OwnerTeamRuleId);
 
         builder.HasMany(x => x.Credentials)
             .WithOne(x => x.Application)

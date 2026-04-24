@@ -82,6 +82,8 @@ export function DeviceRuleWizard({
   )
   const [preview, setPreview] = useState<FilterPreview | null>(null)
   const isSoftwareRule = assetType === 'Software'
+  const isApplicationRule = assetType === 'Application'
+  const supportsOwnerOnlyRule = isSoftwareRule || isApplicationRule
 
   const previewMutation = useMutation({
     mutationFn: async () => previewDeviceRuleFilter({ data: { tenantId, assetType, filterDefinition: filter } }),
@@ -136,7 +138,7 @@ export function DeviceRuleWizard({
       case 1:
         return filter.conditions.length > 0
       case 2:
-        return isSoftwareRule || operations.length > 0
+        return supportsOwnerOnlyRule || operations.length > 0
       default:
         return true
     }
@@ -195,10 +197,11 @@ export function DeviceRuleWizard({
                 <SelectContent>
                   <SelectItem value="Device">Device</SelectItem>
                   <SelectItem value="Software">Software</SelectItem>
+                  <SelectItem value="Application">Application</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Device and software rules support owner-team assignment. Device-only operations remain available where applicable.
+                Device, software, and application rules support owner-team assignment. Device-only operations remain available where applicable.
               </p>
             </div>
             <div className="grid gap-1.5">
@@ -235,6 +238,8 @@ export function DeviceRuleWizard({
             <p className="text-sm text-muted-foreground">
               {isSoftwareRule
                 ? 'Define which software assets this rule applies to. Use groups to combine conditions with AND/OR logic.'
+                : isApplicationRule
+                  ? 'Define which cloud applications this rule applies to. Use groups to combine conditions with AND/OR logic.'
                 : 'Define which devices this rule applies to. Use groups to combine conditions with AND/OR logic.'}
             </p>
           </CardHeader>
@@ -299,20 +304,24 @@ export function DeviceRuleWizard({
 
       {step === 2 && (
         <Card className="rounded-2xl border-border/70">
-            <CardHeader>
+          <CardHeader>
               <CardTitle>Operations</CardTitle>
               <p className="text-sm text-muted-foreground">
               {isSoftwareRule
                 ? 'Select one or more operations to apply to matching tenant software records.'
-                : 'Select one or more operations to apply to matching devices.'}
+                : isApplicationRule
+                  ? 'Select one or more operations to apply to matching cloud applications.'
+                  : 'Select one or more operations to apply to matching devices.'}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            {isSoftwareRule ? (
+            {supportsOwnerOnlyRule ? (
               <OperationEditor
                 type="AssignOwnerTeam"
                 label="Assign Owner Team"
-                description="Set the owning team on matching tenant software inventory records."
+                description={isApplicationRule
+                  ? 'Set the owning team on matching cloud application records.'
+                  : 'Set the owning team on matching tenant software inventory records.'}
                 options={teams.map((t) => ({ value: t.id, label: t.name }))}
                 paramKey="teamId"
                 operations={operations}
@@ -458,6 +467,8 @@ export function DeviceRuleWizard({
                 <p className="text-sm text-muted-foreground">
                   {isSoftwareRule
                     ? 'No operations selected.'
+                    : isApplicationRule
+                    ? 'No operations selected.'
                     : 'No operations selected.'}
                 </p>
               )}
@@ -538,7 +549,7 @@ function buildPreviewHeadline(
   teams: TeamItem[],
   scanProfiles: ScanProfile[],
 ) {
-  const assetLabel = assetType === 'Software' ? 'software asset' : 'device'
+  const assetLabel = describePreviewAsset(assetType)
 
   if (operations.length === 0) {
     return `${count} ${assetLabel}${count !== 1 ? 's' : ''} match`
@@ -550,6 +561,17 @@ function buildPreviewHeadline(
   }
 
   return `This rule will affect ${count} ${assetLabel}${count !== 1 ? 's' : ''} with ${operationDescriptions.length} operations.`
+}
+
+function describePreviewAsset(assetType: AssetRuleAssetType) {
+  switch (assetType) {
+    case 'Software':
+      return 'software asset'
+    case 'Application':
+      return 'cloud application'
+    default:
+      return 'device'
+  }
 }
 
 function buildOperationImpactLines(

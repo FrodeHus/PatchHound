@@ -23,6 +23,11 @@ const fieldsByAssetType: Record<AssetRuleAssetType, ReadonlyArray<{ value: strin
     { value: 'Name', label: 'Name' },
     { value: 'Vendor', label: 'Vendor' },
   ],
+  Application: [
+    { value: 'Name', label: 'Name' },
+    { value: 'AppId', label: 'App ID' },
+    { value: 'ExternalId', label: 'Object ID' },
+  ],
 }
 
 const operators = [

@@ -344,6 +344,61 @@ public class DeviceRuleEvaluationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task EvaluateRulesAsync_AssignOwnerTeamOperation_TracksAndReconcilesCloudApplicationRuleOwnership()
+    {
+        var team = Team.Create(_tenantId, "Application Owners");
+        var application = CloudApplication.Create(
+            _tenantId,
+            _sourceSystemId,
+            "app-object-1",
+            "client-id-1",
+            "Contoso Portal",
+            null,
+            false,
+            []
+        );
+        var rule = DeviceRule.Create(
+            _tenantId,
+            "Assign application owner team",
+            null,
+            1,
+            "Application",
+            new PatchHound.Core.Models.FilterCondition("Name", "Equals", "Contoso Portal"),
+            [
+                new PatchHound.Core.Models.AssetRuleOperation(
+                    "AssignOwnerTeam",
+                    new Dictionary<string, string> { ["teamId"] = team.Id.ToString() }
+                )
+            ]
+        );
+
+        await _dbContext.AddRangeAsync(team, application, rule);
+        await _dbContext.SaveChangesAsync();
+
+        var service = CreateService();
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var assigned = await _dbContext.CloudApplications.SingleAsync(item => item.Id == application.Id);
+        assigned.OwnerTeamId.Should().Be(team.Id);
+        assigned.OwnerTeamRuleId.Should().Be(rule.Id);
+
+        rule.Update(
+            rule.Name,
+            rule.Description,
+            rule.Enabled,
+            "Application",
+            new PatchHound.Core.Models.FilterCondition("Name", "Equals", "Fabrikam Portal"),
+            rule.ParseOperations());
+        await _dbContext.SaveChangesAsync();
+
+        await service.EvaluateRulesAsync(_tenantId, CancellationToken.None);
+
+        var reconciled = await _dbContext.CloudApplications.SingleAsync(item => item.Id == application.Id);
+        reconciled.OwnerTeamId.Should().BeNull();
+        reconciled.OwnerTeamRuleId.Should().BeNull();
+    }
+
+    [Fact]
     public async Task EvaluateRulesAsync_AssignScanProfile_CreatesAssignment()
     {
         var device = CreateDevice("device-7", "Server-01", Criticality.Medium);

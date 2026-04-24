@@ -14,6 +14,19 @@ import { PaginationControls } from '@/components/ui/pagination-controls'
 import type { ColumnDef } from '@tanstack/react-table'
 import { type z } from 'zod'
 
+function ownerAssignmentTone(source: string) {
+  switch (source) {
+    case 'Rule':
+      return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700'
+    case 'Manual':
+      return 'border-sky-500/25 bg-sky-500/10 text-sky-700'
+    case 'Default':
+      return 'border-border/70 bg-muted/50 text-muted-foreground'
+    default:
+      return 'border-amber-500/25 bg-amber-500/10 text-amber-700'
+  }
+}
+
 const applicationsSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
   credentialFilter: searchStringSchema,
@@ -73,6 +86,21 @@ const columns: ColumnDef<CloudApplicationListItem>[] = [
         )}
       </div>
     ),
+  },
+  {
+    id: 'owner',
+    header: 'Owner',
+    cell: ({ row }) => {
+      const item = row.original
+      return (
+        <div>
+          <div className="text-sm font-medium">{item.ownerTeamName ?? 'Unassigned'}</div>
+          <Badge variant="outline" className={`mt-1 rounded-full text-[10px] ${ownerAssignmentTone(item.ownerAssignmentSource)}`}>
+            {item.ownerAssignmentSource}
+          </Badge>
+        </div>
+      )
+    },
   },
   {
     id: 'credentials',
