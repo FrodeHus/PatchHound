@@ -239,6 +239,7 @@ export const approvedPatchingTaskSchema = z.object({
   remediationCaseId: z.string().uuid(),
   softwareName: z.string(),
   ownerTeamName: z.string(),
+  ownerAssignmentSource: z.string(),
   highestSeverity: z.string(),
   affectedDeviceCount: z.number(),
   approvedAt: z.string().datetime({ offset: true }),

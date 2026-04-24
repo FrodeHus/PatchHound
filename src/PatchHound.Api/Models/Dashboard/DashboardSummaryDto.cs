@@ -231,6 +231,7 @@ public record ApprovedPatchingTaskDto(
     Guid RemediationCaseId,
     string SoftwareName,
     string OwnerTeamName,
+    string OwnerAssignmentSource,
     string HighestSeverity,
     int AffectedDeviceCount,
     DateTimeOffset ApprovedAt,
