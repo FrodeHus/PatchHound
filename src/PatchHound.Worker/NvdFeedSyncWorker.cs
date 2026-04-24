@@ -37,7 +37,7 @@ public class NvdFeedSyncWorker(
                 var service = scope.ServiceProvider.GetRequiredService<NvdFeedSyncService>();
                 await service.SyncYearFeedAsync(year, ct);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 logger.LogWarning(ex, "NVD initial sync failed for year {Year}", year);
             }
@@ -49,7 +49,7 @@ public class NvdFeedSyncWorker(
             var service = scope.ServiceProvider.GetRequiredService<NvdFeedSyncService>();
             await service.SyncModifiedFeedAsync(ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "NVD initial modified feed sync failed");
         }
@@ -64,7 +64,7 @@ public class NvdFeedSyncWorker(
         {
             await service.SyncModifiedFeedAsync(ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "NVD modified feed sync failed");
         }
