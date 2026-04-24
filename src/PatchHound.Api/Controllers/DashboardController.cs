@@ -538,6 +538,7 @@ public class DashboardController : ControllerBase
                     app.Name,
                     app.AppId,
                     team.Name,
+                    app.OwnerTeamRuleId != null ? "Rule" : "Manual",
                     app.Credentials.Count(c => c.ExpiresAt < now),
                     app.Credentials.Count(c => c.ExpiresAt >= now && c.ExpiresAt <= credentialSoonThreshold),
                     app.Credentials

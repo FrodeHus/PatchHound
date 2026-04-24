@@ -180,6 +180,7 @@ export const ownerCloudAppActionSchema = z.object({
   appName: z.string(),
   appId: z.string().nullable(),
   ownerTeamName: z.string(),
+  ownerAssignmentSource: z.string(),
   expiredCredentialCount: z.number(),
   expiringCredentialCount: z.number(),
   nearestExpiryAt: z.string().datetime({ offset: true }).nullable(),

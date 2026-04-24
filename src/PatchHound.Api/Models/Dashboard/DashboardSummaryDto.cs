@@ -189,6 +189,7 @@ public record OwnerCloudAppActionDto(
     string AppName,
     string? AppId,
     string OwnerTeamName,
+    string OwnerAssignmentSource,
     int ExpiredCredentialCount,
     int ExpiringCredentialCount,
     DateTimeOffset? NearestExpiryAt
