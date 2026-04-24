@@ -162,6 +162,8 @@ export const decisionContextSchema = z.object({
 export const decisionListItemSchema = z.object({
   remediationCaseId: z.string().uuid(),
   softwareName: z.string(),
+  softwareOwnerTeamName: z.string().nullable(),
+  softwareOwnerAssignmentSource: z.string(),
   criticality: z.string(),
   outcome: z.string().nullable(),
   approvalStatus: z.string().nullable(),

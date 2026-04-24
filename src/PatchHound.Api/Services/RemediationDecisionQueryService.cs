@@ -188,6 +188,42 @@ public class RemediationDecisionQueryService(
         var activeWorkflowStages = activeWorkflowRows
             .GroupBy(w => w.RemediationCaseId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(w => w.UpdatedAt).First().CurrentStage);
+        var activeWorkflowOwnerTeams = await dbContext.RemediationWorkflows.AsNoTracking()
+            .Where(w => w.TenantId == tenantId
+                && caseIds.Contains(w.RemediationCaseId)
+                && w.Status == RemediationWorkflowStatus.Active)
+            .Select(w => new { w.RemediationCaseId, w.SoftwareOwnerTeamId, w.UpdatedAt })
+            .ToListAsync(ct);
+        var activeWorkflowOwnerTeamIds = activeWorkflowOwnerTeams
+            .GroupBy(w => w.RemediationCaseId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(w => w.UpdatedAt).First().SoftwareOwnerTeamId);
+
+        var tenantSoftwareRows = await dbContext.SoftwareTenantRecords.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && productIds.Contains(item.SoftwareProductId))
+            .Select(item => new
+            {
+                item.SoftwareProductId,
+                item.OwnerTeamId,
+                item.OwnerTeamRuleId,
+                item.LastSeenAt,
+                item.UpdatedAt,
+            })
+            .ToListAsync(ct);
+        var tenantSoftwareByProduct = tenantSoftwareRows
+            .GroupBy(item => item.SoftwareProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g
+                    .OrderByDescending(item => item.LastSeenAt)
+                    .ThenByDescending(item => item.UpdatedAt)
+                    .First());
+
+        var ownerTeamIds = activeWorkflowOwnerTeamIds.Values.ToHashSet();
+        var ownerTeamNames = ownerTeamIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await dbContext.Teams.AsNoTracking()
+                .Where(team => ownerTeamIds.Contains(team.Id))
+                .ToDictionaryAsync(team => team.Id, team => team.Name, ct);
 
         // Build vulnCounts and riskScoresByCaseId keyed by RemediationCaseId.
         var vulnCounts = new Dictionary<Guid, (int Total, int Critical, int High, DateTimeOffset EarliestFirstSeen, Severity HighestSeverity)>();
@@ -285,10 +321,23 @@ public class RemediationDecisionQueryService(
             }
 
             var workflowStage = activeWorkflowStages.TryGetValue(rc.Id, out var stage) ? stage.ToString() : null;
+            var hasWorkflowOwnerTeam = activeWorkflowOwnerTeamIds.TryGetValue(rc.Id, out var softwareOwnerTeamId);
+            tenantSoftwareByProduct.TryGetValue(productId, out var tenantSoftware);
+            var softwareOwnerAssignmentSource = !hasWorkflowOwnerTeam
+                ? "Default"
+                : tenantSoftware?.OwnerTeamRuleId != null
+                    ? "Rule"
+                    : "Manual";
+            var softwareOwnerTeamName = hasWorkflowOwnerTeam
+                && ownerTeamNames.TryGetValue(softwareOwnerTeamId, out var resolvedSoftwareOwnerTeamName)
+                    ? resolvedSoftwareOwnerTeamName
+                    : null;
 
             items.Add(new RemediationDecisionListItemDto(
                 rc.Id,
                 ResolveDisplaySoftwareName(rc.Name, null),
+                softwareOwnerTeamName,
+                softwareOwnerAssignmentSource,
                 criticality.ToString(),
                 decision?.Outcome.ToString(),
                 decision?.ApprovalStatus.ToString(),
