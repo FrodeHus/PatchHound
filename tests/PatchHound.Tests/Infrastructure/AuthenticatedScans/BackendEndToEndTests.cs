@@ -84,8 +84,7 @@ public class BackendEndToEndTests : IAsyncLifetime
         var deviceResolver = new DeviceResolver(_db);
         var softwareResolver = new SoftwareProductResolver(_db);
         var stagedDeviceMerge = new StagedDeviceMergeService(_db, deviceResolver, softwareResolver);
-        var resolver = new NormalizedSoftwareResolver(_db);
-        var projectionService = new NormalizedSoftwareProjectionService(_db, resolver);
+        var projectionService = new NormalizedSoftwareProjectionService(_db);
         var validator = new AuthenticatedScanOutputValidator();
         var ingestionService = new AuthenticatedScanIngestionService(_db, validator, stagedDeviceMerge, projectionService);
 
