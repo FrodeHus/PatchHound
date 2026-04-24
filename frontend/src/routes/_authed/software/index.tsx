@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchTenantSoftware } from '@/api/software.functions'
+import { assignTenantSoftwareOwner, fetchTenantSoftware } from '@/api/software.functions'
 import { SoftwareRiskDetailDialog } from '@/components/features/software/SoftwareRiskDetailDialog'
 import { SoftwareTable } from '@/components/features/software/SoftwareTable'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { buildSoftwareListRequest, softwareQueryKeys } from '@/features/software/list-state'
 import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
 import { createListSearchUpdater } from '@/routes/-list-search-helpers'
+import { toast } from 'sonner'
 
 const softwareSearchSchema = baseListSearchSchema.extend({
   search: searchStringSchema,
@@ -32,12 +33,23 @@ function SoftwareIndexPage() {
   const [selectedRiskSoftwareId, setSelectedRiskSoftwareId] = useState<string | null>(null)
   const canUseInitialData = initialTenantId === selectedTenantId
   const searchActions = createListSearchUpdater<typeof search>(navigate)
+  const queryClient = useQueryClient()
   const query = useQuery({
     queryKey: softwareQueryKeys.list(selectedTenantId, search),
     queryFn: () => fetchTenantSoftware({ data: buildSoftwareListRequest(search) }),
     initialData: canUseInitialData ? initialData : undefined,
   })
   const data = query.data ?? (canUseInitialData ? initialData : undefined)
+  const returnToRuleControlMutation = useMutation({
+    mutationFn: (tenantSoftwareId: string) => assignTenantSoftwareOwner({ data: { id: tenantSoftwareId, teamId: null } }),
+    onSuccess: async () => {
+      toast.success('Software owner returned to rule control.')
+      await queryClient.invalidateQueries({ queryKey: softwareQueryKeys.all })
+    },
+    onError: () => {
+      toast.error('Failed to return software owner to rule control.')
+    },
+  })
 
   if (!data) {
     return null
@@ -76,6 +88,9 @@ function SoftwareIndexPage() {
           })
         }}
         onShowRiskDetail={setSelectedRiskSoftwareId}
+        onReturnToRuleControl={(tenantSoftwareId) => {
+          returnToRuleControlMutation.mutate(tenantSoftwareId)
+        }}
         onPageChange={(page) => {
           searchActions.updatePage(page)
         }}

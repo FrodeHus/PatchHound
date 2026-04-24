@@ -48,6 +48,7 @@ type SoftwareTableProps = {
     missedMaintenanceWindow: boolean
   }) => void
   onShowRiskDetail: (softwareProductId: string) => void
+  onReturnToRuleControl: (tenantSoftwareId: string) => void
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
   onClearFilters: () => void
@@ -71,6 +72,7 @@ export function SoftwareTable({
   onMissedMaintenanceWindowChange,
   onApplyStructuredFilters,
   onShowRiskDetail,
+  onReturnToRuleControl,
   onPageChange,
   onPageSizeChange,
   onClearFilters,
@@ -213,10 +215,21 @@ export function SoftwareTable({
             <span className={row.original.ownerTeamName ? 'text-foreground' : 'text-muted-foreground'}>
               {row.original.ownerTeamName ?? 'Unassigned'}
             </span>
-            <div>
+            <div className="flex flex-wrap items-center gap-2">
               <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${ownerAssignmentTone(row.original.ownerAssignmentSource)}`}>
                 {row.original.ownerAssignmentSource}
               </span>
+              {row.original.ownerAssignmentSource === 'Manual' ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-[11px] text-muted-foreground"
+                  onClick={() => onReturnToRuleControl(row.original.id)}
+                >
+                  Return to rule control
+                </Button>
+              ) : null}
             </div>
           </div>
         ),
@@ -250,7 +263,7 @@ export function SoftwareTable({
           ),
         },
     ],
-    [onShowRiskDetail, renderedAt],
+    [onReturnToRuleControl, onShowRiskDetail, renderedAt],
   )
 
   return (

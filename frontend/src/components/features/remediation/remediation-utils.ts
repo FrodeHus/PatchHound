@@ -70,3 +70,21 @@ export function riskBandTone(band: string): Tone {
     default: return 'neutral'
   }
 }
+
+export function formatSoftwareOwnerRoutingDetail(
+  ownerTeamName: string | null | undefined,
+  assignmentSource: string | null | undefined,
+): string {
+  switch (assignmentSource) {
+    case 'Rule':
+      return `Rule managed${ownerTeamName ? ` by ${ownerTeamName}` : ''}`
+    case 'Manual':
+      return 'Manual override'
+    case 'Default':
+      return 'Default team fallback'
+    case 'Unassigned':
+      return 'No owner team assigned'
+    default:
+      return ownerTeamName ? `Routed to ${ownerTeamName}` : 'Owner routing not available'
+  }
+}

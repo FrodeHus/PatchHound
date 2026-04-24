@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { TenantSoftwareListItem } from '@/api/software.schemas'
 import { SoftwareTable } from '@/components/features/software/SoftwareTable'
@@ -46,6 +46,7 @@ describe('SoftwareTable', () => {
         onMissedMaintenanceWindowChange={() => {}}
         onApplyStructuredFilters={() => {}}
         onShowRiskDetail={() => {}}
+        onReturnToRuleControl={() => {}}
         onPageChange={() => {}}
         onPageSizeChange={() => {}}
         onClearFilters={() => {}}
@@ -54,5 +55,37 @@ describe('SoftwareTable', () => {
 
     expect(screen.getByText('Platform Engineering')).toBeInTheDocument()
     expect(screen.getByText('Manual')).toBeInTheDocument()
+  })
+
+  it('offers return to rule control for manual owner assignments', () => {
+    const onReturnToRuleControl = vi.fn()
+
+    render(
+      <SoftwareTable
+        items={[itemFixture]}
+        totalCount={1}
+        page={1}
+        pageSize={25}
+        totalPages={1}
+        searchValue=""
+        categoryFilter=""
+        vulnerableOnly={false}
+        missedMaintenanceWindow={false}
+        onSearchChange={() => {}}
+        onCategoryFilterChange={() => {}}
+        onVulnerableOnlyChange={() => {}}
+        onMissedMaintenanceWindowChange={() => {}}
+        onApplyStructuredFilters={() => {}}
+        onShowRiskDetail={() => {}}
+        onReturnToRuleControl={onReturnToRuleControl}
+        onPageChange={() => {}}
+        onPageSizeChange={() => {}}
+        onClearFilters={() => {}}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Return to rule control/i }))
+
+    expect(onReturnToRuleControl).toHaveBeenCalledWith(itemFixture.id)
   })
 })

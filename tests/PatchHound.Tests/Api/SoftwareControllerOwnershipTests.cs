@@ -169,6 +169,57 @@ public class SoftwareControllerOwnershipTests : IDisposable
     }
 
     [Fact]
+    public async Task AssignOwner_WithNullTeamId_LeavesSoftwareUnassignedWhenNoRuleMatches_AndFallsBackWorkflowToDefaultTeam()
+    {
+        var previousTeam = Team.Create(_tenantId, "Previous Owners");
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        var tenantSoftware = SoftwareTenantRecord.Create(
+            _tenantId,
+            null,
+            product.Id,
+            DateTimeOffset.UtcNow.AddDays(-5),
+            DateTimeOffset.UtcNow.AddDays(-1)
+        );
+        tenantSoftware.AssignOwnerTeam(previousTeam.Id);
+
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var workflow = RemediationWorkflow.Create(_tenantId, remediationCase.Id, previousTeam.Id);
+        var nonMatchingRule = DeviceRule.Create(
+            _tenantId,
+            "Fabrikam ownership",
+            null,
+            1,
+            "Software",
+            new PatchHound.Core.Models.FilterCondition("Vendor", "Equals", "Fabrikam"),
+            [
+                new PatchHound.Core.Models.AssetRuleOperation(
+                    "AssignOwnerTeam",
+                    new Dictionary<string, string> { ["teamId"] = previousTeam.Id.ToString() }
+                )
+            ]
+        );
+
+        await _dbContext.AddRangeAsync(previousTeam, product, tenantSoftware, remediationCase, workflow, nonMatchingRule);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.AssignOwner(
+            tenantSoftware.Id,
+            new AssignTenantSoftwareOwnerRequest(null),
+            CancellationToken.None
+        );
+
+        action.Should().BeOfType<NoContentResult>();
+
+        var storedSoftware = await _dbContext.SoftwareTenantRecords.SingleAsync(item => item.Id == tenantSoftware.Id);
+        storedSoftware.OwnerTeamId.Should().BeNull();
+        storedSoftware.OwnerTeamRuleId.Should().BeNull();
+
+        var defaultTeam = await _dbContext.Teams.SingleAsync(item => item.TenantId == _tenantId && item.Name == "Default");
+        var storedWorkflow = await _dbContext.RemediationWorkflows.SingleAsync(item => item.Id == workflow.Id);
+        storedWorkflow.SoftwareOwnerTeamId.Should().Be(defaultTeam.Id);
+    }
+
+    [Fact]
     public async Task Get_ReturnsManualOwnerAssignmentSource()
     {
         var ownerTeam = Team.Create(_tenantId, "Platform Engineering");
