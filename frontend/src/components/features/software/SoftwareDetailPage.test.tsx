@@ -134,4 +134,30 @@ describe('SoftwareDetailPage tabs', () => {
     expect(screen.getAllByText('Platform Engineering')).toHaveLength(2)
     expect(screen.getByText('Rule')).toBeInTheDocument()
   })
+
+  it('shows return-to-rule-control action for manual owner assignments', () => {
+    render(
+      <SoftwareDetailPage
+        detail={{
+          ...detailFixture,
+          ownerTeamManagedByRule: false,
+          ownerAssignmentSource: 'Manual',
+        }}
+        selectedVersion="1.0"
+        installations={installationsFixture}
+        vulnerabilities={vulnerabilitiesFixture}
+        activeTab="overview"
+        onTabChange={() => {}}
+        onSelectVersion={() => {}}
+        onPageChange={() => {}}
+        canViewRemediation
+        remediationData={null}
+        tenantSoftwareId={detailFixture.id}
+        ownerTeams={[]}
+        onOwnerTeamChange={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: /Return to rule control/i })).toBeInTheDocument()
+  })
 })

@@ -59,6 +59,13 @@ type SoftwareDetailPageProps = {
   isOwnerTeamUpdating?: boolean
 }
 
+function shouldShowReturnToRuleControl(
+  ownerAssignmentSource: TenantSoftwareDetail['ownerAssignmentSource'],
+  ownerTeamId: string | null,
+) {
+  return ownerAssignmentSource !== 'Rule' && ownerTeamId !== null
+}
+
 export function SoftwareDetailPage({
   detail,
   selectedVersion,
@@ -199,7 +206,7 @@ export function SoftwareDetailPage({
                       ))}
                     </SelectContent>
                   </Select>
-                  {detail.ownerTeamId ? (
+                  {shouldShowReturnToRuleControl(detail.ownerAssignmentSource, detail.ownerTeamId) ? (
                     <Button
                       type="button"
                       variant="ghost"
@@ -208,7 +215,7 @@ export function SoftwareDetailPage({
                       onClick={() => onOwnerTeamChange(null)}
                       disabled={isOwnerTeamUpdating}
                     >
-                      Clear
+                      Return to rule control
                     </Button>
                   ) : null}
                 </div>

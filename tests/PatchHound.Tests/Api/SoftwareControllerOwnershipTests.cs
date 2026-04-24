@@ -11,6 +11,7 @@ using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Services.Inventory;
 using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
@@ -47,6 +48,7 @@ public class SoftwareControllerOwnershipTests : IDisposable
             Substitute.For<ITenantAiResearchService>(),
             new RemediationTaskQueryService(_dbContext),
             new CycloneDxSupplyChainImportService(_dbContext),
+            new SoftwareRuleFilterBuilder(),
             _tenantContext
         );
     }
@@ -55,7 +57,7 @@ public class SoftwareControllerOwnershipTests : IDisposable
     public async Task Get_ReturnsOwnerFields()
     {
         var ownerTeam = Team.Create(_tenantId, "Platform Engineering");
-        var product = SoftwareProduct.Create("Contoso Agent", "Contoso", null);
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
         var tenantSoftware = SoftwareTenantRecord.Create(
             _tenantId,
             null,
@@ -83,7 +85,7 @@ public class SoftwareControllerOwnershipTests : IDisposable
     {
         var previousTeam = Team.Create(_tenantId, "Old Owners");
         var nextTeam = Team.Create(_tenantId, "New Owners");
-        var product = SoftwareProduct.Create("Contoso Agent", "Contoso", null);
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
         var tenantSoftware = SoftwareTenantRecord.Create(
             _tenantId,
             null,
@@ -116,10 +118,61 @@ public class SoftwareControllerOwnershipTests : IDisposable
     }
 
     [Fact]
+    public async Task AssignOwner_WithNullTeamId_ReappliesMatchingRuleAndUpdatesWorkflow()
+    {
+        var previousTeam = Team.Create(_tenantId, "Previous Owners");
+        var ruleTeam = Team.Create(_tenantId, "Rule Owners");
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        var tenantSoftware = SoftwareTenantRecord.Create(
+            _tenantId,
+            null,
+            product.Id,
+            DateTimeOffset.UtcNow.AddDays(-5),
+            DateTimeOffset.UtcNow.AddDays(-1)
+        );
+        tenantSoftware.AssignOwnerTeam(previousTeam.Id);
+
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var workflow = RemediationWorkflow.Create(_tenantId, remediationCase.Id, previousTeam.Id);
+        var rule = DeviceRule.Create(
+            _tenantId,
+            "Contoso ownership",
+            null,
+            1,
+            "Software",
+            new PatchHound.Core.Models.FilterCondition("Vendor", "Equals", "Contoso"),
+            [
+                new PatchHound.Core.Models.AssetRuleOperation(
+                    "AssignOwnerTeam",
+                    new Dictionary<string, string> { ["teamId"] = ruleTeam.Id.ToString() }
+                )
+            ]
+        );
+
+        await _dbContext.AddRangeAsync(previousTeam, ruleTeam, product, tenantSoftware, remediationCase, workflow, rule);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.AssignOwner(
+            tenantSoftware.Id,
+            new AssignTenantSoftwareOwnerRequest(null),
+            CancellationToken.None
+        );
+
+        action.Should().BeOfType<NoContentResult>();
+
+        var storedSoftware = await _dbContext.SoftwareTenantRecords.SingleAsync(item => item.Id == tenantSoftware.Id);
+        storedSoftware.OwnerTeamId.Should().Be(ruleTeam.Id);
+        storedSoftware.OwnerTeamRuleId.Should().Be(rule.Id);
+
+        var storedWorkflow = await _dbContext.RemediationWorkflows.SingleAsync(item => item.Id == workflow.Id);
+        storedWorkflow.SoftwareOwnerTeamId.Should().Be(ruleTeam.Id);
+    }
+
+    [Fact]
     public async Task Get_ReturnsManualOwnerAssignmentSource()
     {
         var ownerTeam = Team.Create(_tenantId, "Platform Engineering");
-        var product = SoftwareProduct.Create("Contoso Agent", "Contoso", null);
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
         var tenantSoftware = SoftwareTenantRecord.Create(
             _tenantId,
             null,

@@ -13,6 +13,7 @@ using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Services.Inventory;
 using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Api.Controllers;
@@ -28,6 +29,7 @@ public class SoftwareController(
     ITenantAiResearchService tenantAiResearchService,
     RemediationTaskQueryService remediationTaskQueryService,
     CycloneDxSupplyChainImportService cycloneDxSupplyChainImportService,
+    SoftwareRuleFilterBuilder softwareRuleFilterBuilder,
     ITenantContext tenantContext
 ) : ControllerBase
 {
@@ -545,9 +547,17 @@ public class SoftwareController(
             }
         }
 
-        tenantSoftware.AssignOwnerTeam(request.TeamId);
+        if (request.TeamId.HasValue)
+        {
+            tenantSoftware.AssignOwnerTeam(request.TeamId);
+        }
+        else
+        {
+            tenantSoftware.AssignOwnerTeam(null);
+            await ReapplySoftwareOwnerRuleAsync(currentTenantId, tenantSoftware, ct);
+        }
 
-        var workflowOwnerTeamId = request.TeamId
+        var workflowOwnerTeamId = tenantSoftware.OwnerTeamId
             ?? (await DefaultTeamHelper.EnsureDefaultTeamAsync(dbContext, currentTenantId, ct)).Id;
 
         var activeWorkflows = await dbContext.RemediationWorkflows
@@ -1239,5 +1249,56 @@ public class SoftwareController(
         }
 
         return query;
+    }
+
+    private async Task ReapplySoftwareOwnerRuleAsync(
+        Guid tenantId,
+        SoftwareTenantRecord tenantSoftware,
+        CancellationToken ct
+    )
+    {
+        var rules = await dbContext.DeviceRules.AsNoTracking()
+            .Where(rule =>
+                rule.TenantId == tenantId
+                && rule.Enabled
+                && rule.AssetType == "Software")
+            .OrderBy(rule => rule.Priority)
+            .ToListAsync(ct);
+
+        foreach (var rule in rules)
+        {
+            var assignOwnerOperation = rule.ParseOperations().FirstOrDefault(operation =>
+                string.Equals(operation.Type, "AssignOwnerTeam", StringComparison.Ordinal));
+            if (assignOwnerOperation is null)
+            {
+                continue;
+            }
+
+            if (!assignOwnerOperation.Parameters.TryGetValue("teamId", out var ownerTeamIdValue)
+                || !Guid.TryParse(ownerTeamIdValue, out var ownerTeamId))
+            {
+                continue;
+            }
+
+            var teamExists = await dbContext.Teams.AsNoTracking()
+                .AnyAsync(team => team.TenantId == tenantId && team.Id == ownerTeamId, ct);
+            if (!teamExists)
+            {
+                continue;
+            }
+
+            var predicate = softwareRuleFilterBuilder.Build(rule.ParseFilter());
+            var matches = await BuildTenantSoftwareRecordsQuery(tenantId, tenantSoftware.SnapshotId)
+                .Where(item => item.Id == tenantSoftware.Id)
+                .Where(predicate)
+                .AnyAsync(ct);
+            if (!matches)
+            {
+                continue;
+            }
+
+            tenantSoftware.AssignOwnerTeamFromRule(ownerTeamId, rule.Id);
+            break;
+        }
     }
 }

@@ -120,8 +120,8 @@ function SoftwareDetailRoute() {
 
   const ownerMutation = useMutation({
     mutationFn: (teamId: string | null) => assignTenantSoftwareOwner({ data: { id, teamId } }),
-    onSuccess: async () => {
-      toast.success('Software owner updated.')
+    onSuccess: async (_data, teamId) => {
+      toast.success(teamId ? 'Software owner updated.' : 'Software owner returned to rule control.')
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: softwareQueryKeys.all }),
         queryClient.invalidateQueries({ queryKey: ['teams', selectedTenantId] }),
