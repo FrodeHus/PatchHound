@@ -144,6 +144,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
                 source.ApiBaseUrl,
                 source.TokenScope,
                 source.SyncSchedule,
+                source.StoredCredentialId,
                 source.ManualRequestedAt,
                 source.LastStartedAt,
                 source.LinkedSourceKey
@@ -209,9 +210,12 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
             );
     }
 
-    private static bool HasConfiguredCredentials(ScheduledSource source)
+    internal static bool HasConfiguredCredentials(ScheduledSource source)
     {
         if (!string.IsNullOrWhiteSpace(source.LinkedSourceKey))
+            return true;
+
+        if (source.StoredCredentialId.HasValue)
             return true;
 
         return !string.IsNullOrWhiteSpace(source.CredentialTenantId)
@@ -254,7 +258,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
         return nextOccurrence.HasValue && nextOccurrence.Value <= nowUtc.UtcDateTime;
     }
 
-    private sealed record ScheduledSource(
+    internal sealed record ScheduledSource(
         Guid Id,
         Guid TenantId,
         string TenantName,
@@ -266,6 +270,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
         string ApiBaseUrl,
         string TokenScope,
         string SyncSchedule,
+        Guid? StoredCredentialId,
         DateTimeOffset? ManualRequestedAt,
         DateTimeOffset? LastStartedAt,
         string? LinkedSourceKey = null

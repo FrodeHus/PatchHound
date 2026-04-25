@@ -429,6 +429,29 @@ public class SystemController : ControllerBase
             var secretRef = existingSource?.SecretRef ?? string.Empty;
             var secretValue = source.Credentials.Secret.Trim();
             var oldSecretRef = existingSource?.SecretRef;
+            var storedCredentialId = source.Credentials.StoredCredentialId;
+
+            if (storedCredentialId.HasValue)
+            {
+                var acceptedTypes = EnrichmentSourceCatalog.GetAcceptedCredentialTypes(source.Key);
+                var credentialAvailable = acceptedTypes.Count > 0
+                    && await _dbContext.StoredCredentials.AsNoTracking()
+                        .AnyAsync(
+                            credential =>
+                                credential.Id == storedCredentialId.Value
+                                && acceptedTypes.Contains(credential.Type)
+                                && credential.IsGlobal,
+                            ct
+                        );
+
+                if (!credentialAvailable)
+                {
+                    return BadRequest(new ProblemDetails
+                    {
+                        Title = "Selected credential is not compatible with this global enrichment source.",
+                    });
+                }
+            }
 
             if (!string.IsNullOrWhiteSpace(secretValue))
             {
@@ -450,6 +473,7 @@ public class SystemController : ControllerBase
                     source.Enabled,
                     secretRef,
                     source.Credentials.ApiBaseUrl,
+                    storedCredentialId,
                     source.RefreshTtlHours
                 );
                 await _dbContext.EnrichmentSourceConfigurations.AddAsync(existingSource, ct);
@@ -466,6 +490,7 @@ public class SystemController : ControllerBase
                 source.Enabled,
                 secretRef,
                 source.Credentials.ApiBaseUrl,
+                storedCredentialId,
                 source.RefreshTtlHours
             );
 
@@ -522,6 +547,8 @@ public class SystemController : ControllerBase
             source.DisplayName,
             source.Enabled,
             new EnrichmentSourceCredentialsDto(
+                source.StoredCredentialId,
+                EnrichmentSourceCatalog.GetAcceptedCredentialTypes(source.SourceKey),
                 !string.IsNullOrWhiteSpace(source.SecretRef),
                 source.ApiBaseUrl
             ),

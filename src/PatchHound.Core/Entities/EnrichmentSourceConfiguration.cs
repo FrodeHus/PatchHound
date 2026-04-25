@@ -8,6 +8,7 @@ public class EnrichmentSourceConfiguration
     public bool Enabled { get; private set; }
     public string SecretRef { get; private set; } = string.Empty;
     public string ApiBaseUrl { get; private set; } = string.Empty;
+    public Guid? StoredCredentialId { get; private set; }
     public int? RefreshTtlHours { get; private set; }
     public Guid? ActiveEnrichmentRunId { get; private set; }
     public DateTimeOffset? LeaseAcquiredAt { get; private set; }
@@ -26,6 +27,7 @@ public class EnrichmentSourceConfiguration
         bool enabled,
         string secretRef = "",
         string apiBaseUrl = "",
+        Guid? storedCredentialId = null,
         int? refreshTtlHours = null
     )
     {
@@ -37,6 +39,7 @@ public class EnrichmentSourceConfiguration
             Enabled = enabled,
             SecretRef = secretRef,
             ApiBaseUrl = apiBaseUrl,
+            StoredCredentialId = storedCredentialId,
             RefreshTtlHours = refreshTtlHours,
         };
     }
@@ -46,6 +49,7 @@ public class EnrichmentSourceConfiguration
         bool enabled,
         string secretRef,
         string apiBaseUrl,
+        Guid? storedCredentialId,
         int? refreshTtlHours
     )
     {
@@ -53,6 +57,7 @@ public class EnrichmentSourceConfiguration
         Enabled = enabled;
         SecretRef = secretRef;
         ApiBaseUrl = apiBaseUrl;
+        StoredCredentialId = storedCredentialId;
         RefreshTtlHours = refreshTtlHours;
     }
 

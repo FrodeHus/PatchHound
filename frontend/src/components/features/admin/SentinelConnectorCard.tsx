@@ -1,12 +1,22 @@
 import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Satellite, Loader2, ExternalLinkIcon } from 'lucide-react'
+import { fetchStoredCredentials } from '@/api/stored-credentials.functions'
+import type { StoredCredential } from '@/api/stored-credentials.schemas'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   fetchSentinelConnector,
   updateSentinelConnector,
@@ -24,6 +34,11 @@ export function SentinelConnectorCard() {
     queryKey: ['sentinel-connector'],
     queryFn: () => fetchSentinelConnector(),
   })
+  const credentialsQuery = useQuery({
+    queryKey: ['stored-credentials', 'sentinel'],
+    queryFn: () => fetchStoredCredentials({ data: { type: 'entra-client-secret' } }),
+    staleTime: 30_000,
+  })
 
   const [editing, setEditing] = useState(false)
 
@@ -38,6 +53,8 @@ export function SentinelConnectorCard() {
   }
 
   const isConfigured = !!(config.dceEndpoint && config.dcrImmutableId && config.streamName)
+  const credentials = credentialsQuery.data ?? []
+  const selectedCredential = credentials.find((credential) => credential.id === config.storedCredentialId)
 
   if (!editing && !isConfigured) {
     return (
@@ -102,8 +119,8 @@ export function SentinelConnectorCard() {
               <p className="font-mono text-xs">{config.streamName}</p>
             </div>
             <div>
-              <span className="text-muted-foreground">Client Secret</span>
-              <p className="text-xs">{config.hasSecret ? '••••••••' : 'Not set'}</p>
+              <span className="text-muted-foreground">Stored Credential</span>
+              <p className="truncate text-xs">{selectedCredential?.name ?? 'Not set'}</p>
             </div>
           </div>
           <Button variant="outline" onClick={() => setEditing(true)}>
@@ -117,6 +134,7 @@ export function SentinelConnectorCard() {
   return (
     <SentinelConnectorForm
       config={config}
+      storedCredentials={credentials}
       onClose={() => setEditing(false)}
       onSaved={() => {
         void queryClient.invalidateQueries({ queryKey: ['sentinel-connector'] })
@@ -128,10 +146,19 @@ export function SentinelConnectorCard() {
 
 function SentinelConnectorForm({
   config,
+  storedCredentials,
   onClose,
   onSaved,
 }: {
-  config: { enabled: boolean; dceEndpoint: string; dcrImmutableId: string; streamName: string; tenantId: string; clientId: string; hasSecret: boolean }
+  config: {
+    enabled: boolean
+    dceEndpoint: string
+    dcrImmutableId: string
+    streamName: string
+    storedCredentialId: string | null
+    acceptedCredentialTypes: string[]
+  }
+  storedCredentials: StoredCredential[]
   onClose: () => void
   onSaved: () => void
 }) {
@@ -140,10 +167,16 @@ function SentinelConnectorForm({
     dceEndpoint: config.dceEndpoint,
     dcrImmutableId: config.dcrImmutableId,
     streamName: config.streamName || 'Custom-PatchHoundAuditLog',
-    tenantId: config.tenantId,
-    clientId: config.clientId,
-    clientSecret: null,
+    storedCredentialId: config.storedCredentialId,
   })
+  const compatibleCredentials = storedCredentials.filter(
+    (credential) =>
+      credential.isGlobal && config.acceptedCredentialTypes.includes(credential.type),
+  )
+  const selectedCredential = compatibleCredentials.find(
+    (credential) => credential.id === form.storedCredentialId,
+  )
+  const canSave = !form.enabled || Boolean(form.storedCredentialId)
 
   const mutation = useMutation({
     mutationFn: (data: UpdateSentinelConnectorInput) => updateSentinelConnector({ data }),
@@ -208,45 +241,44 @@ function SentinelConnectorForm({
               onChange={(e) => update('streamName', e.target.value)}
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="entra-tenant">Entra Tenant ID</Label>
-            <Input
-              id="entra-tenant"
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              value={form.tenantId}
-              onChange={(e) => update('tenantId', e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="client-id">Client ID</Label>
-            <Input
-              id="client-id"
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              value={form.clientId}
-              onChange={(e) => update('clientId', e.target.value)}
-            />
-          </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="client-secret">
-              Client Secret
-              {config.hasSecret && (
-                <span className="ml-2 text-xs text-muted-foreground">(leave blank to keep current)</span>
-              )}
-            </Label>
-            <Input
-              id="client-secret"
-              type="password"
-              placeholder={config.hasSecret ? '••••••••' : 'Enter client secret'}
-              value={form.clientSecret ?? ''}
-              onChange={(e) => update('clientSecret', e.target.value || null)}
-            />
+            <Label>Stored Credential</Label>
+            <Select
+              value={form.storedCredentialId ?? 'none'}
+              onValueChange={(value) =>
+                update('storedCredentialId', value === 'none' ? null : value)
+              }
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl bg-background px-3">
+                <SelectValue placeholder="Select stored credential">
+                  {selectedCredential?.name ?? 'No credential selected'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="none">No credential selected</SelectItem>
+                {compatibleCredentials.map((credential) => (
+                  <SelectItem key={credential.id} value={credential.id}>
+                    {credential.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Sentinel requires a global Entra ID stored credential with Monitoring Metrics Publisher access.
+            </p>
+            <Link
+              to="/admin/platform/credentials"
+              className="inline-flex w-fit text-xs font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Manage stored credentials
+            </Link>
           </div>
         </div>
 
         <div className="flex gap-2">
           <Button
             onClick={() => mutation.mutate(form)}
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || !canSave}
           >
             {mutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
             Save
@@ -259,6 +291,11 @@ function SentinelConnectorForm({
         {mutation.isError && (
           <p className="text-sm text-destructive">
             {mutation.error instanceof Error ? mutation.error.message : 'Failed to save configuration'}
+          </p>
+        )}
+        {!canSave && (
+          <p className="text-sm text-destructive">
+            Select a global Entra ID stored credential before enabling Sentinel.
           </p>
         )}
       </CardContent>

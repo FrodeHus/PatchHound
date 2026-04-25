@@ -7,9 +7,8 @@ public class SentinelConnectorConfiguration
     public string DceEndpoint { get; private set; } = string.Empty;
     public string DcrImmutableId { get; private set; } = string.Empty;
     public string StreamName { get; private set; } = string.Empty;
-    public string TenantId { get; private set; } = string.Empty;
-    public string ClientId { get; private set; } = string.Empty;
-    public string SecretRef { get; private set; } = string.Empty;
+    public Guid? StoredCredentialId { get; private set; }
+    public StoredCredential? StoredCredential { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
     private SentinelConnectorConfiguration() { }
@@ -19,9 +18,7 @@ public class SentinelConnectorConfiguration
         string dceEndpoint,
         string dcrImmutableId,
         string streamName,
-        string tenantId,
-        string clientId,
-        string secretRef
+        Guid? storedCredentialId
     )
     {
         return new SentinelConnectorConfiguration
@@ -31,9 +28,7 @@ public class SentinelConnectorConfiguration
             DceEndpoint = dceEndpoint,
             DcrImmutableId = dcrImmutableId,
             StreamName = streamName,
-            TenantId = tenantId,
-            ClientId = clientId,
-            SecretRef = secretRef,
+            StoredCredentialId = storedCredentialId,
             UpdatedAt = DateTimeOffset.UtcNow,
         };
     }
@@ -43,18 +38,14 @@ public class SentinelConnectorConfiguration
         string dceEndpoint,
         string dcrImmutableId,
         string streamName,
-        string tenantId,
-        string clientId,
-        string secretRef
+        Guid? storedCredentialId
     )
     {
         Enabled = enabled;
         DceEndpoint = dceEndpoint;
         DcrImmutableId = dcrImmutableId;
         StreamName = streamName;
-        TenantId = tenantId;
-        ClientId = clientId;
-        SecretRef = secretRef;
+        StoredCredentialId = storedCredentialId;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

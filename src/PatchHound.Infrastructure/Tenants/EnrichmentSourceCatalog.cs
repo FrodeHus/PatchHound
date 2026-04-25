@@ -1,4 +1,5 @@
 using PatchHound.Core.Entities;
+using PatchHound.Infrastructure.Credentials;
 
 namespace PatchHound.Infrastructure.Tenants;
 
@@ -88,5 +89,12 @@ public static class EnrichmentSourceCatalog
         return string.Equals(sourceKey, NvdSourceKey, StringComparison.OrdinalIgnoreCase)
             ? "apiKey"
             : "secret";
+    }
+
+    public static IReadOnlyList<string> GetAcceptedCredentialTypes(string sourceKey)
+    {
+        return string.Equals(sourceKey, DefenderSourceKey, StringComparison.OrdinalIgnoreCase)
+            ? [StoredCredentialTypes.EntraClientSecret]
+            : [];
     }
 }

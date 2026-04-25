@@ -3,6 +3,9 @@
     <UserSecretsId>dotnet-PatchHound.Worker-e581a381-1285-4971-b5b5-e747fa87d883</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="PatchHound.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Cronos" Version="0.12.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.7" />

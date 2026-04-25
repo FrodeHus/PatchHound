@@ -17,8 +17,15 @@ public class EnrichmentSourceConfigurationConfiguration
         builder.Property(source => source.DisplayName).HasMaxLength(256).IsRequired();
         builder.Property(source => source.SecretRef).HasMaxLength(512).IsRequired();
         builder.Property(source => source.ApiBaseUrl).HasMaxLength(512).IsRequired();
+        builder.Property(source => source.StoredCredentialId);
         builder.HasIndex(source => source.ActiveEnrichmentRunId);
+        builder.HasIndex(source => source.StoredCredentialId);
         builder.Property(source => source.LastStatus).HasMaxLength(64).IsRequired();
         builder.Property(source => source.LastError).HasMaxLength(512).IsRequired();
+
+        builder.HasOne<StoredCredential>()
+            .WithMany()
+            .HasForeignKey(source => source.StoredCredentialId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

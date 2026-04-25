@@ -1,7 +1,10 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Sparkles, X } from 'lucide-react'
+import { fetchStoredCredentials } from '@/api/stored-credentials.functions'
+import type { StoredCredential } from '@/api/stored-credentials.schemas'
 import {
   type EnrichmentSource,
   triggerEndOfLifeEnrichment,
@@ -13,6 +16,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Separator } from '@/components/ui/separator'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Sheet,
   SheetContent,
@@ -51,6 +61,12 @@ export function GlobalEnrichmentSourceManagement({
   const [historySource, setHistorySource] = useState<{ key: string; displayName: string } | null>(null)
   const { selectedTenantId } = useTenantScope()
 
+  const storedCredentialsQuery = useQuery({
+    queryKey: ['stored-credentials', 'enrichment'],
+    queryFn: () => fetchStoredCredentials({ data: {} }),
+    staleTime: 30_000,
+  })
+
   const eolTriggerMutation = useMutation({
     mutationFn: async () => {
       if (!selectedTenantId) throw new Error('No tenant selected')
@@ -73,6 +89,7 @@ export function GlobalEnrichmentSourceManagement({
           enabled: source.enabled,
           refreshTtlHours: source.refreshTtlHours,
           credentials: {
+            storedCredentialId: source.credentials.storedCredentialId ?? null,
             secret: source.credentials.secret,
             apiBaseUrl: source.credentials.apiBaseUrl,
           },
@@ -264,6 +281,7 @@ export function GlobalEnrichmentSourceManagement({
               isSaving={mutation.isPending}
               saveState={saveState}
               selectedTenantId={selectedTenantId}
+              storedCredentials={storedCredentialsQuery.data ?? []}
               isEolTriggering={eolTriggerMutation.isPending}
               onSave={() => mutation.mutate()}
               onClose={() => setEditingSourceKey(null)}
@@ -288,6 +306,7 @@ function EnrichmentSourceEditorSheetContent({
   isSaving,
   saveState,
   selectedTenantId,
+  storedCredentials,
   isEolTriggering,
   onSave,
   onClose,
@@ -299,6 +318,7 @@ function EnrichmentSourceEditorSheetContent({
   isSaving: boolean
   saveState: 'idle' | 'saved' | 'error'
   selectedTenantId: string | null | undefined
+  storedCredentials: StoredCredential[]
   isEolTriggering: boolean
   onSave: () => void
   onClose: () => void
@@ -457,7 +477,13 @@ function EnrichmentSourceEditorSheetContent({
           </FormSection>
 
           <FormSection title="Credentials">
-            {source.credentialMode === 'global-secret' || source.key === 'nvd' ? (
+            {source.credentials.acceptedCredentialTypes.length > 0 ? (
+              <StoredCredentialSelector
+                source={source}
+                storedCredentials={storedCredentials}
+                onUpdateSource={onUpdateSource}
+              />
+            ) : source.credentialMode === 'global-secret' || source.key === 'nvd' ? (
               <div className="grid content-start gap-2">
                 <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                   API Key{source.key === 'nvd' ? ' (optional)' : ''}
@@ -624,6 +650,100 @@ function FormSection({ title, children }: { title: string; children: React.React
       <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
       {children}
       <Separator className="opacity-50" />
+    </div>
+  )
+}
+
+function StoredCredentialSelector({
+  source,
+  storedCredentials,
+  onUpdateSource,
+}: {
+  source: EnrichmentSourceDraft
+  storedCredentials: StoredCredential[]
+  onUpdateSource: (key: string, mutate: (current: EnrichmentSourceDraft) => EnrichmentSourceDraft) => void
+}) {
+  const acceptedTypes = source.credentials.acceptedCredentialTypes
+  const compatibleCredentials = storedCredentials.filter(
+    (credential) => credential.isGlobal && acceptedTypes.includes(credential.type),
+  )
+  const selectedCredential = compatibleCredentials.find(
+    (credential) => credential.id === source.credentials.storedCredentialId,
+  )
+
+  return (
+    <div className="grid content-start gap-2">
+      <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+        Stored Credential
+      </span>
+      <Select
+        value={source.credentials.storedCredentialId ?? 'none'}
+        onValueChange={(value) =>
+          onUpdateSource(source.key, (current) => ({
+            ...current,
+            credentials: {
+              ...current.credentials,
+              storedCredentialId: value === 'none' ? null : value,
+            },
+          }))
+        }
+      >
+        <SelectTrigger className="h-10 w-full rounded-lg border-border/70 bg-background px-3">
+          <SelectValue placeholder="Select stored credential">
+            {selectedCredential?.name ?? 'Source-specific secret'}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent className="rounded-xl border-border/70 bg-popover/95 backdrop-blur">
+          <SelectItem value="none">Source-specific secret</SelectItem>
+          {compatibleCredentials.map((credential) => (
+            <SelectItem key={credential.id} value={credential.id}>
+              {credential.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {compatibleCredentials.length === 0 ? (
+        <div className="space-y-1">
+          <p className="text-[11px] text-muted-foreground">
+            No global stored credentials are available for this provider type.
+          </p>
+          <Link
+            to="/admin/platform/credentials"
+            className="inline-flex w-fit text-[11px] font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Manage stored credentials
+          </Link>
+        </div>
+      ) : selectedCredential ? (
+        <p className="text-[11px] text-muted-foreground">
+          Uses client {selectedCredential.clientId} from tenant {selectedCredential.credentialTenantId}.
+        </p>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">
+          Enter a provider-specific secret below, or select a reusable global credential.
+        </p>
+      )}
+      {source.credentialMode === 'global-secret' || source.key === 'nvd' ? (
+        <Input
+          type="password"
+          placeholder={
+            source.credentials.hasSecret
+              ? 'API key stored — enter a new key to replace it'
+              : source.key === 'nvd'
+                ? 'Enter NVD API key'
+                : 'Enter API key'
+          }
+          value={source.credentials.secret}
+          disabled={Boolean(source.credentials.storedCredentialId)}
+          onChange={(event) =>
+            onUpdateSource(source.key, (current) => ({
+              ...current,
+              credentials: { ...current.credentials, secret: event.target.value },
+            }))
+          }
+          className="h-10"
+        />
+      ) : null}
     </div>
   )
 }

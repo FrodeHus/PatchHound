@@ -3,6 +3,8 @@ import { isoDateTimeSchema, nullableIsoDateTimeSchema } from './common.schemas'
 import { pagedResponseMetaSchema } from './pagination.schemas'
 
 export const tenantCredentialsSchema = z.object({
+  storedCredentialId: z.string().uuid().nullable().optional(),
+  acceptedCredentialTypes: z.array(z.string()).optional().default([]),
   clientId: z.string(),
   hasSecret: z.boolean(),
   apiBaseUrl: z.string(),
