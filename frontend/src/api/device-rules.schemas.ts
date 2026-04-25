@@ -2,6 +2,9 @@ import { z } from 'zod'
 import { isoDateTimeSchema } from './common.schemas'
 import { pagedResponseMetaSchema } from './pagination.schemas'
 
+export const assetRuleAssetTypeSchema = z.enum(['Device', 'Software', 'Application'])
+export type AssetRuleAssetType = z.infer<typeof assetRuleAssetTypeSchema>
+
 // Phase 1 canonical cleanup (Task 15): schemas for /api/device-rules.
 // Replaces the legacy asset-rules surface. Preview items drop the
 // `assetType` column since the payload is always a device.
@@ -35,6 +38,7 @@ export const deviceRuleOperationSchema = z.object({
 
 export const deviceRuleSchema = z.object({
   id: z.string().uuid(),
+  assetType: assetRuleAssetTypeSchema,
   name: z.string(),
   description: z.string().nullable(),
   priority: z.number(),

@@ -222,8 +222,8 @@ function DeviceRulesPage() {
   return (
     <section className="space-y-5">
       <DataTableWorkbench
-        title="Device Rules"
-        description="Rules run in priority order after each ingestion. First match wins per device."
+        title="Asset Rules"
+        description="Asset rules run in priority order after each ingestion. This first slice evaluates device rules only."
         totalCount={query.data.totalCount}
       >
         <div className="flex items-center gap-2">
@@ -240,7 +240,7 @@ function DeviceRulesPage() {
           <Link to="/admin/device-rules/new">
             <Button type="button" size="sm">
               <Plus className="size-3.5" />
-              Create rule
+              Create asset rule
             </Button>
           </Link>
         </div>
@@ -249,8 +249,8 @@ function DeviceRulesPage() {
           data={query.data.items}
           emptyState={
             <DataTableEmptyState
-              title="No device rules yet"
-              description="Create your first rule to automatically classify and tag devices after ingestion."
+              title="No asset rules yet"
+              description="Create your first asset rule to automatically classify and tag devices after ingestion."
             />
           }
         />

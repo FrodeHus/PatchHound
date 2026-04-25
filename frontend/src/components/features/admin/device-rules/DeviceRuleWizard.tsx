@@ -8,6 +8,10 @@ import {
   previewDeviceRuleFilter,
   updateDeviceRule,
 } from '@/api/device-rules.functions'
+import {
+  assetRuleAssetTypeSchema,
+  type AssetRuleAssetType,
+} from '@/api/device-rules.schemas'
 import type {
   DeviceRule,
   DeviceRuleOperation,
@@ -63,6 +67,9 @@ export function DeviceRuleWizard({
 }: DeviceRuleWizardProps) {
   const router = useRouter()
   const [step, setStep] = useState(0)
+  const [assetType, setAssetType] = useState<AssetRuleAssetType>(
+    assetRuleAssetTypeSchema.parse(initialData?.assetType ?? 'Device'),
+  )
   const [name, setName] = useState(initialData?.name ?? '')
   const [description, setDescription] = useState(initialData?.description ?? '')
   const [filter, setFilter] = useState<FilterGroup>(
@@ -74,9 +81,12 @@ export function DeviceRuleWizard({
     initialData?.operations ?? [],
   )
   const [preview, setPreview] = useState<FilterPreview | null>(null)
+  const isSoftwareRule = assetType === 'Software'
+  const isApplicationRule = assetType === 'Application'
+  const supportsOwnerOnlyRule = isSoftwareRule || isApplicationRule
 
   const previewMutation = useMutation({
-    mutationFn: async () => previewDeviceRuleFilter({ data: { tenantId, filterDefinition: filter } }),
+    mutationFn: async () => previewDeviceRuleFilter({ data: { tenantId, assetType, filterDefinition: filter } }),
     onSuccess: (data) => setPreview(data),
   })
 
@@ -86,6 +96,7 @@ export function DeviceRuleWizard({
         return updateDeviceRule({
           data: {
             tenantId,
+            assetType,
             id: initialData.id,
             name,
             description: description || undefined,
@@ -98,6 +109,7 @@ export function DeviceRuleWizard({
       return createDeviceRule({
         data: {
           tenantId,
+          assetType,
           name,
           description: description || undefined,
           filterDefinition: filter,
@@ -126,10 +138,19 @@ export function DeviceRuleWizard({
       case 1:
         return filter.conditions.length > 0
       case 2:
-        return operations.length > 0
+        return supportsOwnerOnlyRule || operations.length > 0
       default:
         return true
     }
+  }
+
+  const handleAssetTypeChange = (value: string | null) => {
+    if (!value) return
+    const nextAssetType = assetRuleAssetTypeSchema.parse(value)
+    setAssetType(nextAssetType)
+    setFilter(emptyFilter)
+    setOperations([])
+    setPreview(null)
   }
 
   return (
@@ -167,6 +188,24 @@ export function DeviceRuleWizard({
           <CardContent className="space-y-4">
             <div className="grid gap-1.5">
               <label className="text-xs font-medium text-muted-foreground">
+                Asset type
+              </label>
+              <Select value={assetType} onValueChange={handleAssetTypeChange}>
+                <SelectTrigger className="rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Device">Device</SelectItem>
+                  <SelectItem value="Software">Software</SelectItem>
+                  <SelectItem value="Application">Application</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Device, software, and application rules support owner-team assignment. Device-only operations remain available where applicable.
+              </p>
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
                 Rule name
               </label>
               <Input
@@ -197,12 +236,15 @@ export function DeviceRuleWizard({
           <CardHeader>
             <CardTitle>Filter Conditions</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Define which devices this rule applies to. Use groups to combine
-              conditions with AND/OR logic.
+              {isSoftwareRule
+                ? 'Define which software assets this rule applies to. Use groups to combine conditions with AND/OR logic.'
+                : isApplicationRule
+                  ? 'Define which cloud applications this rule applies to. Use groups to combine conditions with AND/OR logic.'
+                : 'Define which devices this rule applies to. Use groups to combine conditions with AND/OR logic.'}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <FilterBuilder value={filter} onChange={setFilter} />
+            <FilterBuilder assetType={assetType} value={filter} onChange={setFilter} />
 
             {filter.conditions.length > 0 && (
               <div className="space-y-3">
@@ -224,7 +266,7 @@ export function DeviceRuleWizard({
                 {preview && (
                   <InsetPanel className="space-y-2 px-4 py-3">
                     <p className="text-sm font-medium">
-                      {buildPreviewHeadline(preview.count, operations, securityProfiles, businessLabels, teams, scanProfiles)}
+                      {buildPreviewHeadline(assetType, preview.count, operations, securityProfiles, businessLabels, teams, scanProfiles)}
                     </p>
                     {operations.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
@@ -263,66 +305,95 @@ export function DeviceRuleWizard({
       {step === 2 && (
         <Card className="rounded-2xl border-border/70">
           <CardHeader>
-            <CardTitle>Operations</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Select one or more operations to apply to matching devices.
+              <CardTitle>Operations</CardTitle>
+              <p className="text-sm text-muted-foreground">
+              {isSoftwareRule
+                ? 'Select one or more operations to apply to matching tenant software records.'
+                : isApplicationRule
+                  ? 'Select one or more operations to apply to matching cloud applications.'
+                  : 'Select one or more operations to apply to matching devices.'}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <OperationEditor
-              type="AssignSecurityProfile"
-              label="Assign Security Profile"
-              description="Set the security profile on matching devices for environmental CVSS scoring."
-              options={securityProfiles.map((p) => ({
-                value: p.id,
-                label: p.name,
-              }))}
-              paramKey="securityProfileId"
-              operations={operations}
-              onChange={setOperations}
-            />
-            <OperationEditor
-              type="AssignTeam"
-              label="Assign Team"
-              description="Set the fallback assignment group for task routing on matching devices."
-              options={teams.map((t) => ({ value: t.id, label: t.name }))}
-              paramKey="teamId"
-              operations={operations}
-              onChange={setOperations}
-            />
-            <OperationEditor
-              type="SetCriticality"
-              label="Set Criticality"
-              description="Set the canonical device criticality used by risk scoring and executive reporting."
-              options={criticalityOptions}
-              paramKey="criticality"
-              operations={operations}
-              onChange={setOperations}
-            />
-            <OperationEditor
-              type="AssignBusinessLabel"
-              label="Assign Business Label"
-              description="Apply a tenant business label to matching devices so dashboards and summaries use recognizable business context."
-              options={businessLabels.filter((label) => label.isActive).map((label) => ({
-                value: label.id,
-                label: label.name,
-              }))}
-              paramKey="businessLabelId"
-              operations={operations}
-              onChange={setOperations}
-            />
-            <OperationEditor
-              type="AssignScanProfile"
-              label="Assign Scan Profile"
-              description="Assign an authenticated scan profile to matching devices for on-prem host scanning."
-              options={scanProfiles.map((p) => ({
-                value: p.id,
-                label: p.name,
-              }))}
-              paramKey="scanProfileId"
-              operations={operations}
-              onChange={setOperations}
-            />
+            {supportsOwnerOnlyRule ? (
+              <OperationEditor
+                type="AssignOwnerTeam"
+                label="Assign Owner Team"
+                description={isApplicationRule
+                  ? 'Set the owning team on matching cloud application records.'
+                  : 'Set the owning team on matching tenant software inventory records.'}
+                options={teams.map((t) => ({ value: t.id, label: t.name }))}
+                paramKey="teamId"
+                operations={operations}
+                onChange={setOperations}
+              />
+            ) : (
+              <>
+                <OperationEditor
+                  type="AssignOwnerTeam"
+                  label="Assign Owner Team"
+                  description="Set the owning team on matching devices."
+                  options={teams.map((t) => ({ value: t.id, label: t.name }))}
+                  paramKey="teamId"
+                  operations={operations}
+                  onChange={setOperations}
+                />
+                <OperationEditor
+                  type="AssignSecurityProfile"
+                  label="Assign Security Profile"
+                  description="Set the security profile on matching devices for environmental CVSS scoring."
+                  options={securityProfiles.map((p) => ({
+                    value: p.id,
+                    label: p.name,
+                  }))}
+                  paramKey="securityProfileId"
+                  operations={operations}
+                  onChange={setOperations}
+                />
+                <OperationEditor
+                  type="AssignTeam"
+                  label="Assign Team"
+                  description="Set the fallback assignment group for task routing on matching devices."
+                  options={teams.map((t) => ({ value: t.id, label: t.name }))}
+                  paramKey="teamId"
+                  operations={operations}
+                  onChange={setOperations}
+                />
+                <OperationEditor
+                  type="SetCriticality"
+                  label="Set Criticality"
+                  description="Set the canonical device criticality used by risk scoring and executive reporting."
+                  options={criticalityOptions}
+                  paramKey="criticality"
+                  operations={operations}
+                  onChange={setOperations}
+                />
+                <OperationEditor
+                  type="AssignBusinessLabel"
+                  label="Assign Business Label"
+                  description="Apply a tenant business label to matching devices so dashboards and summaries use recognizable business context."
+                  options={businessLabels.filter((label) => label.isActive).map((label) => ({
+                    value: label.id,
+                    label: label.name,
+                  }))}
+                  paramKey="businessLabelId"
+                  operations={operations}
+                  onChange={setOperations}
+                />
+                <OperationEditor
+                  type="AssignScanProfile"
+                  label="Assign Scan Profile"
+                  description="Assign an authenticated scan profile to matching devices for on-prem host scanning."
+                  options={scanProfiles.map((p) => ({
+                    value: p.id,
+                    label: p.name,
+                  }))}
+                  paramKey="scanProfileId"
+                  operations={operations}
+                  onChange={setOperations}
+                />
+              </>
+            )}
           </CardContent>
         </Card>
       )}
@@ -336,6 +407,13 @@ export function DeviceRuleWizard({
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
+            <InsetPanel className="space-y-2 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Asset type
+              </p>
+              <p className="text-sm font-medium">{assetType}</p>
+            </InsetPanel>
+
             <InsetPanel className="space-y-2 px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 Name
@@ -357,29 +435,43 @@ export function DeviceRuleWizard({
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 Operations
               </p>
-              <div className="space-y-1">
-                {operations.map((op, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm">
-                    <Badge variant="outline" className="text-[10px]">
-                      {op.type === "AssignSecurityProfile"
-                        ? "Security Profile"
-                        : op.type === "AssignTeam"
-                          ? "Team"
-                          : op.type === "AssignBusinessLabel"
-                            ? "Business Label"
-                            : op.type === "AssignScanProfile"
-                              ? "Scan Profile"
-                              : "Criticality"}
-                    </Badge>
-                    <span>
-                      {describeOperationTarget(op, securityProfiles, businessLabels, teams, scanProfiles)}
-                    </span>
+              {operations.length > 0 ? (
+                <>
+                  <div className="space-y-1">
+                    {operations.map((op, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        <Badge variant="outline" className="text-[10px]">
+                          {op.type === "AssignSecurityProfile"
+                            ? "Security Profile"
+                            : op.type === "AssignOwnerTeam"
+                              ? "Owner Team"
+                            : op.type === "AssignTeam"
+                              ? "Team"
+                              : op.type === "AssignBusinessLabel"
+                                ? "Business Label"
+                                : op.type === "AssignScanProfile"
+                                  ? "Scan Profile"
+                                  : "Criticality"}
+                        </Badge>
+                        <span>
+                          {describeOperationTarget(op, securityProfiles, businessLabels, teams, scanProfiles)}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {buildPreviewHeadline(preview?.count ?? 0, operations, securityProfiles, businessLabels, teams, scanProfiles)}
-              </p>
+                  <p className="text-xs text-muted-foreground">
+                    {buildPreviewHeadline(assetType, preview?.count ?? 0, operations, securityProfiles, businessLabels, teams, scanProfiles)}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {isSoftwareRule
+                    ? 'No operations selected.'
+                    : isApplicationRule
+                    ? 'No operations selected.'
+                    : 'No operations selected.'}
+                </p>
+              )}
             </InsetPanel>
 
             {saveMutation.isError && (
@@ -449,6 +541,7 @@ export function DeviceRuleWizard({
 }
 
 function buildPreviewHeadline(
+  assetType: AssetRuleAssetType,
   count: number,
   operations: DeviceRuleOperation[],
   securityProfiles: SecurityProfile[],
@@ -456,16 +549,29 @@ function buildPreviewHeadline(
   teams: TeamItem[],
   scanProfiles: ScanProfile[],
 ) {
+  const assetLabel = describePreviewAsset(assetType)
+
   if (operations.length === 0) {
-    return `${count} device${count !== 1 ? 's' : ''} match`
+    return `${count} ${assetLabel}${count !== 1 ? 's' : ''} match`
   }
 
   const operationDescriptions = buildOperationImpactLines(operations, securityProfiles, businessLabels, teams, scanProfiles)
   if (operationDescriptions.length === 1) {
-    return `This rule will ${operationDescriptions[0]} for ${count} device${count !== 1 ? 's' : ''}.`
+    return `This rule will ${operationDescriptions[0]} for ${count} ${assetLabel}${count !== 1 ? 's' : ''}.`
   }
 
-  return `This rule will affect ${count} device${count !== 1 ? 's' : ''} with ${operationDescriptions.length} operations.`
+  return `This rule will affect ${count} ${assetLabel}${count !== 1 ? 's' : ''} with ${operationDescriptions.length} operations.`
+}
+
+function describePreviewAsset(assetType: AssetRuleAssetType) {
+  switch (assetType) {
+    case 'Software':
+      return 'software asset'
+    case 'Application':
+      return 'cloud application'
+    default:
+      return 'device'
+  }
 }
 
 function buildOperationImpactLines(
@@ -479,6 +585,8 @@ function buildOperationImpactLines(
     switch (operation.type) {
       case 'AssignSecurityProfile':
         return `set security profile to ${describeOperationTarget(operation, securityProfiles, businessLabels, teams, scanProfiles)}`
+      case 'AssignOwnerTeam':
+        return `assign owner team ${describeOperationTarget(operation, securityProfiles, businessLabels, teams, scanProfiles)}`
       case 'AssignTeam':
         return `assign fallback team ${describeOperationTarget(operation, securityProfiles, businessLabels, teams, scanProfiles)}`
       case 'AssignBusinessLabel':
@@ -506,6 +614,11 @@ function describeOperationTarget(
   }
 
   if (operation.type === 'AssignTeam') {
+    return teams.find((team) => team.id === operation.parameters.teamId)?.name
+      ?? operation.parameters.teamId
+  }
+
+  if (operation.type === 'AssignOwnerTeam') {
     return teams.find((team) => team.id === operation.parameters.teamId)?.name
       ?? operation.parameters.teamId
   }

@@ -116,7 +116,7 @@ export function TenantAdministrationDetail({
             </TabsTrigger>
             <TabsTrigger value="device-rules" className="rounded-lg px-4 text-sm">
               <GitBranchPlus className="size-3.5" />
-              Device Rules
+              Asset Rules
             </TabsTrigger>
             <TabsTrigger value="workflows" className="rounded-lg px-4 text-sm">
               <Workflow className="size-3.5" />

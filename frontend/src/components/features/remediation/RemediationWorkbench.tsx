@@ -9,6 +9,7 @@ import { toneBadge } from '@/lib/tone-classes'
 import { OpenEpisodeSparkline } from './OpenEpisodeSparkline'
 import {
   approvalStatusTone,
+  formatSoftwareOwnerRoutingDetail,
   outcomeLabel,
   outcomeTone,
   riskBandTone,
@@ -252,6 +253,11 @@ export function RemediationWorkbench({
                           >
                             {item.criticality}
                           </span>
+                          <span
+                            className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(item.softwareOwnerAssignmentSource === 'Rule' ? 'success' : item.softwareOwnerAssignmentSource === 'Manual' ? 'info' : 'neutral')}`}
+                          >
+                            {item.softwareOwnerAssignmentSource}
+                          </span>
                           {item.maintenanceWindowDate ? (
                             <span
                               className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${
@@ -275,6 +281,14 @@ export function RemediationWorkbench({
                             </Link>
                           ) : null}
                         </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          {(item.softwareOwnerTeamName ?? 'Default Team')}
+                          {' · '}
+                          {formatSoftwareOwnerRoutingDetail(
+                            item.softwareOwnerTeamName,
+                            item.softwareOwnerAssignmentSource,
+                          )}
+                        </p>
                       </div>
                     </td>
                     <td className="px-4 py-3">

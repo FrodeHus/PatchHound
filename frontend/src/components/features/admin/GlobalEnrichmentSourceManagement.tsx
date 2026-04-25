@@ -457,15 +457,19 @@ function EnrichmentSourceEditorSheetContent({
           </FormSection>
 
           <FormSection title="Credentials">
-            {source.credentialMode === 'global-secret' ? (
+            {source.credentialMode === 'global-secret' || source.key === 'nvd' ? (
               <div className="grid content-start gap-2">
-                <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">API Key</span>
+                <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  API Key{source.key === 'nvd' ? ' (optional)' : ''}
+                </span>
                 <Input
                   type="password"
                   placeholder={
                     source.credentials.hasSecret
                       ? 'API key stored — enter a new key to replace it'
-                      : 'Enter API key'
+                      : source.key === 'nvd'
+                        ? 'Enter NVD API key'
+                        : 'Enter API key'
                   }
                   value={source.credentials.secret}
                   onChange={(event) =>
@@ -476,6 +480,11 @@ function EnrichmentSourceEditorSheetContent({
                   }
                   className="h-10"
                 />
+                {source.key === 'nvd' ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    NVD can run without a key, but a key raises the allowed request rate for modified-feed sync.
+                  </p>
+                ) : null}
               </div>
             ) : source.credentialMode === 'no-credential' ? (
               <div className="rounded-lg border border-border/50 bg-muted/20 px-4 py-3">
@@ -656,7 +665,7 @@ function getProviderStatusTone(source: EnrichmentSource): 'neutral' | 'success' 
 function getProviderStatusDescription(source: EnrichmentSource) {
   if (source.key === 'nvd') {
     if (!source.enabled) return 'NVD enrichment is configured globally but currently inactive.'
-    if (!source.credentials.hasSecret) return 'Add an NVD API key so the worker can enrich missing description, CVSS score, and vector data.'
+    if (!source.credentials.hasSecret) return 'NVD enrichment can run without an API key; add one to increase the allowed request rate for modified-feed sync.'
     if (source.runtime.lastError) return 'The worker is attempting NVD enrichment, but the latest run failed and should be reviewed.'
     return 'NVD is the global backfill source for missing vulnerability metadata when tenant ingestion does not provide it.'
   }

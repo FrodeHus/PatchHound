@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MetricInfoTooltip } from '@/components/features/dashboard/MetricInfoTooltip'
+import { formatSoftwareOwnerRoutingDetail } from '@/components/features/remediation/remediation-utils'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 
 type Props = {
@@ -109,10 +110,15 @@ export function TechnicalManagerOverview({ summary, isLoading }: Props) {
                         {startCase(item.softwareName)}
                       </Link>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Owned by {item.ownerTeamName}
+                        {formatSoftwareOwnerRoutingDetail(item.ownerTeamName, item.ownerAssignmentSource)}
                       </p>
                     </div>
                     <div className="text-right text-sm text-muted-foreground">
+                      <div className="flex justify-end">
+                        <Badge variant="outline" className="rounded-full">
+                          {item.ownerAssignmentSource}
+                        </Badge>
+                      </div>
                       <div>Approved {formatDateTime(item.approvedAt)}</div>
                       <div className="mt-1">
                         Maintenance {item.maintenanceWindowDate ? formatDate(item.maintenanceWindowDate) : 'Not scheduled'}

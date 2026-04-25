@@ -22,10 +22,15 @@ namespace PatchHound.Api.Controllers;
 // DeviceBusinessLabel distinguishes rule-assigned from manual links
 // so delete/reorder can unwind only the rule's own effects.
 [ApiController]
+[Route("api/asset-rules")]
 [Route("api/device-rules")]
 [Authorize(Policy = Policies.ConfigureTenant)]
 public class DeviceRulesController : ControllerBase
 {
+    private const string DeviceAssetType = "Device";
+    private const string SoftwareAssetType = "Software";
+    private const string ApplicationAssetType = "Application";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -35,6 +40,8 @@ public class DeviceRulesController : ControllerBase
     private readonly ITenantContext _tenantContext;
     private readonly IDeviceRuleEvaluationService _evaluationService;
     private readonly DeviceRuleFilterBuilder _filterBuilder;
+    private readonly SoftwareRuleFilterBuilder _softwareFilterBuilder;
+    private readonly CloudApplicationRuleFilterBuilder _cloudApplicationFilterBuilder;
     private readonly RiskRefreshService _riskRefreshService;
 
     public DeviceRulesController(
@@ -42,12 +49,15 @@ public class DeviceRulesController : ControllerBase
         ITenantContext tenantContext,
         IDeviceRuleEvaluationService evaluationService,
         DeviceRuleFilterBuilder filterBuilder,
+        SoftwareRuleFilterBuilder softwareFilterBuilder,
         RiskRefreshService riskRefreshService)
     {
         _dbContext = dbContext;
         _tenantContext = tenantContext;
         _evaluationService = evaluationService;
         _filterBuilder = filterBuilder;
+        _softwareFilterBuilder = softwareFilterBuilder;
+        _cloudApplicationFilterBuilder = new CloudApplicationRuleFilterBuilder();
         _riskRefreshService = riskRefreshService;
     }
 
@@ -101,10 +111,13 @@ public class DeviceRulesController : ControllerBase
         var filter = DeserializeFilter(request.FilterDefinition);
         var operations = DeserializeOperations(request.Operations);
 
+        if (!IsSupportedAssetType(request.AssetType))
+            return BadRequest(new ProblemDetails { Title = "Unsupported asset type." });
+
         if (filter is null || operations is null)
             return BadRequest(new ProblemDetails { Title = "Invalid filter or operations JSON." });
 
-        var validationError = ValidateOperations(operations);
+        var validationError = ValidateOperations(request.AssetType, operations);
         if (validationError is not null)
             return BadRequest(new ProblemDetails { Title = validationError });
 
@@ -116,7 +129,7 @@ public class DeviceRulesController : ControllerBase
             .Where(r => r.TenantId == tenantId)
             .MaxAsync(r => (int?)r.Priority, ct) ?? 0;
 
-        var rule = DeviceRule.Create(tenantId, request.Name, request.Description, maxPriority + 1, filter, operations);
+        var rule = DeviceRule.Create(tenantId, request.Name, request.Description, maxPriority + 1, request.AssetType, filter, operations);
         _dbContext.DeviceRules.Add(rule);
         await _dbContext.SaveChangesAsync(ct);
 
@@ -141,10 +154,13 @@ public class DeviceRulesController : ControllerBase
         var filter = DeserializeFilter(request.FilterDefinition);
         var operations = DeserializeOperations(request.Operations);
 
+        if (!IsSupportedAssetType(request.AssetType))
+            return BadRequest(new ProblemDetails { Title = "Unsupported asset type." });
+
         if (filter is null || operations is null)
             return BadRequest(new ProblemDetails { Title = "Invalid filter or operations JSON." });
 
-        var validationError = ValidateOperations(operations);
+        var validationError = ValidateOperations(request.AssetType, operations);
         if (validationError is not null)
             return BadRequest(new ProblemDetails { Title = validationError });
 
@@ -152,7 +168,7 @@ public class DeviceRulesController : ControllerBase
         if (referenceValidationError is not null)
             return BadRequest(new ProblemDetails { Title = referenceValidationError });
 
-        rule.Update(request.Name, request.Description, request.Enabled, filter, operations);
+        rule.Update(request.Name, request.Description, request.Enabled, request.AssetType, filter, operations);
         await _dbContext.SaveChangesAsync(ct);
 
         return Ok(ToDto(rule));
@@ -170,7 +186,6 @@ public class DeviceRulesController : ControllerBase
         if (rule is null)
             return NotFound();
 
-        var affectedDeviceIds = await GetMatchingDeviceIdsAsync(rule, tenantId, ct);
         var operations = rule.ParseOperations();
 
         _dbContext.DeviceRules.Remove(rule);
@@ -186,7 +201,7 @@ public class DeviceRulesController : ControllerBase
             remaining[i].SetPriority(i + 1);
 
         await _dbContext.SaveChangesAsync(ct);
-        await ResetDeletedRuleEffectsAsync(tenantId, rule.Id, affectedDeviceIds, operations, ct);
+        await ResetDeletedRuleEffectsAsync(tenantId, rule, operations, ct);
         await _evaluationService.EvaluateRulesAsync(tenantId, ct);
         await _riskRefreshService.RefreshForTenantAsync(
             tenantId,
@@ -204,14 +219,51 @@ public class DeviceRulesController : ControllerBase
         if (_tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
+        if (!IsSupportedAssetType(request.AssetType))
+            return BadRequest(new ProblemDetails { Title = "Unsupported asset type." });
+
         var filter = DeserializeFilter(request.FilterDefinition);
         if (filter is null)
             return BadRequest(new ProblemDetails { Title = "Invalid filter JSON." });
 
-        var result = await _evaluationService.PreviewFilterAsync(tenantId, filter, ct);
+        if (string.Equals(request.AssetType, DeviceAssetType, StringComparison.OrdinalIgnoreCase))
+        {
+            var result = await _evaluationService.PreviewFilterAsync(tenantId, filter, ct);
+            return Ok(new DeviceRulePreviewDto(
+                result.Count,
+                result.Samples.Select(s => new DevicePreviewItemDto(s.Id, s.Name)).ToList()));
+        }
+
+        if (string.Equals(request.AssetType, ApplicationAssetType, StringComparison.OrdinalIgnoreCase))
+        {
+            (int Count, List<(Guid Id, string Name)> Samples) applicationPreview;
+            try
+            {
+                applicationPreview = await PreviewApplicationFilterAsync(tenantId, filter, ct);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new ProblemDetails { Title = ex.Message });
+            }
+
+            return Ok(new DeviceRulePreviewDto(
+                applicationPreview.Count,
+                applicationPreview.Samples.Select(s => new DevicePreviewItemDto(s.Id, s.Name)).ToList()));
+        }
+
+        (int Count, List<(Guid Id, string Name)> Samples) softwarePreview;
+        try
+        {
+            softwarePreview = await PreviewSoftwareFilterAsync(tenantId, filter, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetails { Title = ex.Message });
+        }
+
         return Ok(new DeviceRulePreviewDto(
-            result.Count,
-            result.Samples.Select(s => new DevicePreviewItemDto(s.Id, s.Name)).ToList()));
+            softwarePreview.Count,
+            softwarePreview.Samples.Select(s => new DevicePreviewItemDto(s.Id, s.Name)).ToList()));
     }
 
     [HttpPost("run")]
@@ -255,6 +307,7 @@ public class DeviceRulesController : ControllerBase
 
     private static DeviceRuleDto ToDto(DeviceRule rule) => new(
         rule.Id,
+        rule.AssetType,
         rule.Name,
         rule.Description,
         rule.Priority,
@@ -266,6 +319,11 @@ public class DeviceRulesController : ControllerBase
         rule.LastExecutedAt,
         rule.LastMatchCount
     );
+
+    private static bool IsSupportedAssetType(string assetType) =>
+        string.Equals(assetType, DeviceAssetType, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(assetType, SoftwareAssetType, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(assetType, ApplicationAssetType, StringComparison.OrdinalIgnoreCase);
 
     private static FilterNode? DeserializeFilter(JsonElement element)
     {
@@ -291,8 +349,32 @@ public class DeviceRulesController : ControllerBase
         }
     }
 
-    private static string? ValidateOperations(IReadOnlyList<AssetRuleOperation> operations)
+    private static string? ValidateOperations(string assetType, IReadOnlyList<AssetRuleOperation> operations)
     {
+        if (string.Equals(assetType, SoftwareAssetType, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(assetType, ApplicationAssetType, StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var operation in operations)
+            {
+                switch (operation.Type)
+                {
+                    case "AssignOwnerTeam":
+                        if (!operation.Parameters.TryGetValue("teamId", out var softwareTeamId)
+                            || !Guid.TryParse(softwareTeamId, out _))
+                        {
+                            return "AssignOwnerTeam requires a valid teamId.";
+                        }
+                        break;
+                    default:
+                        return string.Equals(assetType, SoftwareAssetType, StringComparison.OrdinalIgnoreCase)
+                            ? $"Unknown software rule operation type: {operation.Type}."
+                            : $"Unknown application rule operation type: {operation.Type}.";
+                }
+            }
+
+            return null;
+        }
+
         foreach (var operation in operations)
         {
             switch (operation.Type)
@@ -310,6 +392,14 @@ public class DeviceRulesController : ControllerBase
                         || !Guid.TryParse(teamId, out _))
                     {
                         return "AssignTeam requires a valid teamId.";
+                    }
+                    break;
+
+                case "AssignOwnerTeam":
+                    if (!operation.Parameters.TryGetValue("teamId", out var ownerTeamId)
+                        || !Guid.TryParse(ownerTeamId, out _))
+                    {
+                        return "AssignOwnerTeam requires a valid teamId.";
                     }
                     break;
 
@@ -337,6 +427,54 @@ public class DeviceRulesController : ControllerBase
         return null;
     }
 
+    private async Task<(int Count, List<(Guid Id, string Name)> Samples)> PreviewSoftwareFilterAsync(
+        Guid tenantId,
+        FilterNode filter,
+        CancellationToken ct)
+    {
+        var predicate = _softwareFilterBuilder.Build(filter);
+        var query = _dbContext.SoftwareTenantRecords
+            .AsNoTracking()
+            .Where(item => item.TenantId == tenantId)
+            .Where(predicate);
+
+        var count = await query.CountAsync(ct);
+        var samples = await query
+            .OrderBy(item => item.SoftwareProduct.Name)
+            .ThenBy(item => item.SoftwareProduct.Vendor)
+            .Take(5)
+            .Select(item => new ValueTuple<Guid, string>(
+                item.Id,
+                string.IsNullOrWhiteSpace(item.SoftwareProduct.Vendor)
+                    ? item.SoftwareProduct.Name
+                    : $"{item.SoftwareProduct.Vendor} {item.SoftwareProduct.Name}"))
+            .ToListAsync(ct);
+
+        return (count, samples);
+    }
+
+    private async Task<(int Count, List<(Guid Id, string Name)> Samples)> PreviewApplicationFilterAsync(
+        Guid tenantId,
+        FilterNode filter,
+        CancellationToken ct)
+    {
+        var predicate = _cloudApplicationFilterBuilder.Build(filter);
+        var query = _dbContext.CloudApplications
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(item => item.TenantId == tenantId && item.ActiveInTenant)
+            .Where(predicate);
+
+        var count = await query.CountAsync(ct);
+        var samples = await query
+            .OrderBy(item => item.Name)
+            .Take(5)
+            .Select(item => new ValueTuple<Guid, string>(item.Id, item.Name))
+            .ToListAsync(ct);
+
+        return (count, samples);
+    }
+
     private async Task<string?> ValidateOperationReferencesAsync(
         Guid tenantId,
         IReadOnlyList<AssetRuleOperation> operations,
@@ -358,13 +496,14 @@ public class DeviceRulesController : ControllerBase
                     break;
 
                 case "AssignTeam":
+                case "AssignOwnerTeam":
                     if (operation.Parameters.TryGetValue("teamId", out var teamId)
                         && Guid.TryParse(teamId, out var parsedTeamId))
                     {
                         var exists = await _dbContext.Teams
                             .AnyAsync(team => team.TenantId == tenantId && team.Id == parsedTeamId, ct);
                         if (!exists)
-                            return "AssignTeam references a team that does not belong to the active tenant.";
+                            return $"{operation.Type} references a team that does not belong to the active tenant.";
                     }
                     break;
 
@@ -405,15 +544,112 @@ public class DeviceRulesController : ControllerBase
         }
     }
 
+    private async Task<List<Guid>> GetMatchingSoftwareIdsAsync(
+        DeviceRule rule,
+        Guid tenantId,
+        CancellationToken ct)
+    {
+        try
+        {
+            if (string.Equals(rule.AssetType, ApplicationAssetType, StringComparison.OrdinalIgnoreCase))
+            {
+                var applicationPredicate = _cloudApplicationFilterBuilder.Build(rule.ParseFilter());
+                return await _dbContext.CloudApplications
+                    .AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Where(item => item.TenantId == tenantId && item.ActiveInTenant)
+                    .Where(applicationPredicate)
+                    .Select(item => item.Id)
+                    .ToListAsync(ct);
+            }
+
+            var predicate = _softwareFilterBuilder.Build(rule.ParseFilter());
+            return await _dbContext.SoftwareTenantRecords
+                .AsNoTracking()
+                .Where(item => item.TenantId == tenantId)
+                .Where(predicate)
+                .Select(item => item.Id)
+                .ToListAsync(ct);
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     private async Task ResetDeletedRuleEffectsAsync(
         Guid tenantId,
-        Guid deletedRuleId,
-        IReadOnlyCollection<Guid> deviceIds,
+        DeviceRule deletedRule,
         IReadOnlyCollection<AssetRuleOperation> operations,
         CancellationToken ct)
     {
         if (operations.Count == 0)
             return;
+
+        if (string.Equals(deletedRule.AssetType, ApplicationAssetType, StringComparison.OrdinalIgnoreCase))
+        {
+            var applicationIds = await GetMatchingSoftwareIdsAsync(deletedRule, tenantId, ct);
+            foreach (var operation in operations)
+            {
+                if (operation.Type != "AssignOwnerTeam" || applicationIds.Count == 0)
+                {
+                    continue;
+                }
+
+                var applications = await _dbContext.CloudApplications
+                    .IgnoreQueryFilters()
+                    .Where(item =>
+                        item.TenantId == tenantId
+                        && applicationIds.Contains(item.Id)
+                        && item.OwnerTeamRuleId == deletedRule.Id)
+                    .ToListAsync(ct);
+
+                foreach (var application in applications)
+                {
+                    application.ClearRuleAssignedOwnerTeam(deletedRule.Id);
+                }
+
+                if (applications.Count > 0)
+                {
+                    await _dbContext.SaveChangesAsync(ct);
+                }
+            }
+
+            return;
+        }
+
+        if (string.Equals(deletedRule.AssetType, SoftwareAssetType, StringComparison.OrdinalIgnoreCase))
+        {
+            var softwareIds = await GetMatchingSoftwareIdsAsync(deletedRule, tenantId, ct);
+            foreach (var operation in operations)
+            {
+                if (operation.Type != "AssignOwnerTeam" || softwareIds.Count == 0)
+                {
+                    continue;
+                }
+
+                var records = await _dbContext.SoftwareTenantRecords
+                    .Where(item =>
+                        item.TenantId == tenantId
+                        && softwareIds.Contains(item.Id)
+                        && item.OwnerTeamRuleId == deletedRule.Id)
+                    .ToListAsync(ct);
+
+                foreach (var record in records)
+                {
+                    record.ClearRuleAssignedOwnerTeam(deletedRule.Id);
+                }
+
+                if (records.Count > 0)
+                {
+                    await _dbContext.SaveChangesAsync(ct);
+                }
+            }
+
+            return;
+        }
+
+        var deviceIds = await GetMatchingDeviceIdsAsync(deletedRule, tenantId, ct);
 
         foreach (var operation in operations)
         {
@@ -426,11 +662,11 @@ public class DeviceRulesController : ControllerBase
                             .Where(device =>
                                 device.TenantId == tenantId
                                 && deviceIds.Contains(device.Id)
-                                && device.SecurityProfileRuleId == deletedRuleId)
+                                && device.SecurityProfileRuleId == deletedRule.Id)
                             .ToListAsync(ct);
 
                         foreach (var device in devices)
-                            device.ClearRuleAssignedSecurityProfile(deletedRuleId);
+                            device.ClearRuleAssignedSecurityProfile(deletedRule.Id);
 
                         if (devices.Count > 0)
                             await _dbContext.SaveChangesAsync(ct);
@@ -444,11 +680,29 @@ public class DeviceRulesController : ControllerBase
                             .Where(device =>
                                 device.TenantId == tenantId
                                 && deviceIds.Contains(device.Id)
-                                && device.FallbackTeamRuleId == deletedRuleId)
+                                && device.FallbackTeamRuleId == deletedRule.Id)
                             .ToListAsync(ct);
 
                         foreach (var device in devices)
-                            device.ClearRuleAssignedFallbackTeam(deletedRuleId);
+                            device.ClearRuleAssignedFallbackTeam(deletedRule.Id);
+
+                        if (devices.Count > 0)
+                            await _dbContext.SaveChangesAsync(ct);
+                    }
+                    break;
+
+                case "AssignOwnerTeam":
+                    if (operation.Parameters.TryGetValue("teamId", out _) && deviceIds.Count > 0)
+                    {
+                        var devices = await _dbContext.Devices
+                            .Where(device =>
+                                device.TenantId == tenantId
+                                && deviceIds.Contains(device.Id)
+                                && device.OwnerTeamRuleId == deletedRule.Id)
+                            .ToListAsync(ct);
+
+                        foreach (var device in devices)
+                            device.ClearRuleAssignedOwnerTeam(deletedRule.Id);
 
                         if (devices.Count > 0)
                             await _dbContext.SaveChangesAsync(ct);
@@ -465,7 +719,7 @@ public class DeviceRulesController : ControllerBase
                             device.TenantId == tenantId
                             && deviceIds.Contains(device.Id)
                             && device.CriticalitySource == "Rule"
-                            && device.CriticalityRuleId == deletedRuleId)
+                            && device.CriticalityRuleId == deletedRule.Id)
                         .ToListAsync(ct);
 
                     foreach (var device in devices)
@@ -486,7 +740,7 @@ public class DeviceRulesController : ControllerBase
                         var existingAssignments = await _dbContext.DeviceBusinessLabels
                             .Where(link =>
                                 link.TenantId == tenantId
-                                && link.AssignedByRuleId == deletedRuleId
+                                && link.AssignedByRuleId == deletedRule.Id
                                 && link.SourceType == DeviceBusinessLabel.RuleSourceType)
                             .ToListAsync(ct);
 

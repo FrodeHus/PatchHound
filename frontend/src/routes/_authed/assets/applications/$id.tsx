@@ -11,6 +11,26 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ChevronLeft, Key, Shield, ExternalLink } from 'lucide-react'
 
+function ownerAssignmentTone(source: string) {
+  switch (source) {
+    case 'Rule':
+      return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700'
+    case 'Manual':
+      return 'border-sky-500/25 bg-sky-500/10 text-sky-700'
+    case 'Default':
+      return 'border-border/70 bg-muted/50 text-muted-foreground'
+    default:
+      return 'border-amber-500/25 bg-amber-500/10 text-amber-700'
+  }
+}
+
+function shouldShowReturnToRuleControl(
+  ownerAssignmentSource: string,
+  ownerTeamId: string | null,
+) {
+  return ownerAssignmentSource !== 'Rule' && ownerTeamId !== null
+}
+
 export const Route = createFileRoute('/_authed/assets/applications/$id')({
   loader: ({ params }) => fetchCloudApplicationDetail({ data: { id: params.id } }),
   component: ApplicationDetailPage,
@@ -92,10 +112,11 @@ function ApplicationDetailPage() {
     mutationFn: (teamId: string | null) =>
       assignCloudApplicationOwner({ data: { id, teamId } }),
     onSuccess: () => {
-      toast.success('Owner group updated.')
+      toast.success('Application ownership updated.')
       void queryClient.invalidateQueries({ queryKey: ['cloud-application', selectedTenantId, id] })
+      void queryClient.invalidateQueries({ queryKey: ['cloud-applications', selectedTenantId] })
     },
-    onError: () => toast.error('Failed to update owner group.'),
+    onError: () => toast.error('Failed to update application ownership.'),
   })
 
   if (!app) return null
@@ -219,7 +240,9 @@ function ApplicationDetailPage() {
             <div>
               <p className="text-sm font-medium">Owner group</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                The team responsible for this application.
+                {app.ownerTeamManagedByRule
+                  ? 'Rule managed. Manual changes will override the current rule-owned assignment.'
+                  : 'Used for tenant-scoped ownership of this application.'}
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -249,7 +272,10 @@ function ApplicationDetailPage() {
                   ))}
                 </SelectContent>
               </Select>
-              {app.ownerTeamId && (
+              <Badge variant="outline" className={`rounded-full text-[11px] ${ownerAssignmentTone(app.ownerAssignmentSource)}`}>
+                {app.ownerAssignmentSource}
+              </Badge>
+              {shouldShowReturnToRuleControl(app.ownerAssignmentSource, app.ownerTeamId) ? (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -257,9 +283,9 @@ function ApplicationDetailPage() {
                   onClick={() => ownerMutation.mutate(null)}
                   disabled={ownerMutation.isPending}
                 >
-                  Clear
+                  Return to rule control
                 </Button>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

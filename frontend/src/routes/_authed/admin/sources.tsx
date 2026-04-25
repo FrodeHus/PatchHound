@@ -13,7 +13,7 @@ import { InsetPanel } from '@/components/ui/inset-panel'
 import { fetchEnrichmentSources } from '@/server/system.functions'
 import { ScanRunHistoryTab } from '@/components/features/admin/scan-runs/ScanRunHistoryTab'
 import { fetchScanRuns } from '@/api/authenticated-scans.functions'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export const Route = createFileRoute('/_authed/admin/sources')({
   beforeLoad: ({ context }) => {

@@ -1,159 +1,163 @@
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Infrastructure.Services;
 
-public class NormalizedSoftwareProjectionService(
-    PatchHoundDbContext dbContext,
-    NormalizedSoftwareResolver resolver
-)
+public class NormalizedSoftwareProjectionService(PatchHoundDbContext dbContext)
 {
     public async Task SyncTenantAsync(Guid tenantId, CancellationToken ct)
-    {
-        await SyncTenantAsync(tenantId, null, ct);
-    }
+        => await SyncTenantAsync(tenantId, null, ct);
 
     public async Task SyncTenantAsync(Guid tenantId, Guid? snapshotId, CancellationToken ct)
     {
-        var resolutions = await resolver.SyncTenantAsync(tenantId, ct);
-        await RebuildInstallationProjectionAsync(tenantId, snapshotId, resolutions, ct);
+        await UpsertTenantSoftwareAsync(tenantId, snapshotId, ct);
+        await dbContext.SaveChangesAsync(ct);
+        await UpsertSoftwareInstallationsAsync(tenantId, snapshotId, ct);
         await dbContext.SaveChangesAsync(ct);
     }
 
-    private async Task RebuildInstallationProjectionAsync(
-        Guid tenantId,
-        Guid? snapshotId,
-        IReadOnlyDictionary<Guid, NormalizedSoftwareResolver.ResolutionResult> resolutions,
-        CancellationToken ct
-    )
+    private async Task UpsertTenantSoftwareAsync(Guid tenantId, Guid? snapshotId, CancellationToken ct)
     {
-        var tenantSoftwareRows = await UpsertTenantSoftwareAsync(tenantId, snapshotId, resolutions, ct);
-
-        var existingInstallations = await dbContext
-            .SoftwareProductInstallations.IgnoreQueryFilters()
-            .Where(item => item.TenantId == tenantId && item.SnapshotId == snapshotId)
-            .ToListAsync(ct);
-        if (existingInstallations.Count > 0)
-        {
-            dbContext.SoftwareProductInstallations.RemoveRange(existingInstallations);
-        }
-
-        if (resolutions.Count == 0)
-        {
-            return;
-        }
-
-        var relevantSoftwareAssetIds = resolutions.Keys.ToList();
-
-        var currentInstallations = await dbContext
-            .DeviceSoftwareInstallations.IgnoreQueryFilters()
-            .Where(item =>
-                item.TenantId == tenantId
-                && relevantSoftwareAssetIds.Contains(item.SoftwareAssetId)
-            )
-            .ToListAsync(ct);
-        var currentInstallationsByPair = currentInstallations.ToDictionary(
-            item => BuildPairKey(item.DeviceAssetId, item.SoftwareAssetId),
-            StringComparer.Ordinal
-        );
-
-        var latestEpisodes = await dbContext
-            .DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters()
-            .Where(item =>
-                item.TenantId == tenantId
-                && relevantSoftwareAssetIds.Contains(item.SoftwareAssetId)
-            )
-            .GroupBy(item => new { item.DeviceAssetId, item.SoftwareAssetId })
-            .Select(group => group
-                .OrderByDescending(item => item.EpisodeNumber)
-                .First())
-            .ToListAsync(ct);
-
-        var rows = latestEpisodes
-            .Where(episode => resolutions.ContainsKey(episode.SoftwareAssetId))
-            .Select(episode =>
+        var softwareGroups = await dbContext.InstalledSoftware
+            .AsNoTracking()
+            .Where(i => i.TenantId == tenantId)
+            .GroupBy(i => i.SoftwareProductId)
+            .Select(g => new
             {
-                var key = BuildPairKey(episode.DeviceAssetId, episode.SoftwareAssetId);
-                currentInstallationsByPair.TryGetValue(key, out var currentInstallation);
-                var resolution = resolutions[episode.SoftwareAssetId];
-                var tenantSoftware = tenantSoftwareRows[resolution.SoftwareProductId];
-
-                return SoftwareProductInstallation.Create(
-                    tenantId,
-                    snapshotId,
-                    tenantSoftware.Id,
-                    episode.SoftwareAssetId,
-                    episode.DeviceAssetId,
-                    resolution.SourceSystem,
-                    resolution.DetectedVersion,
-                    episode.FirstSeenAt,
-                    currentInstallation?.LastSeenAt ?? episode.LastSeenAt,
-                    currentInstallation is null ? episode.RemovedAt : null,
-                    currentInstallation is not null,
-                    episode.EpisodeNumber
-                );
+                SoftwareProductId = g.Key,
+                FirstSeenAt = g.Min(i => i.FirstSeenAt),
+                LastSeenAt = g.Max(i => i.LastSeenAt),
             })
-            .ToList();
+            .ToListAsync(ct);
 
-        if (rows.Count > 0)
-        {
-            await dbContext.SoftwareProductInstallations.AddRangeAsync(rows, ct);
-        }
-    }
+        var softwareProductIdSet = softwareGroups
+            .Select(g => g.SoftwareProductId)
+            .ToHashSet();
 
-    private async Task<Dictionary<Guid, SoftwareTenantRecord>> UpsertTenantSoftwareAsync(
-        Guid tenantId,
-        Guid? snapshotId,
-        IReadOnlyDictionary<Guid, NormalizedSoftwareResolver.ResolutionResult> resolutions,
-        CancellationToken ct
-    )
-    {
-        var softwareProductIds = resolutions
-            .Values.Select(item => item.SoftwareProductId)
-            .Distinct()
-            .ToList();
-
-        var existingRows = await dbContext
-            .SoftwareTenantRecords.IgnoreQueryFilters()
+        var existingRows = await dbContext.SoftwareTenantRecords
+            .IgnoreQueryFilters()
             .Where(item => item.TenantId == tenantId && item.SnapshotId == snapshotId)
             .ToListAsync(ct);
 
-        var existingBySoftwareProductId = existingRows.ToDictionary(item => item.SoftwareProductId);
-        var rowsBySoftwareProductId = new Dictionary<Guid, SoftwareTenantRecord>();
-        var now = DateTimeOffset.UtcNow;
+        var existingBySoftwareProductId = existingRows.ToDictionary(r => r.SoftwareProductId);
 
-        foreach (var softwareProductId in softwareProductIds)
+        foreach (var group in softwareGroups)
         {
-            if (!existingBySoftwareProductId.TryGetValue(softwareProductId, out var row))
+            if (!existingBySoftwareProductId.TryGetValue(group.SoftwareProductId, out var row))
             {
-                row = SoftwareTenantRecord.Create(tenantId, snapshotId, softwareProductId, now, now);
+                row = SoftwareTenantRecord.Create(
+                    tenantId, snapshotId, group.SoftwareProductId,
+                    group.FirstSeenAt, group.LastSeenAt);
                 await dbContext.SoftwareTenantRecords.AddAsync(row, ct);
             }
             else
             {
-                row.AssignSnapshot(snapshotId);
-                row.UpdateObservationWindow(row.FirstSeenAt, now);
+                var firstSeen = row.FirstSeenAt < group.FirstSeenAt ? row.FirstSeenAt : group.FirstSeenAt;
+                row.UpdateObservationWindow(firstSeen, group.LastSeenAt);
             }
-
-            rowsBySoftwareProductId[softwareProductId] = row;
         }
 
         var staleRows = existingRows
-            .Where(item => !softwareProductIds.Contains(item.SoftwareProductId))
+            .Where(r => !softwareProductIdSet.Contains(r.SoftwareProductId))
             .ToList();
         if (staleRows.Count > 0)
-        {
             dbContext.SoftwareTenantRecords.RemoveRange(staleRows);
+    }
+
+    private async Task UpsertSoftwareInstallationsAsync(Guid tenantId, Guid? snapshotId, CancellationToken ct)
+    {
+        var tenantSoftwareByProductId = await dbContext.SoftwareTenantRecords
+            .IgnoreQueryFilters()
+            .Where(item => item.TenantId == tenantId && item.SnapshotId == snapshotId)
+            .Select(item => new { item.SoftwareProductId, item.Id })
+            .ToDictionaryAsync(item => item.SoftwareProductId, item => item.Id, ct);
+
+        var installRows = await dbContext.InstalledSoftware
+            .AsNoTracking()
+            .Where(item => item.TenantId == tenantId)
+            .Select(item => new
+            {
+                item.Id,
+                item.DeviceId,
+                item.SoftwareProductId,
+                item.SourceSystemId,
+                item.Version,
+                item.FirstSeenAt,
+                item.LastSeenAt,
+                SourceKey = dbContext.SourceSystems
+                    .Where(source => source.Id == item.SourceSystemId)
+                    .Select(source => source.Key)
+                    .FirstOrDefault(),
+            })
+            .ToListAsync(ct);
+
+        var activeInstallIds = installRows.Select(item => item.Id).ToHashSet();
+        var existingRows = await dbContext.SoftwareProductInstallations
+            .IgnoreQueryFilters()
+            .Where(item => item.TenantId == tenantId && item.SnapshotId == snapshotId)
+            .ToListAsync(ct);
+        var existingByInstalledSoftwareId = existingRows.ToDictionary(item => item.SoftwareAssetId);
+
+        foreach (var install in installRows)
+        {
+            if (!tenantSoftwareByProductId.TryGetValue(install.SoftwareProductId, out var tenantSoftwareId))
+            {
+                continue;
+            }
+
+            var sourceSystem = ResolveSourceSystem(install.SourceKey);
+            if (!existingByInstalledSoftwareId.TryGetValue(install.Id, out var row))
+            {
+                row = SoftwareProductInstallation.Create(
+                    tenantId,
+                    snapshotId,
+                    tenantSoftwareId,
+                    softwareAssetId: install.Id,
+                    deviceAssetId: install.DeviceId,
+                    sourceSystem,
+                    install.Version,
+                    install.FirstSeenAt,
+                    install.LastSeenAt,
+                    removedAt: null,
+                    isActive: true,
+                    currentEpisodeNumber: 1);
+                await dbContext.SoftwareProductInstallations.AddAsync(row, ct);
+                continue;
+            }
+
+            row.UpdateProjection(
+                snapshotId,
+                tenantSoftwareId,
+                sourceSystem,
+                install.Version,
+                install.FirstSeenAt,
+                install.LastSeenAt,
+                removedAt: null,
+                isActive: true,
+                currentEpisodeNumber: Math.Max(1, row.CurrentEpisodeNumber));
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return rowsBySoftwareProductId;
+        foreach (var staleRow in existingRows.Where(item => !activeInstallIds.Contains(item.SoftwareAssetId)))
+        {
+            staleRow.UpdateProjection(
+                snapshotId,
+                staleRow.TenantSoftwareId,
+                staleRow.SourceSystem,
+                staleRow.DetectedVersion,
+                staleRow.FirstSeenAt,
+                staleRow.LastSeenAt,
+                removedAt: DateTimeOffset.UtcNow,
+                isActive: false,
+                currentEpisodeNumber: staleRow.CurrentEpisodeNumber);
+        }
     }
 
-    private static string BuildPairKey(Guid deviceAssetId, Guid softwareAssetId)
+    private static SoftwareIdentitySourceSystem ResolveSourceSystem(string? sourceKey)
     {
-        return $"{deviceAssetId:N}:{softwareAssetId:N}";
+        return string.Equals(sourceKey, "authenticated-scan", StringComparison.OrdinalIgnoreCase)
+            ? SoftwareIdentitySourceSystem.AuthenticatedScan
+            : SoftwareIdentitySourceSystem.Defender;
     }
-
 }

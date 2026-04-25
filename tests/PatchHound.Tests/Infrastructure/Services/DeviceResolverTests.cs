@@ -15,7 +15,7 @@ public class DeviceResolverTests : IAsyncLifetime
     private DeviceResolver _sut = null!;
     private readonly Guid _tenantId = Guid.NewGuid();
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _db = await TestDbContextFactory.CreateAsync();
         _sourceSystem = SourceSystem.Create("defender", "Defender");
@@ -25,10 +25,10 @@ public class DeviceResolverTests : IAsyncLifetime
         _sut = new DeviceResolver(_db);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _db.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]

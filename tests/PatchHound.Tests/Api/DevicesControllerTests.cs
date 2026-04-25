@@ -91,6 +91,7 @@ public class DevicesControllerTests : IDisposable
         var deviceRuleEvaluationService = new DeviceRuleEvaluationService(
             _dbContext,
             new DeviceRuleFilterBuilder(_dbContext),
+            new SoftwareRuleFilterBuilder(),
             Substitute.For<Microsoft.Extensions.Logging.ILogger<DeviceRuleEvaluationService>>()
         );
 

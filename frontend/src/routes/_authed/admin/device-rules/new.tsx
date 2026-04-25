@@ -24,8 +24,8 @@ function NewDeviceRulePage() {
   return (
     <section className="space-y-5">
       <div>
-        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Device Rules</p>
-        <h1 className="text-2xl font-semibold tracking-[-0.04em]">Create Rule</h1>
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Asset Rules</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.04em]">Create Asset Rule</h1>
       </div>
       <DeviceRuleWizard
         mode="create"

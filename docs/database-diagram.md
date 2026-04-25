@@ -3,8 +3,10 @@
 This document captures the current PatchHound database model as Mermaid ER diagrams.
 
 Source of truth:
-- `src/PatchHound.Infrastructure/Migrations/20260415055843_Initial.cs`
+- `src/PatchHound.Infrastructure/Migrations/`
 - `src/PatchHound.Infrastructure/Migrations/PatchHoundDbContextModelSnapshot.cs`
+- `src/PatchHound.Infrastructure/Data/PatchHoundDbContext.cs`
+- `src/PatchHound.Infrastructure/Data/Configurations/`
 - `docs/data-model-refactor.md`
 
 The schema is large, so the diagram is split by domain to stay readable.
@@ -17,6 +19,8 @@ erDiagram
         uuid Id PK
         string Name
         string EntraTenantId
+        bool IsPrimary
+        bool IsPendingDeletion
     }
 
     SOURCE_SYSTEMS {
@@ -62,6 +66,22 @@ erDiagram
         string Version
     }
 
+    SOFTWARE_CPE_BINDINGS {
+        uuid Id PK
+        uuid SoftwareProductId FK
+        string Cpe23Uri
+        string BindingMethod
+        string Confidence
+    }
+
+    SOFTWARE_PRODUCT_ALIASES {
+        uuid Id PK
+        uuid SoftwareProductId FK
+        string SourceSystem
+        string ExternalSoftwareId
+        string RawName
+    }
+
     TENANT_SOFTWARE_PRODUCT_INSIGHTS {
         uuid Id PK
         uuid TenantId
@@ -74,8 +94,11 @@ erDiagram
         uuid TenantId
         uuid SnapshotId
         uuid SoftwareProductId FK
+        uuid OwnerTeamId
+        uuid OwnerTeamRuleId
         datetime FirstSeenAt
         datetime LastSeenAt
+        string RemediationAiReviewStatus
     }
 
     SOFTWARE_PRODUCT_INSTALLATIONS {
@@ -83,15 +106,37 @@ erDiagram
         uuid TenantId
         uuid SnapshotId
         uuid TenantSoftwareId FK
+        uuid SoftwareAssetId
         uuid DeviceAssetId FK
+        string SourceSystem
         string DetectedVersion
         bool IsActive
+        int CurrentEpisodeNumber
+    }
+
+    DEVICE_SOFTWARE_INSTALLATIONS {
+        uuid Id PK
+        uuid TenantId
+        uuid DeviceAssetId FK
+        uuid SoftwareAssetId FK
+        int MissingSyncCount
+    }
+
+    DEVICE_SOFTWARE_INSTALLATION_EPISODES {
+        uuid Id PK
+        uuid TenantId
+        uuid DeviceAssetId FK
+        uuid SoftwareAssetId FK
+        int EpisodeNumber
+        datetime RemovedAt
     }
 
     TENANTS ||--o{ DEVICES : owns
     SOURCE_SYSTEMS ||--o{ DEVICES : supplies
     SOURCE_SYSTEMS ||--o{ SOFTWARE_ALIASES : maps
     SOFTWARE_PRODUCTS ||--o{ SOFTWARE_ALIASES : has
+    SOFTWARE_PRODUCTS ||--o{ SOFTWARE_CPE_BINDINGS : bound_to
+    SOFTWARE_PRODUCTS ||--o{ SOFTWARE_PRODUCT_ALIASES : normalized_from
     DEVICES ||--o{ INSTALLED_SOFTWARE : has
     SOFTWARE_PRODUCTS ||--o{ INSTALLED_SOFTWARE : installed_as
     SOURCE_SYSTEMS ||--o{ INSTALLED_SOFTWARE : observed_by
@@ -99,6 +144,8 @@ erDiagram
     SOFTWARE_PRODUCTS ||--o{ SOFTWARE_TENANT_RECORDS : tracked_per_tenant
     DEVICES ||--o{ SOFTWARE_PRODUCT_INSTALLATIONS : appears_on
     SOFTWARE_TENANT_RECORDS ||--o{ SOFTWARE_PRODUCT_INSTALLATIONS : materializes
+    DEVICES ||--o{ DEVICE_SOFTWARE_INSTALLATIONS : currently_has
+    DEVICES ||--o{ DEVICE_SOFTWARE_INSTALLATION_EPISODES : installation_history
 ```
 
 ## Device policy, ownership, and tenant access
@@ -108,6 +155,8 @@ erDiagram
     TENANTS {
         uuid Id PK
         string Name
+        bool IsPrimary
+        bool IsPendingDeletion
     }
 
     USERS {
@@ -136,6 +185,23 @@ erDiagram
         uuid UserId FK
         uuid TenantId FK
         string Role
+    }
+
+    TENANT_DELETION_JOBS {
+        uuid Id PK
+        uuid TenantId FK
+        uuid RequestedByUserId FK
+        string Status
+        datetime CreatedAt
+    }
+
+    TENANT_SLA_CONFIGURATIONS {
+        uuid TenantId PK
+        int CriticalDays
+        int HighDays
+        int MediumDays
+        int LowDays
+        int ApprovalExpiryHours
     }
 
     TEAM_MEMBERSHIP_RULES {
@@ -189,9 +255,12 @@ erDiagram
     DEVICE_RULES {
         uuid Id PK
         uuid TenantId
+        string AssetType
         string Name
         int Priority
         bool Enabled
+        string FilterDefinition
+        string Operations
     }
 
     FEATURE_FLAG_OVERRIDES {
@@ -203,6 +272,9 @@ erDiagram
     }
 
     TENANTS ||--o{ TEAMS : contains
+    TENANTS ||--o{ TENANT_DELETION_JOBS : deletion_lifecycle
+    USERS ||--o{ TENANT_DELETION_JOBS : requested_by
+    TENANTS ||--|| TENANT_SLA_CONFIGURATIONS : uses
     TENANTS ||--o{ USER_TENANT_ROLES : authorizes
     USERS ||--o{ USER_TENANT_ROLES : assigned
     TEAMS ||--o{ TEAM_MEMBERS : includes
@@ -217,6 +289,84 @@ erDiagram
     TENANTS ||--o{ DEVICE_RULES : governs
     TENANTS ||--o{ FEATURE_FLAG_OVERRIDES : targeted_by
     USERS ||--o{ FEATURE_FLAG_OVERRIDES : targeted_by
+```
+
+## Cloud applications and external integrations
+
+```mermaid
+erDiagram
+    TENANTS {
+        uuid Id PK
+        string Name
+    }
+
+    SOURCE_SYSTEMS {
+        uuid Id PK
+        string Key
+    }
+
+    TEAMS {
+        uuid Id PK
+        uuid TenantId
+        string Name
+    }
+
+    DEVICE_RULES {
+        uuid Id PK
+        uuid TenantId
+        string AssetType
+        string Name
+    }
+
+    CLOUD_APPLICATIONS {
+        uuid Id PK
+        uuid TenantId
+        uuid SourceSystemId FK
+        string ExternalId
+        string AppId
+        string Name
+        bool IsFallbackPublicClient
+        uuid OwnerTeamId FK
+        uuid OwnerTeamRuleId FK
+        bool ActiveInTenant
+    }
+
+    CLOUD_APPLICATION_CREDENTIAL_METADATA {
+        uuid Id PK
+        uuid CloudApplicationId FK
+        uuid TenantId
+        string ExternalId
+        string Type
+        string DisplayName
+        datetime ExpiresAt
+    }
+
+    STAGED_CLOUD_APPLICATIONS {
+        uuid Id PK
+        uuid IngestionRunId FK
+        uuid TenantId
+        string SourceKey
+        string ExternalId
+        string Name
+    }
+
+    SENTINEL_CONNECTOR_CONFIGURATIONS {
+        uuid Id PK
+        bool Enabled
+        string DceEndpoint
+        string DcrImmutableId
+        string StreamName
+        string TenantId
+        string ClientId
+        string SecretRef
+    }
+
+    TENANTS ||--o{ CLOUD_APPLICATIONS : owns
+    SOURCE_SYSTEMS ||--o{ CLOUD_APPLICATIONS : supplies
+    CLOUD_APPLICATIONS ||--o{ CLOUD_APPLICATION_CREDENTIAL_METADATA : exposes_credentials
+    TEAMS ||--o{ CLOUD_APPLICATIONS : owns
+    DEVICE_RULES ||--o{ CLOUD_APPLICATIONS : assigns_owner
+    TENANTS ||--o{ STAGED_CLOUD_APPLICATIONS : stages
 ```
 
 ## Vulnerability knowledge, exposure, and remediation
@@ -250,6 +400,21 @@ erDiagram
         uuid VulnerabilityId FK
         decimal ThreatScore
         bool KnownExploited
+    }
+
+    NVD_CVE_CACHE {
+        string CveId PK
+        string Description
+        decimal CvssScore
+        string CvssVector
+        datetime FeedLastModified
+        datetime CachedAt
+    }
+
+    NVD_FEED_CHECKPOINTS {
+        string FeedName PK
+        datetime FeedLastModified
+        datetime SyncedAt
     }
 
     VULNERABILITY_APPLICABILITIES {
@@ -326,6 +491,14 @@ erDiagram
         uuid RemediationCaseId FK
         uuid SoftwareOwnerTeamId
         string CurrentStage
+        string Status
+    }
+
+    REMEDIATION_WORKFLOW_STAGE_RECORDS {
+        uuid Id PK
+        uuid TenantId
+        uuid RemediationWorkflowId FK
+        string Stage
         string Status
     }
 
@@ -414,6 +587,7 @@ erDiagram
     SOFTWARE_PRODUCTS ||--o{ VULNERABILITY_APPLICABILITIES : affected_product
     VULNERABILITIES ||--o{ VULNERABILITY_REFERENCES : documented_by
     VULNERABILITIES ||--|| THREAT_ASSESSMENTS : scored_by
+    NVD_CVE_CACHE ||--o{ VULNERABILITIES : enriches_by_cve
     VULNERABILITIES ||--o{ VULNERABILITY_APPLICABILITIES : applies_to
     VULNERABILITIES ||--o{ ORGANIZATIONAL_SEVERITIES : adjusted_per_tenant
     DEVICES ||--o{ DEVICE_VULNERABILITY_EXPOSURES : has
@@ -425,6 +599,7 @@ erDiagram
     SECURITY_PROFILES ||--o{ EXPOSURE_ASSESSMENTS : influences
     SOFTWARE_PRODUCTS ||--o{ REMEDIATION_CASES : remediated_through
     REMEDIATION_CASES ||--o{ REMEDIATION_WORKFLOWS : progresses_by
+    REMEDIATION_WORKFLOWS ||--o{ REMEDIATION_WORKFLOW_STAGE_RECORDS : records_stage_state
     REMEDIATION_CASES ||--o{ REMEDIATION_DECISIONS : decided_by
     REMEDIATION_WORKFLOWS ||--o{ REMEDIATION_DECISIONS : contextualizes
     REMEDIATION_DECISIONS ||--o{ REMEDIATION_DECISION_VULNERABILITY_OVERRIDES : overrides
@@ -440,6 +615,127 @@ erDiagram
     REMEDIATION_CASES ||--o{ ANALYST_RECOMMENDATIONS : analyzed_by
     REMEDIATION_WORKFLOWS ||--o{ ANALYST_RECOMMENDATIONS : optional_context
     REMEDIATION_CASES ||--o{ AI_REPORTS : explained_by
+```
+
+## Risk scoring, collaboration, and audit
+
+```mermaid
+erDiagram
+    TENANTS {
+        uuid Id PK
+        string Name
+    }
+
+    USERS {
+        uuid Id PK
+        string Email
+    }
+
+    TEAMS {
+        uuid Id PK
+        uuid TenantId
+        string Name
+    }
+
+    DEVICES {
+        uuid Id PK
+        uuid TenantId
+        string Name
+    }
+
+    SOFTWARE_PRODUCTS {
+        uuid Id PK
+        string Vendor
+        string Name
+    }
+
+    REMEDIATION_CASES {
+        uuid Id PK
+        uuid TenantId
+        uuid SoftwareProductId FK
+    }
+
+    DEVICE_RISK_SCORES {
+        uuid Id PK
+        uuid TenantId
+        uuid DeviceId FK
+        decimal Score
+        string Severity
+    }
+
+    DEVICE_GROUP_RISK_SCORES {
+        uuid Id PK
+        uuid TenantId
+        uuid TeamId FK
+        decimal Score
+    }
+
+    SOFTWARE_RISK_SCORES {
+        uuid Id PK
+        uuid TenantId
+        uuid SoftwareProductId FK
+        decimal Score
+    }
+
+    TEAM_RISK_SCORES {
+        uuid Id PK
+        uuid TenantId
+        uuid TeamId FK
+        decimal Score
+    }
+
+    TENANT_RISK_SCORE_SNAPSHOTS {
+        uuid Id PK
+        uuid TenantId
+        decimal Score
+        datetime CalculatedAt
+    }
+
+    COMMENTS {
+        uuid Id PK
+        uuid TenantId
+        uuid AuthorUserId FK
+        string EntityType
+        uuid EntityId
+        bool IsDeleted
+    }
+
+    AUDIT_LOG_ENTRIES {
+        uuid Id PK
+        uuid TenantId
+        uuid ActorUserId
+        string Action
+        string EntityType
+        uuid EntityId
+    }
+
+    NOTIFICATIONS {
+        uuid Id PK
+        uuid TenantId
+        uuid UserId
+        string Type
+        bool IsRead
+    }
+
+    ADVANCED_TOOLS {
+        uuid Id PK
+        uuid TenantId
+        string Name
+        string ToolType
+        bool Enabled
+    }
+
+    TENANTS ||--o{ DEVICE_RISK_SCORES : has
+    DEVICES ||--o{ DEVICE_RISK_SCORES : scored_as
+    TEAMS ||--o{ DEVICE_GROUP_RISK_SCORES : groups
+    SOFTWARE_PRODUCTS ||--o{ SOFTWARE_RISK_SCORES : scored_as
+    TEAMS ||--o{ TEAM_RISK_SCORES : scored_as
+    TENANTS ||--o{ TENANT_RISK_SCORE_SNAPSHOTS : trend
+    USERS ||--o{ COMMENTS : writes
+    TENANTS ||--o{ COMMENTS : contains
+    TENANTS ||--o{ AUDIT_LOG_ENTRIES : records
+    USERS ||--o{ NOTIFICATIONS : receives
+    TENANTS ||--o{ ADVANCED_TOOLS : configures
 ```
 
 ## Ingestion, authenticated scans, and workflows
@@ -524,6 +820,15 @@ erDiagram
         uuid TenantId
         string VulnerabilityExternalId
         string AssetExternalId
+    }
+
+    STAGED_CLOUD_APPLICATIONS {
+        uuid Id PK
+        uuid IngestionRunId
+        uuid TenantId
+        string SourceKey
+        string ExternalId
+        string Name
     }
 
     CONNECTION_PROFILES {
@@ -652,6 +957,7 @@ erDiagram
     INGESTION_RUNS ||--o{ STAGED_DEVICE_SOFTWARE_INSTALLATIONS : stages
     INGESTION_RUNS ||--o{ STAGED_VULNERABILITIES : stages
     INGESTION_RUNS ||--o{ STAGED_VULNERABILITY_EXPOSURES : stages
+    INGESTION_RUNS ||--o{ STAGED_CLOUD_APPLICATIONS : stages
     SCANNING_TOOLS ||--o{ SCANNING_TOOL_VERSIONS : versions
     SCAN_PROFILES ||--o{ SCAN_PROFILE_TOOLS : uses
     SCANNING_TOOLS ||--o{ SCAN_PROFILE_TOOLS : included_in
@@ -667,6 +973,7 @@ erDiagram
 
 ## Notes
 
-- The diagrams emphasize the canonical relationships used by the application and the explicit foreign keys present in the initial migration.
+- The diagrams emphasize the canonical relationships used by the application and the explicit foreign keys present in the current EF model snapshot.
 - Some operational tables store GUID references without a database foreign-key constraint. Those are still shown where they are part of an important application flow.
 - Tenant scoping is a first-class model rule in this schema. Most operational tables include a direct `TenantId`, even when a parent row also implies tenant ownership.
+- Asset rules are shared across device, software, and cloud application ownership workflows via `DeviceRule.AssetType`.

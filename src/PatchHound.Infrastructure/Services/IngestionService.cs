@@ -33,6 +33,7 @@ public class IngestionService
     private readonly ExposureAssessmentService _exposureAssessmentService;
     private readonly RiskScoreService _riskScoreService;
     private readonly VulnerabilityResolver _vulnerabilityResolver;
+    private readonly NormalizedSoftwareProjectionService? _normalizedSoftwareProjectionService;
     private readonly RemediationDecisionService? _remediationDecisionService;
     private readonly ILogger<IngestionService> _logger;
 
@@ -63,6 +64,7 @@ public class IngestionService
             exposureAssessmentService,
             riskScoreService,
             new VulnerabilityResolver(dbContext),
+            normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
             logger
         ) { }
@@ -93,6 +95,7 @@ public class IngestionService
             exposureAssessmentService,
             riskScoreService,
             vulnerabilityResolver,
+            normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
             logger
         ) { }
@@ -123,6 +126,7 @@ public class IngestionService
             exposureAssessmentService,
             riskScoreService,
             new VulnerabilityResolver(dbContext),
+            normalizedSoftwareProjectionService: null,
             remediationDecisionService,
             logger
         ) { }
@@ -139,6 +143,7 @@ public class IngestionService
         ExposureAssessmentService exposureAssessmentService,
         RiskScoreService riskScoreService,
         VulnerabilityResolver vulnerabilityResolver,
+        NormalizedSoftwareProjectionService? normalizedSoftwareProjectionService,
         RemediationDecisionService? remediationDecisionService,
         ILogger<IngestionService> logger
     )
@@ -154,6 +159,7 @@ public class IngestionService
         _exposureAssessmentService = exposureAssessmentService;
         _riskScoreService = riskScoreService;
         _vulnerabilityResolver = vulnerabilityResolver;
+        _normalizedSoftwareProjectionService = normalizedSoftwareProjectionService;
         _remediationDecisionService = remediationDecisionService;
         _logger = logger;
     }
@@ -679,6 +685,15 @@ public class IngestionService
                         }
 
                         await EnqueueEnrichmentJobsForRunAsync(run.Id, tenantId, ct);
+
+                        if (_normalizedSoftwareProjectionService is not null)
+                        {
+                            await _normalizedSoftwareProjectionService.SyncTenantAsync(
+                                tenantId,
+                                softwareSnapshot?.Id,
+                                ct
+                            );
+                        }
 
                         await _deviceRuleEvaluationService.EvaluateRulesAsync(tenantId, ct);
 

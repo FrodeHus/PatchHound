@@ -919,6 +919,9 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<Guid?>("OwnerTeamId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("OwnerTeamRuleId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("RedirectUris")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1145,6 +1148,9 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<Guid?>("OwnerTeamId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("OwnerTeamRuleId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("OwnerType")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -1364,6 +1370,11 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3303,6 +3314,12 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("LastSeenAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("OwnerTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("OwnerTeamRuleId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("RemediationAiAnalystAssessmentContent")
                         .IsRequired()
                         .HasColumnType("text");
@@ -3369,6 +3386,8 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OwnerTeamId");
 
                     b.HasIndex("SnapshotId");
 

@@ -55,6 +55,7 @@ import {
   outcomeTone,
   approvalStatusLabel,
   approvalStatusTone,
+  formatSoftwareOwnerRoutingDetail,
   riskBandTone,
 } from './remediation-utils'
 
@@ -320,6 +321,8 @@ export function SoftwareRemediationView({
               <p className="max-w-4xl text-sm leading-snug text-muted-foreground">
                 {data.summary.totalVulnerabilities.toLocaleString()} open vulnerabilities across active software scope
                 {' · '}
+                {`Owner team ${data.softwareOwnerTeamName ?? 'Default Team'} (${startCase(data.softwareOwnerAssignmentSource)})`}
+                {' · '}
                 {data.summary.withKnownExploit > 0
                   ? `${data.summary.withKnownExploit.toLocaleString()} known exploits`
                   : 'No known exploits'}
@@ -510,6 +513,14 @@ export function SoftwareRemediationView({
                         ? 'Security recommendation ready'
                         : 'Review exposure and capture guidance'
                   }
+                />
+                <WorkflowFact
+                  label="Owner routing"
+                  value={data.softwareOwnerTeamName ?? 'Default Team'}
+                  detail={formatSoftwareOwnerRoutingDetail(
+                    data.softwareOwnerTeamName,
+                    data.softwareOwnerAssignmentSource,
+                  )}
                 />
                 <WorkflowFact
                   label="Execution status"

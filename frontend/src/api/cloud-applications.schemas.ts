@@ -6,6 +6,10 @@ export const cloudApplicationListItemSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   description: z.string().nullable(),
+  ownerTeamId: z.string().uuid().nullable(),
+  ownerTeamName: z.string().nullable(),
+  ownerTeamManagedByRule: z.boolean(),
+  ownerAssignmentSource: z.string(),
   credentialCount: z.number(),
   expiredCredentialCount: z.number(),
   expiringCredentialCount: z.number(),
@@ -30,6 +34,8 @@ export const cloudApplicationDetailSchema = z.object({
   redirectUris: z.array(z.string()),
   ownerTeamId: z.string().uuid().nullable(),
   ownerTeamName: z.string().nullable(),
+  ownerTeamManagedByRule: z.boolean(),
+  ownerAssignmentSource: z.string(),
   credentials: z.array(cloudApplicationCredentialSchema),
 })
 

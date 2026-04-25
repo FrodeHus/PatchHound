@@ -85,7 +85,7 @@ const columns: ColumnDef<DeviceRule>[] = [
     cell: ({ row }) => (
       <span className="text-sm">
         {row.original.lastMatchCount !== null
-          ? `${row.original.lastMatchCount} devices`
+          ? `${row.original.lastMatchCount} ${row.original.assetType === 'Software' ? 'software assets' : 'devices'}`
           : '-'}
       </span>
     ),
@@ -191,6 +191,7 @@ export function TenantDeviceRulesPanel({
         data: {
           tenantId,
           id: rule.id,
+          assetType: rule.assetType,
           name: rule.name,
           description: rule.description ?? undefined,
           enabled: !rule.enabled,
@@ -301,7 +302,7 @@ export function TenantDeviceRulesPanel({
       return (
         <section className="rounded-2xl border border-border/70 bg-card/85 p-6">
           <p className="text-sm text-destructive">
-            Failed to load the device rule editor for {tenantName}.
+            Failed to load the asset rule editor for {tenantName}.
           </p>
           <Button
             type="button"
@@ -319,11 +320,11 @@ export function TenantDeviceRulesPanel({
     return (
       <section className="space-y-5">
         <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Device Rules</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Asset Rules</p>
           <h2 className="text-2xl font-semibold tracking-[-0.04em]">
             {wizardMode === 'new'
-              ? `Create Rule for ${tenantName}`
-              : `Edit: ${editRule?.name ?? 'Rule'}`}
+              ? `Create Asset Rule for ${tenantName}`
+              : `Edit Asset Rule: ${editRule?.name ?? 'Rule'}`}
           </h2>
         </div>
         <DeviceRuleWizard
@@ -347,8 +348,8 @@ export function TenantDeviceRulesPanel({
   return (
     <section className="space-y-5">
       <DataTableWorkbench
-        title="Device Rules"
-        description={`Rules for ${tenantName} run in priority order after each ingestion. First match wins per device.`}
+        title="Asset Rules"
+        description={`Asset rules for ${tenantName} run in priority order after each ingestion. This first slice evaluates device rules only.`}
         totalCount={rulesQuery.data?.totalCount}
       >
         <div className="flex items-center gap-2">
@@ -368,18 +369,18 @@ export function TenantDeviceRulesPanel({
             onClick={() => onSearchChange?.({ mode: 'new', ruleId: undefined })}
           >
             <Plus className="size-3.5" />
-            Create rule
+            Create asset rule
           </Button>
         </div>
 
         {rulesQuery.isLoading ? (
           <div className="flex min-h-40 items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 size-4 animate-spin" />
-            Loading device rules...
+            Loading asset rules...
           </div>
         ) : rulesQuery.isError || !rulesQuery.data ? (
           <p className="text-sm text-destructive">
-            Failed to load device rules for {tenantName}.
+            Failed to load asset rules for {tenantName}.
           </p>
         ) : (
           <>
@@ -388,8 +389,8 @@ export function TenantDeviceRulesPanel({
               data={rulesQuery.data.items}
               emptyState={
                 <DataTableEmptyState
-                  title="No device rules yet"
-                  description="Create your first rule to automatically classify and tag devices after ingestion."
+                  title="No asset rules yet"
+                  description="Create your first asset rule to automatically classify and tag devices after ingestion."
                 />
               }
             />
@@ -411,11 +412,11 @@ export function TenantDeviceRulesPanel({
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete device rule</DialogTitle>
+            <DialogTitle>Delete asset rule</DialogTitle>
             <DialogDescription>
               {deleteTarget
                 ? `Delete "${deleteTarget.name}" for ${tenantName}? This will re-evaluate the remaining rules for the tenant.`
-                : 'Delete this device rule?'}
+                : 'Delete this asset rule?'}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -11,90 +11,201 @@ namespace PatchHound.Infrastructure.Services.Inventory;
 
 public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
 {
+    private const string DeviceAssetType = "Device";
+    private const string SoftwareAssetType = "Software";
+    private const string ApplicationAssetType = "Application";
+
     private readonly PatchHoundDbContext _dbContext;
     private readonly DeviceRuleFilterBuilder _filterBuilder;
+    private readonly SoftwareRuleFilterBuilder _softwareFilterBuilder;
+    private readonly CloudApplicationRuleFilterBuilder _cloudApplicationFilterBuilder;
     private readonly ILogger<DeviceRuleEvaluationService> _logger;
 
     public DeviceRuleEvaluationService(
         PatchHoundDbContext dbContext,
         DeviceRuleFilterBuilder filterBuilder,
+        SoftwareRuleFilterBuilder softwareFilterBuilder,
         ILogger<DeviceRuleEvaluationService> logger)
     {
         _dbContext = dbContext;
         _filterBuilder = filterBuilder;
+        _softwareFilterBuilder = softwareFilterBuilder;
+        _cloudApplicationFilterBuilder = new CloudApplicationRuleFilterBuilder();
         _logger = logger;
     }
 
     public async Task EvaluateRulesAsync(Guid tenantId, CancellationToken ct)
     {
         var rules = await _dbContext.DeviceRules
-            .Where(r => r.TenantId == tenantId && r.Enabled)
+            .Where(r => r.TenantId == tenantId
+                && r.Enabled)
             .OrderBy(r => r.Priority)
             .ToListAsync(ct);
 
         var criticalityRuleMatchedDeviceIds = new HashSet<Guid>();
         var securityProfileRuleMatchedDeviceIds = new HashSet<Guid>();
         var fallbackTeamRuleMatchedDeviceIds = new HashSet<Guid>();
+        var ownerTeamRuleMatchedDeviceIds = new HashSet<Guid>();
         var businessLabelRuleMatchedKeys = new HashSet<(Guid DeviceId, Guid BusinessLabelId, Guid RuleId)>();
+        var ownerTeamRuleMatchedSoftwareIds = new HashSet<Guid>();
+        var ownerTeamRuleMatchedApplicationIds = new HashSet<Guid>();
 
         if (rules.Count == 0)
         {
             await ReconcileCriticalityAsync(tenantId, criticalityRuleMatchedDeviceIds, ct);
             await ReconcileSecurityProfilesAsync(tenantId, securityProfileRuleMatchedDeviceIds, ct);
             await ReconcileFallbackTeamsAsync(tenantId, fallbackTeamRuleMatchedDeviceIds, ct);
+            await ReconcileOwnerTeamsAsync(tenantId, ownerTeamRuleMatchedDeviceIds, ct);
             await ReconcileBusinessLabelsAsync(tenantId, businessLabelRuleMatchedKeys, ct);
+            await ReconcileSoftwareOwnerTeamsAsync(tenantId, ownerTeamRuleMatchedSoftwareIds, ct);
+            await ReconcileCloudApplicationOwnerTeamsAsync(tenantId, ownerTeamRuleMatchedApplicationIds, ct);
             _logger.LogDebug("No enabled device rules for tenant {TenantId}", tenantId);
             return;
         }
 
         var claimedDeviceIds = new HashSet<Guid>();
+        var claimedSoftwareIds = new HashSet<Guid>();
+        var claimedApplicationIds = new HashSet<Guid>();
 
         foreach (var rule in rules)
         {
             try
             {
-                var filter = rule.ParseFilter();
-                var predicate = _filterBuilder.Build(filter);
-
-                var matchingDeviceIds = await _dbContext.Devices
-                    .AsNoTracking()
-                    .Where(d => d.TenantId == tenantId)
-                    .Where(predicate)
-                    .Select(d => d.Id)
-                    .ToListAsync(ct);
-
-                var unclaimedIds = matchingDeviceIds
-                    .Where(id => !claimedDeviceIds.Contains(id))
-                    .ToList();
-
-                if (unclaimedIds.Count > 0)
+                if (string.Equals(rule.AssetType, DeviceAssetType, StringComparison.OrdinalIgnoreCase))
                 {
-                    var operations = rule.ParseOperations();
-                    foreach (var op in operations)
-                    {
-                        await ApplyOperationAsync(
-                            rule,
-                            tenantId,
-                            unclaimedIds,
-                            op,
-                            criticalityRuleMatchedDeviceIds,
-                            securityProfileRuleMatchedDeviceIds,
-                            fallbackTeamRuleMatchedDeviceIds,
-                            businessLabelRuleMatchedKeys,
-                            ct
-                        );
-                    }
+                    var filter = rule.ParseFilter();
+                    var predicate = _filterBuilder.Build(filter);
 
-                    foreach (var id in unclaimedIds)
-                        claimedDeviceIds.Add(id);
+                    var matchingDeviceIds = await _dbContext.Devices
+                        .AsNoTracking()
+                        .Where(d => d.TenantId == tenantId)
+                        .Where(predicate)
+                        .Select(d => d.Id)
+                        .ToListAsync(ct);
+
+                    var unclaimedIds = matchingDeviceIds
+                        .Where(id => !claimedDeviceIds.Contains(id))
+                        .ToList();
+
+                    if (unclaimedIds.Count > 0)
+                    {
+                        var operations = rule.ParseOperations();
+                        foreach (var op in operations)
+                        {
+                            await ApplyDeviceOperationAsync(
+                                rule,
+                                tenantId,
+                                unclaimedIds,
+                                op,
+                                criticalityRuleMatchedDeviceIds,
+                                securityProfileRuleMatchedDeviceIds,
+                                fallbackTeamRuleMatchedDeviceIds,
+                                ownerTeamRuleMatchedDeviceIds,
+                                businessLabelRuleMatchedKeys,
+                                ct
+                            );
+                        }
+
+                        foreach (var id in unclaimedIds)
+                            claimedDeviceIds.Add(id);
+                    }
+                    rule.RecordExecution(unclaimedIds.Count);
+                    await _dbContext.SaveChangesAsync(ct);
+
+                    _logger.LogInformation(
+                        "Device rule '{RuleName}' (priority {Priority}) matched {MatchCount} devices for tenant {TenantId}",
+                        rule.Name, rule.Priority, unclaimedIds.Count, tenantId);
+                    continue;
                 }
 
-                rule.RecordExecution(unclaimedIds.Count);
-                await _dbContext.SaveChangesAsync(ct);
+                if (string.Equals(rule.AssetType, SoftwareAssetType, StringComparison.OrdinalIgnoreCase))
+                {
+                    var filter = rule.ParseFilter();
+                    var predicate = _softwareFilterBuilder.Build(filter);
 
-                _logger.LogInformation(
-                    "Device rule '{RuleName}' (priority {Priority}) matched {MatchCount} devices for tenant {TenantId}",
-                    rule.Name, rule.Priority, unclaimedIds.Count, tenantId);
+                    var matchingSoftwareIds = await _dbContext.SoftwareTenantRecords
+                        .AsNoTracking()
+                        .Where(item => item.TenantId == tenantId)
+                        .Where(predicate)
+                        .Select(item => item.Id)
+                        .ToListAsync(ct);
+
+                    var unclaimedIds = matchingSoftwareIds
+                        .Where(id => !claimedSoftwareIds.Contains(id))
+                        .ToList();
+
+                    if (unclaimedIds.Count > 0)
+                    {
+                        var operations = rule.ParseOperations();
+                        foreach (var op in operations)
+                        {
+                            await ApplySoftwareOperationAsync(
+                                rule,
+                                tenantId,
+                                unclaimedIds,
+                                op,
+                                ownerTeamRuleMatchedSoftwareIds,
+                                ct
+                            );
+                        }
+
+                        foreach (var id in unclaimedIds)
+                            claimedSoftwareIds.Add(id);
+                    }
+
+                    rule.RecordExecution(unclaimedIds.Count);
+                    await _dbContext.SaveChangesAsync(ct);
+
+                    _logger.LogInformation(
+                        "Software rule '{RuleName}' (priority {Priority}) matched {MatchCount} tenant software rows for tenant {TenantId}",
+                        rule.Name, rule.Priority, unclaimedIds.Count, tenantId);
+                    continue;
+                }
+
+                if (string.Equals(rule.AssetType, ApplicationAssetType, StringComparison.OrdinalIgnoreCase))
+                {
+                    var filter = rule.ParseFilter();
+                    var predicate = _cloudApplicationFilterBuilder.Build(filter);
+
+                    var matchingApplicationIds = await _dbContext.CloudApplications
+                        .AsNoTracking()
+                        .Where(item => item.TenantId == tenantId && item.ActiveInTenant)
+                        .Where(predicate)
+                        .Select(item => item.Id)
+                        .ToListAsync(ct);
+
+                    var unclaimedIds = matchingApplicationIds
+                        .Where(id => !claimedApplicationIds.Contains(id))
+                        .ToList();
+
+                    if (unclaimedIds.Count > 0)
+                    {
+                        var operations = rule.ParseOperations();
+                        foreach (var op in operations)
+                        {
+                            await ApplyApplicationOperationAsync(
+                                rule,
+                                tenantId,
+                                unclaimedIds,
+                                op,
+                                ownerTeamRuleMatchedApplicationIds,
+                                ct
+                            );
+                        }
+
+                        foreach (var id in unclaimedIds)
+                        {
+                            claimedApplicationIds.Add(id);
+                        }
+                    }
+
+                    rule.RecordExecution(unclaimedIds.Count);
+                    await _dbContext.SaveChangesAsync(ct);
+
+                    _logger.LogInformation(
+                        "Application rule '{RuleName}' (priority {Priority}) matched {MatchCount} cloud applications for tenant {TenantId}",
+                        rule.Name, rule.Priority, unclaimedIds.Count, tenantId);
+                }
             }
             catch (Exception ex)
             {
@@ -107,7 +218,10 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
         await ReconcileCriticalityAsync(tenantId, criticalityRuleMatchedDeviceIds, ct);
         await ReconcileSecurityProfilesAsync(tenantId, securityProfileRuleMatchedDeviceIds, ct);
         await ReconcileFallbackTeamsAsync(tenantId, fallbackTeamRuleMatchedDeviceIds, ct);
+        await ReconcileOwnerTeamsAsync(tenantId, ownerTeamRuleMatchedDeviceIds, ct);
         await ReconcileBusinessLabelsAsync(tenantId, businessLabelRuleMatchedKeys, ct);
+        await ReconcileSoftwareOwnerTeamsAsync(tenantId, ownerTeamRuleMatchedSoftwareIds, ct);
+        await ReconcileCloudApplicationOwnerTeamsAsync(tenantId, ownerTeamRuleMatchedApplicationIds, ct);
     }
 
     public async Task EvaluateCriticalityForDeviceAsync(Guid tenantId, Guid deviceId, CancellationToken ct)
@@ -125,7 +239,9 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
         }
 
         var rules = await _dbContext.DeviceRules
-            .Where(r => r.TenantId == tenantId && r.Enabled)
+            .Where(r => r.TenantId == tenantId
+                && r.Enabled
+                && r.AssetType == DeviceAssetType)
             .OrderBy(r => r.Priority)
             .ToListAsync(ct);
 
@@ -190,7 +306,7 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
         return new DeviceRulePreviewResult(count, samples);
     }
 
-    private async Task ApplyOperationAsync(
+    private async Task ApplyDeviceOperationAsync(
         DeviceRule rule,
         Guid tenantId,
         List<Guid> deviceIds,
@@ -198,6 +314,7 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
         ISet<Guid> criticalityRuleMatchedDeviceIds,
         ISet<Guid> securityProfileRuleMatchedDeviceIds,
         ISet<Guid> fallbackTeamRuleMatchedDeviceIds,
+        ISet<Guid> ownerTeamRuleMatchedDeviceIds,
         ISet<(Guid DeviceId, Guid BusinessLabelId, Guid RuleId)> businessLabelRuleMatchedKeys,
         CancellationToken ct)
     {
@@ -231,6 +348,22 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
                     {
                         device.SetFallbackTeamFromRule(teamId, rule.Id);
                         fallbackTeamRuleMatchedDeviceIds.Add(device.Id);
+                    }
+                }
+                break;
+
+            case "AssignOwnerTeam":
+                if (op.Parameters.TryGetValue("teamId", out var ownerTeamIdStr)
+                    && Guid.TryParse(ownerTeamIdStr, out var ownerTeamId))
+                {
+                    var devices = await _dbContext.Devices
+                        .Where(d => d.TenantId == tenantId && deviceIds.Contains(d.Id))
+                        .ToListAsync(ct);
+
+                    foreach (var device in devices)
+                    {
+                        device.AssignTeamOwnerFromRule(ownerTeamId, rule.Id);
+                        ownerTeamRuleMatchedDeviceIds.Add(device.Id);
                     }
                 }
                 break;
@@ -327,6 +460,70 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
         }
     }
 
+    private async Task ApplySoftwareOperationAsync(
+        DeviceRule rule,
+        Guid tenantId,
+        List<Guid> softwareIds,
+        AssetRuleOperation op,
+        ISet<Guid> ownerTeamRuleMatchedSoftwareIds,
+        CancellationToken ct)
+    {
+        switch (op.Type)
+        {
+            case "AssignOwnerTeam":
+                if (op.Parameters.TryGetValue("teamId", out var ownerTeamIdStr)
+                    && Guid.TryParse(ownerTeamIdStr, out var ownerTeamId))
+                {
+                    var rows = await _dbContext.SoftwareTenantRecords
+                        .Where(item => item.TenantId == tenantId && softwareIds.Contains(item.Id))
+                        .ToListAsync(ct);
+
+                    foreach (var row in rows)
+                    {
+                        row.AssignOwnerTeamFromRule(ownerTeamId, rule.Id);
+                        ownerTeamRuleMatchedSoftwareIds.Add(row.Id);
+                    }
+                }
+                break;
+
+            default:
+                _logger.LogWarning("Unknown software rule operation type: {OperationType}", op.Type);
+                break;
+        }
+    }
+
+    private async Task ApplyApplicationOperationAsync(
+        DeviceRule rule,
+        Guid tenantId,
+        List<Guid> applicationIds,
+        AssetRuleOperation op,
+        ISet<Guid> ownerTeamRuleMatchedApplicationIds,
+        CancellationToken ct)
+    {
+        switch (op.Type)
+        {
+            case "AssignOwnerTeam":
+                if (op.Parameters.TryGetValue("teamId", out var ownerTeamIdStr)
+                    && Guid.TryParse(ownerTeamIdStr, out var ownerTeamId))
+                {
+                    var applications = await _dbContext.CloudApplications
+                        .Where(item => item.TenantId == tenantId && applicationIds.Contains(item.Id))
+                        .ToListAsync(ct);
+
+                    foreach (var application in applications)
+                    {
+                        application.AssignOwnerTeamFromRule(ownerTeamId, rule.Id);
+                        ownerTeamRuleMatchedApplicationIds.Add(application.Id);
+                    }
+                }
+                break;
+
+            default:
+                _logger.LogWarning("Unknown application rule operation type: {OperationType}", op.Type);
+                break;
+        }
+    }
+
     private async Task ReconcileSecurityProfilesAsync(
         Guid tenantId,
         ISet<Guid> securityProfileRuleMatchedDeviceIds,
@@ -374,6 +571,85 @@ public class DeviceRuleEvaluationService : IDeviceRuleEvaluationService
         }
 
         if (ruleDerivedDevices.Count > 0)
+        {
+            await _dbContext.SaveChangesAsync(ct);
+        }
+    }
+
+    private async Task ReconcileOwnerTeamsAsync(
+        Guid tenantId,
+        ISet<Guid> ownerTeamRuleMatchedDeviceIds,
+        CancellationToken ct)
+    {
+        var ruleDerivedDevices = await _dbContext.Devices
+            .Where(d =>
+                d.TenantId == tenantId
+                && d.OwnerTeamRuleId != null
+                && !ownerTeamRuleMatchedDeviceIds.Contains(d.Id))
+            .ToListAsync(ct);
+
+        foreach (var device in ruleDerivedDevices)
+        {
+            if (device.OwnerTeamRuleId is Guid ruleId)
+            {
+                device.ClearRuleAssignedOwnerTeam(ruleId);
+            }
+        }
+
+        if (ruleDerivedDevices.Count > 0)
+        {
+            await _dbContext.SaveChangesAsync(ct);
+        }
+    }
+
+    private async Task ReconcileSoftwareOwnerTeamsAsync(
+        Guid tenantId,
+        ISet<Guid> ownerTeamRuleMatchedSoftwareIds,
+        CancellationToken ct)
+    {
+        var ruleDerivedRows = await _dbContext.SoftwareTenantRecords
+            .Where(item =>
+                item.TenantId == tenantId
+                && item.OwnerTeamRuleId != null
+                && !ownerTeamRuleMatchedSoftwareIds.Contains(item.Id))
+            .ToListAsync(ct);
+
+        foreach (var row in ruleDerivedRows)
+        {
+            if (row.OwnerTeamRuleId is Guid ruleId)
+            {
+                row.ClearRuleAssignedOwnerTeam(ruleId);
+            }
+        }
+
+        if (ruleDerivedRows.Count > 0)
+        {
+            await _dbContext.SaveChangesAsync(ct);
+        }
+    }
+
+    private async Task ReconcileCloudApplicationOwnerTeamsAsync(
+        Guid tenantId,
+        ISet<Guid> ownerTeamRuleMatchedApplicationIds,
+        CancellationToken ct)
+    {
+        var ruleDerivedApplications = await _dbContext.CloudApplications
+            .IgnoreQueryFilters()
+            .Where(item =>
+                item.TenantId == tenantId
+                && item.OwnerTeamRuleId != null
+                && !ownerTeamRuleMatchedApplicationIds.Contains(item.Id))
+            .ToListAsync(ct);
+
+        foreach (var application in ruleDerivedApplications)
+        {
+            if (application.OwnerTeamRuleId is Guid ruleId)
+            {
+                application.ClearRuleAssignedOwnerTeam(ruleId);
+            }
+        }
+
+        if (ruleDerivedApplications.Count > 0)
         {
             await _dbContext.SaveChangesAsync(ct);
         }
