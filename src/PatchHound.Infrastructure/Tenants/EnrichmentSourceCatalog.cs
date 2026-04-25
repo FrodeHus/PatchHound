@@ -93,8 +93,12 @@ public static class EnrichmentSourceCatalog
 
     public static IReadOnlyList<string> GetAcceptedCredentialTypes(string sourceKey)
     {
-        return string.Equals(sourceKey, DefenderSourceKey, StringComparison.OrdinalIgnoreCase)
-            ? [StoredCredentialTypes.EntraClientSecret]
-            : [];
+        if (string.Equals(sourceKey, DefenderSourceKey, StringComparison.OrdinalIgnoreCase))
+            return [StoredCredentialTypes.EntraClientSecret];
+
+        if (string.Equals(sourceKey, NvdSourceKey, StringComparison.OrdinalIgnoreCase))
+            return [StoredCredentialTypes.ApiKey];
+
+        return [];
     }
 }

@@ -690,11 +690,11 @@ function StoredCredentialSelector({
       >
         <SelectTrigger className="h-10 w-full rounded-lg border-border/70 bg-background px-3">
           <SelectValue placeholder="Select stored credential">
-            {selectedCredential?.name ?? 'Source-specific secret'}
+            {selectedCredential?.name ?? 'No stored credential'}
           </SelectValue>
         </SelectTrigger>
         <SelectContent className="rounded-xl border-border/70 bg-popover/95 backdrop-blur">
-          <SelectItem value="none">Source-specific secret</SelectItem>
+          <SelectItem value="none">No stored credential</SelectItem>
           {compatibleCredentials.map((credential) => (
             <SelectItem key={credential.id} value={credential.id}>
               {credential.name}
@@ -716,7 +716,9 @@ function StoredCredentialSelector({
         </div>
       ) : selectedCredential ? (
         <p className="text-[11px] text-muted-foreground">
-          Uses client {selectedCredential.clientId} from tenant {selectedCredential.credentialTenantId}.
+          {selectedCredential.type === 'api-key'
+            ? 'Uses a stored API key from OpenBao.'
+            : `Uses client ${selectedCredential.clientId} from tenant ${selectedCredential.credentialTenantId}.`}
         </p>
       ) : (
         <p className="text-[11px] text-muted-foreground">
@@ -785,7 +787,7 @@ function getProviderStatusTone(source: EnrichmentSource): 'neutral' | 'success' 
 function getProviderStatusDescription(source: EnrichmentSource) {
   if (source.key === 'nvd') {
     if (!source.enabled) return 'NVD enrichment is configured globally but currently inactive.'
-    if (!source.credentials.hasSecret) return 'NVD enrichment can run without an API key; add one to increase the allowed request rate for modified-feed sync.'
+    if (!source.credentials.hasSecret && !source.credentials.storedCredentialId) return 'NVD enrichment can run without an API key; add one to increase the allowed request rate for modified-feed sync.'
     if (source.runtime.lastError) return 'The worker is attempting NVD enrichment, but the latest run failed and should be reviewed.'
     return 'NVD is the global backfill source for missing vulnerability metadata when tenant ingestion does not provide it.'
   }

@@ -213,6 +213,55 @@ public class SettingsAuditControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateEnrichmentSources_AcceptsGlobalApiKeyStoredCredential_ForNvdSource()
+    {
+        var credential = StoredCredential.Create(
+            "NVD API",
+            StoredCredentialTypes.ApiKey,
+            isGlobal: true,
+            credentialTenantId: string.Empty,
+            clientId: string.Empty,
+            secretRef: "stored-credentials/nvd",
+            now: DateTimeOffset.UtcNow
+        );
+        await _dbContext.StoredCredentials.AddAsync(credential);
+        await _dbContext.SaveChangesAsync();
+
+        var controller = new SystemController(
+            _secretStore,
+            _dbContext,
+            new AuditLogWriter(_dbContext, _tenantContext),
+            new NotificationEmailConfigurationResolver(
+                _secretStore,
+                Options.Create(new PatchHound.Infrastructure.Options.SmtpOptions())
+            ),
+            new MailgunEmailSender(new HttpClient()),
+            _tenantContext
+        );
+
+        var action = await controller.UpdateEnrichmentSources(
+            [
+                new UpdateEnrichmentSourceRequest(
+                    EnrichmentSourceCatalog.NvdSourceKey,
+                    "NVD API",
+                    true,
+                    null,
+                    new UpdateEnrichmentSourceCredentialsRequest(
+                        credential.Id,
+                        string.Empty,
+                        EnrichmentSourceCatalog.DefaultNvdApiBaseUrl
+                    )
+                ),
+            ],
+            CancellationToken.None
+        );
+
+        action.Should().BeOfType<NoContentResult>();
+        var source = await _dbContext.EnrichmentSourceConfigurations.SingleAsync();
+        source.StoredCredentialId.Should().Be(credential.Id);
+    }
+
+    [Fact]
     public async Task GetEnrichmentSources_ReturnsQueueSummaryAndRecentRuns()
     {
         var source = EnrichmentSourceConfiguration.Create(

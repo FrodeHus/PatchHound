@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
+using PatchHound.Infrastructure.Credentials;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Tenants;
@@ -13,6 +14,7 @@ public class NvdFeedSyncService(
     HttpClient httpClient,
     PatchHoundDbContext db,
     ISecretStore secretStore,
+    StoredCredentialResolver credentialResolver,
     ILogger<NvdFeedSyncService> logger)
 {
     private const string FeedBaseUrl = "https://nvd.nist.gov/feeds/json/cve/2.0";
@@ -218,13 +220,36 @@ public class NvdFeedSyncService(
             var source = await db.EnrichmentSourceConfigurations
                 .FirstOrDefaultAsync(s => s.SourceKey == EnrichmentSourceCatalog.NvdSourceKey, ct);
 
-            if (source is null || string.IsNullOrWhiteSpace(source.SecretRef))
+            if (source is null)
+            {
+                logger.LogDebug("NVD source is not configured; proceeding without API key.");
+                return null;
+            }
+
+            if (source.StoredCredentialId.HasValue)
+            {
+                var apiKey = await credentialResolver.ResolveGlobalApiKeyAsync(
+                    source.StoredCredentialId.Value,
+                    ct
+                );
+
+                if (!string.IsNullOrWhiteSpace(apiKey))
+                    return apiKey;
+
+                logger.LogWarning(
+                    "NVD source references stored credential {CredentialId}, but no API key could be resolved; proceeding without key.",
+                    source.StoredCredentialId.Value
+                );
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(source.SecretRef))
             {
                 logger.LogDebug("NVD source has no SecretRef configured; proceeding without API key.");
                 return null;
             }
 
-            return await secretStore.GetSecretAsync(source.SecretRef, "apiKey", ct);
+            return await secretStore.GetSecretAsync(source.SecretRef, StoredCredentialSecretKeys.ApiKey, ct);
         }
         catch (Exception ex)
         {

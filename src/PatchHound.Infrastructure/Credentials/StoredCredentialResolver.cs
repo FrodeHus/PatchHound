@@ -84,6 +84,29 @@ public class StoredCredentialResolver(
             clientSecret
         );
     }
+
+    public async Task<string?> ResolveGlobalApiKeyAsync(Guid credentialId, CancellationToken ct)
+    {
+        var credential = await dbContext.StoredCredentials.AsNoTracking()
+            .FirstOrDefaultAsync(
+                item =>
+                    item.Id == credentialId
+                    && item.Type == StoredCredentialTypes.ApiKey
+                    && item.IsGlobal,
+                ct
+            );
+
+        if (credential is null)
+            return null;
+
+        var apiKey = await secretStore.GetSecretAsync(
+            credential.SecretRef,
+            StoredCredentialSecretKeys.ApiKey,
+            ct
+        ) ?? string.Empty;
+
+        return string.IsNullOrWhiteSpace(apiKey) ? null : apiKey;
+    }
 }
 
 public sealed record EntraStoredCredential(
@@ -94,5 +117,6 @@ public sealed record EntraStoredCredential(
 
 public static class StoredCredentialSecretKeys
 {
+    public const string ApiKey = "apiKey";
     public const string ClientSecret = "clientSecret";
 }

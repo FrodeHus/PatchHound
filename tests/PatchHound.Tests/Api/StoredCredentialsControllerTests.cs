@@ -95,6 +95,38 @@ public class StoredCredentialsControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_WhenApiKey_PersistsApiKeySecretWithoutEntraFields()
+    {
+        var result = await _controller.Create(
+            new CreateStoredCredentialRequest(
+                "NVD",
+                StoredCredentialTypes.ApiKey,
+                IsGlobal: true,
+                CredentialTenantId: string.Empty,
+                ClientId: string.Empty,
+                ClientSecret: " nvd-api-key ",
+                TenantIds: []
+            ),
+            CancellationToken.None
+        );
+
+        var created = result.Result.Should().BeOfType<CreatedAtActionResult>().Subject;
+        var dto = created.Value.Should().BeOfType<StoredCredentialDto>().Subject;
+        dto.Type.Should().Be(StoredCredentialTypes.ApiKey);
+        dto.TypeDisplayName.Should().Be("API key");
+        dto.CredentialTenantId.Should().BeEmpty();
+        dto.ClientId.Should().BeEmpty();
+
+        var saved = await _dbContext.StoredCredentials.SingleAsync();
+        await _secretStore.Received(1).PutSecretAsync(
+            saved.SecretRef,
+            Arg.Is<IReadOnlyDictionary<string, string>>(values =>
+                values[StoredCredentialSecretKeys.ApiKey] == "nvd-api-key"),
+            Arg.Any<CancellationToken>()
+        );
+    }
+
+    [Fact]
     public async Task List_WhenTenantFilterProvided_ReturnsGlobalAndScopedCredentials()
     {
         var otherTenantId = Guid.NewGuid();

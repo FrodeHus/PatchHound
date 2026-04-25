@@ -24,6 +24,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -35,6 +42,7 @@ import { getApiErrorMessage } from '@/lib/api-errors'
 
 type CredentialFormState = {
   id?: string
+  type: string
   name: string
   credentialTenantId: string
   clientId: string
@@ -44,6 +52,7 @@ type CredentialFormState = {
 }
 
 const emptyForm: CredentialFormState = {
+  type: 'entra-client-secret',
   name: '',
   credentialTenantId: '',
   clientId: '',
@@ -117,6 +126,7 @@ export function StoredCredentialsManagement() {
   function openEdit(credential: StoredCredential) {
     setForm({
       id: credential.id,
+      type: credential.type,
       name: credential.name,
       credentialTenantId: credential.credentialTenantId,
       clientId: credential.clientId,
@@ -133,8 +143,8 @@ export function StoredCredentialsManagement() {
         id: form.id,
         name: form.name,
         isGlobal: form.isGlobal,
-        credentialTenantId: form.credentialTenantId,
-        clientId: form.clientId,
+        credentialTenantId: form.type === 'api-key' ? '' : form.credentialTenantId,
+        clientId: form.type === 'api-key' ? '' : form.clientId,
         clientSecret: form.clientSecret.trim() ? form.clientSecret : null,
         tenantIds: form.isGlobal ? [] : form.tenantIds,
       }
@@ -144,10 +154,10 @@ export function StoredCredentialsManagement() {
 
     const input: CreateStoredCredentialInput = {
       name: form.name,
-      type: 'entra-client-secret',
+      type: form.type,
       isGlobal: form.isGlobal,
-      credentialTenantId: form.credentialTenantId,
-      clientId: form.clientId,
+      credentialTenantId: form.type === 'api-key' ? '' : form.credentialTenantId,
+      clientId: form.type === 'api-key' ? '' : form.clientId,
       clientSecret: form.clientSecret,
       tenantIds: form.isGlobal ? [] : form.tenantIds,
     }
@@ -203,7 +213,9 @@ export function StoredCredentialsManagement() {
                     <TableCell>
                       <ScopeBadge credential={credential} tenants={tenants} />
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{credential.clientId}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {credential.clientId || '-'}
+                    </TableCell>
                     <TableCell>{formatDate(credential.updatedAt)}</TableCell>
                     <TableCell className="pr-4">
                       <div className="flex justify-end gap-2">
@@ -266,12 +278,14 @@ function CredentialDialog({
   onChange: (form: CredentialFormState) => void
   onSubmit: () => void
 }) {
+  const isApiKey = form.type === 'api-key'
   const canSubmit = useMemo(() => {
-    if (!form.name.trim() || !form.credentialTenantId.trim() || !form.clientId.trim()) return false
+    if (!form.name.trim()) return false
+    if (!isApiKey && (!form.credentialTenantId.trim() || !form.clientId.trim())) return false
     if (!isEditing && !form.clientSecret.trim()) return false
     if (!form.isGlobal && form.tenantIds.length === 0) return false
     return true
-  }, [form, isEditing])
+  }, [form, isApiKey, isEditing])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -279,7 +293,7 @@ function CredentialDialog({
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit credential' : 'New credential'}</DialogTitle>
           <DialogDescription>
-            Entra ID identity credentials are stored in OpenBao and attached by reference.
+            Stored secrets are kept in OpenBao and attached by reference.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
@@ -287,22 +301,55 @@ function CredentialDialog({
             <Input value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} />
           </Field>
           <Field label="Credential type">
-            <Input value="Entra ID identity" disabled />
+            {isEditing ? (
+              <Input value={getCredentialTypeDisplayName(form.type)} disabled />
+            ) : (
+              <Select
+                value={form.type}
+                onValueChange={(value) => {
+                  const nextType = value ?? 'entra-client-secret'
+                  onChange({
+                    ...form,
+                    type: nextType,
+                    credentialTenantId: nextType === 'api-key' ? '' : form.credentialTenantId,
+                    clientId: nextType === 'api-key' ? '' : form.clientId,
+                  })
+                }}
+              >
+                <SelectTrigger className="h-10 w-full rounded-lg border-border/70 bg-background px-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-border/70 bg-popover/95 backdrop-blur">
+                  <SelectItem value="entra-client-secret">Entra ID identity</SelectItem>
+                  <SelectItem value="api-key">API key</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </Field>
-          <Field label="Entra Tenant ID">
-            <Input
-              value={form.credentialTenantId}
-              onChange={(event) => onChange({ ...form, credentialTenantId: event.target.value })}
-            />
-          </Field>
-          <Field label="Client ID">
-            <Input value={form.clientId} onChange={(event) => onChange({ ...form, clientId: event.target.value })} />
-          </Field>
-          <Field label={isEditing ? 'Rotate client secret' : 'Client secret'}>
+          {!isApiKey ? (
+            <>
+              <Field label="Entra Tenant ID">
+                <Input
+                  value={form.credentialTenantId}
+                  onChange={(event) => onChange({ ...form, credentialTenantId: event.target.value })}
+                />
+              </Field>
+              <Field label="Client ID">
+                <Input value={form.clientId} onChange={(event) => onChange({ ...form, clientId: event.target.value })} />
+              </Field>
+            </>
+          ) : null}
+          <Field label={isEditing ? `Rotate ${isApiKey ? 'API key' : 'client secret'}` : isApiKey ? 'API key' : 'Client secret'}>
             <Input
               type="password"
               value={form.clientSecret}
-              placeholder={isEditing ? 'Leave blank to keep existing secret' : 'Enter client secret'}
+              placeholder={
+                isEditing
+                  ? 'Leave blank to keep existing secret'
+                  : isApiKey
+                    ? 'Enter API key'
+                    : 'Enter client secret'
+              }
               onChange={(event) => onChange({ ...form, clientSecret: event.target.value })}
             />
           </Field>
@@ -424,4 +471,10 @@ function formatDate(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+}
+
+function getCredentialTypeDisplayName(type: string) {
+  if (type === 'api-key') return 'API key'
+  if (type === 'entra-client-secret') return 'Entra ID identity'
+  return type
 }

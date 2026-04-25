@@ -95,7 +95,7 @@ public class StoredCredentialsController(
             secretRef,
             new Dictionary<string, string>
             {
-                [StoredCredentialSecretKeys.ClientSecret] = request.ClientSecret.Trim(),
+                [GetSecretKeyName(request.Type)] = request.ClientSecret.Trim(),
             },
             ct
         );
@@ -179,7 +179,7 @@ public class StoredCredentialsController(
                 credential.SecretRef,
                 new Dictionary<string, string>
                 {
-                    [StoredCredentialSecretKeys.ClientSecret] = request.ClientSecret.Trim(),
+                    [GetSecretKeyName(credential.Type)] = request.ClientSecret.Trim(),
                 },
                 ct
             );
@@ -256,23 +256,42 @@ public class StoredCredentialsController(
         bool requireSecret = true
     )
     {
-        if (!string.Equals(type, StoredCredentialTypes.EntraClientSecret, StringComparison.OrdinalIgnoreCase))
+        if (!IsSupportedCredentialType(type))
             return new BadRequestObjectResult(new ProblemDetails { Title = "Unsupported credential type." });
 
         if (string.IsNullOrWhiteSpace(name))
             return new BadRequestObjectResult(new ProblemDetails { Title = "Credential name is required." });
 
-        if (string.IsNullOrWhiteSpace(credentialTenantId) || string.IsNullOrWhiteSpace(clientId))
+        if (
+            string.Equals(type, StoredCredentialTypes.EntraClientSecret, StringComparison.OrdinalIgnoreCase)
+            && (string.IsNullOrWhiteSpace(credentialTenantId) || string.IsNullOrWhiteSpace(clientId))
+        )
+        {
             return new BadRequestObjectResult(new ProblemDetails { Title = "Tenant ID and client ID are required." });
+        }
 
         if (requireSecret && string.IsNullOrWhiteSpace(clientSecret))
-            return new BadRequestObjectResult(new ProblemDetails { Title = "Client secret is required." });
+        {
+            var title = string.Equals(type, StoredCredentialTypes.ApiKey, StringComparison.OrdinalIgnoreCase)
+                ? "API key is required."
+                : "Client secret is required.";
+            return new BadRequestObjectResult(new ProblemDetails { Title = title });
+        }
 
         if (!isGlobal && tenantIds.Count == 0)
             return new BadRequestObjectResult(new ProblemDetails { Title = "Select at least one tenant or mark the credential global." });
 
         return null;
     }
+
+    private static bool IsSupportedCredentialType(string type) =>
+        string.Equals(type, StoredCredentialTypes.EntraClientSecret, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(type, StoredCredentialTypes.ApiKey, StringComparison.OrdinalIgnoreCase);
+
+    private static string GetSecretKeyName(string type) =>
+        string.Equals(type, StoredCredentialTypes.ApiKey, StringComparison.OrdinalIgnoreCase)
+            ? StoredCredentialSecretKeys.ApiKey
+            : StoredCredentialSecretKeys.ClientSecret;
 
     private static IReadOnlyList<Guid> NormalizeTenantIds(bool isGlobal, IReadOnlyList<Guid> tenantIds) =>
         isGlobal ? [] : tenantIds.Where(id => id != Guid.Empty).Distinct().ToList();
