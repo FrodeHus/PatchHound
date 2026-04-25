@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
@@ -10,7 +9,6 @@ using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Tests.TestData;
-using Xunit;
 
 namespace PatchHound.Tests.Api;
 
@@ -23,7 +21,7 @@ public class AuthenticatedScanRunsControllerTests : IAsyncLifetime
     private ScanProfile _profile = null!;
     private AuthenticatedScanRun _completedRun = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.CurrentTenantId.Returns(_tenantId);
@@ -72,7 +70,7 @@ public class AuthenticatedScanRunsControllerTests : IAsyncLifetime
         _sut = new AuthenticatedScanRunsController(_db, tenantContext);
     }
 
-    public Task DisposeAsync() { _db.Dispose(); return Task.CompletedTask; }
+    public ValueTask DisposeAsync() { _db.Dispose(); return ValueTask.CompletedTask; }
 
     [Fact]
     public async Task List_returns_paged_runs_for_tenant()

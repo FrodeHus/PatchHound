@@ -32,7 +32,7 @@ public class ScanRunnerControllerTests : IAsyncLifetime
     private ScanProfile _profile = null!;
     private Device _device = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.CurrentTenantId.Returns(_tenantId);
@@ -82,7 +82,7 @@ public class ScanRunnerControllerTests : IAsyncLifetime
         SetRunnerClaims(_runner.Id, _tenantId);
     }
 
-    public Task DisposeAsync() { _db.Dispose(); return Task.CompletedTask; }
+    public ValueTask DisposeAsync() { _db.Dispose(); return ValueTask.CompletedTask; }
 
     private void SetRunnerClaims(Guid runnerId, Guid tenantId)
     {

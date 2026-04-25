@@ -18,7 +18,7 @@ public class BackendEndToEndTests : IAsyncLifetime
     private PatchHoundDbContext _db = null!;
     private readonly Guid _tenantId = Guid.NewGuid();
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.CurrentTenantId.Returns(_tenantId);
@@ -28,13 +28,13 @@ public class BackendEndToEndTests : IAsyncLifetime
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new PatchHoundDbContext(options, TestServiceProviderFactory.Create(tenantContext));
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _db.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]

@@ -20,7 +20,7 @@ public class ScanJobDispatcherTests : IAsyncLifetime
     private ScanRunner _runner = null!;
     private ConnectionProfile _conn = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.CurrentTenantId.Returns(_tenantId);
@@ -51,10 +51,10 @@ public class ScanJobDispatcherTests : IAsyncLifetime
         _sut = new ScanJobDispatcher(_db);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _db.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     private async Task<Guid> SeedDeviceAsync(string name)

@@ -13,7 +13,7 @@ public class SoftwareProductResolverTests : IAsyncLifetime
     private SourceSystem _sourceSystem = null!;
     private SoftwareProductResolver _sut = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _db = await TestDbContextFactory.CreateAsync();
         _sourceSystem = SourceSystem.Create("defender", "Defender");
@@ -23,10 +23,10 @@ public class SoftwareProductResolverTests : IAsyncLifetime
         _sut = new SoftwareProductResolver(_db);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _db.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]

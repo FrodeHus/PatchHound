@@ -19,7 +19,7 @@ public class ScanSchedulerWorkerTests : IAsyncLifetime
     private ScanRunner _runner = null!;
     private ConnectionProfile _conn = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.CurrentTenantId.Returns(_tenantId);
@@ -44,7 +44,7 @@ public class ScanSchedulerWorkerTests : IAsyncLifetime
         await _db.SaveChangesAsync();
     }
 
-    public Task DisposeAsync() { _db.Dispose(); return Task.CompletedTask; }
+    public ValueTask DisposeAsync() { _db.Dispose(); return ValueTask.CompletedTask; }
 
     [Fact]
     public async Task TickAsync_dispatches_due_cron_profile()
