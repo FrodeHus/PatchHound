@@ -14,6 +14,7 @@ public class TenantSourceConfiguration
     public string ApiBaseUrl { get; private set; } = string.Empty;
     public string TokenScope { get; private set; } = string.Empty;
     public string? LinkedSourceKey { get; private set; }
+    public Guid? StoredCredentialId { get; private set; }
     public DateTimeOffset? ManualRequestedAt { get; private set; }
     public DateTimeOffset? LastStartedAt { get; private set; }
     public DateTimeOffset? LastCompletedAt { get; private set; }
@@ -39,7 +40,8 @@ public class TenantSourceConfiguration
         string secretRef = "",
         string apiBaseUrl = "",
         string tokenScope = "",
-        string? linkedSourceKey = null
+        string? linkedSourceKey = null,
+        Guid? storedCredentialId = null
     )
     {
         return new TenantSourceConfiguration
@@ -56,6 +58,7 @@ public class TenantSourceConfiguration
             ApiBaseUrl = apiBaseUrl,
             TokenScope = tokenScope,
             LinkedSourceKey = linkedSourceKey,
+            StoredCredentialId = storedCredentialId,
         };
     }
 
@@ -68,7 +71,8 @@ public class TenantSourceConfiguration
         string secretRef,
         string apiBaseUrl,
         string tokenScope,
-        string? linkedSourceKey = null
+        string? linkedSourceKey = null,
+        Guid? storedCredentialId = null
     )
     {
         DisplayName = displayName;
@@ -80,6 +84,7 @@ public class TenantSourceConfiguration
         ApiBaseUrl = apiBaseUrl;
         TokenScope = tokenScope;
         LinkedSourceKey = string.IsNullOrWhiteSpace(linkedSourceKey) ? null : linkedSourceKey;
+        StoredCredentialId = storedCredentialId;
     }
 
     public void UpdateRuntime(

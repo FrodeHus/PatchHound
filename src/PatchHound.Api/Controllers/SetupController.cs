@@ -6,6 +6,8 @@ using PatchHound.Api.Models.Setup;
 using PatchHound.Core.Common;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
+using PatchHound.Core.Entities;
+using PatchHound.Infrastructure.Credentials;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Tenants;
@@ -114,20 +116,31 @@ public class SetupController : ControllerBase
                 );
             }
 
-            var secretRef =
-                string.IsNullOrWhiteSpace(source.SecretRef)
-                    ? $"tenants/{tenant.Id}/sources/{TenantSourceCatalog.DefenderSourceKey}"
-                    : source.SecretRef;
+            var credentialId = Guid.NewGuid();
+            var secretRef = $"stored-credentials/{credentialId}";
+            var credential = StoredCredential.Create(
+                "Microsoft Defender setup credential",
+                StoredCredentialTypes.EntraClientSecret,
+                isGlobal: false,
+                tenant.EntraTenantId,
+                clientId,
+                secretRef,
+                DateTimeOffset.UtcNow,
+                credentialId
+            );
+            credential.TenantScopes.Add(StoredCredentialTenant.Create(credential.Id, tenant.Id));
+            await _dbContext.StoredCredentials.AddAsync(credential, ct);
 
             source.UpdateConfiguration(
                 source.DisplayName,
                 true,
                 TenantSourceCatalog.DefaultDefenderSchedule,
-                tenant.EntraTenantId,
-                clientId,
-                secretRef,
-                TenantSourceCatalog.DefaultDefenderApiBaseUrl,
-                TenantSourceCatalog.DefaultDefenderTokenScope
+                credentialTenantId: string.Empty,
+                clientId: string.Empty,
+                secretRef: string.Empty,
+                apiBaseUrl: TenantSourceCatalog.DefaultDefenderApiBaseUrl,
+                tokenScope: TenantSourceCatalog.DefaultDefenderTokenScope,
+                storedCredentialId: credential.Id
             );
 
             await _dbContext.SaveChangesAsync(ct);
@@ -136,8 +149,7 @@ public class SetupController : ControllerBase
                 secretRef,
                 new Dictionary<string, string>
                 {
-                    [TenantSourceCatalog.GetSecretKeyName(TenantSourceCatalog.DefenderSourceKey)] =
-                        clientSecret,
+                    [StoredCredentialSecretKeys.ClientSecret] = clientSecret,
                 },
                 ct
             );

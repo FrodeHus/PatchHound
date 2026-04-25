@@ -115,6 +115,7 @@ public class DashboardQueryService(
                 Severity = e.Exposure.Vulnerability.VendorSeverity.ToString(),
                 ChangedAt = e.ClosedAt!.Value,
                 e.Exposure.DeviceId,
+                e.DeviceVulnerabilityExposureId,
                 e.Exposure.SoftwareProductId,
             })
             .ToListAsync(ct);
@@ -173,7 +174,7 @@ public class DashboardQueryService(
                         group.Key.ExternalId,
                         group.Key.Title,
                         group.Key.Severity,
-                        group.Select(item => item.DeviceId).Distinct().Count(),
+                        group.Select(item => item.DeviceVulnerabilityExposureId).Distinct().Count(),
                         group.Max(item => item.ChangedAt),
                         caseId
                     );

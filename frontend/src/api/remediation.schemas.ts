@@ -143,6 +143,9 @@ export const decisionAiSummarySchema = z.object({
 export const decisionContextSchema = z.object({
   remediationCaseId: z.string().uuid(),
   softwareName: z.string(),
+  softwareOwnerTeamId: z.string().uuid().nullable(),
+  softwareOwnerTeamName: z.string().nullable(),
+  softwareOwnerAssignmentSource: z.string(),
   criticality: z.string(),
   summary: decisionSummarySchema,
   workflow: decisionWorkflowSummarySchema,
@@ -159,6 +162,8 @@ export const decisionContextSchema = z.object({
 export const decisionListItemSchema = z.object({
   remediationCaseId: z.string().uuid(),
   softwareName: z.string(),
+  softwareOwnerTeamName: z.string().nullable(),
+  softwareOwnerAssignmentSource: z.string(),
   criticality: z.string(),
   outcome: z.string().nullable(),
   approvalStatus: z.string().nullable(),

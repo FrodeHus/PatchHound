@@ -9,6 +9,7 @@ public class DeviceRuleConfiguration : IEntityTypeConfiguration<DeviceRule>
     public void Configure(EntityTypeBuilder<DeviceRule> builder)
     {
         builder.HasKey(r => r.Id);
+        builder.Property(r => r.AssetType).HasMaxLength(DeviceRule.AssetTypeMaxLength).IsRequired();
         builder.Property(r => r.Name).HasMaxLength(DeviceRule.NameMaxLength).IsRequired();
         builder.Property(r => r.Description).HasMaxLength(DeviceRule.DescriptionMaxLength);
         builder.Property(r => r.FilterDefinition).HasColumnType("text").IsRequired();

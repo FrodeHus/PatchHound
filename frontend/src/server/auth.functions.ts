@@ -46,65 +46,69 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       return null
     }
 
+    const globalContext = { token: session.accessToken }
     let systemStatus: SystemStatus | null = null
     let setupStatus: SetupStatus | null = null
     let roles = session.roles ?? []
     let tenantIds = session.tenantIds ?? (session.tenantId ? [session.tenantId] : [])
     let featureFlags: FeaturesResponse = {}
-    try {
-      systemStatus = await apiGet<SystemStatus>('/system/status', {
-        token: session.accessToken,
-        tenantId: session.tenantId,
-      })
-    } catch {
-      systemStatus = null
-    }
+    let selectedTenantId = session.tenantId
+    let shouldSaveSession = false
 
     try {
-      setupStatus = await apiGet<SetupStatus>('/setup/status', {
-        token: session.accessToken,
-        tenantId: session.tenantId,
-      })
-    } catch {
-      setupStatus = null
-    }
+      const [systemResult, setupResult, tenantResult, featureResult] = await Promise.allSettled([
+        apiGet<SystemStatus>('/system/status', globalContext),
+        apiGet<SetupStatus>('/setup/status', globalContext),
+        apiGet<TenantListResponse>('/tenants?page=1&pageSize=100', globalContext),
+        apiGet<FeaturesResponse>('/features', globalContext),
+      ])
 
-    try {
-      const assignedRoles = await apiGet<AssignedRolesResponse>('/roles/assigned', {
-        token: session.accessToken,
-        tenantId: session.tenantId,
-      })
-      if (assignedRoles.roles.length > 0) {
-        roles = assignedRoles.roles
-        session.roles = roles
-        await session.save()
+      systemStatus = systemResult.status === 'fulfilled' ? systemResult.value : null
+      setupStatus = setupResult.status === 'fulfilled' ? setupResult.value : null
+      featureFlags = featureResult.status === 'fulfilled' ? featureResult.value : {}
+
+      if (tenantResult.status !== 'fulfilled') {
+        throw tenantResult.reason
       }
-    } catch {
-      // Fall back to session roles from token claims
-    }
 
-    try {
-      const tenantResponse = await apiGet<TenantListResponse>('/tenants?page=1&pageSize=100', {
-        token: session.accessToken,
-        tenantId: session.tenantId,
-      })
+      const tenantResponse = tenantResult.value
       const nextTenantIds = tenantResponse.items.map((tenant) => tenant.id)
       if (nextTenantIds.length > 0) {
         tenantIds = nextTenantIds
-        session.tenantIds = nextTenantIds
-        await session.save()
+        selectedTenantId = selectedTenantId && nextTenantIds.includes(selectedTenantId)
+          ? selectedTenantId
+          : nextTenantIds[0]
+        if (
+          session.tenantId !== selectedTenantId
+          || JSON.stringify(session.tenantIds ?? []) !== JSON.stringify(nextTenantIds)
+        ) {
+          session.tenantId = selectedTenantId
+          session.tenantIds = nextTenantIds
+          shouldSaveSession = true
+        }
       }
     } catch {
       tenantIds = session.tenantIds ?? (session.tenantId ? [session.tenantId] : [])
     }
 
-    try {
-      featureFlags = await apiGet<FeaturesResponse>('/features', {
-        token: session.accessToken,
-        tenantId: session.tenantId,
-      })
-    } catch {
-      featureFlags = {}
+    if (selectedTenantId && tenantIds.includes(selectedTenantId)) {
+      try {
+        const assignedRoles = await apiGet<AssignedRolesResponse>('/roles/assigned', {
+          token: session.accessToken,
+          tenantId: selectedTenantId,
+        })
+        if (assignedRoles.roles.length > 0) {
+          roles = assignedRoles.roles
+          session.roles = roles
+          shouldSaveSession = true
+        }
+      } catch {
+        // Fall back to session roles from token claims
+      }
+    }
+
+    if (shouldSaveSession) {
+      await session.save()
     }
 
     return {
@@ -113,7 +117,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
       displayName: session.displayName ?? '',
       roles,
       activeRoles: session.activeRoles ?? [],
-      tenantId: session.tenantId,
+      tenantId: selectedTenantId,
       tenantIds,
       requiresSetup: setupStatus?.requiresSetup ?? false,
       systemStatus,

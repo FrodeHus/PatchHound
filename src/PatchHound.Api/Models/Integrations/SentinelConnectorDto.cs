@@ -5,8 +5,7 @@ public record SentinelConnectorDto(
     string DceEndpoint,
     string DcrImmutableId,
     string StreamName,
-    string TenantId,
-    string ClientId,
-    bool HasSecret,
+    Guid? StoredCredentialId,
+    string[] AcceptedCredentialTypes,
     DateTimeOffset? UpdatedAt
 );

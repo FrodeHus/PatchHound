@@ -126,8 +126,9 @@ public class DeviceOwnershipTests
     public void DeviceRule_Create_sets_fields_and_enables_rule()
     {
         var tenantId = Guid.NewGuid();
-        var rule = DeviceRule.Create(tenantId, "My Rule", "desc", 5, SampleFilter(), SampleOperations());
+        var rule = DeviceRule.Create(tenantId, "My Rule", "desc", 5, "Device", SampleFilter(), SampleOperations());
         Assert.Equal(tenantId, rule.TenantId);
+        Assert.Equal("Device", rule.AssetType);
         Assert.Equal("My Rule", rule.Name);
         Assert.Equal("desc", rule.Description);
         Assert.Equal(5, rule.Priority);
@@ -138,15 +139,23 @@ public class DeviceOwnershipTests
     public void DeviceRule_Create_rejects_empty_tenantId()
     {
         var ex = Assert.Throws<ArgumentException>(() =>
-            DeviceRule.Create(Guid.Empty, "name", null, 1, SampleFilter(), SampleOperations()));
+            DeviceRule.Create(Guid.Empty, "name", null, 1, "Device", SampleFilter(), SampleOperations()));
         Assert.Equal("tenantId", ex.ParamName);
+    }
+
+    [Fact]
+    public void DeviceRule_Create_rejects_whitespace_assetType()
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            DeviceRule.Create(Guid.NewGuid(), "name", null, 1, "   ", SampleFilter(), SampleOperations()));
+        Assert.Equal("assetType", ex.ParamName);
     }
 
     [Fact]
     public void DeviceRule_Create_rejects_whitespace_name()
     {
         var ex = Assert.Throws<ArgumentException>(() =>
-            DeviceRule.Create(Guid.NewGuid(), "   ", null, 1, SampleFilter(), SampleOperations()));
+            DeviceRule.Create(Guid.NewGuid(), "   ", null, 1, "Device", SampleFilter(), SampleOperations()));
         Assert.Equal("name", ex.ParamName);
     }
 
@@ -155,7 +164,7 @@ public class DeviceOwnershipTests
     {
         var longName = new string('a', DeviceRule.NameMaxLength + 1);
         var ex = Assert.Throws<ArgumentException>(() =>
-            DeviceRule.Create(Guid.NewGuid(), longName, null, 1, SampleFilter(), SampleOperations()));
+            DeviceRule.Create(Guid.NewGuid(), longName, null, 1, "Device", SampleFilter(), SampleOperations()));
         Assert.Equal("name", ex.ParamName);
     }
 
@@ -164,14 +173,15 @@ public class DeviceOwnershipTests
     {
         var longDescription = new string('d', DeviceRule.DescriptionMaxLength + 1);
         var ex = Assert.Throws<ArgumentException>(() =>
-            DeviceRule.Create(Guid.NewGuid(), "name", longDescription, 1, SampleFilter(), SampleOperations()));
+            DeviceRule.Create(Guid.NewGuid(), "name", longDescription, 1, "Device", SampleFilter(), SampleOperations()));
         Assert.Equal("description", ex.ParamName);
     }
 
     [Fact]
     public void DeviceRule_Create_trims_name_and_description()
     {
-        var rule = DeviceRule.Create(Guid.NewGuid(), "  Name  ", "  desc  ", 1, SampleFilter(), SampleOperations());
+        var rule = DeviceRule.Create(Guid.NewGuid(), "  Name  ", "  desc  ", 1, "  Device  ", SampleFilter(), SampleOperations());
+        Assert.Equal("Device", rule.AssetType);
         Assert.Equal("Name", rule.Name);
         Assert.Equal("desc", rule.Description);
     }
@@ -179,18 +189,19 @@ public class DeviceOwnershipTests
     [Fact]
     public void DeviceRule_Update_refreshes_UpdatedAt()
     {
-        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, SampleFilter(), SampleOperations());
+        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, "Device", SampleFilter(), SampleOperations());
         var originalUpdatedAt = rule.UpdatedAt;
         Thread.Sleep(10);
-        rule.Update("name2", "desc2", enabled: false, SampleFilter(), SampleOperations());
+        rule.Update("name2", "desc2", enabled: false, "Device", SampleFilter(), SampleOperations());
         Assert.True(rule.UpdatedAt > originalUpdatedAt);
     }
 
     [Fact]
     public void DeviceRule_Update_trims_name_and_description()
     {
-        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, SampleFilter(), SampleOperations());
-        rule.Update("  Name  ", "  desc  ", enabled: true, SampleFilter(), SampleOperations());
+        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, "Device", SampleFilter(), SampleOperations());
+        rule.Update("  Name  ", "  desc  ", enabled: true, "  Device  ", SampleFilter(), SampleOperations());
+        Assert.Equal("Device", rule.AssetType);
         Assert.Equal("Name", rule.Name);
         Assert.Equal("desc", rule.Description);
     }
@@ -198,36 +209,36 @@ public class DeviceOwnershipTests
     [Fact]
     public void DeviceRule_Update_rejects_whitespace_name()
     {
-        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, SampleFilter(), SampleOperations());
+        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, "Device", SampleFilter(), SampleOperations());
         var ex = Assert.Throws<ArgumentException>(() =>
-            rule.Update("   ", "desc", enabled: true, SampleFilter(), SampleOperations()));
+            rule.Update("   ", "desc", enabled: true, "Device", SampleFilter(), SampleOperations()));
         Assert.Equal("name", ex.ParamName);
     }
 
     [Fact]
     public void DeviceRule_Update_rejects_name_longer_than_max()
     {
-        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, SampleFilter(), SampleOperations());
+        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, "Device", SampleFilter(), SampleOperations());
         var longName = new string('a', DeviceRule.NameMaxLength + 1);
         var ex = Assert.Throws<ArgumentException>(() =>
-            rule.Update(longName, "desc", enabled: true, SampleFilter(), SampleOperations()));
+            rule.Update(longName, "desc", enabled: true, "Device", SampleFilter(), SampleOperations()));
         Assert.Equal("name", ex.ParamName);
     }
 
     [Fact]
     public void DeviceRule_Update_rejects_description_longer_than_max()
     {
-        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, SampleFilter(), SampleOperations());
+        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, "Device", SampleFilter(), SampleOperations());
         var longDescription = new string('d', DeviceRule.DescriptionMaxLength + 1);
         var ex = Assert.Throws<ArgumentException>(() =>
-            rule.Update("name", longDescription, enabled: true, SampleFilter(), SampleOperations()));
+            rule.Update("name", longDescription, enabled: true, "Device", SampleFilter(), SampleOperations()));
         Assert.Equal("description", ex.ParamName);
     }
 
     [Fact]
     public void DeviceRule_SetPriority_refreshes_UpdatedAt()
     {
-        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, SampleFilter(), SampleOperations());
+        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, "Device", SampleFilter(), SampleOperations());
         var originalUpdatedAt = rule.UpdatedAt;
         Thread.Sleep(10);
         rule.SetPriority(7);
@@ -237,7 +248,7 @@ public class DeviceOwnershipTests
     [Fact]
     public void DeviceRule_SetEnabled_refreshes_UpdatedAt()
     {
-        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, SampleFilter(), SampleOperations());
+        var rule = DeviceRule.Create(Guid.NewGuid(), "name", "desc", 1, "Device", SampleFilter(), SampleOperations());
         var originalUpdatedAt = rule.UpdatedAt;
         Thread.Sleep(10);
         rule.SetEnabled(false);

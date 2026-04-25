@@ -4,6 +4,7 @@ namespace PatchHound.Api.Models.DeviceRules;
 
 public record DeviceRuleDto(
     Guid Id,
+    string AssetType,
     string Name,
     string? Description,
     int Priority,
@@ -19,6 +20,7 @@ public record DeviceRuleDto(
 public record CreateDeviceRuleRequest(
     string Name,
     string? Description,
+    string AssetType,
     JsonElement FilterDefinition,
     JsonElement Operations
 );
@@ -27,11 +29,12 @@ public record UpdateDeviceRuleRequest(
     string Name,
     string? Description,
     bool Enabled,
+    string AssetType,
     JsonElement FilterDefinition,
     JsonElement Operations
 );
 
-public record PreviewDeviceRuleFilterRequest(JsonElement FilterDefinition);
+public record PreviewDeviceRuleFilterRequest(string AssetType, JsonElement FilterDefinition);
 
 public record ReorderDeviceRulesRequest(List<Guid> RuleIds);
 

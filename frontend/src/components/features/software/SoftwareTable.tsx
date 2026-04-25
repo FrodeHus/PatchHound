@@ -48,6 +48,7 @@ type SoftwareTableProps = {
     missedMaintenanceWindow: boolean
   }) => void
   onShowRiskDetail: (softwareProductId: string) => void
+  onReturnToRuleControl: (tenantSoftwareId: string) => void
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
   onClearFilters: () => void
@@ -71,6 +72,7 @@ export function SoftwareTable({
   onMissedMaintenanceWindowChange,
   onApplyStructuredFilters,
   onShowRiskDetail,
+  onReturnToRuleControl,
   onPageChange,
   onPageSizeChange,
   onClearFilters,
@@ -206,6 +208,33 @@ export function SoftwareTable({
         header: ({ column }) => <SortableColumnHeader column={column} title="Versions" />,
       },
       {
+        accessorKey: 'ownerTeamName',
+        header: ({ column }) => <SortableColumnHeader column={column} title="Owner team" />,
+        cell: ({ row }) => (
+          <div className="space-y-1">
+            <span className={row.original.ownerTeamName ? 'text-foreground' : 'text-muted-foreground'}>
+              {row.original.ownerTeamName ?? 'Unassigned'}
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${ownerAssignmentTone(row.original.ownerAssignmentSource)}`}>
+                {row.original.ownerAssignmentSource}
+              </span>
+              {row.original.ownerAssignmentSource === 'Manual' ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-[11px] text-muted-foreground"
+                  onClick={() => onReturnToRuleControl(row.original.id)}
+                >
+                  Return to rule control
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ),
+      },
+      {
         accessorKey: 'activeVulnerabilityCount',
         header: ({ column }) => <SortableColumnHeader column={column} title="Open vulns" />,
         cell: ({ row }) => (
@@ -234,7 +263,7 @@ export function SoftwareTable({
           ),
         },
     ],
-    [onShowRiskDetail, renderedAt],
+    [onReturnToRuleControl, onShowRiskDetail, renderedAt],
   )
 
   return (
@@ -397,4 +426,15 @@ export function SoftwareTable({
       </div>
     </DataTableWorkbench>
   );
+}
+
+function ownerAssignmentTone(source: string) {
+  switch (source) {
+    case 'Rule':
+      return 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300'
+    case 'Manual':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    default:
+      return 'border-border/70 bg-background/70 text-muted-foreground'
+  }
 }

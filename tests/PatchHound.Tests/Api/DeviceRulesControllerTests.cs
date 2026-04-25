@@ -65,6 +65,7 @@ public class DeviceRulesControllerTests : IDisposable
         var evaluationService = new DeviceRuleEvaluationService(
             _dbContext,
             filterBuilder,
+            new SoftwareRuleFilterBuilder(),
             Substitute.For<Microsoft.Extensions.Logging.ILogger<DeviceRuleEvaluationService>>()
         );
 
@@ -73,6 +74,7 @@ public class DeviceRulesControllerTests : IDisposable
             _tenantContext,
             evaluationService,
             filterBuilder,
+            new SoftwareRuleFilterBuilder(),
             riskRefreshService
         );
     }
@@ -90,6 +92,7 @@ public class DeviceRulesControllerTests : IDisposable
             new CreateDeviceRuleRequest(
                 "Critical workstations",
                 "Match anything named Device-A",
+                "Device",
                 SerializeJson(filter),
                 SerializeJson(operations)
             ),
@@ -98,11 +101,95 @@ public class DeviceRulesControllerTests : IDisposable
 
         var created = action.Result.Should().BeOfType<CreatedAtActionResult>().Subject;
         var dto = created.Value.Should().BeOfType<DeviceRuleDto>().Subject;
+        dto.AssetType.Should().Be("Device");
         dto.Name.Should().Be("Critical workstations");
         dto.Priority.Should().Be(1);
 
         var stored = await _dbContext.DeviceRules.SingleAsync(r => r.Id == dto.Id);
         stored.Name.Should().Be("Critical workstations");
+    }
+
+    [Fact]
+    public async Task Create_RejectsUnsupportedAssetType()
+    {
+        var filter = BuildNameFilter("Device-A");
+        var operations = new List<AssetRuleOperation>
+        {
+            new("SetCriticality", new Dictionary<string, string> { ["criticality"] = "High" }),
+        };
+
+        var action = await _controller.Create(
+            new CreateDeviceRuleRequest(
+                "Software rule",
+                "Not supported in the first slice",
+                "Software",
+                SerializeJson(filter),
+                SerializeJson(operations)
+            ),
+            CancellationToken.None
+        );
+
+        var badRequest = action.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        badRequest.Value.Should().BeOfType<ProblemDetails>()
+            .Subject.Title.Should().Be("Unknown software rule operation type: SetCriticality.");
+    }
+
+    [Fact]
+    public async Task Create_AllowsSoftwareRuleWithAssignOwnerTeamOperation()
+    {
+        var team = Team.Create(_tenantId, "Software Owners");
+        await _dbContext.Teams.AddAsync(team);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Create(
+            new CreateDeviceRuleRequest(
+                "Browsers",
+                "Matches software by vendor",
+                "Software",
+                SerializeJson(BuildSoftwareFilter("Vendor", "Contoso")),
+                SerializeJson(new List<AssetRuleOperation>
+                {
+                    new("AssignOwnerTeam", new Dictionary<string, string> { ["teamId"] = team.Id.ToString() }),
+                })
+            ),
+            CancellationToken.None
+        );
+
+        var created = action.Result.Should().BeOfType<CreatedAtActionResult>().Subject;
+        var dto = created.Value.Should().BeOfType<DeviceRuleDto>().Subject;
+        dto.AssetType.Should().Be("Software");
+
+        var stored = await _dbContext.DeviceRules.SingleAsync(r => r.Id == dto.Id);
+        stored.AssetType.Should().Be("Software");
+    }
+
+    [Fact]
+    public async Task Create_AllowsApplicationRuleWithAssignOwnerTeamOperation()
+    {
+        var team = Team.Create(_tenantId, "Application Owners");
+        await _dbContext.Teams.AddAsync(team);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Create(
+            new CreateDeviceRuleRequest(
+                "Portal ownership",
+                "Matches applications by display name",
+                "Application",
+                SerializeJson(BuildSoftwareFilter("Name", "Contoso Portal")),
+                SerializeJson(new List<AssetRuleOperation>
+                {
+                    new("AssignOwnerTeam", new Dictionary<string, string> { ["teamId"] = team.Id.ToString() }),
+                })
+            ),
+            CancellationToken.None
+        );
+
+        var created = action.Result.Should().BeOfType<CreatedAtActionResult>().Subject;
+        var dto = created.Value.Should().BeOfType<DeviceRuleDto>().Subject;
+        dto.AssetType.Should().Be("Application");
+
+        var stored = await _dbContext.DeviceRules.SingleAsync(r => r.Id == dto.Id);
+        stored.AssetType.Should().Be("Application");
     }
 
     [Fact]
@@ -121,6 +208,7 @@ public class DeviceRulesControllerTests : IDisposable
             new CreateDeviceRuleRequest(
                 "Bogus",
                 null,
+                "Device",
                 SerializeJson(filter),
                 SerializeJson(operations)
             ),
@@ -156,7 +244,71 @@ public class DeviceRulesControllerTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var action = await _controller.Preview(
-            new PreviewDeviceRuleFilterRequest(SerializeJson(BuildNameFilter("Device-A"))),
+            new PreviewDeviceRuleFilterRequest("Device", SerializeJson(BuildNameFilter("Device-A"))),
+            CancellationToken.None
+        );
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var preview = ok.Value.Should().BeOfType<DeviceRulePreviewDto>().Subject;
+        preview.Count.Should().Be(1);
+        preview.Samples.Should().ContainSingle().Which.Id.Should().Be(matching.Id);
+    }
+
+    [Fact]
+    public async Task Preview_CountsMatchingTenantSoftwareProducts()
+    {
+        var device = CreateDevice("device-1", "Device-A", Criticality.Medium);
+        var matchingProduct = SoftwareProduct.Create("Contoso", "Browser", null);
+        var otherProduct = SoftwareProduct.Create("Fabrikam", "Agent", null);
+        var matchingTenantSoftware = SoftwareTenantRecord.Create(_tenantId, null, matchingProduct.Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var otherTenantSoftware = SoftwareTenantRecord.Create(_tenantId, null, otherProduct.Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        await _dbContext.AddRangeAsync(
+            device,
+            matchingProduct,
+            otherProduct,
+            matchingTenantSoftware,
+            otherTenantSoftware,
+            InstalledSoftware.Observe(_tenantId, device.Id, matchingProduct.Id, _sourceSystemId, "1.0.0", DateTimeOffset.UtcNow),
+            InstalledSoftware.Observe(_tenantId, device.Id, otherProduct.Id, _sourceSystemId, "2.0.0", DateTimeOffset.UtcNow));
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Preview(
+            new PreviewDeviceRuleFilterRequest("Software", SerializeJson(BuildSoftwareFilter("Vendor", "Contoso"))),
+            CancellationToken.None
+        );
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var preview = ok.Value.Should().BeOfType<DeviceRulePreviewDto>().Subject;
+        preview.Count.Should().Be(1);
+        preview.Samples.Should().ContainSingle().Which.Id.Should().Be(matchingTenantSoftware.Id);
+    }
+
+    [Fact]
+    public async Task Preview_CountsMatchingCloudApplications()
+    {
+        var matching = CloudApplication.Create(
+            _tenantId,
+            _sourceSystemId,
+            "app-object-1",
+            "client-id-1",
+            "Contoso Portal",
+            null,
+            false,
+            []);
+        var other = CloudApplication.Create(
+            _tenantId,
+            _sourceSystemId,
+            "app-object-2",
+            "client-id-2",
+            "Fabrikam Portal",
+            null,
+            false,
+            []);
+        await _dbContext.AddRangeAsync(matching, other);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Preview(
+            new PreviewDeviceRuleFilterRequest("Application", SerializeJson(BuildSoftwareFilter("Name", "Contoso Portal"))),
             CancellationToken.None
         );
 
@@ -183,7 +335,7 @@ public class DeviceRulesControllerTests : IDisposable
             ),
         };
         var createAction = await _controller.Create(
-            new CreateDeviceRuleRequest("Tag Device-A", null, SerializeJson(filter), SerializeJson(operations)),
+            new CreateDeviceRuleRequest("Tag Device-A", null, "Device", SerializeJson(filter), SerializeJson(operations)),
             CancellationToken.None
         );
         var createdRule = createAction.Result.Should().BeOfType<CreatedAtActionResult>()
@@ -228,7 +380,7 @@ public class DeviceRulesControllerTests : IDisposable
             ),
         };
         var createAction = await _controller.Create(
-            new CreateDeviceRuleRequest("Tag Device-A", null, SerializeJson(filter), SerializeJson(operations)),
+            new CreateDeviceRuleRequest("Tag Device-A", null, "Device", SerializeJson(filter), SerializeJson(operations)),
             CancellationToken.None
         );
         var createdRule = createAction.Result.Should().BeOfType<CreatedAtActionResult>()
@@ -272,6 +424,28 @@ public class DeviceRulesControllerTests : IDisposable
         action.Result.Should().BeOfType<NotFoundResult>();
     }
 
+    [Fact]
+    public async Task Run_RecordsExecutionForSoftwareRules()
+    {
+        var rule = DeviceRule.Create(
+            _tenantId,
+            "Software inventory",
+            null,
+            1,
+            "Software",
+            BuildSoftwareFilter("Vendor", "Contoso"),
+            new List<AssetRuleOperation>());
+        await _dbContext.DeviceRules.AddAsync(rule);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.Run(CancellationToken.None);
+
+        action.Should().BeOfType<NoContentResult>();
+
+        var stored = await _dbContext.DeviceRules.SingleAsync(r => r.Id == rule.Id);
+        stored.LastExecutedAt.Should().NotBeNull();
+    }
+
     private Device CreateDevice(string externalId, string name, Criticality criticality)
     {
         return Device.Create(_tenantId, _sourceSystemId, externalId, name, criticality);
@@ -284,6 +458,7 @@ public class DeviceRulesControllerTests : IDisposable
             name,
             null,
             priority,
+            "Device",
             BuildNameFilter("unused"),
             new List<AssetRuleOperation>
             {
@@ -293,11 +468,17 @@ public class DeviceRulesControllerTests : IDisposable
     }
 
     private static FilterNode BuildNameFilter(string name) =>
+        BuildFilter("Name", name);
+
+    private static FilterNode BuildSoftwareFilter(string field, string value) =>
+        BuildFilter(field, value);
+
+    private static FilterNode BuildFilter(string field, string value) =>
         new FilterGroup(
             "AND",
             new List<FilterNode>
             {
-                new FilterCondition("Name", "Equals", name),
+                new FilterCondition(field, "Equals", value),
             }
         );
 

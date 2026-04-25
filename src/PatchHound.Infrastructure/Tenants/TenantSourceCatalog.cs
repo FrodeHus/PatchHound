@@ -1,4 +1,5 @@
 using PatchHound.Core.Entities;
+using PatchHound.Infrastructure.Credentials;
 
 namespace PatchHound.Infrastructure.Tenants;
 
@@ -52,9 +53,20 @@ public static class TenantSourceCatalog
         if (!string.IsNullOrWhiteSpace(source.LinkedSourceKey))
             return true;
 
+        if (source.StoredCredentialId.HasValue)
+            return true;
+
         return !string.IsNullOrWhiteSpace(source.CredentialTenantId)
             && !string.IsNullOrWhiteSpace(source.ClientId)
             && !string.IsNullOrWhiteSpace(source.SecretRef);
+    }
+
+    public static IReadOnlyList<string> GetAcceptedCredentialTypes(string sourceKey)
+    {
+        return string.Equals(sourceKey, DefenderSourceKey, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(sourceKey, EntraApplicationsSourceKey, StringComparison.OrdinalIgnoreCase)
+                ? [StoredCredentialTypes.EntraClientSecret]
+                : [];
     }
 
     public static bool SupportsScheduling(TenantSourceConfiguration source) =>

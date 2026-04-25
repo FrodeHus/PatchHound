@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { authMiddleware } from '@/server/middleware'
-import { apiGet, apiPost } from '@/server/api'
+import { apiGet, apiPost, apiPut } from '@/server/api'
 import {
   tenantSoftwareDetailSchema,
   tenantSoftwareAiReportSchema,
@@ -19,6 +19,13 @@ export const fetchTenantSoftwareDetail = createServerFn({ method: 'GET' })
   .handler(async ({ context, data: { id } }) => {
     const data = await apiGet(`/software/${id}`, context)
     return tenantSoftwareDetailSchema.parse(data)
+  })
+
+export const assignTenantSoftwareOwner = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ id: z.string().uuid(), teamId: z.string().uuid().nullable() }))
+  .handler(async ({ context, data: { id, teamId } }) => {
+    await apiPut(`/software/${id}/owner`, context, { teamId })
   })
 
 export const fetchTenantSoftware = createServerFn({ method: 'GET' })

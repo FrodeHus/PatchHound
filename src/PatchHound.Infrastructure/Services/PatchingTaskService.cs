@@ -27,9 +27,7 @@ public class PatchingTaskService(
 
     public async Task<int> EnsurePatchingTasksAsync(RemediationDecision decision, CancellationToken ct)
     {
-        // TODO Phase 5: group patching tasks by device owner team once DeviceVulnerabilityExposure
-        // is available for this case. For now, create a single patching task for the default team.
-        var defaultTeamId = (await DefaultTeamHelper.EnsureDefaultTeamAsync(dbContext, decision.TenantId, ct)).Id;
+        var ownerTeamId = await ResolveTaskOwnerTeamIdAsync(decision, ct);
 
         var tenantSla = await dbContext.TenantSlaConfigurations
             .IgnoreQueryFilters()
@@ -63,7 +61,7 @@ public class PatchingTaskService(
             .AnyAsync(task =>
                 task.TenantId == decision.TenantId
                 && task.RemediationCaseId == decision.RemediationCaseId
-                && task.OwnerTeamId == defaultTeamId
+                && task.OwnerTeamId == ownerTeamId
                 && task.Status != PatchingTaskStatus.Completed,
                 ct);
 
@@ -74,7 +72,7 @@ public class PatchingTaskService(
             decision.TenantId,
             decision.RemediationCaseId,
             decision.Id,
-            defaultTeamId,
+            ownerTeamId,
             dueDate
         );
 
@@ -112,5 +110,39 @@ public class PatchingTaskService(
         );
 
         return 1;
+    }
+
+    private async Task<Guid> ResolveTaskOwnerTeamIdAsync(
+        RemediationDecision decision,
+        CancellationToken ct
+    )
+    {
+        var workflowOwnerTeamId = decision.RemediationWorkflowId.HasValue
+            ? await dbContext.RemediationWorkflows
+                .AsNoTracking()
+                .Where(item => item.Id == decision.RemediationWorkflowId.Value)
+                .Select(item => (Guid?)item.SoftwareOwnerTeamId)
+                .FirstOrDefaultAsync(ct)
+            : await dbContext.RemediationWorkflows
+                .AsNoTracking()
+                .Where(item =>
+                    item.TenantId == decision.TenantId
+                    && item.RemediationCaseId == decision.RemediationCaseId
+                    && item.Status == RemediationWorkflowStatus.Active
+                )
+                .OrderByDescending(item => item.CreatedAt)
+                .Select(item => (Guid?)item.SoftwareOwnerTeamId)
+                .FirstOrDefaultAsync(ct);
+
+        if (workflowOwnerTeamId.HasValue && workflowOwnerTeamId.Value != Guid.Empty)
+        {
+            return workflowOwnerTeamId.Value;
+        }
+
+        return (await DefaultTeamHelper.EnsureDefaultTeamAsync(
+            dbContext,
+            decision.TenantId,
+            ct
+        )).Id;
     }
 }

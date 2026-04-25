@@ -6,6 +6,8 @@ public class SoftwareTenantRecord
     public Guid TenantId { get; private set; }
     public Guid? SnapshotId { get; private set; }
     public Guid SoftwareProductId { get; private set; }
+    public Guid? OwnerTeamId { get; private set; }
+    public Guid? OwnerTeamRuleId { get; private set; }
     public DateTimeOffset FirstSeenAt { get; private set; }
     public DateTimeOffset LastSeenAt { get; private set; }
     public string RemediationAiSummaryContent { get; private set; } = string.Empty;
@@ -60,6 +62,32 @@ public class SoftwareTenantRecord
     public void AssignSnapshot(Guid? snapshotId)
     {
         SnapshotId = snapshotId;
+    }
+
+    public void AssignOwnerTeam(Guid? teamId)
+    {
+        OwnerTeamId = teamId;
+        OwnerTeamRuleId = null;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void AssignOwnerTeamFromRule(Guid? teamId, Guid ruleId)
+    {
+        OwnerTeamId = teamId;
+        OwnerTeamRuleId = teamId.HasValue ? ruleId : null;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void ClearRuleAssignedOwnerTeam(Guid ruleId)
+    {
+        if (OwnerTeamRuleId != ruleId)
+        {
+            return;
+        }
+
+        OwnerTeamId = null;
+        OwnerTeamRuleId = null;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void StoreRemediationAiSummary(

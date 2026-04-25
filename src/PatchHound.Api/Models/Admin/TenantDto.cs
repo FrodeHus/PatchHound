@@ -45,6 +45,8 @@ public record TenantIngestionSourceDto(
 );
 
 public record TenantSourceCredentialsDto(
+    Guid? StoredCredentialId,
+    IReadOnlyList<string> AcceptedCredentialTypes,
     string ClientId,
     bool HasSecret,
     string ApiBaseUrl,
@@ -121,6 +123,7 @@ public record UpdateTenantIngestionSourceRequest(
 );
 
 public record UpdateTenantSourceCredentialsRequest(
+    Guid? StoredCredentialId,
     string ClientId,
     string Secret,
     string ApiBaseUrl,

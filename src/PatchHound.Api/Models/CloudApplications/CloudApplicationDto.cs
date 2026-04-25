@@ -4,6 +4,10 @@ public record CloudApplicationListItemDto(
     Guid Id,
     string Name,
     string? Description,
+    Guid? OwnerTeamId,
+    string? OwnerTeamName,
+    bool OwnerTeamManagedByRule,
+    string OwnerAssignmentSource,
     int CredentialCount,
     int ExpiredCredentialCount,
     int ExpiringCredentialCount,
@@ -20,6 +24,8 @@ public record CloudApplicationDetailDto(
     IReadOnlyList<string> RedirectUris,
     Guid? OwnerTeamId,
     string? OwnerTeamName,
+    bool OwnerTeamManagedByRule,
+    string OwnerAssignmentSource,
     IReadOnlyList<CloudApplicationCredentialDto> Credentials
 );
 

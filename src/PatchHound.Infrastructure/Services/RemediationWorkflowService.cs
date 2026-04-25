@@ -3,6 +3,7 @@ using PatchHound.Core.Common;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Infrastructure.Services;
 
@@ -14,6 +15,14 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
         CancellationToken ct
     )
     {
+        var localExisting = dbContext.RemediationWorkflows.Local
+            .FirstOrDefault(workflow =>
+                workflow.TenantId == tenantId
+                && workflow.RemediationCaseId == remediationCaseId
+                && workflow.Status == RemediationWorkflowStatus.Active);
+        if (localExisting is not null)
+            return localExisting;
+
         var existing = await dbContext.RemediationWorkflows
             .FirstOrDefaultAsync(workflow =>
                 workflow.TenantId == tenantId
@@ -23,7 +32,11 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
         if (existing is not null)
             return existing;
 
-        var softwareOwnerTeamId = await ResolveSoftwareOwnerTeamIdAsync(tenantId, ct);
+        var softwareOwnerTeamId = await ResolveSoftwareOwnerTeamIdAsync(
+            tenantId,
+            remediationCaseId,
+            ct
+        );
         var previousWorkflow = await dbContext.RemediationWorkflows.AsNoTracking()
             .Where(item =>
                 item.TenantId == tenantId
@@ -547,14 +560,64 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
 
     /// <summary>
     /// Resolves the software owner team for a remediation workflow.
-    /// TODO Phase 5: wire this to device owner teams via DeviceVulnerabilityExposure once
-    /// the canonical exposure model is available. For now falls back to the tenant default team.
+    /// Prefers tenant-scoped software ownership from SoftwareTenantRecord and falls back
+    /// to the tenant default team when no owner has been assigned for the software.
     /// </summary>
     private async Task<Guid> ResolveSoftwareOwnerTeamIdAsync(
         Guid tenantId,
+        Guid remediationCaseId,
         CancellationToken ct
     )
     {
+        var softwareProductId = await dbContext.RemediationCases
+            .AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.Id == remediationCaseId)
+            .Select(item => (Guid?)item.SoftwareProductId)
+            .FirstOrDefaultAsync(ct);
+
+        if (softwareProductId.HasValue)
+        {
+            var activeSnapshotId = await dbContext.TenantSourceConfigurations
+                .AsNoTracking()
+                .Where(item =>
+                    item.TenantId == tenantId
+                    && item.SourceKey == TenantSourceCatalog.DefenderSourceKey
+                )
+                .Select(item => item.ActiveSnapshotId)
+                .FirstOrDefaultAsync(ct);
+
+            var softwareRows = await dbContext.SoftwareTenantRecords
+                .AsNoTracking()
+                .Where(item =>
+                    item.TenantId == tenantId
+                    && item.SoftwareProductId == softwareProductId.Value
+                )
+                .Select(item => new
+                {
+                    item.OwnerTeamId,
+                    item.SnapshotId,
+                    item.LastSeenAt,
+                    item.UpdatedAt,
+                })
+                .ToListAsync(ct);
+
+            var resolvedOwnerTeamId = softwareRows
+                .OrderByDescending(item =>
+                    activeSnapshotId.HasValue
+                        ? item.SnapshotId == activeSnapshotId.Value
+                        : item.SnapshotId == null
+                )
+                .ThenByDescending(item => item.LastSeenAt)
+                .ThenByDescending(item => item.UpdatedAt)
+                .Select(item => item.OwnerTeamId)
+                .FirstOrDefault(item => item.HasValue);
+
+            if (resolvedOwnerTeamId.HasValue)
+            {
+                return resolvedOwnerTeamId.Value;
+            }
+        }
+
         var defaultTeam = await DefaultTeamHelper.EnsureDefaultTeamAsync(dbContext, tenantId, ct);
         return defaultTeam.Id;
     }

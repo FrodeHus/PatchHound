@@ -18,7 +18,7 @@ public class ScanRunCompletionServiceTests : IAsyncLifetime
     private readonly Guid _tenantId = Guid.NewGuid();
     private ScanProfile _profile = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.CurrentTenantId.Returns(_tenantId);
@@ -40,7 +40,7 @@ public class ScanRunCompletionServiceTests : IAsyncLifetime
         _sut = new ScanRunCompletionService(_db);
     }
 
-    public Task DisposeAsync() { _db.Dispose(); return Task.CompletedTask; }
+    public ValueTask DisposeAsync() { _db.Dispose(); return ValueTask.CompletedTask; }
 
     private AuthenticatedScanRun CreateRun()
     {

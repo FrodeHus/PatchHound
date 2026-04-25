@@ -24,6 +24,10 @@ export const tenantSoftwareDetailSchema = z.object({
   descriptionProviderType: z.string().nullable(),
   descriptionProfileName: z.string().nullable(),
   descriptionModel: z.string().nullable(),
+  ownerTeamId: z.string().uuid().nullable(),
+  ownerTeamName: z.string().nullable(),
+  ownerTeamManagedByRule: z.boolean(),
+  ownerAssignmentSource: z.string(),
   firstSeenAt: isoDateTimeSchema.nullable(),
   lastSeenAt: isoDateTimeSchema.nullable(),
   activeInstallCount: z.number(),
@@ -91,6 +95,10 @@ export const tenantSoftwareListItemSchema = z.object({
   exposureImpactScore: z.number().nullable(),
   lastSeenAt: isoDateTimeSchema.nullable(),
   maintenanceWindowDate: isoDateTimeSchema.nullable(),
+  ownerTeamId: z.string().uuid().nullable(),
+  ownerTeamName: z.string().nullable(),
+  ownerTeamManagedByRule: z.boolean(),
+  ownerAssignmentSource: z.string(),
 })
 
 export const tenantSoftwareInstallationSchema = z.object({

@@ -17,7 +17,7 @@ namespace PatchHound.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -919,6 +919,9 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<Guid?>("OwnerTeamId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("OwnerTeamRuleId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("RedirectUris")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1145,6 +1148,9 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<Guid?>("OwnerTeamId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("OwnerTeamRuleId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("OwnerType")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -1364,6 +1370,11 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1776,12 +1787,17 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<Guid?>("StoredCredentialId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ActiveEnrichmentRunId");
 
                     b.HasIndex("SourceKey")
                         .IsUnique();
+
+                    b.HasIndex("StoredCredentialId");
 
                     b.ToTable("EnrichmentSourceConfigurations");
                 });
@@ -2808,11 +2824,6 @@ namespace PatchHound.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ClientId")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
                     b.Property<string>("DceEndpoint")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -2826,25 +2837,20 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("SecretRef")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                    b.Property<Guid?>("StoredCredentialId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("StreamName")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.Property<string>("TenantId")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("StoredCredentialId");
 
                     b.ToTable("SentinelConnectorConfigurations");
                 });
@@ -3303,6 +3309,12 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("LastSeenAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("OwnerTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("OwnerTeamRuleId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("RemediationAiAnalystAssessmentContent")
                         .IsRequired()
                         .HasColumnType("text");
@@ -3369,6 +3381,8 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OwnerTeamId");
 
                     b.HasIndex("SnapshotId");
 
@@ -3672,6 +3686,70 @@ namespace PatchHound.Infrastructure.Migrations
                     b.HasIndex("IngestionRunId", "TenantId", "SourceKey", "VulnerabilityExternalId", "AssetExternalId");
 
                     b.ToTable("StagedVulnerabilityExposures");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.StoredCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CredentialTenantId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("IsGlobal")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("SecretRef")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsGlobal");
+
+                    b.HasIndex("Type");
+
+                    b.ToTable("StoredCredentials");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.StoredCredentialTenant", b =>
+                {
+                    b.Property<Guid>("StoredCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("StoredCredentialId", "TenantId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("StoredCredentialTenants");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.Team", b =>
@@ -4192,6 +4270,9 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<Guid?>("StoredCredentialId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("SyncSchedule")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -4210,6 +4291,8 @@ namespace PatchHound.Infrastructure.Migrations
                     b.HasIndex("ActiveSnapshotId");
 
                     b.HasIndex("BuildingSnapshotId");
+
+                    b.HasIndex("StoredCredentialId");
 
                     b.HasIndex("TenantId", "SourceKey")
                         .IsUnique();
@@ -4902,6 +4985,14 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Navigation("Vulnerability");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.EnrichmentSourceConfiguration", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.StoredCredential", null)
+                        .WithMany()
+                        .HasForeignKey("StoredCredentialId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.ExposureAssessment", b =>
                 {
                     b.HasOne("PatchHound.Core.Entities.DeviceVulnerabilityExposure", "Exposure")
@@ -5087,6 +5178,16 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Navigation("RemediationCase");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.SentinelConnectorConfiguration", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.StoredCredential", "StoredCredential")
+                        .WithMany()
+                        .HasForeignKey("StoredCredentialId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("StoredCredential");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.SoftwareAlias", b =>
                 {
                     b.HasOne("PatchHound.Core.Entities.SoftwareProduct", null)
@@ -5165,6 +5266,25 @@ namespace PatchHound.Infrastructure.Migrations
                     b.Navigation("SoftwareProduct");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.StoredCredentialTenant", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.StoredCredential", "StoredCredential")
+                        .WithMany("TenantScopes")
+                        .HasForeignKey("StoredCredentialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PatchHound.Core.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("StoredCredential");
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.TeamMember", b =>
                 {
                     b.HasOne("PatchHound.Core.Entities.Team", "Team")
@@ -5213,6 +5333,14 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasForeignKey("SoftwareProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.TenantSourceConfiguration", b =>
+                {
+                    b.HasOne("PatchHound.Core.Entities.StoredCredential", null)
+                        .WithMany()
+                        .HasForeignKey("StoredCredentialId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.ThreatAssessment", b =>
@@ -5333,6 +5461,11 @@ namespace PatchHound.Infrastructure.Migrations
             modelBuilder.Entity("PatchHound.Core.Entities.RemediationWorkflow", b =>
                 {
                     b.Navigation("StageRecords");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.StoredCredential", b =>
+                {
+                    b.Navigation("TenantScopes");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.Team", b =>

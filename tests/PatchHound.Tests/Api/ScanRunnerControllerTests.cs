@@ -32,7 +32,7 @@ public class ScanRunnerControllerTests : IAsyncLifetime
     private ScanProfile _profile = null!;
     private Device _device = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.CurrentTenantId.Returns(_tenantId);
@@ -73,8 +73,7 @@ public class ScanRunnerControllerTests : IAsyncLifetime
         var deviceResolver = new DeviceResolver(_db);
         var softwareResolver = new SoftwareProductResolver(_db);
         var stagedDeviceMerge = new StagedDeviceMergeService(_db, deviceResolver, softwareResolver);
-        var resolver = new NormalizedSoftwareResolver(_db);
-        var projectionService = new NormalizedSoftwareProjectionService(_db, resolver);
+        var projectionService = new NormalizedSoftwareProjectionService(_db);
         var validator = new AuthenticatedScanOutputValidator();
         var ingestionService = new AuthenticatedScanIngestionService(_db, validator, stagedDeviceMerge, projectionService);
         var completionService = new ScanRunCompletionService(_db);
@@ -83,7 +82,7 @@ public class ScanRunnerControllerTests : IAsyncLifetime
         SetRunnerClaims(_runner.Id, _tenantId);
     }
 
-    public Task DisposeAsync() { _db.Dispose(); return Task.CompletedTask; }
+    public ValueTask DisposeAsync() { _db.Dispose(); return ValueTask.CompletedTask; }
 
     private void SetRunnerClaims(Guid runnerId, Guid tenantId)
     {

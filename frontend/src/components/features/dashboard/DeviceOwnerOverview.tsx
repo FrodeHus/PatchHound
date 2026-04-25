@@ -84,6 +84,32 @@ function actionStateLabel(value: string) {
   return value
 }
 
+function ownerAssignmentTone(value: string) {
+  switch (value) {
+    case 'Rule':
+      return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700'
+    case 'Manual':
+      return 'border-sky-500/25 bg-sky-500/10 text-sky-700'
+    case 'Default':
+      return 'border-border/70 bg-muted/50 text-muted-foreground'
+    default:
+      return 'border-amber-500/25 bg-amber-500/10 text-amber-700'
+  }
+}
+
+function formatOwnerRoutingDetail(ownerTeamName: string, ownerAssignmentSource: string) {
+  switch (ownerAssignmentSource) {
+    case 'Rule':
+      return `Rule managed by ${ownerTeamName}`
+    case 'Manual':
+      return `Manually assigned to ${ownerTeamName}`
+    case 'Default':
+      return `Defaulted to ${ownerTeamName}`
+    default:
+      return ownerTeamName
+  }
+}
+
 type ActionSort = 'urgency' | 'severity' | 'team'
 type ActionFilter = 'all' | 'overdue'
 type DeviceSort = 'risk' | 'name' | 'criticality'
@@ -270,6 +296,12 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                             >
                               {app.ownerTeamName}
                             </Badge>
+                            <Badge
+                              variant="outline"
+                              className={`rounded-full px-2 py-0.5 text-[11px] ${ownerAssignmentTone(app.ownerAssignmentSource)}`}
+                            >
+                              {app.ownerAssignmentSource}
+                            </Badge>
                             {app.expiredCredentialCount > 0 && (
                               <span className="rounded-full border border-destructive/30 bg-destructive/8 px-2 py-0.5 text-[11px] font-medium text-destructive">
                                 {app.expiredCredentialCount} expired
@@ -293,6 +325,9 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                             {app.expiredCredentialCount > 0
                               ? "This application has expired credentials that need to be rotated."
                               : "This application has credentials expiring within the next 7 days."}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {formatOwnerRoutingDetail(app.ownerTeamName, app.ownerAssignmentSource)}
                           </div>
                         </div>
                         <div className="text-right text-sm text-muted-foreground shrink-0">

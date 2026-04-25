@@ -143,8 +143,8 @@ export function DeviceManagementTable({
   onAssignOwner,
   onSetCriticality,
 }: DeviceManagementTableProps) {
-  const [ownerType, setOwnerType] = useState<"User" | "Team">("User");
-  const [ownerId, setOwnerId] = useState("");
+  const [ownerType, _setOwnerType] = useState<"User" | "Team">("User");
+  const [ownerId, _setOwnerId] = useState("");
   const [searchInput, setSearchInput] = useState(searchValue);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState({
@@ -722,36 +722,6 @@ export function DeviceManagementTable({
             onClearAll={onClearFilters}
             className="flex-1"
           />
-
-          <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-background/50 px-4 py-3 lg:min-w-[340px]">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Quick owner assignment
-            </p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Select
-                value={ownerType}
-                onValueChange={(value) => {
-                  setOwnerType(value === "Team" ? "Team" : "User");
-                }}
-              >
-                <SelectTrigger className="h-9 min-w-[150px] rounded-xl border-border/70 bg-background/80 px-3">
-                  <SelectValue placeholder="Owner type" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
-                  <SelectItem value="User">User</SelectItem>
-                  <SelectItem value="Team">Assignment group</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                value={ownerId}
-                onChange={(event) => {
-                  setOwnerId(event.target.value);
-                }}
-                placeholder="Owner or assignment group ID"
-                className="h-9 rounded-xl border-border/70 bg-background/80"
-              />
-            </div>
-          </div>
         </DataTableToolbarRow>
       </DataTableToolbar>
 

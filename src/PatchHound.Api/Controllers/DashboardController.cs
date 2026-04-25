@@ -538,6 +538,7 @@ public class DashboardController : ControllerBase
                     app.Name,
                     app.AppId,
                     team.Name,
+                    app.OwnerTeamRuleId != null ? "Rule" : "Manual",
                     app.Credentials.Count(c => c.ExpiresAt < now),
                     app.Credentials.Count(c => c.ExpiresAt >= now && c.ExpiresAt <= credentialSoonThreshold),
                     app.Credentials
@@ -809,8 +810,6 @@ public class DashboardController : ControllerBase
                 on task.RemediationCaseId equals rc.Id
             join sp in _dbContext.SoftwareProducts.AsNoTracking()
                 on rc.SoftwareProductId equals sp.Id
-            join ownerTeam in _dbContext.Teams.AsNoTracking()
-                on task.OwnerTeamId equals ownerTeam.Id
             where task.TenantId == tenantId
                   && task.Status != PatchingTaskStatus.Completed
                   && decision.Outcome == RemediationOutcome.ApprovedForPatching
@@ -821,8 +820,9 @@ public class DashboardController : ControllerBase
                 task.Id,
                 task.RemediationDecisionId,
                 RemediationCaseId = task.RemediationCaseId,
+                rc.SoftwareProductId,
                 SoftwareName = sp.Name,
-                OwnerTeamName = ownerTeam.Name,
+                task.OwnerTeamId,
                 task.DueDate,
                 task.Status,
                 task.CreatedAt,
@@ -837,6 +837,63 @@ public class DashboardController : ControllerBase
             tenantId,
             approvedPatchingTasks.Select(item => item.RemediationCaseId).Distinct().ToList(),
             ct);
+
+        var remediationCaseIds = approvedPatchingTasks.Select(item => item.RemediationCaseId).Distinct().ToList();
+        var activeWorkflowOwnerTeams = remediationCaseIds.Count == 0
+            ? []
+            : await _dbContext.RemediationWorkflows.AsNoTracking()
+                .Where(workflow => workflow.TenantId == tenantId
+                    && remediationCaseIds.Contains(workflow.RemediationCaseId)
+                    && workflow.Status == RemediationWorkflowStatus.Active)
+                .Select(workflow => new
+                {
+                    workflow.RemediationCaseId,
+                    workflow.SoftwareOwnerTeamId,
+                    workflow.UpdatedAt,
+                })
+                .ToListAsync(ct);
+        var activeWorkflowOwnerTeamIds = activeWorkflowOwnerTeams
+            .GroupBy(item => item.RemediationCaseId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(item => item.UpdatedAt)
+                    .First()
+                    .SoftwareOwnerTeamId);
+
+        var softwareProductIds = approvedPatchingTasks.Select(item => item.SoftwareProductId).Distinct().ToList();
+        var tenantSoftwareRows = softwareProductIds.Count == 0
+            ? []
+            : await _dbContext.SoftwareTenantRecords.AsNoTracking()
+                .Where(item => item.TenantId == tenantId && softwareProductIds.Contains(item.SoftwareProductId))
+                .Select(item => new
+                {
+                    item.SoftwareProductId,
+                    item.OwnerTeamId,
+                    item.OwnerTeamRuleId,
+                    item.LastSeenAt,
+                    item.UpdatedAt,
+                })
+                .ToListAsync(ct);
+        var tenantSoftwareByProductId = tenantSoftwareRows
+            .GroupBy(item => item.SoftwareProductId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(item => item.LastSeenAt)
+                    .ThenByDescending(item => item.UpdatedAt)
+                    .First());
+
+        var effectiveOwnerTeamIds = approvedPatchingTasks
+            .Select(item => activeWorkflowOwnerTeamIds.GetValueOrDefault(item.RemediationCaseId, item.OwnerTeamId))
+            .Where(teamId => teamId != Guid.Empty)
+            .Distinct()
+            .ToList();
+        var ownerTeamNames = effectiveOwnerTeamIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _dbContext.Teams.AsNoTracking()
+                .Where(team => effectiveOwnerTeamIds.Contains(team.Id))
+                .ToDictionaryAsync(team => team.Id, team => team.Name, ct);
 
         var now = DateTimeOffset.UtcNow;
         var missedMaintenanceWindowCount = await (
@@ -904,12 +961,25 @@ public class DashboardController : ControllerBase
             approvedPatchingTasks.Select(item =>
             {
                 var stats = patchingSoftwareStats.GetValueOrDefault(item.RemediationCaseId);
+                var hasWorkflowOwnerTeam = activeWorkflowOwnerTeamIds.TryGetValue(item.RemediationCaseId, out var workflowOwnerTeamId);
+                var effectiveOwnerTeamId = hasWorkflowOwnerTeam ? workflowOwnerTeamId : item.OwnerTeamId;
+                tenantSoftwareByProductId.TryGetValue(item.SoftwareProductId, out var tenantSoftware);
+                var ownerAssignmentSource = !hasWorkflowOwnerTeam || tenantSoftware?.OwnerTeamId == null
+                    ? "Default"
+                    : tenantSoftware.OwnerTeamRuleId != null
+                        ? "Rule"
+                        : "Manual";
+                var ownerTeamName = effectiveOwnerTeamId != Guid.Empty
+                    && ownerTeamNames.TryGetValue(effectiveOwnerTeamId, out var resolvedOwnerTeamName)
+                        ? resolvedOwnerTeamName
+                        : "Default";
                 return new ApprovedPatchingTaskDto(
                     item.Id,
                     item.RemediationDecisionId,
                     item.RemediationCaseId,
                     item.SoftwareName,
-                    item.OwnerTeamName,
+                    ownerTeamName,
+                    ownerAssignmentSource,
                     stats?.HighestSeverity ?? "Unknown",
                     stats?.AffectedDeviceCount ?? 0,
                     item.ApprovedAt ?? item.CreatedAt,

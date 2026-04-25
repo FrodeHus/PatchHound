@@ -189,6 +189,7 @@ public record OwnerCloudAppActionDto(
     string AppName,
     string? AppId,
     string OwnerTeamName,
+    string OwnerAssignmentSource,
     int ExpiredCredentialCount,
     int ExpiringCredentialCount,
     DateTimeOffset? NearestExpiryAt
@@ -231,6 +232,7 @@ public record ApprovedPatchingTaskDto(
     Guid RemediationCaseId,
     string SoftwareName,
     string OwnerTeamName,
+    string OwnerAssignmentSource,
     string HighestSeverity,
     int AffectedDeviceCount,
     DateTimeOffset ApprovedAt,

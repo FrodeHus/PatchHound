@@ -17,7 +17,7 @@ public class ScanningToolVersionStoreTests : IAsyncLifetime
     private readonly Guid _tenantId = Guid.NewGuid();
     private readonly Guid _userId = Guid.NewGuid();
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.CurrentTenantId.Returns(_tenantId);
@@ -35,10 +35,10 @@ public class ScanningToolVersionStoreTests : IAsyncLifetime
         _sut = new ScanningToolVersionStore(_db);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _db.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]

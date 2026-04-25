@@ -177,6 +177,7 @@ public static class DependencyInjection
             .AddHttpClient<ISecretStore, OpenBaoSecretStore>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 4);
         services.AddScoped<DefenderTenantConfigurationProvider>();
+        services.AddScoped<PatchHound.Infrastructure.Credentials.StoredCredentialResolver>();
         services.AddScoped<EntraApplicationsConfigurationProvider>();
         services
             .AddHttpClient<EntraGraphApiClient>()
@@ -189,6 +190,7 @@ public static class DependencyInjection
 
         // Device Rules
         services.AddScoped<DeviceRuleFilterBuilder>();
+        services.AddScoped<SoftwareRuleFilterBuilder>();
         services.AddScoped<IDeviceRuleEvaluationService, DeviceRuleEvaluationService>();
 
         // Inventory resolvers & staged-device merge (needed by IngestionService + AuthenticatedScanIngestionService)
