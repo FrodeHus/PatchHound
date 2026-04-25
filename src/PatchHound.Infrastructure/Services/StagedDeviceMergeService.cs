@@ -59,10 +59,13 @@ public class StagedDeviceMergeService(
                 && s.AssetType == AssetType.Software
             )
             .ToListAsync(ct);
-        var stagedSoftwareByExternalId = stagedSoftware.ToDictionary(
-            s => s.ExternalId,
-            StringComparer.Ordinal
-        );
+        var stagedSoftwareByExternalId = stagedSoftware
+            .GroupBy(s => s.ExternalId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(item => item.StagedAt).First(),
+                StringComparer.OrdinalIgnoreCase
+            );
 
         // 3. Load all device-software links for this run+tenant and group by
         //    device external id.

@@ -83,6 +83,46 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Merge_creates_installed_software_for_each_device_linked_to_same_software()
+    {
+        var runId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        const string softwareExternalId = "defender-sw::contoso_agent::1.2.3";
+
+        for (var i = 1; i <= 3; i++)
+        {
+            await SeedStagedDeviceWithSoftwareAsync(
+                runId: runId,
+                tenantId: tenantId,
+                deviceExternalId: $"dev-00{i}",
+                deviceName: $"workstation-0{i}",
+                softwareExternalId: softwareExternalId,
+                softwareAssetName: "Contoso Agent 1.2.3",
+                vendor: "Contoso",
+                productName: "Agent",
+                version: "1.2.3"
+            );
+        }
+
+        var summary = await _sut.MergeAsync(runId, tenantId, CancellationToken.None);
+
+        summary.DevicesCreated.Should().Be(3);
+        summary.InstalledSoftwareCreated.Should().Be(3);
+
+        var devices = await _db.Devices.IgnoreQueryFilters().ToListAsync();
+        devices.Should().HaveCount(3);
+
+        var products = await _db.SoftwareProducts.ToListAsync();
+        products.Should().ContainSingle();
+
+        var installed = await _db.InstalledSoftware.IgnoreQueryFilters().ToListAsync();
+        installed.Should().HaveCount(3);
+        installed.Select(item => item.DeviceId).Should().BeEquivalentTo(devices.Select(device => device.Id));
+        installed.Select(item => item.SoftwareProductId).Distinct().Should().ContainSingle().Which.Should().Be(products[0].Id);
+        installed.Should().OnlyContain(item => item.Version == "1.2.3");
+    }
+
+    [Fact]
     public async Task Merge_is_idempotent_on_repeated_run()
     {
         var tenantId = Guid.NewGuid();
