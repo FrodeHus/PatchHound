@@ -2,6 +2,7 @@ using FluentAssertions;
 using NSubstitute;
 using PatchHound.Api.Services;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Tests.Infrastructure;
 
@@ -100,6 +101,42 @@ public class DashboardQueryServiceCanonicalTests : IAsyncDisposable
 
         result.ResolvedCount.Should().BeGreaterThan(0);
         result.Resolved.Should().NotBeEmpty();
+        result.Resolved.Single(item => item.VulnerabilityId == seed.ExposureA.VulnerabilityId)
+            .AffectedAssetCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task BuildRiskChangeBriefAsync_ResolvedItem_CountsAssetsFromClosedExposureEpisodes()
+    {
+        var seed = await CanonicalSeed.PlantAsync(_db, _tenantId);
+        var now = DateTimeOffset.UtcNow;
+
+        var secondExposure = DeviceVulnerabilityExposure.Observe(
+            _tenantId,
+            seed.DeviceB.Id,
+            seed.ExposureA.VulnerabilityId,
+            seed.ProductA.Id,
+            null,
+            "1.0.0",
+            ExposureMatchSource.Product,
+            now.AddHours(-2));
+        _db.DeviceVulnerabilityExposures.Add(secondExposure);
+        await _db.SaveChangesAsync();
+
+        var firstEpisode = ExposureEpisode.Open(_tenantId, seed.ExposureA.Id, 1, now.AddHours(-2));
+        var secondEpisode = ExposureEpisode.Open(_tenantId, secondExposure.Id, 1, now.AddHours(-2));
+        firstEpisode.Close(now);
+        secondEpisode.Close(now);
+        _db.ExposureEpisodes.AddRange(firstEpisode, secondEpisode);
+        await _db.SaveChangesAsync();
+
+        var svc = CreateSut();
+        var result = await svc.BuildRiskChangeBriefAsync(
+            _tenantId, _tenantId, limit: null, highCriticalOnly: false,
+            CancellationToken.None, cutoffHours: 24);
+
+        result.Resolved.Single(item => item.VulnerabilityId == seed.ExposureA.VulnerabilityId)
+            .AffectedAssetCount.Should().Be(2);
     }
 
     // ── Test 5 ──────────────────────────────────────────────────────────────
