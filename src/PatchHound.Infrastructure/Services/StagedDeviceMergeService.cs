@@ -74,8 +74,8 @@ public class StagedDeviceMergeService(
             .Where(l => l.IngestionRunId == ingestionRunId && l.TenantId == tenantId)
             .ToListAsync(ct);
         var linksByDeviceExternalId = stagedLinks
-            .GroupBy(l => l.DeviceExternalId, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+            .GroupBy(l => l.DeviceExternalId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
         // 4. Source system key -> entity lookup. Keys are normalized lowercase.
         var sourceSystems = await db

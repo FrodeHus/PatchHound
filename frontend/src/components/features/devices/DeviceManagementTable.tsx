@@ -143,8 +143,8 @@ export function DeviceManagementTable({
   onAssignOwner,
   onSetCriticality,
 }: DeviceManagementTableProps) {
-  const [ownerType, setOwnerType] = useState<"User" | "Team">("User");
-  const [ownerId, setOwnerId] = useState("");
+  const [ownerType, _setOwnerType] = useState<"User" | "Team">("User");
+  const [ownerId, _setOwnerId] = useState("");
   const [searchInput, setSearchInput] = useState(searchValue);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState({
