@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Bell, Bot, Braces, Building2, ChevronRight, Flag, GitBranchPlus, Globe, Plug, ScanSearch, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
+import { Bell, Bot, Braces, Building2, ChevronRight, Flag, GitBranchPlus, Globe, KeyRound, Plug, ScanSearch, ShieldCheck, ShieldEllipsis, Tags, Users, Workflow, Wrench } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authed/admin/')({
@@ -37,6 +37,7 @@ type AdminArea = {
     | '/admin/platform/access'
     | '/admin/platform/security-profiles'
     | '/admin/platform/enrichment'
+    | '/admin/platform/credentials'
   roles: AdminRole[]
   icon: typeof Users
   featureFlag?: string
@@ -135,6 +136,13 @@ const adminSections: AdminSection[] = [
         to: '/admin/platform/enrichment',
         roles: ['GlobalAdmin'],
         icon: Globe,
+      },
+      {
+        title: 'Stored credentials',
+        description: 'Manage reusable credential references for tenant sources and shared platform integrations.',
+        to: '/admin/platform/credentials',
+        roles: ['GlobalAdmin'],
+        icon: KeyRound,
       },
       {
         title: 'Integrations',

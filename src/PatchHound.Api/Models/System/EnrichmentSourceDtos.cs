@@ -12,7 +12,12 @@ public record EnrichmentSourceDto(
     IReadOnlyList<EnrichmentRunDto> RecentRuns
 );
 
-public record EnrichmentSourceCredentialsDto(bool HasSecret, string ApiBaseUrl);
+public record EnrichmentSourceCredentialsDto(
+    Guid? StoredCredentialId,
+    IReadOnlyList<string> AcceptedCredentialTypes,
+    bool HasSecret,
+    string ApiBaseUrl
+);
 
 public record EnrichmentSourceRuntimeDto(
     DateTimeOffset? LastStartedAt,
@@ -51,4 +56,8 @@ public record UpdateEnrichmentSourceRequest(
     UpdateEnrichmentSourceCredentialsRequest Credentials
 );
 
-public record UpdateEnrichmentSourceCredentialsRequest(string Secret, string ApiBaseUrl);
+public record UpdateEnrichmentSourceCredentialsRequest(
+    Guid? StoredCredentialId,
+    string Secret,
+    string ApiBaseUrl
+);

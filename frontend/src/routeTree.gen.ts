@@ -63,6 +63,7 @@ import { Route as AuthedAdminPlatformNotificationsRouteImport } from './routes/_
 import { Route as AuthedAdminPlatformIntegrationsRouteImport } from './routes/_authed/admin/platform/integrations'
 import { Route as AuthedAdminPlatformFeatureFlagsRouteImport } from './routes/_authed/admin/platform/feature-flags'
 import { Route as AuthedAdminPlatformEnrichmentRouteImport } from './routes/_authed/admin/platform/enrichment'
+import { Route as AuthedAdminPlatformCredentialsRouteImport } from './routes/_authed/admin/platform/credentials'
 import { Route as AuthedAdminPlatformAiRouteImport } from './routes/_authed/admin/platform/ai'
 import { Route as AuthedAdminPlatformAdvancedToolsRouteImport } from './routes/_authed/admin/platform/advanced-tools'
 import { Route as AuthedAdminPlatformAccessRouteImport } from './routes/_authed/admin/platform/access'
@@ -359,6 +360,12 @@ const AuthedAdminPlatformEnrichmentRoute =
     path: '/admin/platform/enrichment',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedAdminPlatformCredentialsRoute =
+  AuthedAdminPlatformCredentialsRouteImport.update({
+    id: '/admin/platform/credentials',
+    path: '/admin/platform/credentials',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAdminPlatformAiRoute = AuthedAdminPlatformAiRouteImport.update({
   id: '/admin/platform/ai',
   path: '/admin/platform/ai',
@@ -429,6 +436,7 @@ export interface FileRoutesByFullPath {
   '/admin/platform/access': typeof AuthedAdminPlatformAccessRoute
   '/admin/platform/advanced-tools': typeof AuthedAdminPlatformAdvancedToolsRoute
   '/admin/platform/ai': typeof AuthedAdminPlatformAiRoute
+  '/admin/platform/credentials': typeof AuthedAdminPlatformCredentialsRoute
   '/admin/platform/enrichment': typeof AuthedAdminPlatformEnrichmentRoute
   '/admin/platform/feature-flags': typeof AuthedAdminPlatformFeatureFlagsRoute
   '/admin/platform/integrations': typeof AuthedAdminPlatformIntegrationsRoute
@@ -489,6 +497,7 @@ export interface FileRoutesByTo {
   '/admin/platform/access': typeof AuthedAdminPlatformAccessRoute
   '/admin/platform/advanced-tools': typeof AuthedAdminPlatformAdvancedToolsRoute
   '/admin/platform/ai': typeof AuthedAdminPlatformAiRoute
+  '/admin/platform/credentials': typeof AuthedAdminPlatformCredentialsRoute
   '/admin/platform/enrichment': typeof AuthedAdminPlatformEnrichmentRoute
   '/admin/platform/feature-flags': typeof AuthedAdminPlatformFeatureFlagsRoute
   '/admin/platform/integrations': typeof AuthedAdminPlatformIntegrationsRoute
@@ -551,6 +560,7 @@ export interface FileRoutesById {
   '/_authed/admin/platform/access': typeof AuthedAdminPlatformAccessRoute
   '/_authed/admin/platform/advanced-tools': typeof AuthedAdminPlatformAdvancedToolsRoute
   '/_authed/admin/platform/ai': typeof AuthedAdminPlatformAiRoute
+  '/_authed/admin/platform/credentials': typeof AuthedAdminPlatformCredentialsRoute
   '/_authed/admin/platform/enrichment': typeof AuthedAdminPlatformEnrichmentRoute
   '/_authed/admin/platform/feature-flags': typeof AuthedAdminPlatformFeatureFlagsRoute
   '/_authed/admin/platform/integrations': typeof AuthedAdminPlatformIntegrationsRoute
@@ -613,6 +623,7 @@ export interface FileRouteTypes {
     | '/admin/platform/access'
     | '/admin/platform/advanced-tools'
     | '/admin/platform/ai'
+    | '/admin/platform/credentials'
     | '/admin/platform/enrichment'
     | '/admin/platform/feature-flags'
     | '/admin/platform/integrations'
@@ -673,6 +684,7 @@ export interface FileRouteTypes {
     | '/admin/platform/access'
     | '/admin/platform/advanced-tools'
     | '/admin/platform/ai'
+    | '/admin/platform/credentials'
     | '/admin/platform/enrichment'
     | '/admin/platform/feature-flags'
     | '/admin/platform/integrations'
@@ -734,6 +746,7 @@ export interface FileRouteTypes {
     | '/_authed/admin/platform/access'
     | '/_authed/admin/platform/advanced-tools'
     | '/_authed/admin/platform/ai'
+    | '/_authed/admin/platform/credentials'
     | '/_authed/admin/platform/enrichment'
     | '/_authed/admin/platform/feature-flags'
     | '/_authed/admin/platform/integrations'
@@ -1147,6 +1160,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminPlatformEnrichmentRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/platform/credentials': {
+      id: '/_authed/admin/platform/credentials'
+      path: '/admin/platform/credentials'
+      fullPath: '/admin/platform/credentials'
+      preLoaderRoute: typeof AuthedAdminPlatformCredentialsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/admin/platform/ai': {
       id: '/_authed/admin/platform/ai'
       path: '/admin/platform/ai'
@@ -1232,6 +1252,7 @@ interface AuthedRouteChildren {
   AuthedAdminPlatformAccessRoute: typeof AuthedAdminPlatformAccessRoute
   AuthedAdminPlatformAdvancedToolsRoute: typeof AuthedAdminPlatformAdvancedToolsRoute
   AuthedAdminPlatformAiRoute: typeof AuthedAdminPlatformAiRoute
+  AuthedAdminPlatformCredentialsRoute: typeof AuthedAdminPlatformCredentialsRoute
   AuthedAdminPlatformEnrichmentRoute: typeof AuthedAdminPlatformEnrichmentRoute
   AuthedAdminPlatformFeatureFlagsRoute: typeof AuthedAdminPlatformFeatureFlagsRoute
   AuthedAdminPlatformIntegrationsRoute: typeof AuthedAdminPlatformIntegrationsRoute
@@ -1284,6 +1305,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminPlatformAccessRoute: AuthedAdminPlatformAccessRoute,
   AuthedAdminPlatformAdvancedToolsRoute: AuthedAdminPlatformAdvancedToolsRoute,
   AuthedAdminPlatformAiRoute: AuthedAdminPlatformAiRoute,
+  AuthedAdminPlatformCredentialsRoute: AuthedAdminPlatformCredentialsRoute,
   AuthedAdminPlatformEnrichmentRoute: AuthedAdminPlatformEnrichmentRoute,
   AuthedAdminPlatformFeatureFlagsRoute: AuthedAdminPlatformFeatureFlagsRoute,
   AuthedAdminPlatformIntegrationsRoute: AuthedAdminPlatformIntegrationsRoute,

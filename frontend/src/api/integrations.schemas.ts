@@ -6,9 +6,8 @@ export const sentinelConnectorSchema = z.object({
   dceEndpoint: z.string(),
   dcrImmutableId: z.string(),
   streamName: z.string(),
-  tenantId: z.string(),
-  clientId: z.string(),
-  hasSecret: z.boolean(),
+  storedCredentialId: z.string().uuid().nullable(),
+  acceptedCredentialTypes: z.array(z.string()),
   updatedAt: isoDateTimeSchema.nullable(),
 })
 
@@ -19,9 +18,7 @@ export const updateSentinelConnectorSchema = z.object({
   dceEndpoint: z.string().max(512),
   dcrImmutableId: z.string().max(256),
   streamName: z.string().max(256),
-  tenantId: z.string().max(128),
-  clientId: z.string().max(128),
-  clientSecret: z.string().nullable().optional(),
+  storedCredentialId: z.string().uuid().nullable(),
 })
 
 export type UpdateSentinelConnectorInput = z.infer<typeof updateSentinelConnectorSchema>

@@ -8,8 +8,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Models;
+using PatchHound.Infrastructure.Credentials;
 using PatchHound.Infrastructure.Data;
-using PatchHound.Infrastructure.Secrets;
 
 namespace PatchHound.Infrastructure.Services;
 
@@ -33,6 +33,7 @@ public sealed class SentinelConnectorWorker : BackgroundService
     private IConfidentialClientApplication? _msalApp;
     private string _cachedClientId = string.Empty;
     private string _cachedTenantId = string.Empty;
+    private Guid? _cachedStoredCredentialId;
 
     public SentinelConnectorWorker(
         SentinelAuditQueue queue,
@@ -56,6 +57,13 @@ public sealed class SentinelConnectorWorker : BackgroundService
             var config = await LoadConfigAsync(stoppingToken);
 
             if (config is null || !config.Enabled)
+            {
+                await DrainAsync(stoppingToken);
+                await DelayOrDrain(ConfigPollInterval, stoppingToken);
+                continue;
+            }
+
+            if (!config.StoredCredentialId.HasValue)
             {
                 await DrainAsync(stoppingToken);
                 await DelayOrDrain(ConfigPollInterval, stoppingToken);
@@ -163,37 +171,41 @@ public sealed class SentinelConnectorWorker : BackgroundService
         CancellationToken ct
     )
     {
+        var credential = await LoadCredentialAsync(config, ct);
         if (
             _msalApp is null
-            || _cachedClientId != config.ClientId
-            || _cachedTenantId != config.TenantId
+            || _cachedStoredCredentialId != config.StoredCredentialId
+            || _cachedClientId != credential.ClientId
+            || _cachedTenantId != credential.TenantId
         )
         {
-            var secret = await LoadClientSecretAsync(config, ct);
             _msalApp = ConfidentialClientApplicationBuilder
-                .Create(config.ClientId)
-                .WithClientSecret(secret)
-                .WithAuthority($"https://login.microsoftonline.com/{config.TenantId}")
+                .Create(credential.ClientId)
+                .WithClientSecret(credential.ClientSecret)
+                .WithAuthority($"https://login.microsoftonline.com/{credential.TenantId}")
                 .Build();
-            _cachedClientId = config.ClientId;
-            _cachedTenantId = config.TenantId;
+            _cachedStoredCredentialId = config.StoredCredentialId;
+            _cachedClientId = credential.ClientId;
+            _cachedTenantId = credential.TenantId;
         }
 
         var result = await _msalApp.AcquireTokenForClient(MonitorScope).ExecuteAsync(ct);
         return result.AccessToken;
     }
 
-    private async Task<string> LoadClientSecretAsync(
+    private async Task<EntraStoredCredential> LoadCredentialAsync(
         SentinelConnectorConfiguration config,
         CancellationToken ct
     )
     {
+        if (!config.StoredCredentialId.HasValue)
+            throw new InvalidOperationException("Sentinel connector requires a stored credential.");
+
         using var scope = _scopeFactory.CreateScope();
-        var secretStore = scope.ServiceProvider.GetRequiredService<ISecretStore>();
-        var value = await secretStore.GetSecretAsync(config.SecretRef, "clientSecret", ct);
-        return value
+        var resolver = scope.ServiceProvider.GetRequiredService<StoredCredentialResolver>();
+        return await resolver.ResolveGlobalEntraClientSecretAsync(config.StoredCredentialId.Value, ct)
             ?? throw new InvalidOperationException(
-                $"Client secret not found at vault path '{config.SecretRef}'"
+                $"Stored credential '{config.StoredCredentialId}' could not be resolved for Sentinel."
             );
     }
 

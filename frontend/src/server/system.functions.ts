@@ -43,6 +43,8 @@ const enrichmentSourceSchema = z.object({
   credentialMode: z.enum(['global-secret', 'tenant-source', 'no-credential']),
   refreshTtlHours: z.number().int().nullable(),
   credentials: z.object({
+    storedCredentialId: z.string().uuid().nullable().optional(),
+    acceptedCredentialTypes: z.array(z.string()).optional().default([]),
     hasSecret: z.boolean(),
     apiBaseUrl: z.string(),
   }),
@@ -155,6 +157,7 @@ export const updateEnrichmentSources = createServerFn({ method: 'POST' })
     enabled: z.boolean(),
     refreshTtlHours: z.number().int().nullable(),
     credentials: z.object({
+      storedCredentialId: z.string().uuid().nullable().optional(),
       secret: z.string(),
       apiBaseUrl: z.string(),
     }),

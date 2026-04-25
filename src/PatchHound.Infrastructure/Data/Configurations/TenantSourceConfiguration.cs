@@ -24,6 +24,7 @@ public class TenantSourceConfigurationConfiguration
         builder.Property(source => source.ActiveIngestionRunId);
         builder.Property(source => source.ActiveSnapshotId);
         builder.Property(source => source.BuildingSnapshotId);
+        builder.Property(source => source.StoredCredentialId);
         builder.Property(source => source.LeaseAcquiredAt);
         builder.Property(source => source.LeaseExpiresAt);
         builder.Property(source => source.LinkedSourceKey).HasMaxLength(128);
@@ -32,5 +33,11 @@ public class TenantSourceConfigurationConfiguration
 
         builder.HasIndex(source => source.ActiveSnapshotId);
         builder.HasIndex(source => source.BuildingSnapshotId);
+        builder.HasIndex(source => source.StoredCredentialId);
+
+        builder.HasOne<StoredCredential>()
+            .WithMany()
+            .HasForeignKey(source => source.StoredCredentialId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

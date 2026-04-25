@@ -11,6 +11,7 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Credentials;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Tenants;
 using PatchHound.Tests.TestData;
@@ -100,19 +101,25 @@ public class SetupControllerTests : IDisposable
             .SingleAsync(item => item.Id == defaultSource.Id);
 
         updatedSource.Enabled.Should().BeTrue();
-        updatedSource.CredentialTenantId.Should().Be("entra-tenant");
-        updatedSource.ClientId.Should().Be("client-id");
-        updatedSource.SecretRef.Should().Be(
-            $"tenants/{tenant.Id}/sources/{TenantSourceCatalog.DefenderSourceKey}"
-        );
+        updatedSource.CredentialTenantId.Should().BeEmpty();
+        updatedSource.ClientId.Should().BeEmpty();
+        updatedSource.SecretRef.Should().BeEmpty();
+        updatedSource.StoredCredentialId.Should().NotBeNull();
+
+        var credential = await _dbContext.StoredCredentials
+            .IgnoreQueryFilters()
+            .Include(item => item.TenantScopes)
+            .SingleAsync(item => item.Id == updatedSource.StoredCredentialId);
+        credential.CredentialTenantId.Should().Be("entra-tenant");
+        credential.ClientId.Should().Be("client-id");
+        credential.TenantScopes.Should().ContainSingle(scope => scope.TenantId == tenant.Id);
 
         await _secretStore
             .Received(1)
             .PutSecretAsync(
-                updatedSource.SecretRef,
+                credential.SecretRef,
                 Arg.Is<IReadOnlyDictionary<string, string>>(values =>
-                    values[TenantSourceCatalog.GetSecretKeyName(TenantSourceCatalog.DefenderSourceKey)]
-                    == "client-secret"
+                    values[StoredCredentialSecretKeys.ClientSecret] == "client-secret"
                 ),
                 Arg.Any<CancellationToken>()
             );

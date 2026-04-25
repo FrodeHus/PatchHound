@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
-import { useRouter } from "@tanstack/react-router";
-import { useMutation } from '@tanstack/react-query'
+import { Link, useRouter } from "@tanstack/react-router";
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, CircleHelp, Clock, PenSquare, RotateCw, Square, X } from 'lucide-react'
 import { abortTenantIngestionRun, triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
+import { createStoredCredential, fetchStoredCredentials } from '@/api/stored-credentials.functions'
 import type { TenantDetail, TenantIngestionSource } from '@/api/settings.schemas'
+import type { CreateStoredCredentialInput, StoredCredential } from '@/api/stored-credentials.schemas'
 import { SourceRunHistoryView } from '@/components/features/admin/SourceRunHistorySheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +22,21 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -62,6 +79,7 @@ export function TenantSourceManagement({
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
   const [syncingSourceKey, setSyncingSourceKey] = useState<string | null>(null)
   const [abortingRunId, setAbortingRunId] = useState<string | null>(null)
+  const [credentialDialogSourceKey, setCredentialDialogSourceKey] = useState<string | null>(null)
 
   const editingSource = useMemo(
     () => sources.find((source) => source.key === editingSourceKey) ?? null,
@@ -85,10 +103,12 @@ export function TenantSourceManagement({
             enabled: source.enabled,
             syncSchedule: source.syncSchedule,
             credentials: {
+              storedCredentialId: source.credentials.storedCredentialId ?? null,
               clientId: source.credentials.clientId,
               secret: source.credentials.secret,
               apiBaseUrl: source.credentials.apiBaseUrl,
               tokenScope: source.credentials.tokenScope,
+              linkedSourceKey: source.credentials.linkedSourceKey ?? null,
             },
           })),
         },
@@ -102,6 +122,36 @@ export function TenantSourceManagement({
     onError: (error) => {
       setSaveState('error')
       toast.error(getApiErrorMessage(error, 'Failed to save source configuration'))
+    },
+  })
+
+  const credentialQuery = useQuery({
+    queryKey: ['stored-credentials', tenant.id, 'entra-client-secret'],
+    queryFn: () => fetchStoredCredentials({ data: { tenantId: tenant.id, type: 'entra-client-secret' } }),
+    staleTime: 30_000,
+  })
+
+  const createCredentialMutation = useMutation({
+    mutationFn: createStoredCredential,
+    onSuccess: async (credential) => {
+      toast.success('Credential created')
+      if (credentialDialogSourceKey) {
+        updateSource(credentialDialogSourceKey, (current) => ({
+          ...current,
+          credentials: {
+            ...current.credentials,
+            storedCredentialId: credential.id,
+            clientId: '',
+            secret: '',
+            hasSecret: true,
+          },
+        }))
+      }
+      setCredentialDialogSourceKey(null)
+      await credentialQuery.refetch()
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to create credential'))
     },
   })
 
@@ -351,11 +401,14 @@ export function TenantSourceManagement({
             {editingSource ? (
               <TenantSourceEditorSheetContent
                 source={editingSource}
+                tenantId={tenant.id}
+                credentials={credentialQuery.data ?? []}
                 isSaving={mutation.isPending}
                 saveState={saveState}
                 onSave={() => mutation.mutate()}
                 onClose={onCloseEditor}
                 onUpdateSource={updateSource}
+                onCreateCredential={(sourceKey) => setCredentialDialogSourceKey(sourceKey)}
                 onViewHistory={() => {
                   onCloseEditor();
                   onOpenHistory(editingSource.key);
@@ -364,6 +417,15 @@ export function TenantSourceManagement({
             ) : null}
           </SheetContent>
         </Sheet>
+        <InlineCredentialDialog
+          open={credentialDialogSourceKey !== null}
+          tenantId={tenant.id}
+          isSubmitting={createCredentialMutation.isPending}
+          onOpenChange={(open) => {
+            if (!open) setCredentialDialogSourceKey(null)
+          }}
+          onSubmit={(input) => createCredentialMutation.mutate({ data: input })}
+        />
       </section>
     </TooltipProvider>
   );
@@ -373,14 +435,19 @@ export function TenantSourceManagement({
 
 function TenantSourceEditorSheetContent({
   source,
+  tenantId,
+  credentials,
   isSaving,
   saveState,
   onSave,
   onClose,
   onUpdateSource,
+  onCreateCredential,
   onViewHistory,
 }: {
   source: TenantIngestionSourceDraft;
+  tenantId: string;
+  credentials: StoredCredential[];
   isSaving: boolean;
   saveState: "idle" | "saved" | "error";
   onSave: () => void;
@@ -389,8 +456,17 @@ function TenantSourceEditorSheetContent({
     key: string,
     mutate: (current: TenantIngestionSourceDraft) => TenantIngestionSourceDraft,
   ) => void;
+  onCreateCredential: (sourceKey: string) => void;
   onViewHistory: () => void;
 }) {
+  const compatibleCredentials = credentials.filter((credential) =>
+    source.credentials.acceptedCredentialTypes?.includes(credential.type)
+    && (credential.isGlobal || credential.tenantIds.includes(tenantId))
+  )
+  const selectedCredential = compatibleCredentials.find(
+    (credential) => credential.id === source.credentials.storedCredentialId,
+  )
+
   return (
     <>
       <SheetHeader className="shrink-0 border-b border-border/60 p-5">
@@ -520,56 +596,54 @@ function TenantSourceEditorSheetContent({
 
           <FormSection title="Credentials">
             <div className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
+              {source.credentials.acceptedCredentialTypes?.length ? (
                 <FieldBlock
-                  label="Client ID"
-                  tooltip="Application client identifier used to authenticate against the source."
+                  label="Stored credential"
+                  tooltip="Reusable credential filtered by source type and tenant availability."
                   className="col-span-2"
                   control={
-                    <Input
-                      value={source.credentials.clientId}
-                      onChange={(event) => {
-                        onUpdateSource(source.key, (current) => ({
-                          ...current,
-                          credentials: {
-                            ...current.credentials,
-                            clientId: event.target.value,
-                          },
-                        }));
-                      }}
-                      className="h-10"
-                    />
+                    <div className="flex gap-2">
+                      <Select
+                        value={source.credentials.storedCredentialId ?? 'none'}
+                        onValueChange={(value) => {
+                          onUpdateSource(source.key, (current) => ({
+                            ...current,
+                            credentials: {
+                              ...current.credentials,
+                              storedCredentialId: value === 'none' ? null : value,
+                            },
+                          }))
+                        }}
+                      >
+                        <SelectTrigger className="h-10 flex-1">
+                          <SelectValue placeholder="Select credential">
+                            {selectedCredential?.name ?? 'No credential selected'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No credential selected</SelectItem>
+                          {compatibleCredentials.map((credential) => (
+                            <SelectItem key={credential.id} value={credential.id}>
+                              {credential.name}
+                              {credential.isGlobal ? ' · global' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button type="button" variant="outline" onClick={() => onCreateCredential(source.key)}>
+                        New
+                      </Button>
+                      <Link
+                        to="/admin/platform/credentials"
+                        className="inline-flex h-10 items-center rounded-lg border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted"
+                      >
+                        Manage
+                      </Link>
+                    </div>
                   }
                 />
-                <FieldBlock
-                  label="Client Secret"
-                  tooltip="Stored securely after save. Enter a new value only when rotating credentials."
-                  className="sm:col-span-2"
-                  control={
-                    <Input
-                      type="password"
-                      value={source.credentials.secret}
-                      placeholder={
-                        source.credentials.hasSecret
-                          ? "Stored in OpenBao — enter a new value to rotate"
-                          : "Not configured"
-                      }
-                      onChange={(event) => {
-                        onUpdateSource(source.key, (current) => ({
-                          ...current,
-                          credentials: {
-                            ...current.credentials,
-                            secret: event.target.value,
-                            hasSecret:
-                              current.credentials.hasSecret ||
-                              event.target.value.trim().length > 0,
-                          },
-                        }));
-                      }}
-                      className="h-10"
-                    />
-                  }
-                />
+              ) : null}
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FieldBlock
                   label="API Base URL"
                   tooltip="Base endpoint used for provider API requests."
@@ -640,6 +714,107 @@ function TenantSourceEditorSheetContent({
       </SheetFooter>
     </>
   );
+}
+
+function InlineCredentialDialog({
+  open,
+  tenantId,
+  isSubmitting,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean
+  tenantId: string
+  isSubmitting: boolean
+  onOpenChange: (open: boolean) => void
+  onSubmit: (input: CreateStoredCredentialInput) => void
+}) {
+  const [name, setName] = useState('')
+  const [credentialTenantId, setCredentialTenantId] = useState('')
+  const [clientId, setClientId] = useState('')
+  const [clientSecret, setClientSecret] = useState('')
+  const [isGlobal, setIsGlobal] = useState(false)
+
+  function reset() {
+    setName('')
+    setCredentialTenantId('')
+    setClientId('')
+    setClientSecret('')
+    setIsGlobal(false)
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        onOpenChange(nextOpen)
+        if (!nextOpen) reset()
+      }}
+    >
+      <DialogContent size="lg">
+        <DialogHeader>
+          <DialogTitle>New stored credential</DialogTitle>
+          <DialogDescription>
+            Create a reusable Entra ID identity for compatible integrations.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <FieldBlock
+            label="Name"
+            tooltip="Operator-facing name shown in credential selectors."
+            control={<Input value={name} onChange={(event) => setName(event.target.value)} />}
+          />
+          <FieldBlock
+            label="Entra Tenant ID"
+            tooltip="Directory tenant used when requesting tokens."
+            control={<Input value={credentialTenantId} onChange={(event) => setCredentialTenantId(event.target.value)} />}
+          />
+          <FieldBlock
+            label="Client ID"
+            tooltip="Application client identifier."
+            control={<Input value={clientId} onChange={(event) => setClientId(event.target.value)} />}
+          />
+          <FieldBlock
+            label="Client Secret"
+            tooltip="Stored server-side in OpenBao."
+            control={<Input type="password" value={clientSecret} onChange={(event) => setClientSecret(event.target.value)} />}
+          />
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isGlobal}
+              onChange={(event) => setIsGlobal(event.target.checked)}
+              className="size-4 rounded border-border"
+            />
+            Available globally
+          </label>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={isSubmitting || !name.trim() || !credentialTenantId.trim() || !clientId.trim() || !clientSecret.trim()}
+            onClick={() => {
+              onSubmit({
+                name,
+                type: 'entra-client-secret',
+                isGlobal,
+                credentialTenantId,
+                clientId,
+                clientSecret,
+                tenantIds: isGlobal ? [] : [tenantId],
+              })
+              reset()
+            }}
+          >
+            {isSubmitting ? 'Creating…' : 'Create credential'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 // ─── History full-page view ─────────────────────────────────────────────────

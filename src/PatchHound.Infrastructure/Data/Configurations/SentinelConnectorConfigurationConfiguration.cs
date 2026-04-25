@@ -14,8 +14,10 @@ public class SentinelConnectorConfigurationConfiguration
         builder.Property(c => c.DceEndpoint).HasMaxLength(512);
         builder.Property(c => c.DcrImmutableId).HasMaxLength(256);
         builder.Property(c => c.StreamName).HasMaxLength(256);
-        builder.Property(c => c.TenantId).HasMaxLength(128);
-        builder.Property(c => c.ClientId).HasMaxLength(128);
-        builder.Property(c => c.SecretRef).HasMaxLength(256);
+
+        builder.HasOne(c => c.StoredCredential)
+            .WithMany()
+            .HasForeignKey(c => c.StoredCredentialId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

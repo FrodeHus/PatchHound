@@ -7,8 +7,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PatchHound.Core.Entities;
+using PatchHound.Infrastructure.Credentials;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Tenants;
 
 namespace PatchHound.Tests.Infrastructure;
 
@@ -20,6 +22,22 @@ public class NvdFeedSyncServiceTests
         store.GetSecretAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((string?)null);
         return store;
+    }
+
+    private static NvdFeedSyncService CreateService(
+        HttpClient httpClient,
+        PatchHound.Infrastructure.Data.PatchHoundDbContext db,
+        ISecretStore? secretStore = null
+    )
+    {
+        var store = secretStore ?? NullSecrets();
+        return new NvdFeedSyncService(
+            httpClient,
+            db,
+            store,
+            new StoredCredentialResolver(db, store),
+            NullLogger<NvdFeedSyncService>.Instance
+        );
     }
 
     [Fact]
@@ -34,8 +52,7 @@ public class NvdFeedSyncServiceTests
 
         var handler = new GzipArchiveHandler(feedJson);
         var httpClient = new HttpClient(handler);
-        var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
-            NullLogger<NvdFeedSyncService>.Instance);
+        var service = CreateService(httpClient, db);
 
         await service.SyncYearFeedAsync(2024, CancellationToken.None);
 
@@ -74,8 +91,7 @@ public class NvdFeedSyncServiceTests
 
         var handler = new FakeApiHandler(feedJson);
         var httpClient = new HttpClient(handler);
-        var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
-            NullLogger<NvdFeedSyncService>.Instance);
+        var service = CreateService(httpClient, db);
 
         await service.SyncModifiedFeedAsync(CancellationToken.None);
 
@@ -93,8 +109,7 @@ public class NvdFeedSyncServiceTests
 
         var handler = new GzipArchiveHandler("{}");
         var httpClient = new HttpClient(handler);
-        var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
-            NullLogger<NvdFeedSyncService>.Instance);
+        var service = CreateService(httpClient, db);
 
         await service.SyncYearFeedAsync(2024, CancellationToken.None);
 
@@ -127,8 +142,7 @@ public class NvdFeedSyncServiceTests
 
         var handler = new GzipArchiveHandler(feedJson);
         var httpClient = new HttpClient(handler);
-        var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
-            NullLogger<NvdFeedSyncService>.Instance);
+        var service = CreateService(httpClient, db);
 
         await service.SyncYearFeedAsync(2024, CancellationToken.None);
 
@@ -145,8 +159,7 @@ public class NvdFeedSyncServiceTests
             "2024-01-01T00:00:00.000", "2024-01-10T00:00:00.000",
             referenceUrl: null, criteria: "cpe:2.3:a:acme:widget:1.0:*:*:*:*:*:*:*"));
         var httpClient = new HttpClient(handler);
-        var service = new NvdFeedSyncService(httpClient, db, NullSecrets(),
-            NullLogger<NvdFeedSyncService>.Instance);
+        var service = CreateService(httpClient, db);
 
         await service.SyncYearFeedAsync(2024, CancellationToken.None);
 
@@ -159,6 +172,53 @@ public class NvdFeedSyncServiceTests
             .Select(c => c.CveId)
             .ToListAsync();
         cachedIds.Should().Equal("CVE-2024-1234");
+    }
+
+    [Fact]
+    public async Task SyncModifiedFeedAsync_uses_global_api_key_stored_credential()
+    {
+        await using var db = await TestDbContextFactory.CreateAsync();
+        var credential = StoredCredential.Create(
+            "NVD API",
+            StoredCredentialTypes.ApiKey,
+            isGlobal: true,
+            credentialTenantId: string.Empty,
+            clientId: string.Empty,
+            secretRef: "stored-credentials/nvd",
+            now: DateTimeOffset.UtcNow
+        );
+        await db.StoredCredentials.AddAsync(credential);
+        await db.EnrichmentSourceConfigurations.AddAsync(
+            EnrichmentSourceConfiguration.Create(
+                EnrichmentSourceCatalog.NvdSourceKey,
+                "NVD API",
+                true,
+                secretRef: string.Empty,
+                apiBaseUrl: EnrichmentSourceCatalog.DefaultNvdApiBaseUrl,
+                storedCredentialId: credential.Id
+            )
+        );
+        await db.SaveChangesAsync();
+
+        var store = NullSecrets();
+        store.GetSecretAsync(
+                credential.SecretRef,
+                StoredCredentialSecretKeys.ApiKey,
+                Arg.Any<CancellationToken>()
+            )
+            .Returns("nvd-api-key");
+
+        var handler = new FakeApiHandler(BuildSinglePageResponse("CVE-2024-1234", "Window 1", 7.5m,
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+            "2024-01-01T00:00:00.000", "2024-01-10T00:00:00.000",
+            referenceUrl: null, criteria: "cpe:2.3:a:acme:widget:1.0:*:*:*:*:*:*:*"));
+        var httpClient = new HttpClient(handler);
+        var service = CreateService(httpClient, db, store);
+
+        await service.SyncModifiedFeedAsync(CancellationToken.None);
+
+        handler.RequestCount.Should().Be(1);
+        handler.ApiKeys.Should().ContainSingle().Which.Should().Be("nvd-api-key");
     }
 
     private static string BuildSinglePageResponse(
@@ -230,6 +290,7 @@ public class NvdFeedSyncServiceTests
     {
         private readonly string _responseJson;
         public int RequestCount { get; private set; }
+        public List<string?> ApiKeys { get; } = [];
 
         public FakeApiHandler(string responseJson) => _responseJson = responseJson;
 
@@ -237,6 +298,11 @@ public class NvdFeedSyncServiceTests
             HttpRequestMessage request, CancellationToken ct)
         {
             RequestCount++;
+            ApiKeys.Add(
+                request.Headers.TryGetValues("apiKey", out var values)
+                    ? values.SingleOrDefault()
+                    : null
+            );
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(_responseJson, Encoding.UTF8, "application/json"),

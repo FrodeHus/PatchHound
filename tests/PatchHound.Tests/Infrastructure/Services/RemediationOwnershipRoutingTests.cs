@@ -65,6 +65,43 @@ public class RemediationOwnershipRoutingTests : IDisposable
     }
 
     [Fact]
+    public async Task AddRecommendationForCaseAsync_ReusesUnsavedWorkflowCreatedEarlierInRequest()
+    {
+        var ownerTeam = Team.Create(_tenantId, "Software Owners");
+        var product = SoftwareProduct.Create("Contoso", "Browser", null);
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var tenantSoftware = SoftwareTenantRecord.Create(
+            _tenantId,
+            null,
+            product.Id,
+            DateTimeOffset.UtcNow.AddDays(-10),
+            DateTimeOffset.UtcNow
+        );
+        tenantSoftware.AssignOwnerTeam(ownerTeam.Id);
+
+        await _dbContext.AddRangeAsync(ownerTeam, product, remediationCase, tenantSoftware);
+        await _dbContext.SaveChangesAsync();
+
+        var workflowService = new RemediationWorkflowService(_dbContext);
+        var sut = new AnalystRecommendationService(_dbContext, workflowService);
+
+        var result = await sut.AddRecommendationForCaseAsync(
+            _tenantId,
+            remediationCase.Id,
+            RemediationOutcome.ApprovedForPatching,
+            "Patch the affected product.",
+            Guid.NewGuid(),
+            ct: CancellationToken.None
+        );
+
+        result.IsSuccess.Should().BeTrue();
+        (await _dbContext.RemediationWorkflows.CountAsync()).Should().Be(1);
+        result.Value.RemediationWorkflowId.Should().Be(
+            await _dbContext.RemediationWorkflows.Select(workflow => workflow.Id).SingleAsync()
+        );
+    }
+
+    [Fact]
     public async Task EnsurePatchingTasksAsync_UsesWorkflowSoftwareOwnerTeam()
     {
         var ownerTeam = Team.Create(_tenantId, "Software Owners");

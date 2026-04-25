@@ -31,5 +31,6 @@
     <ProjectReference Include="..\..\src\PatchHound.Infrastructure\PatchHound.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\PatchHound.Api\PatchHound.Api.csproj" />
     <ProjectReference Include="..\..\src\PatchHound.Puppy\PatchHound.Puppy.csproj" />
+    <ProjectReference Include="..\..\src\PatchHound.Worker\PatchHound.Worker.csproj" />
   </ItemGroup>
 </Project>

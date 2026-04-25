@@ -21,7 +21,6 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
 
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(15);
-    private const int MaxJobsPerCycle = 10;
     private static readonly string LeaseOwner =
         $"{Environment.MachineName}:{Environment.ProcessId}";
 
@@ -181,7 +180,13 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
                 ct
             );
 
-            var jobs = await ClaimDueJobsAsync(dbContext, source.SourceKey, runner.TargetModel, ct);
+            var jobs = await ClaimDueJobsAsync(
+                dbContext,
+                source.SourceKey,
+                runner.TargetModel,
+                runner.MaxJobsPerCycle,
+                ct
+            );
             if (jobs.Count == 0)
             {
                 var completedAt = DateTimeOffset.UtcNow;
@@ -355,6 +360,7 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
         PatchHoundDbContext dbContext,
         string sourceKey,
         EnrichmentTargetModel targetModel,
+        int maxJobs,
         CancellationToken ct
     )
     {
@@ -373,7 +379,7 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
             )
             .OrderByDescending(job => job.Priority)
             .ThenBy(job => job.NextAttemptAt)
-            .Take(MaxJobsPerCycle)
+            .Take(maxJobs)
             .ToListAsync(ct);
 
         foreach (var job in jobs)

@@ -19,6 +19,7 @@ public class SupplyChainEvidenceEnrichmentRunner(
     public string SourceKey => EnrichmentSourceCatalog.SupplyChainSourceKey;
     public EnrichmentTargetModel TargetModel => EnrichmentTargetModel.SoftwareAsset;
     public TimeSpan MinimumDelay => TimeSpan.FromMilliseconds(500);
+    public int MaxJobsPerCycle => 10;
 
     public async Task<EnrichmentJobExecutionResult> ExecuteAsync(
         EnrichmentJob job,
