@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models.Integrations;
 using PatchHound.Core.Entities;
+using PatchHound.Infrastructure.Credentials;
 using PatchHound.Infrastructure.Data;
-using PatchHound.Infrastructure.Secrets;
 
 namespace PatchHound.Api.Controllers;
 
@@ -14,15 +14,10 @@ namespace PatchHound.Api.Controllers;
 [Authorize]
 public class IntegrationsController : ControllerBase
 {
-    private const string SentinelSecretPath = "system/sentinel-connector";
-    private const string SentinelSecretKey = "clientSecret";
-
-    private readonly ISecretStore _secretStore;
     private readonly PatchHoundDbContext _dbContext;
 
-    public IntegrationsController(ISecretStore secretStore, PatchHoundDbContext dbContext)
+    public IntegrationsController(PatchHoundDbContext dbContext)
     {
-        _secretStore = secretStore;
         _dbContext = dbContext;
     }
 
@@ -42,9 +37,8 @@ public class IntegrationsController : ControllerBase
                     DceEndpoint: string.Empty,
                     DcrImmutableId: string.Empty,
                     StreamName: string.Empty,
-                    TenantId: string.Empty,
-                    ClientId: string.Empty,
-                    HasSecret: false,
+                    StoredCredentialId: null,
+                    AcceptedCredentialTypes: [StoredCredentialTypes.EntraClientSecret],
                     UpdatedAt: null
                 )
             );
@@ -56,9 +50,8 @@ public class IntegrationsController : ControllerBase
                 DceEndpoint: config.DceEndpoint,
                 DcrImmutableId: config.DcrImmutableId,
                 StreamName: config.StreamName,
-                TenantId: config.TenantId,
-                ClientId: config.ClientId,
-                HasSecret: !string.IsNullOrWhiteSpace(config.SecretRef),
+                StoredCredentialId: config.StoredCredentialId,
+                AcceptedCredentialTypes: [StoredCredentialTypes.EntraClientSecret],
                 UpdatedAt: config.UpdatedAt
             )
         );
@@ -72,13 +65,25 @@ public class IntegrationsController : ControllerBase
     )
     {
         var config = await _dbContext.SentinelConnectorConfigurations.FirstOrDefaultAsync(ct);
-
-        var hasNewSecret = !string.IsNullOrWhiteSpace(request.ClientSecret);
-        var secretRef = config?.SecretRef ?? string.Empty;
-
-        if (hasNewSecret)
+        if (request.Enabled && !request.StoredCredentialId.HasValue)
         {
-            secretRef = SentinelSecretPath;
+            return ValidationProblem(
+                "Sentinel requires a global Entra ID stored credential before it can be enabled."
+            );
+        }
+
+        if (request.StoredCredentialId.HasValue)
+        {
+            var exists = await _dbContext.StoredCredentials.AsNoTracking().AnyAsync(
+                credential =>
+                    credential.Id == request.StoredCredentialId.Value
+                    && credential.Type == StoredCredentialTypes.EntraClientSecret
+                    && credential.IsGlobal,
+                ct
+            );
+
+            if (!exists)
+                return ValidationProblem("Sentinel requires a global Entra ID stored credential.");
         }
 
         if (config is null)
@@ -88,9 +93,7 @@ public class IntegrationsController : ControllerBase
                 dceEndpoint: request.DceEndpoint.Trim(),
                 dcrImmutableId: request.DcrImmutableId.Trim(),
                 streamName: request.StreamName.Trim(),
-                tenantId: request.TenantId.Trim(),
-                clientId: request.ClientId.Trim(),
-                secretRef: secretRef
+                storedCredentialId: request.StoredCredentialId
             );
             await _dbContext.SentinelConnectorConfigurations.AddAsync(config, ct);
         }
@@ -101,23 +104,11 @@ public class IntegrationsController : ControllerBase
                 dceEndpoint: request.DceEndpoint.Trim(),
                 dcrImmutableId: request.DcrImmutableId.Trim(),
                 streamName: request.StreamName.Trim(),
-                tenantId: request.TenantId.Trim(),
-                clientId: request.ClientId.Trim(),
-                secretRef: secretRef
+                storedCredentialId: request.StoredCredentialId
             );
         }
 
         await _dbContext.SaveChangesAsync(ct);
-
-        // Write secret to vault after DB commit succeeds
-        if (hasNewSecret)
-        {
-            await _secretStore.PutSecretAsync(
-                SentinelSecretPath,
-                new Dictionary<string, string> { [SentinelSecretKey] = request.ClientSecret!.Trim() },
-                ct
-            );
-        }
 
         return NoContent();
     }

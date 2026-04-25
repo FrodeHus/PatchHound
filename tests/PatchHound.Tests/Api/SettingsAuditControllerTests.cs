@@ -5,13 +5,16 @@ using Microsoft.Extensions.Options;
 using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models.Admin;
+using PatchHound.Api.Models.Credentials;
 using PatchHound.Api.Models.System;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
+using PatchHound.Infrastructure.Credentials;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
 using PatchHound.Infrastructure.Services;
+using PatchHound.Infrastructure.Tenants;
 using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
@@ -55,69 +58,49 @@ public class SettingsAuditControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateTenant_WritesAuditEntry_ForTenantSourceSecretChange()
+    public async Task CreateStoredCredential_WritesAuditEntry_ForCredentialLifecycle()
     {
         var tenant = Tenant.Create("Tenant One", "entra-1");
         _tenantContext.CurrentTenantId.Returns(tenant.Id);
         _tenantContext.AccessibleTenantIds.Returns(new List<Guid> { tenant.Id });
         _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
-        var source = TenantSourceConfiguration.Create(
-            tenant.Id,
-            "microsoft-defender",
-            "Microsoft Defender",
-            true,
-            "0 */6 * * *",
-            "tenant",
-            "client",
-            "tenants/old/source",
-            "https://api.security.microsoft.com",
-            "scope"
-        );
 
-        await _dbContext.AddRangeAsync(tenant, source);
+        await _dbContext.AddAsync(tenant);
         await _dbContext.SaveChangesAsync();
 
-        var controller = new TenantsController(
+        var controller = new StoredCredentialsController(
             _dbContext,
             _secretStore,
             _tenantContext,
             new AuditLogWriter(_dbContext, _tenantContext)
         );
 
-        var action = await controller.Update(
-            tenant.Id,
-            new UpdateTenantRequest(
-                "Tenant One Updated",
-                new UpdateTenantSlaConfigurationRequest(5, 10, 20, 30),
-                [
-                    new UpdateTenantIngestionSourceRequest(
-                        "microsoft-defender",
-                        "Microsoft Defender",
-                        true,
-                        "0 */12 * * *",
-                        new UpdateTenantSourceCredentialsRequest(
-                            "client",
-                            "new-secret",
-                            "https://api.security.microsoft.com",
-                            "scope"
-                        )
-                    ),
-                ]
+        var action = await controller.Create(
+            new CreateStoredCredentialRequest(
+                "Defender credential",
+                "entra-client-secret",
+                false,
+                "entra-1",
+                "client",
+                "new-secret",
+                [tenant.Id]
             ),
             CancellationToken.None
         );
 
-        action.Should().BeOfType<NoContentResult>();
+        action.Result.Should().BeOfType<CreatedAtActionResult>();
 
-        var secretAudit = await _dbContext
+        var secretAudit = (await _dbContext
             .AuditLogEntries.IgnoreQueryFilters()
-            .SingleAsync(entry => entry.EntityType == "TenantSourceSecret");
+            .Where(entry => entry.EntityType == nameof(StoredCredential))
+            .ToListAsync())
+            .First(entry => entry.NewValues?.Contains("entra-client-secret") == true);
 
-        secretAudit.TenantId.Should().Be(tenant.Id);
-        secretAudit.Action.Should().Be(AuditAction.Updated);
+        secretAudit.TenantId.Should().Be(Guid.Empty);
+        secretAudit.Action.Should().Be(AuditAction.Created);
         secretAudit.UserId.Should().Be(_userId);
-        secretAudit.OldValues.Should().Contain("tenants/old/source");
-        secretAudit.NewValues.Should().Contain($"tenants/{tenant.Id}/sources/microsoft-defender");
+        secretAudit.NewValues.Should().Contain("Defender credential");
+        secretAudit.NewValues.Should().Contain("entra-client-secret");
     }
 
     [Fact]
@@ -154,6 +137,7 @@ public class SettingsAuditControllerTests : IDisposable
                     true,
                     null,
                     new UpdateEnrichmentSourceCredentialsRequest(
+                        null,
                         "replacement-secret",
                         "https://services.nvd.nist.gov/rest/json/cves/2.0"
                     )
@@ -177,6 +161,104 @@ public class SettingsAuditControllerTests : IDisposable
         secretAudit.UserId.Should().Be(_userId);
         secretAudit.OldValues.Should().Contain("system/enrichment-sources/nvd-old");
         secretAudit.NewValues.Should().Contain("system/enrichment-sources/nvd");
+    }
+
+    [Fact]
+    public async Task UpdateEnrichmentSources_RejectsTenantScopedStoredCredential_ForGlobalSource()
+    {
+        var credential = StoredCredential.Create(
+            "Tenant scoped",
+            StoredCredentialTypes.EntraClientSecret,
+            isGlobal: false,
+            credentialTenantId: "entra-tenant",
+            clientId: "client-id",
+            secretRef: "stored-credentials/test",
+            now: DateTimeOffset.UtcNow
+        );
+        credential.TenantScopes.Add(StoredCredentialTenant.Create(credential.Id, _tenantId));
+        await _dbContext.StoredCredentials.AddAsync(credential);
+        await _dbContext.SaveChangesAsync();
+
+        var controller = new SystemController(
+            _secretStore,
+            _dbContext,
+            new AuditLogWriter(_dbContext, _tenantContext),
+            new NotificationEmailConfigurationResolver(
+                _secretStore,
+                Options.Create(new PatchHound.Infrastructure.Options.SmtpOptions())
+            ),
+            new MailgunEmailSender(new HttpClient()),
+            _tenantContext
+        );
+
+        var action = await controller.UpdateEnrichmentSources(
+            [
+                new UpdateEnrichmentSourceRequest(
+                    EnrichmentSourceCatalog.DefenderSourceKey,
+                    "Microsoft Defender",
+                    true,
+                    24,
+                    new UpdateEnrichmentSourceCredentialsRequest(
+                        credential.Id,
+                        string.Empty,
+                        "https://api.security.microsoft.com"
+                    )
+                ),
+            ],
+            CancellationToken.None
+        );
+
+        action.Should().BeOfType<BadRequestObjectResult>();
+        (await _dbContext.EnrichmentSourceConfigurations.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task UpdateEnrichmentSources_AcceptsGlobalApiKeyStoredCredential_ForNvdSource()
+    {
+        var credential = StoredCredential.Create(
+            "NVD API",
+            StoredCredentialTypes.ApiKey,
+            isGlobal: true,
+            credentialTenantId: string.Empty,
+            clientId: string.Empty,
+            secretRef: "stored-credentials/nvd",
+            now: DateTimeOffset.UtcNow
+        );
+        await _dbContext.StoredCredentials.AddAsync(credential);
+        await _dbContext.SaveChangesAsync();
+
+        var controller = new SystemController(
+            _secretStore,
+            _dbContext,
+            new AuditLogWriter(_dbContext, _tenantContext),
+            new NotificationEmailConfigurationResolver(
+                _secretStore,
+                Options.Create(new PatchHound.Infrastructure.Options.SmtpOptions())
+            ),
+            new MailgunEmailSender(new HttpClient()),
+            _tenantContext
+        );
+
+        var action = await controller.UpdateEnrichmentSources(
+            [
+                new UpdateEnrichmentSourceRequest(
+                    EnrichmentSourceCatalog.NvdSourceKey,
+                    "NVD API",
+                    true,
+                    null,
+                    new UpdateEnrichmentSourceCredentialsRequest(
+                        credential.Id,
+                        string.Empty,
+                        EnrichmentSourceCatalog.DefaultNvdApiBaseUrl
+                    )
+                ),
+            ],
+            CancellationToken.None
+        );
+
+        action.Should().BeOfType<NoContentResult>();
+        var source = await _dbContext.EnrichmentSourceConfigurations.SingleAsync();
+        source.StoredCredentialId.Should().Be(credential.Id);
     }
 
     [Fact]

@@ -7,7 +7,5 @@ public record UpdateSentinelConnectorRequest(
     [MaxLength(512)] string DceEndpoint,
     [MaxLength(256)] string DcrImmutableId,
     [MaxLength(256)] string StreamName,
-    [MaxLength(128)] string TenantId,
-    [MaxLength(128)] string ClientId,
-    string? ClientSecret
+    Guid? StoredCredentialId
 );

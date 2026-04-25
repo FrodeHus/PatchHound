@@ -36,6 +36,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<SecurityProfile> SecurityProfiles => Set<SecurityProfile>();
     public DbSet<TenantSourceConfiguration> TenantSourceConfigurations =>
         Set<TenantSourceConfiguration>();
+    public DbSet<StoredCredential> StoredCredentials => Set<StoredCredential>();
+    public DbSet<StoredCredentialTenant> StoredCredentialTenants => Set<StoredCredentialTenant>();
     public DbSet<IngestionRun> IngestionRuns => Set<IngestionRun>();
     public DbSet<IngestionSnapshot> IngestionSnapshots => Set<IngestionSnapshot>();
     public DbSet<IngestionCheckpoint> IngestionCheckpoints => Set<IngestionCheckpoint>();
@@ -284,6 +286,16 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantSourceConfiguration>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<StoredCredential>()
+            .HasQueryFilter(e =>
+                IsSystemContext
+                || e.IsGlobal
+                || e.TenantScopes.Any(scope => AccessibleTenantIds.Contains(scope.TenantId))
+            );
+        modelBuilder
+            .Entity<StoredCredentialTenant>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<IngestionRun>()

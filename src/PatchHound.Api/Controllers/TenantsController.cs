@@ -240,13 +240,10 @@ public class TenantsController : ControllerBase
             .TenantSourceConfigurations.Where(source => source.TenantId == tenant.Id)
             .ToDictionaryAsync(source => source.SourceKey, StringComparer.OrdinalIgnoreCase, ct);
 
-        // Collect pending secret writes — vault writes happen after DB commit
-        var pendingSecretWrites = new List<(string Path, string Key, string Value)>();
-        var pendingSecretAudits = new List<(Guid EntityId, string? OldSecretRef, string NewSecretRef)>();
-
         foreach (var source in request.IngestionSources)
         {
             existingSources.TryGetValue(source.Key, out var existingSource);
+            var storedCredentialId = source.Credentials.StoredCredentialId;
             var linkedSourceKey = string.IsNullOrWhiteSpace(source.Credentials.LinkedSourceKey)
                 ? null
                 : source.Credentials.LinkedSourceKey.Trim();
@@ -278,37 +275,34 @@ public class TenantsController : ControllerBase
                         credentialTenantId: string.Empty,
                         clientId: string.Empty,
                         secretRef: string.Empty,
-                        source.Credentials.ApiBaseUrl,
-                        source.Credentials.TokenScope,
+                        apiBaseUrl: source.Credentials.ApiBaseUrl,
+                        tokenScope: source.Credentials.TokenScope,
                         linkedSourceKey: linkedSourceKey
                     );
                 }
                 continue;
             }
 
-            var secretRef = existingSource?.SecretRef ?? string.Empty;
-            var secretValue = source.Credentials.Secret.Trim();
-
-            if (string.IsNullOrWhiteSpace(secretValue))
+            if (storedCredentialId.HasValue)
             {
-                secretValue = string.Empty;
+                var credentialAvailable = await _dbContext.StoredCredentials.AsNoTracking()
+                    .AnyAsync(credential =>
+                        credential.Id == storedCredentialId.Value
+                        && TenantSourceCatalog.GetAcceptedCredentialTypes(source.Key).Contains(credential.Type)
+                        && (
+                            credential.IsGlobal
+                            || credential.TenantScopes.Any(scope => scope.TenantId == tenant.Id)
+                        ),
+                        ct
+                    );
+                if (!credentialAvailable)
+                {
+                    return BadRequest(new ProblemDetails
+                    {
+                        Title = "Selected credential is not compatible with this source or tenant.",
+                    });
+                }
             }
-
-            if (!string.IsNullOrWhiteSpace(secretValue))
-            {
-                secretRef = $"tenants/{tenant.Id}/sources/{source.Key}";
-
-                // Defer the actual vault write
-                pendingSecretWrites.Add(
-                    (
-                        secretRef,
-                        TenantSourceCatalog.GetSecretKeyName(source.Key),
-                        secretValue
-                    )
-                );
-            }
-
-            var oldSecretRef = existingSource?.SecretRef;
 
             if (existingSource is null)
             {
@@ -318,18 +312,12 @@ public class TenantsController : ControllerBase
                     source.DisplayName,
                     source.Enabled,
                     source.SyncSchedule,
-                    tenant.EntraTenantId,
-                    source.Credentials.ClientId,
-                    secretRef,
-                    source.Credentials.ApiBaseUrl,
-                    source.Credentials.TokenScope
+                    apiBaseUrl: source.Credentials.ApiBaseUrl,
+                    tokenScope: source.Credentials.TokenScope,
+                    storedCredentialId: storedCredentialId
                 );
                 await _dbContext.TenantSourceConfigurations.AddAsync(created, ct);
                 existingSources[source.Key] = created;
-                if (!string.IsNullOrWhiteSpace(secretValue))
-                {
-                    pendingSecretAudits.Add((created.Id, oldSecretRef, secretRef));
-                }
                 continue;
             }
 
@@ -337,51 +325,16 @@ public class TenantsController : ControllerBase
                 source.DisplayName,
                 source.Enabled,
                 source.SyncSchedule,
-                tenant.EntraTenantId,
-                source.Credentials.ClientId,
-                secretRef,
-                source.Credentials.ApiBaseUrl,
-                source.Credentials.TokenScope
+                credentialTenantId: string.Empty,
+                clientId: string.Empty,
+                secretRef: string.Empty,
+                apiBaseUrl: source.Credentials.ApiBaseUrl,
+                tokenScope: source.Credentials.TokenScope,
+                storedCredentialId: storedCredentialId
             );
-
-            if (
-                !string.IsNullOrWhiteSpace(secretValue)
-                && !string.Equals(oldSecretRef, secretRef, StringComparison.Ordinal)
-            )
-            {
-                pendingSecretAudits.Add((existingSource.Id, oldSecretRef, secretRef));
-            }
         }
 
         await _dbContext.SaveChangesAsync(ct);
-
-        // Write secrets to vault after DB commit succeeds
-        foreach (var (path, key, value) in pendingSecretWrites)
-        {
-            await _secretStore.PutSecretAsync(
-                path,
-                new Dictionary<string, string> { [key] = value },
-                ct
-            );
-        }
-
-        foreach (var (entityId, oldSecretRef, newSecretRef) in pendingSecretAudits)
-        {
-            await _auditLogWriter.WriteAsync(
-                tenant.Id,
-                "TenantSourceSecret",
-                entityId,
-                AuditAction.Updated,
-                string.IsNullOrWhiteSpace(oldSecretRef) ? null : new { SecretRef = oldSecretRef },
-                new { SecretRef = newSecretRef },
-                ct
-            );
-        }
-
-        if (pendingSecretAudits.Count > 0)
-        {
-            await _dbContext.SaveChangesAsync(ct);
-        }
 
         return NoContent();
     }
@@ -767,6 +720,8 @@ public class TenantsController : ControllerBase
             TenantSourceCatalog.SupportsScheduling(source),
             TenantSourceCatalog.SupportsManualSync(source),
             new TenantSourceCredentialsDto(
+                source.StoredCredentialId,
+                TenantSourceCatalog.GetAcceptedCredentialTypes(source.SourceKey),
                 source.ClientId,
                 !string.IsNullOrWhiteSpace(source.SecretRef),
                 source.ApiBaseUrl,

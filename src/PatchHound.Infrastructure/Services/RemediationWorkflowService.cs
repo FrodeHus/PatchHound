@@ -15,6 +15,14 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
         CancellationToken ct
     )
     {
+        var localExisting = dbContext.RemediationWorkflows.Local
+            .FirstOrDefault(workflow =>
+                workflow.TenantId == tenantId
+                && workflow.RemediationCaseId == remediationCaseId
+                && workflow.Status == RemediationWorkflowStatus.Active);
+        if (localExisting is not null)
+            return localExisting;
+
         var existing = await dbContext.RemediationWorkflows
             .FirstOrDefaultAsync(workflow =>
                 workflow.TenantId == tenantId
