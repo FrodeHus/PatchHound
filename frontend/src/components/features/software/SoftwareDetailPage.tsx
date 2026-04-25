@@ -20,6 +20,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 import { toneBadge, toneText } from '@/lib/tone-classes'
 import {
@@ -317,84 +318,88 @@ export function SoftwareDetailPage({
         </div>
       </header>
 
-      {/* Top-level tab bar */}
-      <nav className="flex items-center gap-1 rounded-full border border-border/70 bg-card p-1">
-        <TopTab
-          isActive={activeTab === 'overview'}
-          onClick={() => onTabChange('overview')}
-          icon={<LayoutList className="size-3.5" />}
-          label="Overview"
-        />
-        {canViewRemediation ? (
-          <TopTab
-            isActive={activeTab === 'remediation'}
-            onClick={() => onTabChange('remediation')}
-            icon={<ShieldAlert className="size-3.5" />}
-            label="Remediation"
-            badge={remediationData?.currentDecision ? (
-              <span className={`ml-1.5 inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none ${
-                pendingApproval
-                  ? toneBadge(approvalStatusTone('PendingApproval'))
-                  : toneBadge(outcomeTone(remediationData.currentDecision.outcome))
-              }`}>
-                {pendingApproval
-                  ? 'Pending'
-                  : outcomeLabel(remediationData.currentDecision.outcome)}
+      <Tabs value={activeTab} onValueChange={(value) => onTabChange(value as TabId)} className="gap-4">
+        <TabsList className="h-10 justify-start rounded-xl bg-muted/50 p-1">
+          <TabsTrigger value="overview" className="rounded-lg px-4 text-sm">
+            <span className="inline-flex items-center gap-1.5">
+              <LayoutList className="size-3.5" />
+              Overview
+            </span>
+          </TabsTrigger>
+          {canViewRemediation ? (
+            <TabsTrigger value="remediation" className="rounded-lg px-4 text-sm">
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldAlert className="size-3.5" />
+                Remediation
+                {remediationData?.currentDecision ? (
+                  <span className={`ml-1.5 inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none ${
+                    pendingApproval
+                      ? toneBadge(approvalStatusTone('PendingApproval'))
+                      : toneBadge(outcomeTone(remediationData.currentDecision.outcome))
+                  }`}>
+                    {pendingApproval ? 'Pending' : outcomeLabel(remediationData.currentDecision.outcome)}
+                  </span>
+                ) : remediationData ? (
+                  <span className="ml-1.5 inline-flex rounded-full border border-border/70 bg-muted px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground">
+                    No decision
+                  </span>
+                ) : null}
               </span>
-            ) : remediationData ? (
-              <span className="ml-1.5 inline-flex rounded-full border border-border/70 bg-muted px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground">
-                No decision
-              </span>
-            ) : null}
-          />
-        ) : null}
-        <TopTab
-          isActive={activeTab === 'ai'}
-          onClick={() => onTabChange('ai')}
-          icon={<Sparkles className="size-3.5" />}
-          label="AI Insights"
-        />
-      </nav>
+            </TabsTrigger>
+          ) : null}
+          <TabsTrigger value="ai" className="rounded-lg px-4 text-sm">
+            <span className="inline-flex items-center gap-1.5">
+              <Sparkles className="size-3.5" />
+              AI Insights
+            </span>
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Tab content */}
-      {activeTab === 'overview' ? (
-        <OverviewTab
-          detail={detail}
-          selectedVersion={selectedVersion}
-          activeVersion={activeVersion}
-          installations={installations}
-          vulnerabilities={vulnerabilities}
-          onSelectVersion={onSelectVersion}
-          onPageChange={onPageChange}
-        />
-      ) : activeTab === 'remediation' && canViewRemediation ? (
-        remediationData ? (
-          <SoftwareRemediationView
-            data={remediationData}
-            caseId={remediationData.remediationCaseId}
-            tenantSoftwareId={tenantSoftwareId}
-            embedded
-            initialSoftwareDetail={detail}
-            initialInstallations={installations}
-            initialDeviceVersion={selectedVersion}
+        <TabsContent value="overview" className="pt-1">
+          <OverviewTab
+            detail={detail}
+            selectedVersion={selectedVersion}
+            activeVersion={activeVersion}
+            installations={installations}
+            vulnerabilities={vulnerabilities}
+            onSelectVersion={onSelectVersion}
+            onPageChange={onPageChange}
           />
-        ) : (
-          <section className="rounded-2xl border border-border/70 bg-card p-8">
-            <div className="mx-auto max-w-2xl text-center">
-              <h2 className="text-lg font-semibold tracking-tight">Remediation context unavailable</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {isRemediationLoading
-                  ? 'Loading remediation context for this software title.'
-                  : remediationError
-                    ? 'The remediation view could not be loaded for this software title right now.'
-                    : 'No remediation context is currently available for this software title.'}
-              </p>
-            </div>
-          </section>
-        )
-      ) : activeTab === 'ai' ? (
-        <AiInsightsTab detail={detail} />
-      ) : null}
+        </TabsContent>
+
+        {canViewRemediation ? (
+          <TabsContent value="remediation" className="pt-1">
+            {remediationData ? (
+              <SoftwareRemediationView
+                data={remediationData}
+                caseId={remediationData.remediationCaseId}
+                tenantSoftwareId={tenantSoftwareId}
+                embedded
+                initialSoftwareDetail={detail}
+                initialInstallations={installations}
+                initialDeviceVersion={selectedVersion}
+              />
+            ) : (
+              <section className="rounded-2xl border border-border/70 bg-card p-8">
+                <div className="mx-auto max-w-2xl text-center">
+                  <h2 className="text-lg font-semibold tracking-tight">Remediation context unavailable</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {isRemediationLoading
+                      ? 'Loading remediation context for this software title.'
+                      : remediationError
+                        ? 'The remediation view could not be loaded for this software title right now.'
+                        : 'No remediation context is currently available for this software title.'}
+                  </p>
+                </div>
+              </section>
+            )}
+          </TabsContent>
+        ) : null}
+
+        <TabsContent value="ai" className="pt-1">
+          <AiInsightsTab detail={detail} />
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }
@@ -686,36 +691,6 @@ function AiInsightsTab({ detail }: { detail: TenantSoftwareDetail }) {
 }
 
 /* ── Shared sub-components ───────────────────────────────────── */
-
-function TopTab({
-  isActive,
-  label,
-  icon,
-  badge,
-  onClick,
-}: {
-  isActive: boolean
-  label: string
-  icon: ReactNode
-  badge?: ReactNode
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        isActive
-          ? 'inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground'
-          : 'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm text-muted-foreground hover:bg-muted'
-      }
-    >
-      {icon}
-      {label}
-      {badge}
-    </button>
-  )
-}
 
 function Metric({
   label,

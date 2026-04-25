@@ -172,14 +172,13 @@ public class DashboardController : ControllerBase
                 null);
         }).ToList();
 
-        // Age buckets for open exposures
-        var openEpisodeAges = await _dbContext.ExposureEpisodes.AsNoTracking()
-            .Where(ep => ep.TenantId == tenantId && ep.ClosedAt == null
-                && exposureBaseQuery.Select(e => e.Id).Contains(ep.DeviceVulnerabilityExposureId))
-            .Select(ep => new
+        // Age buckets for open exposures — age measured from vulnerability published date
+        var openEpisodeAges = await exposureBaseQuery
+            .Where(e => e.Status == ExposureStatus.Open && e.Vulnerability.PublishedDate != null)
+            .Select(e => new
             {
-                AgeDays = (int)((now - ep.FirstSeenAt).TotalDays),
-                ep.Exposure.Vulnerability.VendorSeverity,
+                AgeDays = (int)((now - e.Vulnerability.PublishedDate!.Value).TotalDays),
+                e.Vulnerability.VendorSeverity,
             })
             .ToListAsync(ct);
 

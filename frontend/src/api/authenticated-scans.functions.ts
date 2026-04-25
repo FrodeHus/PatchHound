@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { authMiddleware } from '@/server/middleware'
 import { apiDelete, apiGet, apiPost, apiPut } from '@/server/api'
-import { buildFilterParams } from './utils'
+import { buildFilterParams, withTenantOverride } from './utils'
 import {
   createScanRunnerResponseSchema,
   pagedConnectionProfilesSchema,
@@ -23,10 +23,13 @@ import {
 
 export const fetchScanProfiles = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .inputValidator(z.object({ page: z.number().optional(), pageSize: z.number().optional() }))
+  .inputValidator(z.object({ tenantId: z.string().uuid().optional(), page: z.number().optional(), pageSize: z.number().optional() }))
   .handler(async ({ context, data: filters }) => {
-    const params = buildFilterParams({ ...filters, tenantId: context.tenantId })
-    return pagedScanProfilesSchema.parse(await apiGet(`/scan-profiles?${params}`, context))
+    const tenantId = filters.tenantId ?? context.tenantId
+    const params = buildFilterParams({ ...filters, tenantId })
+    return pagedScanProfilesSchema.parse(
+      await apiGet(`/scan-profiles?${params}`, withTenantOverride(context, tenantId)),
+    )
   })
 
 export const createScanProfile = createServerFn({ method: 'POST' })

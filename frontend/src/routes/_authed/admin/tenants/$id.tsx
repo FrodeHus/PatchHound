@@ -10,6 +10,7 @@ const tenantDetailSearchSchema = z.object({
   mode: z.enum(['edit', 'history', 'new']).optional(),
   sourceKey: z.string().optional(),
   profileId: z.string().uuid().optional(),
+  ruleId: z.string().uuid().optional(),
 })
 
 export const Route = createFileRoute('/_authed/admin/tenants/$id')({
@@ -46,9 +47,18 @@ function TenantDetailPage() {
       canViewAudit={canViewAudit}
       recentAuditItems={canViewAudit ? (recentAuditQuery.data?.items ?? []) : []}
       activeTab={search.tab}
-      tabSearch={{ mode: search.mode, sourceKey: search.sourceKey, profileId: search.profileId }}
+      tabSearch={{ mode: search.mode, sourceKey: search.sourceKey, profileId: search.profileId, ruleId: search.ruleId }}
       onTabChange={(tab) => {
-        void navigate({ search: (prev) => ({ ...prev, tab, mode: undefined, sourceKey: undefined, profileId: undefined }) })
+        void navigate({
+          search: (prev) => ({
+            ...prev,
+            tab,
+            mode: undefined,
+            sourceKey: undefined,
+            profileId: undefined,
+            ruleId: undefined,
+          }),
+        })
       }}
       onSearchChange={(patch) => {
         void navigate({
@@ -57,6 +67,7 @@ function TenantDetailPage() {
             mode: patch.mode as 'edit' | 'history' | 'new' | undefined,
             sourceKey: patch.sourceKey,
             profileId: patch.profileId,
+            ruleId: patch.ruleId,
           }),
         })
       }}

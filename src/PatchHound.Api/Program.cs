@@ -11,6 +11,7 @@ using Npgsql;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Hubs;
 using PatchHound.Api.Middleware;
+using PatchHound.Api.Workers;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure;
@@ -421,6 +422,9 @@ builder.Services.AddScoped<PatchHound.Api.Services.BlockedTenantAccessLogger>();
 builder.Services.AddScoped<PatchHound.Api.Services.ApprovalTaskQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.RemediationTaskQueryService>();
 builder.Services.AddHttpContextAccessor();
+
+// Background workers
+builder.Services.AddHostedService<TenantDeletionWorker>();
 
 // SignalR
 builder.Services.AddSignalR();

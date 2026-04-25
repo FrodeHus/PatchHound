@@ -5,6 +5,8 @@ type SSEEvent =
   | 'CriticalVulnerabilityDetected'
   | 'TaskStatusChanged'
   | 'IngestionRunProgress'
+  | 'TenantDeleted'
+  | 'TenantDeletionFailed'
 
 export function useSSE(
   event: SSEEvent,

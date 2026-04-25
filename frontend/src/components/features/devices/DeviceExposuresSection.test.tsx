@@ -86,7 +86,7 @@ describe('Device exposures section', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Exposures' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Exposures' }))
     expect(screen.getByText('CVE-2026-1')).toBeInTheDocument()
     expect(screen.getByText('Environmental CVSS')).toBeInTheDocument()
     expect(screen.getByText('8.2')).toBeInTheDocument()
@@ -111,7 +111,7 @@ describe('Device exposures section', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Exposures' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Exposures' }))
     expect(screen.getByText('No exposures observed for this device.')).toBeInTheDocument()
   })
 })

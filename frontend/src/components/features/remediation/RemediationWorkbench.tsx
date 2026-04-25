@@ -8,7 +8,6 @@ import { formatDate, startCase } from '@/lib/formatting'
 import { toneBadge } from '@/lib/tone-classes'
 import { OpenEpisodeSparkline } from './OpenEpisodeSparkline'
 import {
-  approvalStatusLabel,
   approvalStatusTone,
   outcomeLabel,
   outcomeTone,
@@ -67,85 +66,6 @@ export function RemediationWorkbench({
                 items that still need ownership, approval, or execution.
               </p>
             </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Metric
-              label="Software in scope"
-              value={String(data.summary.softwareInScope)}
-              active={!filters.decisionState && !filters.approvalStatus}
-              onClick={() =>
-                onFiltersChange({
-                  ...filters,
-                  decisionState: "",
-                  approvalStatus: "",
-                  missedMaintenanceWindow: false,
-                })
-              }
-            />
-            <Metric
-              label="With decision"
-              value={String(data.summary.withDecision)}
-              active={filters.decisionState === "WithDecision"}
-              onClick={() =>
-                onFiltersChange({
-                  ...filters,
-                  decisionState:
-                    filters.decisionState === "WithDecision"
-                      ? ""
-                      : "WithDecision",
-                  approvalStatus: "",
-                  missedMaintenanceWindow: false,
-                })
-              }
-            />
-            <Metric
-              label="Pending approval"
-              value={String(data.summary.pendingApproval)}
-              active={filters.approvalStatus === "PendingApproval"}
-              onClick={() =>
-                onFiltersChange({
-                  ...filters,
-                  approvalStatus:
-                    filters.approvalStatus === "PendingApproval"
-                      ? ""
-                      : "PendingApproval",
-                  decisionState: "",
-                  missedMaintenanceWindow: false,
-                })
-              }
-            />
-            <Metric
-              label="No decision"
-              value={String(data.summary.noDecision)}
-              active={filters.decisionState === "NoDecision"}
-              onClick={() =>
-                onFiltersChange({
-                  ...filters,
-                  decisionState:
-                    filters.decisionState === "NoDecision" ? "" : "NoDecision",
-                  approvalStatus: "",
-                  missedMaintenanceWindow: false,
-                })
-              }
-            />
-            <Metric
-              label="Missed maintenance"
-              value={String(data.items.filter((item) =>
-                item.maintenanceWindowDate
-                && new Date(item.maintenanceWindowDate).getTime() < renderedAt
-                && item.totalVulnerabilities > 0
-              ).length)}
-              active={filters.missedMaintenanceWindow}
-              onClick={() =>
-                onFiltersChange({
-                  ...filters,
-                  missedMaintenanceWindow: !filters.missedMaintenanceWindow,
-                  decisionState: "",
-                  approvalStatus: "",
-                })
-              }
-            />
           </div>
         </div>
       </header>
@@ -335,12 +255,14 @@ export function RemediationWorkbench({
                           {item.maintenanceWindowDate ? (
                             <span
                               className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-                                new Date(item.maintenanceWindowDate).getTime() < renderedAt && item.totalVulnerabilities > 0
-                                  ? toneBadge('danger')
-                                  : toneBadge('neutral')
+                                new Date(item.maintenanceWindowDate).getTime() <
+                                  renderedAt && item.totalVulnerabilities > 0
+                                  ? toneBadge("danger")
+                                  : toneBadge("neutral")
                               }`}
                             >
-                              Maintenance {formatDate(item.maintenanceWindowDate)}
+                              Maintenance{" "}
+                              {formatDate(item.maintenanceWindowDate)}
                             </span>
                           ) : null}
                           {item.remediationCaseId ? (
@@ -362,15 +284,15 @@ export function RemediationWorkbench({
                         </span>
                       ) : item.outcome ? (
                         <div className="space-y-1">
-                          {item.approvalStatus === 'PendingApproval' ? (
+                          {item.approvalStatus === "PendingApproval" ? (
                             <>
                               <span
-                                className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge('warning')}`}
+                                className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge("warning")}`}
                               >
                                 Proposed: {outcomeLabel(item.outcome)}
                               </span>
                               <span
-                                className={`ml-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(approvalStatusTone('PendingApproval'))}`}
+                                className={`ml-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneBadge(approvalStatusTone("PendingApproval"))}`}
                               >
                                 Pending approval
                               </span>
@@ -390,15 +312,18 @@ export function RemediationWorkbench({
                           {item.maintenanceWindowDate ? (
                             <p
                               className={`text-[10px] ${
-                                new Date(item.maintenanceWindowDate).getTime() < renderedAt && item.totalVulnerabilities > 0
-                                  ? 'font-medium text-destructive'
-                                  : 'text-muted-foreground'
+                                new Date(item.maintenanceWindowDate).getTime() <
+                                  renderedAt && item.totalVulnerabilities > 0
+                                  ? "font-medium text-destructive"
+                                  : "text-muted-foreground"
                               }`}
                             >
-                              Maintenance {formatDate(item.maintenanceWindowDate)}
-                              {new Date(item.maintenanceWindowDate).getTime() < renderedAt && item.totalVulnerabilities > 0
-                                ? ' missed'
-                                : ''}
+                              Maintenance{" "}
+                              {formatDate(item.maintenanceWindowDate)}
+                              {new Date(item.maintenanceWindowDate).getTime() <
+                                renderedAt && item.totalVulnerabilities > 0
+                                ? " missed"
+                                : ""}
                             </p>
                           ) : null}
                         </div>
@@ -491,35 +416,6 @@ export function RemediationWorkbench({
       </section>
     </section>
   );
-}
-
-function Metric({
-  label,
-  value,
-  active = false,
-  onClick,
-}: {
-  label: string
-  value: string
-  active?: boolean
-  onClick?: () => void
-}) {
-  const content = (
-    <div className={`rounded-2xl border px-4 py-3 transition ${active ? 'border-primary/40 bg-primary/10' : 'border-border/70 bg-background/70'}`}>
-      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-[-0.03em]">{value}</p>
-    </div>
-  )
-
-  if (!onClick) {
-    return content
-  }
-
-  return (
-    <button type="button" onClick={onClick} className="text-left">
-      {content}
-    </button>
-  )
 }
 
 function LabeledFilter({ label, children }: { label: string; children: ReactNode }) {

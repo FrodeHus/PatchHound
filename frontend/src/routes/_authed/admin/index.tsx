@@ -227,27 +227,22 @@ function AdminLandingPage() {
                   <Link key={area.to} to={area.to} className="block">
                     <Card className="h-full rounded-2xl border-border/70 bg-card/92 transition hover:border-primary/30 hover:bg-accent/10">
                       <CardHeader className="space-y-4">
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3">
                           <div className="rounded-2xl border border-border/70 bg-background/50 p-3">
                             <Icon className="size-5 text-primary" />
                           </div>
-                          <ChevronRight className="size-5 text-muted-foreground" />
-                        </div>
-                        <div>
                           <CardTitle>{area.title}</CardTitle>
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {area.description}
-                          </p>
+                          <ChevronRight className="size-5 text-muted-foreground" />
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                          Open section
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {area.description}
                         </p>
                       </CardContent>
                     </Card>
                   </Link>
-                )
+                );
               })}
             </div>
           </section>

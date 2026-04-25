@@ -2145,6 +2145,68 @@ namespace PatchHound.Infrastructure.Migrations
                     b.ToTable("Notifications");
                 });
 
+            modelBuilder.Entity("PatchHound.Core.Entities.NvdCveCache", b =>
+                {
+                    b.Property<string>("CveId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("CachedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConfigurationsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("CvssScore")
+                        .HasColumnType("numeric(4,2)");
+
+                    b.Property<string>("CvssVector")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("");
+
+                    b.Property<DateTimeOffset>("FeedLastModified")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("PublishedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReferencesJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("CveId");
+
+                    b.HasIndex("FeedLastModified");
+
+                    b.HasIndex("PublishedDate");
+
+                    b.ToTable("NvdCveCache");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.NvdFeedCheckpoint", b =>
+                {
+                    b.Property<string>("FeedName")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset>("FeedLastModified")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("SyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("FeedName");
+
+                    b.ToTable("NvdFeedCheckpoints");
+                });
+
             modelBuilder.Entity("PatchHound.Core.Entities.OrganizationalSeverity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3778,6 +3840,9 @@ namespace PatchHound.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<bool>("IsPendingDeletion")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsPrimary")
                         .HasColumnType("boolean");
 
@@ -3912,6 +3977,46 @@ namespace PatchHound.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("TenantAiProfiles");
+                });
+
+            modelBuilder.Entity("PatchHound.Core.Entities.TenantDeletionJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
+
+                    b.ToTable("TenantDeletionJobs");
                 });
 
             modelBuilder.Entity("PatchHound.Core.Entities.TenantRiskScoreSnapshot", b =>

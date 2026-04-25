@@ -24,6 +24,7 @@ builder.Services.AddHostedService<SlaCheckWorker>();
 builder.Services.AddHostedService<WorkflowWorker>();
 builder.Services.AddHostedService<ApprovalExpiryWorker>();
 builder.Services.AddHostedService<ScanSchedulerWorker>();
+builder.Services.AddHostedService<NvdFeedSyncWorker>();
 
 var host = builder.Build();
 

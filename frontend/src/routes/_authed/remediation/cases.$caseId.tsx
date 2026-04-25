@@ -37,5 +37,5 @@ function RemediationCaseRoute() {
     )
   }
 
-  return <SoftwareRemediationView data={data} caseId={caseId} />
+  return <SoftwareRemediationView data={data} caseId={caseId} tenantSoftwareId={caseId} />
 }

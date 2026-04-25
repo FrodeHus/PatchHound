@@ -22,6 +22,7 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<TenantDeletionJob> TenantDeletionJobs => Set<TenantDeletionJob>();
     public DbSet<SourceSystem> SourceSystems => Set<SourceSystem>();
     public DbSet<SoftwareProduct> SoftwareProducts => Set<SoftwareProduct>();
     public DbSet<SoftwareAlias> SoftwareAliases => Set<SoftwareAlias>();
@@ -52,6 +53,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         Set<EnrichmentSourceConfiguration>();
     public DbSet<EnrichmentJob> EnrichmentJobs => Set<EnrichmentJob>();
     public DbSet<EnrichmentRun> EnrichmentRuns => Set<EnrichmentRun>();
+    public DbSet<NvdCveCache> NvdCveCache => Set<NvdCveCache>();
+    public DbSet<NvdFeedCheckpoint> NvdFeedCheckpoints => Set<NvdFeedCheckpoint>();
     public DbSet<TenantSlaConfiguration> TenantSlaConfigurations => Set<TenantSlaConfiguration>();
     public DbSet<TenantAiProfile> TenantAiProfiles => Set<TenantAiProfile>();
     public DbSet<User> Users => Set<User>();

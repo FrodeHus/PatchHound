@@ -30,11 +30,14 @@ import { FilterBuilder } from './FilterBuilder'
 
 type DeviceRuleWizardProps = {
   mode: 'create' | 'edit'
+  tenantId?: string
   initialData?: DeviceRule
   securityProfiles: SecurityProfile[]
   businessLabels: BusinessLabel[]
   teams: TeamItem[]
   scanProfiles: ScanProfile[]
+  onCancel?: () => void
+  onSaved?: (rule: DeviceRule) => void | Promise<void>
 }
 
 const steps = ['Basic Info', 'Filters', 'Operations', 'Summary'] as const
@@ -47,7 +50,17 @@ const criticalityOptions = [
 
 const emptyFilter: FilterGroup = { type: 'group', operator: 'AND', conditions: [] }
 
-export function DeviceRuleWizard({ mode, initialData, securityProfiles, businessLabels, teams, scanProfiles }: DeviceRuleWizardProps) {
+export function DeviceRuleWizard({
+  mode,
+  tenantId,
+  initialData,
+  securityProfiles,
+  businessLabels,
+  teams,
+  scanProfiles,
+  onCancel,
+  onSaved,
+}: DeviceRuleWizardProps) {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [name, setName] = useState(initialData?.name ?? '')
@@ -63,7 +76,7 @@ export function DeviceRuleWizard({ mode, initialData, securityProfiles, business
   const [preview, setPreview] = useState<FilterPreview | null>(null)
 
   const previewMutation = useMutation({
-    mutationFn: async () => previewDeviceRuleFilter({ data: { filterDefinition: filter } }),
+    mutationFn: async () => previewDeviceRuleFilter({ data: { tenantId, filterDefinition: filter } }),
     onSuccess: (data) => setPreview(data),
   })
 
@@ -72,6 +85,7 @@ export function DeviceRuleWizard({ mode, initialData, securityProfiles, business
       if (mode === 'edit' && initialData) {
         return updateDeviceRule({
           data: {
+            tenantId,
             id: initialData.id,
             name,
             description: description || undefined,
@@ -83,6 +97,7 @@ export function DeviceRuleWizard({ mode, initialData, securityProfiles, business
       }
       return createDeviceRule({
         data: {
+          tenantId,
           name,
           description: description || undefined,
           filterDefinition: filter,
@@ -90,9 +105,13 @@ export function DeviceRuleWizard({ mode, initialData, securityProfiles, business
         },
       })
     },
-    onSuccess: async () => {
+    onSuccess: async (rule) => {
       toast.success(mode === 'create' ? 'Rule created' : 'Changes saved')
-      await router.navigate({ to: '/admin/device-rules', search: { page: 1, pageSize: 25 } })
+      if (onSaved) {
+        await onSaved(rule)
+      } else {
+        await router.navigate({ to: '/admin/device-rules', search: { page: 1, pageSize: 25 } })
+      }
       await router.invalidate()
     },
     onError: (error) => {
@@ -388,12 +407,17 @@ export function DeviceRuleWizard({ mode, initialData, securityProfiles, business
             type="button"
             variant="ghost"
             className="text-muted-foreground"
-            onClick={() =>
-              router.navigate({
+            onClick={() => {
+              if (onCancel) {
+                onCancel()
+                return
+              }
+
+              void router.navigate({
                 to: "/admin/device-rules",
                 search: { page: 1, pageSize: 25 },
               })
-            }
+            }}
           >
             Cancel
           </Button>

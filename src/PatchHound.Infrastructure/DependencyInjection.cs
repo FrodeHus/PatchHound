@@ -93,6 +93,7 @@ public static class DependencyInjection
         services.AddScoped<SlaService>();
         services.AddScoped<RemediationCaseService>();
         services.AddScoped<RemediationWorkflowService>();
+        services.AddScoped<TenantDeletionService>();
         services.AddScoped<PatchingTaskService>();
         services.AddScoped<ApprovalTaskService>();
         services.AddScoped<RemediationDecisionService>();
@@ -162,15 +163,15 @@ public static class DependencyInjection
         // Vulnerability Sources
         services.AddScoped<IIngestionSource, DefenderVulnerabilitySource>();
         services.AddScoped<IIngestionSource, EntraApplicationSource>();
-        services.AddScoped<NvdVulnerabilitySource>();
         services
             .AddHttpClient<DefenderApiClient>()
             .AddDefenderHttpPolicies();
         services
             .AddHttpClient<MailgunEmailSender>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
-        services.AddHttpClient<NvdApiClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 1);
         services.AddHttpClient<EndOfLifeApiClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 2);
+        services.AddHttpClient<NvdFeedSyncService>()
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services.AddHttpClient<SupplyChainCatalogClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services
             .AddHttpClient<ISecretStore, OpenBaoSecretStore>()
@@ -180,7 +181,6 @@ public static class DependencyInjection
         services
             .AddHttpClient<EntraGraphApiClient>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
-        services.AddScoped<NvdGlobalConfigurationProvider>();
         services
             .AddOptions<OpenBaoOptions>()
             .Bind(configuration.GetSection(OpenBaoOptions.SectionName))

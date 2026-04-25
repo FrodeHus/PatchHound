@@ -6,7 +6,7 @@ import { VulnerabilityTable } from '@/components/features/vulnerabilities/Vulner
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { buildVulnerabilitiesListRequest, vulnerabilityQueryKeys } from '@/features/vulnerabilities/list-state'
 import { vulnerabilityStatusOptions } from '@/lib/options/vulnerabilities'
-import { baseListSearchSchema, searchBooleanSchema, searchStringSchema } from '@/routes/-list-search'
+import { baseListSearchSchema, searchBooleanSchema, searchBooleanTrueSchema, searchStringSchema } from '@/routes/-list-search'
 import { createListSearchUpdater } from '@/routes/-list-search-helpers'
 
 const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
@@ -18,7 +18,7 @@ const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
   publicExploitOnly: searchBooleanSchema,
   knownExploitedOnly: searchBooleanSchema,
   activeAlertOnly: searchBooleanSchema,
-  presentOnly: searchBooleanSchema,
+  presentOnly: searchBooleanTrueSchema,
 })
 
 export const Route = createFileRoute('/_authed/vulnerabilities/')({
@@ -120,7 +120,7 @@ function VulnerabilitiesPage() {
             publicExploitOnly: false,
             knownExploitedOnly: false,
             activeAlertOnly: false,
-            presentOnly: false,
+            presentOnly: true,
           })
         }}
       />

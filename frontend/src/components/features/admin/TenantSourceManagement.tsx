@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useRouter } from '@tanstack/react-router'
+import { useRouter } from "@tanstack/react-router";
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, CircleHelp, Clock, PenSquare, RotateCw, Square, X } from 'lucide-react'
@@ -168,7 +168,8 @@ export function TenantSourceManagement({
         <div className="space-y-1">
           <h2 className="text-lg font-semibold">Tenant Sources</h2>
           <p className="text-sm text-muted-foreground">
-            Credentials and schedules used by the worker to collect inventory and vulnerability data.
+            Credentials and schedules used by the worker to collect inventory
+            and vulnerability data.
           </p>
         </div>
 
@@ -186,9 +187,7 @@ export function TenantSourceManagement({
                   <TableHead className="h-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                     Last run
                   </TableHead>
-                  <TableHead className="h-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                    Credentials
-                  </TableHead>
+
                   <TableHead className="h-9 pr-4 text-right text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                     Actions
                   </TableHead>
@@ -196,47 +195,60 @@ export function TenantSourceManagement({
               </TableHeader>
               <TableBody>
                 {sources.map((source) => {
-                  const isConfigured = Boolean(source.credentials.clientId || source.credentials.hasSecret)
-                  const statusTone = getSourceStatusTone(source)
-                  const statusLabel = source.runtime.lastStatus ?? (isConfigured ? 'Configured' : 'Needs credentials')
-                  const recoverableFailure = isRecoverableFailure(source)
-                  const activeRunId = source.runtime.activeIngestionRunId
+                  const isConfigured = Boolean(
+                    source.credentials.clientId || source.credentials.hasSecret,
+                  );
+                  const statusTone = getSourceStatusTone(source);
+                  const statusLabel =
+                    source.runtime.lastStatus ??
+                    (isConfigured ? "Configured" : "Needs credentials");
+                  const recoverableFailure = isRecoverableFailure(source);
+                  const activeRunId = source.runtime.activeIngestionRunId;
 
                   return (
                     <TableRow
                       key={source.key}
                       className={cn(
-                        'border-border/50',
-                        editingSourceKey === source.key && 'bg-primary/[0.04]',
+                        "border-border/50",
+                        editingSourceKey === source.key && "bg-primary/[0.04]",
                       )}
                     >
                       {/* Source name + key */}
                       <TableCell className="py-3 pl-4">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-foreground">{source.displayName}</span>
-                          <span className="rounded-full border border-border/60 bg-muted/30 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                            {source.key}
+                          <span className="font-medium text-foreground">
+                            {source.displayName}
                           </span>
                           {!source.enabled ? (
-                            <Badge variant="outline" className="text-[11px]">Disabled</Badge>
+                            <Badge variant="outline" className="text-[11px]">
+                              Disabled
+                            </Badge>
                           ) : null}
                         </div>
                         <p className="mt-0.5 text-[11px] text-muted-foreground">
-                          {source.supportsScheduling ? source.syncSchedule : 'Worker-managed'}
+                          {source.supportsScheduling
+                            ? source.syncSchedule
+                            : "Worker-managed"}
                         </p>
                       </TableCell>
 
                       {/* Status */}
                       <TableCell className="py-3">
-                        <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
+                        <StatusBadge tone={statusTone}>
+                          {statusLabel}
+                        </StatusBadge>
                       </TableCell>
 
                       {/* Last run */}
                       <TableCell className="py-3">
-                        <p className="text-[13px]">{formatTimestamp(source.runtime.lastCompletedAt)}</p>
-                        {source.runtime.lastSucceededAt !== source.runtime.lastCompletedAt ? (
+                        <p className="text-[13px]">
+                          {formatTimestamp(source.runtime.lastCompletedAt)}
+                        </p>
+                        {source.runtime.lastSucceededAt !==
+                        source.runtime.lastCompletedAt ? (
                           <p className="mt-0.5 text-[11px] text-muted-foreground">
-                            Last success {formatTimestamp(source.runtime.lastSucceededAt)}
+                            Last success{" "}
+                            {formatTimestamp(source.runtime.lastSucceededAt)}
                           </p>
                         ) : null}
                         {source.runtime.lastError ? (
@@ -249,14 +261,6 @@ export function TenantSourceManagement({
                         ) : null}
                       </TableCell>
 
-                      {/* Credentials */}
-                      <TableCell className="py-3">
-                        <div className="space-y-1">
-                          <CredentialDot label="Client ID" ok={Boolean(source.credentials.clientId)} />
-                          <CredentialDot label="Secret" ok={source.credentials.hasSecret} />
-                        </div>
-                      </TableCell>
-
                       {/* Actions */}
                       <TableCell className="py-3 pr-4">
                         <div className="flex items-center justify-end gap-1.5">
@@ -266,10 +270,17 @@ export function TenantSourceManagement({
                               variant="outline"
                               size="sm"
                               disabled={abortMutation.isPending}
-                              onClick={() => abortMutation.mutate({ sourceKey: source.key, runId: activeRunId })}
+                              onClick={() =>
+                                abortMutation.mutate({
+                                  sourceKey: source.key,
+                                  runId: activeRunId,
+                                })
+                              }
                             >
                               <Square className="size-3" />
-                              {abortingRunId === activeRunId ? 'Aborting…' : 'Abort'}
+                              {abortingRunId === activeRunId
+                                ? "Aborting…"
+                                : "Abort"}
                             </Button>
                           ) : null}
                           {source.supportsManualSync && !activeRunId ? (
@@ -277,15 +288,17 @@ export function TenantSourceManagement({
                               type="button"
                               variant="outline"
                               size="sm"
-                              disabled={syncMutation.isPending || !source.enabled}
+                              disabled={
+                                syncMutation.isPending || !source.enabled
+                              }
                               onClick={() => syncMutation.mutate(source.key)}
                             >
                               <RotateCw className="size-3" />
                               {syncingSourceKey === source.key
-                                ? 'Syncing…'
+                                ? "Syncing…"
                                 : recoverableFailure
-                                  ? 'Resume'
-                                  : 'Sync'}
+                                  ? "Resume"
+                                  : "Sync"}
                             </Button>
                           ) : null}
                           <Button
@@ -309,13 +322,16 @@ export function TenantSourceManagement({
                         </div>
                       </TableCell>
                     </TableRow>
-                  )
+                  );
                 })}
               </TableBody>
             </Table>
           </div>
         ) : (
-          <InsetPanel emphasis="subtle" className="border-dashed px-4 py-8 text-sm text-muted-foreground">
+          <InsetPanel
+            emphasis="subtle"
+            className="border-dashed px-4 py-8 text-sm text-muted-foreground"
+          >
             No sources are available for the selected tenant.
           </InsetPanel>
         )}
@@ -324,17 +340,16 @@ export function TenantSourceManagement({
         <Sheet
           open={editingSource !== null}
           onOpenChange={(open) => {
-            if (!open) onCloseEditor()
+            if (!open) onCloseEditor();
           }}
         >
           <SheetContent
             showCloseButton={false}
-            className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
+            className="flex flex-col gap-0 overflow-hidden p-0 max-w-xl"
             side="right"
           >
             {editingSource ? (
               <TenantSourceEditorSheetContent
-                tenant={tenant}
                 source={editingSource}
                 isSaving={mutation.isPending}
                 saveState={saveState}
@@ -342,8 +357,8 @@ export function TenantSourceManagement({
                 onClose={onCloseEditor}
                 onUpdateSource={updateSource}
                 onViewHistory={() => {
-                  onCloseEditor()
-                  onOpenHistory(editingSource.key)
+                  onCloseEditor();
+                  onOpenHistory(editingSource.key);
                 }}
               />
             ) : null}
@@ -351,13 +366,12 @@ export function TenantSourceManagement({
         </Sheet>
       </section>
     </TooltipProvider>
-  )
+  );
 }
 
 // ─── Editor sheet content ───────────────────────────────────────────────────
 
 function TenantSourceEditorSheetContent({
-  tenant,
   source,
   isSaving,
   saveState,
@@ -366,17 +380,16 @@ function TenantSourceEditorSheetContent({
   onUpdateSource,
   onViewHistory,
 }: {
-  tenant: TenantDetail
-  source: TenantIngestionSourceDraft
-  isSaving: boolean
-  saveState: 'idle' | 'saved' | 'error'
-  onSave: () => void
-  onClose: () => void
+  source: TenantIngestionSourceDraft;
+  isSaving: boolean;
+  saveState: "idle" | "saved" | "error";
+  onSave: () => void;
+  onClose: () => void;
   onUpdateSource: (
     key: string,
     mutate: (current: TenantIngestionSourceDraft) => TenantIngestionSourceDraft,
-  ) => void
-  onViewHistory: () => void
+  ) => void;
+  onViewHistory: () => void;
 }) {
   return (
     <>
@@ -385,10 +398,17 @@ function TenantSourceEditorSheetContent({
           <div>
             <SheetTitle>Edit {source.displayName}</SheetTitle>
             <SheetDescription className="mt-1">
-              Update runtime control, scheduling, and credentials for this source.
+              Update runtime control, scheduling, and credentials for this
+              source.
             </SheetDescription>
           </div>
-          <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} className="-mr-1 -mt-1 shrink-0">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onClose}
+            className="-mr-1 -mt-1 shrink-0"
+          >
             <X className="size-4" />
           </Button>
         </div>
@@ -397,16 +417,35 @@ function TenantSourceEditorSheetContent({
       <div className="flex-1 overflow-y-auto">
         {/* Posture summary */}
         <div className="space-y-3 border-b border-border/60 p-5">
-          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Source posture</p>
+          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+            Source posture
+          </p>
           <div className="divide-y divide-border/50 overflow-hidden rounded-lg border border-border/60">
-            <PostureRow label="Status" value={source.runtime.lastStatus ?? 'Unknown'} />
-            <PostureRow label="Last run" value={formatTimestamp(source.runtime.lastCompletedAt)} />
-            <PostureRow label="Last success" value={formatTimestamp(source.runtime.lastSucceededAt)} />
+            <PostureRow
+              label="Status"
+              value={source.runtime.lastStatus ?? "Unknown"}
+            />
+            <PostureRow
+              label="Last run"
+              value={formatTimestamp(source.runtime.lastCompletedAt)}
+            />
+            <PostureRow
+              label="Last success"
+              value={formatTimestamp(source.runtime.lastSucceededAt)}
+            />
           </div>
           {source.runtime.lastError ? (
-            <p className="text-xs text-destructive">Error: {source.runtime.lastError}</p>
+            <p className="text-xs text-destructive">
+              Error: {source.runtime.lastError}
+            </p>
           ) : null}
-          <Button type="button" variant="outline" size="sm" className="w-full" onClick={onViewHistory}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={onViewHistory}
+          >
             <Clock className="size-3.5" />
             View full run history
           </Button>
@@ -419,7 +458,8 @@ function TenantSourceEditorSheetContent({
               <div className="space-y-0.5">
                 <p className="text-sm font-medium">Enable source</p>
                 <p className="text-xs text-muted-foreground">
-                  Included in tenant ingestion schedule and credential validation.
+                  Included in tenant ingestion schedule and credential
+                  validation.
                 </p>
               </div>
               <input
@@ -429,7 +469,7 @@ function TenantSourceEditorSheetContent({
                   onUpdateSource(source.key, (current) => ({
                     ...current,
                     enabled: event.target.checked,
-                  }))
+                  }));
                 }}
               />
             </label>
@@ -440,35 +480,35 @@ function TenantSourceEditorSheetContent({
               <FieldBlock
                 label="Display Name"
                 tooltip="The operator-facing name shown for this source throughout the admin UI."
-                control={(
+                control={
                   <Input
                     value={source.displayName}
                     onChange={(event) => {
                       onUpdateSource(source.key, (current) => ({
                         ...current,
                         displayName: event.target.value,
-                      }))
+                      }));
                     }}
                     className="h-10"
                   />
-                )}
+                }
               />
               {source.supportsScheduling ? (
                 <FieldBlock
                   label="Sync Schedule"
                   tooltip="Cron expression used by the worker for recurring ingestion."
-                  control={(
+                  control={
                     <Input
                       value={source.syncSchedule}
                       onChange={(event) => {
                         onUpdateSource(source.key, (current) => ({
                           ...current,
                           syncSchedule: event.target.value,
-                        }))
+                        }));
                       }}
                       className="h-10"
                     />
-                  )}
+                  }
                 />
               ) : (
                 <div className="flex items-center rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
@@ -480,71 +520,39 @@ function TenantSourceEditorSheetContent({
 
           <FormSection title="Credentials">
             <div className="space-y-4">
-              <div className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                Uses tenant Entra ID:{' '}
-                <span className="font-medium text-foreground">{tenant.entraTenantId}</span>
-              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <FieldBlock
                   label="Client ID"
                   tooltip="Application client identifier used to authenticate against the source."
-                  control={(
+                  className="col-span-2"
+                  control={
                     <Input
                       value={source.credentials.clientId}
                       onChange={(event) => {
                         onUpdateSource(source.key, (current) => ({
                           ...current,
-                          credentials: { ...current.credentials, clientId: event.target.value },
-                        }))
+                          credentials: {
+                            ...current.credentials,
+                            clientId: event.target.value,
+                          },
+                        }));
                       }}
                       className="h-10"
                     />
-                  )}
-                />
-                <FieldBlock
-                  label="API Base URL"
-                  tooltip="Base endpoint used for provider API requests."
-                  control={(
-                    <Input
-                      value={source.credentials.apiBaseUrl}
-                      onChange={(event) => {
-                        onUpdateSource(source.key, (current) => ({
-                          ...current,
-                          credentials: { ...current.credentials, apiBaseUrl: event.target.value },
-                        }))
-                      }}
-                      className="h-10"
-                    />
-                  )}
-                />
-                <FieldBlock
-                  label="Token Scope"
-                  tooltip="OAuth scope requested when acquiring access tokens for this source."
-                  control={(
-                    <Input
-                      value={source.credentials.tokenScope}
-                      onChange={(event) => {
-                        onUpdateSource(source.key, (current) => ({
-                          ...current,
-                          credentials: { ...current.credentials, tokenScope: event.target.value },
-                        }))
-                      }}
-                      className="h-10"
-                    />
-                  )}
+                  }
                 />
                 <FieldBlock
                   label="Client Secret"
                   tooltip="Stored securely after save. Enter a new value only when rotating credentials."
                   className="sm:col-span-2"
-                  control={(
+                  control={
                     <Input
                       type="password"
                       value={source.credentials.secret}
                       placeholder={
                         source.credentials.hasSecret
-                          ? 'Stored in OpenBao — enter a new value to rotate'
-                          : 'Not configured'
+                          ? "Stored in OpenBao — enter a new value to rotate"
+                          : "Not configured"
                       }
                       onChange={(event) => {
                         onUpdateSource(source.key, (current) => ({
@@ -556,11 +564,51 @@ function TenantSourceEditorSheetContent({
                               current.credentials.hasSecret ||
                               event.target.value.trim().length > 0,
                           },
-                        }))
+                        }));
                       }}
                       className="h-10"
                     />
-                  )}
+                  }
+                />
+                <FieldBlock
+                  label="API Base URL"
+                  tooltip="Base endpoint used for provider API requests."
+                  className="col-span-2"
+                  control={
+                    <Input
+                      value={source.credentials.apiBaseUrl}
+                      onChange={(event) => {
+                        onUpdateSource(source.key, (current) => ({
+                          ...current,
+                          credentials: {
+                            ...current.credentials,
+                            apiBaseUrl: event.target.value,
+                          },
+                        }));
+                      }}
+                      className="h-10"
+                    />
+                  }
+                />
+                <FieldBlock
+                  label="Token Scope"
+                  tooltip="OAuth scope requested when acquiring access tokens for this source."
+                  className="col-span-2"
+                  control={
+                    <Input
+                      value={source.credentials.tokenScope}
+                      onChange={(event) => {
+                        onUpdateSource(source.key, (current) => ({
+                          ...current,
+                          credentials: {
+                            ...current.credentials,
+                            tokenScope: event.target.value,
+                          },
+                        }));
+                      }}
+                      className="h-10"
+                    />
+                  }
                 />
               </div>
             </div>
@@ -570,11 +618,15 @@ function TenantSourceEditorSheetContent({
 
       <SheetFooter className="mt-0 shrink-0 flex-row items-center justify-between gap-3 border-t border-border/60 p-5">
         <div className="text-xs">
-          {saveState === 'saved' ? (
-            <span className="text-tone-success-foreground">Configuration saved</span>
+          {saveState === "saved" ? (
+            <span className="text-tone-success-foreground">
+              Configuration saved
+            </span>
           ) : null}
-          {saveState === 'error' ? (
-            <span className="text-destructive">Save failed — review and retry</span>
+          {saveState === "error" ? (
+            <span className="text-destructive">
+              Save failed — review and retry
+            </span>
           ) : null}
         </div>
         <div className="flex gap-2">
@@ -582,12 +634,12 @@ function TenantSourceEditorSheetContent({
             Close
           </Button>
           <Button onClick={onSave} disabled={isSaving}>
-            {isSaving ? 'Saving…' : `Save ${source.displayName}`}
+            {isSaving ? "Saving…" : `Save ${source.displayName}`}
           </Button>
         </div>
       </SheetFooter>
     </>
-  )
+  );
 }
 
 // ─── History full-page view ─────────────────────────────────────────────────
@@ -604,19 +656,12 @@ function TenantSourceHistoryPage({
   return (
     <div className="space-y-5">
       <div className="space-y-3">
-        <Link
-          to="/admin/sources"
-          search={{ activeView: 'tenant' }}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Back to tenant sources
-        </Link>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
             <h2 className="text-2xl font-semibold tracking-tight">{`${source.displayName} history`}</h2>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Review ingestion batches, merge progress, and failure posture for this source.
+              Review ingestion batches, merge progress, and failure posture for
+              this source.
             </p>
           </div>
           <Button type="button" variant="outline" onClick={onBack}>
@@ -643,16 +688,28 @@ function TenantSourceHistoryPage({
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <InsetPanel emphasis="subtle" className="px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Current status</p>
-                <p className="mt-1 font-medium text-foreground">{source.runtime.lastStatus ?? 'Unknown'}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Current status
+                </p>
+                <p className="mt-1 font-medium text-foreground">
+                  {source.runtime.lastStatus ?? "Unknown"}
+                </p>
               </InsetPanel>
               <InsetPanel emphasis="subtle" className="px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Last run</p>
-                <p className="mt-1 font-medium text-foreground">{formatTimestamp(source.runtime.lastCompletedAt)}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Last run
+                </p>
+                <p className="mt-1 font-medium text-foreground">
+                  {formatTimestamp(source.runtime.lastCompletedAt)}
+                </p>
               </InsetPanel>
               <InsetPanel emphasis="subtle" className="px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Last success</p>
-                <p className="mt-1 font-medium text-foreground">{formatTimestamp(source.runtime.lastSucceededAt)}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Last success
+                </p>
+                <p className="mt-1 font-medium text-foreground">
+                  {formatTimestamp(source.runtime.lastSucceededAt)}
+                </p>
               </InsetPanel>
               {source.runtime.lastError ? (
                 <InsetPanel className="px-4 py-3 text-sm text-destructive">
@@ -667,9 +724,15 @@ function TenantSourceHistoryPage({
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <InsetPanel emphasis="subtle" className="px-4 py-3">
-                Use the source list for operational overview, then open full history here when you need batch-level or failure-level detail.
+                Use the source list for operational overview, then open full
+                history here when you need batch-level or failure-level detail.
               </InsetPanel>
-              <Button type="button" variant="outline" className="w-full justify-start" onClick={onBack}>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start"
+                onClick={onBack}
+              >
                 <ArrowLeft className="size-4" />
                 Back to source list
               </Button>
@@ -678,24 +741,11 @@ function TenantSourceHistoryPage({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Shared small components ────────────────────────────────────────────────
 
-function CredentialDot({ label, ok }: { label: string; ok: boolean }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span
-        className={cn(
-          'size-1.5 rounded-full',
-          ok ? 'bg-tone-success-foreground' : 'bg-destructive/70',
-        )}
-      />
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-    </div>
-  )
-}
 
 function PostureRow({ label, value }: { label: string; value: string }) {
   return (

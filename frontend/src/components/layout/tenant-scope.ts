@@ -9,6 +9,8 @@ export type TenantScopeContextValue = {
   tenants: Array<{ id: string; name: string }>
   isLoadingTenants: boolean
   setSelectedTenantId: (tenantId: string) => void
+  tenantPendingDeletion: boolean
+  clearTenantPendingDeletion: () => void
 }
 
 export const TenantScopeContext = createContext<TenantScopeContextValue | null>(null)

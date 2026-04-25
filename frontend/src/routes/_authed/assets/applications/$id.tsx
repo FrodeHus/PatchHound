@@ -93,7 +93,7 @@ function ApplicationDetailPage() {
       assignCloudApplicationOwner({ data: { id, teamId } }),
     onSuccess: () => {
       toast.success('Owner group updated.')
-      queryClient.invalidateQueries({ queryKey: ['cloud-application', selectedTenantId, id] })
+      void queryClient.invalidateQueries({ queryKey: ['cloud-application', selectedTenantId, id] })
     },
     onError: () => toast.error('Failed to update owner group.'),
   })

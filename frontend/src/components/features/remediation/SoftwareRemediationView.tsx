@@ -34,7 +34,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { toneBadge } from '@/lib/tone-classes'
 import type { Tone } from '@/lib/tone-classes'
-import { formatDate, formatDateTime, formatNullableDateTime, startCase } from '@/lib/formatting'
+import { formatDateTime, formatNullableDateTime, startCase } from '@/lib/formatting'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { softwareQueryKeys } from '@/features/software/list-state'
 import { RemediationSummaryCards } from './RemediationSummaryCards'
@@ -49,7 +49,6 @@ import {
   type RemediationStage,
   type RemediationStageId,
 } from './RemediationStageRail'
-import { VersionCohortChooser } from '@/components/features/software/VersionCohortChooser'
 import { OpenEpisodeSparkline } from './OpenEpisodeSparkline'
 import {
   outcomeLabel,
@@ -563,10 +562,7 @@ export function SoftwareRemediationView({
 
         <TabsContent value="devices" className="space-y-4 pt-1">
           <DevicesTab
-            detail={softwareDetail}
             installations={remediationInstallations}
-            selectedVersion={normalizedDeviceVersion}
-            onSelectVersion={setDeviceVersion}
             teamStatuses={teamStatuses}
           />
         </TabsContent>
@@ -1821,155 +1817,88 @@ function StageMetricCard({
 }
 
 function DevicesTab({
-  detail,
   installations,
-  selectedVersion,
-  onSelectVersion,
   teamStatuses,
 }: {
-  detail?: TenantSoftwareDetail
   installations?: PagedTenantSoftwareInstallations
-  selectedVersion: string
-  onSelectVersion: (version: string) => void
   teamStatuses: RemediationTaskTeamStatus[]
 }) {
   const items = installations?.items ?? []
-  const ownerTeamCount = new Set(items.map((item) => item.ownerTeamId).filter(Boolean)).size
-  const ownerUserCount = new Set(items.map((item) => item.ownerUserId).filter(Boolean)).size
   const teamStatusById = new Map(teamStatuses.map((status) => [status.ownerTeamId, status]))
 
   return (
-    <div className="space-y-4">
-      <Card className="rounded-[1.6rem] border-border/70">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Execution scope by version cohort</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {detail ? (
-            <VersionCohortChooser
-              title="Execution scope by version cohort"
-              description="Choose a cohort to see which devices and owner teams are involved in this remediation."
-              cohorts={detail.versionCohorts}
-              selectedVersion={selectedVersion}
-              onSelectVersion={onSelectVersion}
-              formatVersion={formatVersion}
-              normalizeVersion={normalizeVersion}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Loading version cohorts for this software scope.
-            </p>
-          )}
-
-          <div className="grid gap-3 md:grid-cols-3">
-            <StageMetricCard
-              label="Visible devices"
-              value={items.length.toLocaleString()}
-              detail="Devices in the selected version cohort"
-            />
-            <StageMetricCard
-              label="Assigned owner teams"
-              value={ownerTeamCount.toLocaleString()}
-              detail="Teams with explicit ownership in this cohort"
-            />
-            <StageMetricCard
-              label="Named owners"
-              value={ownerUserCount.toLocaleString()}
-              detail="Devices carrying direct user ownership"
-            />
+    <Card className="rounded-[1.6rem] border-border/70">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">Affected devices</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {items.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-8 text-center text-sm text-muted-foreground">
+            No affected devices found.
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-[1.6rem] border-border/70">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Affected devices</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {items.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-8 text-center text-sm text-muted-foreground">
-              No active devices were found for this version cohort.
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-border/70">
-              <table className="min-w-full divide-y divide-border/70 text-sm">
-                <thead className="bg-muted/30 text-left text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Device</th>
-                    <th className="px-4 py-3 font-medium">Owner</th>
-                    <th className="px-4 py-3 font-medium">Task status</th>
-                    <th className="px-4 py-3 font-medium">Criticality</th>
-                    <th className="px-4 py-3 font-medium">Open vulns</th>
-                    <th className="px-4 py-3 font-medium">Detected since</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60 bg-card">
-                  {items.map((item) => (
-                    <tr key={`${item.deviceAssetId}-${item.softwareAssetId}`} className="align-top">
-                      {(() => {
-                        const teamStatus = item.ownerTeamId ? teamStatusById.get(item.ownerTeamId) : undefined
-                        return (
-                          <>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-border/70">
+            <table className="min-w-full divide-y divide-border/70 text-sm">
+              <thead className="bg-muted/30 text-left text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Device</th>
+                  <th className="px-4 py-3 font-medium">Risk</th>
+                  <th className="px-4 py-3 font-medium">Criticality</th>
+                  <th className="px-4 py-3 font-medium">Open vulns</th>
+                  <th className="px-4 py-3 font-medium">Owner</th>
+                  <th className="px-4 py-3 font-medium">Task status</th>
+                  <th className="px-4 py-3 font-medium">Version</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60 bg-card">
+                {items.map((item) => {
+                  const teamStatus = item.ownerTeamId ? teamStatusById.get(item.ownerTeamId) : undefined
+                  return (
+                    <tr key={`${item.deviceAssetId}-${item.softwareAssetId}`} className="hover:bg-muted/20">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-foreground">{item.deviceName}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {formatVersion(item.version)} · episode {item.currentEpisodeNumber}
-                        </div>
+                        <Link
+                          to="/devices/$id"
+                          params={{ id: item.deviceAssetId }}
+                          className="font-medium text-foreground hover:underline"
+                        >
+                          {item.deviceName}
+                        </Link>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-foreground">
-                          {item.ownerTeamName ?? item.ownerUserName ?? 'Unassigned'}
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {item.ownerTeamName
-                            ? 'Team owner'
-                            : item.ownerUserName
-                              ? 'Named owner'
-                              : 'No owner assigned'}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {teamStatus ? (
-                          <>
-                            <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${toneBadge(taskStatusTone(teamStatus.status))}`}>
-                              {taskStatusLabel(teamStatus.status)}
-                            </span>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Due {formatDate(teamStatus.dueDate)}
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Maintenance {teamStatus.maintenanceWindowDate ? formatDate(teamStatus.maintenanceWindowDate) : 'Not scheduled'}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-xs text-muted-foreground">
-                            No owner-team task
-                          </div>
-                        )}
+                      <td className="px-4 py-3 font-semibold tabular-nums text-foreground">
+                        {item.currentRiskScore != null ? Math.round(item.currentRiskScore) : '—'}
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex rounded-full border border-border/70 bg-background px-2 py-0.5 text-xs font-medium">
                           {item.deviceCriticality}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-foreground">
+                      <td className="px-4 py-3 tabular-nums text-foreground">
                         {item.openVulnerabilityCount.toLocaleString()}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {formatDateTime(item.lastSeenAt)}
+                        {item.ownerTeamName ?? item.ownerUserName ?? <span className="italic">Unassigned</span>}
                       </td>
-                          </>
-                        )
-                      })()}
+                      <td className="px-4 py-3">
+                        {teamStatus ? (
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${toneBadge(taskStatusTone(teamStatus.status))}`}>
+                            {taskStatusLabel(teamStatus.status)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {item.version ?? '—'}
+                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -2026,10 +1955,6 @@ function DecisionHistorySection({
       </CardContent>
     </Card>
   )
-}
-
-function formatVersion(version: string | null) {
-  return version?.trim() || 'Version unknown'
 }
 
 function normalizeVersion(version: string | null) {

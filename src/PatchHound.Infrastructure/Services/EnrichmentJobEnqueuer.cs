@@ -57,7 +57,8 @@ public class EnrichmentJobEnqueuer(
             .Where(source =>
                 string.Equals(source.SourceKey, EnrichmentSourceCatalog.DefenderSourceKey, StringComparison.OrdinalIgnoreCase)
                     ? defenderConfiguredForTenant
-                    : !string.IsNullOrWhiteSpace(source.SecretRef))
+                    : string.Equals(source.SourceKey, EnrichmentSourceCatalog.NvdSourceKey, StringComparison.OrdinalIgnoreCase)
+                        || !string.IsNullOrWhiteSpace(source.SecretRef))
             .Select(source => source.SourceKey)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
