@@ -8,6 +8,7 @@ public interface IEnrichmentSourceRunner
     string SourceKey { get; }
     EnrichmentTargetModel TargetModel { get; }
     TimeSpan MinimumDelay { get; }
+    int MaxJobsPerCycle { get; }
 
     Task<EnrichmentJobExecutionResult> ExecuteAsync(EnrichmentJob job, CancellationToken ct);
 }
