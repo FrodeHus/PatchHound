@@ -199,16 +199,16 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                 variant="outline"
                 className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-primary"
               >
-                Device owner view
+                Asset owner view
               </Badge>
               <div>
                 <h1 className="text-3xl font-semibold tracking-[-0.06em] sm:text-4xl">
-                  What needs your attention on the devices you own
+                  What needs your attention on the assets you own
                 </h1>
                 <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground">
-                  This view focuses only on the devices you are responsible for.
+                  This view focuses only on the assets you are responsible for.
                   It is written to answer three questions quickly: which
-                  software on your devices needs attention, what matters most,
+                  software on your assets needs attention, what matters most,
                   and what you need to do next.
                 </p>
               </div>
@@ -224,7 +224,7 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
               <div>
                 <CardTitle>Action list</CardTitle>
                 <CardDescription className="mt-1">
-                  The software on devices you own that needs follow-through.
+                  The software on assets you own that needs follow-through.
                 </CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -457,15 +457,15 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
         </Card>
 
         <Card
-          id="owned-devices-needing-attention"
+          id="owned-assets-needing-attention"
           className="rounded-[1.6rem] border-border/70"
         >
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <CardTitle>Devices under the most pressure</CardTitle>
+                <CardTitle>Assets under the most pressure</CardTitle>
                 <CardDescription className="mt-1">
-                  Your owned devices with the highest current risk.
+                  Your owned assets with the highest current risk.
                 </CardDescription>
               </div>
               <div className="flex rounded-lg border border-border/70 text-[11px]">
@@ -543,7 +543,7 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
                       <Link to="/devices/$id" params={{ id: item.assetId }} />
                     }
                   >
-                    Review device
+                    Review asset
                   </Button>
                 </div>
               </div>
@@ -551,7 +551,7 @@ export function DeviceOwnerOverview({ summary, isLoading }: Props) {
 
             {visibleDevices.length === 0 ? (
               <div className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-10 text-center text-sm text-muted-foreground">
-                No owned devices with active pressure were found.
+                No owned assets with active pressure were found.
               </div>
             ) : null}
           </CardContent>

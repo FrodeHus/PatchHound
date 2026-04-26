@@ -4,11 +4,11 @@ import { fetchOwnerAssetsNeedingAttention } from '@/api/dashboard.functions'
 import { DeviceOwnerAttentionView } from '@/components/features/dashboard/DeviceOwnerAttentionView'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 
-export const Route = createFileRoute('/_authed/dashboard/my-devices/attention')({
-  component: MyDevicesAttentionPage,
+export const Route = createFileRoute('/_authed/dashboard/my-assets/attention')({
+  component: MyAssetsAttentionPage,
 })
 
-function MyDevicesAttentionPage() {
+function MyAssetsAttentionPage() {
   const { selectedTenantId } = useTenantScope()
 
   const attentionQuery = useQuery({

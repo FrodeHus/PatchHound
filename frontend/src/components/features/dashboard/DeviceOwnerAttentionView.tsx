@@ -76,10 +76,10 @@ export function DeviceOwnerAttentionView({ items, isLoading }: Props) {
               </Badge>
               <div>
                 <h1 className="text-3xl font-semibold tracking-[-0.06em] sm:text-4xl">
-                  Your devices that need attention now
+                  Your assets that need attention now
                 </h1>
                 <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground">
-                  This is the owner-scoped list behind the dashboard metric. It only includes devices you own that currently carry elevated risk pressure and should be reviewed rather than left in routine monitoring.
+                  This is the owner-scoped list behind the dashboard metric. It only includes assets you own that currently carry elevated risk pressure and should be reviewed rather than left in routine monitoring.
                 </p>
               </div>
             </div>
@@ -94,7 +94,7 @@ export function DeviceOwnerAttentionView({ items, isLoading }: Props) {
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{visible.length}</div>
                 </div>
               )}
-              <Button variant="outline" render={<Link to="/dashboard/my-devices" />}>
+              <Button variant="outline" render={<Link to="/dashboard/my-assets" />}>
                 <ArrowLeft className="mr-2 size-4" />
                 Back to dashboard
               </Button>
@@ -107,7 +107,7 @@ export function DeviceOwnerAttentionView({ items, isLoading }: Props) {
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <CardTitle>Devices needing attention</CardTitle>
+              <CardTitle>Assets needing attention</CardTitle>
               <CardDescription className="mt-1">
                 Ordered by current risk score, with the strongest driver shown in plain language.
               </CardDescription>
@@ -141,11 +141,11 @@ export function DeviceOwnerAttentionView({ items, isLoading }: Props) {
         <CardContent className="space-y-3">
           {isLoading ? (
             <div className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-10 text-center text-sm text-muted-foreground">
-              Loading your owned devices…
+              Loading your owned assets…
             </div>
           ) : visible.length === 0 ? (
             <div className="rounded-[1.2rem] border border-border/60 bg-background/35 px-4 py-10 text-center text-sm text-muted-foreground">
-              {items.length === 0 ? 'No owned devices currently need attention.' : 'No devices match the current filter.'}
+              {items.length === 0 ? 'No owned assets currently need attention.' : 'No assets match the current filter.'}
             </div>
           ) : (
             visible.map((item) => (
@@ -167,7 +167,7 @@ export function DeviceOwnerAttentionView({ items, isLoading }: Props) {
                     </div>
                     <div className="mt-2 text-lg font-medium tracking-tight">{item.assetName}</div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      {item.topDriverSummary || 'This device has unresolved exposure that should be reviewed.'}
+                      {item.topDriverSummary || 'This asset has unresolved exposure that should be reviewed.'}
                     </div>
                     <div className="mt-2 text-sm text-muted-foreground">
                       {item.openEpisodeCount} open exposure items
@@ -195,7 +195,7 @@ export function DeviceOwnerAttentionView({ items, isLoading }: Props) {
 
                 <div className="mt-3">
                   <Button size="sm" variant="outline" render={<Link to="/devices/$id" params={{ id: item.assetId }} />}>
-                    Review device
+                    Review asset
                   </Button>
                 </div>
               </div>

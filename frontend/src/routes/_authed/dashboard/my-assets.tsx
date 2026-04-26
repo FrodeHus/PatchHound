@@ -4,11 +4,11 @@ import { fetchOwnerDashboardSummary } from '@/api/dashboard.functions'
 import { DeviceOwnerOverview } from '@/components/features/dashboard/DeviceOwnerOverview'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 
-export const Route = createFileRoute('/_authed/dashboard/my-devices')({
-  component: MyDevicesDashboardPage,
+export const Route = createFileRoute('/_authed/dashboard/my-assets')({
+  component: MyAssetsDashboardPage,
 })
 
-function MyDevicesDashboardPage() {
+function MyAssetsDashboardPage() {
   const { selectedTenantId } = useTenantScope()
 
   const ownerSummaryQuery = useQuery({
