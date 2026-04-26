@@ -8,7 +8,6 @@ import type { AdvancedToolAssetExecutionResult, AdvancedToolCatalog } from '@/ap
 import type { DeviceDetail, DeviceExposure } from '@/api/devices.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DataTable } from '@/components/ui/data-table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -55,8 +54,8 @@ export function DeviceAdvancedToolsPanel({ device, exposures }: Props) {
   const selectedTool = tools.find((tool) => tool.id === selectedToolId) ?? null
 
   return (
-    <Card className="rounded-3xl border-border/70 bg-card/94">
-      <CardHeader>
+    <section className="space-y-4 rounded-2xl border border-border/70 bg-background p-4">
+      <div>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -67,19 +66,18 @@ export function DeviceAdvancedToolsPanel({ device, exposures }: Props) {
                 <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                   Advanced tools
                 </p>
-                <CardTitle>Run Defender KQL tools</CardTitle>
+                <h2 className="text-lg font-semibold">Run Defender KQL tools</h2>
               </div>
             </div>
-            <CardDescription>
+            <p className="text-sm text-muted-foreground">
               Run investigation tools using Defender advanced hunting.
-            </CardDescription>
+            </p>
           </div>
           <Badge variant="outline" className="rounded-full border-border/70 bg-background/50">
             Defender-backed device
           </Badge>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      </div>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -211,8 +209,6 @@ export function DeviceAdvancedToolsPanel({ device, exposures }: Props) {
             onOpenReport={() => setReportOpen(true)}
           />
         ) : null}
-      </CardContent>
-
       <Dialog open={rawResultsOpen} onOpenChange={setRawResultsOpen}>
         <DialogContent
           size="lg"
@@ -240,7 +236,7 @@ export function DeviceAdvancedToolsPanel({ device, exposures }: Props) {
           ) : null}
         </DialogContent>
       </Dialog>
-    </Card>
+    </section>
   )
 }
 

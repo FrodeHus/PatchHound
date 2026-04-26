@@ -595,7 +595,7 @@ function AdvancedToolWorkbench({
           </div>
         ) : null}
 
-        <div className="space-y-4 rounded-3xl border border-border/70 bg-background/60 p-4">
+        <div className="space-y-4 border-t border-border/70 pt-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
               <h3 className="text-sm font-medium">
@@ -642,21 +642,19 @@ function AdvancedToolWorkbench({
                   {testMutation.data.results.length} rows returned from Defender advanced hunting.
                 </p>
               </div>
-              <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/70">
-                <div className="max-h-[28rem] overflow-auto">
-                  <DataTable
-                    columns={columns}
-                    data={testMutation.data.results}
-                    className="min-w-max"
-                    emptyState={<span className="text-sm text-muted-foreground">The query returned no rows.</span>}
-                  />
-                </div>
+              <div className="max-h-[28rem] overflow-auto rounded-2xl border border-border/70">
+                <DataTable
+                  columns={columns}
+                  data={testMutation.data.results}
+                  className="min-w-max"
+                  emptyState={<span className="text-sm text-muted-foreground">The query returned no rows.</span>}
+                />
               </div>
             </div>
           ) : null}
 
           {aiSummaryMutation.data && currentStep === 2 ? (
-            <div className="space-y-4 rounded-2xl border border-border/70 bg-card/70 p-4">
+            <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge>{aiSummaryMutation.data.profileName}</Badge>
                 <Badge variant="outline">{aiSummaryMutation.data.providerType}</Badge>
@@ -666,7 +664,7 @@ function AdvancedToolWorkbench({
                 <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                   AI summary
                 </p>
-                <div className="max-h-[20rem] overflow-auto rounded-2xl border border-border/70 bg-background/60 p-4">
+                <div className="max-h-[20rem] overflow-auto rounded-2xl border border-border/70 p-4">
                   <MarkdownViewer content={aiSummaryMutation.data.content} />
                 </div>
               </div>
