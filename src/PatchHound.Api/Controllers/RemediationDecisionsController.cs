@@ -6,6 +6,7 @@ using PatchHound.Api.Models;
 using PatchHound.Api.Models.ApprovalTasks;
 using PatchHound.Api.Models.Decisions;
 using PatchHound.Api.Services;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
@@ -471,12 +472,22 @@ public class RemediationDecisionsController(
                 .ToListAsync(ct)
             : [];
 
-        if (decisionIds.Count == 0 && verificationStageIds.Count == 0)
+        var approvalTaskIds = decisionIds.Count > 0
+            ? await dbContext.ApprovalTasks.AsNoTracking()
+                .Where(task =>
+                    task.TenantId == tenantId
+                    && decisionIds.Contains(task.RemediationDecisionId))
+                .Select(task => task.Id)
+                .ToListAsync(ct)
+            : [];
+
+        if (decisionIds.Count == 0 && verificationStageIds.Count == 0 && approvalTaskIds.Count == 0)
             return Ok(new List<ApprovalAuditEntryDto>());
 
         var entries = await dbContext.AuditLogEntries.AsNoTracking()
             .Where(entry =>
                 (entry.EntityType == "RemediationDecision" && decisionIds.Contains(entry.EntityId))
+                || (entry.EntityType == nameof(ApprovalTask) && approvalTaskIds.Contains(entry.EntityId))
                 || (entry.EntityType == "RemediationWorkflowStageRecord" && verificationStageIds.Contains(entry.EntityId)))
             .OrderByDescending(entry => entry.Timestamp)
             .ToListAsync(ct);

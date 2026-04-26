@@ -320,8 +320,10 @@ public class ApprovalTaskQueryService(
         var auditEntries = await dbContext.AuditLogEntries.AsNoTracking()
             .IgnoreQueryFilters()
             .Where(a => a.TenantId == tenantId
-                && a.EntityType == "RemediationDecision"
-                && a.EntityId == decision.Id)
+                && (
+                    (a.EntityType == nameof(RemediationDecision) && a.EntityId == decision.Id)
+                    || (a.EntityType == nameof(ApprovalTask) && a.EntityId == task.Id)
+                ))
             .OrderByDescending(a => a.Timestamp)
             .ToListAsync(ct);
 

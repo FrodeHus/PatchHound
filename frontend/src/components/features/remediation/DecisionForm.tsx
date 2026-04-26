@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -157,20 +158,24 @@ export function DecisionForm({
         </Select>
       </div>
 
-      {needsJustification ? (
-        <div className="space-y-2">
-          <label className="text-sm font-medium">
-            Decision rationale <span className="text-tone-danger-foreground">*</span>
-          </label>
-          <Textarea
-            value={justification}
-            onChange={(e) => setJustification(e.target.value)}
-            placeholder="Explain why this is the right posture for the affected assets..."
-            rows={3}
-            disabled={readOnly}
-          />
-        </div>
-      ) : null}
+      <div className="space-y-2">
+        <label className="text-sm font-medium">
+          Decision rationale
+          {needsJustification ? <span className="text-tone-danger-foreground"> *</span> : null}
+        </label>
+        <Textarea
+          value={justification}
+          onChange={(e) => setJustification(e.target.value)}
+          placeholder="Explain why this is the right posture for the affected assets..."
+          rows={3}
+          disabled={readOnly}
+        />
+        {!needsJustification ? (
+          <p className="text-xs text-muted-foreground">
+            Optional, but shown later to execution teams and approvers.
+          </p>
+        ) : null}
+      </div>
 
       {needsExpiry ? (
         <div className="space-y-2">
