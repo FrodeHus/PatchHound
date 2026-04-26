@@ -465,7 +465,7 @@ export function DeviceDetailPageView({
 
               {canUseAdvancedTools ? (
                 <TabsContent value="advanced" className="space-y-5 pt-1">
-                  <DeviceAdvancedToolsPanel device={device} />
+                  <DeviceAdvancedToolsPanel device={device} exposures={exposures} />
                 </TabsContent>
               ) : null}
             </Tabs>
