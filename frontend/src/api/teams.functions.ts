@@ -28,6 +28,13 @@ export const createTeam = createServerFn({ method: 'POST' })
     await apiPost('/teams', context, payload)
   })
 
+export const renameTeam = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ teamId: z.string().uuid(), name: z.string().min(1) }))
+  .handler(async ({ context, data: { teamId, name } }) => {
+    await apiPut(`/teams/${teamId}/name`, context, { name })
+  })
+
 export const fetchTeamDetail = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ teamId: z.string() }))

@@ -1,4 +1,5 @@
-import { Plus, UserMinus } from 'lucide-react'
+import { useRef } from 'react'
+import { Pencil, Plus, UserMinus } from 'lucide-react'
 import type { FilterGroup } from '@/api/device-rules.schemas'
 import type { TeamDetail, TeamMembershipRulePreview } from '@/api/teams.schemas'
 import type { UserListItem } from '@/api/users.schemas'
@@ -13,6 +14,10 @@ import { UserRuleBuilder } from './UserRuleBuilder'
 type AssignmentGroupDetailViewProps = {
   team: TeamDetail
   canManageGroup: boolean
+  editingName: string | null
+  isRenaming: boolean
+  onEditingNameChange: (value: string | null) => void
+  onRename: (name: string) => void
   availableMembers: UserListItem[]
   selectedMemberId: string
   memberSearch: string
@@ -35,6 +40,10 @@ type AssignmentGroupDetailViewProps = {
 export function AssignmentGroupDetailView({
   team,
   canManageGroup,
+  editingName,
+  isRenaming,
+  onEditingNameChange,
+  onRename,
   availableMembers,
   selectedMemberId,
   memberSearch,
@@ -55,6 +64,16 @@ export function AssignmentGroupDetailView({
 }: AssignmentGroupDetailViewProps) {
   const selectedCandidate = availableMembers.find((member) => member.id === selectedMemberId) ?? null
   const canManageMembersManually = canManageGroup && !team.isDynamic
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  const commitRename = () => {
+    const trimmed = editingName?.trim()
+    if (!trimmed || trimmed === team.name) {
+      onEditingNameChange(null)
+      return
+    }
+    onRename(trimmed)
+  }
 
   return (
     <section className="space-y-4">
@@ -63,7 +82,34 @@ export function AssignmentGroupDetailView({
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-3xl font-semibold tracking-[-0.04em]">{team.name}</CardTitle>
+                {editingName !== null ? (
+                  <Input
+                    ref={nameInputRef}
+                    autoFocus
+                    className="h-10 max-w-sm text-3xl font-semibold tracking-[-0.04em]"
+                    value={editingName}
+                    disabled={isRenaming}
+                    onChange={(e) => onEditingNameChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitRename()
+                      if (e.key === 'Escape') onEditingNameChange(null)
+                    }}
+                    onBlur={commitRename}
+                  />
+                ) : (
+                  <CardTitle className="group/name flex items-center gap-2 text-3xl font-semibold tracking-[-0.04em]">
+                    {team.name}
+                    {canManageGroup ? (
+                      <button
+                        type="button"
+                        className="text-muted-foreground opacity-0 transition group-hover/name:opacity-100"
+                        onClick={() => onEditingNameChange(team.name)}
+                      >
+                        <Pencil className="size-4" />
+                      </button>
+                    ) : null}
+                  </CardTitle>
+                )}
                 {team.isDefault ? (
                   <Badge className="rounded-full border border-amber-300/60 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300">
                     Fallback

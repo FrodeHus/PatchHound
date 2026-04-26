@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import type { FilterGroup } from '@/api/device-rules.schemas'
 import type { TeamMembershipRulePreview } from '@/api/teams.schemas'
-import { fetchTeamDetail, previewTeamMembershipRule, updateTeamMembers, updateTeamMembershipRule } from '@/api/teams.functions'
+import { fetchTeamDetail, previewTeamMembershipRule, renameTeam, updateTeamMembers, updateTeamMembershipRule } from '@/api/teams.functions'
 import { fetchUsers } from '@/api/users.functions'
 import { AssignmentGroupDetailView } from '@/components/features/admin/AssignmentGroupDetailView'
 import { Button } from '@/components/ui/button'
@@ -51,6 +51,7 @@ function AssignmentGroupDetailPage() {
 
   const teamSnapshotKey = [
     teamDetailQuery.data.id,
+    teamDetailQuery.data.name,
     String(teamDetailQuery.data.isDynamic),
     teamDetailQuery.data.membershipRule?.filterDefinition?.type ?? '',
     teamDetailQuery.data.members.map((member) => member.userId).join(','),
@@ -79,6 +80,7 @@ function AssignmentGroupDetailEditor({
   candidateMembers: Awaited<ReturnType<typeof fetchUsers>>['items']
 }) {
   const queryClient = useQueryClient()
+  const [editingName, setEditingName] = useState<string | null>(null)
   const [memberSearch, setMemberSearch] = useState('')
   const [selectedMemberId, setSelectedMemberId] = useState('')
   const [isDynamic, setIsDynamic] = useState(team.isDynamic)
@@ -112,6 +114,22 @@ function AssignmentGroupDetailEditor({
   const effectiveSelectedMemberId = availableMembers.some((member) => member.id === selectedMemberId)
     ? selectedMemberId
     : ''
+
+  const renameTeamMutation = useMutation({
+    mutationFn: async (name: string) =>
+      renameTeam({ data: { teamId: id, name } }),
+    onSuccess: async () => {
+      setEditingName(null)
+      toast.success('Group renamed')
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['team-detail', id] }),
+        queryClient.invalidateQueries({ queryKey: ['teams'] }),
+      ])
+    },
+    onError: () => {
+      toast.error('Failed to rename group')
+    },
+  })
 
   const updateMembersMutation = useMutation({
     mutationFn: async (payload: { userId: string; action: 'add' | 'remove' }) =>
@@ -203,6 +221,10 @@ function AssignmentGroupDetailEditor({
       <AssignmentGroupDetailView
         team={team}
         canManageGroup={canManageGroup}
+        editingName={editingName}
+        isRenaming={renameTeamMutation.isPending}
+        onEditingNameChange={setEditingName}
+        onRename={(name) => renameTeamMutation.mutate(name)}
         availableMembers={availableMembers}
         selectedMemberId={effectiveSelectedMemberId}
         memberSearch={memberSearch}

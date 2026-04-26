@@ -55,6 +55,8 @@ public record TeamMembershipRulePreviewUserDto(Guid UserId, string DisplayName, 
 
 public record CreateTeamRequest(string Name, Guid TenantId);
 
+public record RenameTeamRequest(string Name);
+
 public record UpdateMembersRequest(Guid UserId, string Action);
 
 public record UpdateTeamMembershipRuleRequest(bool IsDynamic, bool AcknowledgeMemberReset, JsonElement FilterDefinition);

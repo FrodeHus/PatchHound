@@ -37,6 +37,15 @@ public class Team
         };
     }
 
+    public void Rename(string newName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(newName);
+        if (newName.Length > 256)
+            throw new ArgumentException("Name must be 256 characters or fewer.", nameof(newName));
+
+        Name = newName;
+    }
+
     public void SetDynamic(bool isDynamic)
     {
         IsDynamic = isDynamic;
