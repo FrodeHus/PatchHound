@@ -50,6 +50,18 @@ public class TeamService
         return Result<Team>.Success(team);
     }
 
+    public async Task<Result<Team>> RenameTeamAsync(Guid teamId, string newName, CancellationToken ct)
+    {
+        var team = await _teamRepository.GetByIdWithMembersAsync(teamId, ct);
+        if (team is null)
+            return Result<Team>.Failure("Team not found");
+
+        team.Rename(newName);
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        return Result<Team>.Success(team);
+    }
+
     public async Task<Result<Team>> RemoveMemberAsync(
         Guid teamId,
         Guid userId,

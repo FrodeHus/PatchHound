@@ -137,4 +137,67 @@ public class TeamServiceTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("Team not found");
     }
+
+    [Fact]
+    public void Rename_SetsNewName()
+    {
+        var team = Team.Create(_tenantId, "Original Name");
+
+        team.Rename("New Name");
+
+        team.Name.Should().Be("New Name");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void Rename_EmptyOrWhitespace_Throws(string? badName)
+    {
+        var team = Team.Create(_tenantId, "Original Name");
+
+        var act = () => team.Rename(badName!);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Rename_ExceedsMaxLength_Throws()
+    {
+        var team = Team.Create(_tenantId, "Original Name");
+
+        var act = () => team.Rename(new string('x', 257));
+
+        act.Should().Throw<ArgumentException>().WithMessage("*256*");
+    }
+
+    [Fact]
+    public async Task RenameTeam_RenamesTeam_Successfully()
+    {
+        var team = Team.Create(_tenantId, "Original Name");
+        _teamRepo.GetByIdWithMembersAsync(team.Id, Arg.Any<CancellationToken>()).Returns(team);
+
+        var result = await _service.RenameTeamAsync(team.Id, "New Name", CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Name.Should().Be("New Name");
+        await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RenameTeam_TeamNotFound_ReturnsFailure()
+    {
+        _teamRepo
+            .GetByIdWithMembersAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((Team?)null);
+
+        var result = await _service.RenameTeamAsync(
+            Guid.NewGuid(),
+            "New Name",
+            CancellationToken.None
+        );
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("Team not found");
+    }
 }

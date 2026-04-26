@@ -34,7 +34,7 @@ import { Route as AuthedRemediationTasksRouteImport } from './routes/_authed/rem
 import { Route as AuthedDevicesIdRouteImport } from './routes/_authed/devices/$id'
 import { Route as AuthedDashboardTechnicalRouteImport } from './routes/_authed/dashboard/technical'
 import { Route as AuthedDashboardSecurityRouteImport } from './routes/_authed/dashboard/security'
-import { Route as AuthedDashboardMyDevicesRouteImport } from './routes/_authed/dashboard/my-devices'
+import { Route as AuthedDashboardMyAssetsRouteImport } from './routes/_authed/dashboard/my-assets'
 import { Route as AuthedDashboardExecutiveRouteImport } from './routes/_authed/dashboard/executive'
 import { Route as AuthedApprovalsIdRouteImport } from './routes/_authed/approvals/$id'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
@@ -52,7 +52,7 @@ import { Route as AuthedAdminIntegrationsIndexRouteImport } from './routes/_auth
 import { Route as AuthedAdminDeviceRulesIndexRouteImport } from './routes/_authed/admin/device-rules/index'
 import { Route as AuthedRemediationTaskIdRouteImport } from './routes/_authed/remediation/task.$id'
 import { Route as AuthedRemediationCasesCaseIdRouteImport } from './routes/_authed/remediation/cases.$caseId'
-import { Route as AuthedDashboardMyDevicesAttentionRouteImport } from './routes/_authed/dashboard/my-devices.attention'
+import { Route as AuthedDashboardMyAssetsAttentionRouteImport } from './routes/_authed/dashboard/my-assets.attention'
 import { Route as AuthedAssetsApplicationsIdRouteImport } from './routes/_authed/assets/applications/$id'
 import { Route as AuthedAdminWorkflowsNewRouteImport } from './routes/_authed/admin/workflows/new'
 import { Route as AuthedAdminWorkflowsIdRouteImport } from './routes/_authed/admin/workflows/$id'
@@ -197,10 +197,10 @@ const AuthedDashboardSecurityRoute = AuthedDashboardSecurityRouteImport.update({
   path: '/dashboard/security',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedDashboardMyDevicesRoute =
-  AuthedDashboardMyDevicesRouteImport.update({
-    id: '/dashboard/my-devices',
-    path: '/dashboard/my-devices',
+const AuthedDashboardMyAssetsRoute =
+  AuthedDashboardMyAssetsRouteImport.update({
+    id: '/dashboard/my-assets',
+    path: '/dashboard/my-assets',
     getParentRoute: () => AuthedRoute,
   } as any)
 const AuthedDashboardExecutiveRoute =
@@ -298,11 +298,11 @@ const AuthedRemediationCasesCaseIdRoute =
     path: '/remediation/cases/$caseId',
     getParentRoute: () => AuthedRoute,
   } as any)
-const AuthedDashboardMyDevicesAttentionRoute =
-  AuthedDashboardMyDevicesAttentionRouteImport.update({
+const AuthedDashboardMyAssetsAttentionRoute =
+  AuthedDashboardMyAssetsAttentionRouteImport.update({
     id: '/attention',
     path: '/attention',
-    getParentRoute: () => AuthedDashboardMyDevicesRoute,
+    getParentRoute: () => AuthedDashboardMyAssetsRoute,
   } as any)
 const AuthedAssetsApplicationsIdRoute =
   AuthedAssetsApplicationsIdRouteImport.update({
@@ -413,7 +413,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AuthedAdminUsersRoute
   '/approvals/$id': typeof AuthedApprovalsIdRoute
   '/dashboard/executive': typeof AuthedDashboardExecutiveRoute
-  '/dashboard/my-devices': typeof AuthedDashboardMyDevicesRouteWithChildren
+  '/dashboard/my-assets': typeof AuthedDashboardMyAssetsRouteWithChildren
   '/dashboard/security': typeof AuthedDashboardSecurityRoute
   '/dashboard/technical': typeof AuthedDashboardTechnicalRoute
   '/devices/$id': typeof AuthedDevicesIdRoute
@@ -447,7 +447,7 @@ export interface FileRoutesByFullPath {
   '/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
   '/admin/workflows/new': typeof AuthedAdminWorkflowsNewRoute
   '/assets/applications/$id': typeof AuthedAssetsApplicationsIdRoute
-  '/dashboard/my-devices/attention': typeof AuthedDashboardMyDevicesAttentionRoute
+  '/dashboard/my-assets/attention': typeof AuthedDashboardMyAssetsAttentionRoute
   '/remediation/cases/$caseId': typeof AuthedRemediationCasesCaseIdRoute
   '/remediation/task/$id': typeof AuthedRemediationTaskIdRoute
   '/admin/device-rules/': typeof AuthedAdminDeviceRulesIndexRoute
@@ -474,7 +474,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AuthedAdminUsersRoute
   '/approvals/$id': typeof AuthedApprovalsIdRoute
   '/dashboard/executive': typeof AuthedDashboardExecutiveRoute
-  '/dashboard/my-devices': typeof AuthedDashboardMyDevicesRouteWithChildren
+  '/dashboard/my-assets': typeof AuthedDashboardMyAssetsRouteWithChildren
   '/dashboard/security': typeof AuthedDashboardSecurityRoute
   '/dashboard/technical': typeof AuthedDashboardTechnicalRoute
   '/devices/$id': typeof AuthedDevicesIdRoute
@@ -508,7 +508,7 @@ export interface FileRoutesByTo {
   '/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
   '/admin/workflows/new': typeof AuthedAdminWorkflowsNewRoute
   '/assets/applications/$id': typeof AuthedAssetsApplicationsIdRoute
-  '/dashboard/my-devices/attention': typeof AuthedDashboardMyDevicesAttentionRoute
+  '/dashboard/my-assets/attention': typeof AuthedDashboardMyAssetsAttentionRoute
   '/remediation/cases/$caseId': typeof AuthedRemediationCasesCaseIdRoute
   '/remediation/task/$id': typeof AuthedRemediationTaskIdRoute
   '/admin/device-rules': typeof AuthedAdminDeviceRulesIndexRoute
@@ -537,7 +537,7 @@ export interface FileRoutesById {
   '/_authed/admin/users': typeof AuthedAdminUsersRoute
   '/_authed/approvals/$id': typeof AuthedApprovalsIdRoute
   '/_authed/dashboard/executive': typeof AuthedDashboardExecutiveRoute
-  '/_authed/dashboard/my-devices': typeof AuthedDashboardMyDevicesRouteWithChildren
+  '/_authed/dashboard/my-assets': typeof AuthedDashboardMyAssetsRouteWithChildren
   '/_authed/dashboard/security': typeof AuthedDashboardSecurityRoute
   '/_authed/dashboard/technical': typeof AuthedDashboardTechnicalRoute
   '/_authed/devices/$id': typeof AuthedDevicesIdRoute
@@ -571,7 +571,7 @@ export interface FileRoutesById {
   '/_authed/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
   '/_authed/admin/workflows/new': typeof AuthedAdminWorkflowsNewRoute
   '/_authed/assets/applications/$id': typeof AuthedAssetsApplicationsIdRoute
-  '/_authed/dashboard/my-devices/attention': typeof AuthedDashboardMyDevicesAttentionRoute
+  '/_authed/dashboard/my-assets/attention': typeof AuthedDashboardMyAssetsAttentionRoute
   '/_authed/remediation/cases/$caseId': typeof AuthedRemediationCasesCaseIdRoute
   '/_authed/remediation/task/$id': typeof AuthedRemediationTaskIdRoute
   '/_authed/admin/device-rules/': typeof AuthedAdminDeviceRulesIndexRoute
@@ -600,7 +600,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/approvals/$id'
     | '/dashboard/executive'
-    | '/dashboard/my-devices'
+    | '/dashboard/my-assets'
     | '/dashboard/security'
     | '/dashboard/technical'
     | '/devices/$id'
@@ -634,7 +634,7 @@ export interface FileRouteTypes {
     | '/admin/workflows/$id'
     | '/admin/workflows/new'
     | '/assets/applications/$id'
-    | '/dashboard/my-devices/attention'
+    | '/dashboard/my-assets/attention'
     | '/remediation/cases/$caseId'
     | '/remediation/task/$id'
     | '/admin/device-rules/'
@@ -661,7 +661,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/approvals/$id'
     | '/dashboard/executive'
-    | '/dashboard/my-devices'
+    | '/dashboard/my-assets'
     | '/dashboard/security'
     | '/dashboard/technical'
     | '/devices/$id'
@@ -695,7 +695,7 @@ export interface FileRouteTypes {
     | '/admin/workflows/$id'
     | '/admin/workflows/new'
     | '/assets/applications/$id'
-    | '/dashboard/my-devices/attention'
+    | '/dashboard/my-assets/attention'
     | '/remediation/cases/$caseId'
     | '/remediation/task/$id'
     | '/admin/device-rules'
@@ -723,7 +723,7 @@ export interface FileRouteTypes {
     | '/_authed/admin/users'
     | '/_authed/approvals/$id'
     | '/_authed/dashboard/executive'
-    | '/_authed/dashboard/my-devices'
+    | '/_authed/dashboard/my-assets'
     | '/_authed/dashboard/security'
     | '/_authed/dashboard/technical'
     | '/_authed/devices/$id'
@@ -757,7 +757,7 @@ export interface FileRouteTypes {
     | '/_authed/admin/workflows/$id'
     | '/_authed/admin/workflows/new'
     | '/_authed/assets/applications/$id'
-    | '/_authed/dashboard/my-devices/attention'
+    | '/_authed/dashboard/my-assets/attention'
     | '/_authed/remediation/cases/$caseId'
     | '/_authed/remediation/task/$id'
     | '/_authed/admin/device-rules/'
@@ -957,11 +957,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedDashboardSecurityRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/dashboard/my-devices': {
-      id: '/_authed/dashboard/my-devices'
-      path: '/dashboard/my-devices'
-      fullPath: '/dashboard/my-devices'
-      preLoaderRoute: typeof AuthedDashboardMyDevicesRouteImport
+    '/_authed/dashboard/my-assets': {
+      id: '/_authed/dashboard/my-assets'
+      path: '/dashboard/my-assets'
+      fullPath: '/dashboard/my-assets'
+      preLoaderRoute: typeof AuthedDashboardMyAssetsRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/dashboard/executive': {
@@ -1083,12 +1083,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedRemediationCasesCaseIdRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/dashboard/my-devices/attention': {
-      id: '/_authed/dashboard/my-devices/attention'
+    '/_authed/dashboard/my-assets/attention': {
+      id: '/_authed/dashboard/my-assets/attention'
       path: '/attention'
-      fullPath: '/dashboard/my-devices/attention'
-      preLoaderRoute: typeof AuthedDashboardMyDevicesAttentionRouteImport
-      parentRoute: typeof AuthedDashboardMyDevicesRoute
+      fullPath: '/dashboard/my-assets/attention'
+      preLoaderRoute: typeof AuthedDashboardMyAssetsAttentionRouteImport
+      parentRoute: typeof AuthedDashboardMyAssetsRoute
     }
     '/_authed/assets/applications/$id': {
       id: '/_authed/assets/applications/$id'
@@ -1205,19 +1205,19 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AuthedDashboardMyDevicesRouteChildren {
-  AuthedDashboardMyDevicesAttentionRoute: typeof AuthedDashboardMyDevicesAttentionRoute
+interface AuthedDashboardMyAssetsRouteChildren {
+  AuthedDashboardMyAssetsAttentionRoute: typeof AuthedDashboardMyAssetsAttentionRoute
 }
 
-const AuthedDashboardMyDevicesRouteChildren: AuthedDashboardMyDevicesRouteChildren =
+const AuthedDashboardMyAssetsRouteChildren: AuthedDashboardMyAssetsRouteChildren =
   {
-    AuthedDashboardMyDevicesAttentionRoute:
-      AuthedDashboardMyDevicesAttentionRoute,
+    AuthedDashboardMyAssetsAttentionRoute:
+      AuthedDashboardMyAssetsAttentionRoute,
   }
 
-const AuthedDashboardMyDevicesRouteWithChildren =
-  AuthedDashboardMyDevicesRoute._addFileChildren(
-    AuthedDashboardMyDevicesRouteChildren,
+const AuthedDashboardMyAssetsRouteWithChildren =
+  AuthedDashboardMyAssetsRoute._addFileChildren(
+    AuthedDashboardMyAssetsRouteChildren,
   )
 
 interface AuthedRouteChildren {
@@ -1230,7 +1230,7 @@ interface AuthedRouteChildren {
   AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
   AuthedApprovalsIdRoute: typeof AuthedApprovalsIdRoute
   AuthedDashboardExecutiveRoute: typeof AuthedDashboardExecutiveRoute
-  AuthedDashboardMyDevicesRoute: typeof AuthedDashboardMyDevicesRouteWithChildren
+  AuthedDashboardMyAssetsRoute: typeof AuthedDashboardMyAssetsRouteWithChildren
   AuthedDashboardSecurityRoute: typeof AuthedDashboardSecurityRoute
   AuthedDashboardTechnicalRoute: typeof AuthedDashboardTechnicalRoute
   AuthedDevicesIdRoute: typeof AuthedDevicesIdRoute
@@ -1283,7 +1283,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminUsersRoute: AuthedAdminUsersRoute,
   AuthedApprovalsIdRoute: AuthedApprovalsIdRoute,
   AuthedDashboardExecutiveRoute: AuthedDashboardExecutiveRoute,
-  AuthedDashboardMyDevicesRoute: AuthedDashboardMyDevicesRouteWithChildren,
+  AuthedDashboardMyAssetsRoute: AuthedDashboardMyAssetsRouteWithChildren,
   AuthedDashboardSecurityRoute: AuthedDashboardSecurityRoute,
   AuthedDashboardTechnicalRoute: AuthedDashboardTechnicalRoute,
   AuthedDevicesIdRoute: AuthedDevicesIdRoute,

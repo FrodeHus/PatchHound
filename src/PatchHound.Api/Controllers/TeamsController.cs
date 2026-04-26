@@ -299,6 +299,27 @@ public class TeamsController : ControllerBase
         );
     }
 
+    [HttpPut("{id:guid}/name")]
+    [Authorize(Policy = Policies.ManageTeams)]
+    public async Task<IActionResult> Rename(
+        Guid id,
+        [FromBody] RenameTeamRequest request,
+        CancellationToken ct
+    )
+    {
+        var team = await _dbContext.Teams.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (team is null)
+            return NotFound();
+        if (!_tenantContext.HasAccessToTenant(team.TenantId))
+            return Forbid();
+
+        var result = await _teamService.RenameTeamAsync(id, request.Name, ct);
+        if (!result.IsSuccess)
+            return BadRequest(new ProblemDetails { Title = result.Error });
+
+        return NoContent();
+    }
+
     [HttpPut("{id:guid}/members")]
     [Authorize(Policy = Policies.ManageTeams)]
     public async Task<IActionResult> UpdateMembers(

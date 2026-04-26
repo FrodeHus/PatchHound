@@ -96,7 +96,7 @@ const navGroups: NavGroup[] = [
       { to: "/dashboard/executive", label: "Executive Summary", icon: BarChart3, roles: ["Stakeholder", "CustomerViewer", "GlobalAdmin"] },
       { to: "/dashboard/security", label: "Security Summary", icon: ShieldAlert, roles: ["SecurityManager", "CustomerOperator", "CustomerAdmin", "GlobalAdmin"] },
       { to: "/dashboard/technical", label: "Technical Summary", icon: Wrench, roles: ["TechnicalManager", "CustomerOperator", "CustomerAdmin", "GlobalAdmin"] },
-      { to: "/dashboard/my-devices", label: "My Assets", icon: Laptop, roles: ["AssetOwner", "CustomerOperator", "CustomerAdmin", "GlobalAdmin"] },
+      { to: "/dashboard/my-assets", label: "My Assets", icon: Laptop, roles: ["AssetOwner", "CustomerOperator", "CustomerAdmin", "GlobalAdmin"] },
     ],
   },
   {
