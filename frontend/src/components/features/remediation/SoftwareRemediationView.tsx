@@ -1358,6 +1358,15 @@ function StageExecutionPanel({
   const latestApproverEvent = (auditQuery.data ?? [])
     .filter((entry) => entry.action === 'Approved' || entry.action === 'Denied')
     .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())[0] ?? null
+  const latestApprovalResolution = data.latestApprovalResolution
+  const approverEvent = latestApprovalResolution
+    ? {
+        action: latestApprovalResolution.status,
+        userDisplayName: latestApprovalResolution.resolvedByDisplayName,
+        justification: latestApprovalResolution.justification,
+        timestamp: latestApprovalResolution.resolvedAt ?? data.currentDecision.approvedAt ?? data.currentDecision.latestRejection?.rejectedAt ?? data.currentDecision.decidedAt,
+      }
+    : latestApproverEvent
 
   return (
     <DecisionSummaryPanel
@@ -1369,7 +1378,7 @@ function StageExecutionPanel({
         <DecisionNarrativeTimeline
           recommendation={data.recommendations[0] ?? null}
           decision={data.currentDecision}
-          approverEvent={latestApproverEvent}
+          approverEvent={approverEvent}
         />
       )}
       rightColumn={

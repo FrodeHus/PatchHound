@@ -140,8 +140,16 @@ export const decisionAiSummarySchema = z.object({
   unavailableMessage: z.string().nullable(),
 })
 
+export const decisionApprovalResolutionSchema = z.object({
+  status: z.string(),
+  justification: z.string().nullable(),
+  resolvedAt: z.string().nullable(),
+  resolvedByDisplayName: z.string().nullable(),
+})
+
 export const decisionContextSchema = z.object({
   remediationCaseId: z.string().uuid(),
+  tenantSoftwareId: z.string().uuid().nullable(),
   softwareName: z.string(),
   softwareOwnerTeamId: z.string().uuid().nullable(),
   softwareOwnerTeamName: z.string().nullable(),
@@ -152,6 +160,7 @@ export const decisionContextSchema = z.object({
   workflowState: decisionWorkflowStateSchema,
   currentDecision: remediationDecisionSchema.nullable(),
   previousDecision: remediationDecisionSchema.nullable(),
+  latestApprovalResolution: decisionApprovalResolutionSchema.nullable(),
   recommendations: z.array(analystRecommendationSchema),
   topVulnerabilities: z.array(decisionVulnSchema),
   riskScore: decisionRiskSchema.nullable(),
@@ -212,6 +221,7 @@ export type DecisionWorkflowStage = z.infer<typeof decisionWorkflowStageSchema>
 export type DecisionRisk = z.infer<typeof decisionRiskSchema>
 export type DecisionSla = z.infer<typeof decisionSlaSchema>
 export type DecisionAiSummary = z.infer<typeof decisionAiSummarySchema>
+export type DecisionApprovalResolution = z.infer<typeof decisionApprovalResolutionSchema>
 export type VulnerabilityOverride = z.infer<typeof vulnerabilityOverrideSchema>
 export type DecisionListItem = z.infer<typeof decisionListItemSchema>
 export type DecisionListSummary = z.infer<typeof decisionListSummarySchema>

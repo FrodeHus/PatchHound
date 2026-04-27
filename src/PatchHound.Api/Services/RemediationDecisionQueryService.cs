@@ -586,6 +586,29 @@ public class RemediationDecisionQueryService(
                 .OrderByDescending(task => task.ResolvedAt ?? task.UpdatedAt)
                 .FirstOrDefaultAsync(ct)
             : null;
+        var latestApprovalResolution = decision is not null
+            ? await dbContext.ApprovalTasks.AsNoTracking()
+                .Where(task =>
+                    task.TenantId == tenantId
+                    && task.RemediationDecisionId == decision.Id
+                    && (task.Status == ApprovalTaskStatus.Approved
+                        || task.Status == ApprovalTaskStatus.Denied
+                        || task.Status == ApprovalTaskStatus.AutoDenied))
+                .OrderByDescending(task => task.ResolvedAt ?? task.UpdatedAt)
+                .Select(task => new
+                {
+                    Status = task.Status.ToString(),
+                    task.ResolutionJustification,
+                    task.ResolvedAt,
+                    ResolvedByDisplayName = task.ResolvedBy == null
+                        ? null
+                        : dbContext.Users.AsNoTracking()
+                            .Where(user => user.Id == task.ResolvedBy.Value)
+                            .Select(user => user.DisplayName)
+                            .FirstOrDefault(),
+                })
+                .FirstOrDefaultAsync(ct)
+            : null;
 
         // Asset risk score — TODO Phase 5: restore from canonical risk scores.
         _ = await dbContext.DeviceRiskScores.AsNoTracking()
@@ -833,6 +856,7 @@ public class RemediationDecisionQueryService(
 
         return new DecisionContextDto(
             remediationCaseId,
+            tenantSoftware?.Id,
             softwareName,
             softwareOwnerTeamId,
             softwareOwnerTeamName,
@@ -849,6 +873,14 @@ public class RemediationDecisionQueryService(
             workflowState,
             decisionDto,
             previousDecisionDto,
+            latestApprovalResolution is null
+                ? null
+                : new DecisionApprovalResolutionDto(
+                    latestApprovalResolution.Status,
+                    latestApprovalResolution.ResolutionJustification,
+                    latestApprovalResolution.ResolvedAt,
+                    latestApprovalResolution.ResolvedByDisplayName
+                ),
             recommendationDtos,
             topVulns.Take(5).ToList(),
             riskDto,

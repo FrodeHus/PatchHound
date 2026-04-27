@@ -2,6 +2,7 @@ namespace PatchHound.Api.Models.Decisions;
 
 public record DecisionContextDto(
     Guid RemediationCaseId,
+    Guid? TenantSoftwareId,
     string SoftwareName,
     Guid? SoftwareOwnerTeamId,
     string? SoftwareOwnerTeamName,
@@ -12,11 +13,19 @@ public record DecisionContextDto(
     DecisionWorkflowStateDto WorkflowState,
     RemediationDecisionDto? CurrentDecision,
     RemediationDecisionDto? PreviousDecision,
+    DecisionApprovalResolutionDto? LatestApprovalResolution,
     List<AnalystRecommendationDto> Recommendations,
     List<DecisionVulnDto> TopVulnerabilities,
     DecisionRiskDto? RiskScore,
     DecisionSlaDto? Sla,
     DecisionAiSummaryDto AiSummary
+);
+
+public record DecisionApprovalResolutionDto(
+    string Status,
+    string? Justification,
+    DateTimeOffset? ResolvedAt,
+    string? ResolvedByDisplayName
 );
 
 public record DecisionAiSummaryDto(
