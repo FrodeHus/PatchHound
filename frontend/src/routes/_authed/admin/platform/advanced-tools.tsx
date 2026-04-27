@@ -686,7 +686,7 @@ function AdvancedToolWorkbench({
               variant="outline"
               onClick={() => setCurrentStep(1)}
             >
-              Back to query
+              Previous: query
             </Button>
           ) : (
             <Button

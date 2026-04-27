@@ -893,26 +893,6 @@ function TenantSourceHistoryPage({
               ) : null}
             </CardContent>
           </Card>
-          <Card className="rounded-2xl border-border/70 bg-card/75">
-            <CardHeader>
-              <h3 className="text-base font-medium">Navigation</h3>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <InsetPanel emphasis="subtle" className="px-4 py-3">
-                Use the source list for operational overview, then open full
-                history here when you need batch-level or failure-level detail.
-              </InsetPanel>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-start"
-                onClick={onBack}
-              >
-                <ArrowLeft className="size-4" />
-                Back to source list
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

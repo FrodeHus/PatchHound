@@ -264,26 +264,6 @@ export function SoftwareRemediationView({
         <header className="rounded-[28px] border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_52%),var(--color-card)] p-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 space-y-1.5">
-              {tenantSoftwareId ? (
-                <Link
-                  to="/software/$id"
-                  params={{ id: tenantSoftwareId }}
-                  search={{ page: 1, pageSize: 25, version: '', tab: 'remediation' }}
-                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="size-4" />
-                  Back to software
-                </Link>
-              ) : (
-                <Link
-                  to="/software"
-                  search={{ page: 1, pageSize: 25, search: '', category: '', vulnerableOnly: false, missedMaintenanceWindow: false }}
-                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="size-4" />
-                  Back to software list
-                </Link>
-              )}
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-[2rem] font-semibold tracking-[-0.05em] leading-none">
                   {startCase(data.softwareName)}

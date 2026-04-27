@@ -94,10 +94,6 @@ export function DeviceOwnerAttentionView({ items, isLoading }: Props) {
                   <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{visible.length}</div>
                 </div>
               )}
-              <Button variant="outline" render={<Link to="/dashboard/my-assets" />}>
-                <ArrowLeft className="mr-2 size-4" />
-                Back to dashboard
-              </Button>
             </div>
           </div>
         </CardContent>

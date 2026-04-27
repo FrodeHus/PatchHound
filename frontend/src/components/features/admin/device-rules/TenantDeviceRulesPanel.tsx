@@ -304,15 +304,6 @@ export function TenantDeviceRulesPanel({
           <p className="text-sm text-destructive">
             Failed to load the asset rule editor for {tenantName}.
           </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-4"
-            onClick={() => onSearchChange?.({ mode: undefined, ruleId: undefined })}
-          >
-            Back to rules
-          </Button>
         </section>
       )
     }

@@ -173,7 +173,7 @@ export function ScanningToolEditor({ tool, initialScript, onBack }: Props) {
                       className="text-primary underline"
                       onClick={handleRestoreEditor}
                     >
-                      back to editor
+                      return to editor
                     </button>
                   </p>
                 )}

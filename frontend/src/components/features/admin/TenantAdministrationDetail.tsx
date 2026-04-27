@@ -73,16 +73,7 @@ export function TenantAdministrationDetail({
   return (
     <TooltipProvider>
       <section className="space-y-4 pb-4">
-        {/* Header */}
         <div className="space-y-2">
-          <Link
-            to="/admin/tenants"
-            search={{ page: 1, pageSize: 25 }}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" />
-            Back to tenants
-          </Link>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-semibold tracking-[-0.04em]">{tenant.name}</h1>
