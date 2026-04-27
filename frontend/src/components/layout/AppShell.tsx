@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react'
+import { useRouterState } from '@tanstack/react-router'
+import { AdminConsoleLayout } from '@/components/features/admin/AdminConsoleLayout'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { TenantScopeProvider } from '@/components/layout/TenantScopeProvider'
 import { TenantUnavailableDialog } from '@/components/layout/TenantUnavailableDialog'
@@ -39,6 +41,8 @@ type AppShellProps = {
 
 export function AppShell({ user, children }: AppShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/')
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(
     getInitialSidebarCollapsed,
   );
@@ -101,7 +105,13 @@ export function AppShell({ user, children }: AppShellProps) {
               }}
             />
             <main className="flex-1 px-4 pb-6 sm:px-6">
-              <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+              <div className="mx-auto w-full max-w-[1600px]">
+                {isAdminRoute ? (
+                  <AdminConsoleLayout user={user}>{children}</AdminConsoleLayout>
+                ) : (
+                  children
+                )}
+              </div>
             </main>
           </div>
         </div>
