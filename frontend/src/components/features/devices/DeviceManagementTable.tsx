@@ -190,15 +190,15 @@ export function DeviceManagementTable({
     searchInputState.source === searchValue ? searchInputState.value : searchValue;
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState(() => getCurrentDraftFilters({
-    criticality: criticalityFilter,
-    businessLabelId: businessLabelIdFilter,
-    ownerType: ownerTypeFilter,
-    deviceGroup: deviceGroupFilter,
-    healthStatus: healthStatusFilter,
-    onboardingStatus: onboardingStatusFilter,
-    riskScore: riskScoreFilter,
-    exposureLevel: exposureLevelFilter,
-    tag: tagFilter,
+    criticalityFilter,
+    businessLabelIdFilter,
+    ownerTypeFilter,
+    deviceGroupFilter,
+    healthStatusFilter,
+    onboardingStatusFilter,
+    riskScoreFilter,
+    exposureLevelFilter,
+    tagFilter,
     unassignedOnly,
   }));
 

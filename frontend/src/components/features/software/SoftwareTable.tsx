@@ -105,7 +105,7 @@ export function SoftwareTable({
     vulnerableOnly: boolean
     missedMaintenanceWindow: boolean
   }>(() => getCurrentDraftFilters({
-    category: categoryFilter,
+    categoryFilter,
     vulnerableOnly,
     missedMaintenanceWindow,
   }))

@@ -54,7 +54,7 @@ export function WorkflowRunViewer({ graph, nodeExecutions }: WorkflowRunViewerPr
     [nodeExecutions],
   )
 
-  const styledNodes = useMemo(
+  const styledNodes = useMemo<Node[]>(
     () =>
       graph.nodes.map((node) => {
         const exec = executionMap.get(node.id)
@@ -66,7 +66,7 @@ export function WorkflowRunViewer({ graph, nodeExecutions }: WorkflowRunViewerPr
             ...(colors ? { outline: colors.outline, outlineOffset: '2px' } : { opacity: 0.4 }),
             ...(colors?.extra === 'pulse' ? { animation: 'pulse 2s infinite' } : {}),
           },
-        } as Node
+        }
       }),
     [graph.nodes, executionMap],
   )
@@ -132,7 +132,9 @@ function NodeExecutionDetail({
   return (
     <div className="w-80 shrink-0 space-y-4 overflow-y-auto border-l border-border/60 bg-card/60 p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">{node.data?.label ?? node.type}</h3>
+        <h3 className="text-sm font-semibold">
+          {typeof node.data?.label === 'string' ? node.data.label : node.type}
+        </h3>
         <Button variant="ghost" size="icon" className="size-7" onClick={onClose}>
           <X className="size-3.5" />
         </Button>
