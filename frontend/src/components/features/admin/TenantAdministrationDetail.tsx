@@ -341,7 +341,7 @@ function OverviewTab({
               <div className="mt-4 space-y-2">
                 <AssetCountRow label="Devices" count={tenant.assets.deviceCount} />
                 <AssetCountRow label="Software" count={tenant.assets.softwareCount} />
-                <AssetCountRow label="Cloud Resources" count={tenant.assets.cloudResourceCount} />
+                <AssetCountRow label="Cloud Applications" count={tenant.assets.cloudResourceCount} />
               </div>
             </InsetPanel>
             {saveState === 'saved' ? <p className="text-sm text-tone-success-foreground">Tenant configuration saved.</p> : null}

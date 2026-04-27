@@ -779,11 +779,48 @@ public class TenantsController : ControllerBase
             .Where(device => device.TenantId == tenantId)
             .CountAsync(ct);
 
+        var sourceConfigurationQuery = _dbContext.TenantSourceConfigurations.AsNoTracking();
+        if (ignoreQueryFilters)
+        {
+            sourceConfigurationQuery = sourceConfigurationQuery.IgnoreQueryFilters();
+        }
+
+        var activeSoftwareSnapshotId = await sourceConfigurationQuery
+            .Where(source =>
+                source.TenantId == tenantId
+                && source.SourceKey == TenantSourceCatalog.DefenderSourceKey
+            )
+            .Select(source => source.ActiveSnapshotId)
+            .FirstOrDefaultAsync(ct);
+
+        var softwareQuery = _dbContext.SoftwareTenantRecords.AsNoTracking()
+            .Where(software => software.TenantId == tenantId);
+        if (ignoreQueryFilters)
+        {
+            softwareQuery = softwareQuery.IgnoreQueryFilters();
+        }
+
+        softwareQuery = activeSoftwareSnapshotId.HasValue
+            ? softwareQuery.Where(software => software.SnapshotId == activeSoftwareSnapshotId)
+            : softwareQuery.Where(software => software.SnapshotId == null);
+
+        var softwareCount = await softwareQuery.CountAsync(ct);
+
+        var cloudApplicationsQuery = _dbContext.CloudApplications.AsNoTracking();
+        if (ignoreQueryFilters)
+        {
+            cloudApplicationsQuery = cloudApplicationsQuery.IgnoreQueryFilters();
+        }
+
+        var cloudApplicationCount = await cloudApplicationsQuery
+            .Where(application => application.TenantId == tenantId)
+            .CountAsync(ct);
+
         var assetSummary = new TenantAssetSummaryDto(
+            deviceCount + softwareCount + cloudApplicationCount,
             deviceCount,
-            deviceCount,
-            0,
-            0
+            softwareCount,
+            cloudApplicationCount
         );
         var slaQuery = _dbContext.TenantSlaConfigurations.AsNoTracking();
         if (ignoreQueryFilters)

@@ -16,9 +16,11 @@ import {
   Laptop,
   AppWindow,
   Wrench,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from '@/components/ui/separator'
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Tooltip,
   TooltipContent,
@@ -29,6 +31,7 @@ import type { CurrentUser } from '@/server/auth.functions'
 type SidebarProps = {
   user: CurrentUser;
   onNavigate?: () => void;
+  onLogout?: () => void;
   compact?: boolean;
   collapsed?: boolean;
 };
@@ -119,9 +122,19 @@ function canAccess(item: NavItem, user: CurrentUser): boolean {
   return effective.some((role) => item.roles?.includes(role as RoleName))
 }
 
+function getInitials(displayName: string, email: string) {
+  const source = displayName.trim() || email.trim();
+  return source
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 export function Sidebar({
   user,
   onNavigate,
+  onLogout,
   compact = false,
   collapsed = false,
 }: SidebarProps) {
@@ -142,30 +155,83 @@ export function Sidebar({
     Dashboards: dashboardsGroupActive || !collapsed,
     Assets: assetsGroupActive || !collapsed,
   })
+  const visibleRoles = user.activeRoles?.length
+    ? `${user.activeRoles.length} role${user.activeRoles.length === 1 ? "" : "s"} active`
+    : "Stakeholder"
+  const navPadding = collapsed && !compact ? "px-2" : "px-4"
+  const linkClassName = cn(
+    "group flex min-h-11 items-center rounded-xl border border-transparent text-sm text-sidebar-foreground/84 transition-colors hover:border-sidebar-border/70 hover:bg-sidebar-accent/80 hover:text-sidebar-foreground",
+    collapsed && !compact
+      ? "justify-center px-2 py-2.5"
+      : "gap-3 px-3 py-2.5",
+  )
+  const activeLinkClassName = cn(
+    "group flex min-h-11 items-center rounded-xl border border-primary/20 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_76%),color-mix(in_oklab,var(--sidebar-accent)_86%,var(--card))] text-sm font-medium text-sidebar-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] [&>span:first-child]:border-primary/24 [&>span:first-child]:bg-primary/14 [&>span:first-child]:text-primary",
+    collapsed && !compact
+      ? "justify-center px-2 py-2.5"
+      : "gap-3 px-3 py-2.5",
+  )
+
+  const renderNavLink = (item: NavItem, iconSize = "size-9") => {
+    const Icon = item.icon
+    const linkContent = (
+      <Link
+        key={item.to}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        {...({ to: item.to, search: {}, params: {} } as any)}
+        onClick={onNavigate}
+        className={linkClassName}
+        activeProps={{ className: activeLinkClassName }}
+      >
+        <span
+          className={cn(
+            "flex shrink-0 items-center justify-center rounded-lg border border-sidebar-border/60 bg-background/20 text-muted-foreground transition-colors group-hover:text-primary",
+            iconSize,
+          )}
+        >
+          <Icon className="size-4" />
+        </span>
+        {showLabels ? (
+          <span className="min-w-0 truncate tracking-tight">{item.label}</span>
+        ) : null}
+      </Link>
+    )
+
+    if (collapsed && !compact) {
+      return (
+        <Tooltip key={item.to}>
+          <TooltipTrigger render={<div />}>{linkContent}</TooltipTrigger>
+          <TooltipContent side="right">{item.label}</TooltipContent>
+        </Tooltip>
+      )
+    }
+
+    return linkContent
+  }
 
   return (
     <aside
       className={cn(
-        "flex h-full flex-col border-r border-sidebar-border/80 bg-sidebar/70 text-sidebar-foreground backdrop-blur-xl transition-[width] duration-200",
+        "flex h-full min-h-0 flex-col overflow-hidden border-r border-sidebar-border/80 bg-sidebar/88 text-sidebar-foreground shadow-[inset_-1px_0_0_color-mix(in_oklab,var(--sidebar-border)_72%,transparent)] backdrop-blur-xl transition-[width] duration-200",
         compact ? "w-full" : collapsed ? "w-[4.5rem]" : "w-80",
       )}
     >
-      <div className={cn("pb-5 pt-6", collapsed && !compact ? "px-3" : "px-5")}>
+      <div className={cn("shrink-0 pb-4 pt-5", collapsed && !compact ? "px-3" : "px-5")}>
         <div
           className={cn(
             "flex items-center",
             collapsed && !compact ? "justify-center" : "gap-3",
           )}
         >
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/12 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
             <Shield className="size-5" />
           </div>
           {showLabels ? (
             <div className="min-w-0">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 PatchHound Console
               </div>
-              <div className="text-lg font-semibold tracking-tight">
+              <div className="truncate text-base font-semibold tracking-tight">
                 Threat Exposure Control
               </div>
             </div>
@@ -173,14 +239,14 @@ export function Sidebar({
         </div>
       </div>
 
-      <div className={cn(collapsed && !compact ? "px-2" : "px-4")}>
+      <div className={cn("shrink-0", navPadding)}>
         <Separator className="bg-sidebar-border/80" />
       </div>
 
       <nav
         className={cn(
-          "flex-1 space-y-2 py-5",
-          collapsed && !compact ? "px-2" : "px-4",
+          "min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain py-4 [scrollbar-width:thin] [scrollbar-color:color-mix(in_oklab,var(--muted-foreground)_36%,transparent)_transparent]",
+          navPadding,
         )}
       >
         {accessibleGroups.map((group) => {
@@ -197,106 +263,105 @@ export function Sidebar({
           }
 
           return (
-            <div key={group.label} className="space-y-1.5">
-              <button
-                type="button"
-                onClick={toggleGroup}
-                className={cn(
-                  "group flex w-full items-center rounded-2xl border border-transparent text-sm text-sidebar-foreground/84 transition-colors hover:border-sidebar-border/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground",
-                  collapsed && !compact
-                    ? "justify-center px-2 py-3"
-                    : "gap-3 px-3.5 py-3",
-                )}
-                aria-expanded={isOpen}
-              >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/30 text-muted-foreground transition-colors group-hover:text-primary">
-                  <GroupIcon className="size-4" />
-                </span>
-                {showLabels ? (
-                  <>
-                    <span className="flex-1 text-left tracking-tight">{group.label}</span>
-                    {isOpen ? (
-                      <ChevronDown className="size-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="size-4 text-muted-foreground" />
-                    )}
-                  </>
-                ) : null}
-              </button>
-
-              {isOpen ? (
-                <div className="space-y-1 pl-4">
-                  {group.items.map((item) => {
-                    const Icon = item.icon
-                    return (
-                      <Link
-                        key={item.to}
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        {...({ to: item.to, search: {}, params: {} } as any)}
-                        onClick={onNavigate}
-                        className="group flex items-center gap-3 rounded-2xl border border-transparent px-3.5 py-2.5 text-sm text-sidebar-foreground/84 transition-colors hover:border-sidebar-border/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground"
-                        activeProps={{
-                          className:
-                            "group flex items-center gap-3 rounded-2xl border border-primary/16 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_72%),var(--color-card)] px-3.5 py-2.5 text-sm font-medium text-sidebar-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] [&>span:first-child]:text-primary",
-                        }}
-                      >
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/30 text-muted-foreground transition-colors group-hover:text-primary">
-                          <Icon className="size-4" />
-                        </span>
-                        <span className="tracking-tight">{item.label}</span>
-                      </Link>
-                    )
-                  })}
+            <section key={group.label} className="space-y-1.5">
+              {showLabels ? (
+                <div className="px-2 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  {group.label}
                 </div>
               ) : null}
-            </div>
+
+              {showLabels ? (
+                <button
+                  type="button"
+                  onClick={toggleGroup}
+                  className="group flex min-h-11 w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm text-sidebar-foreground/84 transition-colors hover:border-sidebar-border/70 hover:bg-sidebar-accent/80 hover:text-sidebar-foreground"
+                  aria-expanded={isOpen}
+                >
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-sidebar-border/60 bg-background/20 text-muted-foreground transition-colors group-hover:text-primary">
+                    <GroupIcon className="size-4" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-left tracking-tight">
+                    {group.label === "Dashboards" ? "Dashboard views" : "Asset inventory"}
+                  </span>
+                  {isOpen ? (
+                    <ChevronDown className="size-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="size-4 text-muted-foreground" />
+                  )}
+                </button>
+              ) : null}
+
+              {isOpen ? (
+                <div className={cn("space-y-1", showLabels ? "pl-3" : "")}>
+                  {group.items.map((item) => renderNavLink(item, showLabels ? "size-8" : "size-9"))}
+                </div>
+              ) : null}
+            </section>
           )
         })}
 
-        {accessibleItems.map((item) => {
-          const Icon = item.icon;
-          const linkContent = (
-            <Link
-              key={item.to}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              {...({ to: item.to, search: {}, params: {} } as any)}
-              onClick={onNavigate}
-              className={cn(
-                "group flex items-center rounded-2xl border border-transparent text-sm text-sidebar-foreground/84 transition-colors hover:border-sidebar-border/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground",
-                collapsed && !compact
-                  ? "justify-center px-2 py-3"
-                  : "gap-3 px-3.5 py-3",
-              )}
-              activeProps={{
-                className: cn(
-                  "group flex items-center rounded-2xl border border-primary/16 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_72%),var(--color-card)] text-sm font-medium text-sidebar-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] [&>span:first-child]:text-primary",
-                  collapsed && !compact
-                    ? "justify-center px-2 py-3"
-                    : "gap-3 px-3.5 py-3",
-                ),
-              }}
-            >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/30 text-muted-foreground transition-colors group-hover:text-primary">
-                <Icon className="size-4" />
-              </span>
-              {showLabels ? (
-                <span className="tracking-tight">{item.label}</span>
-              ) : null}
-            </Link>
-          );
-
-          if (collapsed && !compact) {
-            return (
-              <Tooltip key={item.to}>
-                <TooltipTrigger render={<div />}>{linkContent}</TooltipTrigger>
-                <TooltipContent side="right">{item.label}</TooltipContent>
-              </Tooltip>
-            );
-          }
-
-          return linkContent;
-        })}
+        <section className="space-y-1.5">
+          {showLabels ? (
+            <div className="px-2 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              Operations
+            </div>
+          ) : null}
+          <div className="space-y-1">
+            {accessibleItems.map((item) => renderNavLink(item))}
+          </div>
+        </section>
       </nav>
+
+      <div className={cn("shrink-0 space-y-3 border-t border-sidebar-border/80 py-3", navPadding)}>
+        {showLabels ? (
+          <div className="flex items-center gap-3 rounded-xl border border-sidebar-border/70 bg-card/28 p-3">
+            <Avatar className="size-9">
+              <AvatarFallback className="bg-primary/15 text-[11px] font-semibold text-primary">
+                {getInitials(user.displayName, user.email)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">
+                {user.displayName || "Signed in"}
+              </div>
+              <div className="truncate text-[11px] text-muted-foreground">
+                {visibleRoles}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {onLogout ? (
+          collapsed && !compact ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    className="flex min-h-11 w-full items-center justify-center rounded-xl border border-transparent px-2 py-2.5 text-tone-danger-foreground transition-colors hover:border-tone-danger-border hover:bg-tone-danger"
+                    onClick={onLogout}
+                    aria-label="Logout"
+                  />
+                }
+              >
+                <LogOut className="size-4" />
+              </TooltipTrigger>
+              <TooltipContent side="right">Logout</TooltipContent>
+            </Tooltip>
+          ) : (
+            <button
+              type="button"
+              className="group flex min-h-11 w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm text-tone-danger-foreground transition-colors hover:border-tone-danger-border hover:bg-tone-danger"
+              onClick={onLogout}
+            >
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-tone-danger-border/70 bg-tone-danger/60">
+                <LogOut className="size-4" />
+              </span>
+              <span className="tracking-tight">Logout</span>
+            </button>
+          )
+        ) : null}
+      </div>
     </aside>
   );
 }

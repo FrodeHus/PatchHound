@@ -95,6 +95,61 @@ public class TenantsControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task Get_ReturnsInventoryCountsForDevicesSoftwareAndCloudApplications()
+    {
+        var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");
+        var sourceSystem = SourceSystem.Create("microsoft-defender", "Microsoft Defender");
+        var device = Device.Create(
+            tenant.Id,
+            sourceSystem.Id,
+            "device-1",
+            "Device 1",
+            Criticality.Medium
+        );
+        var product = SoftwareProduct.Create("Contoso", "Agent", null);
+        var tenantSoftware = SoftwareTenantRecord.Create(
+            tenant.Id,
+            null,
+            product.Id,
+            DateTimeOffset.UtcNow.AddDays(-1),
+            DateTimeOffset.UtcNow
+        );
+        var cloudApplication = CloudApplication.Create(
+            tenant.Id,
+            sourceSystem.Id,
+            "application-1",
+            "client-id-1",
+            "Contoso Portal",
+            null,
+            false,
+            []
+        );
+
+        await _dbContext.AddRangeAsync(
+            tenant,
+            sourceSystem,
+            device,
+            product,
+            tenantSoftware,
+            cloudApplication
+        );
+        await _dbContext.SaveChangesAsync();
+
+        _tenantContext.HasAccessToTenant(tenant.Id).Returns(true);
+        _tenantContext.AccessibleTenantIds.Returns([tenant.Id]);
+        _tenantContext.CurrentTenantId.Returns(tenant.Id);
+
+        var action = await _controller.Get(tenant.Id, CancellationToken.None);
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var detail = ok.Value.Should().BeOfType<TenantDetailDto>().Subject;
+        detail.Assets.DeviceCount.Should().Be(1);
+        detail.Assets.SoftwareCount.Should().Be(1);
+        detail.Assets.CloudResourceCount.Should().Be(1);
+        detail.Assets.TotalCount.Should().Be(3);
+    }
+
+    [Fact]
     public async Task TriggerSync_WhenSourceDisabled_ReturnsBadRequest()
     {
         var tenant = Tenant.Create("Contoso", "11111111-1111-1111-1111-111111111111");

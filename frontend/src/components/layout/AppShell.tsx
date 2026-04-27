@@ -60,8 +60,14 @@ export function AppShell({ user, children }: AppShellProps) {
       <TenantGuard>
       <div className="min-h-screen bg-background text-foreground">
         <div className="flex min-h-screen">
-          <div className="sticky top-0 hidden h-screen md:block">
-            <Sidebar user={user} collapsed={isDesktopCollapsed} />
+          <div className="sticky top-0 hidden h-dvh md:block">
+            <Sidebar
+              user={user}
+              collapsed={isDesktopCollapsed}
+              onLogout={() => {
+                window.location.href = "/auth/logout";
+              }}
+            />
           </div>
 
           <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
@@ -72,6 +78,9 @@ export function AppShell({ user, children }: AppShellProps) {
               <Sidebar
                 user={user}
                 compact
+                onLogout={() => {
+                  window.location.href = "/auth/logout";
+                }}
                 onNavigate={() => {
                   setIsSidebarOpen(false);
                 }}

@@ -1,5 +1,6 @@
 import type { ComponentPropsWithoutRef } from 'react'
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import type { TenantDetail } from '@/api/settings.schemas'
 import { TenantAdministrationDetail } from '@/components/features/admin/TenantAdministrationDetail'
@@ -52,6 +53,30 @@ const tenantFixture: TenantDetail = {
 }
 
 describe('TenantAdministrationDetail device rules tab', () => {
+  it('labels cloud inventory as applications', () => {
+    const queryClient = new QueryClient()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TenantAdministrationDetail
+          tenant={{
+            ...tenantFixture,
+            assets: {
+              totalCount: 6,
+              deviceCount: 2,
+              softwareCount: 3,
+              cloudResourceCount: 1,
+            },
+          }}
+          activeTab="overview"
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByText('Cloud Applications')).toBeInTheDocument()
+    expect(screen.queryByText('Cloud Resources')).not.toBeInTheDocument()
+  })
+
   it('renders the embedded asset rules panel instead of linking out', () => {
     render(
       <TenantAdministrationDetail
