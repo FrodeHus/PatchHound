@@ -105,7 +105,7 @@ export function AppShell({ user, children }: AppShellProps) {
               }}
             />
             <main className="flex-1 px-4 pb-6 sm:px-6">
-              <div className="mx-auto w-full max-w-[1600px]">
+              <div className={isAdminRoute ? "w-full" : "mx-auto w-full max-w-[1600px]"}>
                 {isAdminRoute ? (
                   <AdminConsoleLayout user={user}>{children}</AdminConsoleLayout>
                 ) : (
