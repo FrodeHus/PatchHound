@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, CircleHelp, Clock, PenSquare, RotateCw, Square, X } from 'lucide-react'
+import { CircleHelp, Clock, PenSquare, RotateCw, Square, X } from 'lucide-react'
 import { abortTenantIngestionRun, triggerTenantIngestionSync, updateTenant } from '@/api/settings.functions'
 import { createStoredCredential, fetchStoredCredentials } from '@/api/stored-credentials.functions'
 import type { TenantDetail, TenantIngestionSource } from '@/api/settings.schemas'

@@ -4,7 +4,6 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   AlertTriangle,
-  ArrowLeft,
   Bot,
   CircleHelp,
   DatabaseZap,

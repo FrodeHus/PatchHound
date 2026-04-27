@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { ArrowLeft, ShieldAlert } from 'lucide-react'
+import { ShieldAlert } from 'lucide-react'
 import { useState } from 'react'
 import type { OwnerAssetSummary } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'

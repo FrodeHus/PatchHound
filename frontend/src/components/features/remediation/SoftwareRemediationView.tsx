@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { ArrowLeft, Ban, CheckCircle, ClipboardCheck, LoaderCircle, SearchCheck, ShieldAlert, Wrench, XCircle } from 'lucide-react'
+import { Ban, CheckCircle, ClipboardCheck, LoaderCircle, SearchCheck, ShieldAlert, Wrench, XCircle } from 'lucide-react'
 import {
   fetchTenantSoftwareDetail,
   fetchTenantSoftwareInstallations,
