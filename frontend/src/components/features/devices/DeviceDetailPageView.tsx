@@ -442,14 +442,18 @@ export function DeviceDetailPageView({
                               className="rounded-xl border border-border/70 bg-card"
                             >
                               <td className="px-3 py-3 font-medium">
-                                <Link
-                                  to="/software/$id"
-                                  params={{ id: install.softwareProductId }}
-                                  search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
-                                  className="text-primary hover:underline"
-                                >
-                                  {install.softwareName}
-                                </Link>
+                                {install.tenantSoftwareId ? (
+                                  <Link
+                                    to="/software/$id"
+                                    params={{ id: install.tenantSoftwareId }}
+                                    search={{ page: 1, pageSize: 25, version: '', tab: 'overview' }}
+                                    className="text-primary hover:underline"
+                                  >
+                                    {install.softwareName}
+                                  </Link>
+                                ) : (
+                                  <span>{install.softwareName}</span>
+                                )}
                               </td>
                               <td className="px-3 py-3">{install.openVulnerabilityCount}</td>
                               <td className="px-3 py-3">{formatDateTime(install.lastSeenAt)}</td>

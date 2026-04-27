@@ -624,6 +624,15 @@ public class DevicesController : ControllerBase
 
         var nameById = productNames.ToDictionary(p => p.Id, p => p.Name);
 
+        var tenantSoftwareRows = await _dbContext.SoftwareTenantRecords.AsNoTracking()
+            .Where(item => item.TenantId == currentTenantId && productIds.Contains(item.SoftwareProductId))
+            .Select(item => new { item.SoftwareProductId, item.Id })
+            .ToListAsync(ct);
+
+        var tenantSoftwareIdByProductId = tenantSoftwareRows
+            .GroupBy(item => item.SoftwareProductId)
+            .ToDictionary(group => group.Key, group => group.First().Id);
+
         var openVulnCounts = await _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
             .Where(e =>
                 e.TenantId == currentTenantId
@@ -638,6 +647,9 @@ public class DevicesController : ControllerBase
         var vulnCountById = openVulnCounts.ToDictionary(v => v.SoftwareProductId, v => v.Count);
 
         var items = page.Select(g => new DeviceSoftwareItemDto(
+            TenantSoftwareId: tenantSoftwareIdByProductId.TryGetValue(g.SoftwareProductId, out var tenantSoftwareId)
+                ? tenantSoftwareId
+                : null,
             SoftwareProductId: g.SoftwareProductId,
             SoftwareName: nameById.GetValueOrDefault(g.SoftwareProductId, string.Empty),
             LastSeenAt: g.LastSeenAt,

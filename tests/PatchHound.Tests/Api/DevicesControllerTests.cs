@@ -6,6 +6,7 @@ using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Devices;
+using PatchHound.Api.Models.Software;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
@@ -296,6 +297,40 @@ public class DevicesControllerTests : IDisposable
 
         var crossTenant = await _controller.ListExposures(tenantBDevice.Id, new PaginationQuery(), CancellationToken.None);
         crossTenant.Result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task GetSoftware_ReturnsTenantSoftwareIdForDirectLinks()
+    {
+        var device = CreateDevice("device-1", "Device 1", Criticality.Medium);
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        var tenantSoftware = SoftwareTenantRecord.Create(
+            _tenantId,
+            null,
+            product.Id,
+            DateTimeOffset.UtcNow.AddDays(-5),
+            DateTimeOffset.UtcNow.AddDays(-1)
+        );
+        var install = InstalledSoftware.Observe(
+            _tenantId,
+            device.Id,
+            product.Id,
+            _sourceSystemId,
+            "1.0",
+            DateTimeOffset.UtcNow
+        );
+
+        await _dbContext.AddRangeAsync(device, product, tenantSoftware, install);
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetSoftware(device.Id, new PaginationQuery(), CancellationToken.None);
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = ok.Value.Should().BeOfType<PagedResponse<DeviceSoftwareItemDto>>().Subject;
+        var item = payload.Items.Should().ContainSingle().Subject;
+        item.TenantSoftwareId.Should().Be(tenantSoftware.Id);
+        item.SoftwareProductId.Should().Be(product.Id);
+        item.SoftwareName.Should().Be("Contoso Agent");
     }
 
     [Fact]

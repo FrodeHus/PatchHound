@@ -201,6 +201,7 @@ export type TenantSoftwareDescription = z.infer<typeof tenantSoftwareDescription
 export type TenantSoftwareDescriptionJob = z.infer<typeof tenantSoftwareDescriptionJobSchema>
 
 export const deviceSoftwareItemSchema = z.object({
+  tenantSoftwareId: z.string().uuid().nullable(),
   softwareProductId: z.string().uuid(),
   softwareName: z.string(),
   lastSeenAt: isoDateTimeSchema,

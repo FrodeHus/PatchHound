@@ -111,6 +111,7 @@ public record TenantSoftwareInstallationDto(
 );
 
 public record DeviceSoftwareItemDto(
+    Guid? TenantSoftwareId,
     Guid SoftwareProductId,
     string SoftwareName,
     DateTimeOffset LastSeenAt,
