@@ -102,6 +102,43 @@ const ownershipFilterOptions = [
   { label: 'Assignment group', value: 'Team' },
 ]
 
+function getCurrentDraftFilters({
+  criticalityFilter,
+  businessLabelIdFilter,
+  ownerTypeFilter,
+  deviceGroupFilter,
+  healthStatusFilter,
+  onboardingStatusFilter,
+  riskScoreFilter,
+  exposureLevelFilter,
+  tagFilter,
+  unassignedOnly,
+}: {
+  criticalityFilter: string
+  businessLabelIdFilter: string
+  ownerTypeFilter: string
+  deviceGroupFilter: string
+  healthStatusFilter: string
+  onboardingStatusFilter: string
+  riskScoreFilter: string
+  exposureLevelFilter: string
+  tagFilter: string
+  unassignedOnly: boolean
+}) {
+  return {
+    criticality: criticalityFilter,
+    businessLabelId: businessLabelIdFilter,
+    ownerType: ownerTypeFilter,
+    deviceGroup: deviceGroupFilter,
+    healthStatus: healthStatusFilter,
+    onboardingStatus: onboardingStatusFilter,
+    riskScore: riskScoreFilter,
+    exposureLevel: exposureLevelFilter,
+    tag: tagFilter,
+    unassignedOnly,
+  }
+}
+
 export function DeviceManagementTable({
   devices,
   totalCount,
@@ -145,9 +182,14 @@ export function DeviceManagementTable({
 }: DeviceManagementTableProps) {
   const [ownerType, _setOwnerType] = useState<"User" | "Team">("User");
   const [ownerId, _setOwnerId] = useState("");
-  const [searchInput, setSearchInput] = useState(searchValue);
+  const [searchInputState, setSearchInputState] = useState({
+    source: searchValue,
+    value: searchValue,
+  });
+  const searchInput =
+    searchInputState.source === searchValue ? searchInputState.value : searchValue;
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
-  const [draftFilters, setDraftFilters] = useState({
+  const [draftFilters, setDraftFilters] = useState(() => getCurrentDraftFilters({
     criticality: criticalityFilter,
     businessLabelId: businessLabelIdFilter,
     ownerType: ownerTypeFilter,
@@ -158,11 +200,7 @@ export function DeviceManagementTable({
     exposureLevel: exposureLevelFilter,
     tag: tagFilter,
     unassignedOnly,
-  });
-
-  useEffect(() => {
-    setSearchInput(searchValue);
-  }, [searchValue]);
+  }));
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -176,34 +214,18 @@ export function DeviceManagementTable({
     };
   }, [onSearchChange, searchInput, searchValue]);
 
-  useEffect(() => {
-    if (!isFilterDrawerOpen) {
-      setDraftFilters({
-        criticality: criticalityFilter,
-        businessLabelId: businessLabelIdFilter,
-        ownerType: ownerTypeFilter,
-        deviceGroup: deviceGroupFilter,
-        healthStatus: healthStatusFilter,
-        onboardingStatus: onboardingStatusFilter,
-        riskScore: riskScoreFilter,
-        exposureLevel: exposureLevelFilter,
-        tag: tagFilter,
-        unassignedOnly,
-      });
-    }
-  }, [
-    businessLabelIdFilter,
+  const currentDraftFilters = getCurrentDraftFilters({
     criticalityFilter,
-    deviceGroupFilter,
-    exposureLevelFilter,
-    healthStatusFilter,
-    isFilterDrawerOpen,
-    onboardingStatusFilter,
+    businessLabelIdFilter,
     ownerTypeFilter,
+    deviceGroupFilter,
+    healthStatusFilter,
+    onboardingStatusFilter,
     riskScoreFilter,
+    exposureLevelFilter,
     tagFilter,
     unassignedOnly,
-  ]);
+  });
 
   const selectedBusinessLabelName = useMemo(
     () =>
@@ -683,7 +705,10 @@ export function DeviceManagementTable({
               <Input
                 value={searchInput}
                 onChange={(event) => {
-                  setSearchInput(event.target.value);
+                  setSearchInputState({
+                    source: searchValue,
+                    value: event.target.value,
+                  });
                 }}
                 placeholder={searchPlaceholder}
                 className="h-10 rounded-xl border-border/70 bg-background/80 pl-10"
@@ -695,18 +720,7 @@ export function DeviceManagementTable({
             variant="outline"
             className="h-10 rounded-xl border-border/70 bg-background/80 px-4"
             onClick={() => {
-              setDraftFilters({
-                criticality: criticalityFilter,
-                businessLabelId: businessLabelIdFilter,
-                ownerType: ownerTypeFilter,
-                deviceGroup: deviceGroupFilter,
-                healthStatus: healthStatusFilter,
-                onboardingStatus: onboardingStatusFilter,
-                riskScore: riskScoreFilter,
-                exposureLevel: exposureLevelFilter,
-                tag: tagFilter,
-                unassignedOnly,
-              });
+              setDraftFilters(currentDraftFilters);
               setIsFilterDrawerOpen(true);
             }}
           >

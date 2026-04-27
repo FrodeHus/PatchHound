@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { AnalystRecommendation } from '@/api/remediation.schemas'
 import { addRecommendation } from '@/api/remediation.functions'
@@ -53,23 +53,12 @@ export function RecommendationPanel({
 }: RecommendationPanelProps) {
   const queryClient = useQueryClient()
   const currentRecommendation = recommendations[0] ?? null
-  const [showForm, setShowForm] = useState(false)
-  const [outcome, setOutcome] = useState(currentRecommendation?.recommendedOutcome ?? '')
-  const [rationale, setRationale] = useState(currentRecommendation?.rationale ?? '')
-  const [priorityOverride, setPriorityOverride] = useState(currentRecommendation?.priorityOverride ?? '')
+  const [showForm, setShowForm] = useState(Boolean(recommendationSeed))
+  const [outcome, setOutcome] = useState(recommendationSeed?.outcome ?? currentRecommendation?.recommendedOutcome ?? '')
+  const [rationale, setRationale] = useState(recommendationSeed?.rationale ?? currentRecommendation?.rationale ?? '')
+  const [priorityOverride, setPriorityOverride] = useState(recommendationSeed?.priorityOverride ?? currentRecommendation?.priorityOverride ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!recommendationSeed) {
-      return
-    }
-
-    setOutcome(recommendationSeed.outcome ?? currentRecommendation?.recommendedOutcome ?? '')
-    setRationale(recommendationSeed.rationale ?? currentRecommendation?.rationale ?? '')
-    setPriorityOverride(recommendationSeed.priorityOverride ?? currentRecommendation?.priorityOverride ?? '')
-    setShowForm(true)
-  }, [recommendationSeed?.token, recommendationSeed, currentRecommendation?.priorityOverride, currentRecommendation?.rationale, currentRecommendation?.recommendedOutcome])
 
   async function handleSubmit() {
     if (!outcome || !rationale.trim()) return

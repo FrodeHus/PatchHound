@@ -56,6 +56,22 @@ type SoftwareTableProps = {
 
 const categoryOptions = ['All', 'Component']
 
+function getCurrentDraftFilters({
+  categoryFilter,
+  vulnerableOnly,
+  missedMaintenanceWindow,
+}: {
+  categoryFilter: string
+  vulnerableOnly: boolean
+  missedMaintenanceWindow: boolean
+}) {
+  return {
+    category: categoryFilter,
+    vulnerableOnly,
+    missedMaintenanceWindow,
+  }
+}
+
 export function SoftwareTable({
   items,
   totalCount,
@@ -78,21 +94,21 @@ export function SoftwareTable({
   onClearFilters,
 }: SoftwareTableProps) {
   const [renderedAt] = useState(() => Date.now())
-  const [searchInput, setSearchInput] = useState(searchValue)
+  const [searchInputState, setSearchInputState] = useState({
+    source: searchValue,
+    value: searchValue,
+  })
+  const searchInput = searchInputState.source === searchValue ? searchInputState.value : searchValue
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
   const [draftFilters, setDraftFilters] = useState<{
     category: string
     vulnerableOnly: boolean
     missedMaintenanceWindow: boolean
-  }>({
+  }>(() => getCurrentDraftFilters({
     category: categoryFilter,
     vulnerableOnly,
     missedMaintenanceWindow,
-  })
-
-  useEffect(() => {
-    setSearchInput(searchValue)
-  }, [searchValue])
+  }))
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -106,15 +122,11 @@ export function SoftwareTable({
     }
   }, [onSearchChange, searchInput, searchValue])
 
-  useEffect(() => {
-    if (!isFilterDrawerOpen) {
-      setDraftFilters({
-        category: categoryFilter,
-        vulnerableOnly,
-        missedMaintenanceWindow,
-      })
-    }
-  }, [categoryFilter, isFilterDrawerOpen, missedMaintenanceWindow, vulnerableOnly])
+  const currentDraftFilters = getCurrentDraftFilters({
+    categoryFilter,
+    vulnerableOnly,
+    missedMaintenanceWindow,
+  })
 
   const activeFilters = useMemo(
     () =>
@@ -278,7 +290,10 @@ export function SoftwareTable({
               <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
+                onChange={(event) => setSearchInputState({
+                  source: searchValue,
+                  value: event.target.value,
+                })}
                 placeholder="Search software"
                 className="pl-9"
               />
@@ -289,11 +304,7 @@ export function SoftwareTable({
             variant="outline"
             className="h-10 rounded-xl border-border/70 bg-background/80 px-4"
             onClick={() => {
-              setDraftFilters({
-                category: categoryFilter,
-                vulnerableOnly,
-                missedMaintenanceWindow,
-              });
+              setDraftFilters(currentDraftFilters);
               setIsFilterDrawerOpen(true);
             }}
           >

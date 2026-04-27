@@ -111,7 +111,7 @@ function AuthenticatedScansWorkbench() {
             <ScanningToolsTab
               initialData={loaderData.tools}
               toolDetail={'toolDetail' in loaderData ? loaderData.toolDetail : undefined}
-              currentScript={'currentScript' in loaderData ? (loaderData.currentScript as string) : undefined}
+              currentScript={'currentScript' in loaderData ? loaderData.currentScript : undefined}
               page={search.page}
               pageSize={search.pageSize}
               onPageChange={(p) => navigate({ search: { ...search, page: p } })}

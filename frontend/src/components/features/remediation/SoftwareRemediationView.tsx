@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { ArrowLeft, Ban, CheckCircle, ClipboardCheck, LoaderCircle, SearchCheck, ShieldAlert, Wrench, XCircle } from 'lucide-react'
@@ -82,7 +82,6 @@ export function SoftwareRemediationView({
   const { selectedTenantId } = useTenantScope()
   const queryClient = useQueryClient()
   const queryKey = ['remediation-case', selectedTenantId, caseId]
-  const [deviceVersion, setDeviceVersion] = useState(initialDeviceVersion ?? '')
 
   const [approving, setApproving] = useState(false)
   const [generatingAiSummary, setGeneratingAiSummary] = useState(false)
@@ -118,18 +117,8 @@ export function SoftwareRemediationView({
 
   const softwareDetail = softwareDetailQuery.data ?? initialSoftwareDetail
   const isComponentSoftware = softwareDetail?.category === 'Component'
-  const normalizedDeviceVersion = deviceVersion || normalizeVersion(softwareDetail?.versionCohorts[0]?.version ?? null)
-
-  useEffect(() => {
-    if (!softwareDetail) {
-      return
-    }
-
-    const defaultVersion = normalizeVersion(softwareDetail.versionCohorts[0]?.version ?? null)
-    if (!deviceVersion && defaultVersion) {
-      setDeviceVersion(defaultVersion)
-    }
-  }, [softwareDetail, deviceVersion])
+  const normalizedDeviceVersion =
+    normalizeVersion(initialDeviceVersion ?? softwareDetail?.versionCohorts[0]?.version ?? null)
 
   const installationsQuery = useQuery({
     queryKey: softwareQueryKeys.installations(selectedTenantId, tenantSoftwareId ?? '', normalizedDeviceVersion, 1, 25),
@@ -1053,6 +1042,7 @@ function CurrentActionSection({
         ) : null}
         {currentStageId === 'securityAnalysis' ? (
           <RecommendationPanel
+            key={recommendationSeed?.token ?? 'recommendation-panel'}
             caseId={caseId}
             recommendations={data.recommendations}
             aiAnalystAssessment={data.aiSummary.analystAssessment}

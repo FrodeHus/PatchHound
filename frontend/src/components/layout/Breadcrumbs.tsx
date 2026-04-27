@@ -77,7 +77,7 @@ export function Breadcrumbs() {
   // Snapshot search params for every non-layout match after each navigation
   useEffect(() => {
     for (const match of matches) {
-      if (layoutRouteIds.has(match.routeId as string)) continue
+      if (layoutRouteIds.has(match.routeId)) continue
       const search = match.search as Record<string, unknown> | undefined
       if (search && Object.keys(search).length > 0) {
         searchParamsCache.set(match.pathname.replace(/\/$/, ''), { ...search })
@@ -88,7 +88,7 @@ export function Breadcrumbs() {
   const crumbs: { label: string; to: string; search: Record<string, unknown> }[] = []
 
   // Find the deepest non-layout match to build crumbs from its full path
-  const leafMatch = [...matches].reverse().find((m) => !layoutRouteIds.has(m.routeId as string))
+  const leafMatch = [...matches].reverse().find((m) => !layoutRouteIds.has(m.routeId))
   if (!leafMatch) return null
 
   const pathSegments = leafMatch.pathname.replace(/\/$/, '').split('/').filter(Boolean)

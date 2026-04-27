@@ -291,7 +291,7 @@ export function Sidebar({
                 </button>
               ) : null}
 
-              {isOpen ? (
+              {isOpen || !showLabels ? (
                 <div className={cn("space-y-1", showLabels ? "pl-3" : "")}>
                   {group.items.map((item) => renderNavLink(item, showLabels ? "size-8" : "size-9"))}
                 </div>

@@ -21,17 +21,17 @@ import { cn } from '@/lib/utils'
 type TextareaProps = React.ComponentProps<'textarea'>
 
 function Textarea({ className, value, defaultValue, onChange, onBlur, placeholder, disabled, rows, ...props }: TextareaProps) {
-  const [mounted, setMounted] = React.useState(false)
+  const mounted = React.useSyncExternalStore(
+    React.useCallback(() => () => undefined, []),
+    () => true,
+    () => false,
+  )
   const editorRef = React.useRef<MDXEditorMethods | null>(null)
   const markdown = typeof value === 'string'
     ? value
     : typeof defaultValue === 'string'
       ? defaultValue
       : ''
-
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
 
   React.useEffect(() => {
     if (!mounted || !editorRef.current) {

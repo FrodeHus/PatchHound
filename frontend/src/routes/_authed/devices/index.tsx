@@ -40,7 +40,7 @@ export const Route = createFileRoute('/_authed/devices/')({
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     const [devices, businessLabels] = await Promise.all([
-      fetchDevices({ data: buildDevicesListRequest(deps as DevicesListSearch) }),
+      fetchDevices({ data: buildDevicesListRequest(deps) }),
       fetchBusinessLabels({ data: {} }),
     ])
     return { devices, businessLabels }
@@ -58,7 +58,7 @@ function DevicesPage() {
   const searchActions = createListSearchUpdater<typeof search>(navigate)
   const queryClient = useQueryClient()
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
-  const deviceSearch = search as DevicesListSearch
+  const deviceSearch: DevicesListSearch = search
   const devicesQuery = useQuery({
     queryKey: deviceQueryKeys.list(selectedTenantId, deviceSearch),
     queryFn: () => fetchDevices({ data: buildDevicesListRequest(deviceSearch) }),

@@ -343,7 +343,7 @@ function RawResultsDialogContent({ result }: { result: AdvancedToolAssetExecutio
         <div className="h-full overflow-auto">
           <DataTable
             columns={columns}
-            data={result.rawResults.rows as Record<string, unknown>[]}
+            data={result.rawResults.rows}
             className="min-w-max"
             emptyState={<span className="text-sm text-muted-foreground">The query returned no rows.</span>}
           />
