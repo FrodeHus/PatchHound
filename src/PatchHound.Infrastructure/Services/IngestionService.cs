@@ -217,7 +217,7 @@ public class IngestionService
             var fetchedSoftwareInstallationCount = 0;
             var softwareWithoutMachineReferencesCount = 0;
             var vulnerabilityMergeSummary = new StagedVulnerabilityMergeSummary(0, 0, 0, 0, 0, 0);
-            var assetMergeSummary = new StagedAssetMergeSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            var assetMergeSummary = new StagedAssetMergeSummary(0, 0, 0, 0, 0);
             var deactivatedMachineCount = 0;
 
             try
@@ -2604,15 +2604,7 @@ public class IngestionService
             StagedSoftwareCount: persistedSoftwareCount,
             MergedAssetCount: persistedMachineCount + persistedSoftwareCount,
             PersistedMachineCount: persistedMachineCount,
-            PersistedSoftwareCount: persistedSoftwareCount,
-            StagedSoftwareLinkCount: 0,
-            ResolvedSoftwareLinkCount: 0,
-            InstallationsCreated: canonicalSummary.InstalledSoftwareCreated,
-            InstallationsTouched: canonicalSummary.InstalledSoftwareTouched,
-            EpisodesOpened: 0,
-            EpisodesSeen: 0,
-            StaleInstallationsMarked: 0,
-            InstallationsRemoved: 0
+            PersistedSoftwareCount: persistedSoftwareCount
         );
 
         async Task UpdateAssetMergeProgressAsync(
@@ -3119,19 +3111,10 @@ internal sealed record StagedVulnerabilityMergeSummary(
     int ResolvedProjectionCount
 );
 
-// Moved here after StagedAssetMergeService was deleted in Phase 7c.
 public sealed record StagedAssetMergeSummary(
     int StagedMachineCount,
     int StagedSoftwareCount,
     int MergedAssetCount,
     int PersistedMachineCount,
-    int PersistedSoftwareCount,
-    int StagedSoftwareLinkCount,
-    int ResolvedSoftwareLinkCount,
-    int InstallationsCreated,
-    int InstallationsTouched,
-    int EpisodesOpened,
-    int EpisodesSeen,
-    int StaleInstallationsMarked,
-    int InstallationsRemoved
+    int PersistedSoftwareCount
 );

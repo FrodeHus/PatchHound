@@ -1,5 +1,3 @@
-using PatchHound.Api.Models.Remediation;
-
 namespace PatchHound.Api.Models.Assets;
 
 public record AssetDto(
@@ -25,47 +23,6 @@ public record AssetDto(
     string? DeviceValue
 );
 
-public record AssetDetailDto(
-    Guid Id,
-    Guid? TenantSoftwareId,
-    string ExternalId,
-    string Name,
-    string? Description,
-    string AssetType,
-    string Criticality,
-    AssetCriticalityDetailDto? CriticalityDetail,
-    string OwnerType,
-    string? OwnerUserName,
-    Guid? OwnerUserId,
-    string? OwnerTeamName,
-    Guid? OwnerTeamId,
-    string? FallbackTeamName,
-    Guid? FallbackTeamId,
-    AssetSecurityProfileSummaryDto? SecurityProfile,
-    string? DeviceComputerDnsName,
-    string? DeviceHealthStatus,
-    string? DeviceOsPlatform,
-    string? DeviceOsVersion,
-    string? DeviceRiskScore,
-    DateTimeOffset? DeviceLastSeenAt,
-    string? DeviceLastIpAddress,
-    string? DeviceAadDeviceId,
-    string? DeviceGroupId,
-    string? DeviceGroupName,
-    string? DeviceExposureLevel,
-    bool? DeviceIsAadJoined,
-    string? DeviceOnboardingStatus,
-    string? DeviceValue,
-    IReadOnlyList<BusinessLabelSummaryDto> BusinessLabels,
-    AssetRiskDetailDto? Risk,
-    RemediationTaskSummaryDto? Remediation,
-    string[] Tags,
-    SoftwareCpeBindingDto? SoftwareCpeBinding,
-    string Metadata,
-    IReadOnlyList<AssetVulnerabilityDto> Vulnerabilities,
-    IReadOnlyList<AssetSoftwareInstallationDto> SoftwareInventory,
-    IReadOnlyList<AssetKnownSoftwareVulnerabilityDto> KnownSoftwareVulnerabilities
-);
 
 public record AssetCriticalityDetailDto(
     string Source,
@@ -135,51 +92,6 @@ public record AssetRiskDriverDto(
     decimal OperationalScore
 );
 
-public record AssetVulnerabilityDto(
-    Guid VulnerabilityId,
-    string ExternalId,
-    string Title,
-    string Description,
-    string VendorSeverity,
-    decimal? VendorScore,
-    string? CvssVector,
-    DateTimeOffset? PublishedDate,
-    string EffectiveSeverity,
-    decimal? EffectiveScore,
-    string? AssessmentReasonSummary,
-    string Status,
-    DateTimeOffset DetectedDate,
-    DateTimeOffset? ResolvedDate,
-    int EpisodeCount,
-    IReadOnlyList<AssetVulnerabilityEpisodeDto> Episodes,
-    IReadOnlyList<string> PossibleCorrelatedSoftware
-);
-
-public record AssetVulnerabilityEpisodeDto(
-    int EpisodeNumber,
-    string Status,
-    DateTimeOffset FirstSeenAt,
-    DateTimeOffset LastSeenAt,
-    DateTimeOffset? ResolvedAt
-);
-
-public record AssetSoftwareInstallationDto(
-    Guid SoftwareAssetId,
-    Guid? TenantSoftwareId,
-    string Name,
-    string ExternalId,
-    DateTimeOffset LastSeenAt,
-    SoftwareCpeBindingDto? CpeBinding,
-    int EpisodeCount,
-    IReadOnlyList<AssetSoftwareInstallationEpisodeDto> Episodes
-);
-
-public record AssetSoftwareInstallationEpisodeDto(
-    int EpisodeNumber,
-    DateTimeOffset FirstSeenAt,
-    DateTimeOffset LastSeenAt,
-    DateTimeOffset? RemovedAt
-);
 
 public record AssetKnownSoftwareVulnerabilityDto(
     Guid VulnerabilityId,

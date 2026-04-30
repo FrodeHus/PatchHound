@@ -121,7 +121,6 @@ public class TenantDeletionService(
         await DeleteEntitiesAsync(dbContext.TeamRiskScores.IgnoreQueryFilters().Where(item => item.TenantId == tenantId), ct);
         await DeleteEntitiesAsync(dbContext.TenantRiskScoreSnapshots.IgnoreQueryFilters().Where(item => item.TenantId == tenantId), ct);
         await DeleteEntitiesAsync(dbContext.OrganizationalSeverities.IgnoreQueryFilters().Where(item => item.TenantId == tenantId), ct);
-        await DeleteEntitiesAsync(dbContext.DeviceSoftwareInstallationEpisodes.IgnoreQueryFilters().Where(item => item.TenantId == tenantId), ct);
         await DeleteEntitiesAsync(dbContext.DeviceSoftwareInstallations.IgnoreQueryFilters().Where(item => item.TenantId == tenantId), ct);
         await DeleteEntitiesAsync(dbContext.SoftwareProductInstallations.IgnoreQueryFilters().Where(item => item.TenantId == tenantId), ct);
         await DeleteEntitiesAsync(dbContext.SoftwareTenantRecords.IgnoreQueryFilters().Where(item => item.TenantId == tenantId), ct);
