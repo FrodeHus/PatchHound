@@ -1075,13 +1075,14 @@ public class DashboardController : ControllerBase
             var day = DateOnly.FromDateTime(trendWindowEnd.AddDays(-dayOffset).DateTime);
             var dayInstant = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
             var dayEndInstant = dayInstant.AddDays(1);
+            var asOfInstant = dayEndInstant <= trendWindowEnd ? dayEndInstant : trendWindowEnd;
 
             foreach (var severity in Enum.GetValues<Severity>())
             {
                 var openOnDay = episodeRows.Count(ep =>
                     ep.VendorSeverity == severity
-                    && ep.FirstSeenAt < dayEndInstant
-                    && (ep.ClosedAt == null || ep.ClosedAt >= dayInstant));
+                    && ep.FirstSeenAt <= asOfInstant
+                    && (ep.ClosedAt == null || ep.ClosedAt > asOfInstant));
                 if (openOnDay > 0)
                     trendItems.Add(new TrendItem(day, severity.ToString(), openOnDay));
             }
