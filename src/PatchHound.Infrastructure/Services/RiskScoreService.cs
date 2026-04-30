@@ -457,7 +457,7 @@ public class RiskScoreService(
             .ToHashSet();
 
         var episodeScores = await dbContext.ExposureAssessments.AsNoTracking()
-            .Where(item => item.TenantId == tenantId)
+            .Where(item => item.TenantId == tenantId && item.Exposure.Status == ExposureStatus.Open)
             .Select(item => new
             {
                 AssetId = item.Exposure.DeviceId,

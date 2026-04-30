@@ -63,6 +63,8 @@ export function DeviceDetailPageView({
 }: DeviceDetailPageViewProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('overview')
   const [showOpenVulnsOnly, setShowOpenVulnsOnly] = useState(true)
+  const [showOpenExposuresOnly, setShowOpenExposuresOnly] = useState(true)
+  const [selectedExposure, setSelectedExposure] = useState<DeviceExposure | null>(null)
   const [securityProfileSheetOpen, setSecurityProfileSheetOpen] = useState(false)
   const [criticalitySheetOpen, setCriticalitySheetOpen] = useState(false)
   const [businessLabelsSheetOpen, setBusinessLabelsSheetOpen] = useState(false)
@@ -353,44 +355,68 @@ export function DeviceDetailPageView({
 
               <TabsContent value="exposures" className="pt-1">
                 <section className="rounded-2xl border border-border/70 bg-background p-4">
-                <SectionHeader
-                  title="Exposures"
-                  description="Observed vulnerabilities linked to this device from the canonical exposure pipeline."
-                />
-                {exposures.length === 0 ? (
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    No exposures observed for this device.
-                  </p>
-                ) : (
-                  <div className="mt-4 overflow-x-auto">
-                    <table className="min-w-full border-separate border-spacing-y-2 text-sm">
-                      <thead>
-                        <tr className="text-left text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                          <th className="px-3 py-2">CVE</th>
-                          <th className="px-3 py-2">Severity</th>
-                          <th className="px-3 py-2">Matched version</th>
-                          <th className="px-3 py-2">Status</th>
-                          <th className="px-3 py-2">Environmental CVSS</th>
-                          <th className="px-3 py-2">First observed</th>
-                          <th className="px-3 py-2">Last observed</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {exposures.map((exposure) => (
-                          <tr key={exposure.exposureId} className="rounded-xl border border-border/70 bg-card">
-                            <td className="px-3 py-3 font-medium">{exposure.externalId}</td>
-                            <td className="px-3 py-3">{exposure.severity}</td>
-                            <td className="px-3 py-3">{exposure.matchedVersion}</td>
-                            <td className="px-3 py-3">{exposure.status}</td>
-                            <td className="px-3 py-3">{exposure.environmentalCvss?.toFixed(1) ?? 'Unknown'}</td>
-                            <td className="px-3 py-3">{formatDateTime(exposure.firstObservedAt)}</td>
-                            <td className="px-3 py-3">{formatDateTime(exposure.lastObservedAt)}</td>
+                <div className="flex items-start justify-between gap-4">
+                  <SectionHeader
+                    title="Exposures"
+                    description="Observed vulnerabilities linked to this device from the canonical exposure pipeline."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOpenExposuresOnly((v) => !v)}
+                    className={
+                      showOpenExposuresOnly
+                        ? 'shrink-0 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary'
+                        : 'shrink-0 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/20'
+                    }
+                  >
+                    Open only
+                  </button>
+                </div>
+                {(() => {
+                  const visibleExposures = showOpenExposuresOnly
+                    ? exposures.filter((e) => e.status === 'Open')
+                    : exposures
+                  return visibleExposures.length === 0 ? (
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      {showOpenExposuresOnly
+                        ? 'No open exposures on this device.'
+                        : 'No exposures observed for this device.'}
+                    </p>
+                  ) : (
+                    <div className="mt-4 overflow-x-auto">
+                      <table className="min-w-full border-separate border-spacing-y-2 text-sm">
+                        <thead>
+                          <tr className="text-left text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                            <th className="px-3 py-2">CVE</th>
+                            <th className="px-3 py-2">Severity</th>
+                            <th className="px-3 py-2">Matched version</th>
+                            <th className="px-3 py-2">Status</th>
+                            <th className="px-3 py-2">Environmental CVSS</th>
+                            <th className="px-3 py-2">First observed</th>
+                            <th className="px-3 py-2">Last observed</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        </thead>
+                        <tbody>
+                          {visibleExposures.map((exposure) => (
+                            <tr
+                              key={exposure.exposureId}
+                              onClick={() => setSelectedExposure(exposure)}
+                              className="cursor-pointer rounded-xl border border-border/70 bg-card transition-colors hover:bg-muted/30"
+                            >
+                              <td className="px-3 py-3 font-medium">{exposure.externalId}</td>
+                              <td className="px-3 py-3">{exposure.severity}</td>
+                              <td className="px-3 py-3">{exposure.matchedVersion}</td>
+                              <td className="px-3 py-3">{exposure.status}</td>
+                              <td className="px-3 py-3">{exposure.environmentalCvss?.toFixed(1) ?? 'Unknown'}</td>
+                              <td className="px-3 py-3">{formatDateTime(exposure.firstObservedAt)}</td>
+                              <td className="px-3 py-3">{formatDateTime(exposure.lastObservedAt)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                })()}
                 </section>
               </TabsContent>
 
@@ -784,6 +810,56 @@ export function DeviceDetailPageView({
               )}
             </section>
           </div>
+        </SheetContent>
+      </Sheet>
+      <Sheet open={selectedExposure !== null} onOpenChange={(open) => { if (!open) setSelectedExposure(null) }}>
+        <SheetContent
+          side="right"
+          className="w-full border-l border-border/80 bg-card p-0 sm:max-w-md"
+        >
+          {selectedExposure ? (
+            <>
+              <SheetHeader className="border-b border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--card)_96%,black),var(--card))]">
+                <SheetTitle>{selectedExposure.externalId}</SheetTitle>
+                <SheetDescription>{selectedExposure.title}</SheetDescription>
+              </SheetHeader>
+              <div className="space-y-4 p-4">
+                <section className="grid gap-3">
+                  <MetricCard label="Severity" value={selectedExposure.severity} />
+                  <MetricCard
+                    label="Environmental CVSS"
+                    value={selectedExposure.environmentalCvss?.toFixed(1) ?? 'Unknown'}
+                  />
+                  <MetricCard label="Status" value={selectedExposure.status} />
+                  <MetricCard label="Match source" value={selectedExposure.matchSource} />
+                  {selectedExposure.matchedVersion ? (
+                    <MetricCard label="Matched version" value={selectedExposure.matchedVersion} />
+                  ) : null}
+                  <MetricCard
+                    label="First observed"
+                    value={formatDateTime(selectedExposure.firstObservedAt)}
+                  />
+                  <MetricCard
+                    label="Last observed"
+                    value={formatDateTime(selectedExposure.lastObservedAt)}
+                  />
+                  {selectedExposure.resolvedAt ? (
+                    <MetricCard
+                      label="Resolved at"
+                      value={formatDateTime(selectedExposure.resolvedAt)}
+                    />
+                  ) : null}
+                </section>
+                <Link
+                  to="/vulnerabilities/$id"
+                  params={{ id: selectedExposure.vulnerabilityId }}
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/15"
+                >
+                  Open vulnerability detail page
+                </Link>
+              </div>
+            </>
+          ) : null}
         </SheetContent>
       </Sheet>
     </>
