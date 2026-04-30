@@ -4,10 +4,13 @@ import type { TeamItem } from '@/api/teams.schemas'
 import type { UserAuditItem, UserDetail } from '@/api/users.schemas'
 import type { CurrentUser } from '@/server/auth.functions'
 import { AuditTimeline, type AuditTimelineEvent } from '@/components/features/audit/AuditTimeline'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const globalRoleOptions = [
@@ -26,6 +29,20 @@ const customerRoleOptions = [
   'CustomerViewer',
 ] as const
 
+type AccessPayload = {
+  displayName: string
+  email: string
+  company: string | null
+  isEnabled: boolean
+  accessScope: string
+  roles: string[]
+  tenantAccess: Array<{ tenantId: string; roles: string[] }>
+}
+
+type GroupsPayload = {
+  teamIds: string[]
+}
+
 type UserDetailPanelProps = {
   user: UserDetail | undefined
   currentUser: CurrentUser
@@ -39,16 +56,8 @@ type UserDetailPanelProps = {
   isLoading: boolean
   isSaving: boolean
   onAuditFilterChange: (next: { entityType: string; action: string }) => void
-  onSave: (payload: {
-    displayName: string
-    email: string
-    company: string | null
-    isEnabled: boolean
-    accessScope: string
-    roles: string[]
-    teamIds: string[]
-    tenantAccess: Array<{ tenantId: string; roles: string[] }>
-  }) => void
+  onSaveAccess: (payload: AccessPayload) => void
+  onSaveGroups: (payload: GroupsPayload) => void
 }
 
 export function UserDetailPanel({
@@ -61,7 +70,8 @@ export function UserDetailPanel({
   isLoading,
   isSaving,
   onAuditFilterChange,
-  onSave,
+  onSaveAccess,
+  onSaveGroups,
 }: UserDetailPanelProps) {
   if (!user) {
     return (
@@ -97,7 +107,8 @@ export function UserDetailPanel({
       isLoading={isLoading}
       isSaving={isSaving}
       onAuditFilterChange={onAuditFilterChange}
-      onSave={onSave}
+      onSaveAccess={onSaveAccess}
+      onSaveGroups={onSaveGroups}
     />
   )
 }
@@ -112,7 +123,8 @@ function UserDetailEditor({
   isLoading,
   isSaving,
   onAuditFilterChange,
-  onSave,
+  onSaveAccess,
+  onSaveGroups,
 }: {
   user: UserDetail
   currentUser: CurrentUser
@@ -126,7 +138,8 @@ function UserDetailEditor({
   isLoading: boolean
   isSaving: boolean
   onAuditFilterChange: (next: { entityType: string; action: string }) => void
-  onSave: UserDetailPanelProps['onSave']
+  onSaveAccess: UserDetailPanelProps['onSaveAccess']
+  onSaveGroups: UserDetailPanelProps['onSaveGroups']
 }) {
   const [displayName, setDisplayName] = useState(user.displayName)
   const [email, setEmail] = useState(user.email)
@@ -183,44 +196,134 @@ function UserDetailEditor({
     )
   }
 
+  const initials = user.displayName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+
+  const assignedTenants = tenantAccess.length
+  const assignedGroups = selectedTeamIds.length
+  const assignedRoles = selectedRoles.length
+
+  const saveAccess = () => onSaveAccess({
+    displayName: displayName.trim(),
+    email: email.trim(),
+    company: company.trim().length > 0 ? company.trim() : null,
+    isEnabled,
+    accessScope,
+    roles: selectedRoles,
+    tenantAccess: tenantAccess.map((item) => ({
+      tenantId: item.tenantId,
+      roles: item.roles,
+    })),
+  })
+
+  const saveGroups = () => onSaveGroups({ teamIds: selectedTeamIds })
+
   return (
-    <Card className="rounded-2xl border-border/70">
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-2xl tracking-[-0.04em]">{user.displayName}</CardTitle>
-            <CardDescription className="mt-1">
-              Set identity scope, assign tenant reach, and tune the roles this user carries inside each customer boundary.
-            </CardDescription>
+    <Card className="rounded-2xl border-border/70 bg-card/80">
+      <CardHeader className="space-y-4">
+        <div className="flex items-start gap-4">
+          <Avatar className="size-14 rounded-2xl border border-border/70 bg-primary/10 text-primary">
+            <AvatarFallback className="rounded-2xl bg-primary/10 text-lg font-semibold text-primary">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle className="truncate text-2xl font-semibold tracking-[-0.04em]">
+                  {user.displayName}
+                </CardTitle>
+                <CardDescription className="mt-1 truncate">
+                  {user.email}
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
+                  {accessScope}
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className={isEnabled
+                    ? 'rounded-full border-emerald-300/60 bg-emerald-500/10 text-emerald-700'
+                    : 'rounded-full border-rose-300/60 bg-rose-500/10 text-rose-700'}
+                >
+                  {isEnabled ? 'Enabled' : 'Disabled'}
+                </Badge>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {user.currentTenantName ? (
-              <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
-                Viewing {user.currentTenantName}
-              </Badge>
-            ) : null}
-            <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
-              {accessScope}
-            </Badge>
-            <Badge
-              variant="outline"
-              className={user.isEnabled
-                ? 'rounded-full border-emerald-300/60 bg-emerald-500/10 text-emerald-700'
-                : 'rounded-full border-rose-300/60 bg-rose-500/10 text-rose-700'}
-            >
-              {user.isEnabled ? 'Enabled' : 'Disabled'}
-            </Badge>
-          </div>
+        </div>
+        <div className="grid gap-2 md:grid-cols-3">
+          <StatTile label="Tenant reach" value={`${assignedTenants} tenant${assignedTenants === 1 ? '' : 's'}`} />
+          <StatTile label="Assignment groups" value={`${assignedGroups} assignment group${assignedGroups === 1 ? '' : 's'}`} />
+          <StatTile label="Current roles" value={`${assignedRoles} role${assignedRoles === 1 ? '' : 's'}`} />
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="profile" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="profile">Profile</TabsTrigger>
+        <Tabs defaultValue="overview" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="access">Access</TabsTrigger>
+            <TabsTrigger value="groups">Groups</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="profile" className="space-y-4">
+          <TabsContent value="overview" className="space-y-4">
+            <div className="rounded-xl border border-border/70 bg-background/50 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Basic info</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Read-only orientation before editing access.
+                  </p>
+                </div>
+                {user.currentTenantName ? (
+                  <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
+                    Viewing {user.currentTenantName}
+                  </Badge>
+                ) : null}
+              </div>
+              <Separator className="my-4" />
+              <div className="grid gap-4 md:grid-cols-2">
+                <DetailRow label="Display name" value={user.displayName} />
+                <DetailRow label="Email / UPN" value={user.email} />
+                <DetailRow label="Company" value={user.company || 'No company set'} />
+                <DetailRow label="Entra object ID" value={user.entraObjectId} />
+                <DetailRow label="Access scope" value={user.accessScope} />
+                <DetailRow label="Account status" value={user.isEnabled ? 'Enabled' : 'Disabled'} />
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <SummaryPanel
+                title="Tenant access"
+                value={`${user.tenantAccess.length} tenant${user.tenantAccess.length === 1 ? '' : 's'}`}
+                description={user.tenantAccess.length > 0
+                  ? user.tenantAccess
+                      .map((item) => tenants.find((tenant) => tenant.id === item.tenantId)?.name)
+                      .filter((name): name is string => Boolean(name))
+                      .join(', ')
+                  : 'No tenant access assigned'}
+              />
+              <SummaryPanel
+                title="Groups"
+                value={`${user.teams.length} assignment group${user.teams.length === 1 ? '' : 's'}`}
+                description={user.teams.length > 0
+                  ? user.teams.map((team) => team.teamName).join(', ')
+                  : 'No groups assigned'}
+              />
+              <SummaryPanel
+                title="Current tenant roles"
+                value={`${user.roles.length} role${user.roles.length === 1 ? '' : 's'}`}
+                description={user.roles.length > 0 ? user.roles.join(', ') : 'No roles assigned'}
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="access" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Name">
                 <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
@@ -372,8 +475,21 @@ function UserDetailEditor({
               </div>
             </div>
 
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                className="rounded-full"
+                disabled={isSaving || isLoading}
+                onClick={saveAccess}
+              >
+                {isSaving ? 'Saving access...' : 'Save access model'}
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="groups" className="space-y-4">
             <SelectionSection
-              title="Current tenant groups"
+              title="Assignment groups"
               description="These memberships affect routing and local task ownership in the currently selected tenant."
               items={teams.map((team) => ({
                 id: team.id,
@@ -389,59 +505,96 @@ function UserDetailEditor({
                 )
               }}
             />
-
             <div className="flex justify-end">
               <Button
                 type="button"
                 className="rounded-full"
                 disabled={isSaving || isLoading}
-                onClick={() => onSave({
-                  displayName: displayName.trim(),
-                  email: email.trim(),
-                  company: company.trim().length > 0 ? company.trim() : null,
-                  isEnabled,
-                  accessScope,
-                  roles: selectedRoles,
-                  teamIds: selectedTeamIds,
-                  tenantAccess: tenantAccess.map((item) => ({
-                    tenantId: item.tenantId,
-                    roles: item.roles,
-                  })),
-                })}
+                onClick={saveGroups}
               >
-                {isSaving ? 'Saving access...' : 'Save access model'}
+                {isSaving ? 'Saving groups...' : 'Save group memberships'}
               </Button>
             </div>
           </TabsContent>
 
           <TabsContent value="audit" className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
-              <select
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={auditFilters.entityType}
-                onChange={(event) => onAuditFilterChange({ ...auditFilters, entityType: event.target.value })}
+              <Select
+                value={auditFilters.entityType || 'all'}
+                onValueChange={(value) => onAuditFilterChange({ ...auditFilters, entityType: value === 'all' ? '' : (value ?? '') })}
               >
-                <option value="">All entity types</option>
-                <option value="User">User</option>
-                <option value="UserTenantRole">Role assignment</option>
-                <option value="TeamMember">Group membership</option>
-              </select>
-              <select
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={auditFilters.action}
-                onChange={(event) => onAuditFilterChange({ ...auditFilters, action: event.target.value })}
+                <SelectTrigger
+                  aria-label="Filter audit by entity type"
+                  className="h-8 w-full justify-between rounded-lg border-border/70 bg-background/70"
+                >
+                  <SelectValue placeholder="All entity types" />
+                </SelectTrigger>
+                <SelectContent align="start" className="rounded-xl border-border/70">
+                  <SelectItem value="all">All entity types</SelectItem>
+                  <SelectItem value="User">User</SelectItem>
+                  <SelectItem value="UserTenantRole">Role assignment</SelectItem>
+                  <SelectItem value="TeamMember">Group membership</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={auditFilters.action || 'all'}
+                onValueChange={(value) => onAuditFilterChange({ ...auditFilters, action: value === 'all' ? '' : (value ?? '') })}
               >
-                <option value="">All actions</option>
-                <option value="Created">Created</option>
-                <option value="Updated">Updated</option>
-                <option value="Deleted">Deleted</option>
-              </select>
+                <SelectTrigger
+                  aria-label="Filter audit by action"
+                  className="h-8 w-full justify-between rounded-lg border-border/70 bg-background/70"
+                >
+                  <SelectValue placeholder="All actions" />
+                </SelectTrigger>
+                <SelectContent align="start" className="rounded-xl border-border/70">
+                  <SelectItem value="all">All actions</SelectItem>
+                  <SelectItem value="Created">Created</SelectItem>
+                  <SelectItem value="Updated">Updated</SelectItem>
+                  <SelectItem value="Deleted">Deleted</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <AuditTimeline events={auditEvents} emptyMessage="No audit entries matched the current filters." />
           </TabsContent>
         </Tabs>
       </CardContent>
     </Card>
+  )
+}
+
+function StatTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border/70 bg-background/55 px-3 py-2">
+      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold tracking-tight">{value}</p>
+    </div>
+  )
+}
+
+function SummaryPanel({
+  title,
+  value,
+  description,
+}: {
+  title: string
+  value: string
+  description: string
+}) {
+  return (
+    <div className="rounded-xl border border-border/70 bg-background/50 p-4">
+      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{title}</p>
+      <p className="mt-2 text-lg font-semibold tracking-tight">{value}</p>
+      <p className="mt-1 line-clamp-3 text-sm leading-6 text-muted-foreground">{description}</p>
+    </div>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+      <p className="mt-1 break-words text-sm font-medium tracking-tight">{value}</p>
+    </div>
   )
 }
 

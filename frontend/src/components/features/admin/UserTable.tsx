@@ -1,8 +1,29 @@
+import { useState } from 'react'
+import { SearchIcon } from 'lucide-react'
 import type { UserListItem } from '@/api/users.schemas'
+import type { TeamItem } from '@/api/teams.schemas'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PaginationControls } from '@/components/ui/pagination-controls'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  DataTableActiveFilters,
+  DataTableField,
+  DataTableToolbar,
+  DataTableToolbarRow,
+  DataTableWorkbench,
+} from '@/components/ui/data-table-workbench'
+import { WorkbenchFilterDrawer, WorkbenchFilterSection } from '@/components/ui/workbench-filter-drawer'
+import { cn } from '@/lib/utils'
+
+type UserFilters = {
+  search: string
+  role: string
+  status: string
+  teamId: string
+}
 
 type UserTableProps = {
   users: UserListItem[]
@@ -11,18 +32,26 @@ type UserTableProps = {
   pageSize: number
   totalPages: number
   selectedUserId: string | null
-  filters: {
-    search: string
-    role: string
-    status: string
-    teamId: string
-  }
+  filters: UserFilters
   teams: Array<{ id: string; name: string }>
-  onFilterChange: (next: { search: string; role: string; status: string; teamId: string }) => void
+  onFilterChange: (next: UserFilters) => void
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
   onSelectUser: (userId: string) => void
 }
+
+const roleOptions = [
+  { value: 'GlobalAdmin', label: 'Global Admin' },
+  { value: 'CustomerAdmin', label: 'Customer Admin' },
+  { value: 'CustomerOperator', label: 'Customer Operator' },
+  { value: 'CustomerViewer', label: 'Customer Viewer' },
+  { value: 'SecurityManager', label: 'Security Manager' },
+  { value: 'SecurityAnalyst', label: 'Security Analyst' },
+  { value: 'TechnicalManager', label: 'Technical Manager' },
+  { value: 'AssetOwner', label: 'Asset Owner' },
+  { value: 'Stakeholder', label: 'Stakeholder' },
+  { value: 'Auditor', label: 'Auditor' },
+]
 
 export function UserTable({
   users,
@@ -38,137 +67,263 @@ export function UserTable({
   onPageSizeChange,
   onSelectUser,
 }: UserTableProps) {
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
+  const [draftFilters, setDraftFilters] = useState<Omit<UserFilters, 'search'>>({
+    role: filters.role,
+    status: filters.status,
+    teamId: filters.teamId,
+  })
+
+  const activeStructuredFilterCount = [filters.role, filters.status, filters.teamId].filter(Boolean).length
+
+  const activeFilters = [
+    filters.search
+      ? { key: 'search', label: `Search: ${filters.search}`, onClear: () => onFilterChange({ ...filters, search: '' }) }
+      : null,
+    filters.role
+      ? {
+          key: 'role',
+          label: `Role: ${roleOptions.find((r) => r.value === filters.role)?.label ?? filters.role}`,
+          onClear: () => onFilterChange({ ...filters, role: '' }),
+        }
+      : null,
+    filters.status
+      ? { key: 'status', label: `Status: ${filters.status}`, onClear: () => onFilterChange({ ...filters, status: '' }) }
+      : null,
+    filters.teamId
+      ? {
+          key: 'teamId',
+          label: `Group: ${teams.find((t) => t.id === filters.teamId)?.name ?? filters.teamId}`,
+          onClear: () => onFilterChange({ ...filters, teamId: '' }),
+        }
+      : null,
+  ].filter((f): f is NonNullable<typeof f> => f !== null)
+
   return (
-    <Card className="rounded-2xl border-border/70">
-      <CardHeader className="space-y-4">
-        <div>
-          <CardTitle>Access directory</CardTitle>
-          <CardDescription>
-            Review identities, tenant reach, and assignment posture before opening the access editor.
-          </CardDescription>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Input
-            placeholder="Search name, email, or company"
-            value={filters.search}
-            onChange={(event) => onFilterChange({ ...filters, search: event.target.value })}
+    <DataTableWorkbench
+      title="Access directory"
+      description="Select an identity to inspect and update access."
+      totalCount={totalCount}
+    >
+      <DataTableToolbar>
+        <DataTableToolbarRow className="items-end gap-4">
+          <DataTableField label="Search" className="flex-1">
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={filters.search}
+                onChange={(event) => onFilterChange({ ...filters, search: event.target.value })}
+                placeholder="Search name, email, or company"
+                className="h-10 rounded-xl border-border/70 bg-background/80 pl-10"
+              />
+            </div>
+          </DataTableField>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 rounded-xl border-border/70 bg-background/80 px-4"
+            onClick={() => {
+              setDraftFilters({ role: filters.role, status: filters.status, teamId: filters.teamId })
+              setIsFilterDrawerOpen(true)
+            }}
+          >
+            {activeStructuredFilterCount > 0 ? `Filters (${activeStructuredFilterCount})` : 'Filters...'}
+          </Button>
+        </DataTableToolbarRow>
+
+        <DataTableToolbarRow>
+          <DataTableActiveFilters
+            filters={activeFilters}
+            onClearAll={() => onFilterChange({ search: '', role: '', status: '', teamId: '' })}
+            className="flex-1"
           />
-          <select
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={filters.role}
-            onChange={(event) => onFilterChange({ ...filters, role: event.target.value })}
-          >
-            <option value="">All roles</option>
-            <option value="GlobalAdmin">Global Admin</option>
-            <option value="CustomerAdmin">Customer Admin</option>
-            <option value="CustomerOperator">Customer Operator</option>
-            <option value="CustomerViewer">Customer Viewer</option>
-            <option value="SecurityManager">Security Manager</option>
-            <option value="SecurityAnalyst">Security Analyst</option>
-            <option value="TechnicalManager">Technical Manager</option>
-            <option value="AssetOwner">Asset Owner</option>
-            <option value="Stakeholder">Stakeholder</option>
-            <option value="Auditor">Auditor</option>
-          </select>
-          <select
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={filters.status}
-            onChange={(event) => onFilterChange({ ...filters, status: event.target.value })}
-          >
-            <option value="">All statuses</option>
-            <option value="enabled">Enabled</option>
-            <option value="disabled">Disabled</option>
-          </select>
-          <select
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={filters.teamId}
-            onChange={(event) => onFilterChange({ ...filters, teamId: event.target.value })}
-          >
-            <option value="">All assignment groups</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </select>
+        </DataTableToolbarRow>
+      </DataTableToolbar>
+
+      <WorkbenchFilterDrawer
+        open={isFilterDrawerOpen}
+        onOpenChange={setIsFilterDrawerOpen}
+        title="Access filters"
+        description="Narrow the identity directory by role, account status, or group membership."
+        activeCount={activeStructuredFilterCount}
+        onResetDraft={() => setDraftFilters({ role: '', status: '', teamId: '' })}
+        onApply={() => {
+          onFilterChange({ ...filters, ...draftFilters })
+          setIsFilterDrawerOpen(false)
+        }}
+      >
+        <WorkbenchFilterSection
+          title="Identity"
+          description="Filter by the role this user holds in the current tenant."
+        >
+          <DataTableField label="Role">
+            <Select
+              value={draftFilters.role || 'all'}
+              onValueChange={(value) =>
+                setDraftFilters((current) => ({ ...current, role: value === 'all' ? '' : (value ?? '') }))
+              }
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any role" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any role</SelectItem>
+                {roleOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
+        </WorkbenchFilterSection>
+
+        <WorkbenchFilterSection
+          title="Account"
+          description="Show only enabled or disabled accounts."
+        >
+          <DataTableField label="Status">
+            <Select
+              value={draftFilters.status || 'all'}
+              onValueChange={(value) =>
+                setDraftFilters((current) => ({ ...current, status: value === 'all' ? '' : (value ?? '') }))
+              }
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any status" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any status</SelectItem>
+                <SelectItem value="enabled">Enabled</SelectItem>
+                <SelectItem value="disabled">Disabled</SelectItem>
+              </SelectContent>
+            </Select>
+          </DataTableField>
+        </WorkbenchFilterSection>
+
+        <WorkbenchFilterSection
+          title="Membership"
+          description="Filter to users who belong to a specific assignment group."
+        >
+          <DataTableField label="Assignment group">
+            <Select
+              value={draftFilters.teamId || 'all'}
+              onValueChange={(value) =>
+                setDraftFilters((current) => ({ ...current, teamId: value === 'all' ? '' : (value ?? '') }))
+              }
+            >
+              <SelectTrigger className="h-10 w-full rounded-xl border-border/70 bg-background/80 px-3">
+                <SelectValue placeholder="Any group" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/70 bg-popover/95 backdrop-blur">
+                <SelectItem value="all">Any group</SelectItem>
+                {teams.map((team) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DataTableField>
+        </WorkbenchFilterSection>
+      </WorkbenchFilterDrawer>
+
+      {users.length === 0 ? (
+        <div className="rounded-xl border border-border/70 bg-background/50 px-4 py-10 text-center text-sm text-muted-foreground">
+          No users matched the current filters.
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-          {totalCount} matching users
-        </div>
-        {users.length === 0 ? (
-          <div className="rounded-xl border border-border/70 bg-background/50 px-4 py-8 text-sm text-muted-foreground">
-            No users matched the current filters.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {users.map((user) => {
-              const isSelected = user.id === selectedUserId
-              return (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => onSelectUser(user.id)}
-                  className={`w-full rounded-xl border px-4 py-4 text-left transition ${
-                    isSelected
-                      ? 'border-primary/40 bg-primary/8'
-                      : 'border-border/70 bg-background/40 hover:border-primary/20 hover:bg-background/70'
-                  }`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium tracking-tight">{user.displayName}</p>
-                        <Badge variant="outline" className="rounded-full border-border/70 bg-background/60">
-                          {user.accessScope}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={user.isEnabled
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border/70 bg-background/40">
+          <Table aria-label="Access directory">
+            <TableHeader>
+              <TableRow className="bg-muted/45 hover:bg-muted/45">
+                <TableHead className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">Display name</TableHead>
+                <TableHead className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">Email / UPN</TableHead>
+                <TableHead className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">Scope</TableHead>
+                <TableHead className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">Status</TableHead>
+                <TableHead className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">Tenant access</TableHead>
+                <TableHead className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">Roles</TableHead>
+                <TableHead className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">Groups</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => {
+                const isSelected = user.id === selectedUserId
+                const tenantSummary =
+                  user.tenantNames.length === 0
+                    ? 'No tenant access'
+                    : user.tenantNames.length === 1
+                      ? user.tenantNames[0]
+                      : `${user.tenantNames.length} tenants`
+
+                return (
+                  <TableRow
+                    key={user.id}
+                    data-state={isSelected ? 'selected' : undefined}
+                    tabIndex={0}
+                    className={cn(
+                      'cursor-pointer border-border/60',
+                      isSelected && 'bg-primary/8 hover:bg-primary/10',
+                    )}
+                    onClick={() => onSelectUser(user.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        onSelectUser(user.id)
+                      }
+                    }}
+                  >
+                    <TableCell className="max-w-[14rem] px-3 py-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium tracking-tight">{user.displayName}</p>
+                        {user.company ? (
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">{user.company}</p>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-[16rem] px-3 py-3 text-muted-foreground">
+                      <span className="block truncate">{user.email}</span>
+                    </TableCell>
+                    <TableCell className="px-3 py-3">
+                      <Badge variant="outline" className="rounded-full border-border/70 bg-background/70">
+                        {user.accessScope}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="px-3 py-3">
+                      <Badge
+                        variant="outline"
+                        className={
+                          user.isEnabled
                             ? 'rounded-full border-emerald-300/60 bg-emerald-500/10 text-emerald-700'
-                            : 'rounded-full border-rose-300/60 bg-rose-500/10 text-rose-700'}
-                        >
-                          {user.isEnabled ? 'Enabled' : 'Disabled'}
-                        </Badge>
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
-                      {user.company ? (
-                        <p className="mt-1 text-sm text-muted-foreground">{user.company}</p>
-                      ) : null}
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {user.roles.map((role) => (
-                          <Badge key={role} variant="outline" className="rounded-full border-border/70 bg-background/70">
-                            {role}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="text-right text-sm text-muted-foreground">
-                      <div>{user.teams.length} groups</div>
-                      <div className="mt-1">
-                        {user.tenantNames.length === 0
-                          ? 'No tenant access'
-                          : user.tenantNames.length === 1
-                            ? user.tenantNames[0]
-                            : `${user.tenantNames.length} tenants`}
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        )}
-        <PaginationControls
-          page={page}
-          pageSize={pageSize}
-          totalCount={totalCount}
-          totalPages={totalPages}
-          onPageChange={onPageChange}
-          onPageSizeChange={onPageSizeChange}
-        />
-      </CardContent>
-    </Card>
+                            : 'rounded-full border-rose-300/60 bg-rose-500/10 text-rose-700'
+                        }
+                      >
+                        {user.isEnabled ? 'Enabled' : 'Disabled'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 text-muted-foreground">{tenantSummary}</TableCell>
+                    <TableCell className="max-w-[13rem] px-3 py-3">
+                      <span className="block truncate text-muted-foreground">
+                        {user.roles.length > 0 ? user.roles.join(', ') : 'No roles'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 text-muted-foreground">{user.teams.length} groups</TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <PaginationControls
+        page={page}
+        pageSize={pageSize}
+        totalCount={totalCount}
+        totalPages={totalPages}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
+    </DataTableWorkbench>
   )
 }

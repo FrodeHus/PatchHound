@@ -66,9 +66,10 @@ import { Route as AuthedAdminPlatformEnrichmentRouteImport } from './routes/_aut
 import { Route as AuthedAdminPlatformCredentialsRouteImport } from './routes/_authed/admin/platform/credentials'
 import { Route as AuthedAdminPlatformAiRouteImport } from './routes/_authed/admin/platform/ai'
 import { Route as AuthedAdminPlatformAdvancedToolsRouteImport } from './routes/_authed/admin/platform/advanced-tools'
-import { Route as AuthedAdminPlatformAccessRouteImport } from './routes/_authed/admin/platform/access'
 import { Route as AuthedAdminDeviceRulesNewRouteImport } from './routes/_authed/admin/device-rules/new'
 import { Route as AuthedAdminDeviceRulesIdRouteImport } from './routes/_authed/admin/device-rules/$id'
+import { Route as AuthedAdminPlatformAccessIndexRouteImport } from './routes/_authed/admin/platform/access/index'
+import { Route as AuthedAdminPlatformAccessUserIdRouteImport } from './routes/_authed/admin/platform/access/$userId'
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
@@ -197,12 +198,11 @@ const AuthedDashboardSecurityRoute = AuthedDashboardSecurityRouteImport.update({
   path: '/dashboard/security',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedDashboardMyAssetsRoute =
-  AuthedDashboardMyAssetsRouteImport.update({
-    id: '/dashboard/my-assets',
-    path: '/dashboard/my-assets',
-    getParentRoute: () => AuthedRoute,
-  } as any)
+const AuthedDashboardMyAssetsRoute = AuthedDashboardMyAssetsRouteImport.update({
+  id: '/dashboard/my-assets',
+  path: '/dashboard/my-assets',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedDashboardExecutiveRoute =
   AuthedDashboardExecutiveRouteImport.update({
     id: '/dashboard/executive',
@@ -377,12 +377,6 @@ const AuthedAdminPlatformAdvancedToolsRoute =
     path: '/admin/platform/advanced-tools',
     getParentRoute: () => AuthedRoute,
   } as any)
-const AuthedAdminPlatformAccessRoute =
-  AuthedAdminPlatformAccessRouteImport.update({
-    id: '/admin/platform/access',
-    path: '/admin/platform/access',
-    getParentRoute: () => AuthedRoute,
-  } as any)
 const AuthedAdminDeviceRulesNewRoute =
   AuthedAdminDeviceRulesNewRouteImport.update({
     id: '/admin/device-rules/new',
@@ -393,6 +387,18 @@ const AuthedAdminDeviceRulesIdRoute =
   AuthedAdminDeviceRulesIdRouteImport.update({
     id: '/admin/device-rules/$id',
     path: '/admin/device-rules/$id',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAdminPlatformAccessIndexRoute =
+  AuthedAdminPlatformAccessIndexRouteImport.update({
+    id: '/admin/platform/access/',
+    path: '/admin/platform/access/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAdminPlatformAccessUserIdRoute =
+  AuthedAdminPlatformAccessUserIdRouteImport.update({
+    id: '/admin/platform/access/$userId',
+    path: '/admin/platform/access/$userId',
     getParentRoute: () => AuthedRoute,
   } as any)
 
@@ -433,7 +439,6 @@ export interface FileRoutesByFullPath {
   '/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/admin/device-rules/$id': typeof AuthedAdminDeviceRulesIdRoute
   '/admin/device-rules/new': typeof AuthedAdminDeviceRulesNewRoute
-  '/admin/platform/access': typeof AuthedAdminPlatformAccessRoute
   '/admin/platform/advanced-tools': typeof AuthedAdminPlatformAdvancedToolsRoute
   '/admin/platform/ai': typeof AuthedAdminPlatformAiRoute
   '/admin/platform/credentials': typeof AuthedAdminPlatformCredentialsRoute
@@ -456,6 +461,8 @@ export interface FileRoutesByFullPath {
   '/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
   '/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
   '/assets/applications/': typeof AuthedAssetsApplicationsIndexRoute
+  '/admin/platform/access/$userId': typeof AuthedAdminPlatformAccessUserIdRoute
+  '/admin/platform/access/': typeof AuthedAdminPlatformAccessIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -494,7 +501,6 @@ export interface FileRoutesByTo {
   '/vulnerabilities': typeof AuthedVulnerabilitiesIndexRoute
   '/admin/device-rules/$id': typeof AuthedAdminDeviceRulesIdRoute
   '/admin/device-rules/new': typeof AuthedAdminDeviceRulesNewRoute
-  '/admin/platform/access': typeof AuthedAdminPlatformAccessRoute
   '/admin/platform/advanced-tools': typeof AuthedAdminPlatformAdvancedToolsRoute
   '/admin/platform/ai': typeof AuthedAdminPlatformAiRoute
   '/admin/platform/credentials': typeof AuthedAdminPlatformCredentialsRoute
@@ -517,6 +523,8 @@ export interface FileRoutesByTo {
   '/admin/tenants': typeof AuthedAdminTenantsIndexRoute
   '/admin/workflows': typeof AuthedAdminWorkflowsIndexRoute
   '/assets/applications': typeof AuthedAssetsApplicationsIndexRoute
+  '/admin/platform/access/$userId': typeof AuthedAdminPlatformAccessUserIdRoute
+  '/admin/platform/access': typeof AuthedAdminPlatformAccessIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -557,7 +565,6 @@ export interface FileRoutesById {
   '/_authed/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/_authed/admin/device-rules/$id': typeof AuthedAdminDeviceRulesIdRoute
   '/_authed/admin/device-rules/new': typeof AuthedAdminDeviceRulesNewRoute
-  '/_authed/admin/platform/access': typeof AuthedAdminPlatformAccessRoute
   '/_authed/admin/platform/advanced-tools': typeof AuthedAdminPlatformAdvancedToolsRoute
   '/_authed/admin/platform/ai': typeof AuthedAdminPlatformAiRoute
   '/_authed/admin/platform/credentials': typeof AuthedAdminPlatformCredentialsRoute
@@ -580,6 +587,8 @@ export interface FileRoutesById {
   '/_authed/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
   '/_authed/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
   '/_authed/assets/applications/': typeof AuthedAssetsApplicationsIndexRoute
+  '/_authed/admin/platform/access/$userId': typeof AuthedAdminPlatformAccessUserIdRoute
+  '/_authed/admin/platform/access/': typeof AuthedAdminPlatformAccessIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -620,7 +629,6 @@ export interface FileRouteTypes {
     | '/vulnerabilities/'
     | '/admin/device-rules/$id'
     | '/admin/device-rules/new'
-    | '/admin/platform/access'
     | '/admin/platform/advanced-tools'
     | '/admin/platform/ai'
     | '/admin/platform/credentials'
@@ -643,6 +651,8 @@ export interface FileRouteTypes {
     | '/admin/tenants/'
     | '/admin/workflows/'
     | '/assets/applications/'
+    | '/admin/platform/access/$userId'
+    | '/admin/platform/access/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -681,7 +691,6 @@ export interface FileRouteTypes {
     | '/vulnerabilities'
     | '/admin/device-rules/$id'
     | '/admin/device-rules/new'
-    | '/admin/platform/access'
     | '/admin/platform/advanced-tools'
     | '/admin/platform/ai'
     | '/admin/platform/credentials'
@@ -704,6 +713,8 @@ export interface FileRouteTypes {
     | '/admin/tenants'
     | '/admin/workflows'
     | '/assets/applications'
+    | '/admin/platform/access/$userId'
+    | '/admin/platform/access'
   id:
     | '__root__'
     | '/'
@@ -743,7 +754,6 @@ export interface FileRouteTypes {
     | '/_authed/vulnerabilities/'
     | '/_authed/admin/device-rules/$id'
     | '/_authed/admin/device-rules/new'
-    | '/_authed/admin/platform/access'
     | '/_authed/admin/platform/advanced-tools'
     | '/_authed/admin/platform/ai'
     | '/_authed/admin/platform/credentials'
@@ -766,6 +776,8 @@ export interface FileRouteTypes {
     | '/_authed/admin/tenants/'
     | '/_authed/admin/workflows/'
     | '/_authed/assets/applications/'
+    | '/_authed/admin/platform/access/$userId'
+    | '/_authed/admin/platform/access/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1181,13 +1193,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminPlatformAdvancedToolsRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/admin/platform/access': {
-      id: '/_authed/admin/platform/access'
-      path: '/admin/platform/access'
-      fullPath: '/admin/platform/access'
-      preLoaderRoute: typeof AuthedAdminPlatformAccessRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/admin/device-rules/new': {
       id: '/_authed/admin/device-rules/new'
       path: '/admin/device-rules/new'
@@ -1200,6 +1205,20 @@ declare module '@tanstack/react-router' {
       path: '/admin/device-rules/$id'
       fullPath: '/admin/device-rules/$id'
       preLoaderRoute: typeof AuthedAdminDeviceRulesIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/admin/platform/access/': {
+      id: '/_authed/admin/platform/access/'
+      path: '/admin/platform/access'
+      fullPath: '/admin/platform/access/'
+      preLoaderRoute: typeof AuthedAdminPlatformAccessIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/admin/platform/access/$userId': {
+      id: '/_authed/admin/platform/access/$userId'
+      path: '/admin/platform/access/$userId'
+      fullPath: '/admin/platform/access/$userId'
+      preLoaderRoute: typeof AuthedAdminPlatformAccessUserIdRouteImport
       parentRoute: typeof AuthedRoute
     }
   }
@@ -1249,7 +1268,6 @@ interface AuthedRouteChildren {
   AuthedVulnerabilitiesIndexRoute: typeof AuthedVulnerabilitiesIndexRoute
   AuthedAdminDeviceRulesIdRoute: typeof AuthedAdminDeviceRulesIdRoute
   AuthedAdminDeviceRulesNewRoute: typeof AuthedAdminDeviceRulesNewRoute
-  AuthedAdminPlatformAccessRoute: typeof AuthedAdminPlatformAccessRoute
   AuthedAdminPlatformAdvancedToolsRoute: typeof AuthedAdminPlatformAdvancedToolsRoute
   AuthedAdminPlatformAiRoute: typeof AuthedAdminPlatformAiRoute
   AuthedAdminPlatformCredentialsRoute: typeof AuthedAdminPlatformCredentialsRoute
@@ -1271,6 +1289,8 @@ interface AuthedRouteChildren {
   AuthedAdminTenantsIndexRoute: typeof AuthedAdminTenantsIndexRoute
   AuthedAdminWorkflowsIndexRoute: typeof AuthedAdminWorkflowsIndexRoute
   AuthedAssetsApplicationsIndexRoute: typeof AuthedAssetsApplicationsIndexRoute
+  AuthedAdminPlatformAccessUserIdRoute: typeof AuthedAdminPlatformAccessUserIdRoute
+  AuthedAdminPlatformAccessIndexRoute: typeof AuthedAdminPlatformAccessIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -1302,7 +1322,6 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedVulnerabilitiesIndexRoute: AuthedVulnerabilitiesIndexRoute,
   AuthedAdminDeviceRulesIdRoute: AuthedAdminDeviceRulesIdRoute,
   AuthedAdminDeviceRulesNewRoute: AuthedAdminDeviceRulesNewRoute,
-  AuthedAdminPlatformAccessRoute: AuthedAdminPlatformAccessRoute,
   AuthedAdminPlatformAdvancedToolsRoute: AuthedAdminPlatformAdvancedToolsRoute,
   AuthedAdminPlatformAiRoute: AuthedAdminPlatformAiRoute,
   AuthedAdminPlatformCredentialsRoute: AuthedAdminPlatformCredentialsRoute,
@@ -1325,6 +1344,8 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminTenantsIndexRoute: AuthedAdminTenantsIndexRoute,
   AuthedAdminWorkflowsIndexRoute: AuthedAdminWorkflowsIndexRoute,
   AuthedAssetsApplicationsIndexRoute: AuthedAssetsApplicationsIndexRoute,
+  AuthedAdminPlatformAccessUserIdRoute: AuthedAdminPlatformAccessUserIdRoute,
+  AuthedAdminPlatformAccessIndexRoute: AuthedAdminPlatformAccessIndexRoute,
 }
 
 const AuthedRouteWithChildren =
