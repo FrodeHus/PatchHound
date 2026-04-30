@@ -68,8 +68,14 @@ public class ExposureDerivationService(
 
                     if (existingByPair.TryGetValue(pair, out var exposure))
                     {
-                        exposure.Reobserve(observedAt);
-                        reobserved++;
+                        // If a direct-report source (e.g. Defender) already resolved this
+                        // exposure in the same ingestion cycle, respect that decision.
+                        // Adding to activePairs prevents the bottom loop from re-resolving.
+                        if (exposure.Status != ExposureStatus.Resolved)
+                        {
+                            exposure.Reobserve(observedAt);
+                            reobserved++;
+                        }
                         continue;
                     }
 
