@@ -1,11 +1,14 @@
 import { ArrowDownRight, ArrowUpRight, Building2, Clock3, Flame, RefreshCw, Siren, Trophy } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import type { DashboardSummary, TrendData } from '@/api/dashboard.schemas'
+import { fetchRiskScoreSummary } from '@/api/risk-score.functions'
+import type { RiskScoreSummary } from '@/api/risk-score.schemas'
 import { MetricInfoTooltip } from '@/components/features/dashboard/MetricInfoTooltip'
-import { RiskScoreCard } from '@/components/features/dashboard/RiskScoreCard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 import { cn } from '@/lib/utils'
 import type { LucideIcon } from 'lucide-react'
 
@@ -23,6 +26,7 @@ type Props = {
 }
 
 type ExecutiveTone = 'contained' | 'watch' | 'critical'
+type RiskGaugeBand = 'contained' | 'elevated' | 'high' | 'critical'
 
 function formatPercent(value: number) {
   return `${Math.round(value)}%`
@@ -116,6 +120,111 @@ function getTrendDirection(trends: TrendData) {
   }
 }
 
+function riskGaugeBand(score: number): RiskGaugeBand {
+  if (score >= 900) return 'critical'
+  if (score >= 750) return 'high'
+  if (score >= 500) return 'elevated'
+  return 'contained'
+}
+
+function riskGaugeLabel(score: number) {
+  switch (riskGaugeBand(score)) {
+    case 'critical':
+      return 'Critical'
+    case 'high':
+      return 'High'
+    case 'elevated':
+      return 'Elevated'
+    default:
+      return 'Contained'
+  }
+}
+
+function riskGaugeTone(score: number) {
+  switch (riskGaugeBand(score)) {
+    case 'critical':
+      return 'text-destructive'
+    case 'high':
+      return 'text-tone-warning-foreground'
+    case 'elevated':
+      return 'text-chart-2'
+    default:
+      return 'text-chart-3'
+  }
+}
+
+function RiskScoreGauge({
+  summary,
+  isLoading,
+}: {
+  summary?: RiskScoreSummary
+  isLoading: boolean
+}) {
+  const score = summary?.overallScore ?? 0
+  const clampedScore = Math.min(1000, Math.max(0, score))
+  const needleAngle = 180 - (clampedScore / 1000) * 180
+  const needleRadians = (needleAngle * Math.PI) / 180
+  const needleX = 160 + 104 * Math.cos(needleRadians)
+  const needleY = 160 - 104 * Math.sin(needleRadians)
+  const bandLabel = summary ? riskGaugeLabel(score) : 'Preparing'
+  const bandTone = summary ? riskGaugeTone(score) : 'text-muted-foreground'
+
+  return (
+    <div className="rounded-[1.6rem] border border-border/70 bg-background/60 p-5 shadow-sm backdrop-blur-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Current total risk
+          </div>
+          <div className={cn('mt-1 text-sm font-semibold uppercase tracking-[0.16em]', bandTone)}>
+            {bandLabel}
+          </div>
+        </div>
+        <MetricInfoTooltip content="Total risk score is the tenant rollup across active asset risk. The gauge bands are contained, elevated, high, and critical." />
+      </div>
+
+      <div className="mt-5">
+        <svg viewBox="0 0 320 190" role="img" aria-label={`Current total risk score ${summary ? Math.round(score) : 'loading'}`} className="h-auto w-full">
+          <path d="M 36 160 A 124 124 0 0 1 284 160" pathLength="100" fill="none" stroke="var(--color-muted)" strokeWidth="18" strokeLinecap="round" opacity="0.45" />
+          <path d="M 36 160 A 124 124 0 0 1 284 160" pathLength="100" fill="none" stroke="var(--color-chart-3)" strokeWidth="18" strokeLinecap="round" strokeDasharray="50 50" strokeDashoffset="0" />
+          <path d="M 36 160 A 124 124 0 0 1 284 160" pathLength="100" fill="none" stroke="var(--color-chart-2)" strokeWidth="18" strokeLinecap="butt" strokeDasharray="25 75" strokeDashoffset="-50" />
+          <path d="M 36 160 A 124 124 0 0 1 284 160" pathLength="100" fill="none" stroke="var(--color-tone-warning-foreground)" strokeWidth="18" strokeLinecap="butt" strokeDasharray="15 85" strokeDashoffset="-75" />
+          <path d="M 36 160 A 124 124 0 0 1 284 160" pathLength="100" fill="none" stroke="var(--color-destructive)" strokeWidth="18" strokeLinecap="round" strokeDasharray="10 90" strokeDashoffset="-90" />
+          {summary ? (
+            <>
+              <line x1="160" y1="160" x2={needleX} y2={needleY} stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="text-foreground" />
+              <circle cx="160" cy="160" r="7" fill="currentColor" className="text-foreground" />
+            </>
+          ) : null}
+          <text x="40" y="184" className="fill-muted-foreground text-[10px] uppercase tracking-[0.14em]">Contained</text>
+          <text x="230" y="184" className="fill-muted-foreground text-[10px] uppercase tracking-[0.14em]">Critical</text>
+        </svg>
+      </div>
+
+      <div className="mt-[-0.5rem] flex items-end justify-between gap-4">
+        <div>
+          <div className={cn('text-5xl font-semibold tracking-[-0.05em]', bandTone)}>
+            {summary ? Math.round(score) : isLoading ? '...' : 'N/A'}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {summary?.calculatedAt ? `Calculated ${new Date(summary.calculatedAt).toLocaleString()}` : 'Awaiting risk rollup'}
+          </div>
+        </div>
+        <div className="text-right text-xs text-muted-foreground">
+          <div>{summary?.assetCount ?? 0} scored assets</div>
+          <div>{summary?.criticalAssetCount ?? 0} critical / {summary?.highAssetCount ?? 0} high</div>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-4 gap-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+        <span className="border-t-2 border-chart-3 pt-1">Contained</span>
+        <span className="border-t-2 border-chart-2 pt-1">Elevated</span>
+        <span className="border-t-2 border-tone-warning-border pt-1">High</span>
+        <span className="border-t-2 border-destructive pt-1">Critical</span>
+      </div>
+    </div>
+  )
+}
+
 function ExecutiveSignalCard({
   label,
   tooltip,
@@ -167,6 +276,14 @@ export function CisoExecutiveOverview({
   isLoading,
   filters,
 }: Props) {
+  const { selectedTenantId } = useTenantScope()
+  const riskScoreQuery = useQuery({
+    queryKey: ['risk-score', 'summary', selectedTenantId, filters.minAgeDays, filters.platform, filters.deviceGroup],
+    queryFn: () => fetchRiskScoreSummary({ data: filters }),
+    enabled: Boolean(selectedTenantId),
+    placeholderData: (previousData) => previousData,
+    staleTime: 30_000,
+  })
   const tone = deriveTone(summary)
   const trend = getTrendDirection(trends)
   const criticalCount = summary.vulnerabilitiesBySeverity.Critical ?? 0
@@ -183,6 +300,12 @@ export function CisoExecutiveOverview({
     .reduce((total, [, count]) => total + count, 0)
   const totalDevices = Object.values(summary.deviceHealthBreakdown).reduce((total, count) => total + count, 0)
   const resolvedVsAppeared = summary.riskChangeBrief.resolvedCount - summary.riskChangeBrief.appearedCount
+  const movementIsImproving = resolvedVsAppeared > 0 && trend.direction !== 'up'
+  const movementTone: ExecutiveTone = trend.direction === 'up' || resolvedVsAppeared < 0
+    ? 'watch'
+    : movementIsImproving
+      ? 'contained'
+      : 'contained'
 
   return (
     <section className="space-y-6 pb-4">
@@ -193,7 +316,7 @@ export function CisoExecutiveOverview({
         tone.tone === 'contained' && 'bg-[linear-gradient(135deg,color-mix(in_oklab,var(--chart-3)_18%,var(--background)),var(--card)_55%,var(--background))]',
       )}>
         <CardContent className="p-6 sm:p-8">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_22rem]">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.85fr)]">
             <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-3">
                 <Badge
@@ -221,48 +344,58 @@ export function CisoExecutiveOverview({
                 </p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <div className="rounded-[1.4rem] border border-border/70 bg-background/50 px-4 py-4 backdrop-blur-sm">
                   <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Critical exposure<MetricInfoTooltip content="Exposure is the part of organizational risk that is currently reachable through unresolved vulnerabilities. Critical exposure is the subset sitting in the highest severity band." /></div>
                   <div className="mt-2 text-4xl font-semibold tracking-[-0.06em]">{criticalCount}</div>
                   <div className="mt-2 text-sm text-muted-foreground">currently critical vulnerabilities across the estate</div>
                 </div>
-                <div className="rounded-[1.4rem] border border-border/70 bg-background/50 px-4 py-4 backdrop-blur-sm">
-                  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Remediation momentum<MetricInfoTooltip content="Momentum describes whether remediation is reducing pressure faster than new exposure is appearing. Positive movement means closure is outpacing inflow." /></div>
-                  <div className="mt-2 flex items-end gap-2">
+                <div className={cn(
+                  'rounded-[1.4rem] border border-border/70 bg-background/50 px-4 py-4 backdrop-blur-sm',
+                  movementTone === 'watch' && 'border-primary/25 bg-primary/6',
+                )}>
+                  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Risk movement<MetricInfoTooltip content="Risk movement combines remediation momentum with the recent open-pressure trend, so leaders can see whether closure is outpacing new exposure and whether pressure is still rising." /></div>
+                  <div className="mt-2 flex flex-wrap items-end gap-3">
                     <span className="text-4xl font-semibold tracking-[-0.06em]">{resolvedVsAppeared > 0 ? '+' : ''}{resolvedVsAppeared}</span>
                     <span className="pb-1 text-sm text-muted-foreground">net weekly movement</span>
+                    <span className="flex items-center gap-1 pb-1 text-sm font-medium">
+                      {trend.direction === 'down' ? <ArrowDownRight className="size-4 text-chart-3" /> : null}
+                      {trend.direction === 'up' ? <ArrowUpRight className="size-4 text-destructive" /> : null}
+                      {trend.direction === 'flat' ? <RefreshCw className="size-3.5 text-muted-foreground" /> : null}
+                      {Math.abs(trend.delta)} trend
+                    </span>
                   </div>
-                  <div className="mt-2 text-sm text-muted-foreground">resolved minus newly appeared vulnerabilities in the latest brief</div>
+                  <div className="mt-2 text-sm text-muted-foreground">Resolved minus newly appeared vulnerabilities, paired with recent open-pressure direction.</div>
                 </div>
                 <div className="rounded-[1.4rem] border border-border/70 bg-background/50 px-4 py-4 backdrop-blur-sm">
-                  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Trend direction<MetricInfoTooltip content="Trend direction shows whether open vulnerability pressure is rising, falling, or flat over the recent reporting window." /></div>
-                  <div className="mt-2 flex items-center gap-2 text-4xl font-semibold tracking-[-0.06em]">
-                    {trend.direction === 'down' ? <ArrowDownRight className="size-8 text-chart-3" /> : null}
-                    {trend.direction === 'up' ? <ArrowUpRight className="size-8 text-destructive" /> : null}
-                    {trend.direction === 'flat' ? <RefreshCw className="size-7 text-muted-foreground" /> : null}
-                    {Math.abs(trend.delta)}
-                  </div>
-                  <div className="mt-2 text-sm text-muted-foreground">net change in open vulnerability pressure over the recent trend window</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[1.6rem] border border-border/70 bg-background/55 p-5 backdrop-blur-sm">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                <Building2 className="size-4" />
-                Management Readout
-              </div>
-              <div className="mt-4 space-y-4">
-                <div>
                   <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Top pressure area</div>
-                  <div className="mt-1 text-lg font-medium tracking-tight">
+                  <div className="mt-2 text-lg font-medium tracking-tight">
                     {topDeviceGroup?.deviceGroupName ?? 'No device-group pressure detected'}
                   </div>
                   <div className="mt-1 text-sm text-muted-foreground">
                     {describePressureArea(topDeviceGroup)}
                   </div>
                 </div>
+                <div className="rounded-[1.4rem] border border-border/70 bg-background/50 px-4 py-4 backdrop-blur-sm">
+                  <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Estate resilience</div>
+                  <div className="mt-2 text-lg font-medium tracking-tight">
+                    {healthyDevices}/{totalDevices} devices in healthy or active status
+                  </div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    {formatPercent(summary.slaCompliancePercent)} SLA compliance. Average remediation time is {formatDays(summary.averageRemediationDays)}.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <RiskScoreGauge summary={riskScoreQuery.data} isLoading={isLoading || riskScoreQuery.isFetching} />
+              <div className="rounded-[1.6rem] border border-border/70 bg-background/55 p-5 backdrop-blur-sm">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                <Building2 className="size-4" />
+                Management Readout
+              </div>
+              <div className="mt-4 space-y-4">
                 <div>
                   <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Operational discipline</div>
                   <div className="mt-1 text-lg font-medium tracking-tight">
@@ -272,18 +405,10 @@ export function CisoExecutiveOverview({
                     {summary.overdueTaskCount} overdue remediation actions requiring follow-through.
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Estate resilience</div>
-                  <div className="mt-1 text-lg font-medium tracking-tight">
-                    {healthyDevices}/{totalDevices} devices in healthy or active status
-                  </div>
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    Average remediation time is {formatDays(summary.averageRemediationDays)}.
-                  </div>
-                </div>
                 <Link to="/dashboard" className="mt-2 inline-flex w-full items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground">
                   Open operational dashboard
                 </Link>
+              </div>
               </div>
             </div>
           </div>
@@ -324,8 +449,6 @@ export function CisoExecutiveOverview({
           icon={Trophy}
         />
       </div>
-
-      <RiskScoreCard isLoading={isLoading} filters={filters} />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,1fr)]">
         <Card className="rounded-[1.6rem] border-border/70">
