@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowUpRight, Building2, Clock3, Flame, RefreshCw, Siren, Trophy } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
+import { PolarAngleAxis, RadialBar, RadialBarChart } from 'recharts'
 import type { DashboardSummary, TrendData } from '@/api/dashboard.schemas'
 import { fetchRiskScoreSummary } from '@/api/risk-score.functions'
 import type { RiskScoreSummary } from '@/api/risk-score.schemas'
@@ -27,6 +28,48 @@ type Props = {
 
 type ExecutiveTone = 'contained' | 'watch' | 'critical'
 type RiskGaugeBand = 'contained' | 'elevated' | 'high' | 'critical'
+
+const riskGaugeBands: Array<{
+  band: RiskGaugeBand
+  label: string
+  range: string
+  colorClass: string
+  borderClass: string
+  fill: string
+}> = [
+  {
+    band: 'contained',
+    label: 'Contained',
+    range: '0-499',
+    colorClass: 'text-chart-3',
+    borderClass: 'border-chart-3',
+    fill: 'var(--color-chart-3)',
+  },
+  {
+    band: 'elevated',
+    label: 'Elevated',
+    range: '500-749',
+    colorClass: 'text-chart-2',
+    borderClass: 'border-chart-2',
+    fill: 'var(--color-chart-2)',
+  },
+  {
+    band: 'high',
+    label: 'High',
+    range: '750-899',
+    colorClass: 'text-tone-warning-foreground',
+    borderClass: 'border-tone-warning-border',
+    fill: 'var(--color-tone-warning-foreground)',
+  },
+  {
+    band: 'critical',
+    label: 'Critical',
+    range: '900-1000',
+    colorClass: 'text-destructive',
+    borderClass: 'border-destructive',
+    fill: 'var(--color-destructive)',
+  },
+]
 
 function formatPercent(value: number) {
   return `${Math.round(value)}%`
@@ -128,29 +171,11 @@ function riskGaugeBand(score: number): RiskGaugeBand {
 }
 
 function riskGaugeLabel(score: number) {
-  switch (riskGaugeBand(score)) {
-    case 'critical':
-      return 'Critical'
-    case 'high':
-      return 'High'
-    case 'elevated':
-      return 'Elevated'
-    default:
-      return 'Contained'
-  }
+  return riskGaugeBands.find((band) => band.band === riskGaugeBand(score))?.label ?? 'Contained'
 }
 
-function riskGaugeTone(score: number) {
-  switch (riskGaugeBand(score)) {
-    case 'critical':
-      return 'text-destructive'
-    case 'high':
-      return 'text-tone-warning-foreground'
-    case 'elevated':
-      return 'text-chart-2'
-    default:
-      return 'text-chart-3'
-  }
+function riskGaugeBandMeta(score: number) {
+  return riskGaugeBands.find((band) => band.band === riskGaugeBand(score)) ?? riskGaugeBands[0]
 }
 
 function RiskScoreGauge({
@@ -162,12 +187,10 @@ function RiskScoreGauge({
 }) {
   const score = summary?.overallScore ?? 0
   const clampedScore = Math.min(1000, Math.max(0, score))
-  const needleAngle = 180 - (clampedScore / 1000) * 180
-  const needleRadians = (needleAngle * Math.PI) / 180
-  const needleX = 160 + 104 * Math.cos(needleRadians)
-  const needleY = 160 - 104 * Math.sin(needleRadians)
   const bandLabel = summary ? riskGaugeLabel(score) : 'Preparing'
-  const bandTone = summary ? riskGaugeTone(score) : 'text-muted-foreground'
+  const activeBand = riskGaugeBandMeta(score)
+  const bandTone = summary ? activeBand.colorClass : 'text-muted-foreground'
+  const chartData = [{ score: clampedScore, fill: summary ? activeBand.fill : 'var(--color-muted-foreground)' }]
 
   return (
     <div className="rounded-[1.6rem] border border-border/70 bg-background/60 p-5 shadow-sm backdrop-blur-sm">
@@ -183,43 +206,67 @@ function RiskScoreGauge({
         <MetricInfoTooltip content="Total risk score is the tenant rollup across active asset risk. The gauge bands are contained, elevated, high, and critical." />
       </div>
 
-      <div className="mt-5">
-        <svg viewBox="0 0 320 190" role="img" aria-label={`Current total risk score ${summary ? Math.round(score) : 'loading'}`} className="h-auto w-full">
-          <path d="M 36 160 A 124 124 0 0 1 284 160" pathLength="100" fill="none" stroke="var(--color-muted)" strokeWidth="18" strokeLinecap="round" opacity="0.45" />
-          <path d="M 36 160 A 124 124 0 0 1 284 160" pathLength="100" fill="none" stroke="var(--color-chart-3)" strokeWidth="18" strokeLinecap="round" strokeDasharray="50 50" strokeDashoffset="0" />
-          <path d="M 36 160 A 124 124 0 0 1 284 160" pathLength="100" fill="none" stroke="var(--color-chart-2)" strokeWidth="18" strokeLinecap="butt" strokeDasharray="25 75" strokeDashoffset="-50" />
-          <path d="M 36 160 A 124 124 0 0 1 284 160" pathLength="100" fill="none" stroke="var(--color-tone-warning-foreground)" strokeWidth="18" strokeLinecap="butt" strokeDasharray="15 85" strokeDashoffset="-75" />
-          <path d="M 36 160 A 124 124 0 0 1 284 160" pathLength="100" fill="none" stroke="var(--color-destructive)" strokeWidth="18" strokeLinecap="round" strokeDasharray="10 90" strokeDashoffset="-90" />
-          {summary ? (
-            <>
-              <line x1="160" y1="160" x2={needleX} y2={needleY} stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="text-foreground" />
-              <circle cx="160" cy="160" r="7" fill="currentColor" className="text-foreground" />
-            </>
-          ) : null}
-          <text x="40" y="184" className="fill-muted-foreground text-[10px] uppercase tracking-[0.14em]">Contained</text>
-          <text x="230" y="184" className="fill-muted-foreground text-[10px] uppercase tracking-[0.14em]">Critical</text>
-        </svg>
-      </div>
-
-      <div className="mt-[-0.5rem] flex items-end justify-between gap-4">
-        <div>
+      <div
+        className="relative mt-5 flex h-[190px] items-center justify-center"
+        role="img"
+        aria-label={`Current total risk score ${summary ? Math.round(score) : 'loading'} with ${bandLabel.toLowerCase()} status`}
+      >
+        <RadialBarChart
+          width={280}
+          height={190}
+          data={chartData}
+          cx={140}
+          cy={142}
+          innerRadius={86}
+          outerRadius={118}
+          barSize={18}
+          startAngle={180}
+          endAngle={0}
+        >
+          <PolarAngleAxis type="number" domain={[0, 1000]} tick={false} />
+          <RadialBar
+            dataKey="score"
+            background={{ fill: 'var(--color-muted)', opacity: 0.42 }}
+            cornerRadius={12}
+            className="drop-shadow-sm"
+          />
+        </RadialBarChart>
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 text-center">
           <div className={cn('text-5xl font-semibold tracking-[-0.05em]', bandTone)}>
             {summary ? Math.round(score) : isLoading ? '...' : 'N/A'}
           </div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            {summary?.calculatedAt ? `Calculated ${new Date(summary.calculatedAt).toLocaleString()}` : 'Awaiting risk rollup'}
+          <div className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            Current risk score
           </div>
+        </div>
+      </div>
+
+      <div className="mt-1 flex items-end justify-between gap-4">
+        <div className="text-xs text-muted-foreground">
+          {summary?.calculatedAt ? `Calculated ${new Date(summary.calculatedAt).toLocaleString()}` : 'Awaiting risk rollup'}
         </div>
         <div className="text-right text-xs text-muted-foreground">
           <div>{summary?.assetCount ?? 0} scored assets</div>
           <div>{summary?.criticalAssetCount ?? 0} critical / {summary?.highAssetCount ?? 0} high</div>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-4 gap-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-        <span className="border-t-2 border-chart-3 pt-1">Contained</span>
-        <span className="border-t-2 border-chart-2 pt-1">Elevated</span>
-        <span className="border-t-2 border-tone-warning-border pt-1">High</span>
-        <span className="border-t-2 border-destructive pt-1">Critical</span>
+      <div className="mt-4 grid grid-cols-4 gap-1 text-[10px] uppercase tracking-[0.12em]">
+        {riskGaugeBands.map((band) => {
+          const isActive = summary && band.band === activeBand.band
+          return (
+            <div
+              key={band.band}
+              className={cn(
+                'rounded-lg border-t-2 bg-background/35 px-2 py-2 text-muted-foreground',
+                band.borderClass,
+                isActive && `${band.colorClass} bg-muted/45`,
+              )}
+            >
+              <div className="font-semibold">{band.label}</div>
+              <div className="mt-0.5 text-[9px] tracking-[0.08em] opacity-75">{band.range}</div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -343,6 +390,18 @@ export function CisoExecutiveOverview({
                   {tone.narrative}
                 </p>
               </div>
+
+              {summary.riskChangeBrief.aiSummary ? (
+                <div className="max-w-4xl border-l-2 border-primary/35 pl-4">
+                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-primary">
+                    <Flame className="size-3.5" />
+                    Briefing note
+                  </div>
+                  <p className="mt-2 whitespace-pre-line text-sm leading-6 text-foreground/80">
+                    {summary.riskChangeBrief.aiSummary}
+                  </p>
+                </div>
+              ) : null}
 
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <div className="rounded-[1.4rem] border border-border/70 bg-background/50 px-4 py-4 backdrop-blur-sm">
@@ -523,17 +582,6 @@ export function CisoExecutiveOverview({
                   Vulnerabilities that dropped out of the current exposure picture.
                 </p>
               </div>
-              {summary.riskChangeBrief.aiSummary ? (
-                <div className="rounded-[1.2rem] border border-primary/18 bg-primary/6 px-4 py-3">
-                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-primary">
-                    <Flame className="size-3.5" />
-                    Briefing note
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {summary.riskChangeBrief.aiSummary}
-                  </p>
-                </div>
-              ) : null}
             </CardContent>
           </Card>
 

@@ -182,7 +182,28 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
     {
         using var scope = scopeFactory.CreateScope();
         var ingestionService = scope.ServiceProvider.GetRequiredService<IngestionService>();
-        return await ingestionService.RunIngestionAsync(tenantId, sourceKey, ct);
+        var started = await ingestionService.RunIngestionAsync(tenantId, sourceKey, ct);
+        if (!started)
+        {
+            return false;
+        }
+
+        try
+        {
+            var briefingService =
+                scope.ServiceProvider.GetRequiredService<ExecutiveDashboardBriefingService>();
+            await briefingService.RefreshAsync(tenantId, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(
+                ex,
+                "Failed to refresh executive dashboard briefing after ingestion for tenant {TenantId}",
+                tenantId
+            );
+        }
+
+        return true;
     }
 
     private static bool IsManualSyncQueued(ScheduledSource source)

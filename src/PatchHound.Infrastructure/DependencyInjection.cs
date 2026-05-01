@@ -115,6 +115,7 @@ public static class DependencyInjection
         services.AddScoped<SoftwareDescriptionGenerationService>();
         services.AddScoped<SoftwareDescriptionJobService>();
         services.AddScoped<RemediationAiJobService>();
+        services.AddScoped<ExecutiveDashboardBriefingService>();
         services.AddScoped<IRiskChangeBriefAiSummaryService, RiskChangeBriefAiSummaryService>();
         services.AddScoped<ITenantAiConfigurationResolver, TenantAiConfigurationResolver>();
         services

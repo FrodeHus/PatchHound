@@ -99,6 +99,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AIReport> AIReports => Set<AIReport>();
+    public DbSet<ExecutiveDashboardBriefing> ExecutiveDashboardBriefings =>
+        Set<ExecutiveDashboardBriefing>();
     public DbSet<SoftwareDescriptionJob> SoftwareDescriptionJobs => Set<SoftwareDescriptionJob>();
     public DbSet<RemediationAiJob> RemediationAiJobs => Set<RemediationAiJob>();
     public DbSet<DeviceGroupRiskScore> DeviceGroupRiskScores => Set<DeviceGroupRiskScore>();
@@ -324,6 +326,9 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<TenantRiskScoreSnapshot>()
+            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
+        modelBuilder
+            .Entity<ExecutiveDashboardBriefing>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
 
         // Workflow entities – TenantId is nullable (system workflows have null).

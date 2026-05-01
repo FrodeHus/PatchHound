@@ -10,7 +10,8 @@ namespace PatchHound.Api.Services;
 
 public class DashboardQueryService(
     PatchHoundDbContext dbContext,
-    IRiskChangeBriefAiSummaryService riskChangeBriefAiSummaryService
+    IRiskChangeBriefAiSummaryService riskChangeBriefAiSummaryService,
+    ExecutiveDashboardBriefingService? executiveDashboardBriefingService = null
 )
 {
     public record RecurrenceData(
@@ -135,6 +136,13 @@ public class DashboardQueryService(
                 .Select(c => new { c.SoftwareProductId, c.Id })
                 .ToDictionaryAsync(c => c.SoftwareProductId, c => c.Id, ct);
 
+        if (highCriticalOnly)
+        {
+            appeared = appeared
+                .Where(item => item.Severity is nameof(Severity.Critical) or nameof(Severity.High))
+                .ToList();
+        }
+
         var deterministicBrief = new DashboardRiskChangeBriefDto(
             appeared.Select(item => item.VulnerabilityId).Distinct().Count(),
             resolved.Select(item => item.VulnerabilityId).Distinct().Count(),
@@ -190,36 +198,46 @@ public class DashboardQueryService(
             return deterministicBrief;
         }
 
+        var storedBriefing = await dbContext.ExecutiveDashboardBriefings.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.TenantId == tenantId, ct);
+        if (storedBriefing is not null)
+        {
+            return deterministicBrief with { AiSummary = storedBriefing.Content };
+        }
+
         try
         {
-            var aiSummary = await riskChangeBriefAiSummaryService.GenerateAsync(
-                currentTenantId,
-                new RiskChangeBriefSummaryInput(
-                    deterministicBrief.AppearedCount,
-                    deterministicBrief.ResolvedCount,
-                    deterministicBrief.Appeared
-                        .Select(item => new RiskChangeBriefSummaryItemInput(
-                            item.ExternalId,
-                            item.Title,
-                            item.Severity,
-                            item.AffectedAssetCount,
-                            item.ChangedAt
-                        ))
-                        .ToList(),
-                    deterministicBrief.Resolved
-                        .Select(item => new RiskChangeBriefSummaryItemInput(
-                            item.ExternalId,
-                            item.Title,
-                            item.Severity,
-                            item.AffectedAssetCount,
-                            item.ChangedAt
-                        ))
-                        .ToList()
-                ),
-                ct
-            );
-
-            return deterministicBrief with { AiSummary = aiSummary };
+            return deterministicBrief with
+            {
+                AiSummary = executiveDashboardBriefingService is null
+                    ? await riskChangeBriefAiSummaryService.GenerateAsync(
+                        currentTenantId,
+                        new RiskChangeBriefSummaryInput(
+                            deterministicBrief.AppearedCount,
+                            deterministicBrief.ResolvedCount,
+                            deterministicBrief.Appeared
+                                .Select(item => new RiskChangeBriefSummaryItemInput(
+                                    item.ExternalId,
+                                    item.Title,
+                                    item.Severity,
+                                    item.AffectedAssetCount,
+                                    item.ChangedAt
+                                ))
+                                .ToList(),
+                            deterministicBrief.Resolved
+                                .Select(item => new RiskChangeBriefSummaryItemInput(
+                                    item.ExternalId,
+                                    item.Title,
+                                    item.Severity,
+                                    item.AffectedAssetCount,
+                                    item.ChangedAt
+                                ))
+                                .ToList()
+                        ),
+                        ct
+                    )
+                    : await executiveDashboardBriefingService.BuildFallbackAsync(tenantId, ct),
+            };
         }
         catch
         {
