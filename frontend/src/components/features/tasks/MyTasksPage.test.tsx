@@ -119,8 +119,8 @@ describe('bucketsForRoles', () => {
     expect(bucketsForRoles(['AssetOwner'])).toEqual(['decision'])
   })
 
-  it('maps SecurityManager to approval only', () => {
-    expect(bucketsForRoles(['SecurityManager'])).toEqual(['approval'])
+  it('maps SecurityManager to recommendation and approval', () => {
+    expect(bucketsForRoles(['SecurityManager'])).toEqual(['recommendation', 'approval'])
   })
 
   it('combines buckets when the user holds multiple non-admin roles', () => {

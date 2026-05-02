@@ -282,6 +282,30 @@ public class RemediationDecisionListTests : IDisposable
     }
 
     [Fact]
+    public async Task ListAsync_WhenNeedsAnalystRecommendation_IncludesCasesWithoutAnyWorkflow()
+    {
+        // Workflows are bootstrapped lazily when an analyst saves a recommendation
+        // or an owner saves a decision. Brand-new cases that nobody has touched yet
+        // should still appear in the analyst recommendation queue.
+        var product = SoftwareProduct.Create("Contoso", "Untouched Software", null);
+        var untouchedCase = RemediationCase.Create(_tenantId, product.Id);
+        await _dbContext.AddRangeAsync(product, untouchedCase);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.ListAsync(
+            _tenantId,
+            new PatchHound.Api.Models.Decisions.RemediationDecisionFilterQuery(NeedsAnalystRecommendation: true),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var item = result.Items.Should().ContainSingle().Subject;
+        item.RemediationCaseId.Should().Be(untouchedCase.Id);
+        // No workflow exists yet → WorkflowStage is null in the projection.
+        item.WorkflowStage.Should().BeNull();
+    }
+
+    [Fact]
     public async Task ListAsync_WhenNeedsRemediationDecision_ReturnsRemediationDecisionStageCasesWithoutDecision()
     {
         // Case at RemediationDecision stage with no decision → matches.

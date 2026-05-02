@@ -312,11 +312,19 @@ public class RemediationDecisionQueryService(
 
             if (filter.NeedsAnalystRecommendation == true)
             {
-                if (!activeWorkflowsByCase.TryGetValue(rc.Id, out var activeWorkflow)
-                    || activeWorkflow.CurrentStage != RemediationWorkflowStage.SecurityAnalysis
-                    || workflowRecommendationSet.Contains(activeWorkflow.Id))
+                // A case needs analyst attention when:
+                //   * it has no active workflow yet (workflows are bootstrapped lazily on first
+                //     recommendation/decision, so brand-new cases would otherwise be invisible), OR
+                //   * its active workflow is parked at SecurityAnalysis without a recommendation.
+                // Any later stage (RemediationDecision, Approval, Execution, Closure) means analyst
+                // input has already happened.
+                if (activeWorkflowsByCase.TryGetValue(rc.Id, out var activeWorkflow))
                 {
-                    continue;
+                    if (activeWorkflow.CurrentStage != RemediationWorkflowStage.SecurityAnalysis
+                        || workflowRecommendationSet.Contains(activeWorkflow.Id))
+                    {
+                        continue;
+                    }
                 }
             }
 

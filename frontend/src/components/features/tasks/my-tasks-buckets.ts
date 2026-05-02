@@ -29,7 +29,11 @@ export function bucketsForRoles(roles: readonly string[]): TaskBucketKey[] {
     return ['recommendation', 'decision', 'approval']
   }
   const out: TaskBucketKey[] = []
-  if (roles.includes('SecurityAnalyst')) out.push('recommendation')
+  // SecurityManager covers analyst work too — they can write recommendations
+  // when an analyst isn't available.
+  if (roles.includes('SecurityAnalyst') || roles.includes('SecurityManager')) {
+    out.push('recommendation')
+  }
   if (roles.includes('AssetOwner')) out.push('decision')
   if (roles.includes('SecurityManager')) out.push('approval')
   return out
