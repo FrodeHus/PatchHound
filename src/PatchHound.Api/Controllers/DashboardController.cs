@@ -1024,9 +1024,41 @@ public class DashboardController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
 
-        // Heatmap not yet implemented — returns empty list.
-        _ = tenantId;
-        return Ok(new List<HeatmapRowDto>());
+        var normalizedGroupBy = NormalizeHeatmapGroupBy(groupBy);
+        if (normalizedGroupBy is null)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Unsupported heatmap grouping.",
+                Detail = "Supported groupBy values are deviceGroup, ownerTeam, businessLabel, businessService, platform, and severity.",
+            });
+        }
+
+        var (filteredAssetIds, minPublishedDate) = BuildFilterContext(tenantId, filter);
+        var exposureQuery = _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            .Where(exposure => exposure.TenantId == tenantId && exposure.Status == ExposureStatus.Open);
+
+        if (filteredAssetIds != null)
+        {
+            exposureQuery = exposureQuery.Where(exposure => filteredAssetIds.Contains(exposure.DeviceId));
+        }
+
+        if (minPublishedDate.HasValue)
+        {
+            exposureQuery = exposureQuery.Where(exposure => exposure.Vulnerability.PublishedDate >= minPublishedDate.Value);
+        }
+
+        var rows = normalizedGroupBy switch
+        {
+            "deviceGroup" => await BuildDeviceGroupHeatmapAsync(exposureQuery, ct),
+            "ownerTeam" => await BuildOwnerTeamHeatmapAsync(exposureQuery, tenantId, ct),
+            "businessLabel" => await BuildBusinessLabelHeatmapAsync(exposureQuery, tenantId, ct),
+            "platform" => await BuildPlatformHeatmapAsync(exposureQuery, ct),
+            "severity" => await BuildSeverityHeatmapAsync(exposureQuery, ct),
+            _ => [],
+        };
+
+        return Ok(rows);
     }
 
     [HttpGet("trends")]
@@ -1321,6 +1353,188 @@ public class DashboardController : ControllerBase
             : null;
 
         return (filteredAssetIdQuery, minPublishedDate);
+    }
+
+    private static string? NormalizeHeatmapGroupBy(string? groupBy)
+    {
+        return groupBy?.Trim().ToLowerInvariant() switch
+        {
+            null or "" or "devicegroup" or "device-group" or "device_group" => "deviceGroup",
+            "ownerteam" or "owner-team" or "owner_team" or "owner" or "team" => "ownerTeam",
+            "businesslabel" or "business-label" or "business_label" or "businessservice" or "business-service" or "business_service" => "businessLabel",
+            "platform" or "os" or "osplatform" or "os-platform" or "os_platform" => "platform",
+            "severity" => "severity",
+            _ => null,
+        };
+    }
+
+    private static List<HeatmapRowDto> SortHeatmapRows(IEnumerable<HeatmapRowDto> rows)
+    {
+        return rows
+            .OrderByDescending(row => row.Critical)
+            .ThenByDescending(row => row.High)
+            .ThenByDescending(row => row.Medium)
+            .ThenByDescending(row => row.Low)
+            .ThenBy(row => row.Label)
+            .Take(20)
+            .ToList();
+    }
+
+    private static HeatmapRowDto BuildHeatmapRow(string label, IEnumerable<Severity> severities)
+    {
+        var counts = severities
+            .GroupBy(severity => severity)
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        return new HeatmapRowDto(
+            label,
+            counts.GetValueOrDefault(Severity.Critical),
+            counts.GetValueOrDefault(Severity.High),
+            counts.GetValueOrDefault(Severity.Medium),
+            counts.GetValueOrDefault(Severity.Low)
+        );
+    }
+
+    private static async Task<List<HeatmapRowDto>> BuildDeviceGroupHeatmapAsync(
+        IQueryable<DeviceVulnerabilityExposure> exposureQuery,
+        CancellationToken ct)
+    {
+        var rows = await exposureQuery
+            .Select(exposure => new
+            {
+                Label = exposure.Device.GroupName ?? "No device group",
+                Severity = exposure.Vulnerability.VendorSeverity,
+            })
+            .ToListAsync(ct);
+
+        return SortHeatmapRows(rows
+            .GroupBy(row => row.Label)
+            .Select(group => BuildHeatmapRow(group.Key, group.Select(row => row.Severity))));
+    }
+
+    private static async Task<List<HeatmapRowDto>> BuildPlatformHeatmapAsync(
+        IQueryable<DeviceVulnerabilityExposure> exposureQuery,
+        CancellationToken ct)
+    {
+        var rows = await exposureQuery
+            .Select(exposure => new
+            {
+                Label = exposure.Device.OsPlatform ?? "Unknown platform",
+                Severity = exposure.Vulnerability.VendorSeverity,
+            })
+            .ToListAsync(ct);
+
+        return SortHeatmapRows(rows
+            .GroupBy(row => row.Label)
+            .Select(group => BuildHeatmapRow(group.Key, group.Select(row => row.Severity))));
+    }
+
+    private async Task<List<HeatmapRowDto>> BuildOwnerTeamHeatmapAsync(
+        IQueryable<DeviceVulnerabilityExposure> exposureQuery,
+        Guid tenantId,
+        CancellationToken ct)
+    {
+        var rows = await exposureQuery
+            .Select(exposure => new
+            {
+                TeamId = exposure.Device.OwnerTeamId ?? exposure.Device.FallbackTeamId,
+                Severity = exposure.Vulnerability.VendorSeverity,
+            })
+            .ToListAsync(ct);
+
+        var teamIds = rows
+            .Select(row => row.TeamId)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+
+        var teamNamesById = teamIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _dbContext.Teams.AsNoTracking()
+                .Where(team => team.TenantId == tenantId && teamIds.Contains(team.Id))
+                .ToDictionaryAsync(team => team.Id, team => team.Name, ct);
+
+        return SortHeatmapRows(rows
+            .GroupBy(row => row.TeamId)
+            .Select(group =>
+            {
+                var label = group.Key.HasValue && teamNamesById.TryGetValue(group.Key.Value, out var teamName)
+                    ? teamName
+                    : "Unowned";
+
+                return BuildHeatmapRow(label, group.Select(row => row.Severity));
+            }));
+    }
+
+    private async Task<List<HeatmapRowDto>> BuildBusinessLabelHeatmapAsync(
+        IQueryable<DeviceVulnerabilityExposure> exposureQuery,
+        Guid tenantId,
+        CancellationToken ct)
+    {
+        var exposureRows = await exposureQuery
+            .Select(exposure => new
+            {
+                exposure.DeviceId,
+                Severity = exposure.Vulnerability.VendorSeverity,
+            })
+            .ToListAsync(ct);
+
+        if (exposureRows.Count == 0)
+        {
+            return [];
+        }
+
+        var deviceIds = exposureRows.Select(row => row.DeviceId).Distinct().ToList();
+        var labelRows = await (
+            from deviceLabel in _dbContext.DeviceBusinessLabels.AsNoTracking()
+            join label in _dbContext.BusinessLabels.AsNoTracking()
+                on deviceLabel.BusinessLabelId equals label.Id
+            where deviceLabel.TenantId == tenantId
+                  && label.TenantId == tenantId
+                  && label.IsActive
+                  && deviceIds.Contains(deviceLabel.DeviceId)
+            select new
+            {
+                deviceLabel.DeviceId,
+                label.Name,
+            }
+        ).ToListAsync(ct);
+
+        var labelsByDeviceId = labelRows
+            .GroupBy(row => row.DeviceId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(row => row.Name).Distinct().ToList());
+
+        var rows = exposureRows.SelectMany(row =>
+        {
+            if (!labelsByDeviceId.TryGetValue(row.DeviceId, out var labels) || labels.Count == 0)
+            {
+                labels = ["Unlabeled"];
+            }
+
+            return labels.Select(label => new { Label = label, row.Severity });
+        });
+
+        return SortHeatmapRows(rows
+            .GroupBy(row => row.Label)
+            .Select(group => BuildHeatmapRow(group.Key, group.Select(row => row.Severity))));
+    }
+
+    private static async Task<List<HeatmapRowDto>> BuildSeverityHeatmapAsync(
+        IQueryable<DeviceVulnerabilityExposure> exposureQuery,
+        CancellationToken ct)
+    {
+        var severities = await exposureQuery
+            .Select(exposure => exposure.Vulnerability.VendorSeverity)
+            .ToListAsync(ct);
+
+        var severityOrder = new[] { Severity.Critical, Severity.High, Severity.Medium, Severity.Low };
+        return severityOrder
+            .Select(severity => BuildHeatmapRow(severity.ToString(), severities.Where(item => item == severity)))
+            .Where(row => row.Critical + row.High + row.Medium + row.Low > 0)
+            .ToList();
     }
 
     private static IEnumerable<DateOnly> EachDay(DateOnly startDate, DateOnly endDate)

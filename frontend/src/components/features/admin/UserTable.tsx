@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { SearchIcon } from 'lucide-react'
 import type { UserListItem } from '@/api/users.schemas'
-import type { TeamItem } from '@/api/teams.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
