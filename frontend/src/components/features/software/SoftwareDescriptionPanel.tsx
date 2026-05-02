@@ -51,8 +51,9 @@ export function SoftwareDescriptionPanel({
     enabled: !!selectedTenantId,
     refetchInterval: (query) => {
       const status = query.state.data?.status
-      return status === 'Pending' || status === 'Running' ? 3000 : false
+      return status === 'Pending' || status === 'Running' ? 8000 : false
     },
+    refetchIntervalInBackground: false,
   })
 
   useEffect(() => {

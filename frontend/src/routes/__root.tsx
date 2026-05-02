@@ -35,7 +35,19 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 })
 
 function RootDocument() {
-  const [queryClient] = useState(() => new QueryClient())
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 60_000,
+            refetchOnWindowFocus: false,
+            refetchOnMount: false,
+            retry: 1,
+          },
+        },
+      }),
+  )
 
   return (
     <html lang="en">

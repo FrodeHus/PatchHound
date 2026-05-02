@@ -23,8 +23,9 @@ function RemediationCaseRoute() {
     initialData: canUseInitialData ? initialData : undefined,
     refetchInterval: (currentQuery) => {
       const status = currentQuery.state.data?.aiSummary.status
-      return status === 'Queued' || status === 'Generating' ? 3000 : false
+      return status === 'Queued' || status === 'Generating' ? 8000 : false
     },
+    refetchIntervalInBackground: false,
   })
 
   const data = query.data ?? (canUseInitialData ? initialData : undefined)

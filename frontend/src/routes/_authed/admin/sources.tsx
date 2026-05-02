@@ -49,8 +49,9 @@ function SourcesAdministrationPage() {
         return false
       }
 
-      return tenant.ingestionSources.some((source) => source.runtime.activeIngestionRunId) ? 3000 : false
+      return tenant.ingestionSources.some((source) => source.runtime.activeIngestionRunId) ? 8000 : false
     },
+    refetchIntervalInBackground: false,
   })
   const enrichmentQuery = useQuery({
     queryKey: ['enrichment-sources'],

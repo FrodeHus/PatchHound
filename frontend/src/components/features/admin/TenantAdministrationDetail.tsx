@@ -511,8 +511,9 @@ function SourcesTab({
     refetchInterval: (query) => {
       const data = query.state.data
       if (!data) return false
-      return data.ingestionSources.some((source) => source.runtime.activeIngestionRunId) ? 3000 : false
+      return data.ingestionSources.some((source) => source.runtime.activeIngestionRunId) ? 8000 : false
     },
+    refetchIntervalInBackground: false,
   })
 
   const liveTenant = tenantQuery.data ?? tenant

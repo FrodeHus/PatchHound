@@ -8,6 +8,11 @@ export function createRouter() {
     },
     routeTree,
     scrollRestoration: true,
+    // Skip loader re-runs on back-navigation when the route's data is < 1 min old.
+    // Routes whose loaders depend on search params still re-run when those deps
+    // change (loaderDeps controls invalidation), but identical-URL revisits hit cache.
+    defaultStaleTime: 60_000,
+    defaultPreloadStaleTime: 60_000,
   })
 }
 

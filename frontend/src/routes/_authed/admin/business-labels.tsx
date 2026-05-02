@@ -73,6 +73,7 @@ function BusinessLabelsPage() {
             description: value.description,
             color: value.color,
             isActive: value.isActive,
+            weightCategory: value.weightCategory,
           },
         })
         return
