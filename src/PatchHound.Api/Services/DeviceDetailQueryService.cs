@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Models.Assets;
 using PatchHound.Api.Models.Devices;
+using PatchHound.Core.Entities;
 using PatchHound.Infrastructure.Data;
 
 namespace PatchHound.Api.Services;
@@ -56,21 +57,31 @@ public class DeviceDetailQueryService
                 .FirstOrDefaultAsync(ct)
             : null;
 
-        var businessLabels = await _dbContext.DeviceBusinessLabels
+        var businessLabelRows = await _dbContext.DeviceBusinessLabels
             .AsNoTracking()
             .Where(link => link.DeviceId == deviceId)
             .OrderBy(link => link.BusinessLabel.Name)
-            .Select(link => new BusinessLabelSummaryDto(
+            .Select(link => new
+            {
                 link.BusinessLabel.Id,
                 link.BusinessLabel.Name,
                 link.BusinessLabel.Description,
-                link.BusinessLabel.Color
-            ))
+                link.BusinessLabel.Color,
+                link.BusinessLabel.WeightCategory,
+            })
             .ToListAsync(ct);
-        businessLabels = businessLabels
+        var businessLabels = businessLabelRows
             .GroupBy(label => label.Id)
             .Select(group => group.First())
             .OrderBy(label => label.Name)
+            .Select(label => new BusinessLabelSummaryDto(
+                label.Id,
+                label.Name,
+                label.Description,
+                label.Color,
+                label.WeightCategory,
+                BusinessLabel.CategoryWeights[label.WeightCategory]
+            ))
             .ToList();
 
         var ownerUserName = device.OwnerUserId is Guid ownerUserId

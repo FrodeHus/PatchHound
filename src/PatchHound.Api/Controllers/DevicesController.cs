@@ -213,6 +213,7 @@ public class DevicesController : ControllerBase
                 link.BusinessLabel.Name,
                 link.BusinessLabel.Description,
                 link.BusinessLabel.Color,
+                link.BusinessLabel.WeightCategory,
             })
             .ToListAsync(ct);
         var businessLabelLookup = businessLabelsByDeviceId
@@ -227,7 +228,9 @@ public class DevicesController : ControllerBase
                         item.Id,
                         item.Name,
                         item.Description,
-                        item.Color
+                        item.Color,
+                        item.WeightCategory,
+                        BusinessLabel.CategoryWeights[item.WeightCategory]
                     ))
                     .ToList() as IReadOnlyList<BusinessLabelSummaryDto>
             );

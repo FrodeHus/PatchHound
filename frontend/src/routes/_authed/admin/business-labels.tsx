@@ -9,7 +9,8 @@ import {
   fetchBusinessLabels,
   updateBusinessLabel,
 } from '@/api/business-labels.functions'
-import type { BusinessLabel, SaveBusinessLabel } from '@/api/business-labels.schemas'
+import type { BusinessLabel, BusinessLabelWeightCategory, SaveBusinessLabel } from '@/api/business-labels.schemas'
+import { WEIGHT_CATEGORY_CONFIG, businessLabelWeightCategorySchema } from '@/api/business-labels.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -45,6 +46,7 @@ const emptyDraft = (): LabelDraft => ({
   description: '',
   color: '#2563eb',
   isActive: true,
+  weightCategory: 'Normal',
 })
 
 function BusinessLabelsPage() {
@@ -173,6 +175,7 @@ function BusinessLabelsPage() {
                           <BusinessLabelChip
                             name={label.name}
                             color={label.color}
+                            weightCategory={label.weightCategory}
                           />
                           <Badge
                             variant="outline"
@@ -187,6 +190,9 @@ function BusinessLabelsPage() {
                             {label.description?.trim() ||
                               "No description provided yet."}
                           </CardDescription>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {WEIGHT_CATEGORY_CONFIG[label.weightCategory].description}
+                          </p>
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -202,6 +208,7 @@ function BusinessLabelsPage() {
                               description: label.description,
                               color: label.color,
                               isActive: label.isActive,
+                              weightCategory: label.weightCategory,
                             });
                             setEditorOpen(true);
                           }}
@@ -329,6 +336,36 @@ function BusinessLabelsPage() {
                 </p>
               </button>
             </div>
+
+            <div className="grid gap-2">
+              <span className="text-sm font-medium">Business value category</span>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {businessLabelWeightCategorySchema.options.map((cat) => {
+                  const cfg = WEIGHT_CATEGORY_CONFIG[cat]
+                  const isSelected = (draft.weightCategory ?? 'Normal') === cat
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
+                        isSelected
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border/70 bg-muted/20 hover:bg-muted/40'
+                      }`}
+                      onClick={() =>
+                        setDraft((current) => ({ ...current, weightCategory: cat }))
+                      }
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">{cfg.label}</p>
+                        <WeightMarker category={cat} />
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{cfg.description}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           </div>
 
           <DialogFooter>
@@ -389,14 +426,57 @@ function BusinessLabelsPage() {
   );
 }
 
-function BusinessLabelChip({ name, color }: { name: string; color: string | null }) {
+function BusinessLabelChip({
+  name,
+  color,
+  weightCategory,
+}: {
+  name: string
+  color: string | null
+  weightCategory: BusinessLabelWeightCategory
+}) {
+  const cfg = WEIGHT_CATEGORY_CONFIG[weightCategory]
   return (
-    <Badge variant="outline" className="rounded-full border-border/70 bg-background/50 px-3 py-1 text-foreground">
+    <Badge
+      variant="outline"
+      className="rounded-full border-border/70 bg-background/50 px-3 py-1 text-foreground"
+      title={`${cfg.label} business value, ${cfg.riskWeight}x risk weight`}
+    >
       <span
         className="mr-2 inline-flex size-2.5 rounded-full border border-black/10"
         style={{ backgroundColor: color ?? 'var(--muted-foreground)' }}
       />
       {name}
+      <WeightMarker category={weightCategory} className="ml-2" />
     </Badge>
+  )
+}
+
+function WeightMarker({
+  category,
+  className,
+}: {
+  category: BusinessLabelWeightCategory
+  className?: string
+}) {
+  const cfg = WEIGHT_CATEGORY_CONFIG[category]
+  const colorClass =
+    category === 'Informational'
+      ? 'text-muted-foreground'
+      : category === 'Normal'
+        ? 'text-muted-foreground/60'
+        : category === 'Sensitive'
+          ? 'text-amber-500'
+          : 'text-destructive'
+
+  if (category === 'Normal') return null
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-sm px-1 text-[10px] font-semibold leading-none ${colorClass} ${className ?? ''}`}
+      title={`${cfg.label} business value, ${cfg.riskWeight}x risk weight`}
+    >
+      {cfg.riskWeight}×
+    </span>
   )
 }

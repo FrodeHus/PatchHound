@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { pagedResponseMetaSchema } from './pagination.schemas'
 import { remediationTaskSummarySchema } from './remediation-tasks.schemas'
+import { businessLabelWeightCategorySchema } from './business-labels.schemas'
 
 // Phase 1 canonical cleanup (Task 15): schemas for the device-native
 // /api/devices surface. Fields that previously lived on the legacy
@@ -14,6 +15,8 @@ const businessLabelSummarySchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   color: z.string().nullable(),
+  weightCategory: businessLabelWeightCategorySchema,
+  riskWeight: z.number(),
 })
 
 export const deviceSchema = z.object({

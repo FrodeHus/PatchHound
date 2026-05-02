@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Auth;
 using PatchHound.Api.Models.Assets;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 
@@ -27,18 +28,11 @@ public class BusinessLabelsController(
         var items = await dbContext.BusinessLabels.AsNoTracking()
             .Where(item => item.TenantId == tenantId)
             .OrderBy(item => item.Name)
-            .Select(item => new BusinessLabelDto(
-                item.Id,
-                item.Name,
-                item.Description,
-                item.Color,
-                item.IsActive,
-                item.CreatedAt,
-                item.UpdatedAt
-            ))
             .ToListAsync(ct);
 
-        return Ok(items);
+        var dtos = items.Select(ToDto).ToList();
+
+        return Ok(dtos);
     }
 
     [HttpPost]
@@ -54,6 +48,9 @@ public class BusinessLabelsController(
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(new ProblemDetails { Title = "Name is required." });
 
+        if (!Enum.IsDefined(typeof(BusinessLabelWeightCategory), request.WeightCategory))
+            return BadRequest(new ProblemDetails { Title = "Invalid weight category." });
+
         var exists = await dbContext.BusinessLabels.AnyAsync(
             item => item.TenantId == tenantId && item.Name == request.Name.Trim(),
             ct
@@ -61,10 +58,10 @@ public class BusinessLabelsController(
         if (exists)
             return BadRequest(new ProblemDetails { Title = "A business label with that name already exists." });
 
-        var label = BusinessLabel.Create(tenantId, request.Name, request.Description, request.Color);
+        var label = BusinessLabel.Create(tenantId, request.Name, request.Description, request.Color, request.WeightCategory);
         if (!request.IsActive)
         {
-            label.Update(label.Name, label.Description, label.Color, false);
+            label.Update(label.Name, label.Description, label.Color, false, request.WeightCategory);
         }
 
         await dbContext.BusinessLabels.AddAsync(label, ct);
@@ -89,6 +86,9 @@ public class BusinessLabelsController(
         if (label is null)
             return NotFound(new ProblemDetails { Title = "Business label not found." });
 
+        if (!Enum.IsDefined(typeof(BusinessLabelWeightCategory), request.WeightCategory))
+            return BadRequest(new ProblemDetails { Title = "Invalid weight category." });
+
         var normalizedName = request.Name.Trim();
         var nameInUse = await dbContext.BusinessLabels.AnyAsync(
             item => item.TenantId == tenantId && item.Id != id && item.Name == normalizedName,
@@ -97,7 +97,7 @@ public class BusinessLabelsController(
         if (nameInUse)
             return BadRequest(new ProblemDetails { Title = "A business label with that name already exists." });
 
-        label.Update(request.Name, request.Description, request.Color, request.IsActive);
+        label.Update(request.Name, request.Description, request.Color, request.IsActive, request.WeightCategory);
         await dbContext.SaveChangesAsync(ct);
 
         return Ok(ToDto(label));
@@ -127,6 +127,8 @@ public class BusinessLabelsController(
             item.Description,
             item.Color,
             item.IsActive,
+            item.WeightCategory,
+            item.RiskWeight,
             item.CreatedAt,
             item.UpdatedAt
         );

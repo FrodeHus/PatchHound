@@ -3,7 +3,8 @@ import { Link } from '@tanstack/react-router'
 import { Loader2, RotateCcw } from 'lucide-react'
 import type { DeviceDetail } from '@/api/devices.schemas'
 import type { DeviceExposure } from '@/api/devices.schemas'
-import type { BusinessLabel } from '@/api/business-labels.schemas'
+import type { BusinessLabel, BusinessLabelWeightCategory } from '@/api/business-labels.schemas'
+import { WEIGHT_CATEGORY_CONFIG } from '@/api/business-labels.schemas'
 import type { SecurityProfile } from '@/api/security-profiles.schemas'
 import type { DeviceSoftwareItem } from '@/api/software.schemas'
 import { Badge } from '@/components/ui/badge'
@@ -89,7 +90,7 @@ export function DeviceDetailPageView({
                 {device.groupName ? <Pill>{device.groupName}</Pill> : null}
                 {device.securityProfile ? <Pill>{device.securityProfile.name}</Pill> : null}
                 {device.businessLabels.slice(0, 3).map((label) => (
-                  <BusinessLabelBadge key={label.id} name={label.name} color={label.color} />
+                  <BusinessLabelBadge key={label.id} name={label.name} color={label.color} weightCategory={label.weightCategory} />
                 ))}
                 {device.businessLabels.length > 3 ? (
                   <Pill>+{device.businessLabels.length - 3} labels</Pill>
@@ -312,6 +313,7 @@ export function DeviceDetailPageView({
                                 key={label.id}
                                 name={label.name}
                                 color={label.color}
+                                weightCategory={label.weightCategory}
                               />
                             ))
                           ) : (
@@ -755,7 +757,7 @@ export function DeviceDetailPageView({
               {device.businessLabels.length > 0 ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {device.businessLabels.map((label) => (
-                    <BusinessLabelBadge key={label.id} name={label.name} color={label.color} />
+                    <BusinessLabelBadge key={label.id} name={label.name} color={label.color} weightCategory={label.weightCategory} />
                   ))}
                 </div>
               ) : (
@@ -866,17 +868,41 @@ export function DeviceDetailPageView({
   )
 }
 
-function BusinessLabelBadge({ name, color }: { name: string; color: string | null }) {
+function BusinessLabelBadge({
+  name,
+  color,
+  weightCategory,
+}: {
+  name: string
+  color: string | null
+  weightCategory: BusinessLabelWeightCategory
+}) {
+  const cfg = WEIGHT_CATEGORY_CONFIG[weightCategory]
+  const markerColorClass =
+    weightCategory === 'Informational'
+      ? 'text-muted-foreground'
+      : weightCategory === 'Sensitive'
+        ? 'text-amber-500'
+        : weightCategory === 'Critical'
+          ? 'text-destructive'
+          : null
+
   return (
     <Badge
       variant="outline"
       className="rounded-full border-border/70 bg-background/60 px-2.5 py-0.5 text-xs text-foreground"
+      title={`${cfg.label} business value, ${cfg.riskWeight}x risk weight`}
     >
       <span
         className="mr-1.5 inline-flex size-2 rounded-full border border-black/10"
         style={{ backgroundColor: color ?? 'var(--muted-foreground)' }}
       />
       {name}
+      {markerColorClass !== null && (
+        <span className={`ml-1 text-[10px] font-semibold leading-none ${markerColorClass}`}>
+          {cfg.riskWeight}×
+        </span>
+      )}
     </Badge>
   )
 }

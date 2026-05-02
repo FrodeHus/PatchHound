@@ -1,3 +1,5 @@
+using PatchHound.Core.Enums;
+
 namespace PatchHound.Api.Models.Assets;
 
 public record AssetDto(
@@ -35,7 +37,9 @@ public record BusinessLabelSummaryDto(
     Guid Id,
     string Name,
     string? Description,
-    string? Color
+    string? Color,
+    BusinessLabelWeightCategory WeightCategory,
+    decimal RiskWeight
 );
 
 public record UpdateAssetBusinessLabelsRequest(
