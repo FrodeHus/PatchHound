@@ -97,6 +97,109 @@ public class RemediationDecisionListTests : IDisposable
     }
 
     [Fact]
+    public async Task BuildByCaseIdAsync_ReturnsAnalystWorkbenchMetadata()
+    {
+        var sourceSystemId = Guid.NewGuid();
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        product.UpdateIdentity("Endpoint agent", null, SoftwareNormalizationMethod.Heuristic, SoftwareNormalizationConfidence.High, DateTimeOffset.UtcNow);
+        var insight = TenantSoftwareProductInsight.Create(_tenantId, product.Id);
+        insight.UpdateDescription("Tenant-specific description for analysts.");
+        var tenantSoftware = SoftwareTenantRecord.Create(
+            _tenantId,
+            null,
+            product.Id,
+            DateTimeOffset.UtcNow.AddDays(-10),
+            DateTimeOffset.UtcNow.AddDays(-1)
+        );
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var device = Device.Create(_tenantId, sourceSystemId, "device-1", "Device 1", Criticality.High);
+        var label = BusinessLabel.Create(_tenantId, "Revenue", null, "#22c55e", BusinessLabelWeightCategory.Critical);
+        var installedSoftware = InstalledSoftware.Observe(
+            _tenantId,
+            device.Id,
+            product.Id,
+            sourceSystemId,
+            "1.2.3",
+            DateTimeOffset.UtcNow.AddDays(-2)
+        );
+        var vulnerability = Vulnerability.Create(
+            "nvd",
+            "CVE-2026-4242",
+            "Remote code execution",
+            "A remotely exploitable vulnerability.",
+            Severity.Critical,
+            9.8m,
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            DateTimeOffset.UtcNow.AddDays(-30)
+        );
+        var exposure = DeviceVulnerabilityExposure.Observe(
+            _tenantId,
+            device.Id,
+            vulnerability.Id,
+            product.Id,
+            installedSoftware.Id,
+            "1.2.3",
+            ExposureMatchSource.Product,
+            DateTimeOffset.UtcNow.AddDays(-2)
+        );
+        var threat = ThreatAssessment.Create(
+            vulnerability.Id,
+            threatScore: 95m,
+            technicalScore: 98m,
+            exploitLikelihoodScore: 90m,
+            threatActivityScore: 90m,
+            epssScore: 0.42m,
+            knownExploited: true,
+            publicExploit: true,
+            activeAlert: false,
+            hasRansomwareAssociation: false,
+            hasMalwareAssociation: false,
+            factorsJson: "[]",
+            calculationVersion: "test"
+        );
+
+        await _dbContext.AddRangeAsync(
+            product,
+            insight,
+            tenantSoftware,
+            remediationCase,
+            device,
+            label,
+            DeviceBusinessLabel.Create(_tenantId, device.Id, label.Id),
+            installedSoftware,
+            vulnerability,
+            exposure,
+            threat
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.BuildByCaseIdAsync(
+            _tenantId,
+            remediationCase.Id,
+            forceAiSummaryRefresh: false,
+            CancellationToken.None
+        );
+
+        result.Should().NotBeNull();
+        result!.SoftwareVendor.Should().Be("Contoso");
+        result.SoftwareCategory.Should().Be("Endpoint agent");
+        result.SoftwareDescription.Should().Be("Tenant-specific description for analysts.");
+        result.BusinessLabels.Should().ContainSingle().Which.Name.Should().Be("Revenue");
+        result.BusinessLabels.Single().AffectedDeviceCount.Should().Be(1);
+        result.BusinessLabels.Single().WeightCategory.Should().Be(nameof(BusinessLabelWeightCategory.Critical));
+        result.OpenVulnerabilities.Should().ContainSingle();
+        var vuln = result.OpenVulnerabilities.Single();
+        vuln.ExternalId.Should().Be("CVE-2026-4242");
+        vuln.Description.Should().Be("A remotely exploitable vulnerability.");
+        vuln.FirstSeenAt.Should().NotBeNull();
+        vuln.AffectedDeviceCount.Should().Be(1);
+        vuln.AffectedVersionCount.Should().Be(1);
+        vuln.KnownExploited.Should().BeTrue();
+        vuln.PublicExploit.Should().BeTrue();
+        vuln.EpssScore.Should().Be(0.42);
+    }
+
+    [Fact]
     public async Task ListAsync_ReturnsSoftwareOwnerRoutingFields()
     {
         var ownerTeam = Team.Create(_tenantId, "Platform Engineering");

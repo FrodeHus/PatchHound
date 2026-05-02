@@ -43,11 +43,15 @@ export const decisionVulnSchema = z.object({
   vulnerabilityDefinitionId: z.string().uuid(),
   externalId: z.string(),
   title: z.string(),
+  description: z.string().nullable(),
   vendorSeverity: z.string(),
   vendorScore: z.number().nullable(),
   effectiveSeverity: z.string().nullable(),
   effectiveScore: z.number().nullable(),
   cvssVector: z.string().nullable(),
+  firstSeenAt: z.string().nullable(),
+  affectedDeviceCount: z.number(),
+  affectedVersionCount: z.number(),
   knownExploited: z.boolean(),
   publicExploit: z.boolean(),
   activeAlert: z.boolean(),
@@ -140,6 +144,15 @@ export const decisionAiSummarySchema = z.object({
   unavailableMessage: z.string().nullable(),
 })
 
+export const decisionBusinessLabelSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  color: z.string().nullable(),
+  weightCategory: z.string(),
+  riskWeight: z.number(),
+  affectedDeviceCount: z.number(),
+})
+
 export const decisionApprovalResolutionSchema = z.object({
   status: z.string(),
   justification: z.string().nullable(),
@@ -151,10 +164,14 @@ export const decisionContextSchema = z.object({
   remediationCaseId: z.string().uuid(),
   tenantSoftwareId: z.string().uuid().nullable(),
   softwareName: z.string(),
+  softwareVendor: z.string().nullable(),
+  softwareCategory: z.string().nullable(),
+  softwareDescription: z.string().nullable(),
   softwareOwnerTeamId: z.string().uuid().nullable(),
   softwareOwnerTeamName: z.string().nullable(),
   softwareOwnerAssignmentSource: z.string(),
   criticality: z.string(),
+  businessLabels: z.array(decisionBusinessLabelSchema),
   summary: decisionSummarySchema,
   workflow: decisionWorkflowSummarySchema,
   workflowState: decisionWorkflowStateSchema,
@@ -163,6 +180,7 @@ export const decisionContextSchema = z.object({
   latestApprovalResolution: decisionApprovalResolutionSchema.nullable(),
   recommendations: z.array(analystRecommendationSchema),
   topVulnerabilities: z.array(decisionVulnSchema),
+  openVulnerabilities: z.array(decisionVulnSchema),
   riskScore: decisionRiskSchema.nullable(),
   sla: decisionSlaSchema.nullable(),
   aiSummary: decisionAiSummarySchema,
@@ -213,6 +231,7 @@ export const pagedDecisionListSchema = z.object({
 export type DecisionContext = z.infer<typeof decisionContextSchema>
 export type RemediationDecision = z.infer<typeof remediationDecisionSchema>
 export type AnalystRecommendation = z.infer<typeof analystRecommendationSchema>
+export type DecisionBusinessLabel = z.infer<typeof decisionBusinessLabelSchema>
 export type DecisionVuln = z.infer<typeof decisionVulnSchema>
 export type DecisionSummary = z.infer<typeof decisionSummarySchema>
 export type DecisionWorkflowSummary = z.infer<typeof decisionWorkflowSummarySchema>
