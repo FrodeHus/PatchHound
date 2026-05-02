@@ -1439,7 +1439,8 @@ public class DashboardController : ControllerBase
         var caseProductByCaseId = caseProductRows.ToDictionary(row => row.Id, row => row.SoftwareProductId);
         var softwareOwnerByProductId = softwareOwnershipRows
             .Where(row => row.OwnerTeamId.HasValue)
-            .ToDictionary(row => row.SoftwareProductId, row => row.OwnerTeamId!.Value);
+            .GroupBy(row => row.SoftwareProductId)
+            .ToDictionary(g => g.Key, g => g.First().OwnerTeamId!.Value);
 
         Guid? ResolveRemediationOwner(Guid? workflowId, Guid remediationCaseId)
         {
