@@ -34,6 +34,41 @@ export const executiveExposureSummarySchema = z.object({
   topDriverDetail: z.string().nullable(),
 })
 
+export const executiveAccountabilityRowSchema = z.object({
+  teamId: z.string().uuid().nullable(),
+  ownerName: z.string(),
+  ownerAssignmentSource: z.string(),
+  riskScore: z.number(),
+  criticalOpenExposureCount: z.number(),
+  highOpenExposureCount: z.number(),
+  assetCount: z.number(),
+  openEpisodeCount: z.number(),
+  overduePatchingTaskCount: z.number(),
+  overdueApprovalCount: z.number(),
+  awaitingDecisionCount: z.number(),
+  acceptedRiskCount: z.number(),
+  manualOwnedAssetCount: z.number(),
+  ruleOwnedAssetCount: z.number(),
+  defaultRoutedAssetCount: z.number(),
+  manualOwnedSoftwareCount: z.number(),
+  ruleOwnedSoftwareCount: z.number(),
+  defaultRoutedSoftwareCount: z.number(),
+  unownedAssetCount: z.number(),
+  unownedSoftwareCount: z.number(),
+})
+
+export const executiveAccountabilitySummarySchema = z.object({
+  unownedAssetCount: z.number(),
+  unownedSoftwareCount: z.number(),
+  defaultRoutedAssetCount: z.number(),
+  defaultRoutedSoftwareCount: z.number(),
+  awaitingDecisionCount: z.number(),
+  overdueApprovalCount: z.number(),
+  overduePatchingTaskCount: z.number(),
+  acceptedRiskCount: z.number(),
+  topOwners: z.array(executiveAccountabilityRowSchema),
+})
+
 export const dashboardSummarySchema = z.object({
   exposureScore: z.number(),
   vulnerabilitiesBySeverity: z.record(z.string(), z.number()),
@@ -118,6 +153,7 @@ export const dashboardSummarySchema = z.object({
     previousDays: z.number().nullable(),
   })).optional(),
   executiveExposure: executiveExposureSummarySchema.nullable().optional(),
+  accountability: executiveAccountabilitySummarySchema.nullable().optional(),
 })
 
 export const trendItemSchema = z.object({
@@ -134,6 +170,7 @@ export const dashboardRiskChangeBriefSchema = dashboardSummarySchema.shape.riskC
 
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>
 export type ExecutiveExposureSummary = z.infer<typeof executiveExposureSummarySchema>
+export type ExecutiveAccountabilitySummary = z.infer<typeof executiveAccountabilitySummarySchema>
 export type TopVulnerability = z.infer<typeof topVulnerabilitySchema>
 export type UnhandledVulnerability = z.infer<typeof unhandledVulnerabilitySchema>
 export type TrendData = z.infer<typeof trendDataSchema>

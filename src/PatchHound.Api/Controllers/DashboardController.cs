@@ -246,6 +246,7 @@ public class DashboardController : ControllerBase
             vulnsByDeviceGroup,
             hasFilters,
             ct);
+        var accountability = await BuildExecutiveAccountabilitySummaryAsync(tenantId, now, ct);
         var exposureScore = executiveExposure.Score;
 
         // Device health breakdown — NOT affected by vulnerability filters
@@ -338,7 +339,8 @@ public class DashboardController : ControllerBase
                 metricSparklines,
                 ageBuckets,
                 mttrBySeverity,
-                executiveExposure
+                executiveExposure,
+                accountability
             )
         );
     }
@@ -1366,6 +1368,277 @@ public class DashboardController : ControllerBase
         return (filteredAssetIdQuery, minPublishedDate);
     }
 
+    private async Task<ExecutiveAccountabilitySummaryDto> BuildExecutiveAccountabilitySummaryAsync(
+        Guid tenantId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var teams = await _dbContext.Teams.AsNoTracking()
+            .Where(team => team.TenantId == tenantId)
+            .Select(team => new { team.Id, team.Name, team.IsDefault })
+            .ToListAsync(ct);
+        var teamsById = teams.ToDictionary(team => team.Id);
+        var defaultTeamIds = teams.Where(team => team.IsDefault).Select(team => team.Id).ToHashSet();
+
+        var teamRiskRows = await _dbContext.TeamRiskScores.AsNoTracking()
+            .Where(score => score.TenantId == tenantId)
+            .Select(score => new
+            {
+                score.TeamId,
+                score.OverallScore,
+                score.CriticalEpisodeCount,
+                score.HighEpisodeCount,
+                score.AssetCount,
+                score.OpenEpisodeCount,
+            })
+            .ToListAsync(ct);
+        var teamRiskByTeamId = teamRiskRows.ToDictionary(row => row.TeamId);
+
+        var deviceOwnershipRows = await _dbContext.Devices.AsNoTracking()
+            .Where(device => device.TenantId == tenantId)
+            .Select(device => new
+            {
+                device.Id,
+                device.OwnerTeamId,
+                device.OwnerTeamRuleId,
+                device.FallbackTeamId,
+            })
+            .ToListAsync(ct);
+
+        var softwareOwnershipRows = await _dbContext.SoftwareTenantRecords.AsNoTracking()
+            .Where(record => record.TenantId == tenantId)
+            .Select(record => new
+            {
+                record.SoftwareProductId,
+                record.OwnerTeamId,
+                record.OwnerTeamRuleId,
+            })
+            .ToListAsync(ct);
+
+        var workflowRows = await _dbContext.RemediationWorkflows.AsNoTracking()
+            .Where(workflow => workflow.TenantId == tenantId)
+            .Select(workflow => new
+            {
+                workflow.Id,
+                workflow.RemediationCaseId,
+                workflow.SoftwareOwnerTeamId,
+                workflow.CurrentStage,
+                workflow.Status,
+            })
+            .ToListAsync(ct);
+        var workflowsById = workflowRows.ToDictionary(workflow => workflow.Id);
+
+        var caseProductRows = await _dbContext.RemediationCases.AsNoTracking()
+            .Where(remediationCase => remediationCase.TenantId == tenantId)
+            .Select(remediationCase => new
+            {
+                remediationCase.Id,
+                remediationCase.SoftwareProductId,
+            })
+            .ToListAsync(ct);
+        var caseProductByCaseId = caseProductRows.ToDictionary(row => row.Id, row => row.SoftwareProductId);
+        var softwareOwnerByProductId = softwareOwnershipRows
+            .Where(row => row.OwnerTeamId.HasValue)
+            .ToDictionary(row => row.SoftwareProductId, row => row.OwnerTeamId!.Value);
+
+        Guid? ResolveRemediationOwner(Guid? workflowId, Guid remediationCaseId)
+        {
+            if (workflowId.HasValue && workflowsById.TryGetValue(workflowId.Value, out var workflow))
+            {
+                return workflow.SoftwareOwnerTeamId;
+            }
+
+            return caseProductByCaseId.TryGetValue(remediationCaseId, out var productId)
+                && softwareOwnerByProductId.TryGetValue(productId, out var ownerTeamId)
+                    ? ownerTeamId
+                    : null;
+        }
+
+        var overduePatchingRows = await _dbContext.PatchingTasks.AsNoTracking()
+            .Where(task => task.TenantId == tenantId
+                && task.Status != PatchingTaskStatus.Completed
+                && task.DueDate < now)
+            .Select(task => new
+            {
+                task.OwnerTeamId,
+            })
+            .ToListAsync(ct);
+        var overduePatchingByTeamId = overduePatchingRows
+            .GroupBy(task => task.OwnerTeamId)
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        var overdueApprovalRows = await _dbContext.ApprovalTasks.AsNoTracking()
+            .Where(task => task.TenantId == tenantId
+                && task.Status == ApprovalTaskStatus.Pending
+                && task.ExpiresAt < now)
+            .Select(task => new
+            {
+                task.RemediationWorkflowId,
+                task.RemediationCaseId,
+            })
+            .ToListAsync(ct);
+        var overdueApprovalByTeamId = overdueApprovalRows
+            .Select(row => ResolveRemediationOwner(row.RemediationWorkflowId, row.RemediationCaseId))
+            .Where(teamId => teamId.HasValue)
+            .GroupBy(teamId => teamId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        var awaitingDecisionByTeamId = workflowRows
+            .Where(workflow => workflow.Status == RemediationWorkflowStatus.Active
+                && workflow.CurrentStage == RemediationWorkflowStage.RemediationDecision)
+            .GroupBy(workflow => workflow.SoftwareOwnerTeamId)
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        var acceptedRiskRows = await _dbContext.RemediationDecisions.AsNoTracking()
+            .Where(decision => decision.TenantId == tenantId
+                && decision.Outcome == RemediationOutcome.RiskAcceptance
+                && decision.ApprovalStatus == DecisionApprovalStatus.Approved)
+            .Select(decision => new
+            {
+                decision.RemediationWorkflowId,
+                decision.RemediationCaseId,
+            })
+            .ToListAsync(ct);
+        var acceptedRiskByTeamId = acceptedRiskRows
+            .Select(row => ResolveRemediationOwner(row.RemediationWorkflowId, row.RemediationCaseId))
+            .Where(teamId => teamId.HasValue)
+            .GroupBy(teamId => teamId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        var manualAssetsByTeamId = deviceOwnershipRows
+            .Where(row => row.OwnerTeamId.HasValue
+                && row.OwnerTeamRuleId is null
+                && !defaultTeamIds.Contains(row.OwnerTeamId.Value))
+            .GroupBy(row => row.OwnerTeamId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count());
+        var ruleAssetsByTeamId = deviceOwnershipRows
+            .Where(row => row.OwnerTeamId.HasValue && row.OwnerTeamRuleId is not null)
+            .GroupBy(row => row.OwnerTeamId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count());
+        var defaultAssetsByTeamId = deviceOwnershipRows
+            .Select(row => row.OwnerTeamId ?? row.FallbackTeamId)
+            .Where(teamId => teamId.HasValue && defaultTeamIds.Contains(teamId.Value))
+            .GroupBy(teamId => teamId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        var manualSoftwareByTeamId = softwareOwnershipRows
+            .Where(row => row.OwnerTeamId.HasValue
+                && row.OwnerTeamRuleId is null
+                && !defaultTeamIds.Contains(row.OwnerTeamId.Value))
+            .GroupBy(row => row.OwnerTeamId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count());
+        var ruleSoftwareByTeamId = softwareOwnershipRows
+            .Where(row => row.OwnerTeamId.HasValue && row.OwnerTeamRuleId is not null)
+            .GroupBy(row => row.OwnerTeamId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count());
+        var defaultSoftwareByTeamId = softwareOwnershipRows
+            .Where(row => row.OwnerTeamId.HasValue && defaultTeamIds.Contains(row.OwnerTeamId.Value))
+            .GroupBy(row => row.OwnerTeamId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        var unownedAssetCount = deviceOwnershipRows.Count(row =>
+            !row.OwnerTeamId.HasValue && !row.FallbackTeamId.HasValue);
+        var unownedSoftwareCount = softwareOwnershipRows.Count(row => !row.OwnerTeamId.HasValue);
+        var defaultRoutedAssetCount = defaultAssetsByTeamId.Values.Sum();
+        var defaultRoutedSoftwareCount = defaultSoftwareByTeamId.Values.Sum();
+
+        var teamIds = teamRiskByTeamId.Keys
+            .Concat(overduePatchingByTeamId.Keys)
+            .Concat(overdueApprovalByTeamId.Keys)
+            .Concat(awaitingDecisionByTeamId.Keys)
+            .Concat(acceptedRiskByTeamId.Keys)
+            .Concat(manualAssetsByTeamId.Keys)
+            .Concat(ruleAssetsByTeamId.Keys)
+            .Concat(defaultAssetsByTeamId.Keys)
+            .Concat(manualSoftwareByTeamId.Keys)
+            .Concat(ruleSoftwareByTeamId.Keys)
+            .Concat(defaultSoftwareByTeamId.Keys)
+            .Distinct()
+            .ToList();
+
+        var rows = teamIds.Select(teamId =>
+        {
+            teamRiskByTeamId.TryGetValue(teamId, out var risk);
+            var manualAssetCount = manualAssetsByTeamId.GetValueOrDefault(teamId);
+            var ruleAssetCount = ruleAssetsByTeamId.GetValueOrDefault(teamId);
+            var defaultAssetCount = defaultAssetsByTeamId.GetValueOrDefault(teamId);
+            var manualSoftwareCount = manualSoftwareByTeamId.GetValueOrDefault(teamId);
+            var ruleSoftwareCount = ruleSoftwareByTeamId.GetValueOrDefault(teamId);
+            var defaultSoftwareCount = defaultSoftwareByTeamId.GetValueOrDefault(teamId);
+            var ownerName = teamsById.TryGetValue(teamId, out var team) ? team.Name : "Unknown team";
+
+            return new ExecutiveAccountabilityRowDto(
+                teamId,
+                ownerName,
+                DescribeOwnerAssignmentSource(
+                    manualAssetCount + manualSoftwareCount,
+                    ruleAssetCount + ruleSoftwareCount,
+                    defaultAssetCount + defaultSoftwareCount),
+                risk?.OverallScore ?? 0m,
+                risk?.CriticalEpisodeCount ?? 0,
+                risk?.HighEpisodeCount ?? 0,
+                risk?.AssetCount ?? 0,
+                risk?.OpenEpisodeCount ?? 0,
+                overduePatchingByTeamId.GetValueOrDefault(teamId),
+                overdueApprovalByTeamId.GetValueOrDefault(teamId),
+                awaitingDecisionByTeamId.GetValueOrDefault(teamId),
+                acceptedRiskByTeamId.GetValueOrDefault(teamId),
+                manualAssetCount,
+                ruleAssetCount,
+                defaultAssetCount,
+                manualSoftwareCount,
+                ruleSoftwareCount,
+                defaultSoftwareCount,
+                0,
+                0);
+        }).ToList();
+
+        if (unownedAssetCount + unownedSoftwareCount > 0)
+        {
+            rows.Add(new ExecutiveAccountabilityRowDto(
+                null,
+                "Unowned",
+                "Unowned",
+                0m,
+                0,
+                0,
+                unownedAssetCount,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                unownedAssetCount,
+                unownedSoftwareCount));
+        }
+
+        var topOwners = rows
+            .OrderByDescending(row => row.RiskScore)
+            .ThenByDescending(row => row.OverdueApprovalCount + row.OverduePatchingTaskCount)
+            .ThenByDescending(row => row.AwaitingDecisionCount)
+            .ThenByDescending(row => row.AcceptedRiskCount)
+            .ThenByDescending(row => row.UnownedAssetCount + row.UnownedSoftwareCount)
+            .Take(8)
+            .ToList();
+
+        return new ExecutiveAccountabilitySummaryDto(
+            unownedAssetCount,
+            unownedSoftwareCount,
+            defaultRoutedAssetCount,
+            defaultRoutedSoftwareCount,
+            awaitingDecisionByTeamId.Values.Sum(),
+            overdueApprovalByTeamId.Values.Sum(),
+            overduePatchingByTeamId.Values.Sum(),
+            acceptedRiskByTeamId.Values.Sum(),
+            topOwners);
+    }
+
     private async Task<ExecutiveExposureSummaryDto> BuildExecutiveExposureSummaryAsync(
         Guid tenantId,
         DashboardFilterQuery filter,
@@ -1590,6 +1863,19 @@ public class DashboardController : ControllerBase
             < 0m => "Improving",
             _ => "Stable",
         };
+    }
+
+    private static string DescribeOwnerAssignmentSource(
+        int manualCount,
+        int ruleCount,
+        int defaultCount)
+    {
+        if (defaultCount > 0 && defaultCount >= manualCount && defaultCount >= ruleCount)
+        {
+            return "Default";
+        }
+
+        return ruleCount > manualCount ? "Rule" : "Manual";
     }
 
     private static string? NormalizeHeatmapGroupBy(string? groupBy)
