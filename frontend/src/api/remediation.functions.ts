@@ -148,6 +148,7 @@ export const fetchDecisionList = createServerFn({ method: 'GET' })
       approvalStatus: z.string().optional(),
       decisionState: z.string().optional(),
       missedMaintenanceWindow: z.boolean().optional(),
+      needsAnalystRecommendation: z.boolean().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
     })

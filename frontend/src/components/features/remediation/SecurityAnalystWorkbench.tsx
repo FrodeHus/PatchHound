@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Bot, ExternalLink, LoaderCircle, SearchCheck, ShieldAlert } from 'lucide-react'
+import { Bot, ExternalLink, LoaderCircle, Save, SearchCheck, ShieldAlert, Sparkles, TriangleAlert } from 'lucide-react'
 import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
 import { addRecommendation, generateRemediationAiSummary } from '@/api/remediation.functions'
 import { Button } from '@/components/ui/button'
@@ -53,6 +53,24 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
 
   const vulnerabilities = data.openVulnerabilities.length > 0 ? data.openVulnerabilities : data.topVulnerabilities
   const topDrivers = useMemo(() => vulnerabilities.slice(0, 4), [vulnerabilities])
+  const hiddenDriverCount = Math.max(vulnerabilities.length - topDrivers.length, 0)
+  const threatDriverCount = vulnerabilities.filter((vulnerability) =>
+    vulnerability.knownExploited || vulnerability.publicExploit || vulnerability.activeAlert
+  ).length
+  const highestRiskDriver = useMemo(
+    () => vulnerabilities.reduce<DecisionVuln | null>((highest, vulnerability) => {
+      const score = vulnerability.effectiveScore ?? vulnerability.vendorScore ?? 0
+      const highestScore = highest?.effectiveScore ?? highest?.vendorScore ?? 0
+      return score > highestScore ? vulnerability : highest
+    }, null),
+    [vulnerabilities],
+  )
+  const highestRiskDriverDetail = highestRiskDriver
+    ? formatSeverityScore(
+      highestRiskDriver.effectiveSeverity ?? highestRiskDriver.vendorSeverity,
+      highestRiskDriver.effectiveScore ?? highestRiskDriver.vendorScore,
+    )
+    : 'No active exposure'
   const canSave = recommendedOutcome !== '' && rationale.trim().length > 0
   const displaySoftwareName = startCase(data.softwareName)
   const softwareIdentity = data.softwareVendor
@@ -95,9 +113,9 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
   }
 
   function useAiDraft() {
-    setRecommendedOutcome((current) => current || data.aiSummary.recommendedOutcome || '')
-    setRationale((current) => current || data.aiSummary.analystAssessment || '')
-    setPriorityOverride((current) => current || data.aiSummary.recommendedPriority || '')
+    setRecommendedOutcome(data.aiSummary.recommendedOutcome || recommendedOutcome)
+    setRationale(data.aiSummary.analystAssessment || rationale)
+    setPriorityOverride(data.aiSummary.recommendedPriority || priorityOverride)
   }
 
   return (
@@ -142,24 +160,50 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
         <WorkbenchMetric label="SLA" value={data.sla?.slaStatus ?? 'Not set'} detail={data.sla?.dueDate ? `Due ${formatNullableDateTime(data.sla.dueDate)}` : 'No due date'} />
       </div>
 
-      {data.businessLabels.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {data.businessLabels.map((label) => (
-            <span
-              key={label.id}
-              className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs"
-              title={`${label.weightCategory} business value, ${label.riskWeight.toFixed(1)}x risk weight`}
-            >
-              <span
-                className="size-2 rounded-full border border-border/60"
-                style={{ backgroundColor: label.color ?? 'transparent' }}
-              />
-              {label.name}
-              <span className="text-muted-foreground">({label.affectedDeviceCount})</span>
-            </span>
-          ))}
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.44fr)]">
+        <div className="grid gap-3 md:grid-cols-3">
+          <RiskDriver
+            label="Top driver"
+            value={highestRiskDriver?.externalId ?? 'None'}
+            detail={highestRiskDriverDetail}
+            tone={highestRiskDriver ? 'danger' : 'neutral'}
+          />
+          <RiskDriver
+            label="Threat signals"
+            value={threatDriverCount.toLocaleString()}
+            detail="KEV, public exploit, or active alert"
+            tone={threatDriverCount > 0 ? 'danger' : 'neutral'}
+          />
+          <RiskDriver
+            label="Decision inputs"
+            value={data.aiSummary.status ?? 'Not requested'}
+            detail={data.recommendations.length > 0 ? 'Recommendation already captured' : 'Awaiting analyst recommendation'}
+            tone={data.recommendations.length > 0 ? 'success' : 'neutral'}
+          />
         </div>
-      ) : null}
+
+        {data.businessLabels.length > 0 ? (
+          <div className="rounded-lg border border-border/70 bg-card px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Business impact</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {data.businessLabels.map((label) => (
+                <span
+                  key={label.id}
+                  className="inline-flex items-center gap-2 rounded-md border border-border/70 bg-background px-2.5 py-1 text-xs"
+                  title={`${label.weightCategory} business value, ${label.riskWeight.toFixed(1)}x risk weight`}
+                >
+                  <span
+                    className="size-2 rounded-full border border-border/60"
+                    style={{ backgroundColor: label.color ?? 'transparent' }}
+                  />
+                  <span className="font-medium">{label.name}</span>
+                  <span className="text-muted-foreground">{label.affectedDeviceCount}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {error ? (
         <div role="alert" className="rounded-lg border border-destructive/35 bg-destructive/8 px-4 py-3 text-sm text-destructive">
@@ -192,11 +236,30 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
               </div>
             ) : null}
 
+            {(data.aiSummary.analystAssessment || data.aiSummary.recommendedOutcome || data.aiSummary.recommendedPriority) ? (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Sparkles className="size-4 text-primary" />
+                      AI draft available
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Apply the latest generated priority, action, and rationale to the form for analyst review.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={useAiDraft}>
+                    Apply draft
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Recommended remediation</label>
+                <label htmlFor="recommended-outcome" className="text-sm font-medium">Recommended remediation</label>
                 <Select value={recommendedOutcome} onValueChange={(value) => setRecommendedOutcome(value ?? '')}>
-                  <SelectTrigger>
+                  <SelectTrigger id="recommended-outcome">
                     <SelectValue placeholder="Select action..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -207,9 +270,9 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Priority</label>
+                <label htmlFor="priority-override" className="text-sm font-medium">Priority</label>
                 <Select value={priorityOverride || 'none'} onValueChange={(value) => setPriorityOverride(value === 'none' ? '' : value ?? '')}>
-                  <SelectTrigger>
+                  <SelectTrigger id="priority-override">
                     <SelectValue placeholder="No priority" />
                   </SelectTrigger>
                   <SelectContent>
@@ -236,13 +299,9 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
 
             <div className="flex flex-wrap gap-2">
               <Button onClick={handleSaveRecommendation} disabled={!canSave || isSaving}>
+                {isSaving ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}
                 {isSaving ? 'Saving...' : currentRecommendation ? 'Update recommendation' : 'Save recommendation'}
               </Button>
-              {(data.aiSummary.analystAssessment || data.aiSummary.recommendedOutcome || data.aiSummary.recommendedPriority) ? (
-                <Button type="button" variant="outline" onClick={useAiDraft}>
-                  Use AI draft
-                </Button>
-              ) : null}
             </div>
           </CardContent>
         </Card>
@@ -258,11 +317,14 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">Open vulnerabilities</h2>
-            <p className="text-sm text-muted-foreground">Highest-risk drivers first. Open a row for essentials without leaving the workbench.</p>
+            <p className="text-sm text-muted-foreground">
+              Highest-risk drivers first. Showing {topDrivers.length.toLocaleString()} of {vulnerabilities.length.toLocaleString()}
+              {hiddenDriverCount > 0 ? `, with ${hiddenDriverCount.toLocaleString()} more in the full case` : ''}.
+            </p>
           </div>
         </div>
-        <div className="overflow-hidden rounded-lg border border-border/70 bg-card">
-          <table className="min-w-full divide-y divide-border/70 text-sm">
+        <div className="overflow-x-auto rounded-lg border border-border/70 bg-card">
+          <table className="min-w-[760px] divide-y divide-border/70 text-sm">
             <thead className="bg-muted/35 text-left text-xs uppercase tracking-[0.12em] text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Vulnerability</th>
@@ -274,7 +336,7 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
             </thead>
             <tbody className="divide-y divide-border/60">
               {topDrivers.map((vulnerability) => (
-                <tr key={vulnerability.vulnerabilityId}>
+                <tr key={vulnerability.vulnerabilityId} className="transition-colors hover:bg-muted/25">
                   <td className="px-4 py-3">
                     <div className="font-medium">{vulnerability.externalId}</div>
                     <div className="line-clamp-1 max-w-xl text-xs text-muted-foreground">{vulnerability.title}</div>
@@ -292,7 +354,12 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
                     {vulnerability.affectedDeviceCount} devices
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedVulnerability(vulnerability)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Open details for ${vulnerability.externalId}`}
+                      onClick={() => setSelectedVulnerability(vulnerability)}
+                    >
                       Details
                     </Button>
                   </td>
@@ -327,6 +394,40 @@ function WorkbenchMetric({ label, value, detail }: { label: string; value: strin
       <p className="mt-1 truncate text-xs text-muted-foreground">{detail}</p>
     </div>
   )
+}
+
+function RiskDriver({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string
+  value: string
+  detail: string
+  tone: 'danger' | 'success' | 'neutral'
+}) {
+  return (
+    <div className={cn(
+      'rounded-lg border px-4 py-3',
+      tone === 'danger'
+        ? 'border-destructive/30 bg-destructive/8'
+        : tone === 'success'
+          ? 'border-emerald-500/25 bg-emerald-500/8'
+          : 'border-border/70 bg-card',
+    )}>
+      <div className="flex items-center gap-2">
+        {tone === 'danger' ? <TriangleAlert className="size-4 text-destructive" /> : null}
+        <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      </div>
+      <p className="mt-1 truncate text-base font-semibold">{value}</p>
+      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{detail}</p>
+    </div>
+  )
+}
+
+function formatSeverityScore(severity: string, score: number | null | undefined) {
+  return score == null ? severity : `${severity} ${score.toFixed(1)}`
 }
 
 function AiRiskBrief({

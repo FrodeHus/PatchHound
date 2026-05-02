@@ -231,6 +231,56 @@ public class RemediationDecisionListTests : IDisposable
         item.SoftwareOwnerAssignmentSource.Should().Be("Rule");
     }
 
+    [Fact]
+    public async Task ListAsync_WhenNeedsAnalystRecommendation_ReturnsSecurityAnalysisCasesWithoutRecommendations()
+    {
+        var needsRecommendationProduct = SoftwareProduct.Create("Contoso", "Needs Recommendation", null);
+        var needsRecommendationCase = RemediationCase.Create(_tenantId, needsRecommendationProduct.Id);
+        var needsRecommendationWorkflow = RemediationWorkflow.Create(_tenantId, needsRecommendationCase.Id, Guid.NewGuid());
+
+        var alreadyRecommendedProduct = SoftwareProduct.Create("Contoso", "Already Recommended", null);
+        var alreadyRecommendedCase = RemediationCase.Create(_tenantId, alreadyRecommendedProduct.Id);
+        var alreadyRecommendedWorkflow = RemediationWorkflow.Create(_tenantId, alreadyRecommendedCase.Id, Guid.NewGuid());
+        var recommendation = AnalystRecommendation.Create(
+            _tenantId,
+            alreadyRecommendedCase.Id,
+            RemediationOutcome.ApprovedForPatching,
+            "Patch this software.",
+            _userId
+        );
+        recommendation.AttachToWorkflow(alreadyRecommendedWorkflow.Id);
+
+        var decisionStageProduct = SoftwareProduct.Create("Contoso", "Decision Stage", null);
+        var decisionStageCase = RemediationCase.Create(_tenantId, decisionStageProduct.Id);
+        var decisionStageWorkflow = RemediationWorkflow.Create(_tenantId, decisionStageCase.Id, Guid.NewGuid());
+        decisionStageWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+
+        await _dbContext.AddRangeAsync(
+            needsRecommendationProduct,
+            needsRecommendationCase,
+            needsRecommendationWorkflow,
+            alreadyRecommendedProduct,
+            alreadyRecommendedCase,
+            alreadyRecommendedWorkflow,
+            recommendation,
+            decisionStageProduct,
+            decisionStageCase,
+            decisionStageWorkflow
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.ListAsync(
+            _tenantId,
+            new PatchHound.Api.Models.Decisions.RemediationDecisionFilterQuery(NeedsAnalystRecommendation: true),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var item = result.Items.Should().ContainSingle().Subject;
+        item.RemediationCaseId.Should().Be(needsRecommendationCase.Id);
+        item.WorkflowStage.Should().Be(nameof(RemediationWorkflowStage.SecurityAnalysis));
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

@@ -183,11 +183,24 @@ public class RemediationDecisionQueryService(
             .Where(w => w.TenantId == tenantId
                 && caseIds.Contains(w.RemediationCaseId)
                 && w.Status == RemediationWorkflowStatus.Active)
-            .Select(w => new { w.RemediationCaseId, w.CurrentStage, w.UpdatedAt })
+            .Select(w => new { w.Id, w.RemediationCaseId, w.CurrentStage, w.UpdatedAt })
             .ToListAsync(ct);
-        var activeWorkflowStages = activeWorkflowRows
+        var activeWorkflowsByCase = activeWorkflowRows
             .GroupBy(w => w.RemediationCaseId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(w => w.UpdatedAt).First().CurrentStage);
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(w => w.UpdatedAt).First());
+        var activeWorkflowStages = activeWorkflowsByCase
+            .ToDictionary(pair => pair.Key, pair => pair.Value.CurrentStage);
+        var activeWorkflowIds = activeWorkflowsByCase.Values.Select(w => w.Id).ToHashSet();
+        var workflowsWithRecommendations = activeWorkflowIds.Count == 0
+            ? []
+            : await dbContext.AnalystRecommendations.AsNoTracking()
+                .Where(r => r.TenantId == tenantId
+                    && r.RemediationWorkflowId != null
+                    && activeWorkflowIds.Contains(r.RemediationWorkflowId.Value))
+                .Select(r => r.RemediationWorkflowId!.Value)
+                .Distinct()
+                .ToListAsync(ct);
+        var workflowRecommendationSet = workflowsWithRecommendations.ToHashSet();
         var activeWorkflowOwnerTeams = await dbContext.RemediationWorkflows.AsNoTracking()
             .Where(w => w.TenantId == tenantId
                 && caseIds.Contains(w.RemediationCaseId)
@@ -292,6 +305,16 @@ public class RemediationDecisionQueryService(
             {
                 if (decision?.MaintenanceWindowDate is not DateTimeOffset maintenanceWindowDate
                     || maintenanceWindowDate >= DateTimeOffset.UtcNow)
+                {
+                    continue;
+                }
+            }
+
+            if (filter.NeedsAnalystRecommendation == true)
+            {
+                if (!activeWorkflowsByCase.TryGetValue(rc.Id, out var activeWorkflow)
+                    || activeWorkflow.CurrentStage != RemediationWorkflowStage.SecurityAnalysis
+                    || workflowRecommendationSet.Contains(activeWorkflow.Id))
                 {
                     continue;
                 }

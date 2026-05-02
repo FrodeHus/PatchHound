@@ -166,4 +166,28 @@ describe('SecurityAnalystWorkbench', () => {
     expect(screen.getByText('A remotely exploitable vulnerability.')).toBeInTheDocument()
     expect(screen.getByText('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H')).toBeInTheDocument()
   })
+
+  it('applies the AI draft over an existing saved recommendation', () => {
+    renderWorkbench({
+      ...dataFixture,
+      recommendations: [
+        {
+          id: '77777777-7777-7777-7777-777777777777',
+          vulnerabilityId: null,
+          recommendedOutcome: 'RiskAcceptance',
+          rationale: 'Existing analyst text.',
+          priorityOverride: 'Medium',
+          analystId: '88888888-8888-8888-8888-888888888888',
+          analystDisplayName: 'Casey Analyst',
+          createdAt: '2026-05-02T01:00:00Z',
+        },
+      ],
+    })
+
+    expect(screen.getByLabelText(/Recommendation rationale/i)).toHaveValue('Existing analyst text.')
+
+    fireEvent.click(screen.getByRole('button', { name: /Apply draft/i }))
+
+    expect(screen.getByLabelText(/Recommendation rationale/i)).toHaveValue('Prioritize patching because exploitation is known.')
+  })
 })
