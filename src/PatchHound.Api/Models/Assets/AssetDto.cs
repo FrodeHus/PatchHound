@@ -35,7 +35,9 @@ public record BusinessLabelSummaryDto(
     Guid Id,
     string Name,
     string? Description,
-    string? Color
+    string? Color,
+    string WeightCategory,
+    decimal RiskWeight
 );
 
 public record UpdateAssetBusinessLabelsRequest(

@@ -490,13 +490,32 @@ public class RiskScoreService(
             return (item.AssetId, EpisodeRiskScore: score, RiskBand: band, HasReduction: hasReduction);
         });
 
+        // Load the highest active business-label weight per device. The CASE expression
+        // translates to SQL so aggregation happens server-side — only one row per device
+        // returns even when many labels are assigned.
+        var deviceLabelWeights = await dbContext.DeviceBusinessLabels.AsNoTracking()
+            .Where(dbl => dbl.TenantId == tenantId && dbl.BusinessLabel.IsActive)
+            .GroupBy(dbl => dbl.DeviceId)
+            .Select(g => new
+            {
+                DeviceId = g.Key,
+                MaxWeight = g.Max(dbl =>
+                    dbl.BusinessLabel.WeightCategory == BusinessLabelWeightCategory.Critical ? 2.0m
+                    : dbl.BusinessLabel.WeightCategory == BusinessLabelWeightCategory.Sensitive ? 1.5m
+                    : dbl.BusinessLabel.WeightCategory == BusinessLabelWeightCategory.Informational ? 0.5m
+                    : 1.0m),
+            })
+            .ToDictionaryAsync(item => item.DeviceId, item => item.MaxWeight, ct);
+
         return BuildAssetRiskResults(
-            adjusted.Select(item => (item.AssetId, item.EpisodeRiskScore, item.RiskBand, item.HasReduction))
+            adjusted.Select(item => (item.AssetId, item.EpisodeRiskScore, item.RiskBand, item.HasReduction)),
+            deviceLabelWeights
         );
     }
 
     private static List<AssetRiskResult> BuildAssetRiskResults(
-        IEnumerable<(Guid AssetId, decimal EpisodeRiskScore, string RiskBand, bool HasReduction)> episodeScores
+        IEnumerable<(Guid AssetId, decimal EpisodeRiskScore, string RiskBand, bool HasReduction)> episodeScores,
+        Dictionary<Guid, decimal>? deviceLabelWeights = null
     )
     {
         return episodeScores
@@ -515,7 +534,9 @@ public class RiskScoreService(
                 var lowCount = group.Count(item => item.RiskBand == "Low");
                 var reducedCount = group.Count(item => item.HasReduction);
 
-                var overallScore = Math.Clamp(
+                // Clamp the unweighted score first so the multiplier applies to the
+                // same value reported as the asset's pre-label "base" risk.
+                var baseScore = Math.Clamp(
                     Math.Round(
                         (0.7m * maxEpisodeRisk)
                         + (0.2m * topThreeAverage)
@@ -526,6 +547,9 @@ public class RiskScoreService(
                         2),
                     0m,
                     1000m);
+
+                var labelWeight = deviceLabelWeights?.GetValueOrDefault(group.Key, 1.0m) ?? 1.0m;
+                var overallScore = Math.Clamp(Math.Round(baseScore * labelWeight, 2), 0m, 1000m);
 
                 var factors = new List<RiskFactor>
                 {
@@ -541,6 +565,11 @@ public class RiskScoreService(
                     factors.Add(new("RemediationReduction",
                         $"{reducedCount} episode(s) score reduced by active remediation decision (factor {RemediationAdjustmentFactor}).",
                         -reducedCount));
+
+                if (labelWeight != 1.0m)
+                    factors.Add(new("BusinessLabelWeight",
+                        $"Asset score multiplied by business label weight {labelWeight}x.",
+                        Math.Round(overallScore - baseScore, 2)));
 
                 var factorsJson = JsonSerializer.Serialize(factors);
 

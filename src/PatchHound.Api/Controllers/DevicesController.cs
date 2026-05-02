@@ -205,7 +205,7 @@ public class DevicesController : ControllerBase
 
         var businessLabelsByDeviceId = await _dbContext.DeviceBusinessLabels
             .AsNoTracking()
-            .Where(link => deviceIds.Contains(link.DeviceId))
+            .Where(link => link.TenantId == _tenantContext.CurrentTenantId.Value && deviceIds.Contains(link.DeviceId))
             .Select(link => new
             {
                 link.DeviceId,
@@ -213,6 +213,7 @@ public class DevicesController : ControllerBase
                 link.BusinessLabel.Name,
                 link.BusinessLabel.Description,
                 link.BusinessLabel.Color,
+                link.BusinessLabel.WeightCategory,
             })
             .ToListAsync(ct);
         var businessLabelLookup = businessLabelsByDeviceId
@@ -227,7 +228,9 @@ public class DevicesController : ControllerBase
                         item.Id,
                         item.Name,
                         item.Description,
-                        item.Color
+                        item.Color,
+                        item.WeightCategory.ToString(),
+                        BusinessLabel.CategoryWeights[item.WeightCategory]
                     ))
                     .ToList() as IReadOnlyList<BusinessLabelSummaryDto>
             );
