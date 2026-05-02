@@ -21,7 +21,21 @@ public record DashboardSummaryDto(
     List<SlaComplianceTrendPointDto>? SlaComplianceTrend = null,
     MetricSparklinesDto? MetricSparklines = null,
     List<VulnerabilityAgeBucketDto>? VulnerabilityAgeBuckets = null,
-    List<MttrBySeverityDto>? MttrBySeverity = null
+    List<MttrBySeverityDto>? MttrBySeverity = null,
+    ExecutiveExposureSummaryDto? ExecutiveExposure = null
+);
+
+public record ExecutiveExposureSummaryDto(
+    decimal Score,
+    string RiskLevel,
+    decimal? ScoreDelta,
+    string Trend,
+    string Scope,
+    int AssetCount,
+    int CriticalAssetCount,
+    int HighAssetCount,
+    string? TopDriver,
+    string? TopDriverDetail
 );
 
 public record TopVulnerabilityDto(
