@@ -25,6 +25,7 @@ import { Route as AuthedDashboardIndexRouteImport } from './routes/_authed/dashb
 import { Route as AuthedAuditLogIndexRouteImport } from './routes/_authed/audit-log/index'
 import { Route as AuthedApprovalsIndexRouteImport } from './routes/_authed/approvals/index'
 import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/index'
+import { Route as AuthedMyTasksRouteImport } from './routes/_authed/my-tasks'
 import { Route as AuthedActionsIndexRouteImport } from './routes/_authed/actions/index'
 import { Route as ApiInternalEventsRouteImport } from './routes/api/internal/events'
 import { Route as AuthedVulnerabilitiesChangesRouteImport } from './routes/_authed/vulnerabilities/changes'
@@ -52,6 +53,7 @@ import { Route as AuthedAdminIntegrationsIndexRouteImport } from './routes/_auth
 import { Route as AuthedAdminDeviceRulesIndexRouteImport } from './routes/_authed/admin/device-rules/index'
 import { Route as AuthedRemediationTaskIdRouteImport } from './routes/_authed/remediation/task.$id'
 import { Route as AuthedRemediationCasesCaseIdRouteImport } from './routes/_authed/remediation/cases.$caseId'
+import { Route as AuthedWorkbenchesSecurityAnalystCasesCaseIdRouteImport } from './routes/_authed/workbenches/security-analyst/cases.$caseId'
 import { Route as AuthedDashboardMyAssetsAttentionRouteImport } from './routes/_authed/dashboard/my-assets.attention'
 import { Route as AuthedAssetsApplicationsIdRouteImport } from './routes/_authed/assets/applications/$id'
 import { Route as AuthedAdminWorkflowsNewRouteImport } from './routes/_authed/admin/workflows/new'
@@ -149,6 +151,11 @@ const AuthedApprovalsIndexRoute = AuthedApprovalsIndexRouteImport.update({
 const AuthedAdminIndexRoute = AuthedAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedMyTasksRoute = AuthedMyTasksRouteImport.update({
+  id: '/my-tasks',
+  path: '/my-tasks',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedActionsIndexRoute = AuthedActionsIndexRouteImport.update({
@@ -298,6 +305,12 @@ const AuthedRemediationCasesCaseIdRoute =
     path: '/remediation/cases/$caseId',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute =
+  AuthedWorkbenchesSecurityAnalystCasesCaseIdRouteImport.update({
+    id: '/workbenches/security-analyst/cases/$caseId',
+    path: '/workbenches/security-analyst/cases/$caseId',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedDashboardMyAssetsAttentionRoute =
   AuthedDashboardMyAssetsAttentionRouteImport.update({
     id: '/attention',
@@ -428,6 +441,7 @@ export interface FileRoutesByFullPath {
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/vulnerabilities/changes': typeof AuthedVulnerabilitiesChangesRoute
   '/api/internal/events': typeof ApiInternalEventsRoute
+  '/my-tasks': typeof AuthedMyTasksRoute
   '/actions/': typeof AuthedActionsIndexRoute
   '/admin/': typeof AuthedAdminIndexRoute
   '/approvals/': typeof AuthedApprovalsIndexRoute
@@ -455,6 +469,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/my-assets/attention': typeof AuthedDashboardMyAssetsAttentionRoute
   '/remediation/cases/$caseId': typeof AuthedRemediationCasesCaseIdRoute
   '/remediation/task/$id': typeof AuthedRemediationTaskIdRoute
+  '/workbenches/security-analyst/cases/$caseId': typeof AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute
   '/admin/device-rules/': typeof AuthedAdminDeviceRulesIndexRoute
   '/admin/integrations/': typeof AuthedAdminIntegrationsIndexRoute
   '/admin/teams/': typeof AuthedAdminTeamsIndexRoute
@@ -490,6 +505,7 @@ export interface FileRoutesByTo {
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/vulnerabilities/changes': typeof AuthedVulnerabilitiesChangesRoute
   '/api/internal/events': typeof ApiInternalEventsRoute
+  '/my-tasks': typeof AuthedMyTasksRoute
   '/actions': typeof AuthedActionsIndexRoute
   '/admin': typeof AuthedAdminIndexRoute
   '/approvals': typeof AuthedApprovalsIndexRoute
@@ -517,6 +533,7 @@ export interface FileRoutesByTo {
   '/dashboard/my-assets/attention': typeof AuthedDashboardMyAssetsAttentionRoute
   '/remediation/cases/$caseId': typeof AuthedRemediationCasesCaseIdRoute
   '/remediation/task/$id': typeof AuthedRemediationTaskIdRoute
+  '/workbenches/security-analyst/cases/$caseId': typeof AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute
   '/admin/device-rules': typeof AuthedAdminDeviceRulesIndexRoute
   '/admin/integrations': typeof AuthedAdminIntegrationsIndexRoute
   '/admin/teams': typeof AuthedAdminTeamsIndexRoute
@@ -554,6 +571,7 @@ export interface FileRoutesById {
   '/_authed/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/_authed/vulnerabilities/changes': typeof AuthedVulnerabilitiesChangesRoute
   '/api/internal/events': typeof ApiInternalEventsRoute
+  '/_authed/my-tasks': typeof AuthedMyTasksRoute
   '/_authed/actions/': typeof AuthedActionsIndexRoute
   '/_authed/admin/': typeof AuthedAdminIndexRoute
   '/_authed/approvals/': typeof AuthedApprovalsIndexRoute
@@ -581,6 +599,7 @@ export interface FileRoutesById {
   '/_authed/dashboard/my-assets/attention': typeof AuthedDashboardMyAssetsAttentionRoute
   '/_authed/remediation/cases/$caseId': typeof AuthedRemediationCasesCaseIdRoute
   '/_authed/remediation/task/$id': typeof AuthedRemediationTaskIdRoute
+  '/_authed/workbenches/security-analyst/cases/$caseId': typeof AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute
   '/_authed/admin/device-rules/': typeof AuthedAdminDeviceRulesIndexRoute
   '/_authed/admin/integrations/': typeof AuthedAdminIntegrationsIndexRoute
   '/_authed/admin/teams/': typeof AuthedAdminTeamsIndexRoute
@@ -618,6 +637,7 @@ export interface FileRouteTypes {
     | '/vulnerabilities/$id'
     | '/vulnerabilities/changes'
     | '/api/internal/events'
+    | '/my-tasks'
     | '/actions/'
     | '/admin/'
     | '/approvals/'
@@ -645,6 +665,7 @@ export interface FileRouteTypes {
     | '/dashboard/my-assets/attention'
     | '/remediation/cases/$caseId'
     | '/remediation/task/$id'
+    | '/workbenches/security-analyst/cases/$caseId'
     | '/admin/device-rules/'
     | '/admin/integrations/'
     | '/admin/teams/'
@@ -680,6 +701,7 @@ export interface FileRouteTypes {
     | '/vulnerabilities/$id'
     | '/vulnerabilities/changes'
     | '/api/internal/events'
+    | '/my-tasks'
     | '/actions'
     | '/admin'
     | '/approvals'
@@ -707,6 +729,7 @@ export interface FileRouteTypes {
     | '/dashboard/my-assets/attention'
     | '/remediation/cases/$caseId'
     | '/remediation/task/$id'
+    | '/workbenches/security-analyst/cases/$caseId'
     | '/admin/device-rules'
     | '/admin/integrations'
     | '/admin/teams'
@@ -743,6 +766,7 @@ export interface FileRouteTypes {
     | '/_authed/vulnerabilities/$id'
     | '/_authed/vulnerabilities/changes'
     | '/api/internal/events'
+    | '/_authed/my-tasks'
     | '/_authed/actions/'
     | '/_authed/admin/'
     | '/_authed/approvals/'
@@ -770,6 +794,7 @@ export interface FileRouteTypes {
     | '/_authed/dashboard/my-assets/attention'
     | '/_authed/remediation/cases/$caseId'
     | '/_authed/remediation/task/$id'
+    | '/_authed/workbenches/security-analyst/cases/$caseId'
     | '/_authed/admin/device-rules/'
     | '/_authed/admin/integrations/'
     | '/_authed/admin/teams/'
@@ -911,6 +936,13 @@ declare module '@tanstack/react-router' {
       path: '/actions'
       fullPath: '/actions/'
       preLoaderRoute: typeof AuthedActionsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/my-tasks': {
+      id: '/_authed/my-tasks'
+      path: '/my-tasks'
+      fullPath: '/my-tasks'
+      preLoaderRoute: typeof AuthedMyTasksRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/api/internal/events': {
@@ -1095,6 +1127,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedRemediationCasesCaseIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/workbenches/security-analyst/cases/$caseId': {
+      id: '/_authed/workbenches/security-analyst/cases/$caseId'
+      path: '/workbenches/security-analyst/cases/$caseId'
+      fullPath: '/workbenches/security-analyst/cases/$caseId'
+      preLoaderRoute: typeof AuthedWorkbenchesSecurityAnalystCasesCaseIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/dashboard/my-assets/attention': {
       id: '/_authed/dashboard/my-assets/attention'
       path: '/attention'
@@ -1259,6 +1298,7 @@ interface AuthedRouteChildren {
   AuthedVulnerabilitiesChangesRoute: typeof AuthedVulnerabilitiesChangesRoute
   AuthedActionsIndexRoute: typeof AuthedActionsIndexRoute
   AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
+  AuthedMyTasksRoute: typeof AuthedMyTasksRoute
   AuthedApprovalsIndexRoute: typeof AuthedApprovalsIndexRoute
   AuthedAuditLogIndexRoute: typeof AuthedAuditLogIndexRoute
   AuthedDashboardIndexRoute: typeof AuthedDashboardIndexRoute
@@ -1283,6 +1323,7 @@ interface AuthedRouteChildren {
   AuthedAssetsApplicationsIdRoute: typeof AuthedAssetsApplicationsIdRoute
   AuthedRemediationCasesCaseIdRoute: typeof AuthedRemediationCasesCaseIdRoute
   AuthedRemediationTaskIdRoute: typeof AuthedRemediationTaskIdRoute
+  AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute: typeof AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute
   AuthedAdminDeviceRulesIndexRoute: typeof AuthedAdminDeviceRulesIndexRoute
   AuthedAdminIntegrationsIndexRoute: typeof AuthedAdminIntegrationsIndexRoute
   AuthedAdminTeamsIndexRoute: typeof AuthedAdminTeamsIndexRoute
@@ -1313,6 +1354,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedVulnerabilitiesChangesRoute: AuthedVulnerabilitiesChangesRoute,
   AuthedActionsIndexRoute: AuthedActionsIndexRoute,
   AuthedAdminIndexRoute: AuthedAdminIndexRoute,
+  AuthedMyTasksRoute: AuthedMyTasksRoute,
   AuthedApprovalsIndexRoute: AuthedApprovalsIndexRoute,
   AuthedAuditLogIndexRoute: AuthedAuditLogIndexRoute,
   AuthedDashboardIndexRoute: AuthedDashboardIndexRoute,
@@ -1338,6 +1380,8 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAssetsApplicationsIdRoute: AuthedAssetsApplicationsIdRoute,
   AuthedRemediationCasesCaseIdRoute: AuthedRemediationCasesCaseIdRoute,
   AuthedRemediationTaskIdRoute: AuthedRemediationTaskIdRoute,
+  AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute:
+    AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute,
   AuthedAdminDeviceRulesIndexRoute: AuthedAdminDeviceRulesIndexRoute,
   AuthedAdminIntegrationsIndexRoute: AuthedAdminIntegrationsIndexRoute,
   AuthedAdminTeamsIndexRoute: AuthedAdminTeamsIndexRoute,

@@ -50,5 +50,8 @@ public record RemediationDecisionFilterQuery(
     string? Outcome = null,
     string? ApprovalStatus = null,
     string? DecisionState = null,
-    bool? MissedMaintenanceWindow = null
+    bool? MissedMaintenanceWindow = null,
+    bool? NeedsAnalystRecommendation = null,
+    bool? NeedsRemediationDecision = null,
+    bool? NeedsApproval = null
 );

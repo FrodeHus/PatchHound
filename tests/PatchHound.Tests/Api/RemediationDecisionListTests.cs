@@ -97,6 +97,109 @@ public class RemediationDecisionListTests : IDisposable
     }
 
     [Fact]
+    public async Task BuildByCaseIdAsync_ReturnsAnalystWorkbenchMetadata()
+    {
+        var sourceSystemId = Guid.NewGuid();
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        product.UpdateIdentity("Endpoint agent", null, SoftwareNormalizationMethod.Heuristic, SoftwareNormalizationConfidence.High, DateTimeOffset.UtcNow);
+        var insight = TenantSoftwareProductInsight.Create(_tenantId, product.Id);
+        insight.UpdateDescription("Tenant-specific description for analysts.");
+        var tenantSoftware = SoftwareTenantRecord.Create(
+            _tenantId,
+            null,
+            product.Id,
+            DateTimeOffset.UtcNow.AddDays(-10),
+            DateTimeOffset.UtcNow.AddDays(-1)
+        );
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var device = Device.Create(_tenantId, sourceSystemId, "device-1", "Device 1", Criticality.High);
+        var label = BusinessLabel.Create(_tenantId, "Revenue", null, "#22c55e", BusinessLabelWeightCategory.Critical);
+        var installedSoftware = InstalledSoftware.Observe(
+            _tenantId,
+            device.Id,
+            product.Id,
+            sourceSystemId,
+            "1.2.3",
+            DateTimeOffset.UtcNow.AddDays(-2)
+        );
+        var vulnerability = Vulnerability.Create(
+            "nvd",
+            "CVE-2026-4242",
+            "Remote code execution",
+            "A remotely exploitable vulnerability.",
+            Severity.Critical,
+            9.8m,
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            DateTimeOffset.UtcNow.AddDays(-30)
+        );
+        var exposure = DeviceVulnerabilityExposure.Observe(
+            _tenantId,
+            device.Id,
+            vulnerability.Id,
+            product.Id,
+            installedSoftware.Id,
+            "1.2.3",
+            ExposureMatchSource.Product,
+            DateTimeOffset.UtcNow.AddDays(-2)
+        );
+        var threat = ThreatAssessment.Create(
+            vulnerability.Id,
+            threatScore: 95m,
+            technicalScore: 98m,
+            exploitLikelihoodScore: 90m,
+            threatActivityScore: 90m,
+            epssScore: 0.42m,
+            knownExploited: true,
+            publicExploit: true,
+            activeAlert: false,
+            hasRansomwareAssociation: false,
+            hasMalwareAssociation: false,
+            factorsJson: "[]",
+            calculationVersion: "test"
+        );
+
+        await _dbContext.AddRangeAsync(
+            product,
+            insight,
+            tenantSoftware,
+            remediationCase,
+            device,
+            label,
+            DeviceBusinessLabel.Create(_tenantId, device.Id, label.Id),
+            installedSoftware,
+            vulnerability,
+            exposure,
+            threat
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.BuildByCaseIdAsync(
+            _tenantId,
+            remediationCase.Id,
+            forceAiSummaryRefresh: false,
+            CancellationToken.None
+        );
+
+        result.Should().NotBeNull();
+        result!.SoftwareVendor.Should().Be("Contoso");
+        result.SoftwareCategory.Should().Be("Endpoint agent");
+        result.SoftwareDescription.Should().Be("Tenant-specific description for analysts.");
+        result.BusinessLabels.Should().ContainSingle().Which.Name.Should().Be("Revenue");
+        result.BusinessLabels.Single().AffectedDeviceCount.Should().Be(1);
+        result.BusinessLabels.Single().WeightCategory.Should().Be(nameof(BusinessLabelWeightCategory.Critical));
+        result.OpenVulnerabilities.Should().ContainSingle();
+        var vuln = result.OpenVulnerabilities.Single();
+        vuln.ExternalId.Should().Be("CVE-2026-4242");
+        vuln.Description.Should().Be("A remotely exploitable vulnerability.");
+        vuln.FirstSeenAt.Should().NotBeNull();
+        vuln.AffectedDeviceCount.Should().Be(1);
+        vuln.AffectedVersionCount.Should().Be(1);
+        vuln.KnownExploited.Should().BeTrue();
+        vuln.PublicExploit.Should().BeTrue();
+        vuln.EpssScore.Should().Be(0.42);
+    }
+
+    [Fact]
     public async Task ListAsync_ReturnsSoftwareOwnerRoutingFields()
     {
         var ownerTeam = Team.Create(_tenantId, "Platform Engineering");
@@ -126,6 +229,160 @@ public class RemediationDecisionListTests : IDisposable
         var item = result.Items.Should().ContainSingle().Subject;
         item.SoftwareOwnerTeamName.Should().Be("Platform Engineering");
         item.SoftwareOwnerAssignmentSource.Should().Be("Rule");
+    }
+
+    [Fact]
+    public async Task ListAsync_WhenNeedsAnalystRecommendation_ReturnsSecurityAnalysisCasesWithoutRecommendations()
+    {
+        var needsRecommendationProduct = SoftwareProduct.Create("Contoso", "Needs Recommendation", null);
+        var needsRecommendationCase = RemediationCase.Create(_tenantId, needsRecommendationProduct.Id);
+        var needsRecommendationWorkflow = RemediationWorkflow.Create(_tenantId, needsRecommendationCase.Id, Guid.NewGuid());
+
+        var alreadyRecommendedProduct = SoftwareProduct.Create("Contoso", "Already Recommended", null);
+        var alreadyRecommendedCase = RemediationCase.Create(_tenantId, alreadyRecommendedProduct.Id);
+        var alreadyRecommendedWorkflow = RemediationWorkflow.Create(_tenantId, alreadyRecommendedCase.Id, Guid.NewGuid());
+        var recommendation = AnalystRecommendation.Create(
+            _tenantId,
+            alreadyRecommendedCase.Id,
+            RemediationOutcome.ApprovedForPatching,
+            "Patch this software.",
+            _userId
+        );
+        recommendation.AttachToWorkflow(alreadyRecommendedWorkflow.Id);
+
+        var decisionStageProduct = SoftwareProduct.Create("Contoso", "Decision Stage", null);
+        var decisionStageCase = RemediationCase.Create(_tenantId, decisionStageProduct.Id);
+        var decisionStageWorkflow = RemediationWorkflow.Create(_tenantId, decisionStageCase.Id, Guid.NewGuid());
+        decisionStageWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+
+        await _dbContext.AddRangeAsync(
+            needsRecommendationProduct,
+            needsRecommendationCase,
+            needsRecommendationWorkflow,
+            alreadyRecommendedProduct,
+            alreadyRecommendedCase,
+            alreadyRecommendedWorkflow,
+            recommendation,
+            decisionStageProduct,
+            decisionStageCase,
+            decisionStageWorkflow
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.ListAsync(
+            _tenantId,
+            new PatchHound.Api.Models.Decisions.RemediationDecisionFilterQuery(NeedsAnalystRecommendation: true),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var item = result.Items.Should().ContainSingle().Subject;
+        item.RemediationCaseId.Should().Be(needsRecommendationCase.Id);
+        item.WorkflowStage.Should().Be(nameof(RemediationWorkflowStage.SecurityAnalysis));
+    }
+
+    [Fact]
+    public async Task ListAsync_WhenNeedsRemediationDecision_ReturnsRemediationDecisionStageCasesWithoutDecision()
+    {
+        // Case at RemediationDecision stage with no decision → matches.
+        var pendingProduct = SoftwareProduct.Create("Contoso", "Awaiting Decision", null);
+        var pendingCase = RemediationCase.Create(_tenantId, pendingProduct.Id);
+        var pendingWorkflow = RemediationWorkflow.Create(_tenantId, pendingCase.Id, Guid.NewGuid());
+        pendingWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+
+        // Case at RemediationDecision stage WITH a decision → excluded.
+        var decidedProduct = SoftwareProduct.Create("Contoso", "Already Decided", null);
+        var decidedCase = RemediationCase.Create(_tenantId, decidedProduct.Id);
+        var decidedWorkflow = RemediationWorkflow.Create(_tenantId, decidedCase.Id, Guid.NewGuid());
+        decidedWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+        var decidedDecision = RemediationDecision.Create(
+            _tenantId,
+            decidedCase.Id,
+            RemediationOutcome.RiskAcceptance,
+            "Accepted",
+            _userId
+        );
+
+        // Case at SecurityAnalysis stage → excluded (wrong stage).
+        var earlyProduct = SoftwareProduct.Create("Contoso", "Still Analyzing", null);
+        var earlyCase = RemediationCase.Create(_tenantId, earlyProduct.Id);
+        var earlyWorkflow = RemediationWorkflow.Create(_tenantId, earlyCase.Id, Guid.NewGuid());
+
+        await _dbContext.AddRangeAsync(
+            pendingProduct, pendingCase, pendingWorkflow,
+            decidedProduct, decidedCase, decidedWorkflow, decidedDecision,
+            earlyProduct, earlyCase, earlyWorkflow
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.ListAsync(
+            _tenantId,
+            new PatchHound.Api.Models.Decisions.RemediationDecisionFilterQuery(NeedsRemediationDecision: true),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var item = result.Items.Should().ContainSingle().Subject;
+        item.RemediationCaseId.Should().Be(pendingCase.Id);
+        item.WorkflowStage.Should().Be(nameof(RemediationWorkflowStage.RemediationDecision));
+    }
+
+    [Fact]
+    public async Task ListAsync_WhenNeedsApproval_ReturnsApprovalStageCasesWithPendingApproval()
+    {
+        // Case at Approval stage with PendingApproval decision → matches.
+        var pendingApprovalProduct = SoftwareProduct.Create("Contoso", "Awaiting Approval", null);
+        var pendingApprovalCase = RemediationCase.Create(_tenantId, pendingApprovalProduct.Id);
+        var pendingApprovalWorkflow = RemediationWorkflow.Create(_tenantId, pendingApprovalCase.Id, Guid.NewGuid());
+        pendingApprovalWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+        pendingApprovalWorkflow.MoveToStage(RemediationWorkflowStage.Approval);
+        var pendingApprovalDecision = RemediationDecision.Create(
+            _tenantId,
+            pendingApprovalCase.Id,
+            RemediationOutcome.ApprovedForPatching,
+            "Patch ready",
+            _userId,
+            initialApprovalStatus: DecisionApprovalStatus.PendingApproval
+        );
+
+        // Case at Approval stage with already-approved decision → excluded.
+        var approvedProduct = SoftwareProduct.Create("Contoso", "Already Approved", null);
+        var approvedCase = RemediationCase.Create(_tenantId, approvedProduct.Id);
+        var approvedWorkflow = RemediationWorkflow.Create(_tenantId, approvedCase.Id, Guid.NewGuid());
+        approvedWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+        approvedWorkflow.MoveToStage(RemediationWorkflowStage.Approval);
+        var approvedDecision = RemediationDecision.Create(
+            _tenantId,
+            approvedCase.Id,
+            RemediationOutcome.ApprovedForPatching,
+            "Approved",
+            _userId,
+            initialApprovalStatus: DecisionApprovalStatus.Approved
+        );
+
+        // Case at RemediationDecision stage → excluded (wrong stage).
+        var decisionProduct = SoftwareProduct.Create("Contoso", "Still Deciding", null);
+        var decisionCase = RemediationCase.Create(_tenantId, decisionProduct.Id);
+        var decisionWorkflow = RemediationWorkflow.Create(_tenantId, decisionCase.Id, Guid.NewGuid());
+        decisionWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+
+        await _dbContext.AddRangeAsync(
+            pendingApprovalProduct, pendingApprovalCase, pendingApprovalWorkflow, pendingApprovalDecision,
+            approvedProduct, approvedCase, approvedWorkflow, approvedDecision,
+            decisionProduct, decisionCase, decisionWorkflow
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.ListAsync(
+            _tenantId,
+            new PatchHound.Api.Models.Decisions.RemediationDecisionFilterQuery(NeedsApproval: true),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var item = result.Items.Should().ContainSingle().Subject;
+        item.RemediationCaseId.Should().Be(pendingApprovalCase.Id);
+        item.WorkflowStage.Should().Be(nameof(RemediationWorkflowStage.Approval));
     }
 
     public void Dispose()

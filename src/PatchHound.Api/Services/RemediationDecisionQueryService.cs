@@ -183,11 +183,24 @@ public class RemediationDecisionQueryService(
             .Where(w => w.TenantId == tenantId
                 && caseIds.Contains(w.RemediationCaseId)
                 && w.Status == RemediationWorkflowStatus.Active)
-            .Select(w => new { w.RemediationCaseId, w.CurrentStage, w.UpdatedAt })
+            .Select(w => new { w.Id, w.RemediationCaseId, w.CurrentStage, w.UpdatedAt })
             .ToListAsync(ct);
-        var activeWorkflowStages = activeWorkflowRows
+        var activeWorkflowsByCase = activeWorkflowRows
             .GroupBy(w => w.RemediationCaseId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(w => w.UpdatedAt).First().CurrentStage);
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(w => w.UpdatedAt).First());
+        var activeWorkflowStages = activeWorkflowsByCase
+            .ToDictionary(pair => pair.Key, pair => pair.Value.CurrentStage);
+        var activeWorkflowIds = activeWorkflowsByCase.Values.Select(w => w.Id).ToHashSet();
+        var workflowsWithRecommendations = activeWorkflowIds.Count == 0
+            ? []
+            : await dbContext.AnalystRecommendations.AsNoTracking()
+                .Where(r => r.TenantId == tenantId
+                    && r.RemediationWorkflowId != null
+                    && activeWorkflowIds.Contains(r.RemediationWorkflowId.Value))
+                .Select(r => r.RemediationWorkflowId!.Value)
+                .Distinct()
+                .ToListAsync(ct);
+        var workflowRecommendationSet = workflowsWithRecommendations.ToHashSet();
         var activeWorkflowOwnerTeams = await dbContext.RemediationWorkflows.AsNoTracking()
             .Where(w => w.TenantId == tenantId
                 && caseIds.Contains(w.RemediationCaseId)
@@ -297,6 +310,36 @@ public class RemediationDecisionQueryService(
                 }
             }
 
+            if (filter.NeedsAnalystRecommendation == true)
+            {
+                if (!activeWorkflowsByCase.TryGetValue(rc.Id, out var activeWorkflow)
+                    || activeWorkflow.CurrentStage != RemediationWorkflowStage.SecurityAnalysis
+                    || workflowRecommendationSet.Contains(activeWorkflow.Id))
+                {
+                    continue;
+                }
+            }
+
+            if (filter.NeedsRemediationDecision == true)
+            {
+                if (!activeWorkflowsByCase.TryGetValue(rc.Id, out var activeWorkflow)
+                    || activeWorkflow.CurrentStage != RemediationWorkflowStage.RemediationDecision
+                    || decision is not null)
+                {
+                    continue;
+                }
+            }
+
+            if (filter.NeedsApproval == true)
+            {
+                if (!activeWorkflowsByCase.TryGetValue(rc.Id, out var activeWorkflow)
+                    || activeWorkflow.CurrentStage != RemediationWorkflowStage.Approval
+                    || decision?.ApprovalStatus != DecisionApprovalStatus.PendingApproval)
+                {
+                    continue;
+                }
+            }
+
             string? riskBand = null;
             double? riskScore = null;
             if (riskScoresByCaseId.TryGetValue(rc.Id, out var risk))
@@ -397,6 +440,8 @@ public class RemediationDecisionQueryService(
                 c.SoftwareProductId,
                 Name = c.SoftwareProduct.Name,
                 Vendor = c.SoftwareProduct.Vendor,
+                Category = c.SoftwareProduct.Category,
+                ProductDescription = c.SoftwareProduct.Description,
             })
             .FirstOrDefaultAsync(ct);
 
@@ -405,6 +450,14 @@ public class RemediationDecisionQueryService(
 
         var softwareName = ResolveDisplaySoftwareName(caseMeta.Name, null);
         var softwareProductId = caseMeta.SoftwareProductId;
+
+        var tenantSoftwareInsight = await dbContext.TenantSoftwareProductInsights.AsNoTracking()
+            .Where(insight => insight.TenantId == tenantId && insight.SoftwareProductId == softwareProductId)
+            .Select(insight => new { insight.Description })
+            .FirstOrDefaultAsync(ct);
+        var softwareDescription = !string.IsNullOrWhiteSpace(tenantSoftwareInsight?.Description)
+            ? tenantSoftwareInsight.Description
+            : caseMeta.ProductDescription;
 
         var scopedDeviceAssetIds = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
             .Where(e => e.TenantId == tenantId
@@ -455,18 +508,39 @@ public class RemediationDecisionQueryService(
                 .Select(team => team.Name)
                 .Take(5)
                 .ToListAsync(ct);
-        var businessLabelSummary = scopedDeviceAssetIds.Count == 0
+        var businessLabelRows = scopedDeviceAssetIds.Count == 0
             ? []
             : await dbContext.DeviceBusinessLabels.AsNoTracking()
-                .Where(link => scopedDeviceAssetIds.Contains(link.DeviceId))
-                .Select(link => new { link.DeviceId, link.BusinessLabel.Name })
+                .Where(link => scopedDeviceAssetIds.Contains(link.DeviceId) && link.BusinessLabel.IsActive)
+                .Select(link => new
+                {
+                    link.DeviceId,
+                    link.BusinessLabel.Id,
+                    link.BusinessLabel.Name,
+                    link.BusinessLabel.Color,
+                    link.BusinessLabel.WeightCategory,
+                })
                 .Distinct()
-                .GroupBy(item => item.Name)
-                .OrderByDescending(group => group.Count())
-                .ThenBy(group => group.Key)
-                .Select(group => $"{group.Key} ({group.Count()})")
-                .Take(3)
                 .ToListAsync(ct);
+        var businessLabelDtos = businessLabelRows
+            .GroupBy(item => new { item.Id, item.Name, item.Color, item.WeightCategory })
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key.Name)
+            .Select(group => new DecisionBusinessLabelDto(
+                group.Key.Id,
+                group.Key.Name,
+                group.Key.Color,
+                group.Key.WeightCategory.ToString(),
+                (double)BusinessLabel.CategoryWeights[group.Key.WeightCategory],
+                group.Count()
+            ))
+            .ToList();
+        var businessLabelSummary = businessLabelDtos.Count == 0
+            ? []
+            : businessLabelDtos
+                .Take(3)
+                .Select(label => $"{label.Name} ({label.AffectedDeviceCount})")
+                .ToList();
         var patchingTaskCounts = await dbContext.PatchingTasks.AsNoTracking()
             .Where(task => task.TenantId == tenantId && task.RemediationCaseId == remediationCaseId)
             .GroupBy(_ => 1)
@@ -492,10 +566,17 @@ public class RemediationDecisionQueryService(
                 Id = g.Key,
                 g.First().Vulnerability.ExternalId,
                 g.First().Vulnerability.Title,
+                g.First().Vulnerability.Description,
                 VendorSeverity = g.First().Vulnerability.VendorSeverity,
                 VendorScore = g.First().Vulnerability.CvssScore,
                 g.First().Vulnerability.CvssVector,
                 FirstSeenAt = g.Min(e => e.FirstObservedAt),
+                AffectedDeviceCount = g.Select(e => e.DeviceId).Distinct().Count(),
+                AffectedVersionCount = g
+                    .Select(e => e.MatchedVersion == null ? null : e.MatchedVersion.Trim().ToLower())
+                    .Where(v => !string.IsNullOrEmpty(v))
+                    .Distinct()
+                    .Count(),
             })
             .ToListAsync(ct);
 
@@ -641,11 +722,15 @@ public class RemediationDecisionQueryService(
                     m.Id,
                     m.ExternalId,
                     m.Title,
+                    m.Description,
                     m.VendorSeverity.ToString(),
                     m.VendorScore.HasValue ? (double?)((double)m.VendorScore.Value) : null,
                     effectiveSeverity,
                     effectiveScore,
                     m.CvssVector,
+                    m.FirstSeenAt,
+                    m.AffectedDeviceCount,
+                    m.AffectedVersionCount,
                     threat?.KnownExploited ?? false,
                     threat?.PublicExploit ?? false,
                     threat?.ActiveAlert ?? false,
@@ -858,10 +943,14 @@ public class RemediationDecisionQueryService(
             remediationCaseId,
             tenantSoftware?.Id,
             softwareName,
+            caseMeta.Vendor,
+            caseMeta.Category,
+            softwareDescription,
             softwareOwnerTeamId,
             softwareOwnerTeamName,
             softwareOwnerAssignmentSource,
             assetCriticality.ToString(),
+            businessLabelDtos,
             summary,
             new DecisionWorkflowSummaryDto(
                 scopedDeviceAssetIds.Count,
@@ -883,6 +972,7 @@ public class RemediationDecisionQueryService(
                 ),
             recommendationDtos,
             topVulns.Take(5).ToList(),
+            topVulns,
             riskDto,
             slaDto,
             aiSummary

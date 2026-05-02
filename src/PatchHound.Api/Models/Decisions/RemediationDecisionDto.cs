@@ -4,10 +4,14 @@ public record DecisionContextDto(
     Guid RemediationCaseId,
     Guid? TenantSoftwareId,
     string SoftwareName,
+    string? SoftwareVendor,
+    string? SoftwareCategory,
+    string? SoftwareDescription,
     Guid? SoftwareOwnerTeamId,
     string? SoftwareOwnerTeamName,
     string SoftwareOwnerAssignmentSource,
     string Criticality,
+    List<DecisionBusinessLabelDto> BusinessLabels,
     DecisionSummaryDto Summary,
     DecisionWorkflowSummaryDto Workflow,
     DecisionWorkflowStateDto WorkflowState,
@@ -16,9 +20,19 @@ public record DecisionContextDto(
     DecisionApprovalResolutionDto? LatestApprovalResolution,
     List<AnalystRecommendationDto> Recommendations,
     List<DecisionVulnDto> TopVulnerabilities,
+    List<DecisionVulnDto> OpenVulnerabilities,
     DecisionRiskDto? RiskScore,
     DecisionSlaDto? Sla,
     DecisionAiSummaryDto AiSummary
+);
+
+public record DecisionBusinessLabelDto(
+    Guid Id,
+    string Name,
+    string? Color,
+    string WeightCategory,
+    double RiskWeight,
+    int AffectedDeviceCount
 );
 
 public record DecisionApprovalResolutionDto(
@@ -139,11 +153,15 @@ public record DecisionVulnDto(
     Guid VulnerabilityDefinitionId,
     string ExternalId,
     string Title,
+    string? Description,
     string VendorSeverity,
     double? VendorScore,
     string? EffectiveSeverity,
     double? EffectiveScore,
     string? CvssVector,
+    DateTimeOffset? FirstSeenAt,
+    int AffectedDeviceCount,
+    int AffectedVersionCount,
     bool KnownExploited,
     bool PublicExploit,
     bool ActiveAlert,

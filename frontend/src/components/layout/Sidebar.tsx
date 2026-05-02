@@ -4,6 +4,7 @@ import {
   BarChart3,
   Bug,
   ClipboardCheck,
+  ClipboardList,
   LayoutDashboard,
   ScrollText,
   Server,
@@ -64,6 +65,7 @@ type NavGroup = {
 
 const navItems: NavItem[] = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { to: "/my-tasks", label: "My Tasks", icon: ClipboardList },
   { to: "/vulnerabilities", label: "Vulnerabilities", icon: Bug },
   {
     to: "/remediation",
