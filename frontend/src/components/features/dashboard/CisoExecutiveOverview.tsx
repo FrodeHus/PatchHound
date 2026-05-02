@@ -1,15 +1,11 @@
 import { ArrowDownRight, ArrowUpRight, Building2, Clock3, Flame, RefreshCw, Siren, Trophy } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { PolarAngleAxis, RadialBar, RadialBarChart } from 'recharts'
-import type { DashboardSummary, TrendData } from '@/api/dashboard.schemas'
-import { fetchRiskScoreSummary } from '@/api/risk-score.functions'
-import type { RiskScoreSummary } from '@/api/risk-score.schemas'
+import type { DashboardSummary, ExecutiveExposureSummary, TrendData } from '@/api/dashboard.schemas'
 import { MetricInfoTooltip } from '@/components/features/dashboard/MetricInfoTooltip'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useTenantScope } from '@/components/layout/tenant-scope'
 import { cn } from '@/lib/utils'
 import type { LucideIcon } from 'lucide-react'
 
@@ -113,6 +109,23 @@ function deriveTone(summary: DashboardSummary): {
   headline: string
   narrative: string
 } {
+  const exposure = summary.executiveExposure
+  if (exposure?.riskLevel === 'Critical') {
+    return {
+      tone: 'critical',
+      headline: 'Cyber exposure needs leadership attention',
+      narrative: exposure.topDriverDetail ?? 'The current exposure score is in the critical band and should be actively managed through the next reporting cycle.',
+    }
+  }
+
+  if (exposure?.riskLevel === 'High' || exposure?.trend === 'Worsening') {
+    return {
+      tone: 'watch',
+      headline: 'Cyber exposure is elevated',
+      narrative: exposure.topDriverDetail ?? 'The current score or recent movement shows enough pressure to warrant management follow-through.',
+    }
+  }
+
   const critical = summary.vulnerabilitiesBySeverity.Critical ?? 0
   const overdue = summary.overdueTaskCount
   const recurrence = summary.recurrenceRatePercent
@@ -170,27 +183,51 @@ function riskGaugeBand(score: number): RiskGaugeBand {
   return 'contained'
 }
 
-function riskGaugeLabel(score: number) {
-  return riskGaugeBands.find((band) => band.band === riskGaugeBand(score))?.label ?? 'Contained'
+function normalizeRiskLevel(level: string | undefined): RiskGaugeBand {
+  const normalized = level?.toLowerCase()
+  if (normalized === 'critical' || normalized === 'high' || normalized === 'elevated' || normalized === 'contained') {
+    return normalized
+  }
+
+  return 'contained'
 }
 
 function riskGaugeBandMeta(score: number) {
   return riskGaugeBands.find((band) => band.band === riskGaugeBand(score)) ?? riskGaugeBands[0]
 }
 
+function describeExecutiveTrend(exposure: ExecutiveExposureSummary | null | undefined) {
+  if (!exposure) {
+    return 'Awaiting risk rollup'
+  }
+
+  if (exposure.trend === 'Filtered') {
+    return 'Trend hidden for filtered scope'
+  }
+
+  if (exposure.scoreDelta === null) {
+    return 'No baseline yet'
+  }
+
+  const direction = exposure.scoreDelta > 0 ? '+' : ''
+  return `${direction}${Math.round(exposure.scoreDelta)} vs prior snapshot`
+}
+
 function RiskScoreGauge({
-  summary,
+  exposure,
   isLoading,
 }: {
-  summary?: RiskScoreSummary
+  exposure?: ExecutiveExposureSummary | null
   isLoading: boolean
 }) {
-  const score = summary?.overallScore ?? 0
+  const score = exposure?.score ?? 0
   const clampedScore = Math.min(1000, Math.max(0, score))
-  const bandLabel = summary ? riskGaugeLabel(score) : 'Preparing'
-  const activeBand = riskGaugeBandMeta(score)
-  const bandTone = summary ? activeBand.colorClass : 'text-muted-foreground'
-  const chartData = [{ score: clampedScore, fill: summary ? activeBand.fill : 'var(--color-muted-foreground)' }]
+  const activeBand = exposure
+    ? riskGaugeBands.find((band) => band.band === normalizeRiskLevel(exposure.riskLevel)) ?? riskGaugeBandMeta(score)
+    : riskGaugeBandMeta(score)
+  const bandLabel = exposure ? activeBand.label : 'Preparing'
+  const bandTone = exposure ? activeBand.colorClass : 'text-muted-foreground'
+  const chartData = [{ score: clampedScore, fill: exposure ? activeBand.fill : 'var(--color-muted-foreground)' }]
 
   return (
     <div className="rounded-[1.6rem] border border-border/70 bg-background/60 p-5 shadow-sm backdrop-blur-sm">
@@ -209,7 +246,7 @@ function RiskScoreGauge({
       <div
         className="relative mt-5 flex h-[190px] items-center justify-center"
         role="img"
-        aria-label={`Current total risk score ${summary ? Math.round(score) : 'loading'} with ${bandLabel.toLowerCase()} status`}
+        aria-label={`Current total risk score ${exposure ? Math.round(score) : 'loading'} with ${bandLabel.toLowerCase()} status`}
       >
         <RadialBarChart
           width={280}
@@ -233,7 +270,7 @@ function RiskScoreGauge({
         </RadialBarChart>
         <div className="pointer-events-none absolute inset-x-0 bottom-6 text-center">
           <div className={cn('text-5xl font-semibold tracking-[-0.05em]', bandTone)}>
-            {summary ? Math.round(score) : isLoading ? '...' : 'N/A'}
+            {exposure ? Math.round(score) : isLoading ? '...' : 'N/A'}
           </div>
           <div className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">
             Current risk score
@@ -243,16 +280,16 @@ function RiskScoreGauge({
 
       <div className="mt-1 flex items-end justify-between gap-4">
         <div className="text-xs text-muted-foreground">
-          {summary?.calculatedAt ? `Calculated ${new Date(summary.calculatedAt).toLocaleString()}` : 'Awaiting risk rollup'}
+          {describeExecutiveTrend(exposure)}
         </div>
         <div className="text-right text-xs text-muted-foreground">
-          <div>{summary?.assetCount ?? 0} scored assets</div>
-          <div>{summary?.criticalAssetCount ?? 0} critical / {summary?.highAssetCount ?? 0} high</div>
+          <div>{exposure?.assetCount ?? 0} scored assets</div>
+          <div>{exposure?.criticalAssetCount ?? 0} critical / {exposure?.highAssetCount ?? 0} high</div>
         </div>
       </div>
       <div className="mt-4 grid grid-cols-4 gap-1 text-[10px] uppercase tracking-[0.12em]">
         {riskGaugeBands.map((band) => {
-          const isActive = summary && band.band === activeBand.band
+          const isActive = exposure && band.band === activeBand.band
           return (
             <div
               key={band.band}
@@ -321,18 +358,11 @@ export function CisoExecutiveOverview({
   summary,
   trends,
   isLoading,
-  filters,
+  filters: _filters,
 }: Props) {
-  const { selectedTenantId } = useTenantScope()
-  const riskScoreQuery = useQuery({
-    queryKey: ['risk-score', 'summary', selectedTenantId, filters.minAgeDays, filters.platform, filters.deviceGroup],
-    queryFn: () => fetchRiskScoreSummary({ data: filters }),
-    enabled: Boolean(selectedTenantId),
-    placeholderData: (previousData) => previousData,
-    staleTime: 30_000,
-  })
   const tone = deriveTone(summary)
   const trend = getTrendDirection(trends)
+  const executiveExposure = summary.executiveExposure
   const criticalCount = summary.vulnerabilitiesBySeverity.Critical ?? 0
   const highCount = summary.vulnerabilitiesBySeverity.High ?? 0
   const topDeviceGroup = [...summary.vulnerabilitiesByDeviceGroup]
@@ -429,10 +459,10 @@ export function CisoExecutiveOverview({
                 <div className="rounded-[1.4rem] border border-border/70 bg-background/50 px-4 py-4 backdrop-blur-sm">
                   <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Top pressure area</div>
                   <div className="mt-2 text-lg font-medium tracking-tight">
-                    {topDeviceGroup?.deviceGroupName ?? 'No device-group pressure detected'}
+                    {executiveExposure?.topDriver ?? topDeviceGroup?.deviceGroupName ?? 'No active risk driver detected'}
                   </div>
                   <div className="mt-1 text-sm text-muted-foreground">
-                    {describePressureArea(topDeviceGroup)}
+                    {executiveExposure?.topDriverDetail ?? describePressureArea(topDeviceGroup)}
                   </div>
                 </div>
                 <div className="rounded-[1.4rem] border border-border/70 bg-background/50 px-4 py-4 backdrop-blur-sm">
@@ -448,7 +478,7 @@ export function CisoExecutiveOverview({
             </div>
 
             <div className="space-y-4">
-              <RiskScoreGauge summary={riskScoreQuery.data} isLoading={isLoading || riskScoreQuery.isFetching} />
+              <RiskScoreGauge exposure={executiveExposure} isLoading={isLoading} />
               <div className="rounded-[1.6rem] border border-border/70 bg-background/55 p-5 backdrop-blur-sm">
               <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                 <Building2 className="size-4" />

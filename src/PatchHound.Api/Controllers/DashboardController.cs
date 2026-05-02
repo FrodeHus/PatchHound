@@ -48,6 +48,7 @@ public class DashboardController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
         }
         var (filteredAssetIds, minPublishedDate) = BuildFilterContext(tenantId, filter);
+        var hasFilters = filteredAssetIds is not null || minPublishedDate.HasValue;
 
         var riskChangeBrief = await _dashboardQueryService.BuildRiskChangeBriefAsync(
             tenantId,
@@ -196,8 +197,6 @@ public class DashboardController : ControllerBase
             );
         }).ToList();
 
-        var exposureScore = 0m;
-
         // SLA compliance and remediation metrics — tenant-wide, NOT affected by dashboard filters
         var patchingTasks = await _dbContext
             .PatchingTasks.AsNoTracking()
@@ -223,6 +222,7 @@ public class DashboardController : ControllerBase
         // Vulnerability exposure by device group — derived from DeviceGroupRiskScores (canonical).
         var vulnsByDeviceGroup = await _dbContext.DeviceGroupRiskScores.AsNoTracking()
             .Where(score => score.TenantId == tenantId)
+            .Where(score => string.IsNullOrEmpty(filter.DeviceGroup) || score.DeviceGroupName == filter.DeviceGroup)
             .OrderByDescending(score => score.OverallScore)
             .ThenByDescending(score => score.OpenEpisodeCount)
             .Take(10)
@@ -237,6 +237,16 @@ public class DashboardController : ControllerBase
                 score.OpenEpisodeCount
             ))
             .ToListAsync(ct);
+
+        var executiveExposure = await BuildExecutiveExposureSummaryAsync(
+            tenantId,
+            filter,
+            filteredAssetIds,
+            minPublishedDate,
+            vulnsByDeviceGroup,
+            hasFilters,
+            ct);
+        var exposureScore = executiveExposure.Score;
 
         // Device health breakdown — NOT affected by vulnerability filters
         var deviceHealthRows = await _dbContext
@@ -327,7 +337,8 @@ public class DashboardController : ControllerBase
                 slaComplianceTrend,
                 metricSparklines,
                 ageBuckets,
-                mttrBySeverity
+                mttrBySeverity,
+                executiveExposure
             )
         );
     }
@@ -1355,6 +1366,232 @@ public class DashboardController : ControllerBase
         return (filteredAssetIdQuery, minPublishedDate);
     }
 
+    private async Task<ExecutiveExposureSummaryDto> BuildExecutiveExposureSummaryAsync(
+        Guid tenantId,
+        DashboardFilterQuery filter,
+        IQueryable<Guid>? filteredAssetIds,
+        DateTimeOffset? minPublishedDate,
+        List<DeviceGroupVulnerabilityDto> deviceGroups,
+        bool hasFilters,
+        CancellationToken ct)
+    {
+        var query = _dbContext.DeviceRiskScores.AsNoTracking()
+            .Where(score => score.TenantId == tenantId);
+
+        if (filteredAssetIds is not null)
+        {
+            query = query.Where(score => filteredAssetIds.Contains(score.DeviceId));
+        }
+
+        if (minPublishedDate.HasValue)
+        {
+            query = query.Where(score => _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                .Any(exposure =>
+                    exposure.TenantId == tenantId
+                    && exposure.DeviceId == score.DeviceId
+                    && exposure.Status == ExposureStatus.Open
+                    && exposure.Vulnerability.PublishedDate >= minPublishedDate.Value));
+        }
+
+        var assetScores = await query
+            .OrderByDescending(score => score.OverallScore)
+            .Select(score => new RiskScoreService.AssetRiskResult(
+                score.DeviceId,
+                score.OverallScore,
+                score.MaxEpisodeRiskScore,
+                score.CriticalCount,
+                score.HighCount,
+                score.MediumCount,
+                score.LowCount,
+                score.OpenEpisodeCount,
+                score.FactorsJson
+            ))
+            .ToListAsync(ct);
+
+        var tenantRisk = RiskScoreService.CalculateTenantRisk(assetScores);
+        var scoreDelta = hasFilters
+            ? null
+            : await CalculateTenantRiskDeltaAsync(tenantId, tenantRisk.OverallScore, ct);
+        var trend = hasFilters ? "Filtered" : DescribeScoreTrend(scoreDelta);
+        var topDriver = await FindExecutiveTopDriverAsync(
+            tenantId,
+            filter,
+            filteredAssetIds,
+            minPublishedDate,
+            deviceGroups,
+            ct);
+
+        return new ExecutiveExposureSummaryDto(
+            tenantRisk.OverallScore,
+            DescribeRiskLevel(tenantRisk.OverallScore),
+            scoreDelta,
+            trend,
+            hasFilters ? "Filtered" : "Tenant",
+            tenantRisk.AssetCount,
+            tenantRisk.CriticalAssetCount,
+            tenantRisk.HighAssetCount,
+            topDriver?.Title,
+            topDriver?.Detail
+        );
+    }
+
+    private async Task<decimal?> CalculateTenantRiskDeltaAsync(
+        Guid tenantId,
+        decimal currentScore,
+        CancellationToken ct)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var baseline = await _dbContext.TenantRiskScoreSnapshots.AsNoTracking()
+            .Where(snapshot => snapshot.TenantId == tenantId && snapshot.Date < today)
+            .OrderByDescending(snapshot => snapshot.Date)
+            .FirstOrDefaultAsync(ct);
+
+        return baseline is null
+            ? null
+            : Math.Round(currentScore - baseline.OverallScore, 2);
+    }
+
+    private async Task<ExecutiveTopDriver?> FindExecutiveTopDriverAsync(
+        Guid tenantId,
+        DashboardFilterQuery filter,
+        IQueryable<Guid>? filteredAssetIds,
+        DateTimeOffset? minPublishedDate,
+        List<DeviceGroupVulnerabilityDto> deviceGroups,
+        CancellationToken ct)
+    {
+        var candidates = new List<ExecutiveTopDriver>();
+
+        IEnumerable<DeviceGroupVulnerabilityDto> groupDriverCandidates = string.IsNullOrEmpty(filter.DeviceGroup) && filteredAssetIds is not null
+            ? []
+            : deviceGroups;
+        var topGroup = groupDriverCandidates
+            .Where(group => group.CurrentRiskScore.HasValue)
+            .OrderByDescending(group => group.CurrentRiskScore)
+            .FirstOrDefault();
+        if (topGroup is not null)
+        {
+            candidates.Add(new ExecutiveTopDriver(
+                $"Device group: {topGroup.DeviceGroupName}",
+                $"{topGroup.OpenEpisodeCount ?? 0} open episodes across {topGroup.AssetCount ?? 0} assets.",
+                topGroup.CurrentRiskScore ?? 0m));
+        }
+
+        var assetQuery =
+            from score in _dbContext.DeviceRiskScores.AsNoTracking()
+            join device in _dbContext.Devices.AsNoTracking()
+                on score.DeviceId equals device.Id
+            where score.TenantId == tenantId && device.TenantId == tenantId
+            select new { score, device };
+
+        if (filteredAssetIds is not null)
+        {
+            assetQuery = assetQuery.Where(item => filteredAssetIds.Contains(item.score.DeviceId));
+        }
+
+        if (minPublishedDate.HasValue)
+        {
+            assetQuery = assetQuery.Where(item => _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                .Any(exposure =>
+                    exposure.TenantId == tenantId
+                    && exposure.DeviceId == item.score.DeviceId
+                    && exposure.Status == ExposureStatus.Open
+                    && exposure.Vulnerability.PublishedDate >= minPublishedDate.Value));
+        }
+
+        var topAsset = await assetQuery
+            .OrderByDescending(item => item.score.OverallScore)
+            .Select(item => new
+            {
+                item.device.Name,
+                item.score.OverallScore,
+                item.score.OpenEpisodeCount,
+                item.score.CriticalCount,
+                item.score.HighCount,
+            })
+            .FirstOrDefaultAsync(ct);
+        if (topAsset is not null)
+        {
+            candidates.Add(new ExecutiveTopDriver(
+                $"Asset: {topAsset.Name}",
+                $"{topAsset.CriticalCount} critical and {topAsset.HighCount} high exposures among {topAsset.OpenEpisodeCount} open episodes.",
+                topAsset.OverallScore));
+        }
+
+        var softwareQuery =
+            from score in _dbContext.SoftwareRiskScores.AsNoTracking()
+            join product in _dbContext.SoftwareProducts.AsNoTracking()
+                on score.SoftwareProductId equals product.Id
+            where score.TenantId == tenantId
+            select new { score, product };
+
+        if (filteredAssetIds is not null)
+        {
+            softwareQuery = softwareQuery.Where(item => _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                .Any(exposure =>
+                    exposure.TenantId == tenantId
+                    && exposure.SoftwareProductId == item.score.SoftwareProductId
+                    && exposure.Status == ExposureStatus.Open
+                    && filteredAssetIds.Contains(exposure.DeviceId)));
+        }
+
+        if (minPublishedDate.HasValue)
+        {
+            softwareQuery = softwareQuery.Where(item => _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                .Any(exposure =>
+                    exposure.TenantId == tenantId
+                    && exposure.SoftwareProductId == item.score.SoftwareProductId
+                    && exposure.Status == ExposureStatus.Open
+                    && exposure.Vulnerability.PublishedDate >= minPublishedDate.Value));
+        }
+
+        var topSoftware = await softwareQuery
+            .OrderByDescending(item => item.score.OverallScore)
+            .Select(item => new
+            {
+                item.product.Name,
+                item.product.Vendor,
+                item.score.OverallScore,
+                item.score.OpenExposureCount,
+                item.score.AffectedDeviceCount,
+            })
+            .FirstOrDefaultAsync(ct);
+        if (topSoftware is not null)
+        {
+            candidates.Add(new ExecutiveTopDriver(
+                $"Software: {topSoftware.Vendor} {topSoftware.Name}",
+                $"{topSoftware.OpenExposureCount} open exposures across {topSoftware.AffectedDeviceCount} devices.",
+                topSoftware.OverallScore));
+        }
+
+        return candidates
+            .OrderByDescending(candidate => candidate.Score)
+            .FirstOrDefault();
+    }
+
+    private static string DescribeRiskLevel(decimal score) =>
+        score switch
+        {
+            >= 900m => "Critical",
+            >= 750m => "High",
+            >= 500m => "Elevated",
+            _ => "Contained",
+        };
+
+    private static string DescribeScoreTrend(decimal? delta)
+    {
+        if (!delta.HasValue)
+        {
+            return "NoBaseline";
+        }
+
+        return delta.Value switch
+        {
+            > 0m => "Worsening",
+            < 0m => "Improving",
+            _ => "Stable",
+        };
+    }
+
     private static string? NormalizeHeatmapGroupBy(string? groupBy)
     {
         return groupBy?.Trim().ToLowerInvariant() switch
@@ -1558,6 +1795,12 @@ public class DashboardController : ControllerBase
         string HighestSeverity,
         int VulnerabilityCount,
         int AffectedDeviceCount
+    );
+
+    private sealed record ExecutiveTopDriver(
+        string Title,
+        string Detail,
+        decimal Score
     );
 
     private sealed record OwnerTopDriverRow(

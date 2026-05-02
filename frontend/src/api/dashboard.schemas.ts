@@ -21,6 +21,19 @@ export const unhandledVulnerabilitySchema = z.object({
   latestSeenAt: z.string().datetime({ offset: true }),
 })
 
+export const executiveExposureSummarySchema = z.object({
+  score: z.number(),
+  riskLevel: z.string(),
+  scoreDelta: z.number().nullable(),
+  trend: z.string(),
+  scope: z.string(),
+  assetCount: z.number(),
+  criticalAssetCount: z.number(),
+  highAssetCount: z.number(),
+  topDriver: z.string().nullable(),
+  topDriverDetail: z.string().nullable(),
+})
+
 export const dashboardSummarySchema = z.object({
   exposureScore: z.number(),
   vulnerabilitiesBySeverity: z.record(z.string(), z.number()),
@@ -104,6 +117,7 @@ export const dashboardSummarySchema = z.object({
     days: z.number(),
     previousDays: z.number().nullable(),
   })).optional(),
+  executiveExposure: executiveExposureSummarySchema.nullable().optional(),
 })
 
 export const trendItemSchema = z.object({
@@ -119,6 +133,7 @@ export const trendDataSchema = z.object({
 export const dashboardRiskChangeBriefSchema = dashboardSummarySchema.shape.riskChangeBrief
 
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>
+export type ExecutiveExposureSummary = z.infer<typeof executiveExposureSummarySchema>
 export type TopVulnerability = z.infer<typeof topVulnerabilitySchema>
 export type UnhandledVulnerability = z.infer<typeof unhandledVulnerabilitySchema>
 export type TrendData = z.infer<typeof trendDataSchema>
