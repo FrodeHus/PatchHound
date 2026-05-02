@@ -490,19 +490,22 @@ public class RiskScoreService(
             return (item.AssetId, EpisodeRiskScore: score, RiskBand: band, HasReduction: hasReduction);
         });
 
-        // Load the highest active business-label weight per device.
-        // Only labels that are IsActive=true contribute to the weight.
-        var labelWeights = await dbContext.DeviceBusinessLabels.AsNoTracking()
+        // Load the highest active business-label weight per device. The CASE expression
+        // translates to SQL so aggregation happens server-side — only one row per device
+        // returns even when many labels are assigned.
+        var deviceLabelWeights = await dbContext.DeviceBusinessLabels.AsNoTracking()
             .Where(dbl => dbl.TenantId == tenantId && dbl.BusinessLabel.IsActive)
-            .Select(dbl => new { dbl.DeviceId, dbl.BusinessLabel.WeightCategory })
-            .ToListAsync(ct);
-
-        var deviceLabelWeights = labelWeights
-            .GroupBy(item => item.DeviceId)
-            .ToDictionary(
-                g => g.Key,
-                g => g.Max(item => BusinessLabel.CategoryWeights[item.WeightCategory])
-            );
+            .GroupBy(dbl => dbl.DeviceId)
+            .Select(g => new
+            {
+                DeviceId = g.Key,
+                MaxWeight = g.Max(dbl =>
+                    dbl.BusinessLabel.WeightCategory == BusinessLabelWeightCategory.Critical ? 2.0m
+                    : dbl.BusinessLabel.WeightCategory == BusinessLabelWeightCategory.Sensitive ? 1.5m
+                    : dbl.BusinessLabel.WeightCategory == BusinessLabelWeightCategory.Informational ? 0.5m
+                    : 1.0m),
+            })
+            .ToDictionaryAsync(item => item.DeviceId, item => item.MaxWeight, ct);
 
         return BuildAssetRiskResults(
             adjusted.Select(item => (item.AssetId, item.EpisodeRiskScore, item.RiskBand, item.HasReduction)),
@@ -531,14 +534,19 @@ public class RiskScoreService(
                 var lowCount = group.Count(item => item.RiskBand == "Low");
                 var reducedCount = group.Count(item => item.HasReduction);
 
-                var baseScore = Math.Round(
-                    (0.7m * maxEpisodeRisk)
-                    + (0.2m * topThreeAverage)
-                    + Math.Min(criticalCount * 35m, 120m)
-                    + Math.Min(highCount * 15m, 60m)
-                    + Math.Min(mediumCount * 5m, 20m)
-                    + Math.Min(lowCount * 1m, 5m),
-                    2);
+                // Clamp the unweighted score first so the multiplier applies to the
+                // same value reported as the asset's pre-label "base" risk.
+                var baseScore = Math.Clamp(
+                    Math.Round(
+                        (0.7m * maxEpisodeRisk)
+                        + (0.2m * topThreeAverage)
+                        + Math.Min(criticalCount * 35m, 120m)
+                        + Math.Min(highCount * 15m, 60m)
+                        + Math.Min(mediumCount * 5m, 20m)
+                        + Math.Min(lowCount * 1m, 5m),
+                        2),
+                    0m,
+                    1000m);
 
                 var labelWeight = deviceLabelWeights?.GetValueOrDefault(group.Key, 1.0m) ?? 1.0m;
                 var overallScore = Math.Clamp(Math.Round(baseScore * labelWeight, 2), 0m, 1000m);

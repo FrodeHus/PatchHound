@@ -46,20 +46,20 @@ public class BusinessLabelsControllerTests : IDisposable
 
         var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
         var dto = ok.Value.Should().BeOfType<BusinessLabelDto>().Subject;
-        dto.WeightCategory.Should().Be(BusinessLabelWeightCategory.Normal);
+        dto.WeightCategory.Should().Be("Normal");
         dto.RiskWeight.Should().Be(1.0m);
     }
 
     [Fact]
     public async Task Create_PersistsWeightCategory()
     {
-        var request = new SaveBusinessLabelRequest("Finance", null, null, true, BusinessLabelWeightCategory.Critical);
+        var request = new SaveBusinessLabelRequest("Finance", null, null, true, "Critical");
 
         var result = await _controller.Create(request, CancellationToken.None);
 
         var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
         var dto = ok.Value.Should().BeOfType<BusinessLabelDto>().Subject;
-        dto.WeightCategory.Should().Be(BusinessLabelWeightCategory.Critical);
+        dto.WeightCategory.Should().Be("Critical");
         dto.RiskWeight.Should().Be(2.0m);
 
         var saved = await _dbContext.BusinessLabels.SingleAsync();
@@ -78,7 +78,7 @@ public class BusinessLabelsControllerTests : IDisposable
         var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
         var dtos = ok.Value.Should().BeAssignableTo<IReadOnlyList<BusinessLabelDto>>().Subject;
         dtos.Should().ContainSingle();
-        dtos[0].WeightCategory.Should().Be(BusinessLabelWeightCategory.Sensitive);
+        dtos[0].WeightCategory.Should().Be("Sensitive");
         dtos[0].RiskWeight.Should().Be(1.5m);
     }
 
@@ -89,12 +89,12 @@ public class BusinessLabelsControllerTests : IDisposable
         await _dbContext.BusinessLabels.AddAsync(label);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SaveBusinessLabelRequest("Shared", null, null, true, BusinessLabelWeightCategory.Informational);
+        var request = new SaveBusinessLabelRequest("Shared", null, null, true, "Informational");
         var result = await _controller.Update(label.Id, request, CancellationToken.None);
 
         var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
         var dto = ok.Value.Should().BeOfType<BusinessLabelDto>().Subject;
-        dto.WeightCategory.Should().Be(BusinessLabelWeightCategory.Informational);
+        dto.WeightCategory.Should().Be("Informational");
         dto.RiskWeight.Should().Be(0.5m);
     }
 
@@ -103,7 +103,7 @@ public class BusinessLabelsControllerTests : IDisposable
     [Fact]
     public async Task Create_RejectsInvalidWeightCategory()
     {
-        var request = new SaveBusinessLabelRequest("Bad", null, null, true, (BusinessLabelWeightCategory)999);
+        var request = new SaveBusinessLabelRequest("Bad", null, null, true, "NotARealCategory");
 
         var result = await _controller.Create(request, CancellationToken.None);
 
@@ -117,10 +117,22 @@ public class BusinessLabelsControllerTests : IDisposable
         await _dbContext.BusinessLabels.AddAsync(label);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SaveBusinessLabelRequest("Existing", null, null, true, (BusinessLabelWeightCategory)999);
+        var request = new SaveBusinessLabelRequest("Existing", null, null, true, "NotARealCategory");
         var result = await _controller.Update(label.Id, request, CancellationToken.None);
 
         result.Result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Create_DefaultsToNormalWhenWeightCategoryIsNull()
+    {
+        var request = new SaveBusinessLabelRequest("OmittedCategory", null, null, true, null);
+
+        var result = await _controller.Create(request, CancellationToken.None);
+
+        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var dto = ok.Value.Should().BeOfType<BusinessLabelDto>().Subject;
+        dto.WeightCategory.Should().Be("Normal");
     }
 
     // ── RiskWeight derivation ───────────────────────────────────────────────────

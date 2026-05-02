@@ -59,7 +59,7 @@ public class DeviceDetailQueryService
 
         var businessLabelRows = await _dbContext.DeviceBusinessLabels
             .AsNoTracking()
-            .Where(link => link.DeviceId == deviceId)
+            .Where(link => link.TenantId == tenantId && link.DeviceId == deviceId)
             .OrderBy(link => link.BusinessLabel.Name)
             .Select(link => new
             {
@@ -79,7 +79,7 @@ public class DeviceDetailQueryService
                 label.Name,
                 label.Description,
                 label.Color,
-                label.WeightCategory,
+                label.WeightCategory.ToString(),
                 BusinessLabel.CategoryWeights[label.WeightCategory]
             ))
             .ToList();

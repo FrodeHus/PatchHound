@@ -48,7 +48,7 @@ public class BusinessLabelsController(
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(new ProblemDetails { Title = "Name is required." });
 
-        if (!Enum.IsDefined(typeof(BusinessLabelWeightCategory), request.WeightCategory))
+        if (!TryParseWeightCategory(request.WeightCategory, out var weightCategory))
             return BadRequest(new ProblemDetails { Title = "Invalid weight category." });
 
         var exists = await dbContext.BusinessLabels.AnyAsync(
@@ -58,10 +58,10 @@ public class BusinessLabelsController(
         if (exists)
             return BadRequest(new ProblemDetails { Title = "A business label with that name already exists." });
 
-        var label = BusinessLabel.Create(tenantId, request.Name, request.Description, request.Color, request.WeightCategory);
+        var label = BusinessLabel.Create(tenantId, request.Name, request.Description, request.Color, weightCategory);
         if (!request.IsActive)
         {
-            label.Update(label.Name, label.Description, label.Color, false, request.WeightCategory);
+            label.Update(label.Name, label.Description, label.Color, false, weightCategory);
         }
 
         await dbContext.BusinessLabels.AddAsync(label, ct);
@@ -86,7 +86,7 @@ public class BusinessLabelsController(
         if (label is null)
             return NotFound(new ProblemDetails { Title = "Business label not found." });
 
-        if (!Enum.IsDefined(typeof(BusinessLabelWeightCategory), request.WeightCategory))
+        if (!TryParseWeightCategory(request.WeightCategory, out var weightCategory))
             return BadRequest(new ProblemDetails { Title = "Invalid weight category." });
 
         var normalizedName = request.Name.Trim();
@@ -97,7 +97,7 @@ public class BusinessLabelsController(
         if (nameInUse)
             return BadRequest(new ProblemDetails { Title = "A business label with that name already exists." });
 
-        label.Update(request.Name, request.Description, request.Color, request.IsActive, request.WeightCategory);
+        label.Update(request.Name, request.Description, request.Color, request.IsActive, weightCategory);
         await dbContext.SaveChangesAsync(ct);
 
         return Ok(ToDto(label));
@@ -127,9 +127,20 @@ public class BusinessLabelsController(
             item.Description,
             item.Color,
             item.IsActive,
-            item.WeightCategory,
+            item.WeightCategory.ToString(),
             item.RiskWeight,
             item.CreatedAt,
             item.UpdatedAt
         );
+
+    private static bool TryParseWeightCategory(string? value, out BusinessLabelWeightCategory category)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            category = BusinessLabelWeightCategory.Normal;
+            return true;
+        }
+        return Enum.TryParse(value, ignoreCase: false, out category)
+            && Enum.IsDefined(typeof(BusinessLabelWeightCategory), category);
+    }
 }

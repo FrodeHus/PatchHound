@@ -1,5 +1,3 @@
-using PatchHound.Core.Enums;
-
 namespace PatchHound.Api.Models.Assets;
 
 public record BusinessLabelDto(
@@ -8,7 +6,7 @@ public record BusinessLabelDto(
     string? Description,
     string? Color,
     bool IsActive,
-    BusinessLabelWeightCategory WeightCategory,
+    string WeightCategory,
     decimal RiskWeight,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt
@@ -19,5 +17,5 @@ public record SaveBusinessLabelRequest(
     string? Description,
     string? Color,
     bool IsActive = true,
-    BusinessLabelWeightCategory WeightCategory = BusinessLabelWeightCategory.Normal
+    string? WeightCategory = null
 );
