@@ -320,6 +320,26 @@ public class RemediationDecisionQueryService(
                 }
             }
 
+            if (filter.NeedsRemediationDecision == true)
+            {
+                if (!activeWorkflowsByCase.TryGetValue(rc.Id, out var activeWorkflow)
+                    || activeWorkflow.CurrentStage != RemediationWorkflowStage.RemediationDecision
+                    || decision is not null)
+                {
+                    continue;
+                }
+            }
+
+            if (filter.NeedsApproval == true)
+            {
+                if (!activeWorkflowsByCase.TryGetValue(rc.Id, out var activeWorkflow)
+                    || activeWorkflow.CurrentStage != RemediationWorkflowStage.Approval
+                    || decision?.ApprovalStatus != DecisionApprovalStatus.PendingApproval)
+                {
+                    continue;
+                }
+            }
+
             string? riskBand = null;
             double? riskScore = null;
             if (riskScoresByCaseId.TryGetValue(rc.Id, out var risk))

@@ -281,6 +281,110 @@ public class RemediationDecisionListTests : IDisposable
         item.WorkflowStage.Should().Be(nameof(RemediationWorkflowStage.SecurityAnalysis));
     }
 
+    [Fact]
+    public async Task ListAsync_WhenNeedsRemediationDecision_ReturnsRemediationDecisionStageCasesWithoutDecision()
+    {
+        // Case at RemediationDecision stage with no decision → matches.
+        var pendingProduct = SoftwareProduct.Create("Contoso", "Awaiting Decision", null);
+        var pendingCase = RemediationCase.Create(_tenantId, pendingProduct.Id);
+        var pendingWorkflow = RemediationWorkflow.Create(_tenantId, pendingCase.Id, Guid.NewGuid());
+        pendingWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+
+        // Case at RemediationDecision stage WITH a decision → excluded.
+        var decidedProduct = SoftwareProduct.Create("Contoso", "Already Decided", null);
+        var decidedCase = RemediationCase.Create(_tenantId, decidedProduct.Id);
+        var decidedWorkflow = RemediationWorkflow.Create(_tenantId, decidedCase.Id, Guid.NewGuid());
+        decidedWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+        var decidedDecision = RemediationDecision.Create(
+            _tenantId,
+            decidedCase.Id,
+            RemediationOutcome.RiskAcceptance,
+            "Accepted",
+            _userId
+        );
+
+        // Case at SecurityAnalysis stage → excluded (wrong stage).
+        var earlyProduct = SoftwareProduct.Create("Contoso", "Still Analyzing", null);
+        var earlyCase = RemediationCase.Create(_tenantId, earlyProduct.Id);
+        var earlyWorkflow = RemediationWorkflow.Create(_tenantId, earlyCase.Id, Guid.NewGuid());
+
+        await _dbContext.AddRangeAsync(
+            pendingProduct, pendingCase, pendingWorkflow,
+            decidedProduct, decidedCase, decidedWorkflow, decidedDecision,
+            earlyProduct, earlyCase, earlyWorkflow
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.ListAsync(
+            _tenantId,
+            new PatchHound.Api.Models.Decisions.RemediationDecisionFilterQuery(NeedsRemediationDecision: true),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var item = result.Items.Should().ContainSingle().Subject;
+        item.RemediationCaseId.Should().Be(pendingCase.Id);
+        item.WorkflowStage.Should().Be(nameof(RemediationWorkflowStage.RemediationDecision));
+    }
+
+    [Fact]
+    public async Task ListAsync_WhenNeedsApproval_ReturnsApprovalStageCasesWithPendingApproval()
+    {
+        // Case at Approval stage with PendingApproval decision → matches.
+        var pendingApprovalProduct = SoftwareProduct.Create("Contoso", "Awaiting Approval", null);
+        var pendingApprovalCase = RemediationCase.Create(_tenantId, pendingApprovalProduct.Id);
+        var pendingApprovalWorkflow = RemediationWorkflow.Create(_tenantId, pendingApprovalCase.Id, Guid.NewGuid());
+        pendingApprovalWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+        pendingApprovalWorkflow.MoveToStage(RemediationWorkflowStage.Approval);
+        var pendingApprovalDecision = RemediationDecision.Create(
+            _tenantId,
+            pendingApprovalCase.Id,
+            RemediationOutcome.ApprovedForPatching,
+            "Patch ready",
+            _userId,
+            initialApprovalStatus: DecisionApprovalStatus.PendingApproval
+        );
+
+        // Case at Approval stage with already-approved decision → excluded.
+        var approvedProduct = SoftwareProduct.Create("Contoso", "Already Approved", null);
+        var approvedCase = RemediationCase.Create(_tenantId, approvedProduct.Id);
+        var approvedWorkflow = RemediationWorkflow.Create(_tenantId, approvedCase.Id, Guid.NewGuid());
+        approvedWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+        approvedWorkflow.MoveToStage(RemediationWorkflowStage.Approval);
+        var approvedDecision = RemediationDecision.Create(
+            _tenantId,
+            approvedCase.Id,
+            RemediationOutcome.ApprovedForPatching,
+            "Approved",
+            _userId,
+            initialApprovalStatus: DecisionApprovalStatus.Approved
+        );
+
+        // Case at RemediationDecision stage → excluded (wrong stage).
+        var decisionProduct = SoftwareProduct.Create("Contoso", "Still Deciding", null);
+        var decisionCase = RemediationCase.Create(_tenantId, decisionProduct.Id);
+        var decisionWorkflow = RemediationWorkflow.Create(_tenantId, decisionCase.Id, Guid.NewGuid());
+        decisionWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+
+        await _dbContext.AddRangeAsync(
+            pendingApprovalProduct, pendingApprovalCase, pendingApprovalWorkflow, pendingApprovalDecision,
+            approvedProduct, approvedCase, approvedWorkflow, approvedDecision,
+            decisionProduct, decisionCase, decisionWorkflow
+        );
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.ListAsync(
+            _tenantId,
+            new PatchHound.Api.Models.Decisions.RemediationDecisionFilterQuery(NeedsApproval: true),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var item = result.Items.Should().ContainSingle().Subject;
+        item.RemediationCaseId.Should().Be(pendingApprovalCase.Id);
+        item.WorkflowStage.Should().Be(nameof(RemediationWorkflowStage.Approval));
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();
