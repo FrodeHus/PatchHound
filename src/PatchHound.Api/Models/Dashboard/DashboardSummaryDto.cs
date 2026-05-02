@@ -22,7 +22,8 @@ public record DashboardSummaryDto(
     MetricSparklinesDto? MetricSparklines = null,
     List<VulnerabilityAgeBucketDto>? VulnerabilityAgeBuckets = null,
     List<MttrBySeverityDto>? MttrBySeverity = null,
-    ExecutiveExposureSummaryDto? ExecutiveExposure = null
+    ExecutiveExposureSummaryDto? ExecutiveExposure = null,
+    ExecutiveAccountabilitySummaryDto? Accountability = null
 );
 
 public record ExecutiveExposureSummaryDto(
@@ -36,6 +37,41 @@ public record ExecutiveExposureSummaryDto(
     int HighAssetCount,
     string? TopDriver,
     string? TopDriverDetail
+);
+
+public record ExecutiveAccountabilitySummaryDto(
+    int UnownedAssetCount,
+    int UnownedSoftwareCount,
+    int DefaultRoutedAssetCount,
+    int DefaultRoutedSoftwareCount,
+    int AwaitingDecisionCount,
+    int OverdueApprovalCount,
+    int OverduePatchingTaskCount,
+    int AcceptedRiskCount,
+    List<ExecutiveAccountabilityRowDto> TopOwners
+);
+
+public record ExecutiveAccountabilityRowDto(
+    Guid? TeamId,
+    string OwnerName,
+    string OwnerAssignmentSource,
+    decimal RiskScore,
+    int CriticalOpenExposureCount,
+    int HighOpenExposureCount,
+    int AssetCount,
+    int OpenEpisodeCount,
+    int OverduePatchingTaskCount,
+    int OverdueApprovalCount,
+    int AwaitingDecisionCount,
+    int AcceptedRiskCount,
+    int ManualOwnedAssetCount,
+    int RuleOwnedAssetCount,
+    int DefaultRoutedAssetCount,
+    int ManualOwnedSoftwareCount,
+    int RuleOwnedSoftwareCount,
+    int DefaultRoutedSoftwareCount,
+    int UnownedAssetCount,
+    int UnownedSoftwareCount
 );
 
 public record TopVulnerabilityDto(

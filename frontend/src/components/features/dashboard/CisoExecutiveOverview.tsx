@@ -354,6 +354,21 @@ function ExecutiveSignalCard({
   )
 }
 
+function sourceTone(source: string) {
+  switch (source) {
+    case 'Rule':
+      return 'border-chart-3/30 text-chart-3'
+    case 'Manual':
+      return 'border-primary/30 text-primary'
+    case 'Default':
+      return 'border-tone-warning-border text-tone-warning-foreground'
+    case 'Unowned':
+      return 'border-destructive/35 text-destructive'
+    default:
+      return 'border-border text-muted-foreground'
+  }
+}
+
 export function CisoExecutiveOverview({
   summary,
   trends,
@@ -383,6 +398,12 @@ export function CisoExecutiveOverview({
     : movementIsImproving
       ? 'contained'
       : 'contained'
+  const accountability = summary.accountability
+  const accountabilityOpenWork = (accountability?.awaitingDecisionCount ?? 0)
+    + (accountability?.overdueApprovalCount ?? 0)
+    + (accountability?.overduePatchingTaskCount ?? 0)
+  const unownedCount = (accountability?.unownedAssetCount ?? 0) + (accountability?.unownedSoftwareCount ?? 0)
+  const defaultRoutedCount = (accountability?.defaultRoutedAssetCount ?? 0) + (accountability?.defaultRoutedSoftwareCount ?? 0)
 
   return (
     <section className="space-y-6 pb-4">
@@ -538,6 +559,66 @@ export function CisoExecutiveOverview({
           icon={Trophy}
         />
       </div>
+
+      {accountability ? (
+        <Card className="rounded-[1.6rem] border-border/70">
+          <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle>Ownership Accountability</CardTitle>
+                <CardDescription>
+                  Owner-level risk, unanswered workflow decisions, and routing gaps.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-xs', unownedCount > 0 && 'border-destructive/35 text-destructive')}>
+                  {unownedCount} unowned
+                </Badge>
+                <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-xs', defaultRoutedCount > 0 && 'border-tone-warning-border text-tone-warning-foreground')}>
+                  {defaultRoutedCount} default-routed
+                </Badge>
+                <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-xs', accountabilityOpenWork > 0 && 'border-primary/35 text-primary')}>
+                  {accountabilityOpenWork} blocked
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {accountability.topOwners.slice(0, 5).map((owner) => {
+              const urgentWork = owner.overduePatchingTaskCount + owner.overdueApprovalCount + owner.awaitingDecisionCount
+              const routedCount = owner.manualOwnedAssetCount + owner.ruleOwnedAssetCount + owner.defaultRoutedAssetCount
+                + owner.manualOwnedSoftwareCount + owner.ruleOwnedSoftwareCount + owner.defaultRoutedSoftwareCount
+              return (
+                <div key={owner.teamId ?? owner.ownerName} className="rounded-[1.2rem] border border-border/60 bg-background/40 px-4 py-3">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="font-medium tracking-tight">{owner.ownerName}</div>
+                        <Badge variant="outline" className={cn('rounded-full px-2 py-0.5 text-[11px]', sourceTone(owner.ownerAssignmentSource))}>
+                          {owner.ownerAssignmentSource}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        {owner.criticalOpenExposureCount} critical, {owner.highOpenExposureCount} high, {urgentWork} decision or overdue items.
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="text-2xl font-semibold tracking-[-0.05em]">{Math.round(owner.riskScore)}</div>
+                      <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">owner risk</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-4">
+                    <div>{owner.assetCount || owner.unownedAssetCount} assets</div>
+                    <div>{routedCount || owner.unownedSoftwareCount} routed items</div>
+                    <div>{owner.acceptedRiskCount} accepted risk</div>
+                    <div>{owner.openEpisodeCount} open episodes</div>
+                  </div>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,1fr)]">
         <Card className="rounded-[1.6rem] border-border/70">
