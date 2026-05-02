@@ -112,6 +112,6 @@ describe('Device exposures section', () => {
     )
 
     fireEvent.click(screen.getByRole('tab', { name: 'Exposures' }))
-    expect(screen.getByText('No exposures observed for this device.')).toBeInTheDocument()
+    expect(screen.getByText('No open exposures on this device.')).toBeInTheDocument()
   })
 })
