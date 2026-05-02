@@ -91,7 +91,10 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
           priorityOverride: priorityOverride || undefined,
         },
       })
-      await queryClient.invalidateQueries({ queryKey })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey }),
+        queryClient.invalidateQueries({ queryKey: ['my-tasks'] }),
+      ])
     } catch (err) {
       setError(getApiErrorMessage(err, 'Unable to save the analyst recommendation.'))
     } finally {

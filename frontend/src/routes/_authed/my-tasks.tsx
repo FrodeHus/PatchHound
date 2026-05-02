@@ -65,10 +65,6 @@ function MyTasksRoute() {
     return data ? [{ bucket, data }] : []
   })
 
-  if (sections.length === 0) {
-    return null
-  }
-
   return (
     <MyTasksPage
       sections={sections}

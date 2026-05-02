@@ -572,7 +572,11 @@ public class RemediationDecisionQueryService(
                 g.First().Vulnerability.CvssVector,
                 FirstSeenAt = g.Min(e => e.FirstObservedAt),
                 AffectedDeviceCount = g.Select(e => e.DeviceId).Distinct().Count(),
-                AffectedVersionCount = g.Select(e => e.MatchedVersion).Distinct().Count(),
+                AffectedVersionCount = g
+                    .Select(e => e.MatchedVersion == null ? null : e.MatchedVersion.Trim().ToLower())
+                    .Where(v => !string.IsNullOrEmpty(v))
+                    .Distinct()
+                    .Count(),
             })
             .ToListAsync(ct);
 
