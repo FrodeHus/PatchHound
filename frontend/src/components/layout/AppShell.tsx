@@ -72,7 +72,7 @@ export function AppShell({ user, children }: AppShellProps) {
   return (
     <TenantScopeProvider user={user}>
       <TenantGuard>
-      <div className="min-h-screen bg-background text-foreground">
+      <div className={`min-h-screen text-foreground${glassTheme ? "" : " bg-background"}`}>
         {glassTheme && <AuroraBackground />}
         <div className="flex min-h-screen relative z-10">
           {glassTheme ? (

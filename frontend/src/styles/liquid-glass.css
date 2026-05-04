@@ -6,83 +6,83 @@
 [data-theme="liquid-glass"] {
     --radius: 1.25rem;
 
-    /* Surface */
-    --background: oklch(0.97 0.008 240);
-    --foreground: oklch(0.18 0.025 255);
-    --card: oklch(0.99 0.003 240 / 62%);
-    --card-foreground: oklch(0.18 0.025 255);
-    --popover: oklch(0.98 0.004 240 / 88%);
-    --popover-foreground: oklch(0.18 0.025 255);
+    /* Surface — slightly tinted white; body provides the opaque base */
+    --background: oklch(0.97 0.01 270);
+    --foreground: oklch(0.15 0.03 260);
+    --card: oklch(1 0 0 / 60%);
+    --card-foreground: oklch(0.15 0.03 260);
+    --popover: oklch(0.99 0.003 260 / 90%);
+    --popover-foreground: oklch(0.15 0.03 260);
 
-    /* Primary — violet */
-    --primary: oklch(0.58 0.2 275);
-    --primary-foreground: oklch(0.99 0.003 240);
+    /* Primary — vivid violet */
+    --primary: oklch(0.55 0.24 275);
+    --primary-foreground: oklch(0.99 0.003 260);
 
     /* Secondary */
-    --secondary: oklch(0.92 0.02 255 / 70%);
-    --secondary-foreground: oklch(0.22 0.02 255);
+    --secondary: oklch(0.92 0.025 270 / 72%);
+    --secondary-foreground: oklch(0.2 0.03 260);
 
     /* Muted */
-    --muted: oklch(0.93 0.015 245 / 60%);
-    --muted-foreground: oklch(0.5 0.02 255);
+    --muted: oklch(0.93 0.018 265 / 65%);
+    --muted-foreground: oklch(0.46 0.03 260);
 
-    /* Accent — sky */
-    --accent: oklch(0.88 0.06 215 / 55%);
-    --accent-foreground: oklch(0.22 0.025 255);
+    /* Accent — sky blue */
+    --accent: oklch(0.87 0.08 215 / 58%);
+    --accent-foreground: oklch(0.2 0.03 260);
 
-    --destructive: oklch(0.64 0.2 25);
-    --border: oklch(0.78 0.02 255 / 55%);
-    --input: oklch(0.97 0.006 240 / 75%);
-    --ring: oklch(0.62 0.16 275 / 65%);
+    --destructive: oklch(0.62 0.22 25);
+    --border: oklch(0.7 0.04 265 / 40%);
+    --input: oklch(0.98 0.006 260 / 78%);
+    --ring: oklch(0.58 0.22 275 / 65%);
 
-    /* Charts */
-    --chart-1: oklch(0.58 0.2 275);
-    --chart-2: oklch(0.62 0.18 212);
-    --chart-3: oklch(0.6 0.17 155);
-    --chart-4: oklch(0.7 0.17 35);
-    --chart-5: oklch(0.64 0.18 340);
+    /* Charts — saturated so they pop on the frosted surface */
+    --chart-1: oklch(0.55 0.24 275);
+    --chart-2: oklch(0.58 0.22 210);
+    --chart-3: oklch(0.56 0.2 155);
+    --chart-4: oklch(0.66 0.2 35);
+    --chart-5: oklch(0.6 0.22 335);
 
     /* Sidebar */
-    --sidebar: oklch(0.96 0.01 240 / 55%);
-    --sidebar-foreground: oklch(0.2 0.025 255);
-    --sidebar-primary: oklch(0.58 0.2 275);
-    --sidebar-primary-foreground: oklch(0.99 0.003 240);
-    --sidebar-accent: oklch(0.9 0.03 255 / 55%);
-    --sidebar-accent-foreground: oklch(0.22 0.025 255);
-    --sidebar-border: oklch(0.75 0.02 255 / 45%);
-    --sidebar-ring: oklch(0.62 0.16 275 / 65%);
+    --sidebar: oklch(0.96 0.012 268 / 58%);
+    --sidebar-foreground: oklch(0.17 0.03 260);
+    --sidebar-primary: oklch(0.55 0.24 275);
+    --sidebar-primary-foreground: oklch(0.99 0.003 260);
+    --sidebar-accent: oklch(0.9 0.04 265 / 58%);
+    --sidebar-accent-foreground: oklch(0.2 0.03 260);
+    --sidebar-border: oklch(0.68 0.04 265 / 35%);
+    --sidebar-ring: oklch(0.58 0.22 275 / 65%);
 
     /* Tone tokens */
-    --tone-danger: oklch(0.96 0.04 25 / 70%);
-    --tone-danger-foreground: oklch(0.45 0.16 25);
-    --tone-danger-border: oklch(0.82 0.06 25 / 55%);
-    --tone-warning: oklch(0.96 0.04 85 / 70%);
-    --tone-warning-foreground: oklch(0.44 0.13 85);
-    --tone-warning-border: oklch(0.84 0.06 85 / 55%);
-    --tone-success: oklch(0.96 0.04 155 / 70%);
-    --tone-success-foreground: oklch(0.42 0.13 155);
-    --tone-success-border: oklch(0.82 0.05 155 / 55%);
-    --tone-info: oklch(0.95 0.04 230 / 70%);
-    --tone-info-foreground: oklch(0.42 0.11 230);
-    --tone-info-border: oklch(0.82 0.05 230 / 55%);
+    --tone-danger: oklch(0.95 0.05 25 / 72%);
+    --tone-danger-foreground: oklch(0.4 0.18 25);
+    --tone-danger-border: oklch(0.78 0.08 25 / 55%);
+    --tone-warning: oklch(0.95 0.05 80 / 72%);
+    --tone-warning-foreground: oklch(0.4 0.14 80);
+    --tone-warning-border: oklch(0.8 0.07 80 / 55%);
+    --tone-success: oklch(0.95 0.05 150 / 72%);
+    --tone-success-foreground: oklch(0.38 0.14 150);
+    --tone-success-border: oklch(0.78 0.06 150 / 55%);
+    --tone-info: oklch(0.94 0.05 230 / 72%);
+    --tone-info-foreground: oklch(0.38 0.12 230);
+    --tone-info-border: oklch(0.78 0.06 230 / 55%);
     --tone-neutral: var(--card);
     --tone-neutral-foreground: var(--foreground);
     --tone-neutral-border: var(--border);
 
     /* Glass-specific tokens */
-    --glass-bg: oklch(0.99 0.003 240 / 55%);
-    --glass-bg-strong: oklch(0.97 0.005 240 / 75%);
-    --glass-bg-soft: oklch(0.99 0.002 240 / 35%);
-    --glass-border: oklch(0.72 0.018 255 / 50%);
-    --glass-border-strong: oklch(0.6 0.02 255 / 65%);
-    --glass-shadow: 0 4px 24px oklch(0.18 0.06 255 / 10%), 0 1px 4px oklch(0.18 0.06 255 / 8%), inset 0 1px 0 oklch(1 0 0 / 55%);
-    --glass-shadow-lg: 0 8px 40px oklch(0.18 0.06 255 / 14%), 0 2px 8px oklch(0.18 0.06 255 / 10%), inset 0 1px 0 oklch(1 0 0 / 60%);
+    --glass-bg: oklch(1 0 0 / 52%);
+    --glass-bg-strong: oklch(0.99 0.004 260 / 72%);
+    --glass-bg-soft: oklch(1 0 0 / 32%);
+    --glass-border: oklch(0.65 0.05 265 / 38%);
+    --glass-border-strong: oklch(0.55 0.06 265 / 55%);
+    --glass-shadow: 0 4px 24px oklch(0.15 0.08 265 / 12%), 0 1px 4px oklch(0.15 0.08 265 / 8%), inset 0 1px 0 oklch(1 0 0 / 70%);
+    --glass-shadow-lg: 0 8px 40px oklch(0.15 0.08 265 / 18%), 0 2px 8px oklch(0.15 0.08 265 / 12%), inset 0 1px 0 oklch(1 0 0 / 75%);
 
-    /* Aurora colors */
-    --aurora-1: oklch(0.72 0.22 285 / 28%);
-    --aurora-2: oklch(0.74 0.2 220 / 22%);
-    --aurora-3: oklch(0.76 0.18 155 / 18%);
-    --aurora-4: oklch(0.78 0.2 335 / 20%);
+    /* Aurora colors — punchy so they show through white glass */
+    --aurora-1: oklch(0.68 0.28 285 / 55%);
+    --aurora-2: oklch(0.7 0.24 215 / 45%);
+    --aurora-3: oklch(0.72 0.22 150 / 38%);
+    --aurora-4: oklch(0.74 0.26 335 / 48%);
 }
 
 /* ---------- Dark variant ---------- */
@@ -161,27 +161,33 @@
     --glass-shadow: 0 4px 24px oklch(0 0 0 / 36%), 0 1px 4px oklch(0 0 0 / 28%), inset 0 1px 0 oklch(1 0 0 / 8%);
     --glass-shadow-lg: 0 8px 40px oklch(0 0 0 / 44%), 0 2px 8px oklch(0 0 0 / 32%), inset 0 1px 0 oklch(1 0 0 / 10%);
 
-    /* Aurora colors */
-    --aurora-1: oklch(0.62 0.24 285 / 32%);
-    --aurora-2: oklch(0.65 0.22 215 / 26%);
-    --aurora-3: oklch(0.6 0.2 155 / 22%);
-    --aurora-4: oklch(0.66 0.22 330 / 24%);
+    /* Aurora colors — higher alpha since dark base absorbs them */
+    --aurora-1: oklch(0.62 0.26 285 / 52%);
+    --aurora-2: oklch(0.65 0.24 215 / 42%);
+    --aurora-3: oklch(0.6 0.22 155 / 36%);
+    --aurora-4: oklch(0.66 0.24 330 / 44%);
 }
 
 /* =========================================================
-   Kill the radial-gradient body background for glass themes
-   so the aurora layer shows through cleanly.
+   Body provides the opaque base for glass themes.
+   The AppShell wrapper has no background, so the aurora
+   (position: fixed, z-index: -10) shows through directly.
    ========================================================= */
-[data-theme="liquid-glass"] body,
+[data-theme="liquid-glass"] body {
+    background-image: none;
+    background-color: var(--background);
+}
+
 [data-theme="liquid-glass-dark"] body {
     background-image: none;
+    background-color: var(--background);
 }
 
 /* =========================================================
    Aurora background layer
    ========================================================= */
 .aurora-stage {
-    background: var(--background);
+    /* No background — the body color shows behind the blobs */
     will-change: transform;
 }
 
