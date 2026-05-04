@@ -93,7 +93,7 @@ export function TopNav({
   return (
     <header
       className={[
-        "sticky top-0 z-20 border-b transition-all duration-200",
+        "glass sticky top-0 z-20 border-b transition-all duration-200 !rounded-none",
         isScrolled
           ? "border-border/50 shadow-[0_1px_12px_rgba(0,0,0,0.12)]"
           : "border-transparent",

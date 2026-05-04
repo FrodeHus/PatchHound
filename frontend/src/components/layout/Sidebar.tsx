@@ -214,7 +214,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-hidden border-r border-sidebar-border/80 bg-sidebar/88 text-sidebar-foreground shadow-[inset_-1px_0_0_color-mix(in_oklab,var(--sidebar-border)_72%,transparent)] backdrop-blur-xl transition-[width] duration-200",
+        "glass flex h-full min-h-0 flex-col overflow-hidden border-r border-sidebar-border/80 bg-sidebar/88 text-sidebar-foreground shadow-[inset_-1px_0_0_color-mix(in_oklab,var(--sidebar-border)_72%,transparent)] backdrop-blur-xl transition-[width] duration-200 !rounded-none",
         compact ? "w-full" : collapsed ? "w-[4.5rem]" : "w-80",
       )}
     >
@@ -316,7 +316,7 @@ export function Sidebar({
 
       <div className={cn("shrink-0 space-y-3 border-t border-sidebar-border/80 py-3", navPadding)}>
         {showLabels ? (
-          <div className="flex items-center gap-3 rounded-xl border border-sidebar-border/70 bg-card/28 p-3">
+          <div className="glass flex items-center gap-3 rounded-xl border border-sidebar-border/70 bg-card/28 p-3">
             <Avatar className="size-9">
               <AvatarFallback className="bg-primary/15 text-[11px] font-semibold text-primary">
                 {getInitials(user.displayName, user.email)}

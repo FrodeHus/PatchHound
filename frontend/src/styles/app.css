@@ -527,6 +527,142 @@
     }
 }
 
+/* ============================================================
+   Liquid Glass — variables and utilities (from glass-styles.css)
+   Adapted to integrate with the app's data-theme / .dark system
+   ============================================================ */
+
+/* Light-mode glass tokens (default for light themes) */
+[data-theme="light"],
+[data-theme="catppuccin-latte"] {
+  --glass-bg: rgba(255, 255, 255, 0.42);
+  --glass-bg-strong: rgba(255, 255, 255, 0.62);
+  --glass-bg-soft: rgba(255, 255, 255, 0.22);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-border-strong: rgba(255, 255, 255, 0.85);
+  --glass-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 0 0 0.5px rgba(255, 255, 255, 0.4) inset,
+    0 -10px 24px rgba(255, 255, 255, 0.12) inset,
+    0 18px 40px -8px rgba(20, 30, 80, 0.18),
+    0 6px 14px -6px rgba(20, 30, 80, 0.14);
+}
+
+/* Dark-mode glass tokens (.dark covers all dark data-theme values) */
+.dark {
+  --glass-bg: rgba(20, 22, 48, 0.42);
+  --glass-bg-strong: rgba(28, 30, 60, 0.6);
+  --glass-bg-soft: rgba(15, 17, 40, 0.28);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-border-strong: rgba(255, 255, 255, 0.28);
+  --glass-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 0 0 0.5px rgba(255, 255, 255, 0.10) inset,
+    0 -10px 30px rgba(140, 160, 255, 0.10) inset,
+    0 22px 50px -10px rgba(0, 0, 0, 0.55),
+    0 8px 20px -8px rgba(0, 0, 0, 0.45);
+}
+
+@keyframes ph-aurora-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(40px, -30px) scale(1.08); }
+  66%       { transform: translate(-30px, 25px) scale(0.95); }
+}
+
+@layer components {
+  /*
+   * .glass — main frosted glass surface.
+   * Mirrors the class from glass-styles.css, using the --glass-* tokens
+   * so all data-theme variants are supported automatically.
+   */
+  .glass {
+    position: relative;
+    background: var(--glass-bg);
+    border: 0.5px solid var(--glass-border);
+    border-radius: 22px;
+    box-shadow: var(--glass-shadow);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    backdrop-filter: blur(28px) saturate(180%);
+    isolation: isolate;
+  }
+
+  /* Refraction inner highlight ring */
+  .glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 0.5px;
+    background: linear-gradient(
+      140deg,
+      rgba(255, 255, 255, 0.85) 0%,
+      rgba(255, 255, 255, 0.15) 28%,
+      rgba(255, 255, 255, 0) 50%,
+      rgba(255, 255, 255, 0.10) 78%,
+      rgba(255, 255, 255, 0.55) 100%
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Specular sheen — caught light at top-left edge */
+  .glass::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      radial-gradient(120% 60% at 0% 0%, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 38%),
+      radial-gradient(80% 50% at 100% 100%, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 50%);
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.85;
+    mix-blend-mode: overlay;
+  }
+
+  .dark .glass::after {
+    background:
+      radial-gradient(120% 60% at 0% 0%, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 40%),
+      radial-gradient(80% 50% at 100% 100%, rgba(140, 160, 255, 0.10) 0%, rgba(255, 255, 255, 0) 50%);
+  }
+
+  .glass > * { position: relative; z-index: 3; }
+
+  /* .glass-chip — softer pill/chip variant */
+  .glass-chip {
+    background: var(--glass-bg-soft);
+    border: 0.5px solid var(--glass-border);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+    border-radius: 999px;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.5) inset,
+      0 4px 14px -4px rgba(20, 30, 80, 0.18);
+  }
+
+  /* Aurora floating blob */
+  .aurora-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0;
+    mix-blend-mode: screen;
+    animation: ph-aurora-float 22s ease-in-out infinite;
+    will-change: transform;
+    pointer-events: none;
+  }
+
+  /* Only visible on dark themes */
+  .dark .aurora-blob { opacity: 0.55; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aurora-blob { animation: none !important; }
+  }
+}
+
 .ph-markdown-editor {
     --accentBase: color-mix(in oklab, var(--primary) 10%, var(--card));
     --accentBgSubtle: color-mix(in oklab, var(--primary) 14%, var(--card));

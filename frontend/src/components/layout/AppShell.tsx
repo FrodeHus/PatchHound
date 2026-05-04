@@ -63,6 +63,13 @@ export function AppShell({ user, children }: AppShellProps) {
     <TenantScopeProvider user={user}>
       <TenantGuard>
       <div className="min-h-screen bg-background text-foreground">
+        {/* Aurora background — visible on dark themes via CSS, hidden on light */}
+        <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+          <div className="aurora-blob" style={{ width: 560, height: 560, left: '8%', top: '6%', background: 'oklch(0.45 0.22 260)', animationDelay: '0s' }} />
+          <div className="aurora-blob" style={{ width: 480, height: 480, right: '8%', top: '10%', background: 'oklch(0.38 0.2 295)', animationDelay: '-7s' }} />
+          <div className="aurora-blob" style={{ width: 620, height: 620, right: '14%', bottom: '-12%', background: 'oklch(0.48 0.18 205)', animationDelay: '-14s' }} />
+          <div className="aurora-blob" style={{ width: 400, height: 400, left: '16%', bottom: '4%', background: 'oklch(0.4 0.16 280)', animationDelay: '-3s' }} />
+        </div>
         <div className="flex min-h-screen">
           <div className="sticky top-0 hidden h-dvh md:block">
             <Sidebar
