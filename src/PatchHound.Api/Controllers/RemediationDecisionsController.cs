@@ -258,7 +258,8 @@ public class RemediationDecisionsController(
         RemediationDecisionDeadlineMode? deadlineMode = null;
         if (!string.IsNullOrWhiteSpace(request.DeadlineMode))
         {
-            if (!Enum.TryParse<RemediationDecisionDeadlineMode>(request.DeadlineMode, true, out var parsedDeadlineMode))
+            if (!Enum.TryParse<RemediationDecisionDeadlineMode>(request.DeadlineMode, true, out var parsedDeadlineMode)
+                || !IsSupportedDeadlineMode(parsedDeadlineMode))
                 return BadRequest(new ProblemDetails { Title = "Invalid deadline mode value." });
 
             deadlineMode = parsedDeadlineMode;
@@ -290,6 +291,9 @@ public class RemediationDecisionsController(
             []
         ));
     }
+
+    private static bool IsSupportedDeadlineMode(RemediationDecisionDeadlineMode deadlineMode) =>
+        deadlineMode is RemediationDecisionDeadlineMode.Forever or RemediationDecisionDeadlineMode.Date;
 
     [HttpPost("approval")]
     [Authorize(Policy = Policies.ResolveApprovalTask)]

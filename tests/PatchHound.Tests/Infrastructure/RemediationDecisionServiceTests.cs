@@ -80,6 +80,91 @@ public class RemediationDecisionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateDecisionForCaseAsync_RiskAcceptanceForeverModeAllowsOmittedExpiryDate()
+    {
+        var remediationCase = await SeedCaseAsync();
+
+        var result = await _service.CreateDecisionForCaseAsync(
+            _tenantId,
+            remediationCase.Id,
+            RemediationOutcome.RiskAcceptance,
+            "Risk accepted permanently.",
+            _userId,
+            expiryDate: null,
+            reEvaluationDate: null,
+            CancellationToken.None,
+            deadlineMode: RemediationDecisionDeadlineMode.Forever
+        );
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.ExpiryDate.Should().BeNull();
+        result.Value.ReEvaluationDate.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CreateDecisionForCaseAsync_RiskAcceptanceDateModeRequiresExpiryDate()
+    {
+        var remediationCase = await SeedCaseAsync();
+
+        var result = await _service.CreateDecisionForCaseAsync(
+            _tenantId,
+            remediationCase.Id,
+            RemediationOutcome.RiskAcceptance,
+            "Risk accepted until a specific date.",
+            _userId,
+            expiryDate: null,
+            reEvaluationDate: null,
+            CancellationToken.None,
+            deadlineMode: RemediationDecisionDeadlineMode.Date
+        );
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("expiry date");
+    }
+
+    [Fact]
+    public async Task CreateDecisionForCaseAsync_PatchingDeferredDateModeRequiresReviewDate()
+    {
+        var remediationCase = await SeedCaseAsync();
+
+        var result = await _service.CreateDecisionForCaseAsync(
+            _tenantId,
+            remediationCase.Id,
+            RemediationOutcome.PatchingDeferred,
+            "Defer until the next release window.",
+            _userId,
+            expiryDate: null,
+            reEvaluationDate: null,
+            CancellationToken.None,
+            deadlineMode: RemediationDecisionDeadlineMode.Date
+        );
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("review date");
+    }
+
+    [Fact]
+    public async Task CreateDecisionForCaseAsync_RejectsUndefinedDeadlineMode()
+    {
+        var remediationCase = await SeedCaseAsync();
+
+        var result = await _service.CreateDecisionForCaseAsync(
+            _tenantId,
+            remediationCase.Id,
+            RemediationOutcome.RiskAcceptance,
+            "Risk accepted with invalid deadline mode.",
+            _userId,
+            expiryDate: null,
+            reEvaluationDate: null,
+            CancellationToken.None,
+            deadlineMode: (RemediationDecisionDeadlineMode)999
+        );
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("deadline mode");
+    }
+
+    [Fact]
     public async Task CreateDecisionForCaseAsync_PatchingDeferredRoutesToSecurityApproval()
     {
         var remediationCase = await SeedCaseAsync();

@@ -162,8 +162,17 @@ describe('AssetOwnerWorkbench', () => {
 
     expect(screen.queryByText('CVE-2026-4242')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /Show vulnerabilities/i }))
+    const toggle = screen.getByRole('button', { name: /Show vulnerabilities/i })
+    const controlledRegionId = toggle.getAttribute('aria-controls')
 
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(controlledRegionId).toBeTruthy()
+    expect(document.getElementById(controlledRegionId!)).not.toBeInTheDocument()
+
+    fireEvent.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(document.getElementById(controlledRegionId!)).toBeInTheDocument()
     expect(screen.getByText('CVE-2026-4242')).toBeInTheDocument()
     expect(screen.getByText('Remote code execution')).toBeInTheDocument()
   })

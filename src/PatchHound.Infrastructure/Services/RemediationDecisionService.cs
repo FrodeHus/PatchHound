@@ -185,6 +185,9 @@ public class RemediationDecisionService(
         if (!deadlineMode.HasValue)
             return Result<bool>.Failure("Risk acceptance and patch deferral decisions require a deadline mode.");
 
+        if (deadlineMode.Value is not (RemediationDecisionDeadlineMode.Forever or RemediationDecisionDeadlineMode.Date))
+            return Result<bool>.Failure("Invalid deadline mode.");
+
         if (deadlineMode == RemediationDecisionDeadlineMode.Date)
         {
             if (outcome == RemediationOutcome.RiskAcceptance && !expiryDate.HasValue)

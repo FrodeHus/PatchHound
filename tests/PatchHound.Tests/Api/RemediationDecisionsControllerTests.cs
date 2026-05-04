@@ -4,10 +4,13 @@ using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using PatchHound.Api.Controllers;
 using PatchHound.Api.Models.ApprovalTasks;
+using PatchHound.Api.Models.Decisions;
+using PatchHound.Api.Services;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 using PatchHound.Tests.TestData;
 
 namespace PatchHound.Tests.Api;
@@ -25,6 +28,7 @@ public class RemediationDecisionsControllerTests : IDisposable
         _tenantContext.CurrentTenantId.Returns(_tenantId);
         _tenantContext.CurrentUserId.Returns(_userId);
         _tenantContext.AccessibleTenantIds.Returns([_tenantId]);
+        _tenantContext.GetRolesForTenant(_tenantId).Returns([RoleName.GlobalAdmin.ToString()]);
 
         var options = new DbContextOptionsBuilder<PatchHoundDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
@@ -81,18 +85,62 @@ public class RemediationDecisionsControllerTests : IDisposable
             && entry.Justification == "Approved for Saturday window");
     }
 
-    private RemediationDecisionsController CreateController() =>
+    [Fact]
+    public async Task CreateDecision_RejectsNumericDeadlineMode()
+    {
+        var caseId = await SeedActiveDecisionWorkflowAsync();
+        var controller = CreateController(
+            workflowAuthorizationService: new RemediationWorkflowAuthorizationService(_dbContext, _tenantContext)
+        );
+
+        var result = await controller.CreateDecision(
+            caseId,
+            new CreateDecisionRequest(
+                Outcome: RemediationOutcome.RiskAcceptance.ToString(),
+                Justification: "Risk accepted with invalid deadline mode.",
+                MaintenanceWindowDate: null,
+                ExpiryDate: null,
+                ReEvaluationDate: null,
+                DeadlineMode: "999"
+            ),
+            CancellationToken.None
+        );
+
+        var badRequest = result.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        var problem = badRequest.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Title.Should().Be("Invalid deadline mode value.");
+    }
+
+    private RemediationDecisionsController CreateController(
+        RemediationWorkflowAuthorizationService? workflowAuthorizationService = null
+    ) =>
         new(
             queryService: null!,
             decisionService: null!,
             approvalTaskService: null!,
             recommendationService: null!,
-            workflowAuthorizationService: null!,
+            workflowAuthorizationService: workflowAuthorizationService!,
             workflowService: null!,
             remediationAiJobService: null!,
             dbContext: _dbContext,
             tenantContext: _tenantContext
         );
+
+    private async Task<Guid> SeedActiveDecisionWorkflowAsync()
+    {
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var workflow = RemediationWorkflow.Create(
+            _tenantId,
+            remediationCase.Id,
+            Guid.NewGuid(),
+            RemediationWorkflowStage.RemediationDecision
+        );
+
+        await _dbContext.AddRangeAsync(product, remediationCase, workflow);
+        await _dbContext.SaveChangesAsync();
+        return remediationCase.Id;
+    }
 
     public void Dispose() => _dbContext.Dispose();
 }

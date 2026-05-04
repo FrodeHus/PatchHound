@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Bot, ChevronDown, ChevronUp, ExternalLink, SearchCheck, ShieldAlert, TriangleAlert } from 'lucide-react'
 import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
@@ -23,6 +23,7 @@ type AssetOwnerWorkbenchProps = {
 }
 
 export function AssetOwnerWorkbench({ data, caseId, queryKey }: AssetOwnerWorkbenchProps) {
+  const vulnerabilityDetailsId = useId()
   const [showVulnerabilities, setShowVulnerabilities] = useState(false)
   const recommendation = data.recommendations[0] ?? null
   const vulnerabilities = data.openVulnerabilities.length > 0 ? data.openVulnerabilities : data.topVulnerabilities
@@ -166,6 +167,8 @@ export function AssetOwnerWorkbench({ data, caseId, queryKey }: AssetOwnerWorkbe
           <Button
             type="button"
             variant="outline"
+            aria-controls={vulnerabilityDetailsId}
+            aria-expanded={showVulnerabilities}
             onClick={() => setShowVulnerabilities((value) => !value)}
           >
             {showVulnerabilities ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
@@ -173,7 +176,7 @@ export function AssetOwnerWorkbench({ data, caseId, queryKey }: AssetOwnerWorkbe
           </Button>
         </div>
         {showVulnerabilities ? (
-          <div className="overflow-x-auto border-t border-border/70">
+          <div id={vulnerabilityDetailsId} className="overflow-x-auto border-t border-border/70">
             <table className="min-w-[760px] divide-y divide-border/70 text-sm">
               <thead className="bg-muted/35 text-left text-xs uppercase tracking-[0.12em] text-muted-foreground">
                 <tr>
