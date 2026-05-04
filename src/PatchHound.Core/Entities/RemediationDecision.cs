@@ -30,6 +30,7 @@ public class RemediationDecision
     [
         RemediationOutcome.RiskAcceptance,
         RemediationOutcome.AlternateMitigation,
+        RemediationOutcome.PatchingDeferred,
     ];
 
     private static readonly RemediationOutcome[] OutcomesRequiringJustification =
@@ -59,9 +60,6 @@ public class RemediationDecision
 
         if (OutcomesRequiringJustification.Contains(outcome) && string.IsNullOrWhiteSpace(justification))
             throw new ArgumentException($"Justification is required for {outcome}.");
-
-        if (outcome == RemediationOutcome.PatchingDeferred && !reEvaluationDate.HasValue)
-            throw new ArgumentException("Re-evaluation date is required for PatchingDeferred.");
 
         var now = DateTimeOffset.UtcNow;
         var requiresApproval = initialApprovalStatus.HasValue

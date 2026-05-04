@@ -190,7 +190,8 @@ public record CreateDecisionRequest(
     string? Justification,
     DateTimeOffset? MaintenanceWindowDate,
     DateTimeOffset? ExpiryDate,
-    DateTimeOffset? ReEvaluationDate
+    DateTimeOffset? ReEvaluationDate,
+    string? DeadlineMode
 );
 
 public record CreateOverrideRequest(

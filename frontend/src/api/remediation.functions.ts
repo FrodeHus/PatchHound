@@ -38,6 +38,7 @@ export const createDecision = createServerFn({ method: 'POST' })
       maintenanceWindowDate: z.string().optional(),
       expiryDate: z.string().optional(),
       reEvaluationDate: z.string().optional(),
+      deadlineMode: z.enum(['forever', 'date']).optional(),
     })
   )
   .handler(async ({ context, data: { caseId, ...body } }) => {

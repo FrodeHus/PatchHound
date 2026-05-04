@@ -631,14 +631,12 @@ public class RemediationWorkflowService(PatchHoundDbContext dbContext)
     ) =>
         outcome switch
         {
-            RemediationOutcome.RiskAcceptance or RemediationOutcome.AlternateMitigation =>
+            RemediationOutcome.RiskAcceptance
+                or RemediationOutcome.AlternateMitigation
+                or RemediationOutcome.PatchingDeferred =>
                 RemediationWorkflowApprovalMode.SecurityApproval,
             RemediationOutcome.ApprovedForPatching =>
                 RemediationWorkflowApprovalMode.TechnicalApproval,
-            RemediationOutcome.PatchingDeferred when priority == RemediationWorkflowPriority.Emergency =>
-                RemediationWorkflowApprovalMode.TechnicalApproval,
-            RemediationOutcome.PatchingDeferred =>
-                RemediationWorkflowApprovalMode.TechnicalAutoApproved,
             _ => RemediationWorkflowApprovalMode.None,
         };
 

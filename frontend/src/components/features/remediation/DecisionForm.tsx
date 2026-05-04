@@ -66,8 +66,9 @@ export function DecisionForm({
   const [outcome, setOutcome] = useState(initialOutcome ?? '')
   const [justification, setJustification] = useState(initialJustification ?? '')
   const [expiryDate, setExpiryDate] = useState(toDateInputValue(initialExpiryDate))
-  const [expiryMode, setExpiryMode] = useState<'permanent' | 'expires'>('permanent')
+  const [expiryMode, setExpiryMode] = useState<'forever' | 'date'>('forever')
   const [reEvaluationDate, setReEvaluationDate] = useState(toDateInputValue(initialReEvaluationDate))
+  const [deferralMode, setDeferralMode] = useState<'forever' | 'date'>('forever')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -80,6 +81,8 @@ export function DecisionForm({
     setJustification(initialJustification ?? '')
     setExpiryDate(toDateInputValue(initialExpiryDate))
     setReEvaluationDate(toDateInputValue(initialReEvaluationDate))
+    setExpiryMode(initialExpiryDate ? 'date' : 'forever')
+    setDeferralMode(initialReEvaluationDate ? 'date' : 'forever')
   }, [initialOutcome, initialJustification, initialMaintenanceWindowDate, initialExpiryDate, initialReEvaluationDate])
 
   useEffect(() => {
@@ -91,26 +94,35 @@ export function DecisionForm({
     setJustification(decisionSeed.justification ?? initialJustification ?? '')
     setExpiryDate(toDateInputValue(decisionSeed.expiryDate ?? initialExpiryDate))
     setReEvaluationDate(toDateInputValue(decisionSeed.reEvaluationDate ?? initialReEvaluationDate))
-    setExpiryMode(decisionSeed.expiryDate || initialExpiryDate ? 'expires' : 'permanent')
+    setExpiryMode(decisionSeed.expiryDate || initialExpiryDate ? 'date' : 'forever')
+    setDeferralMode(decisionSeed.reEvaluationDate || initialReEvaluationDate ? 'date' : 'forever')
   }, [decisionSeed?.token, decisionSeed, initialExpiryDate, initialJustification, initialMaintenanceWindowDate, initialOutcome, initialReEvaluationDate])
 
   useEffect(() => {
     if (!needsExpiry) {
-      setExpiryMode('permanent')
+      setExpiryMode('forever')
       setExpiryDate('')
     }
   }, [needsExpiry])
 
   useEffect(() => {
     if (needsExpiry) {
-      setExpiryMode(initialExpiryDate ? 'expires' : 'permanent')
+      setExpiryMode(initialExpiryDate ? 'date' : 'forever')
     }
   }, [initialExpiryDate, needsExpiry])
+
+  useEffect(() => {
+    if (!needsReEvaluation) {
+      setDeferralMode('forever')
+      setReEvaluationDate('')
+    }
+  }, [needsReEvaluation])
 
   const canSubmit =
     outcome !== '' &&
     (!needsJustification || justification.trim().length > 0) &&
-    (!needsReEvaluation || reEvaluationDate !== '')
+    (!needsExpiry || expiryMode === 'forever' || expiryDate !== '') &&
+    (!needsReEvaluation || deferralMode === 'forever' || reEvaluationDate !== '')
 
   async function handleSubmit() {
     if (!canSubmit) return
@@ -123,16 +135,18 @@ export function DecisionForm({
           outcome,
           justification: justification || undefined,
           maintenanceWindowDate: undefined,
-          expiryDate: needsExpiry && expiryMode === 'expires' ? toIsoDateBoundary(expiryDate) : undefined,
-          reEvaluationDate: toIsoDateBoundary(reEvaluationDate),
+          expiryDate: needsExpiry && expiryMode === 'date' ? toIsoDateBoundary(expiryDate) : undefined,
+          reEvaluationDate: needsReEvaluation && deferralMode === 'date' ? toIsoDateBoundary(reEvaluationDate) : undefined,
+          deadlineMode: needsExpiry ? expiryMode : needsReEvaluation ? deferralMode : undefined,
         },
       })
       await queryClient.invalidateQueries({ queryKey })
       setOutcome('')
       setJustification('')
       setExpiryDate('')
-      setExpiryMode('permanent')
+      setExpiryMode('forever')
       setReEvaluationDate('')
+      setDeferralMode('forever')
     } catch (error) {
       setSubmitError(getApiErrorMessage(error, 'Unable to save the remediation decision.'))
     } finally {
@@ -183,27 +197,27 @@ export function DecisionForm({
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
-              variant={expiryMode === 'permanent' ? 'default' : 'outline'}
+              variant={expiryMode === 'forever' ? 'default' : 'outline'}
               size="sm"
               disabled={readOnly}
               onClick={() => {
-                setExpiryMode('permanent')
+                setExpiryMode('forever')
                 setExpiryDate('')
               }}
             >
-              Permanent or until cancelled
+              Forever / no fixed deadline
             </Button>
             <Button
               type="button"
-              variant={expiryMode === 'expires' ? 'default' : 'outline'}
+              variant={expiryMode === 'date' ? 'default' : 'outline'}
               size="sm"
               disabled={readOnly}
-              onClick={() => setExpiryMode('expires')}
+              onClick={() => setExpiryMode('date')}
             >
               Expires on date
             </Button>
           </div>
-          {expiryMode === 'expires' ? (
+          {expiryMode === 'date' ? (
             <Input
               type="date"
               value={expiryDate}
@@ -219,17 +233,40 @@ export function DecisionForm({
 
       {needsReEvaluation ? (
         <div className="space-y-2">
-          <label className="text-sm font-medium">
-            Deferral review date <span className="text-tone-danger-foreground">*</span>
-          </label>
-          <Input
-            type="date"
-            value={reEvaluationDate}
-            onChange={(e) => setReEvaluationDate(e.target.value)}
-            disabled={readOnly}
-          />
+          <label className="text-sm font-medium">Deferral review</label>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={deferralMode === 'forever' ? 'default' : 'outline'}
+              size="sm"
+              disabled={readOnly}
+              onClick={() => {
+                setDeferralMode('forever')
+                setReEvaluationDate('')
+              }}
+            >
+              Forever / no fixed deadline
+            </Button>
+            <Button
+              type="button"
+              variant={deferralMode === 'date' ? 'default' : 'outline'}
+              size="sm"
+              disabled={readOnly}
+              onClick={() => setDeferralMode('date')}
+            >
+              Review on date
+            </Button>
+          </div>
+          {deferralMode === 'date' ? (
+            <Input
+              type="date"
+              value={reEvaluationDate}
+              onChange={(e) => setReEvaluationDate(e.target.value)}
+              disabled={readOnly}
+            />
+          ) : null}
           <p className="text-xs text-muted-foreground">
-            When this deferred patch decision must be revisited.
+            Choose no fixed deadline or set the date this deferred patch decision must be revisited.
           </p>
         </div>
       ) : null}

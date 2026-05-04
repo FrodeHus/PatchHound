@@ -23,7 +23,7 @@ type IngestionRunProgressDto = {
   lastCheckpointCommittedAt: string | null
 }
 
-export const Route = createFileRoute('/api/ingestion-run-events' as never)({
+export const Route = createFileRoute('/api/ingestion-run-events')({
   server: {
     handlers: {
       GET: async ({ request }) => {
