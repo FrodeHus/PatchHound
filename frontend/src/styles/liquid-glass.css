@@ -3,7 +3,10 @@
    ========================================================= */
 
 /* ---------- Light variant ---------- */
-[data-theme="liquid-glass"] {
+/* :root[data-theme=...] has specificity (0,2,0) vs :root's (0,1,0), which
+   ensures these tokens win over the patchhound/:root defaults regardless of
+   where this file lands in the import order. */
+:root[data-theme="liquid-glass"] {
     --radius: 1.25rem;
 
     /*
@@ -96,7 +99,7 @@
 }
 
 /* ---------- Dark variant ---------- */
-[data-theme="liquid-glass-dark"] {
+:root[data-theme="liquid-glass-dark"] {
     --radius: 1.25rem;
 
     /* Surface */
