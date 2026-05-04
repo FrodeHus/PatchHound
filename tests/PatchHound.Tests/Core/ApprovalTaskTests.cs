@@ -41,14 +41,14 @@ public class ApprovalTaskTests
     }
 
     [Fact]
-    public void Create_PatchingDeferred_SetsAutoApproved()
+    public void Create_PatchingDeferred_RoutesToSecurityApproval()
     {
         var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.PatchingDeferred, null, Expiry);
 
         task.Type.Should().Be(ApprovalTaskType.PatchingDeferred);
-        task.Status.Should().Be(ApprovalTaskStatus.AutoApproved);
-        task.RequiresJustification.Should().BeFalse();
-        task.VisibleToRoles.Should().BeEquivalentTo(new[] { RoleName.GlobalAdmin, RoleName.TechnicalManager });
+        task.Status.Should().Be(ApprovalTaskStatus.Pending);
+        task.RequiresJustification.Should().BeTrue();
+        task.VisibleToRoles.Should().BeEquivalentTo(new[] { RoleName.GlobalAdmin, RoleName.SecurityManager });
     }
 
     [Fact]

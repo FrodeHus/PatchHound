@@ -15,7 +15,7 @@ export const BUCKET_LABELS: Record<TaskBucketKey, { title: string; description: 
   decision: {
     title: 'Decision needed',
     description: 'Cases where the owning team needs to choose a remediation outcome.',
-    cta: 'Open case',
+    cta: 'Open decision workbench',
   },
   approval: {
     title: 'Approval needed',

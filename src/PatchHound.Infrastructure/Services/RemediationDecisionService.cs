@@ -25,7 +25,8 @@ public class RemediationDecisionService(
         DateTimeOffset? expiryDate,
         DateTimeOffset? reEvaluationDate,
         CancellationToken ct,
-        DateTimeOffset? maintenanceWindowDate = null
+        DateTimeOffset? maintenanceWindowDate = null,
+        RemediationDecisionDeadlineMode? deadlineMode = null
     )
     {
         var caseExists = await dbContext.RemediationCases
@@ -63,6 +64,15 @@ public class RemediationDecisionService(
         var initialApprovalStatus = approvalMode is RemediationWorkflowApprovalMode.SecurityApproval or RemediationWorkflowApprovalMode.TechnicalApproval
             ? DecisionApprovalStatus.PendingApproval
             : DecisionApprovalStatus.Approved;
+        var validation = ValidateDecisionInput(outcome, justification, expiryDate, reEvaluationDate, deadlineMode);
+        if (!validation.IsSuccess)
+            return Result<RemediationDecision>.Failure(validation.Error ?? "Decision input is invalid.");
+
+        if (deadlineMode == RemediationDecisionDeadlineMode.Forever)
+        {
+            expiryDate = null;
+            reEvaluationDate = null;
+        }
 
         var decision = RemediationDecision.Create(
             tenantId,
@@ -157,6 +167,40 @@ public class RemediationDecisionService(
             ? approvalExpiryHours.Value
             : DefaultApprovalExpiryHours;
     }
+
+    private static Result<bool> ValidateDecisionInput(
+        RemediationOutcome outcome,
+        string? justification,
+        DateTimeOffset? expiryDate,
+        DateTimeOffset? reEvaluationDate,
+        RemediationDecisionDeadlineMode? deadlineMode
+    )
+    {
+        if (RequiresJustification(outcome) && string.IsNullOrWhiteSpace(justification))
+            return Result<bool>.Failure($"Justification is required for {outcome}.");
+
+        if (outcome is not (RemediationOutcome.RiskAcceptance or RemediationOutcome.PatchingDeferred))
+            return Result<bool>.Success(true);
+
+        if (!deadlineMode.HasValue)
+            return Result<bool>.Failure("Risk acceptance and patch deferral decisions require a deadline mode.");
+
+        if (deadlineMode == RemediationDecisionDeadlineMode.Date)
+        {
+            if (outcome == RemediationOutcome.RiskAcceptance && !expiryDate.HasValue)
+                return Result<bool>.Failure("Risk acceptance with a date deadline requires an expiry date.");
+
+            if (outcome == RemediationOutcome.PatchingDeferred && !reEvaluationDate.HasValue)
+                return Result<bool>.Failure("Patch deferral with a date deadline requires a review date.");
+        }
+
+        return Result<bool>.Success(true);
+    }
+
+    private static bool RequiresJustification(RemediationOutcome outcome) =>
+        outcome is RemediationOutcome.RiskAcceptance
+            or RemediationOutcome.AlternateMitigation
+            or RemediationOutcome.PatchingDeferred;
 
     public async Task<Result<bool>> VerifyAndRequireNewDecisionAsync(
         Guid tenantId,

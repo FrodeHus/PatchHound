@@ -52,8 +52,8 @@ public class ApprovalTask
                     new[] { RoleName.GlobalAdmin, RoleName.TechnicalManager }, false),
 
             RemediationOutcome.PatchingDeferred =>
-                (ApprovalTaskType.PatchingDeferred, ApprovalTaskStatus.AutoApproved,
-                    new[] { RoleName.GlobalAdmin, RoleName.TechnicalManager }, false),
+                (ApprovalTaskType.PatchingDeferred, ApprovalTaskStatus.Pending,
+                    new[] { RoleName.GlobalAdmin, RoleName.SecurityManager }, true),
 
             _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "Unsupported outcome for approval task."),
         };

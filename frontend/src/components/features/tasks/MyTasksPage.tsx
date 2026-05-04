@@ -157,7 +157,7 @@ function BucketSection({
                       </Link>
                     ) : (
                       <Link
-                        to="/remediation/cases/$caseId"
+                        to="/workbenches/asset-owner/cases/$caseId"
                         params={{ caseId: item.remediationCaseId }}
                         className="inline-flex h-7 items-center justify-center rounded-lg bg-primary px-2.5 text-[0.8rem] font-medium text-primary-foreground transition-colors hover:bg-primary/80"
                       >

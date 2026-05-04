@@ -83,7 +83,10 @@ describe('MyTasksPage', () => {
     expect(screen.getByRole('heading', { name: /Decision needed/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /Approval needed/i })).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /Open workbench/i }).length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('link', { name: /Open case/i }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: /Open decision workbench/i })[0]).toHaveAttribute(
+      'href',
+      '/workbenches/asset-owner/cases/$caseId',
+    )
     expect(screen.getAllByRole('link', { name: /Review approval/i }).length).toBeGreaterThan(0)
   })
 

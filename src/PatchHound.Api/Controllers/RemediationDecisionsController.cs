@@ -255,6 +255,14 @@ public class RemediationDecisionsController(
 
         if (!Enum.TryParse<RemediationOutcome>(request.Outcome, true, out var outcome))
             return BadRequest(new ProblemDetails { Title = "Invalid outcome value." });
+        RemediationDecisionDeadlineMode? deadlineMode = null;
+        if (!string.IsNullOrWhiteSpace(request.DeadlineMode))
+        {
+            if (!Enum.TryParse<RemediationDecisionDeadlineMode>(request.DeadlineMode, true, out var parsedDeadlineMode))
+                return BadRequest(new ProblemDetails { Title = "Invalid deadline mode value." });
+
+            deadlineMode = parsedDeadlineMode;
+        }
 
         var result = await decisionService.CreateDecisionForCaseAsync(
             tenantId,
@@ -265,7 +273,8 @@ public class RemediationDecisionsController(
             request.ExpiryDate,
             request.ReEvaluationDate,
             ct,
-            request.MaintenanceWindowDate
+            request.MaintenanceWindowDate,
+            deadlineMode
         );
 
         if (!result.IsSuccess)
