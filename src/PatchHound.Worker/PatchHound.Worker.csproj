@@ -6,10 +6,10 @@
     <InternalsVisibleTo Include="PatchHound.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Cronos" Version="0.13.0" />
+    <PackageReference Include="Cronos" Version="0.12.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.7" />
-    <PackageReference Include="Microsoft.Identity.Web" Version="4.9.0" />
+    <PackageReference Include="Microsoft.Identity.Web" Version="4.8.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.7" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
