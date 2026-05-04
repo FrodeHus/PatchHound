@@ -14,6 +14,8 @@ export const themeOptions: ThemeOption[] = [
   { id: 'catppuccin-frappe', label: 'Catppuccin Frappe', mode: 'dark' },
   { id: 'catppuccin-macchiato', label: 'Catppuccin Macchiato', mode: 'dark' },
   { id: 'catppuccin-mocha', label: 'Catppuccin Mocha', mode: 'dark' },
+  { id: 'liquid-glass', label: 'Liquid Glass · Light', mode: 'light' },
+  { id: 'liquid-glass-dark', label: 'Liquid Glass · Dark', mode: 'dark' },
 ]
 
 export const defaultThemeId = 'patchhound'

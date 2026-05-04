@@ -92,6 +92,7 @@ export function TopNav({
 
   return (
     <header
+      data-topnav
       className={[
         "sticky top-0 z-20 border-b transition-all duration-200",
         isScrolled
