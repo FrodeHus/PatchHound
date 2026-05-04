@@ -6,83 +6,93 @@
 [data-theme="liquid-glass"] {
     --radius: 1.25rem;
 
-    /* Surface — slightly tinted white; body provides the opaque base */
-    --background: oklch(0.97 0.01 270);
-    --foreground: oklch(0.15 0.03 260);
-    --card: oklch(1 0 0 / 60%);
-    --card-foreground: oklch(0.15 0.03 260);
-    --popover: oklch(0.99 0.003 260 / 90%);
-    --popover-foreground: oklch(0.15 0.03 260);
+    /*
+      Body background: a soft lavender-blue tint (not pure white) gives
+      the aurora blobs a colored canvas to sit on. Glass surfaces refract
+      this, producing the frosted pastel look rather than plain white.
+    */
+    --background: oklch(0.92 0.04 272);
+    --foreground: oklch(0.14 0.04 258);
+    --card: oklch(0.98 0.01 268 / 38%);
+    --card-foreground: oklch(0.14 0.04 258);
+    --popover: oklch(0.97 0.012 268 / 88%);
+    --popover-foreground: oklch(0.14 0.04 258);
 
     /* Primary — vivid violet */
-    --primary: oklch(0.55 0.24 275);
-    --primary-foreground: oklch(0.99 0.003 260);
+    --primary: oklch(0.52 0.26 278);
+    --primary-foreground: oklch(0.99 0.002 268);
 
     /* Secondary */
-    --secondary: oklch(0.92 0.025 270 / 72%);
-    --secondary-foreground: oklch(0.2 0.03 260);
+    --secondary: oklch(0.88 0.04 268 / 65%);
+    --secondary-foreground: oklch(0.18 0.04 258);
 
     /* Muted */
-    --muted: oklch(0.93 0.018 265 / 65%);
-    --muted-foreground: oklch(0.46 0.03 260);
+    --muted: oklch(0.88 0.035 265 / 55%);
+    --muted-foreground: oklch(0.42 0.04 260);
 
     /* Accent — sky blue */
-    --accent: oklch(0.87 0.08 215 / 58%);
-    --accent-foreground: oklch(0.2 0.03 260);
+    --accent: oklch(0.82 0.1 218 / 52%);
+    --accent-foreground: oklch(0.18 0.04 258);
 
-    --destructive: oklch(0.62 0.22 25);
-    --border: oklch(0.7 0.04 265 / 40%);
-    --input: oklch(0.98 0.006 260 / 78%);
-    --ring: oklch(0.58 0.22 275 / 65%);
+    --destructive: oklch(0.6 0.22 25);
+    --border: oklch(0.6 0.06 265 / 32%);
+    --input: oklch(0.96 0.015 268 / 72%);
+    --ring: oklch(0.55 0.24 278 / 62%);
 
     /* Charts — saturated so they pop on the frosted surface */
-    --chart-1: oklch(0.55 0.24 275);
-    --chart-2: oklch(0.58 0.22 210);
-    --chart-3: oklch(0.56 0.2 155);
-    --chart-4: oklch(0.66 0.2 35);
-    --chart-5: oklch(0.6 0.22 335);
+    --chart-1: oklch(0.52 0.26 278);
+    --chart-2: oklch(0.54 0.24 212);
+    --chart-3: oklch(0.52 0.22 158);
+    --chart-4: oklch(0.62 0.22 35);
+    --chart-5: oklch(0.56 0.24 338);
 
     /* Sidebar */
-    --sidebar: oklch(0.96 0.012 268 / 58%);
-    --sidebar-foreground: oklch(0.17 0.03 260);
-    --sidebar-primary: oklch(0.55 0.24 275);
-    --sidebar-primary-foreground: oklch(0.99 0.003 260);
-    --sidebar-accent: oklch(0.9 0.04 265 / 58%);
-    --sidebar-accent-foreground: oklch(0.2 0.03 260);
-    --sidebar-border: oklch(0.68 0.04 265 / 35%);
-    --sidebar-ring: oklch(0.58 0.22 275 / 65%);
+    --sidebar: oklch(0.9 0.04 268 / 52%);
+    --sidebar-foreground: oklch(0.16 0.04 258);
+    --sidebar-primary: oklch(0.52 0.26 278);
+    --sidebar-primary-foreground: oklch(0.99 0.002 268);
+    --sidebar-accent: oklch(0.86 0.05 265 / 52%);
+    --sidebar-accent-foreground: oklch(0.18 0.04 258);
+    --sidebar-border: oklch(0.62 0.05 265 / 28%);
+    --sidebar-ring: oklch(0.55 0.24 278 / 62%);
 
     /* Tone tokens */
-    --tone-danger: oklch(0.95 0.05 25 / 72%);
-    --tone-danger-foreground: oklch(0.4 0.18 25);
-    --tone-danger-border: oklch(0.78 0.08 25 / 55%);
-    --tone-warning: oklch(0.95 0.05 80 / 72%);
-    --tone-warning-foreground: oklch(0.4 0.14 80);
-    --tone-warning-border: oklch(0.8 0.07 80 / 55%);
-    --tone-success: oklch(0.95 0.05 150 / 72%);
-    --tone-success-foreground: oklch(0.38 0.14 150);
-    --tone-success-border: oklch(0.78 0.06 150 / 55%);
-    --tone-info: oklch(0.94 0.05 230 / 72%);
-    --tone-info-foreground: oklch(0.38 0.12 230);
-    --tone-info-border: oklch(0.78 0.06 230 / 55%);
+    --tone-danger: oklch(0.92 0.06 25 / 68%);
+    --tone-danger-foreground: oklch(0.38 0.2 25);
+    --tone-danger-border: oklch(0.74 0.1 25 / 50%);
+    --tone-warning: oklch(0.92 0.06 78 / 68%);
+    --tone-warning-foreground: oklch(0.38 0.16 78);
+    --tone-warning-border: oklch(0.76 0.08 78 / 50%);
+    --tone-success: oklch(0.92 0.06 152 / 68%);
+    --tone-success-foreground: oklch(0.36 0.16 152);
+    --tone-success-border: oklch(0.74 0.07 152 / 50%);
+    --tone-info: oklch(0.9 0.06 232 / 68%);
+    --tone-info-foreground: oklch(0.36 0.14 232);
+    --tone-info-border: oklch(0.74 0.07 232 / 50%);
     --tone-neutral: var(--card);
     --tone-neutral-foreground: var(--foreground);
     --tone-neutral-border: var(--border);
 
-    /* Glass-specific tokens */
-    --glass-bg: oklch(1 0 0 / 52%);
-    --glass-bg-strong: oklch(0.99 0.004 260 / 72%);
-    --glass-bg-soft: oklch(1 0 0 / 32%);
-    --glass-border: oklch(0.65 0.05 265 / 38%);
-    --glass-border-strong: oklch(0.55 0.06 265 / 55%);
-    --glass-shadow: 0 4px 24px oklch(0.15 0.08 265 / 12%), 0 1px 4px oklch(0.15 0.08 265 / 8%), inset 0 1px 0 oklch(1 0 0 / 70%);
-    --glass-shadow-lg: 0 8px 40px oklch(0.15 0.08 265 / 18%), 0 2px 8px oklch(0.15 0.08 265 / 12%), inset 0 1px 0 oklch(1 0 0 / 75%);
+    /*
+      Glass tokens: low opacity (28–42%) so aurora bleeds through strongly.
+      Blur + saturation does the heavy lifting — the color comes from behind.
+    */
+    --glass-bg: oklch(0.98 0.01 268 / 30%);
+    --glass-bg-strong: oklch(0.97 0.014 268 / 52%);
+    --glass-bg-soft: oklch(0.99 0.006 268 / 18%);
+    --glass-border: oklch(0.58 0.08 268 / 28%);
+    --glass-border-strong: oklch(0.48 0.1 268 / 45%);
+    --glass-shadow: 0 4px 24px oklch(0.18 0.1 265 / 14%), 0 1px 4px oklch(0.18 0.1 265 / 10%), inset 0 1px 0 oklch(1 0 0 / 65%);
+    --glass-shadow-lg: 0 8px 40px oklch(0.18 0.1 265 / 20%), 0 2px 8px oklch(0.18 0.1 265 / 14%), inset 0 1px 0 oklch(1 0 0 / 72%);
 
-    /* Aurora colors — punchy so they show through white glass */
-    --aurora-1: oklch(0.68 0.28 285 / 55%);
-    --aurora-2: oklch(0.7 0.24 215 / 45%);
-    --aurora-3: oklch(0.72 0.22 150 / 38%);
-    --aurora-4: oklch(0.74 0.26 335 / 48%);
+    /*
+      Aurora: high chroma + high alpha so blobs punch through the light body.
+      On a white base, blobs need 72–82% alpha to be legible through glass.
+    */
+    --aurora-1: oklch(0.65 0.3 285 / 78%);
+    --aurora-2: oklch(0.68 0.26 218 / 68%);
+    --aurora-3: oklch(0.7 0.24 152 / 58%);
+    --aurora-4: oklch(0.72 0.28 338 / 72%);
 }
 
 /* ---------- Dark variant ---------- */
@@ -176,6 +186,15 @@
 [data-theme="liquid-glass"] body {
     background-image: none;
     background-color: var(--background);
+}
+
+/* Tighter blob blur on light theme — less spread = more concentrated color */
+[data-theme="liquid-glass"] .aurora-blob {
+    filter: blur(48px);
+}
+
+[data-theme="liquid-glass"] .aurora {
+    filter: blur(32px);
 }
 
 [data-theme="liquid-glass-dark"] body {
@@ -400,6 +419,29 @@
 [data-theme^="liquid-glass"] [data-slot="card"] > * {
     position: relative;
     z-index: 1;
+}
+
+/*
+  Light variant: reduce blur from 28px → 16px and push saturation to
+  220% so the vivid aurora behind the glass stays vivid instead of
+  averaging into grey. The lower opacity tokens already let more color
+  through; lower blur keeps it sharp.
+*/
+[data-theme="liquid-glass"] [data-slot="card"],
+[data-theme="liquid-glass"] .glass {
+    backdrop-filter: blur(16px) saturate(220%);
+    -webkit-backdrop-filter: blur(16px) saturate(220%);
+}
+
+[data-theme="liquid-glass"] .glass-strong,
+[data-theme="liquid-glass"] .dock-sidebar {
+    backdrop-filter: blur(22px) saturate(220%);
+    -webkit-backdrop-filter: blur(22px) saturate(220%);
+}
+
+[data-theme="liquid-glass"] header[data-topnav] {
+    backdrop-filter: blur(20px) saturate(220%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(220%) !important;
 }
 
 /* =========================================================
