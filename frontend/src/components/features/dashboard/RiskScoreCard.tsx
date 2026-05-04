@@ -3,9 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, Flame, RefreshCw, ShieldAlert, Siren } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { InsetPanel } from '@/components/ui/inset-panel'
 import { Sparkline } from '@/components/features/dashboard/Sparkline'
 import { fetchRiskScoreSummary, recalculateRiskScores } from '@/api/risk-score.functions'
 import type { RiskScoreSummary } from '@/api/risk-score.schemas'
@@ -47,43 +45,38 @@ export function RiskScoreCard({ isLoading: parentLoading, filters }: RiskScoreCa
 
   if (loading && !summary) {
     return (
-      <Card className="overflow-hidden rounded-[32px] border-border/70 bg-[linear-gradient(140deg,color-mix(in_oklab,var(--destructive)_10%,transparent),transparent_52%),var(--color-card)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-        <CardContent className="p-5">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(18rem,1fr)]">
-            <Skeleton className="h-44 rounded-2xl" />
-            <Skeleton className="h-44 rounded-2xl" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-[1.15fr_1px_1fr]">
+        <Skeleton className="m-5 h-44 rounded-2xl" />
+        <div className="my-4 bg-border/50" />
+        <Skeleton className="m-5 h-44 rounded-2xl" />
+      </div>
     )
   }
 
   if (!summary) {
     return (
-      <Card className="overflow-hidden rounded-[32px] border-border/70 bg-[linear-gradient(140deg,color-mix(in_oklab,var(--destructive)_6%,transparent),transparent_52%),var(--color-card)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-        <CardContent className="p-5">
-          <InsetPanel className="rounded-[24px] p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              Current Risk Score
-            </p>
-            <p className="mt-3 text-lg font-medium">
-              {isError ? 'Risk score unavailable' : 'Risk score not ready yet'}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {isError
-                ? error instanceof Error
-                  ? error.message
-                  : 'The risk summary request failed.'
-                : 'Risk rollups are still being prepared for this tenant.'}
-            </p>
-            <div className="mt-4">
-              <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
-                Retry
-              </Button>
-            </div>
-          </InsetPanel>
-        </CardContent>
-      </Card>
+      <div className="p-5">
+        <div className="rounded-2xl border border-border/70 bg-muted/40 p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Current Risk Score
+          </p>
+          <p className="mt-3 text-lg font-medium">
+            {isError ? 'Risk score unavailable' : 'Risk score not ready yet'}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {isError
+              ? error instanceof Error
+                ? error.message
+                : 'The risk summary request failed.'
+              : 'Risk rollups are still being prepared for this tenant.'}
+          </p>
+          <div className="mt-4">
+            <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -110,11 +103,9 @@ export function RiskScoreCard({ isLoading: parentLoading, filters }: RiskScoreCa
 
   return (
     <>
-      <Card className={`overflow-hidden rounded-[32px] border ${posture.cardClass} shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]`}>
-        <CardContent className="p-5">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(18rem,1fr)]">
-            <InsetPanel className={`space-y-5 rounded-[24px] border ${posture.heroPanelClass} p-5`}>
-              <div className="flex items-start justify-between gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1px_1fr]">
+        <div className={`space-y-5 p-5 lg:p-6 ${posture.heroPanelBg}`}>
+          <div className="flex items-start justify-between gap-4">
                 <div className="space-y-3">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     Current Risk Score
@@ -238,9 +229,15 @@ export function RiskScoreCard({ isLoading: parentLoading, filters }: RiskScoreCa
                   </p>
                 </div>
               ) : null}
-            </InsetPanel>
+        </div>
 
-            <InsetPanel className="space-y-4 rounded-[24px] p-4">
+        {/* Vertical hairline divider */}
+        <div
+          className="hidden bg-[linear-gradient(180deg,transparent_0%,var(--color-border)_12%,var(--color-border)_88%,transparent_100%)] lg:block"
+          aria-hidden
+        />
+
+        <div className="space-y-4 p-5 lg:p-6">
               <div>
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -311,10 +308,8 @@ export function RiskScoreCard({ isLoading: parentLoading, filters }: RiskScoreCa
                 <MetricTile label="High assets" tooltip="High risk band means the asset carries serious active exposure, but below the platform's top critical threshold." value={summary.highAssetCount} tone="text-tone-warning-foreground" />
                 <MetricTile label="Medium assets" tooltip="Medium risk band represents meaningful active exposure that is notable but not yet in the high or critical tiers." value={mediumAssetCount} tone="text-chart-2" />
               </div>
-            </InsetPanel>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <RiskScoreDetailDialog
         open={detailOpen}
@@ -359,8 +354,7 @@ function riskPosture(score: number) {
       verdictTone: 'text-destructive',
       badgeClass: 'border-destructive/25 bg-destructive/10 text-destructive',
       iconClass: 'border-destructive/25 bg-destructive/10 text-destructive',
-      cardClass: 'border-destructive/20 bg-[linear-gradient(140deg,color-mix(in_oklab,var(--destructive)_14%,transparent),transparent_56%),var(--color-card)]',
-      heroPanelClass: 'border-destructive/15 bg-[linear-gradient(160deg,color-mix(in_oklab,var(--destructive)_10%,transparent),transparent_60%),var(--color-background)]',
+      heroPanelBg: 'bg-[linear-gradient(160deg,color-mix(in_oklab,var(--destructive)_10%,transparent),transparent_60%)]',
       meterClass: 'bg-[linear-gradient(90deg,var(--color-chart-3),var(--color-chart-2),var(--color-tone-warning-foreground),var(--color-destructive))]',
       sparkColor: 'var(--color-destructive)',
     }
@@ -375,8 +369,7 @@ function riskPosture(score: number) {
       verdictTone: 'text-tone-warning-foreground',
       badgeClass: 'border-tone-warning-border bg-tone-warning text-tone-warning-foreground',
       iconClass: 'border-tone-warning-border bg-tone-warning/40 text-tone-warning-foreground',
-      cardClass: 'border-tone-warning-border/40 bg-[linear-gradient(140deg,color-mix(in_oklab,var(--color-tone-warning-foreground)_10%,transparent),transparent_56%),var(--color-card)]',
-      heroPanelClass: 'border-tone-warning-border/35 bg-[linear-gradient(160deg,color-mix(in_oklab,var(--color-tone-warning-foreground)_8%,transparent),transparent_60%),var(--color-background)]',
+      heroPanelBg: 'bg-[linear-gradient(160deg,color-mix(in_oklab,var(--color-tone-warning-foreground)_8%,transparent),transparent_60%)]',
       meterClass: 'bg-[linear-gradient(90deg,var(--color-chart-3),var(--color-chart-2),var(--color-tone-warning-foreground),var(--color-destructive))]',
       sparkColor: 'var(--color-tone-warning-foreground)',
     }
@@ -391,8 +384,7 @@ function riskPosture(score: number) {
       verdictTone: 'text-chart-2',
       badgeClass: 'border-chart-2/25 bg-chart-2/10 text-chart-2',
       iconClass: 'border-chart-2/20 bg-chart-2/10 text-chart-2',
-      cardClass: 'border-chart-2/25 bg-[linear-gradient(140deg,color-mix(in_oklab,var(--color-chart-2)_10%,transparent),transparent_56%),var(--color-card)]',
-      heroPanelClass: 'border-chart-2/20 bg-[linear-gradient(160deg,color-mix(in_oklab,var(--color-chart-2)_8%,transparent),transparent_60%),var(--color-background)]',
+      heroPanelBg: 'bg-[linear-gradient(160deg,color-mix(in_oklab,var(--color-chart-2)_8%,transparent),transparent_60%)]',
       meterClass: 'bg-[linear-gradient(90deg,var(--color-chart-3),var(--color-chart-2),var(--color-tone-warning-foreground),var(--color-destructive))]',
       sparkColor: 'var(--color-chart-2)',
     }
@@ -406,8 +398,7 @@ function riskPosture(score: number) {
     verdictTone: 'text-chart-3',
     badgeClass: 'border-chart-3/20 bg-chart-3/10 text-chart-3',
     iconClass: 'border-chart-3/20 bg-chart-3/10 text-chart-3',
-    cardClass: 'border-chart-3/20 bg-[linear-gradient(140deg,color-mix(in_oklab,var(--color-chart-3)_10%,transparent),transparent_56%),var(--color-card)]',
-    heroPanelClass: 'border-chart-3/20 bg-[linear-gradient(160deg,color-mix(in_oklab,var(--color-chart-3)_8%,transparent),transparent_60%),var(--color-background)]',
+    heroPanelBg: 'bg-[linear-gradient(160deg,color-mix(in_oklab,var(--color-chart-3)_8%,transparent),transparent_60%)]',
     meterClass: 'bg-[linear-gradient(90deg,var(--color-chart-3),var(--color-chart-2),var(--color-tone-warning-foreground),var(--color-destructive))]',
     sparkColor: 'var(--color-chart-3)',
   }
