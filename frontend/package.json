@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@azure/msal-node": "^3.8.0",
+    "@azure/msal-node": "^5.1.5",
     "@base-ui/react": "^1.2.0",
     "@codemirror/autocomplete": "^6.20.1",
     "@codemirror/lang-json": "^6.0.2",
