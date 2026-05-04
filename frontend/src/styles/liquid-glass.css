@@ -442,20 +442,29 @@
     -webkit-backdrop-filter: blur(22px) saturate(220%);
 }
 
-[data-theme="liquid-glass"] header[data-topnav] {
-    backdrop-filter: blur(20px) saturate(220%) !important;
-    -webkit-backdrop-filter: blur(20px) saturate(220%) !important;
-}
 
 /* =========================================================
-   Glass header / topnav
+   Topnav: transparent when at top, glass pill when scrolled
    ========================================================= */
+
+/* Header wrapper — always transparent; the pill div provides the surface */
 [data-theme^="liquid-glass"] header[data-topnav] {
+    background: transparent;
+}
+
+/* Pill state — glass surface on the controls row */
+[data-theme^="liquid-glass"] [data-pill="true"] {
     background: var(--glass-bg-strong) !important;
-    border-bottom: 0.5px solid var(--glass-border) !important;
-    backdrop-filter: blur(32px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(32px) saturate(180%) !important;
-    box-shadow: 0 1px 0 var(--glass-border), 0 4px 20px oklch(0 0 0 / 8%);
+    border-color: var(--glass-border-strong) !important;
+    backdrop-filter: blur(24px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+    box-shadow: var(--glass-shadow-lg) !important;
+}
+
+/* Light variant — tighter blur keeps aurora colour in the pill */
+[data-theme="liquid-glass"] [data-pill="true"] {
+    backdrop-filter: blur(18px) saturate(220%) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(220%) !important;
 }
 
 /* =========================================================
