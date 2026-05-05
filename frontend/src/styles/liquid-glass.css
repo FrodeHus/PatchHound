@@ -498,6 +498,44 @@
 }
 
 /* =========================================================
+   Tables — glass-aware surfaces
+   =========================================================
+   Problem: Tailwind applies bg-background (opaque) to tbody
+   which blocks the glass card behind it. Strip all opaque
+   table backgrounds so the glass card shows through.
+   ========================================================= */
+
+/* Strip opaque body/footer backgrounds */
+[data-theme^="liquid-glass"] [data-slot="table-body"],
+[data-theme^="liquid-glass"] [data-slot="table-footer"],
+[data-theme^="liquid-glass"] table tbody,
+[data-theme^="liquid-glass"] table tfoot {
+    background: transparent !important;
+}
+
+/* Header: subtle frosted separator */
+[data-theme^="liquid-glass"] [data-slot="table-header"],
+[data-theme^="liquid-glass"] table thead {
+    background: color-mix(in oklab, var(--foreground) 5%, transparent) !important;
+}
+
+/* Row hover — glass tint instead of muted-bg */
+[data-theme^="liquid-glass"] [data-slot="table-row"]:hover,
+[data-theme^="liquid-glass"] table tbody tr:hover {
+    background: var(--glass-bg) !important;
+}
+
+/* Selected row */
+[data-theme^="liquid-glass"] [data-slot="table-row"][data-state="selected"] {
+    background: color-mix(in oklab, var(--primary) 14%, var(--glass-bg)) !important;
+}
+
+/* Table container borders — use glass border token */
+[data-theme^="liquid-glass"] [data-slot="table-container"] {
+    border-color: var(--glass-border);
+}
+
+/* =========================================================
    Recharts — glowing strokes + invisible gridlines fix
    ========================================================= */
 [data-theme^="liquid-glass"] .recharts-line .recharts-curve {
