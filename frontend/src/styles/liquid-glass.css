@@ -468,6 +468,26 @@
 }
 
 /* =========================================================
+   Tooltip / popover content — glass surface
+   ========================================================= */
+[data-theme^="liquid-glass"] [role="tooltip"],
+[data-theme^="liquid-glass"] [data-slot="tooltip-content"] {
+    background: var(--glass-bg-strong) !important;
+    border: 0.5px solid var(--glass-border-strong) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    box-shadow: var(--glass-shadow-lg) !important;
+    color: var(--popover-foreground) !important;
+}
+
+/* Tighter blur on light variant */
+[data-theme="liquid-glass"] [role="tooltip"],
+[data-theme="liquid-glass"] [data-slot="tooltip-content"] {
+    backdrop-filter: blur(18px) saturate(220%) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(220%) !important;
+}
+
+/* =========================================================
    Glass tabs
    ========================================================= */
 [data-theme^="liquid-glass"] [role="tablist"] {
