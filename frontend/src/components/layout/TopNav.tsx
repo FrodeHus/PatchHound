@@ -92,20 +92,24 @@ export function TopNav({
 
   return (
     <header
-      className={[
-        "sticky top-0 z-20 border-b transition-all duration-200",
-        isScrolled
-          ? "border-border/50 shadow-[0_1px_12px_rgba(0,0,0,0.12)]"
-          : "border-transparent",
-      ].join(" ")}
-      style={{
-        background:
-          "color-mix(in oklab, var(--color-background) 78%, transparent)",
-        backdropFilter: "blur(16px) saturate(1.3)",
-        WebkitBackdropFilter: "blur(16px) saturate(1.3)",
-      }}
+      data-topnav
+      className="sticky top-0 z-20"
     >
-      <div className="relative flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      {/* Controls row — collapses to a floating pill on scroll */}
+      <div
+        data-pill={isScrolled ? "true" : undefined}
+        className={[
+          "relative flex items-center justify-between gap-3 transition-all duration-300",
+          isScrolled
+            ? "mx-3 mt-2 mb-0.5 rounded-2xl border border-border/50 px-3 py-2 sm:px-4 shadow-[0_4px_24px_rgba(0,0,0,0.1),0_1px_3px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.05)]"
+            : "border-b border-transparent px-4 py-3 sm:px-6",
+        ].join(" ")}
+        style={isScrolled ? {
+          background: "color-mix(in oklab, var(--color-background) 76%, transparent)",
+          backdropFilter: "blur(20px) saturate(1.5)",
+          WebkitBackdropFilter: "blur(20px) saturate(1.5)",
+        } : undefined}
+      >
         <div className="flex min-w-0 items-center gap-3">
           <Button
             type="button"
@@ -308,9 +312,11 @@ export function TopNav({
           </DropdownMenu>
         </div>
       </div>
-      <div className="px-4 pb-2 sm:px-6">
-        <Breadcrumbs />
-      </div>
+      {!isScrolled && (
+        <div className="px-4 pb-2 sm:px-6">
+          <Breadcrumbs />
+        </div>
+      )}
       <OpenBaoUnsealDialog
         isOpen={isUnsealDialogOpen}
         isSubmitting={unsealMutation.isPending}

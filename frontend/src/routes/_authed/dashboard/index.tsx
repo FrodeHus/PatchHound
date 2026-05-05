@@ -188,13 +188,18 @@ function DashboardPage() {
         </CardContent>
       </Card>
 
+      {/*
+        Unified tab surface: the strip sits above the pane and merges into it
+        via negative margin. Both share one continuous glass/card surface.
+      */}
       <Tabs
         value={activeTab}
         onValueChange={(value) =>
           void navigate({ search: (prev) => ({ ...prev, tab: value as DashboardTab }) })
         }
       >
-        <TabsList className="h-10 w-full justify-start rounded-xl bg-muted/60 p-1">
+        {/* Strip — top of unified surface (rounded top, square bottom) */}
+        <TabsList className="relative z-10 mb-[-22px] h-auto w-full justify-start rounded-t-2xl rounded-b-none border border-b-0 border-border/70 bg-card/80 px-1.5 pt-1.5 pb-7 backdrop-blur-sm after:absolute after:inset-x-4 after:bottom-[18px] after:h-px after:bg-border/60 after:content-['']">
           <TabsTrigger value="risk" className="rounded-lg px-4 text-sm">
             Risk Overview
           </TabsTrigger>
@@ -206,12 +211,35 @@ function DashboardPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="risk" className="space-y-6 pt-2">
-          <RiskScoreCard
-            isLoading={summaryQuery.isFetching}
-            filters={filterParams}
-          />
+        {/* Pane — bottom of unified surface (square top, rounded bottom) */}
+        <div className="relative z-0 overflow-hidden rounded-b-2xl border border-border/70 bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+          <TabsContent value="risk" className="mt-0">
+            <RiskScoreCard
+              isLoading={summaryQuery.isFetching}
+              filters={filterParams}
+            />
+          </TabsContent>
 
+          <TabsContent value="remediation" className="mt-0">
+            <BurndownChart
+              data={burndownQuery.data}
+              isLoading={burndownQuery.isFetching}
+            />
+          </TabsContent>
+
+          <TabsContent value="infrastructure" className="mt-0">
+            <DeviceGroupVulnerabilityChart
+              data={summary.vulnerabilitiesByDeviceGroup}
+              isLoading={summaryQuery.isFetching}
+              onBarClick={setSelectedDeviceGroup}
+            />
+          </TabsContent>
+        </div>
+      </Tabs>
+
+      {/* Below-pane content — gated by activeTab so it stays in sync */}
+      {activeTab === 'risk' && (
+        <div className="space-y-6">
           <RiskHeatmap
             filters={filterParams}
             onCellClick={(_group, severity) => {
@@ -255,14 +283,11 @@ function DashboardPage() {
             summary={summary}
             isLoading={summaryQuery.isFetching}
           />
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="remediation" className="space-y-6 pt-2">
-          <BurndownChart
-            data={burndownQuery.data}
-            isLoading={burndownQuery.isFetching}
-          />
-
+      {activeTab === 'remediation' && (
+        <div className="space-y-6">
           <RemediationVelocity
             averageDays={summary.averageRemediationDays}
             vulnerabilitiesBySeverity={summary.vulnerabilitiesBySeverity}
@@ -273,27 +298,21 @@ function DashboardPage() {
             brief={summary.riskChangeBrief}
             isLoading={summaryQuery.isFetching}
           />
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="infrastructure" className="space-y-6 pt-2">
-          <DeviceGroupVulnerabilityChart
-            data={summary.vulnerabilitiesByDeviceGroup}
+      {activeTab === 'infrastructure' && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <DeviceHealthCard
+            healthBreakdown={summary.deviceHealthBreakdown}
             isLoading={summaryQuery.isFetching}
-            onBarClick={setSelectedDeviceGroup}
           />
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <DeviceHealthCard
-              healthBreakdown={summary.deviceHealthBreakdown}
-              isLoading={summaryQuery.isFetching}
-            />
-            <OnboardingStatusCard
-              onboardingBreakdown={summary.deviceOnboardingBreakdown}
-              isLoading={summaryQuery.isFetching}
-            />
-          </div>
-        </TabsContent>
-      </Tabs>
+          <OnboardingStatusCard
+            onboardingBreakdown={summary.deviceOnboardingBreakdown}
+            isLoading={summaryQuery.isFetching}
+          />
+        </div>
+      )}
 
       <DeviceGroupRiskDetailDialog
         deviceGroupName={selectedDeviceGroup}

@@ -1,11 +1,14 @@
 import { useState, type ReactNode } from 'react'
 import { useRouterState } from '@tanstack/react-router'
 import { AdminConsoleLayout } from '@/components/features/admin/AdminConsoleLayout'
+import { AuroraBackground } from '@/components/layout/AuroraBackground'
 import { Sidebar } from '@/components/layout/Sidebar'
+import { SidebarDock } from '@/components/layout/SidebarDock'
 import { TenantScopeProvider } from '@/components/layout/TenantScopeProvider'
 import { TenantUnavailableDialog } from '@/components/layout/TenantUnavailableDialog'
 import { TopNav } from '@/components/layout/TopNav'
 import { useTenantScope } from '@/components/layout/tenant-scope'
+import { themeStorageKey } from '@/lib/themes'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import type { CurrentUser } from '@/server/auth.functions'
 
@@ -34,6 +37,12 @@ function getInitialSidebarCollapsed(): boolean {
   return window.sessionStorage.getItem(sidebarStorageKey) === "true";
 }
 
+function isGlassTheme(): boolean {
+  if (typeof window === "undefined") return false;
+  const stored = window.localStorage.getItem(themeStorageKey) ?? "";
+  return stored.startsWith("liquid-glass");
+}
+
 type AppShellProps = {
   user: CurrentUser
   children: ReactNode
@@ -46,6 +55,7 @@ export function AppShell({ user, children }: AppShellProps) {
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(
     getInitialSidebarCollapsed,
   );
+  const [glassTheme] = useState(isGlassTheme);
 
   const toggleDesktopSidebar = () => {
     setIsDesktopCollapsed((prev) => {
@@ -62,17 +72,30 @@ export function AppShell({ user, children }: AppShellProps) {
   return (
     <TenantScopeProvider user={user}>
       <TenantGuard>
-      <div className="min-h-screen bg-background text-foreground">
-        <div className="flex min-h-screen">
-          <div className="sticky top-0 hidden h-dvh md:block">
-            <Sidebar
-              user={user}
-              collapsed={isDesktopCollapsed}
-              onLogout={() => {
-                window.location.href = "/auth/logout";
-              }}
-            />
-          </div>
+      <div className={`min-h-screen text-foreground${glassTheme ? "" : " bg-background"}`}>
+        {glassTheme && <AuroraBackground />}
+        <div className="flex min-h-screen relative z-10">
+          {glassTheme ? (
+            <div className="sticky top-0 hidden h-dvh md:block">
+              <SidebarDock
+                user={user}
+                expanded={!isDesktopCollapsed}
+                onLogout={() => {
+                  window.location.href = "/auth/logout";
+                }}
+              />
+            </div>
+          ) : (
+            <div className="sticky top-0 hidden h-dvh md:block">
+              <Sidebar
+                user={user}
+                collapsed={isDesktopCollapsed}
+                onLogout={() => {
+                  window.location.href = "/auth/logout";
+                }}
+              />
+            </div>
+          )}
 
           <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
             <SheetContent

@@ -1,0 +1,696 @@
+/* =========================================================
+   Liquid Glass theme — light and dark variants
+   ========================================================= */
+
+/* ---------- Light variant ---------- */
+/* :root[data-theme=...] has specificity (0,2,0) vs :root's (0,1,0), which
+   ensures these tokens win over the patchhound/:root defaults regardless of
+   where this file lands in the import order. */
+:root[data-theme="liquid-glass"] {
+    --radius: 1.25rem;
+
+    /*
+      Body background: a soft lavender-blue tint (not pure white) gives
+      the aurora blobs a colored canvas to sit on. Glass surfaces refract
+      this, producing the frosted pastel look rather than plain white.
+    */
+    --background: oklch(0.92 0.04 272);
+    --foreground: oklch(0.14 0.04 258);
+    --card: oklch(0.98 0.01 268 / 38%);
+    --card-foreground: oklch(0.14 0.04 258);
+    --popover: oklch(0.97 0.012 268 / 88%);
+    --popover-foreground: oklch(0.14 0.04 258);
+
+    /* Primary — vivid violet */
+    --primary: oklch(0.52 0.26 278);
+    --primary-foreground: oklch(0.99 0.002 268);
+
+    /* Secondary */
+    --secondary: oklch(0.88 0.04 268 / 65%);
+    --secondary-foreground: oklch(0.18 0.04 258);
+
+    /* Muted */
+    --muted: oklch(0.88 0.035 265 / 55%);
+    --muted-foreground: oklch(0.42 0.04 260);
+
+    /* Accent — sky blue */
+    --accent: oklch(0.82 0.1 218 / 52%);
+    --accent-foreground: oklch(0.18 0.04 258);
+
+    --destructive: oklch(0.6 0.22 25);
+    --border: oklch(0.6 0.06 265 / 32%);
+    --input: oklch(0.96 0.015 268 / 72%);
+    --ring: oklch(0.55 0.24 278 / 62%);
+
+    /* Charts — saturated so they pop on the frosted surface */
+    --chart-1: oklch(0.52 0.26 278);
+    --chart-2: oklch(0.54 0.24 212);
+    --chart-3: oklch(0.52 0.22 158);
+    --chart-4: oklch(0.62 0.22 35);
+    --chart-5: oklch(0.56 0.24 338);
+
+    /* Sidebar */
+    --sidebar: oklch(0.9 0.04 268 / 52%);
+    --sidebar-foreground: oklch(0.16 0.04 258);
+    --sidebar-primary: oklch(0.52 0.26 278);
+    --sidebar-primary-foreground: oklch(0.99 0.002 268);
+    --sidebar-accent: oklch(0.86 0.05 265 / 52%);
+    --sidebar-accent-foreground: oklch(0.18 0.04 258);
+    --sidebar-border: oklch(0.62 0.05 265 / 28%);
+    --sidebar-ring: oklch(0.55 0.24 278 / 62%);
+
+    /* Tone tokens */
+    --tone-danger: oklch(0.92 0.06 25 / 68%);
+    --tone-danger-foreground: oklch(0.38 0.2 25);
+    --tone-danger-border: oklch(0.74 0.1 25 / 50%);
+    --tone-warning: oklch(0.92 0.06 78 / 68%);
+    --tone-warning-foreground: oklch(0.38 0.16 78);
+    --tone-warning-border: oklch(0.76 0.08 78 / 50%);
+    --tone-success: oklch(0.92 0.06 152 / 68%);
+    --tone-success-foreground: oklch(0.36 0.16 152);
+    --tone-success-border: oklch(0.74 0.07 152 / 50%);
+    --tone-info: oklch(0.9 0.06 232 / 68%);
+    --tone-info-foreground: oklch(0.36 0.14 232);
+    --tone-info-border: oklch(0.74 0.07 232 / 50%);
+    --tone-neutral: var(--card);
+    --tone-neutral-foreground: var(--foreground);
+    --tone-neutral-border: var(--border);
+
+    /*
+      Glass tokens: low opacity (28–42%) so aurora bleeds through strongly.
+      Blur + saturation does the heavy lifting — the color comes from behind.
+    */
+    --glass-bg: oklch(0.98 0.01 268 / 30%);
+    --glass-bg-strong: oklch(0.97 0.014 268 / 52%);
+    --glass-bg-soft: oklch(0.99 0.006 268 / 18%);
+    --glass-border: oklch(0.58 0.08 268 / 28%);
+    --glass-border-strong: oklch(0.48 0.1 268 / 45%);
+    --glass-shadow: 0 4px 24px oklch(0.18 0.1 265 / 14%), 0 1px 4px oklch(0.18 0.1 265 / 10%), inset 0 1px 0 oklch(1 0 0 / 65%);
+    --glass-shadow-lg: 0 8px 40px oklch(0.18 0.1 265 / 20%), 0 2px 8px oklch(0.18 0.1 265 / 14%), inset 0 1px 0 oklch(1 0 0 / 72%);
+
+    /*
+      Aurora: high chroma + high alpha so blobs punch through the light body.
+      On a white base, blobs need 72–82% alpha to be legible through glass.
+    */
+    --aurora-1: oklch(0.65 0.3 285 / 78%);
+    --aurora-2: oklch(0.68 0.26 218 / 68%);
+    --aurora-3: oklch(0.7 0.24 152 / 58%);
+    --aurora-4: oklch(0.72 0.28 338 / 72%);
+}
+
+/* ---------- Dark variant ---------- */
+:root[data-theme="liquid-glass-dark"] {
+    --radius: 1.25rem;
+
+    /* Surface */
+    --background: oklch(0.14 0.025 255);
+    --foreground: oklch(0.95 0.01 255);
+    --card: oklch(0.22 0.022 258 / 58%);
+    --card-foreground: oklch(0.96 0.01 255);
+    --popover: oklch(0.2 0.02 258 / 88%);
+    --popover-foreground: oklch(0.96 0.01 255);
+
+    /* Primary — violet */
+    --primary: oklch(0.76 0.2 275);
+    --primary-foreground: oklch(0.14 0.025 255);
+
+    /* Secondary */
+    --secondary: oklch(0.26 0.022 258 / 68%);
+    --secondary-foreground: oklch(0.94 0.012 255);
+
+    /* Muted */
+    --muted: oklch(0.24 0.018 256 / 58%);
+    --muted-foreground: oklch(0.68 0.016 255);
+
+    /* Accent */
+    --accent: oklch(0.3 0.04 230 / 55%);
+    --accent-foreground: oklch(0.96 0.01 255);
+
+    --destructive: oklch(0.7 0.2 25);
+    --border: oklch(0.38 0.02 258 / 55%);
+    --input: oklch(0.22 0.02 258 / 72%);
+    --ring: oklch(0.74 0.18 275 / 72%);
+
+    /* Charts */
+    --chart-1: oklch(0.74 0.2 275);
+    --chart-2: oklch(0.7 0.16 212);
+    --chart-3: oklch(0.72 0.16 155);
+    --chart-4: oklch(0.74 0.17 35);
+    --chart-5: oklch(0.72 0.18 340);
+
+    /* Sidebar */
+    --sidebar: oklch(0.18 0.022 258 / 55%);
+    --sidebar-foreground: oklch(0.95 0.012 255);
+    --sidebar-primary: oklch(0.76 0.2 275);
+    --sidebar-primary-foreground: oklch(0.14 0.025 255);
+    --sidebar-accent: oklch(0.26 0.022 258 / 55%);
+    --sidebar-accent-foreground: oklch(0.95 0.012 255);
+    --sidebar-border: oklch(0.35 0.02 258 / 48%);
+    --sidebar-ring: oklch(0.74 0.18 275 / 72%);
+
+    /* Tone tokens */
+    --tone-danger: oklch(0.22 0.05 25 / 70%);
+    --tone-danger-foreground: oklch(0.82 0.14 25);
+    --tone-danger-border: oklch(0.4 0.08 25 / 55%);
+    --tone-warning: oklch(0.24 0.05 85 / 70%);
+    --tone-warning-foreground: oklch(0.84 0.11 85);
+    --tone-warning-border: oklch(0.42 0.07 85 / 55%);
+    --tone-success: oklch(0.22 0.05 155 / 70%);
+    --tone-success-foreground: oklch(0.82 0.12 155);
+    --tone-success-border: oklch(0.4 0.06 155 / 55%);
+    --tone-info: oklch(0.22 0.04 230 / 70%);
+    --tone-info-foreground: oklch(0.82 0.1 230);
+    --tone-info-border: oklch(0.4 0.06 230 / 55%);
+    --tone-neutral: var(--card);
+    --tone-neutral-foreground: var(--foreground);
+    --tone-neutral-border: var(--border);
+
+    /* Glass-specific tokens */
+    --glass-bg: oklch(0.24 0.022 258 / 48%);
+    --glass-bg-strong: oklch(0.28 0.025 258 / 65%);
+    --glass-bg-soft: oklch(0.2 0.018 258 / 32%);
+    --glass-border: oklch(0.5 0.025 265 / 42%);
+    --glass-border-strong: oklch(0.62 0.03 265 / 58%);
+    --glass-shadow: 0 4px 24px oklch(0 0 0 / 36%), 0 1px 4px oklch(0 0 0 / 28%), inset 0 1px 0 oklch(1 0 0 / 8%);
+    --glass-shadow-lg: 0 8px 40px oklch(0 0 0 / 44%), 0 2px 8px oklch(0 0 0 / 32%), inset 0 1px 0 oklch(1 0 0 / 10%);
+
+    /* Aurora colors — higher alpha since dark base absorbs them */
+    --aurora-1: oklch(0.62 0.26 285 / 52%);
+    --aurora-2: oklch(0.65 0.24 215 / 42%);
+    --aurora-3: oklch(0.6 0.22 155 / 36%);
+    --aurora-4: oklch(0.66 0.24 330 / 44%);
+}
+
+/* =========================================================
+   Body provides the opaque base for glass themes.
+   The AppShell wrapper has no background, so the aurora
+   (position: fixed, z-index: -10) shows through directly.
+   ========================================================= */
+[data-theme="liquid-glass"] body {
+    background-image: none;
+    background-color: var(--background);
+}
+
+/* Tighter blob blur on light theme — less spread = more concentrated color */
+[data-theme="liquid-glass"] .aurora-blob {
+    filter: blur(48px);
+}
+
+[data-theme="liquid-glass"] .aurora {
+    filter: blur(32px);
+}
+
+[data-theme="liquid-glass-dark"] body {
+    background-image: none;
+    background-color: var(--background);
+}
+
+/* =========================================================
+   Aurora background layer
+   ========================================================= */
+.aurora-stage {
+    /* No background — the body color shows behind the blobs */
+    will-change: transform;
+}
+
+.aurora {
+    position: absolute;
+    inset: -60% -40%;
+    background:
+        radial-gradient(ellipse 70% 55% at 20% 30%, var(--aurora-1), transparent 65%),
+        radial-gradient(ellipse 60% 50% at 80% 20%, var(--aurora-2), transparent 60%),
+        radial-gradient(ellipse 55% 60% at 55% 75%, var(--aurora-3), transparent 60%),
+        radial-gradient(ellipse 65% 45% at 85% 80%, var(--aurora-4), transparent 55%);
+    animation: aurora-drift 28s ease-in-out infinite alternate;
+    filter: blur(48px);
+}
+
+.aurora-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    animation: blob-drift 20s ease-in-out infinite alternate;
+}
+
+.aurora-blob.b1 {
+    width: 45vw;
+    height: 45vw;
+    top: -10%;
+    left: -5%;
+    background: var(--aurora-1);
+    animation-delay: 0s;
+    animation-duration: 26s;
+}
+
+.aurora-blob.b2 {
+    width: 40vw;
+    height: 40vw;
+    top: 5%;
+    right: -10%;
+    background: var(--aurora-2);
+    animation-delay: -8s;
+    animation-duration: 22s;
+}
+
+.aurora-blob.b3 {
+    width: 50vw;
+    height: 38vw;
+    bottom: -5%;
+    left: 20%;
+    background: var(--aurora-3);
+    animation-delay: -14s;
+    animation-duration: 30s;
+}
+
+.aurora-blob.b4 {
+    width: 36vw;
+    height: 36vw;
+    bottom: 10%;
+    right: 5%;
+    background: var(--aurora-4);
+    animation-delay: -5s;
+    animation-duration: 24s;
+}
+
+@keyframes aurora-drift {
+    0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+    33% { transform: translate(3%, 2%) rotate(4deg) scale(1.03); }
+    66% { transform: translate(-2%, 3%) rotate(-3deg) scale(0.98); }
+    100% { transform: translate(1%, -2%) rotate(2deg) scale(1.02); }
+}
+
+@keyframes blob-drift {
+    0% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(4%, 3%) scale(1.05); }
+    50% { transform: translate(-3%, 5%) scale(0.96); }
+    75% { transform: translate(5%, -2%) scale(1.03); }
+    100% { transform: translate(-2%, 4%) scale(0.98); }
+}
+
+/* Grain overlay for analog texture */
+.grain {
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+    opacity: 0.028;
+    pointer-events: none;
+}
+
+/* =========================================================
+   Glass surface utility
+   ========================================================= */
+.glass {
+    position: relative;
+    isolation: isolate;
+    background: var(--glass-bg);
+    border: 0.5px solid var(--glass-border);
+    backdrop-filter: blur(28px) saturate(170%);
+    -webkit-backdrop-filter: blur(28px) saturate(170%);
+    box-shadow: var(--glass-shadow);
+    overflow: hidden;
+}
+
+/* Top specular edge */
+.glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+        160deg,
+        oklch(1 0 0 / 22%) 0%,
+        oklch(1 0 0 / 6%) 30%,
+        transparent 60%
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Bottom refraction edge */
+.glass::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+        to bottom,
+        oklch(1 0 0 / 12%) 0px,
+        transparent 2px,
+        transparent calc(100% - 2px),
+        oklch(1 0 0 / 6%) 100%
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+.glass > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* Stronger glass for popovers / modals */
+.glass-strong {
+    background: var(--glass-bg-strong);
+    border: 0.5px solid var(--glass-border-strong);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    box-shadow: var(--glass-shadow-lg);
+}
+
+/* Softer glass for nested surfaces */
+.glass-soft {
+    background: var(--glass-bg-soft);
+    border: 0.5px solid var(--glass-border);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+/* Chip variant — small inline badges */
+.glass-chip {
+    background: var(--glass-bg-soft);
+    border: 0.5px solid var(--glass-border);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* =========================================================
+   Glass-ify shadcn Card when liquid-glass theme is active
+   ========================================================= */
+[data-theme^="liquid-glass"] [data-slot="card"] {
+    position: relative;
+    isolation: isolate;
+    background: var(--glass-bg);
+    border: 0.5px solid var(--glass-border);
+    backdrop-filter: blur(28px) saturate(170%);
+    -webkit-backdrop-filter: blur(28px) saturate(170%);
+    box-shadow: var(--glass-shadow);
+    overflow: hidden;
+}
+
+[data-theme^="liquid-glass"] [data-slot="card"]::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+        160deg,
+        oklch(1 0 0 / 20%) 0%,
+        oklch(1 0 0 / 5%) 28%,
+        transparent 55%
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+[data-theme^="liquid-glass"] [data-slot="card"]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+        to bottom,
+        oklch(1 0 0 / 10%) 0px,
+        transparent 2px,
+        transparent calc(100% - 2px),
+        oklch(1 0 0 / 5%) 100%
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+[data-theme^="liquid-glass"] [data-slot="card"] > * {
+    position: relative;
+    z-index: 1;
+}
+
+/*
+  Light variant: reduce blur from 28px → 16px and push saturation to
+  220% so the vivid aurora behind the glass stays vivid instead of
+  averaging into grey. The lower opacity tokens already let more color
+  through; lower blur keeps it sharp.
+*/
+[data-theme="liquid-glass"] [data-slot="card"],
+[data-theme="liquid-glass"] .glass {
+    backdrop-filter: blur(16px) saturate(220%);
+    -webkit-backdrop-filter: blur(16px) saturate(220%);
+}
+
+[data-theme="liquid-glass"] .glass-strong,
+[data-theme="liquid-glass"] .dock-sidebar {
+    backdrop-filter: blur(22px) saturate(220%);
+    -webkit-backdrop-filter: blur(22px) saturate(220%);
+}
+
+
+/* =========================================================
+   Topnav: transparent when at top, glass pill when scrolled
+   ========================================================= */
+
+/* Header wrapper — always transparent; the pill div provides the surface */
+[data-theme^="liquid-glass"] header[data-topnav] {
+    background: transparent;
+}
+
+/* Pill state — glass surface on the controls row */
+[data-theme^="liquid-glass"] [data-pill="true"] {
+    background: var(--glass-bg-strong) !important;
+    border-color: var(--glass-border-strong) !important;
+    backdrop-filter: blur(24px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+    box-shadow: var(--glass-shadow-lg) !important;
+}
+
+/* Light variant — tighter blur keeps aurora colour in the pill */
+[data-theme="liquid-glass"] [data-pill="true"] {
+    backdrop-filter: blur(18px) saturate(220%) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(220%) !important;
+}
+
+/* =========================================================
+   Tooltip / popover content — glass surface
+   ========================================================= */
+[data-theme^="liquid-glass"] [role="tooltip"],
+[data-theme^="liquid-glass"] [data-slot="tooltip-content"] {
+    background: var(--glass-bg-strong) !important;
+    border: 0.5px solid var(--glass-border-strong) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    box-shadow: var(--glass-shadow-lg) !important;
+    color: var(--popover-foreground) !important;
+}
+
+/* Tighter blur on light variant */
+[data-theme="liquid-glass"] [role="tooltip"],
+[data-theme="liquid-glass"] [data-slot="tooltip-content"] {
+    backdrop-filter: blur(18px) saturate(220%) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(220%) !important;
+}
+
+/* =========================================================
+   Glass tabs
+   ========================================================= */
+[data-theme^="liquid-glass"] [role="tablist"] {
+    background: var(--glass-bg-soft);
+    border: 0.5px solid var(--glass-border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+/* =========================================================
+   Tables — glass-aware surfaces
+   =========================================================
+   Problem: Tailwind applies bg-background (opaque) to tbody
+   which blocks the glass card behind it. Strip all opaque
+   table backgrounds so the glass card shows through.
+   ========================================================= */
+
+/* Strip opaque body/footer backgrounds */
+[data-theme^="liquid-glass"] [data-slot="table-body"],
+[data-theme^="liquid-glass"] [data-slot="table-footer"],
+[data-theme^="liquid-glass"] table tbody,
+[data-theme^="liquid-glass"] table tfoot {
+    background: transparent !important;
+}
+
+/* Header: subtle frosted separator */
+[data-theme^="liquid-glass"] [data-slot="table-header"],
+[data-theme^="liquid-glass"] table thead {
+    background: color-mix(in oklab, var(--foreground) 5%, transparent) !important;
+}
+
+/* Row hover — glass tint instead of muted-bg */
+[data-theme^="liquid-glass"] [data-slot="table-row"]:hover,
+[data-theme^="liquid-glass"] table tbody tr:hover {
+    background: var(--glass-bg) !important;
+}
+
+/* Selected row */
+[data-theme^="liquid-glass"] [data-slot="table-row"][data-state="selected"] {
+    background: color-mix(in oklab, var(--primary) 14%, var(--glass-bg)) !important;
+}
+
+/* Table container borders — use glass border token */
+[data-theme^="liquid-glass"] [data-slot="table-container"] {
+    border-color: var(--glass-border);
+}
+
+/* =========================================================
+   Recharts — glowing strokes + invisible gridlines fix
+   ========================================================= */
+[data-theme^="liquid-glass"] .recharts-line .recharts-curve {
+    filter: drop-shadow(0 1px 6px color-mix(in oklab, currentColor 55%, transparent));
+    stroke-width: 2.2;
+}
+
+[data-theme^="liquid-glass"] .recharts-cartesian-grid line {
+    stroke: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+/* =========================================================
+   Markdown editor — glass-aware base background
+   ========================================================= */
+[data-theme^="liquid-glass"] .ph-markdown-editor {
+    --basePageBg: var(--glass-bg-strong);
+}
+
+/* =========================================================
+   Dock sidebar (SidebarDock component)
+   ========================================================= */
+.dock-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 76px;
+    margin: 12px;
+    border-radius: 28px;
+    background: var(--glass-bg-strong);
+    border: 0.5px solid var(--glass-border-strong);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    box-shadow: var(--glass-shadow-lg);
+    overflow: hidden;
+    position: relative;
+    isolation: isolate;
+    transition: width 0.35s cubic-bezier(.2,.8,.2,1);
+}
+
+.dock-sidebar.expanded {
+    width: 232px;
+}
+
+.dock-sidebar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+        175deg,
+        oklch(1 0 0 / 20%) 0%,
+        oklch(1 0 0 / 4%) 25%,
+        transparent 50%
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+.dock-sidebar > * {
+    position: relative;
+    z-index: 1;
+}
+
+.dock-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    border: 1px solid transparent;
+    color: var(--sidebar-foreground);
+    opacity: 0.72;
+    transition: opacity 150ms, background 150ms, border-color 150ms, box-shadow 150ms;
+    position: relative;
+    margin: 0 auto;
+}
+
+.dock-item:hover {
+    opacity: 1;
+    background: var(--glass-bg);
+    border-color: var(--glass-border);
+}
+
+.dock-item.active {
+    opacity: 1;
+    background: color-mix(in oklab, var(--primary) 14%, var(--glass-bg));
+    border-color: color-mix(in oklab, var(--primary) 28%, var(--glass-border));
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--primary) 12%, transparent),
+                inset 0 1px 0 oklch(1 0 0 / 10%);
+    color: var(--primary);
+}
+
+/* Left accent bar on active dock item */
+.dock-item.active::before {
+    content: '';
+    position: absolute;
+    left: -14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 24px;
+    border-radius: 0 2px 2px 0;
+    background: var(--primary);
+    box-shadow: 0 0 8px var(--primary);
+}
+
+.dock-divider {
+    width: 32px;
+    height: 1px;
+    margin: 4px auto;
+    background: var(--glass-border);
+    transition: width 0.35s cubic-bezier(.2,.8,.2,1), margin 0.35s cubic-bezier(.2,.8,.2,1);
+}
+
+/* Section header labels (expanded mode) */
+.dock-section {
+    padding: 8px 8px 4px;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    opacity: 0.7;
+}
+
+/* Expanded item layout */
+.dock-sidebar.expanded nav {
+    align-items: stretch;
+}
+
+.dock-sidebar.expanded .dock-item {
+    width: 100%;
+    height: 40px;
+    justify-content: flex-start;
+    padding: 0 12px;
+    gap: 12px;
+    border-radius: 12px;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+/* Hide left accent bar in expanded mode — item is full-width */
+.dock-sidebar.expanded .dock-item.active::before {
+    display: none;
+}
+
+/* Text label */
+.dock-label {
+    font-size: 12.5px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dock-item.active .dock-label {
+    font-weight: 600;
+}
