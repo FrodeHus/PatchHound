@@ -3,13 +3,16 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
 import { z } from 'zod'
 import { AlertTriangle, CheckCircle2, ShieldAlert, TimerReset } from 'lucide-react'
-import { fetchDashboardBurndown, fetchDashboardFilterOptions, fetchDashboardSummary, fetchDashboardTrends } from '@/api/dashboard.functions'
-import { Card, CardContent } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { InsetPanel } from '@/components/ui/inset-panel'
-import { Sparkline } from '@/components/features/dashboard/Sparkline'
-import { CriticalVulnerabilities } from '@/components/features/dashboard/CriticalVulnerabilities'
-import { DashboardFilterBar } from '@/components/features/dashboard/DashboardFilterBar'
+import {
+  fetchDashboardBurndown,
+  fetchDashboardSummary,
+  fetchDashboardTrends,
+} from "@/api/dashboard.functions";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InsetPanel } from "@/components/ui/inset-panel";
+import { Sparkline } from "@/components/features/dashboard/Sparkline";
+import { CriticalVulnerabilities } from "@/components/features/dashboard/CriticalVulnerabilities";
 import { DeviceGroupVulnerabilityChart } from '@/components/features/dashboard/DeviceGroupVulnerabilityChart'
 import { DeviceGroupRiskDetailDialog } from '@/components/features/dashboard/DeviceGroupRiskDetailDialog'
 import { DeviceHealthCard } from '@/components/features/dashboard/DeviceHealthCard'
@@ -76,12 +79,7 @@ function DashboardPage() {
     enabled: Boolean(selectedTenantId),
     staleTime: 30_000,
   })
-  const filterOptionsQuery = useQuery({
-    queryKey: ['dashboard', 'filter-options', selectedTenantId],
-    queryFn: () => fetchDashboardFilterOptions(),
-    enabled: Boolean(selectedTenantId),
-    staleTime: 60_000,
-  })
+
 
   const globalNavigate = useNavigate()
 
@@ -146,22 +144,6 @@ function DashboardPage() {
           isLoading={summaryQuery.isFetching}
         />
       ) : null}
-
-      <DashboardFilterBar
-        minAgeDays={minAgeDays}
-        platform={platform}
-        deviceGroup={deviceGroup}
-        filterOptions={filterOptionsQuery.data}
-        onMinAgeDaysChange={(value) =>
-          void navigate({ search: (prev) => ({ ...prev, minAgeDays: value }) })
-        }
-        onPlatformChange={(value) =>
-          void navigate({ search: (prev) => ({ ...prev, platform: value }) })
-        }
-        onDeviceGroupChange={(value) =>
-          void navigate({ search: (prev) => ({ ...prev, deviceGroup: value }) })
-        }
-      />
 
       <Card className="overflow-hidden rounded-2xl border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_18%,transparent),transparent_42%),linear-gradient(180deg,color-mix(in_oklab,var(--card)_92%,black),var(--card))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <CardContent className="p-6 sm:p-7">
