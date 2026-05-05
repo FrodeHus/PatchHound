@@ -79,6 +79,7 @@ export function AppShell({ user, children }: AppShellProps) {
             <div className="sticky top-0 hidden h-dvh md:block">
               <SidebarDock
                 user={user}
+                expanded={!isDesktopCollapsed}
                 onLogout={() => {
                   window.location.href = "/auth/logout";
                 }}

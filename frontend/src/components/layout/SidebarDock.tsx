@@ -6,7 +6,9 @@ import {
   ClipboardCheck,
   ClipboardList,
   LayoutDashboard,
+  LogOut,
   ScrollText,
+  Server,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -14,8 +16,6 @@ import {
   Laptop,
   AppWindow,
   Wrench,
-  LogOut,
-  Server,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -105,13 +105,39 @@ function getInitials(displayName: string, email: string) {
 
 type SidebarDockProps = {
   user: CurrentUser
+  expanded?: boolean
   onLogout?: () => void
   onNavigate?: () => void
 }
 
-function DockLink({ item, pathname, onNavigate }: { item: NavItem; pathname: string; onNavigate?: () => void }) {
+function DockLink({
+  item,
+  pathname,
+  onNavigate,
+  expanded,
+}: {
+  item: NavItem
+  pathname: string
+  onNavigate?: () => void
+  expanded: boolean
+}) {
   const Icon = item.icon
   const isActive = pathname === item.to || pathname.startsWith(item.to + '/')
+
+  if (expanded) {
+    return (
+      <Link
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        {...({ to: item.to, search: {}, params: {} } as any)}
+        onClick={onNavigate}
+        className={cn('dock-item', isActive && 'active')}
+        aria-label={item.label}
+      >
+        <Icon className="size-5 flex-shrink-0" />
+        <span className="dock-label">{item.label}</span>
+      </Link>
+    )
+  }
 
   return (
     <Tooltip>
@@ -131,7 +157,12 @@ function DockLink({ item, pathname, onNavigate }: { item: NavItem; pathname: str
   )
 }
 
-export function SidebarDock({ user, onLogout, onNavigate }: SidebarDockProps) {
+function SectionHeader({ label, expanded }: { label: string; expanded: boolean }) {
+  if (!expanded) return <div className="dock-divider my-1" />
+  return <div className="dock-section">{label}</div>
+}
+
+export function SidebarDock({ user, expanded = false, onLogout, onNavigate }: SidebarDockProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
 
   const mainItems = allNavItems.filter((item) => canAccess(item, user))
@@ -142,126 +173,176 @@ export function SidebarDock({ user, onLogout, onNavigate }: SidebarDockProps) {
   const hasAssets = visibleAssetItems.length > 0
 
   return (
-    <aside className="dock-sidebar h-dvh sticky top-0">
+    <aside className={cn('dock-sidebar h-dvh', expanded && 'expanded')}>
       {/* Logo */}
-      <div className="flex items-center justify-center py-4">
-        <Tooltip>
-          <TooltipTrigger render={<div />}>
-            <div className="flex size-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/12 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-              <Shield className="size-5" />
+      <div className={cn('flex py-4', expanded ? 'items-center gap-3 px-3' : 'items-center justify-center')}>
+        {expanded ? (
+          <>
+            <div className="flex size-8 flex-shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/12 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+              <Shield className="size-4" />
             </div>
-          </TooltipTrigger>
-          <TooltipContent side="right">PatchHound</TooltipContent>
-        </Tooltip>
+            <span className="text-sm font-semibold text-foreground">PatchHound</span>
+          </>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger render={<div />}>
+              <div className="flex size-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/12 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <Shield className="size-5" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right">PatchHound</TooltipContent>
+          </Tooltip>
+        )}
       </div>
 
-      <div className="dock-divider" />
+      <div className={cn('dock-divider', expanded && 'mx-3')} />
 
       {/* Main nav */}
-      <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto overscroll-contain py-3 [scrollbar-width:none]">
+      <nav className={cn(
+        'flex flex-1 flex-col gap-1 overflow-y-auto overscroll-contain py-3 [scrollbar-width:none]',
+        expanded ? 'px-2' : 'items-center',
+      )}>
+        {expanded && <div className="dock-section">Operations</div>}
+
         {mainItems.map((item) => (
-          <DockLink key={item.to} item={item} pathname={pathname} onNavigate={onNavigate} />
+          <DockLink key={item.to} item={item} pathname={pathname} onNavigate={onNavigate} expanded={expanded} />
         ))}
 
         {/* Dashboards group */}
         {hasDashboards && (
           <>
-            <div className="dock-divider my-1" />
-            <Tooltip>
-              <TooltipTrigger render={<div />}>
-                <div className={cn(
-                  'dock-item',
-                  pathname.startsWith('/dashboard/') && 'active'
-                )}>
-                  <BarChart3 className="size-5" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <div className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">Dashboards</div>
-                <div className="space-y-0.5">
-                  {visibleDashItems.map((item) => (
-                    <Link
-                      key={item.to}
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      {...({ to: item.to, search: {}, params: {} } as any)}
-                      onClick={onNavigate}
-                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              </TooltipContent>
-            </Tooltip>
+            <SectionHeader label="Dashboards" expanded={expanded} />
+            {expanded ? (
+              visibleDashItems.map((item) => (
+                <DockLink key={item.to} item={item} pathname={pathname} onNavigate={onNavigate} expanded={expanded} />
+              ))
+            ) : (
+              <Tooltip>
+                <TooltipTrigger render={<div />}>
+                  <div className={cn('dock-item', pathname.startsWith('/dashboard/') && 'active')}>
+                    <BarChart3 className="size-5" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <div className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Dashboards</div>
+                  <div className="space-y-0.5">
+                    {visibleDashItems.map((item) => (
+                      <Link
+                        key={item.to}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        {...({ to: item.to, search: {}, params: {} } as any)}
+                        onClick={onNavigate}
+                        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </>
         )}
 
         {/* Assets group */}
         {hasAssets && (
           <>
-            <div className="dock-divider my-1" />
-            <Tooltip>
-              <TooltipTrigger render={<div />}>
-                <div className={cn(
-                  'dock-item',
-                  (pathname.startsWith('/devices') || pathname.startsWith('/software') || pathname.startsWith('/assets')) && 'active'
-                )}>
-                  <Server className="size-5" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <div className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">Assets</div>
-                <div className="space-y-0.5">
-                  {visibleAssetItems.map((item) => (
-                    <Link
-                      key={item.to}
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      {...({ to: item.to, search: {}, params: {} } as any)}
-                      onClick={onNavigate}
-                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              </TooltipContent>
-            </Tooltip>
+            <SectionHeader label="Assets" expanded={expanded} />
+            {expanded ? (
+              visibleAssetItems.map((item) => (
+                <DockLink key={item.to} item={item} pathname={pathname} onNavigate={onNavigate} expanded={expanded} />
+              ))
+            ) : (
+              <Tooltip>
+                <TooltipTrigger render={<div />}>
+                  <div className={cn(
+                    'dock-item',
+                    (pathname.startsWith('/devices') || pathname.startsWith('/software') || pathname.startsWith('/assets')) && 'active',
+                  )}>
+                    <Server className="size-5" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <div className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Assets</div>
+                  <div className="space-y-0.5">
+                    {visibleAssetItems.map((item) => (
+                      <Link
+                        key={item.to}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        {...({ to: item.to, search: {}, params: {} } as any)}
+                        onClick={onNavigate}
+                        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </>
         )}
       </nav>
 
-      <div className="dock-divider" />
+      <div className={cn('dock-divider', expanded && 'mx-3')} />
 
-      {/* Footer — avatar + logout */}
-      <div className="flex flex-col items-center gap-2 py-3">
-        <Tooltip>
-          <TooltipTrigger render={<div />}>
-            <Avatar className="size-9 cursor-default">
-              <AvatarFallback className="bg-primary/15 text-[11px] font-semibold text-primary">
+      {/* Footer */}
+      <div className={cn('flex flex-col gap-2 py-3', expanded ? 'px-2' : 'items-center')}>
+        {expanded ? (
+          <div className="flex items-center gap-2.5 rounded-xl px-3 py-1.5">
+            <Avatar className="size-7 flex-shrink-0">
+              <AvatarFallback className="bg-primary/15 text-[10px] font-semibold text-primary">
                 {getInitials(user.displayName, user.email)}
               </AvatarFallback>
             </Avatar>
-          </TooltipTrigger>
-          <TooltipContent side="right">
-            <div className="text-sm font-medium">{user.displayName || 'Signed in'}</div>
-            <div className="text-xs text-muted-foreground">{user.email}</div>
-          </TooltipContent>
-        </Tooltip>
-
-        {onLogout && (
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium leading-none text-foreground">
+                {user.displayName || 'Signed in'}
+              </p>
+              <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{user.email}</p>
+            </div>
+          </div>
+        ) : (
           <Tooltip>
             <TooltipTrigger render={<div />}>
-              <button
-                type="button"
-                className="dock-item text-tone-danger-foreground hover:bg-tone-danger hover:border-tone-danger-border"
-                onClick={onLogout}
-                aria-label="Logout"
-              >
-                <LogOut className="size-4" />
-              </button>
+              <Avatar className="size-9 cursor-default">
+                <AvatarFallback className="bg-primary/15 text-[11px] font-semibold text-primary">
+                  {getInitials(user.displayName, user.email)}
+                </AvatarFallback>
+              </Avatar>
             </TooltipTrigger>
-            <TooltipContent side="right">Logout</TooltipContent>
+            <TooltipContent side="right">
+              <div className="text-sm font-medium">{user.displayName || 'Signed in'}</div>
+              <div className="text-xs text-muted-foreground">{user.email}</div>
+            </TooltipContent>
           </Tooltip>
+        )}
+
+        {onLogout && (
+          expanded ? (
+            <button
+              type="button"
+              className="dock-item text-tone-danger-foreground hover:bg-tone-danger hover:border-tone-danger-border"
+              onClick={onLogout}
+            >
+              <LogOut className="size-4 flex-shrink-0" />
+              <span className="dock-label">Logout</span>
+            </button>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger render={<div />}>
+                <button
+                  type="button"
+                  className="dock-item text-tone-danger-foreground hover:bg-tone-danger hover:border-tone-danger-border"
+                  onClick={onLogout}
+                  aria-label="Logout"
+                >
+                  <LogOut className="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Logout</TooltipContent>
+            </Tooltip>
+          )
         )}
       </div>
     </aside>
