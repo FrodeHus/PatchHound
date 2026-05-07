@@ -11,7 +11,7 @@ vi.mock('@tanstack/react-router', () => ({
 
 vi.mock('@/api/remediation.functions', () => ({
   addRecommendation: vi.fn(),
-  generateRemediationAiSummary: vi.fn(),
+  generateThreatIntel: vi.fn(),
 }))
 
 vi.mock('@/components/ui/textarea', () => ({
