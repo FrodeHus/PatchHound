@@ -14,6 +14,13 @@ vi.mock('@/api/remediation.functions', () => ({
   generateThreatIntel: vi.fn(),
 }))
 
+vi.mock('@/api/work-notes.functions', () => ({
+  fetchWorkNotes: vi.fn().mockResolvedValue([]),
+  createWorkNote: vi.fn(),
+  updateWorkNote: vi.fn(),
+  deleteWorkNote: vi.fn(),
+}))
+
 vi.mock('@/components/ui/textarea', () => ({
   Textarea: (props: TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...props} />,
 }))
