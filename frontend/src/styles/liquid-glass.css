@@ -694,3 +694,52 @@
 .dock-item.active .dock-label {
     font-weight: 600;
 }
+
+.dock-submenu {
+    width: 236px;
+    gap: 8px;
+    border-radius: 18px;
+    border: 0.5px solid color-mix(in oklab, var(--popover-foreground) 14%, var(--glass-border-strong));
+    background: color-mix(in oklab, var(--popover) 94%, var(--background));
+    color: var(--popover-foreground);
+    padding: 10px;
+    box-shadow: 0 22px 50px rgb(0 0 0 / 0.36);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+[data-theme^="liquid-glass"] .dock-submenu {
+    background: color-mix(in oklab, var(--popover) 88%, black) !important;
+    border-color: color-mix(in oklab, var(--popover-foreground) 20%, var(--glass-border-strong)) !important;
+    color: var(--popover-foreground) !important;
+}
+
+.dock-submenu__title {
+    padding: 2px 8px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+}
+
+.dock-submenu__link {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 9px;
+    border-radius: 10px;
+    padding: 8px 9px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--popover-foreground);
+    transition: background 150ms, color 150ms;
+}
+
+.dock-submenu__link:hover,
+.dock-submenu__link:focus-visible {
+    background: color-mix(in oklab, var(--accent) 78%, transparent);
+    color: var(--foreground);
+    outline: none;
+}

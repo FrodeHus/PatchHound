@@ -24,6 +24,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import type { CurrentUser } from '@/server/auth.functions'
 
 type RoleName =
@@ -162,6 +167,48 @@ function SectionHeader({ label, expanded }: { label: string; expanded: boolean }
   return <div className="dock-section">{label}</div>
 }
 
+function DockSubmenu({
+  label,
+  icon: Icon,
+  items,
+  active,
+  onNavigate,
+}: {
+  label: string
+  icon: ComponentType<{ className?: string }>
+  items: NavItem[]
+  active: boolean
+  onNavigate?: () => void
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger render={<button type="button" className={cn('dock-item', active && 'active')} aria-label={label} />}>
+        <Icon className="size-5" />
+      </PopoverTrigger>
+      <PopoverContent side="right" align="center" sideOffset={12} className="dock-submenu">
+        <div className="dock-submenu__title">{label}</div>
+        <div className="space-y-1">
+          {items.map((item) => {
+            const ItemIcon = item.icon
+            return (
+              <Link
+                key={item.to}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                {...({ to: item.to, search: {}, params: {} } as any)}
+                onClick={onNavigate}
+                className="dock-submenu__link"
+              >
+                <ItemIcon className="size-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 truncate">{item.label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 export function SidebarDock({ user, expanded = false, onLogout, onNavigate }: SidebarDockProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
 
@@ -217,29 +264,13 @@ export function SidebarDock({ user, expanded = false, onLogout, onNavigate }: Si
                 <DockLink key={item.to} item={item} pathname={pathname} onNavigate={onNavigate} expanded={expanded} />
               ))
             ) : (
-              <Tooltip>
-                <TooltipTrigger render={<div />}>
-                  <div className={cn('dock-item', pathname.startsWith('/dashboard/') && 'active')}>
-                    <BarChart3 className="size-5" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <div className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Dashboards</div>
-                  <div className="space-y-0.5">
-                    {visibleDashItems.map((item) => (
-                      <Link
-                        key={item.to}
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        {...({ to: item.to, search: {}, params: {} } as any)}
-                        onClick={onNavigate}
-                        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
+              <DockSubmenu
+                label="Dashboards"
+                icon={BarChart3}
+                items={visibleDashItems}
+                active={pathname.startsWith('/dashboard/')}
+                onNavigate={onNavigate}
+              />
             )}
           </>
         )}
@@ -253,32 +284,13 @@ export function SidebarDock({ user, expanded = false, onLogout, onNavigate }: Si
                 <DockLink key={item.to} item={item} pathname={pathname} onNavigate={onNavigate} expanded={expanded} />
               ))
             ) : (
-              <Tooltip>
-                <TooltipTrigger render={<div />}>
-                  <div className={cn(
-                    'dock-item',
-                    (pathname.startsWith('/devices') || pathname.startsWith('/software') || pathname.startsWith('/assets')) && 'active',
-                  )}>
-                    <Server className="size-5" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <div className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Assets</div>
-                  <div className="space-y-0.5">
-                    {visibleAssetItems.map((item) => (
-                      <Link
-                        key={item.to}
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        {...({ to: item.to, search: {}, params: {} } as any)}
-                        onClick={onNavigate}
-                        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
+              <DockSubmenu
+                label="Assets"
+                icon={Server}
+                items={visibleAssetItems}
+                active={pathname.startsWith('/devices') || pathname.startsWith('/software') || pathname.startsWith('/assets')}
+                onNavigate={onNavigate}
+              />
             )}
           </>
         )}
