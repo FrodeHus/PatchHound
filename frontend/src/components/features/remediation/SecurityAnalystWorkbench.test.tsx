@@ -21,6 +21,17 @@ vi.mock('@/api/work-notes.functions', () => ({
   deleteWorkNote: vi.fn(),
 }))
 
+vi.mock('@/components/layout/tenant-scope', () => ({
+  useTenantScope: () => ({
+    selectedTenantId: 'test-tenant-id',
+    tenants: [],
+    isLoadingTenants: false,
+    setSelectedTenantId: vi.fn(),
+    tenantPendingDeletion: false,
+    clearTenantPendingDeletion: vi.fn(),
+  }),
+}))
+
 vi.mock('@/components/ui/textarea', () => ({
   Textarea: (props: TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...props} />,
 }))
