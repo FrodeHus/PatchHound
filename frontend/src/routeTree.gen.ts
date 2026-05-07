@@ -72,6 +72,8 @@ import { Route as AuthedAdminDeviceRulesIdRouteImport } from './routes/_authed/a
 import { Route as AuthedAdminPlatformAccessIndexRouteImport } from './routes/_authed/admin/platform/access/index'
 import { Route as AuthedWorkbenchesSecurityAnalystCasesCaseIdRouteImport } from './routes/_authed/workbenches/security-analyst/cases.$caseId'
 import { Route as AuthedWorkbenchesAssetOwnerCasesCaseIdRouteImport } from './routes/_authed/workbenches/asset-owner/cases.$caseId'
+import { Route as AuthedAdminPlatformSecurityProfilesNewRouteImport } from './routes/_authed/admin/platform/security-profiles.new'
+import { Route as AuthedAdminPlatformSecurityProfilesProfileIdRouteImport } from './routes/_authed/admin/platform/security-profiles.$profileId'
 import { Route as AuthedAdminPlatformAccessUserIdRouteImport } from './routes/_authed/admin/platform/access/$userId'
 
 const AuthedRoute = AuthedRouteImport.update({
@@ -415,6 +417,18 @@ const AuthedWorkbenchesAssetOwnerCasesCaseIdRoute =
     path: '/workbenches/asset-owner/cases/$caseId',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedAdminPlatformSecurityProfilesNewRoute =
+  AuthedAdminPlatformSecurityProfilesNewRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => AuthedAdminPlatformSecurityProfilesRoute,
+  } as any)
+const AuthedAdminPlatformSecurityProfilesProfileIdRoute =
+  AuthedAdminPlatformSecurityProfilesProfileIdRouteImport.update({
+    id: '/$profileId',
+    path: '/$profileId',
+    getParentRoute: () => AuthedAdminPlatformSecurityProfilesRoute,
+  } as any)
 const AuthedAdminPlatformAccessUserIdRoute =
   AuthedAdminPlatformAccessUserIdRouteImport.update({
     id: '/admin/platform/access/$userId',
@@ -467,7 +481,7 @@ export interface FileRoutesByFullPath {
   '/admin/platform/feature-flags': typeof AuthedAdminPlatformFeatureFlagsRoute
   '/admin/platform/integrations': typeof AuthedAdminPlatformIntegrationsRoute
   '/admin/platform/notifications': typeof AuthedAdminPlatformNotificationsRoute
-  '/admin/platform/security-profiles': typeof AuthedAdminPlatformSecurityProfilesRoute
+  '/admin/platform/security-profiles': typeof AuthedAdminPlatformSecurityProfilesRouteWithChildren
   '/admin/teams/$id': typeof AuthedAdminTeamsIdRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
   '/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
@@ -483,6 +497,8 @@ export interface FileRoutesByFullPath {
   '/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
   '/assets/applications/': typeof AuthedAssetsApplicationsIndexRoute
   '/admin/platform/access/$userId': typeof AuthedAdminPlatformAccessUserIdRoute
+  '/admin/platform/security-profiles/$profileId': typeof AuthedAdminPlatformSecurityProfilesProfileIdRoute
+  '/admin/platform/security-profiles/new': typeof AuthedAdminPlatformSecurityProfilesNewRoute
   '/workbenches/asset-owner/cases/$caseId': typeof AuthedWorkbenchesAssetOwnerCasesCaseIdRoute
   '/workbenches/security-analyst/cases/$caseId': typeof AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute
   '/admin/platform/access/': typeof AuthedAdminPlatformAccessIndexRoute
@@ -532,7 +548,7 @@ export interface FileRoutesByTo {
   '/admin/platform/feature-flags': typeof AuthedAdminPlatformFeatureFlagsRoute
   '/admin/platform/integrations': typeof AuthedAdminPlatformIntegrationsRoute
   '/admin/platform/notifications': typeof AuthedAdminPlatformNotificationsRoute
-  '/admin/platform/security-profiles': typeof AuthedAdminPlatformSecurityProfilesRoute
+  '/admin/platform/security-profiles': typeof AuthedAdminPlatformSecurityProfilesRouteWithChildren
   '/admin/teams/$id': typeof AuthedAdminTeamsIdRoute
   '/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
   '/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
@@ -548,6 +564,8 @@ export interface FileRoutesByTo {
   '/admin/workflows': typeof AuthedAdminWorkflowsIndexRoute
   '/assets/applications': typeof AuthedAssetsApplicationsIndexRoute
   '/admin/platform/access/$userId': typeof AuthedAdminPlatformAccessUserIdRoute
+  '/admin/platform/security-profiles/$profileId': typeof AuthedAdminPlatformSecurityProfilesProfileIdRoute
+  '/admin/platform/security-profiles/new': typeof AuthedAdminPlatformSecurityProfilesNewRoute
   '/workbenches/asset-owner/cases/$caseId': typeof AuthedWorkbenchesAssetOwnerCasesCaseIdRoute
   '/workbenches/security-analyst/cases/$caseId': typeof AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute
   '/admin/platform/access': typeof AuthedAdminPlatformAccessIndexRoute
@@ -599,7 +617,7 @@ export interface FileRoutesById {
   '/_authed/admin/platform/feature-flags': typeof AuthedAdminPlatformFeatureFlagsRoute
   '/_authed/admin/platform/integrations': typeof AuthedAdminPlatformIntegrationsRoute
   '/_authed/admin/platform/notifications': typeof AuthedAdminPlatformNotificationsRoute
-  '/_authed/admin/platform/security-profiles': typeof AuthedAdminPlatformSecurityProfilesRoute
+  '/_authed/admin/platform/security-profiles': typeof AuthedAdminPlatformSecurityProfilesRouteWithChildren
   '/_authed/admin/teams/$id': typeof AuthedAdminTeamsIdRoute
   '/_authed/admin/tenants/$id': typeof AuthedAdminTenantsIdRoute
   '/_authed/admin/workflows/$id': typeof AuthedAdminWorkflowsIdRoute
@@ -615,6 +633,8 @@ export interface FileRoutesById {
   '/_authed/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
   '/_authed/assets/applications/': typeof AuthedAssetsApplicationsIndexRoute
   '/_authed/admin/platform/access/$userId': typeof AuthedAdminPlatformAccessUserIdRoute
+  '/_authed/admin/platform/security-profiles/$profileId': typeof AuthedAdminPlatformSecurityProfilesProfileIdRoute
+  '/_authed/admin/platform/security-profiles/new': typeof AuthedAdminPlatformSecurityProfilesNewRoute
   '/_authed/workbenches/asset-owner/cases/$caseId': typeof AuthedWorkbenchesAssetOwnerCasesCaseIdRoute
   '/_authed/workbenches/security-analyst/cases/$caseId': typeof AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute
   '/_authed/admin/platform/access/': typeof AuthedAdminPlatformAccessIndexRoute
@@ -682,6 +702,8 @@ export interface FileRouteTypes {
     | '/admin/workflows/'
     | '/assets/applications/'
     | '/admin/platform/access/$userId'
+    | '/admin/platform/security-profiles/$profileId'
+    | '/admin/platform/security-profiles/new'
     | '/workbenches/asset-owner/cases/$caseId'
     | '/workbenches/security-analyst/cases/$caseId'
     | '/admin/platform/access/'
@@ -747,6 +769,8 @@ export interface FileRouteTypes {
     | '/admin/workflows'
     | '/assets/applications'
     | '/admin/platform/access/$userId'
+    | '/admin/platform/security-profiles/$profileId'
+    | '/admin/platform/security-profiles/new'
     | '/workbenches/asset-owner/cases/$caseId'
     | '/workbenches/security-analyst/cases/$caseId'
     | '/admin/platform/access'
@@ -813,6 +837,8 @@ export interface FileRouteTypes {
     | '/_authed/admin/workflows/'
     | '/_authed/assets/applications/'
     | '/_authed/admin/platform/access/$userId'
+    | '/_authed/admin/platform/security-profiles/$profileId'
+    | '/_authed/admin/platform/security-profiles/new'
     | '/_authed/workbenches/asset-owner/cases/$caseId'
     | '/_authed/workbenches/security-analyst/cases/$caseId'
     | '/_authed/admin/platform/access/'
@@ -1273,6 +1299,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedWorkbenchesAssetOwnerCasesCaseIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/platform/security-profiles/new': {
+      id: '/_authed/admin/platform/security-profiles/new'
+      path: '/new'
+      fullPath: '/admin/platform/security-profiles/new'
+      preLoaderRoute: typeof AuthedAdminPlatformSecurityProfilesNewRouteImport
+      parentRoute: typeof AuthedAdminPlatformSecurityProfilesRoute
+    }
+    '/_authed/admin/platform/security-profiles/$profileId': {
+      id: '/_authed/admin/platform/security-profiles/$profileId'
+      path: '/$profileId'
+      fullPath: '/admin/platform/security-profiles/$profileId'
+      preLoaderRoute: typeof AuthedAdminPlatformSecurityProfilesProfileIdRouteImport
+      parentRoute: typeof AuthedAdminPlatformSecurityProfilesRoute
+    }
     '/_authed/admin/platform/access/$userId': {
       id: '/_authed/admin/platform/access/$userId'
       path: '/admin/platform/access/$userId'
@@ -1296,6 +1336,24 @@ const AuthedDashboardMyAssetsRouteChildren: AuthedDashboardMyAssetsRouteChildren
 const AuthedDashboardMyAssetsRouteWithChildren =
   AuthedDashboardMyAssetsRoute._addFileChildren(
     AuthedDashboardMyAssetsRouteChildren,
+  )
+
+interface AuthedAdminPlatformSecurityProfilesRouteChildren {
+  AuthedAdminPlatformSecurityProfilesProfileIdRoute: typeof AuthedAdminPlatformSecurityProfilesProfileIdRoute
+  AuthedAdminPlatformSecurityProfilesNewRoute: typeof AuthedAdminPlatformSecurityProfilesNewRoute
+}
+
+const AuthedAdminPlatformSecurityProfilesRouteChildren: AuthedAdminPlatformSecurityProfilesRouteChildren =
+  {
+    AuthedAdminPlatformSecurityProfilesProfileIdRoute:
+      AuthedAdminPlatformSecurityProfilesProfileIdRoute,
+    AuthedAdminPlatformSecurityProfilesNewRoute:
+      AuthedAdminPlatformSecurityProfilesNewRoute,
+  }
+
+const AuthedAdminPlatformSecurityProfilesRouteWithChildren =
+  AuthedAdminPlatformSecurityProfilesRoute._addFileChildren(
+    AuthedAdminPlatformSecurityProfilesRouteChildren,
   )
 
 interface AuthedRouteChildren {
@@ -1335,7 +1393,7 @@ interface AuthedRouteChildren {
   AuthedAdminPlatformFeatureFlagsRoute: typeof AuthedAdminPlatformFeatureFlagsRoute
   AuthedAdminPlatformIntegrationsRoute: typeof AuthedAdminPlatformIntegrationsRoute
   AuthedAdminPlatformNotificationsRoute: typeof AuthedAdminPlatformNotificationsRoute
-  AuthedAdminPlatformSecurityProfilesRoute: typeof AuthedAdminPlatformSecurityProfilesRoute
+  AuthedAdminPlatformSecurityProfilesRoute: typeof AuthedAdminPlatformSecurityProfilesRouteWithChildren
   AuthedAdminTeamsIdRoute: typeof AuthedAdminTeamsIdRoute
   AuthedAdminTenantsIdRoute: typeof AuthedAdminTenantsIdRoute
   AuthedAdminWorkflowsIdRoute: typeof AuthedAdminWorkflowsIdRoute
@@ -1393,7 +1451,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminPlatformIntegrationsRoute: AuthedAdminPlatformIntegrationsRoute,
   AuthedAdminPlatformNotificationsRoute: AuthedAdminPlatformNotificationsRoute,
   AuthedAdminPlatformSecurityProfilesRoute:
-    AuthedAdminPlatformSecurityProfilesRoute,
+    AuthedAdminPlatformSecurityProfilesRouteWithChildren,
   AuthedAdminTeamsIdRoute: AuthedAdminTeamsIdRoute,
   AuthedAdminTenantsIdRoute: AuthedAdminTenantsIdRoute,
   AuthedAdminWorkflowsIdRoute: AuthedAdminWorkflowsIdRoute,

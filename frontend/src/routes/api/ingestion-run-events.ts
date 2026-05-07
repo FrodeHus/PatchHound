@@ -71,6 +71,7 @@ export const Route = createFileRoute('/api/ingestion-run-events')({
                 {
                   token: session.accessToken!,
                   tenantId,
+                  activeRoles: session.activeRoles ?? [],
                 },
               )
 
