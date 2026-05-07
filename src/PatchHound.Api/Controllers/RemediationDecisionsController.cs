@@ -443,7 +443,11 @@ public class RemediationDecisionsController(
 
         var result = await threatIntelService.GenerateAsync(tenantId, caseId, ct);
         if (!result.IsSuccess)
+        {
+            if (result.Error == "Remediation case not found.")
+                return NotFound(new ProblemDetails { Title = result.Error });
             return BadRequest(new ProblemDetails { Title = result.Error });
+        }
 
         return Ok(result.Value);
     }

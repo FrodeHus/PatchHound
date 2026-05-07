@@ -957,9 +957,10 @@ public class RemediationDecisionQueryService(
             decision
         );
 
+        var aiProfileAvailable = (await aiConfigurationResolver.ResolveDefaultAsync(tenantId, ct)).IsSuccess;
+
         var aiSummary = await ResolveAiSummaryAsync(ct);
 
-        var aiProfileAvailable = (await aiConfigurationResolver.ResolveDefaultAsync(tenantId, ct)).IsSuccess;
         var threatIntel = new ThreatIntelDto(
             caseMeta.ThreatIntelSummary,
             caseMeta.ThreatIntelGeneratedAt,

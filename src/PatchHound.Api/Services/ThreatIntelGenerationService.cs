@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Models.Decisions;
 using PatchHound.Core.Common;
@@ -51,26 +50,22 @@ public class ThreatIntelGenerationService(
             .Select(p => $"{p.Vendor} {p.Name}".Trim())
             .FirstOrDefaultAsync(ct) ?? "Unknown software";
 
-        var topVulns = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+        var openVulnIds = dbContext.DeviceVulnerabilityExposures.AsNoTracking()
             .Where(e => e.TenantId == tenantId
                 && e.SoftwareProductId == softwareProductId
                 && e.Status == ExposureStatus.Open)
-            .GroupBy(e => new
+            .Select(e => e.VulnerabilityId)
+            .Distinct();
+
+        var topVulns = await dbContext.Vulnerabilities.AsNoTracking()
+            .Where(v => openVulnIds.Contains(v.Id))
+            .Select(v => new
             {
-                e.VulnerabilityId,
-                e.Vulnerability.ExternalId,
-                e.Vulnerability.Title,
-                VendorSeverity = e.Vulnerability.VendorSeverity,
-                e.Vulnerability.CvssScore,
-                e.Vulnerability.Description,
-            })
-            .Select(g => new
-            {
-                g.Key.ExternalId,
-                g.Key.Title,
-                g.Key.VendorSeverity,
-                g.Key.CvssScore,
-                g.Key.Description,
+                v.ExternalId,
+                v.Title,
+                VendorSeverity = v.VendorSeverity,
+                v.CvssScore,
+                v.Description,
             })
             .OrderByDescending(v => v.VendorSeverity)
             .ThenByDescending(v => v.CvssScore)
