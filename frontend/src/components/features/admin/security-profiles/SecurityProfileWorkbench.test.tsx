@@ -30,4 +30,27 @@ describe('SecurityProfileWorkbench', () => {
     expect(screen.getByRole('button', { name: 'Save as draft' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Apply profile' })).toBeInTheDocument()
   })
+
+  it('uses the app theme instead of a standalone gradient surface', () => {
+    const draft = createSecurityProfileDraft()
+
+    const { container } = render(
+      <SecurityProfileWorkbench
+        mode="create"
+        tenantName="Reothor Labs"
+        draft={draft}
+        isSaving={false}
+        onDraftChange={vi.fn()}
+        onCancel={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    )
+
+    const workbench = container.querySelector('section')
+
+    expect(workbench).toHaveClass('space-y-5')
+    expect(workbench?.className).not.toContain('bg-[linear-gradient')
+    expect(workbench?.className).not.toContain('-m-')
+    expect(container.querySelector('.bg-card\\/85')).toBeInTheDocument()
+  })
 })
