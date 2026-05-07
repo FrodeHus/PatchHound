@@ -16,6 +16,7 @@ public class RemediationCaseConfiguration : IEntityTypeConfiguration<Remediation
         builder.Property(c => c.Status).HasConversion<string>().HasMaxLength(32);
         builder.Property(c => c.CreatedAt).IsRequired();
         builder.Property(c => c.UpdatedAt).IsRequired();
+        builder.Property(c => c.ThreatIntelProfileName).HasMaxLength(256);
 
         builder.HasIndex(c => new { c.TenantId, c.SoftwareProductId }).IsUnique();
         builder.HasIndex(c => c.TenantId);

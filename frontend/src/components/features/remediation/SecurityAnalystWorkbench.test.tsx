@@ -11,7 +11,25 @@ vi.mock('@tanstack/react-router', () => ({
 
 vi.mock('@/api/remediation.functions', () => ({
   addRecommendation: vi.fn(),
-  generateRemediationAiSummary: vi.fn(),
+  generateThreatIntel: vi.fn(),
+}))
+
+vi.mock('@/api/work-notes.functions', () => ({
+  fetchWorkNotes: vi.fn().mockResolvedValue([]),
+  createWorkNote: vi.fn(),
+  updateWorkNote: vi.fn(),
+  deleteWorkNote: vi.fn(),
+}))
+
+vi.mock('@/components/layout/tenant-scope', () => ({
+  useTenantScope: () => ({
+    selectedTenantId: 'test-tenant-id',
+    tenants: [],
+    isLoadingTenants: false,
+    setSelectedTenantId: vi.fn(),
+    tenantPendingDeletion: false,
+    clearTenantPendingDeletion: vi.fn(),
+  }),
 }))
 
 vi.mock('@/components/ui/textarea', () => ({
@@ -129,6 +147,13 @@ const dataFixture: DecisionContext = {
     canGenerate: true,
     isGenerating: false,
     lastError: null,
+    unavailableMessage: null,
+  },
+  threatIntel: {
+    summary: null,
+    generatedAt: null,
+    profileName: null,
+    canGenerate: true,
     unavailableMessage: null,
   },
 }

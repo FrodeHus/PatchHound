@@ -8,6 +8,7 @@ import {
   decisionContextSchema,
   pagedDecisionListSchema,
   remediationDecisionSchema,
+  threatIntelSchema,
   vulnerabilityOverrideSchema,
 } from './remediation.schemas'
 import { buildFilterParams } from './utils'
@@ -124,6 +125,14 @@ export const generateRemediationAiSummary = createServerFn({ method: 'POST' })
   .handler(async ({ context, data: { caseId } }) => {
     const data = await apiPost(`/remediation/cases/${caseId}/ai-summary`, context, {})
     return decisionAiSummarySchema.parse(data)
+  })
+
+export const generateThreatIntel = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ caseId: z.string().uuid() }))
+  .handler(async ({ context, data: { caseId } }) => {
+    const data = await apiPost(`/remediation/cases/${caseId}/threat-intel`, context, {})
+    return threatIntelSchema.parse(data)
   })
 
 export const reviewRemediationAiSummary = createServerFn({ method: 'POST' })

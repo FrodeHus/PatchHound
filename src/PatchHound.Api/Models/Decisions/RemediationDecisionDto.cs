@@ -23,7 +23,8 @@ public record DecisionContextDto(
     List<DecisionVulnDto> OpenVulnerabilities,
     DecisionRiskDto? RiskScore,
     DecisionSlaDto? Sla,
-    DecisionAiSummaryDto AiSummary
+    DecisionAiSummaryDto AiSummary,
+    ThreatIntelDto ThreatIntel
 );
 
 public record DecisionBusinessLabelDto(
@@ -63,6 +64,14 @@ public record DecisionAiSummaryDto(
     bool CanGenerate,
     bool IsGenerating,
     string? LastError,
+    string? UnavailableMessage
+);
+
+public record ThreatIntelDto(
+    string? Summary,
+    DateTimeOffset? GeneratedAt,
+    string? ProfileName,
+    bool CanGenerate,
     string? UnavailableMessage
 );
 

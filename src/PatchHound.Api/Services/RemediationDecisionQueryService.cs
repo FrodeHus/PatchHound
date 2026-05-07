@@ -19,6 +19,7 @@ public class RemediationDecisionQueryService(
     PatchHoundDbContext dbContext,
     SlaService slaService,
     TenantAiTextGenerationService aiTextGenerationService,
+    ITenantAiConfigurationResolver aiConfigurationResolver,
     ITenantContext tenantContext
 )
 {
@@ -458,6 +459,9 @@ public class RemediationDecisionQueryService(
                 Vendor = c.SoftwareProduct.Vendor,
                 Category = c.SoftwareProduct.Category,
                 ProductDescription = c.SoftwareProduct.Description,
+                c.ThreatIntelSummary,
+                c.ThreatIntelGeneratedAt,
+                c.ThreatIntelProfileName,
             })
             .FirstOrDefaultAsync(ct);
 
@@ -953,7 +957,19 @@ public class RemediationDecisionQueryService(
             decision
         );
 
+        var aiProfileAvailable = (await aiConfigurationResolver.ResolveDefaultAsync(tenantId, ct)).IsSuccess;
+
         var aiSummary = await ResolveAiSummaryAsync(ct);
+
+        var threatIntel = new ThreatIntelDto(
+            caseMeta.ThreatIntelSummary,
+            caseMeta.ThreatIntelGeneratedAt,
+            caseMeta.ThreatIntelProfileName,
+            CanGenerate: aiProfileAvailable,
+            UnavailableMessage: aiProfileAvailable
+                ? null
+                : "Set up and enable a default AI profile for this tenant to retrieve threat intelligence."
+        );
 
         return new DecisionContextDto(
             remediationCaseId,
@@ -991,7 +1007,8 @@ public class RemediationDecisionQueryService(
             topVulns,
             riskDto,
             slaDto,
-            aiSummary
+            aiSummary,
+            threatIntel
         );
     }
 
