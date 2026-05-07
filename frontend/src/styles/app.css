@@ -656,6 +656,13 @@
 }
 
 .ph-markdown-editor.mdxeditor-popup-container {
+    --basePageBg: var(--popover);
+    --baseBase: color-mix(in oklab, var(--background) 88%, var(--card));
+    --baseBgSubtle: color-mix(in oklab, var(--background) 84%, var(--card));
+    --baseBg: color-mix(in oklab, var(--background) 80%, var(--card));
+    --baseBorder: var(--input);
+    --baseText: var(--muted-foreground);
+    --baseTextContrast: var(--foreground);
     z-index: 1000;
 }
 
@@ -685,7 +692,7 @@
 .ph-markdown-editor.mdxeditor-popup-container [class*="_linkDialogInputWrapper_"] {
     min-height: 2.25rem;
     border: 1px solid var(--input);
-    background: color-mix(in oklab, var(--background) 88%, var(--card));
+    background-color: color-mix(in oklab, var(--background) 88%, var(--card));
     color: var(--foreground);
 }
 
@@ -694,6 +701,7 @@
     width: 100%;
     color: var(--foreground);
     caret-color: var(--primary);
+    -webkit-text-fill-color: var(--foreground);
 }
 
 .ph-markdown-editor.mdxeditor-popup-container [class*="_linkDialogInput_"]::placeholder,
