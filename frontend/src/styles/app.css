@@ -655,8 +655,12 @@
     color: var(--muted-foreground);
 }
 
+.ph-markdown-editor.mdxeditor-popup-container {
+    z-index: 1000;
+}
+
 .ph-markdown-editor.mdxeditor-popup-container [class*="_linkDialogPopoverContent_"] {
-    z-index: 70;
+    z-index: 1001;
     align-items: stretch;
     min-width: min(24rem, calc(100vw - 2rem));
     border: 1px solid color-mix(in oklab, var(--border) 78%, var(--foreground));
