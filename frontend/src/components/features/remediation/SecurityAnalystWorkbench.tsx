@@ -1,12 +1,15 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Bot, ExternalLink, LoaderCircle, Save, SearchCheck, ShieldAlert, Sparkles, TriangleAlert } from 'lucide-react'
+import { Bot, ExternalLink, LoaderCircle, NotebookPen, Pencil, Save, SearchCheck, ShieldAlert, Sparkles, Trash2, TriangleAlert } from 'lucide-react'
 import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
 import { addRecommendation, generateRemediationAiSummary } from '@/api/remediation.functions'
+import { createWorkNote, deleteWorkNote, fetchWorkNotes, updateWorkNote } from '@/api/work-notes.functions'
+import type { WorkNote } from '@/api/work-notes.schemas'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { MarkdownViewer } from '@/components/ui/markdown-viewer'
 import {
   Select,
   SelectContent,
@@ -16,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
+import { useTenantScope } from '@/components/layout/tenant-scope'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { formatDateTime, formatNullableDateTime, startCase } from '@/lib/formatting'
 import { toneBadge } from '@/lib/tone-classes'
@@ -498,6 +502,8 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
           if (!open) setSelectedVulnerability(null);
         }}
       />
+
+      <WorkNotesSection caseId={caseId} />
     </section>
   );
 }
@@ -687,6 +693,187 @@ function VulnerabilityEssentialsSheet({
         ) : null}
       </SheetContent>
     </Sheet>
+  )
+}
+
+function WorkNotesSection({ caseId }: { caseId: string }) {
+  const { selectedTenantId } = useTenantScope()
+  const queryClient = useQueryClient()
+  const [content, setContent] = useState('')
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  const queryKey = useMemo(
+    () => ['work-notes', selectedTenantId, 'remediations', caseId] as const,
+    [selectedTenantId, caseId],
+  )
+
+  const notesQuery = useQuery({
+    queryKey,
+    queryFn: () => fetchWorkNotes({ data: { entityType: 'remediations', entityId: caseId } }),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (markdown: string) =>
+      createWorkNote({ data: { entityType: 'remediations', entityId: caseId, content: markdown } }),
+    onSuccess: async () => {
+      setContent('')
+      await queryClient.invalidateQueries({ queryKey })
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ noteId, markdown }: { noteId: string; markdown: string }) =>
+      updateWorkNote({ data: { noteId, content: markdown } }),
+    onSuccess: async () => {
+      setContent('')
+      setEditingNoteId(null)
+      await queryClient.invalidateQueries({ queryKey })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (noteId: string) => deleteWorkNote({ data: { noteId } }),
+    onSuccess: async () => {
+      if (editingNoteId === confirmDeleteId) {
+        setEditingNoteId(null)
+        setContent('')
+      }
+      setConfirmDeleteId(null)
+      await queryClient.invalidateQueries({ queryKey })
+    },
+  })
+
+  const notes = notesQuery.data ?? []
+  const isEditing = editingNoteId !== null
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
+
+  function beginEdit(note: WorkNote) {
+    setEditingNoteId(note.id)
+    setContent(note.content)
+    setConfirmDeleteId(null)
+  }
+
+  function resetComposer() {
+    setEditingNoteId(null)
+    setContent('')
+    setConfirmDeleteId(null)
+  }
+
+  function handleSubmit() {
+    const trimmed = content.trim()
+    if (!trimmed) return
+    if (editingNoteId) {
+      updateMutation.mutate({ noteId: editingNoteId, markdown: trimmed })
+    } else {
+      createMutation.mutate(trimmed)
+    }
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <NotebookPen className="size-4 text-muted-foreground" />
+        <h2 className="text-lg font-semibold">Work notes</h2>
+        {notesQuery.isFetching ? (
+          <LoaderCircle className="size-3.5 animate-spin text-muted-foreground" />
+        ) : notes.length > 0 ? (
+          <span className="text-sm text-muted-foreground">({notes.length})</span>
+        ) : null}
+      </div>
+
+      {notes.length === 0 && !notesQuery.isFetching ? (
+        <div className="rounded-lg border border-dashed border-border/60 bg-card/50 px-4 py-6 text-center text-sm text-muted-foreground">
+          No work notes yet. Capture useful context, links, or handover notes below.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {notes.map((note) => (
+            <article key={note.id} className="rounded-lg border border-border/70 bg-card px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">{note.authorDisplayName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDateTime(note.updatedAt ?? note.createdAt)}
+                    {note.updatedAt ? ' · edited' : ''}
+                  </p>
+                </div>
+                {note.canEdit || note.canDelete ? (
+                  <div className="flex items-center gap-1">
+                    {note.canEdit ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        onClick={() => beginEdit(note)}
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                    ) : null}
+                    {note.canDelete ? (
+                      confirmDeleteId === note.id ? (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteMutation.mutate(note.id)}
+                          disabled={deleteMutation.isPending}
+                        >
+                          Confirm delete
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          onClick={() => setConfirmDeleteId(note.id)}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      )
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+              <MarkdownViewer content={note.content} className="mt-3" />
+            </article>
+          ))}
+        </div>
+      )}
+
+      <div className="rounded-lg border border-border/60 bg-card px-4 py-4 space-y-3">
+        <p className="text-sm font-medium">
+          {isEditing ? 'Edit note' : 'Add note'}
+        </p>
+        <p className="text-xs text-muted-foreground -mt-1">
+          Markdown supported. Links, context, and handover notes are welcome.
+        </p>
+        <Textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          rows={4}
+          placeholder="Write a note — markdown and links are supported…"
+          className="bg-background/60"
+        />
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting || content.trim().length === 0}
+          >
+            {isSubmitting ? <LoaderCircle className="size-4 animate-spin" /> : null}
+            {isSubmitting ? 'Saving…' : isEditing ? 'Update note' : 'Add note'}
+          </Button>
+          {isEditing ? (
+            <Button type="button" variant="outline" onClick={resetComposer}>
+              Cancel
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </section>
   )
 }
 
