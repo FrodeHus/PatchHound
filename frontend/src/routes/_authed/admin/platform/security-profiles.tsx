@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link, redirect } from '@tanstack/react-router'
+import { createFileRoute, Link, Outlet, redirect, useRouterState } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { PenSquare, Plus, Trash2 } from 'lucide-react'
 import { fetchAuditLog } from '@/api/audit-log.functions'
@@ -35,6 +35,7 @@ export const Route = createFileRoute('/_authed/admin/platform/security-profiles'
 })
 
 function SecurityProfilesPage() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const { user } = Route.useRouteContext()
@@ -97,6 +98,10 @@ function SecurityProfilesPage() {
       deleteMutation.mutate(pendingDeleteId)
     }
   }, [pendingDeleteId, deleteMutation])
+
+  if (pathname !== '/admin/platform/security-profiles') {
+    return <Outlet />
+  }
 
   return (
     <section className="space-y-4 pb-4">
