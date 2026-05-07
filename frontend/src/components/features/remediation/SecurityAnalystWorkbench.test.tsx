@@ -215,4 +215,28 @@ describe('SecurityAnalystWorkbench', () => {
 
     expect(screen.getByLabelText(/Recommendation rationale/i)).toHaveValue('Prioritize patching because exploitation is known.')
   })
+
+  it('opens long threat intelligence summaries in a fullscreen dialog', () => {
+    const longSummary = Array.from(
+      { length: 18 },
+      (_, index) => `Paragraph ${index + 1}: active exploitation details and mitigation notes for analyst review.`,
+    ).join('\n\n')
+
+    renderWorkbench({
+      ...dataFixture,
+      threatIntel: {
+        summary: longSummary,
+        generatedAt: '2026-05-03T00:00:00Z',
+        profileName: 'Threat profile',
+        canGenerate: true,
+        unavailableMessage: null,
+      },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /View threat intelligence in fullscreen/i }))
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Threat intelligence/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/Paragraph 18:/i).length).toBeGreaterThan(0)
+  })
 })

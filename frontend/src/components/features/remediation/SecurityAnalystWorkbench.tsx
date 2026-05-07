@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Bot, ExternalLink, LoaderCircle, NotebookPen, Pencil, Save, SearchCheck, ShieldAlert, Sparkles, Trash2, TriangleAlert } from 'lucide-react'
+import { Bot, ExternalLink, LoaderCircle, Maximize2, NotebookPen, Pencil, Save, SearchCheck, ShieldAlert, Sparkles, Trash2, TriangleAlert } from 'lucide-react'
 import type { DecisionContext, DecisionVuln, ThreatIntel } from '@/api/remediation.schemas'
 import { addRecommendation, generateThreatIntel } from '@/api/remediation.functions'
 import { createWorkNote, deleteWorkNote, fetchWorkNotes, updateWorkNote } from '@/api/work-notes.functions'
@@ -9,6 +9,12 @@ import type { WorkNote } from '@/api/work-notes.schemas'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { MarkdownViewer } from '@/components/ui/markdown-viewer'
 import {
   Select,
@@ -43,6 +49,9 @@ const OUTCOMES = [
   'AlternateMitigation',
   'PatchingDeferred',
 ] as const
+
+const LONG_THREAT_INTEL_SUMMARY_LENGTH = 700
+const LONG_THREAT_INTEL_SUMMARY_LINES = 10
 
 export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAnalystWorkbenchProps) {
   const queryClient = useQueryClient()
@@ -561,57 +570,95 @@ function ThreatIntelBrief({
   isGenerating: boolean
   onGenerate: () => void
 }) {
+  const [fullscreenOpen, setFullscreenOpen] = useState(false)
+  const summaryLineCount = threatIntel.summary?.split(/\r?\n/).length ?? 0
+  const hasLongSummary = !!threatIntel.summary
+    && (threatIntel.summary.length > LONG_THREAT_INTEL_SUMMARY_LENGTH
+      || summaryLineCount > LONG_THREAT_INTEL_SUMMARY_LINES)
+
   return (
-    <Card className="shadow-none">
-      <CardHeader>
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2">
-            {isGenerating ? <LoaderCircle className="size-4 animate-spin text-primary" /> : <Bot className="size-4 text-primary" />}
-            Threat intelligence
-          </CardTitle>
-          {threatIntel.summary && threatIntel.canGenerate ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={onGenerate}
-              disabled={isGenerating}
-              className="text-xs text-muted-foreground"
-            >
-              {isGenerating ? 'Updating...' : 'Update threat intel'}
-            </Button>
-          ) : null}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {threatIntel.summary ? (
-          <>
-            <MarkdownViewer content={threatIntel.summary} />
-            <p className="text-xs text-muted-foreground">
-              Generated {formatNullableDateTime(threatIntel.generatedAt)}
-              {threatIntel.profileName ? ` · ${threatIntel.profileName}` : null}
-            </p>
-          </>
-        ) : isGenerating ? (
-          <p className="text-sm text-muted-foreground">
-            Retrieving threat intelligence. This may take a moment.
-          </p>
-        ) : threatIntel.canGenerate ? (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Generate a threat intelligence summary for the top vulnerabilities — covering active exploitation, attack vectors, and mitigations.
-            </p>
-            <Button type="button" variant="outline" onClick={onGenerate} disabled={isGenerating}>
-              Retrieve threat intel
-            </Button>
+    <>
+      <Card className="shadow-none">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2">
+              {isGenerating ? <LoaderCircle className="size-4 animate-spin text-primary" /> : <Bot className="size-4 text-primary" />}
+              Threat intelligence
+              {hasLongSummary ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="View threat intelligence in fullscreen"
+                  onClick={() => setFullscreenOpen(true)}
+                  className="text-muted-foreground"
+                >
+                  <Maximize2 className="size-4" />
+                </Button>
+              ) : null}
+            </CardTitle>
+            {threatIntel.summary && threatIntel.canGenerate ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onGenerate}
+                disabled={isGenerating}
+                className="text-xs text-muted-foreground"
+              >
+                {isGenerating ? 'Updating...' : 'Update threat intel'}
+              </Button>
+            ) : null}
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {threatIntel.unavailableMessage ?? 'AI is not configured for this tenant.'}
-          </p>
-        )}
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {threatIntel.summary ? (
+            <>
+              <div className="max-h-80 overflow-y-auto pr-2">
+                <MarkdownViewer content={threatIntel.summary} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Generated {formatNullableDateTime(threatIntel.generatedAt)}
+                {threatIntel.profileName ? ` · ${threatIntel.profileName}` : null}
+              </p>
+            </>
+          ) : isGenerating ? (
+            <p className="text-sm text-muted-foreground">
+              Retrieving threat intelligence. This may take a moment.
+            </p>
+          ) : threatIntel.canGenerate ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Generate a threat intelligence summary for the top vulnerabilities — covering active exploitation, attack vectors, and mitigations.
+              </p>
+              <Button type="button" variant="outline" onClick={onGenerate} disabled={isGenerating}>
+                Retrieve threat intel
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {threatIntel.unavailableMessage ?? 'AI is not configured for this tenant.'}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
+        <DialogContent className="w-[min(96vw,72rem)] max-w-[72rem] p-0 sm:max-w-[72rem]">
+          <DialogHeader className="border-b border-border/60 px-5 py-4">
+            <DialogTitle className="flex items-center gap-2">
+              <Bot className="size-4 text-primary" />
+              Threat intelligence
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[min(74vh,48rem)] overflow-y-auto px-5 py-4">
+            {threatIntel.summary ? (
+              <MarkdownViewer content={threatIntel.summary} />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
