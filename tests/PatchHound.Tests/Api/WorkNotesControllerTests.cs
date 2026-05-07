@@ -70,6 +70,34 @@ public class WorkNotesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_RemediationWorkNote_StoresRemediationCaseEntityType()
+    {
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        await _dbContext.AddRangeAsync(product, remediationCase);
+        await _dbContext.SaveChangesAsync();
+        await SeedUsersAsync();
+
+        var action = await _controller.Create(
+            "remediations",
+            remediationCase.Id,
+            new CreateWorkNoteRequest("Security analyst handover"),
+            CancellationToken.None
+        );
+
+        var result = action.Result.Should().BeOfType<CreatedResult>().Subject;
+        var dto = result.Value.Should().BeOfType<WorkNoteDto>().Subject;
+
+        dto.EntityType.Should().Be(nameof(RemediationCase));
+        dto.EntityId.Should().Be(remediationCase.Id);
+
+        var stored = await _dbContext.Comments.SingleAsync();
+        stored.EntityType.Should().Be(nameof(RemediationCase));
+        stored.EntityId.Should().Be(remediationCase.Id);
+        stored.Content.Should().Be("Security analyst handover");
+    }
+
+    [Fact]
     public async Task List_ExcludesDeletedNotes()
     {
         var asset = await SeedAssetAsync();

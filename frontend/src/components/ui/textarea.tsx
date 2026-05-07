@@ -8,6 +8,7 @@ import {
   Separator,
   UndoRedo,
   headingsPlugin,
+  linkDialogPlugin,
   linkPlugin,
   listsPlugin,
   markdownShortcutPlugin,
@@ -94,6 +95,7 @@ function Textarea({ className, value, defaultValue, onChange, onBlur, placeholde
           listsPlugin(),
           quotePlugin(),
           linkPlugin(),
+          linkDialogPlugin(),
           markdownShortcutPlugin(),
           toolbarPlugin({
             toolbarContents: () => (

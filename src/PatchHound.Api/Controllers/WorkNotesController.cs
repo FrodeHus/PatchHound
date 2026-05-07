@@ -22,7 +22,7 @@ public class WorkNotesController : ControllerBase
     {
         ["vulnerabilities"] = "TenantVulnerability",
         ["software"] = "TenantSoftware",
-        ["remediations"] = "TenantSoftwareRemediation",
+        ["remediations"] = nameof(RemediationCase),
         ["assets"] = nameof(Device),
         ["devices"] = nameof(Device),
     };
@@ -201,10 +201,15 @@ public class WorkNotesController : ControllerBase
                 .Where(v => v.Id == entityId)
                 .Select(_ => (Guid?)_tenantContext.CurrentTenantId)
                 .FirstOrDefaultAsync(ct),
-            "TenantSoftware" or "TenantSoftwareRemediation" => await _dbContext.SoftwareTenantRecords
+            "TenantSoftware" => await _dbContext.SoftwareTenantRecords
                 .IgnoreQueryFilters()
                 .Where(s => s.Id == entityId)
                 .Select(s => (Guid?)s.TenantId)
+                .FirstOrDefaultAsync(ct),
+            nameof(RemediationCase) => await _dbContext.RemediationCases
+                .IgnoreQueryFilters()
+                .Where(c => c.Id == entityId)
+                .Select(c => (Guid?)c.TenantId)
                 .FirstOrDefaultAsync(ct),
             nameof(Device) => await _dbContext.Devices
                 .IgnoreQueryFilters()
