@@ -654,3 +654,54 @@
 .ph-markdown-editor [class*="_contentEditable_"]::placeholder {
     color: var(--muted-foreground);
 }
+
+.ph-markdown-editor.mdxeditor-popup-container [class*="_linkDialogPopoverContent_"] {
+    z-index: 70;
+    align-items: stretch;
+    min-width: min(24rem, calc(100vw - 2rem));
+    border: 1px solid color-mix(in oklab, var(--border) 78%, var(--foreground));
+    background: var(--popover);
+    color: var(--popover-foreground);
+    box-shadow: 0 18px 44px rgb(0 0 0 / 0.34);
+    filter: none;
+    padding: 0.75rem;
+}
+
+.ph-markdown-editor.mdxeditor-popup-container [class*="_linkDialogEditForm_"] {
+    gap: 0.625rem;
+}
+
+.ph-markdown-editor.mdxeditor-popup-container [class*="_linkDialogEditForm_"] label,
+.ph-markdown-editor.mdxeditor-popup-container [class*="_dialogForm_"] label {
+    color: var(--popover-foreground);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.ph-markdown-editor.mdxeditor-popup-container [class*="_linkDialogInputWrapper_"] {
+    min-height: 2.25rem;
+    border: 1px solid var(--input);
+    background: color-mix(in oklab, var(--background) 88%, var(--card));
+    color: var(--foreground);
+}
+
+.ph-markdown-editor.mdxeditor-popup-container [class*="_linkDialogInput_"],
+.ph-markdown-editor.mdxeditor-popup-container [class*="_dialogInput_"] {
+    width: 100%;
+    color: var(--foreground);
+    caret-color: var(--primary);
+}
+
+.ph-markdown-editor.mdxeditor-popup-container [class*="_linkDialogInput_"]::placeholder,
+.ph-markdown-editor.mdxeditor-popup-container [class*="_dialogInput_"]::placeholder {
+    color: var(--muted-foreground);
+}
+
+.ph-markdown-editor.mdxeditor-popup-container [class*="_linkDialogInputWrapper_"] > button,
+.ph-markdown-editor.mdxeditor-popup-container [class*="_linkDialogPopoverContent_"] button {
+    color: var(--foreground);
+}
+
+.ph-markdown-editor.mdxeditor-popup-container [class*="_linkDialogPopoverContent_"] button:hover {
+    background: color-mix(in oklab, var(--accent) 72%, transparent);
+}
