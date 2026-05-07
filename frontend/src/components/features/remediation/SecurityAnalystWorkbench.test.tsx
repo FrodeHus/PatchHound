@@ -183,6 +183,25 @@ describe('SecurityAnalystWorkbench', () => {
     expect(screen.getByLabelText(/Recommendation rationale/i)).toHaveValue('Prioritize patching because exploitation is known.')
   })
 
+  it('keeps case metrics inside the title card rail', () => {
+    renderWorkbench()
+
+    const header = screen.getByRole('banner')
+    const metricRail = screen.getByTestId('security-workbench-metric-rail')
+
+    expect(header).toContainElement(metricRail)
+    expect(metricRail).toHaveTextContent('Open vulns')
+    expect(metricRail).toHaveTextContent('Affected')
+    expect(metricRail).toHaveTextContent('Owner')
+    expect(metricRail).toHaveTextContent('SLA')
+    expect(metricRail).toHaveTextContent('Top driver')
+    expect(metricRail).toHaveTextContent('Signals')
+    expect(metricRail).toHaveTextContent('Revenue')
+    expect(header.compareDocumentPosition(screen.getByText('Analyst recommendation'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+  })
+
   it('opens vulnerability essentials from the compact list', () => {
     renderWorkbench()
 

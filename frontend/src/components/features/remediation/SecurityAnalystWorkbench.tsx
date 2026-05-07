@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Bot, ExternalLink, LoaderCircle, Maximize2, NotebookPen, Pencil, Save, SearchCheck, ShieldAlert, Sparkles, Trash2, TriangleAlert } from 'lucide-react'
+import { Bot, ExternalLink, LoaderCircle, Maximize2, NotebookPen, Pencil, Save, SearchCheck, ShieldAlert, Sparkles, Trash2 } from 'lucide-react'
 import type { DecisionContext, DecisionVuln, ThreatIntel } from '@/api/remediation.schemas'
 import { addRecommendation, generateThreatIntel } from '@/api/remediation.functions'
 import { createWorkNote, deleteWorkNote, fetchWorkNotes, updateWorkNote } from '@/api/work-notes.functions'
@@ -36,6 +36,7 @@ import {
   outcomeTone,
   severityTone,
 } from './remediation-utils'
+import { MetricRail, type MetricRailItem, type MetricRailTone } from './MetricRail'
 
 type SecurityAnalystWorkbenchProps = {
   data: DecisionContext
@@ -91,6 +92,12 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
     && !displaySoftwareName.toLowerCase().startsWith(data.softwareVendor.toLowerCase())
     ? `${data.softwareVendor} ${displaySoftwareName}`
     : displaySoftwareName
+  const metricRailItems = buildMetricRailItems({
+    data,
+    highestRiskDriver,
+    highestRiskDriverDetail,
+    threatDriverCount,
+  })
 
   async function handleSaveRecommendation() {
     if (!canSave) return
@@ -185,80 +192,8 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
             </Link>
           </div>
         </div>
+        <MetricRail items={metricRailItems} className="mt-4" />
       </header>
-
-      <div className="grid gap-3 md:grid-cols-4">
-        <WorkbenchMetric
-          label="Open vulnerabilities"
-          value={data.summary.totalVulnerabilities.toLocaleString()}
-          detail={`${data.summary.criticalCount} critical · ${data.summary.highCount} high`}
-        />
-        <WorkbenchMetric
-          label="Affected devices"
-          value={data.workflow.affectedDeviceCount.toLocaleString()}
-          detail={`${data.workflow.affectedOwnerTeamCount} owner teams`}
-        />
-        <WorkbenchMetric
-          label="Owner routing"
-          value={data.softwareOwnerTeamName ?? "Default Team"}
-          detail={formatSoftwareOwnerRoutingDetail(
-            data.softwareOwnerTeamName,
-            data.softwareOwnerAssignmentSource,
-          )}
-        />
-        <WorkbenchMetric
-          label="SLA"
-          value={data.sla?.slaStatus ?? "Not set"}
-          detail={
-            data.sla?.dueDate
-              ? `Due ${formatNullableDateTime(data.sla.dueDate)}`
-              : "No due date"
-          }
-        />
-      </div>
-
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.44fr)]">
-        <div className="grid gap-3 md:grid-cols-3">
-          <RiskDriver
-            label="Top driver"
-            value={highestRiskDriver?.externalId ?? "None"}
-            detail={highestRiskDriverDetail}
-            tone={highestRiskDriver ? "danger" : "neutral"}
-          />
-          <RiskDriver
-            label="Threat signals"
-            value={threatDriverCount.toLocaleString()}
-            detail="KEV, public exploit, or active alert"
-            tone={threatDriverCount > 0 ? "danger" : "neutral"}
-          />
-        </div>
-
-        {data.businessLabels.length > 0 ? (
-          <div className="rounded-lg border border-border/70 bg-card px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-              Business impact
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {data.businessLabels.map((label) => (
-                <span
-                  key={label.id}
-                  className="inline-flex items-center gap-2 rounded-md border border-border/70 bg-background px-2.5 py-1 text-xs"
-                  title={`${label.weightCategory} business value, ${label.riskWeight.toFixed(1)}x risk weight`}
-                >
-                  <span
-                    className="size-2 rounded-full border border-border/60"
-                    style={{ backgroundColor: label.color ?? "transparent" }}
-                  />
-                  <span className="font-medium">{label.name}</span>
-                  <span className="text-muted-foreground">
-                    {label.affectedDeviceCount}
-                  </span>
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </div>
 
       {error ? (
         <div
@@ -541,44 +476,83 @@ function isDecisionContextQueryForCase(queryKey: readonly unknown[], caseId: str
   )
 }
 
-function WorkbenchMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="rounded-lg border border-border/70 bg-card px-4 py-3">
-      <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <p className="mt-1 truncate text-lg font-semibold">{value}</p>
-      <p className="mt-1 truncate text-xs text-muted-foreground">{detail}</p>
-    </div>
-  )
+function buildMetricRailItems({
+  data,
+  highestRiskDriver,
+  highestRiskDriverDetail,
+  threatDriverCount,
+}: {
+  data: DecisionContext
+  highestRiskDriver: DecisionVuln | null
+  highestRiskDriverDetail: string
+  threatDriverCount: number
+}): MetricRailItem[] {
+  return [
+    {
+      eyebrow: 'Open vulns',
+      value: data.summary.totalVulnerabilities.toLocaleString(),
+      sub: `${data.summary.criticalCount} critical · ${data.summary.highCount} high`,
+    },
+    {
+      eyebrow: 'Affected',
+      value: data.workflow.affectedDeviceCount.toLocaleString(),
+      sub: `${data.workflow.affectedOwnerTeamCount} owner teams`,
+    },
+    {
+      eyebrow: 'Owner',
+      value: data.softwareOwnerTeamName ?? 'Default Team',
+      sub: formatSoftwareOwnerRoutingDetail(
+        data.softwareOwnerTeamName,
+        data.softwareOwnerAssignmentSource,
+      ),
+    },
+    {
+      eyebrow: 'SLA',
+      value: data.sla?.slaStatus ? startCase(data.sla.slaStatus) : 'Not set',
+      sub: data.sla?.dueDate ? `Due ${formatNullableDateTime(data.sla.dueDate)}` : 'No due date',
+      tone: getSlaTone(data.sla?.slaStatus),
+      after: data.businessLabels.length > 0 ? (
+        <>
+          {data.businessLabels.map((label) => (
+            <span
+              key={label.id}
+              className="inline-flex min-w-0 items-center gap-1 rounded-full border border-border/70 px-1.5 py-0.5 text-[10px] leading-none"
+              title={`${label.weightCategory} business value, ${label.riskWeight.toFixed(1)}x risk weight`}
+            >
+              <span
+                className="size-1.5 shrink-0 rounded-full border border-border/60"
+                style={{ backgroundColor: label.color ?? 'transparent' }}
+              />
+              <span className="truncate font-medium">{label.name}</span>
+              <span className="text-muted-foreground">{label.affectedDeviceCount}</span>
+            </span>
+          ))}
+        </>
+      ) : undefined,
+    },
+    {
+      eyebrow: 'Top driver',
+      eyebrowPrefix: highestRiskDriver ? '⚠' : undefined,
+      value: highestRiskDriver?.externalId ?? 'None',
+      sub: highestRiskDriverDetail,
+      tone: highestRiskDriver ? 'danger' : 'default',
+      mono: !!highestRiskDriver,
+    },
+    {
+      eyebrow: 'Signals',
+      value: threatDriverCount.toLocaleString(),
+      sub: 'KEV, public exploit, or active alert',
+      tone: threatDriverCount > 0 ? 'danger' : 'default',
+    },
+  ]
 }
 
-function RiskDriver({
-  label,
-  value,
-  detail,
-  tone,
-}: {
-  label: string
-  value: string
-  detail: string
-  tone: 'danger' | 'success' | 'neutral'
-}) {
-  return (
-    <div className={cn(
-      'rounded-lg border px-4 py-3',
-      tone === 'danger'
-        ? 'border-destructive/30 bg-destructive/8'
-        : tone === 'success'
-          ? 'border-emerald-500/25 bg-emerald-500/8'
-          : 'border-border/70 bg-card',
-    )}>
-      <div className="flex items-center gap-2">
-        {tone === 'danger' ? <TriangleAlert className="size-4 text-destructive" /> : null}
-        <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      </div>
-      <p className="mt-1 truncate text-base font-semibold">{value}</p>
-      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{detail}</p>
-    </div>
-  )
+function getSlaTone(status: string | null | undefined): MetricRailTone {
+  const normalized = status?.toLowerCase() ?? ''
+  if (normalized.includes('breach') || normalized.includes('overdue')) return 'danger'
+  if (normalized.includes('risk') || normalized.includes('due')) return 'warning'
+  if (normalized.includes('track') || normalized.includes('met')) return 'success'
+  return 'default'
 }
 
 function formatSeverityScore(severity: string, score: number | null | undefined) {
