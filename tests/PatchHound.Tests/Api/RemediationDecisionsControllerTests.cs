@@ -122,6 +122,7 @@ public class RemediationDecisionsControllerTests : IDisposable
             workflowAuthorizationService: workflowAuthorizationService!,
             workflowService: null!,
             remediationAiJobService: null!,
+            threatIntelService: null!,
             dbContext: _dbContext,
             tenantContext: _tenantContext
         );

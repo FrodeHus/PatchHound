@@ -160,6 +160,14 @@ export const decisionApprovalResolutionSchema = z.object({
   resolvedByDisplayName: z.string().nullable(),
 })
 
+export const threatIntelSchema = z.object({
+  summary: z.string().nullable(),
+  generatedAt: z.string().nullable(),
+  profileName: z.string().nullable(),
+  canGenerate: z.boolean(),
+  unavailableMessage: z.string().nullable(),
+})
+
 export const decisionContextSchema = z.object({
   remediationCaseId: z.string().uuid(),
   tenantSoftwareId: z.string().uuid().nullable(),
@@ -184,6 +192,7 @@ export const decisionContextSchema = z.object({
   riskScore: decisionRiskSchema.nullable(),
   sla: decisionSlaSchema.nullable(),
   aiSummary: decisionAiSummarySchema,
+  threatIntel: threatIntelSchema,
 })
 
 export const decisionListItemSchema = z.object({
@@ -242,6 +251,7 @@ export type DecisionSla = z.infer<typeof decisionSlaSchema>
 export type DecisionAiSummary = z.infer<typeof decisionAiSummarySchema>
 export type DecisionApprovalResolution = z.infer<typeof decisionApprovalResolutionSchema>
 export type VulnerabilityOverride = z.infer<typeof vulnerabilityOverrideSchema>
+export type ThreatIntel = z.infer<typeof threatIntelSchema>
 export type DecisionListItem = z.infer<typeof decisionListItemSchema>
 export type DecisionListSummary = z.infer<typeof decisionListSummarySchema>
 export type PagedDecisionList = z.infer<typeof pagedDecisionListSchema>

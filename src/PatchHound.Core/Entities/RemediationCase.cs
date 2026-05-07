@@ -12,6 +12,10 @@ public class RemediationCase
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? ClosedAt { get; private set; }
 
+    public string? ThreatIntelSummary { get; private set; }
+    public DateTimeOffset? ThreatIntelGeneratedAt { get; private set; }
+    public string? ThreatIntelProfileName { get; private set; }
+
     public SoftwareProduct SoftwareProduct { get; private set; } = null!;
 
     private RemediationCase() { }
@@ -42,6 +46,14 @@ public class RemediationCase
         Status = RemediationCaseStatus.Closed;
         ClosedAt = DateTimeOffset.UtcNow;
         UpdatedAt = ClosedAt.Value;
+    }
+
+    public void SetThreatIntel(string summary, string? profileName)
+    {
+        ThreatIntelSummary = summary;
+        ThreatIntelGeneratedAt = DateTimeOffset.UtcNow;
+        ThreatIntelProfileName = profileName;
+        UpdatedAt = ThreatIntelGeneratedAt.Value;
     }
 
     public void Reopen()

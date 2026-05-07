@@ -5,7 +5,9 @@ using PatchHound.Api.Models;
 using PatchHound.Api.Services;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Common;
 using PatchHound.Core.Interfaces;
+using PatchHound.Core.Models;
 using PatchHound.Core.Services;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
@@ -38,10 +40,14 @@ public class RemediationDecisionListTests : IDisposable
         );
 
         var aiConfigurationResolver = Substitute.For<ITenantAiConfigurationResolver>();
+        aiConfigurationResolver
+            .ResolveDefaultAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Result<TenantAiProfileResolved>.Failure("No AI profile configured."));
         _service = new RemediationDecisionQueryService(
             _dbContext,
             new SlaService(),
             new TenantAiTextGenerationService([], aiConfigurationResolver),
+            aiConfigurationResolver,
             _tenantContext
         );
     }

@@ -25,6 +25,7 @@ public class RemediationDecisionsController(
     RemediationWorkflowAuthorizationService workflowAuthorizationService,
     RemediationWorkflowService workflowService,
     RemediationAiJobService remediationAiJobService,
+    ThreatIntelGenerationService threatIntelService,
     PatchHoundDbContext dbContext,
     ITenantContext tenantContext
 ) : ControllerBase
@@ -422,6 +423,29 @@ public class RemediationDecisionsController(
         }
 
         return Ok(context.AiSummary);
+    }
+
+    [HttpPost("threat-intel")]
+    [Authorize(Policy = Policies.GenerateAiReports)]
+    public async Task<ActionResult<ThreatIntelDto>> GenerateThreatIntel(
+        Guid caseId,
+        CancellationToken ct
+    )
+    {
+        if (tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        if (!await threatIntelService.CanGenerateAsync(tenantId, ct))
+            return BadRequest(new ProblemDetails
+            {
+                Title = "No enabled default AI profile is configured for this tenant."
+            });
+
+        var result = await threatIntelService.GenerateAsync(tenantId, caseId, ct);
+        if (!result.IsSuccess)
+            return BadRequest(new ProblemDetails { Title = result.Error });
+
+        return Ok(result.Value);
     }
 
     [HttpPost("ai-summary/review")]

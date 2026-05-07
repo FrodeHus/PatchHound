@@ -2,8 +2,8 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Bot, ExternalLink, LoaderCircle, NotebookPen, Pencil, Save, SearchCheck, ShieldAlert, Sparkles, Trash2, TriangleAlert } from 'lucide-react'
-import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
-import { addRecommendation, generateRemediationAiSummary } from '@/api/remediation.functions'
+import type { DecisionContext, DecisionVuln, ThreatIntel } from '@/api/remediation.schemas'
+import { addRecommendation, generateThreatIntel } from '@/api/remediation.functions'
 import { createWorkNote, deleteWorkNote, fetchWorkNotes, updateWorkNote } from '@/api/work-notes.functions'
 import type { WorkNote } from '@/api/work-notes.schemas'
 import { Button } from '@/components/ui/button'
@@ -52,7 +52,7 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
   const [rationale, setRationale] = useState(currentRecommendation?.rationale ?? data.aiSummary.analystAssessment ?? '')
   const [priorityOverride, setPriorityOverride] = useState(currentRecommendation?.priorityOverride ?? data.aiSummary.recommendedPriority ?? '')
   const [isSaving, setIsSaving] = useState(false)
-  const [isGeneratingAi, setIsGeneratingAi] = useState(false)
+  const [isGeneratingThreatIntel, setIsGeneratingThreatIntel] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const vulnerabilities = data.openVulnerabilities.length > 0 ? data.openVulnerabilities : data.topVulnerabilities
@@ -106,16 +106,16 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
     }
   }
 
-  async function handleGenerateAiSummary() {
-    setIsGeneratingAi(true)
+  async function handleGenerateThreatIntel() {
+    setIsGeneratingThreatIntel(true)
     setError(null)
     try {
-      await generateRemediationAiSummary({ data: { caseId } })
+      await generateThreatIntel({ data: { caseId } })
       await queryClient.invalidateQueries({ queryKey })
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Unable to request AI risk guidance.'))
+      setError(getApiErrorMessage(err, 'Unable to generate threat intel.'))
     } finally {
-      setIsGeneratingAi(false)
+      setIsGeneratingThreatIntel(false)
     }
   }
 
@@ -396,10 +396,10 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
           </CardContent>
         </Card>
 
-        <AiRiskBrief
-          data={data}
-          isGenerating={isGeneratingAi}
-          onGenerate={() => void handleGenerateAiSummary()}
+        <ThreatIntelBrief
+          threatIntel={data.threatIntel}
+          isGenerating={isGeneratingThreatIntel}
+          onGenerate={() => void handleGenerateThreatIntel()}
         />
       </div>
 
@@ -552,66 +552,62 @@ function formatSeverityScore(severity: string, score: number | null | undefined)
   return score == null ? severity : `${severity} ${score.toFixed(1)}`
 }
 
-function AiRiskBrief({
-  data,
+function ThreatIntelBrief({
+  threatIntel,
   isGenerating,
   onGenerate,
 }: {
-  data: DecisionContext
+  threatIntel: ThreatIntel
   isGenerating: boolean
   onGenerate: () => void
 }) {
-  const hasAnalystGuidance = Boolean(data.aiSummary.analystAssessment || data.aiSummary.recommendedOutcome || data.aiSummary.recommendedPriority)
-  const isWorking = data.aiSummary.status === 'Queued' || data.aiSummary.status === 'Generating'
-
   return (
     <Card className="shadow-none">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {isWorking ? <LoaderCircle className="size-4 animate-spin text-primary" /> : <Bot className="size-4 text-primary" />}
-          AI risk brief
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2">
+            {isGenerating ? <LoaderCircle className="size-4 animate-spin text-primary" /> : <Bot className="size-4 text-primary" />}
+            Threat intelligence
+          </CardTitle>
+          {threatIntel.summary && threatIntel.canGenerate ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onGenerate}
+              disabled={isGenerating}
+              className="text-xs text-muted-foreground"
+            >
+              {isGenerating ? 'Updating...' : 'Update threat intel'}
+            </Button>
+          ) : null}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {hasAnalystGuidance ? (
+        {threatIntel.summary ? (
           <>
-            {data.aiSummary.recommendedPriority ? (
-              <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Suggested priority</p>
-                <p className="mt-1 text-sm font-medium">{data.aiSummary.recommendedPriority}</p>
-              </div>
-            ) : null}
-            {data.aiSummary.recommendedOutcome ? (
-              <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Suggested action</p>
-                <p className="mt-1 text-sm font-medium">{outcomeLabel(data.aiSummary.recommendedOutcome)}</p>
-              </div>
-            ) : null}
-            {data.aiSummary.analystAssessment ? (
-              <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                {data.aiSummary.analystAssessment}
-              </p>
-            ) : null}
+            <MarkdownViewer content={threatIntel.summary} />
             <p className="text-xs text-muted-foreground">
-              Generated {formatNullableDateTime(data.aiSummary.generatedAt)}
+              Generated {formatNullableDateTime(threatIntel.generatedAt)}
+              {threatIntel.profileName ? ` · ${threatIntel.profileName}` : null}
             </p>
           </>
-        ) : isWorking ? (
+        ) : isGenerating ? (
           <p className="text-sm text-muted-foreground">
-            AI guidance is queued or generating. You can continue the analysis while it runs.
+            Retrieving threat intelligence. This may take a moment.
           </p>
-        ) : data.aiSummary.canGenerate ? (
+        ) : threatIntel.canGenerate ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Ask AI for a concise analyst-oriented summary of the highest-risk open vulnerabilities.
+              Generate a threat intelligence summary for the top vulnerabilities — covering active exploitation, attack vectors, and mitigations.
             </p>
             <Button type="button" variant="outline" onClick={onGenerate} disabled={isGenerating}>
-              {isGenerating ? 'Asking AI...' : 'Ask AI'}
+              Retrieve threat intel
             </Button>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            {data.aiSummary.unavailableMessage ?? 'AI guidance is not available for this tenant.'}
+            {threatIntel.unavailableMessage ?? 'AI is not configured for this tenant.'}
           </p>
         )}
       </CardContent>
