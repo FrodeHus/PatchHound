@@ -205,6 +205,83 @@ public class RemediationDecisionsControllerTests : IDisposable
             .Be("Remediation case not found.");
     }
 
+    [Fact]
+    public async Task GenerateThreatIntel_PersistsSummaryForDecisionContextReload()
+    {
+        var product = SoftwareProduct.Create("Contoso", "Contoso Agent", null);
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var device = CanonicalTestData.MakeDevice(_tenantId);
+        var installedSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, device.Id, product.Id);
+        var vulnerability = Vulnerability.Create(
+            "nvd",
+            "CVE-2026-4242",
+            "Remote code execution",
+            "A remotely exploitable vulnerability.",
+            Severity.Critical,
+            9.8m,
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            DateTimeOffset.UtcNow.AddDays(-30)
+        );
+        var exposure = DeviceVulnerabilityExposure.Observe(
+            _tenantId,
+            device.Id,
+            vulnerability.Id,
+            product.Id,
+            installedSoftware.Id,
+            "1.2.3",
+            ExposureMatchSource.Product,
+            DateTimeOffset.UtcNow.AddDays(-2)
+        );
+        var profile = TenantAiProfileFactory.Create(_tenantId, name: "Threat profile");
+        var provider = Substitute.For<IAiReportProvider>();
+        provider.ProviderType.Returns(TenantAiProviderType.OpenAi);
+        provider
+            .GenerateTextAsync(
+                Arg.Any<AiTextGenerationRequest>(),
+                Arg.Any<TenantAiProfileResolved>(),
+                Arg.Any<CancellationToken>())
+            .Returns("Persisted threat intelligence.");
+        var aiResolver = Substitute.For<ITenantAiConfigurationResolver>();
+        aiResolver.ResolveDefaultAsync(_tenantId, Arg.Any<CancellationToken>())
+            .Returns(Result<TenantAiProfileResolved>.Success(new TenantAiProfileResolved(profile, "secret")));
+
+        await _dbContext.AddRangeAsync(product, remediationCase, device, installedSoftware, vulnerability, exposure);
+        await _dbContext.SaveChangesAsync();
+
+        var threatIntelService = new ThreatIntelGenerationService(
+            _dbContext,
+            new TenantAiTextGenerationService([provider], aiResolver),
+            aiResolver
+        );
+        var generated = await threatIntelService.GenerateAsync(
+            _tenantId,
+            remediationCase.Id,
+            CancellationToken.None
+        );
+
+        generated.IsSuccess.Should().BeTrue(generated.Error);
+        _dbContext.ChangeTracker.Clear();
+
+        var queryService = new RemediationDecisionQueryService(
+            _dbContext,
+            new SlaService(),
+            new TenantAiTextGenerationService([provider], aiResolver),
+            aiResolver,
+            _tenantContext
+        );
+        var reloaded = await queryService.BuildByCaseIdAsync(
+            _tenantId,
+            remediationCase.Id,
+            forceAiSummaryRefresh: false,
+            CancellationToken.None
+        );
+
+        reloaded.Should().NotBeNull();
+        reloaded!.ThreatIntel.Summary.Should().Be("Persisted threat intelligence.");
+        reloaded.ThreatIntel.GeneratedAt.Should().NotBeNull();
+        reloaded.ThreatIntel.ProfileName.Should().Be("Threat profile");
+    }
+
     private RemediationDecisionsController CreateController(
         RemediationWorkflowAuthorizationService? workflowAuthorizationService = null
     ) =>

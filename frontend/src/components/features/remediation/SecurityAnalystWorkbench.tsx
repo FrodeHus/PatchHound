@@ -62,6 +62,7 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
   const [priorityOverride, setPriorityOverride] = useState(currentRecommendation?.priorityOverride ?? data.aiSummary.recommendedPriority ?? '')
   const [isSaving, setIsSaving] = useState(false)
   const [isGeneratingThreatIntel, setIsGeneratingThreatIntel] = useState(false)
+  const [generatedThreatIntel, setGeneratedThreatIntel] = useState<ThreatIntel | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const vulnerabilities = data.openVulnerabilities.length > 0 ? data.openVulnerabilities : data.topVulnerabilities
@@ -119,8 +120,23 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
     setIsGeneratingThreatIntel(true)
     setError(null)
     try {
-      await generateThreatIntel({ data: { caseId } })
-      await queryClient.invalidateQueries({ queryKey })
+      const threatIntel = await generateThreatIntel({ data: { caseId } })
+      setGeneratedThreatIntel(threatIntel)
+      queryClient.setQueryData<DecisionContext>(
+        queryKey,
+        (current) => current ? { ...current, threatIntel } : current,
+      )
+      queryClient.setQueriesData<DecisionContext>(
+        {
+          predicate: ({ queryKey: candidateKey }) =>
+            isDecisionContextQueryForCase(candidateKey, caseId),
+        },
+        (current) => current ? { ...current, threatIntel } : current,
+      )
+      await queryClient.invalidateQueries({
+        predicate: ({ queryKey: candidateKey }) =>
+          isDecisionContextQueryForCase(candidateKey, caseId),
+      })
     } catch (err) {
       setError(getApiErrorMessage(err, 'Unable to generate threat intel.'))
     } finally {
@@ -406,7 +422,7 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
         </Card>
 
         <ThreatIntelBrief
-          threatIntel={data.threatIntel}
+          threatIntel={generatedThreatIntel ?? data.threatIntel}
           isGenerating={isGeneratingThreatIntel}
           onGenerate={() => void handleGenerateThreatIntel()}
         />
@@ -515,6 +531,14 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
       <WorkNotesSection caseId={caseId} />
     </section>
   );
+}
+
+function isDecisionContextQueryForCase(queryKey: readonly unknown[], caseId: string) {
+  const namespace = queryKey[0]
+  return (
+    (namespace === 'security-analyst-workbench' || namespace === 'remediation-case')
+    && queryKey[queryKey.length - 1] === caseId
+  )
 }
 
 function WorkbenchMetric({ label, value, detail }: { label: string; value: string; detail: string }) {

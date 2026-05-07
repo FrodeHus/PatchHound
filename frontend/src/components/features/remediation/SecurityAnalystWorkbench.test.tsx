@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { AnchorHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { DecisionContext } from '@/api/remediation.schemas'
+import { generateThreatIntel } from '@/api/remediation.functions'
 import { SecurityAnalystWorkbench } from './SecurityAnalystWorkbench'
 
 vi.mock('@tanstack/react-router', () => ({
@@ -238,5 +239,21 @@ describe('SecurityAnalystWorkbench', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /Threat intelligence/i })).toBeInTheDocument()
     expect(screen.getAllByText(/Paragraph 18:/i).length).toBeGreaterThan(0)
+  })
+
+  it('shows generated threat intelligence from the mutation response', async () => {
+    vi.mocked(generateThreatIntel).mockResolvedValueOnce({
+      summary: 'Generated threat intelligence summary.',
+      generatedAt: '2026-05-03T00:00:00Z',
+      profileName: 'Threat profile',
+      canGenerate: true,
+      unavailableMessage: null,
+    })
+
+    renderWorkbench()
+
+    fireEvent.click(screen.getByRole('button', { name: /Retrieve threat intel/i }))
+
+    expect(await screen.findByText('Generated threat intelligence summary.')).toBeInTheDocument()
   })
 })
