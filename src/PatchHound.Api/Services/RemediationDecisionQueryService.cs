@@ -84,7 +84,15 @@ public class RemediationDecisionQueryService(
     )
     {
         var casesQuery = dbContext.RemediationCases.AsNoTracking()
-            .Where(c => c.TenantId == tenantId);
+            .Where(c => c.TenantId == tenantId)
+            .Where(c =>
+                dbContext.DeviceVulnerabilityExposures.Any(e =>
+                    e.TenantId == tenantId
+                    && e.SoftwareProductId == c.SoftwareProductId
+                    && e.Status == ExposureStatus.Open)
+                || dbContext.InstalledSoftware.Any(i =>
+                    i.TenantId == tenantId
+                    && i.SoftwareProductId == c.SoftwareProductId));
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {

@@ -30,6 +30,14 @@ public class RemediationCasesController(
 
         var query = db.RemediationCases.AsNoTracking()
             .Where(c => c.TenantId == tenantId)
+            .Where(c =>
+                db.DeviceVulnerabilityExposures.Any(e =>
+                    e.TenantId == tenantId
+                    && e.SoftwareProductId == c.SoftwareProductId
+                    && e.Status == ExposureStatus.Open)
+                || db.InstalledSoftware.Any(i =>
+                    i.TenantId == tenantId
+                    && i.SoftwareProductId == c.SoftwareProductId))
             .OrderByDescending(c => c.UpdatedAt);
 
         var total = await query.CountAsync(ct);

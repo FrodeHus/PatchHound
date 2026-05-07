@@ -215,8 +215,10 @@ public class RemediationDecisionListTests : IDisposable
 
         var remediationCase = RemediationCase.Create(_tenantId, product.Id);
         var workflow = RemediationWorkflow.Create(_tenantId, remediationCase.Id, ownerTeam.Id);
+        var device = CanonicalTestData.MakeDevice(_tenantId);
+        var installedSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, device.Id, product.Id);
 
-        await _dbContext.AddRangeAsync(ownerTeam, product, tenantSoftware, remediationCase, workflow);
+        await _dbContext.AddRangeAsync(ownerTeam, product, tenantSoftware, remediationCase, workflow, device, installedSoftware);
         await _dbContext.SaveChangesAsync();
 
         var result = await _service.ListAsync(
@@ -237,6 +239,8 @@ public class RemediationDecisionListTests : IDisposable
         var needsRecommendationProduct = SoftwareProduct.Create("Contoso", "Needs Recommendation", null);
         var needsRecommendationCase = RemediationCase.Create(_tenantId, needsRecommendationProduct.Id);
         var needsRecommendationWorkflow = RemediationWorkflow.Create(_tenantId, needsRecommendationCase.Id, Guid.NewGuid());
+        var needsRecommendationDevice = CanonicalTestData.MakeDevice(_tenantId);
+        var needsRecommendationSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, needsRecommendationDevice.Id, needsRecommendationProduct.Id);
 
         var alreadyRecommendedProduct = SoftwareProduct.Create("Contoso", "Already Recommended", null);
         var alreadyRecommendedCase = RemediationCase.Create(_tenantId, alreadyRecommendedProduct.Id);
@@ -249,23 +253,33 @@ public class RemediationDecisionListTests : IDisposable
             _userId
         );
         recommendation.AttachToWorkflow(alreadyRecommendedWorkflow.Id);
+        var alreadyRecommendedDevice = CanonicalTestData.MakeDevice(_tenantId);
+        var alreadyRecommendedSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, alreadyRecommendedDevice.Id, alreadyRecommendedProduct.Id);
 
         var decisionStageProduct = SoftwareProduct.Create("Contoso", "Decision Stage", null);
         var decisionStageCase = RemediationCase.Create(_tenantId, decisionStageProduct.Id);
         var decisionStageWorkflow = RemediationWorkflow.Create(_tenantId, decisionStageCase.Id, Guid.NewGuid());
         decisionStageWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+        var decisionStageDevice = CanonicalTestData.MakeDevice(_tenantId);
+        var decisionStageSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, decisionStageDevice.Id, decisionStageProduct.Id);
 
         await _dbContext.AddRangeAsync(
             needsRecommendationProduct,
             needsRecommendationCase,
             needsRecommendationWorkflow,
+            needsRecommendationDevice,
+            needsRecommendationSoftware,
             alreadyRecommendedProduct,
             alreadyRecommendedCase,
             alreadyRecommendedWorkflow,
             recommendation,
+            alreadyRecommendedDevice,
+            alreadyRecommendedSoftware,
             decisionStageProduct,
             decisionStageCase,
-            decisionStageWorkflow
+            decisionStageWorkflow,
+            decisionStageDevice,
+            decisionStageSoftware
         );
         await _dbContext.SaveChangesAsync();
 
@@ -289,7 +303,9 @@ public class RemediationDecisionListTests : IDisposable
         // should still appear in the analyst recommendation queue.
         var product = SoftwareProduct.Create("Contoso", "Untouched Software", null);
         var untouchedCase = RemediationCase.Create(_tenantId, product.Id);
-        await _dbContext.AddRangeAsync(product, untouchedCase);
+        var device = CanonicalTestData.MakeDevice(_tenantId);
+        var installedSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, device.Id, product.Id);
+        await _dbContext.AddRangeAsync(product, untouchedCase, device, installedSoftware);
         await _dbContext.SaveChangesAsync();
 
         var result = await _service.ListAsync(
@@ -313,6 +329,8 @@ public class RemediationDecisionListTests : IDisposable
         var pendingCase = RemediationCase.Create(_tenantId, pendingProduct.Id);
         var pendingWorkflow = RemediationWorkflow.Create(_tenantId, pendingCase.Id, Guid.NewGuid());
         pendingWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+        var pendingDevice = CanonicalTestData.MakeDevice(_tenantId);
+        var pendingSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, pendingDevice.Id, pendingProduct.Id);
 
         // Case at RemediationDecision stage WITH a decision → excluded.
         var decidedProduct = SoftwareProduct.Create("Contoso", "Already Decided", null);
@@ -326,16 +344,20 @@ public class RemediationDecisionListTests : IDisposable
             "Accepted",
             _userId
         );
+        var decidedDevice = CanonicalTestData.MakeDevice(_tenantId);
+        var decidedSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, decidedDevice.Id, decidedProduct.Id);
 
         // Case at SecurityAnalysis stage → excluded (wrong stage).
         var earlyProduct = SoftwareProduct.Create("Contoso", "Still Analyzing", null);
         var earlyCase = RemediationCase.Create(_tenantId, earlyProduct.Id);
         var earlyWorkflow = RemediationWorkflow.Create(_tenantId, earlyCase.Id, Guid.NewGuid());
+        var earlyDevice = CanonicalTestData.MakeDevice(_tenantId);
+        var earlySoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, earlyDevice.Id, earlyProduct.Id);
 
         await _dbContext.AddRangeAsync(
-            pendingProduct, pendingCase, pendingWorkflow,
-            decidedProduct, decidedCase, decidedWorkflow, decidedDecision,
-            earlyProduct, earlyCase, earlyWorkflow
+            pendingProduct, pendingCase, pendingWorkflow, pendingDevice, pendingSoftware,
+            decidedProduct, decidedCase, decidedWorkflow, decidedDecision, decidedDevice, decidedSoftware,
+            earlyProduct, earlyCase, earlyWorkflow, earlyDevice, earlySoftware
         );
         await _dbContext.SaveChangesAsync();
 
@@ -368,6 +390,8 @@ public class RemediationDecisionListTests : IDisposable
             _userId,
             initialApprovalStatus: DecisionApprovalStatus.PendingApproval
         );
+        var pendingApprovalDevice = CanonicalTestData.MakeDevice(_tenantId);
+        var pendingApprovalSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, pendingApprovalDevice.Id, pendingApprovalProduct.Id);
 
         // Case at Approval stage with already-approved decision → excluded.
         var approvedProduct = SoftwareProduct.Create("Contoso", "Already Approved", null);
@@ -383,17 +407,24 @@ public class RemediationDecisionListTests : IDisposable
             _userId,
             initialApprovalStatus: DecisionApprovalStatus.Approved
         );
+        var approvedDevice = CanonicalTestData.MakeDevice(_tenantId);
+        var approvedSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, approvedDevice.Id, approvedProduct.Id);
 
         // Case at RemediationDecision stage → excluded (wrong stage).
         var decisionProduct = SoftwareProduct.Create("Contoso", "Still Deciding", null);
         var decisionCase = RemediationCase.Create(_tenantId, decisionProduct.Id);
         var decisionWorkflow = RemediationWorkflow.Create(_tenantId, decisionCase.Id, Guid.NewGuid());
         decisionWorkflow.MoveToStage(RemediationWorkflowStage.RemediationDecision);
+        var decisionDevice = CanonicalTestData.MakeDevice(_tenantId);
+        var decisionSoftware = CanonicalTestData.MakeInstalledSoftware(_tenantId, decisionDevice.Id, decisionProduct.Id);
 
         await _dbContext.AddRangeAsync(
             pendingApprovalProduct, pendingApprovalCase, pendingApprovalWorkflow, pendingApprovalDecision,
+            pendingApprovalDevice, pendingApprovalSoftware,
             approvedProduct, approvedCase, approvedWorkflow, approvedDecision,
-            decisionProduct, decisionCase, decisionWorkflow
+            approvedDevice, approvedSoftware,
+            decisionProduct, decisionCase, decisionWorkflow,
+            decisionDevice, decisionSoftware
         );
         await _dbContext.SaveChangesAsync();
 

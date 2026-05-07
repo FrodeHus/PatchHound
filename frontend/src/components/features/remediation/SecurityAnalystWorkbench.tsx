@@ -136,11 +136,13 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
               {data.softwareCategory ? (
                 <Badge variant="outline">{data.softwareCategory}</Badge>
               ) : null}
-              <Badge variant="outline">{data.workflowState.currentStageLabel}</Badge>
+              <Badge variant="outline">
+                {data.workflowState.currentStageLabel}
+              </Badge>
             </div>
             <p className="max-w-4xl text-sm leading-relaxed text-muted-foreground">
-              {data.softwareDescription
-                ?? 'Review the open exposure and capture the recommendation the asset owner will use to decide the remediation path.'}
+              {data.softwareDescription ??
+                "Review the open exposure and capture the recommendation the asset owner will use to decide the remediation path."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -157,37 +159,56 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
       </header>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <WorkbenchMetric label="Open vulnerabilities" value={data.summary.totalVulnerabilities.toLocaleString()} detail={`${data.summary.criticalCount} critical · ${data.summary.highCount} high`} />
-        <WorkbenchMetric label="Affected devices" value={data.workflow.affectedDeviceCount.toLocaleString()} detail={`${data.workflow.affectedOwnerTeamCount} owner teams`} />
-        <WorkbenchMetric label="Owner routing" value={data.softwareOwnerTeamName ?? 'Default Team'} detail={formatSoftwareOwnerRoutingDetail(data.softwareOwnerTeamName, data.softwareOwnerAssignmentSource)} />
-        <WorkbenchMetric label="SLA" value={data.sla?.slaStatus ?? 'Not set'} detail={data.sla?.dueDate ? `Due ${formatNullableDateTime(data.sla.dueDate)}` : 'No due date'} />
+        <WorkbenchMetric
+          label="Open vulnerabilities"
+          value={data.summary.totalVulnerabilities.toLocaleString()}
+          detail={`${data.summary.criticalCount} critical · ${data.summary.highCount} high`}
+        />
+        <WorkbenchMetric
+          label="Affected devices"
+          value={data.workflow.affectedDeviceCount.toLocaleString()}
+          detail={`${data.workflow.affectedOwnerTeamCount} owner teams`}
+        />
+        <WorkbenchMetric
+          label="Owner routing"
+          value={data.softwareOwnerTeamName ?? "Default Team"}
+          detail={formatSoftwareOwnerRoutingDetail(
+            data.softwareOwnerTeamName,
+            data.softwareOwnerAssignmentSource,
+          )}
+        />
+        <WorkbenchMetric
+          label="SLA"
+          value={data.sla?.slaStatus ?? "Not set"}
+          detail={
+            data.sla?.dueDate
+              ? `Due ${formatNullableDateTime(data.sla.dueDate)}`
+              : "No due date"
+          }
+        />
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.44fr)]">
         <div className="grid gap-3 md:grid-cols-3">
           <RiskDriver
             label="Top driver"
-            value={highestRiskDriver?.externalId ?? 'None'}
+            value={highestRiskDriver?.externalId ?? "None"}
             detail={highestRiskDriverDetail}
-            tone={highestRiskDriver ? 'danger' : 'neutral'}
+            tone={highestRiskDriver ? "danger" : "neutral"}
           />
           <RiskDriver
             label="Threat signals"
             value={threatDriverCount.toLocaleString()}
             detail="KEV, public exploit, or active alert"
-            tone={threatDriverCount > 0 ? 'danger' : 'neutral'}
-          />
-          <RiskDriver
-            label="Decision inputs"
-            value={data.aiSummary.status ?? 'Not requested'}
-            detail={data.recommendations.length > 0 ? 'Recommendation already captured' : 'Awaiting analyst recommendation'}
-            tone={data.recommendations.length > 0 ? 'success' : 'neutral'}
+            tone={threatDriverCount > 0 ? "danger" : "neutral"}
           />
         </div>
 
         {data.businessLabels.length > 0 ? (
           <div className="rounded-lg border border-border/70 bg-card px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Business impact</p>
+            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              Business impact
+            </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {data.businessLabels.map((label) => (
                 <span
@@ -197,10 +218,12 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
                 >
                   <span
                     className="size-2 rounded-full border border-border/60"
-                    style={{ backgroundColor: label.color ?? 'transparent' }}
+                    style={{ backgroundColor: label.color ?? "transparent" }}
                   />
                   <span className="font-medium">{label.name}</span>
-                  <span className="text-muted-foreground">{label.affectedDeviceCount}</span>
+                  <span className="text-muted-foreground">
+                    {label.affectedDeviceCount}
+                  </span>
                 </span>
               ))}
             </div>
@@ -209,7 +232,10 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
       </div>
 
       {error ? (
-        <div role="alert" className="rounded-lg border border-destructive/35 bg-destructive/8 px-4 py-3 text-sm text-destructive">
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/35 bg-destructive/8 px-4 py-3 text-sm text-destructive"
+        >
           {error}
         </div>
       ) : null}
@@ -226,20 +252,35 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
             {currentRecommendation ? (
               <div className="rounded-lg border border-border/70 bg-muted/25 px-3 py-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs font-medium', toneBadge(outcomeTone(currentRecommendation.recommendedOutcome)))}>
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full border px-2 py-0.5 text-xs font-medium",
+                      toneBadge(
+                        outcomeTone(currentRecommendation.recommendedOutcome),
+                      ),
+                    )}
+                  >
                     {outcomeLabel(currentRecommendation.recommendedOutcome)}
                   </span>
                   {currentRecommendation.priorityOverride ? (
-                    <span className="text-xs text-muted-foreground">{currentRecommendation.priorityOverride} priority</span>
+                    <span className="text-xs text-muted-foreground">
+                      {currentRecommendation.priorityOverride} priority
+                    </span>
                   ) : null}
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Saved {currentRecommendation.analystDisplayName ? `by ${currentRecommendation.analystDisplayName} ` : ''}{formatDateTime(currentRecommendation.createdAt)}
+                  Saved{" "}
+                  {currentRecommendation.analystDisplayName
+                    ? `by ${currentRecommendation.analystDisplayName} `
+                    : ""}
+                  {formatDateTime(currentRecommendation.createdAt)}
                 </p>
               </div>
             ) : null}
 
-            {(data.aiSummary.analystAssessment || data.aiSummary.recommendedOutcome || data.aiSummary.recommendedPriority) ? (
+            {data.aiSummary.analystAssessment ||
+            data.aiSummary.recommendedOutcome ||
+            data.aiSummary.recommendedPriority ? (
               <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
@@ -248,10 +289,16 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
                       AI draft available
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Apply the latest generated priority, action, and rationale to the form for analyst review.
+                      Apply the latest generated priority, action, and rationale
+                      to the form for analyst review.
                     </p>
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={useAiDraft}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={useAiDraft}
+                  >
                     Apply draft
                   </Button>
                 </div>
@@ -260,21 +307,41 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
 
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
               <div className="space-y-2">
-                <label htmlFor="recommended-outcome" className="text-sm font-medium">Recommended remediation</label>
-                <Select value={recommendedOutcome} onValueChange={(value) => setRecommendedOutcome(value ?? '')}>
+                <label
+                  htmlFor="recommended-outcome"
+                  className="text-sm font-medium"
+                >
+                  Recommended remediation
+                </label>
+                <Select
+                  value={recommendedOutcome}
+                  onValueChange={(value) => setRecommendedOutcome(value ?? "")}
+                >
                   <SelectTrigger id="recommended-outcome">
                     <SelectValue placeholder="Select action..." />
                   </SelectTrigger>
                   <SelectContent>
                     {OUTCOMES.map((outcome) => (
-                      <SelectItem key={outcome} value={outcome}>{outcomeLabel(outcome)}</SelectItem>
+                      <SelectItem key={outcome} value={outcome}>
+                        {outcomeLabel(outcome)}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <label htmlFor="priority-override" className="text-sm font-medium">Priority</label>
-                <Select value={priorityOverride || 'none'} onValueChange={(value) => setPriorityOverride(value === 'none' ? '' : value ?? '')}>
+                <label
+                  htmlFor="priority-override"
+                  className="text-sm font-medium"
+                >
+                  Priority
+                </label>
+                <Select
+                  value={priorityOverride || "none"}
+                  onValueChange={(value) =>
+                    setPriorityOverride(value === "none" ? "" : (value ?? ""))
+                  }
+                >
                   <SelectTrigger id="priority-override">
                     <SelectValue placeholder="No priority" />
                   </SelectTrigger>
@@ -290,7 +357,12 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="analyst-recommendation-rationale" className="text-sm font-medium">Recommendation rationale</label>
+              <label
+                htmlFor="analyst-recommendation-rationale"
+                className="text-sm font-medium"
+              >
+                Recommendation rationale
+              </label>
               <Textarea
                 id="analyst-recommendation-rationale"
                 value={rationale}
@@ -301,9 +373,20 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={handleSaveRecommendation} disabled={!canSave || isSaving}>
-                {isSaving ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}
-                {isSaving ? 'Saving...' : currentRecommendation ? 'Update recommendation' : 'Save recommendation'}
+              <Button
+                onClick={handleSaveRecommendation}
+                disabled={!canSave || isSaving}
+              >
+                {isSaving ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
+                )}
+                {isSaving
+                  ? "Saving..."
+                  : currentRecommendation
+                    ? "Update recommendation"
+                    : "Save recommendation"}
               </Button>
             </div>
           </CardContent>
@@ -321,8 +404,13 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
           <div>
             <h2 className="text-lg font-semibold">Open vulnerabilities</h2>
             <p className="text-sm text-muted-foreground">
-              Highest-risk drivers first. Showing {topDrivers.length.toLocaleString()} of {vulnerabilities.length.toLocaleString()}
-              {hiddenDriverCount > 0 ? `, with ${hiddenDriverCount.toLocaleString()} more in the full case` : ''}.
+              Highest-risk drivers first. Showing{" "}
+              {topDrivers.length.toLocaleString()} of{" "}
+              {vulnerabilities.length.toLocaleString()}
+              {hiddenDriverCount > 0
+                ? `, with ${hiddenDriverCount.toLocaleString()} more in the full case`
+                : ""}
+              .
             </p>
           </div>
         </div>
@@ -339,15 +427,35 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
             </thead>
             <tbody className="divide-y divide-border/60">
               {topDrivers.map((vulnerability) => (
-                <tr key={vulnerability.vulnerabilityId} className="transition-colors hover:bg-muted/25">
+                <tr
+                  key={vulnerability.vulnerabilityId}
+                  className="transition-colors hover:bg-muted/25"
+                >
                   <td className="px-4 py-3">
-                    <div className="font-medium">{vulnerability.externalId}</div>
-                    <div className="line-clamp-1 max-w-xl text-xs text-muted-foreground">{vulnerability.title}</div>
+                    <div className="font-medium">
+                      {vulnerability.externalId}
+                    </div>
+                    <div className="line-clamp-1 max-w-xl text-xs text-muted-foreground">
+                      {vulnerability.title}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs font-medium', toneBadge(severityTone(vulnerability.effectiveSeverity ?? vulnerability.vendorSeverity)))}>
-                      {vulnerability.effectiveSeverity ?? vulnerability.vendorSeverity}
-                      {vulnerability.effectiveScore != null ? ` ${vulnerability.effectiveScore.toFixed(1)}` : ''}
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full border px-2 py-0.5 text-xs font-medium",
+                        toneBadge(
+                          severityTone(
+                            vulnerability.effectiveSeverity ??
+                              vulnerability.vendorSeverity,
+                          ),
+                        ),
+                      )}
+                    >
+                      {vulnerability.effectiveSeverity ??
+                        vulnerability.vendorSeverity}
+                      {vulnerability.effectiveScore != null
+                        ? ` ${vulnerability.effectiveScore.toFixed(1)}`
+                        : ""}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -370,7 +478,10 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
               ))}
               {topDrivers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                  <td
+                    colSpan={5}
+                    className="px-4 py-8 text-center text-muted-foreground"
+                  >
                     No open vulnerabilities are linked to this remediation case.
                   </td>
                 </tr>
@@ -383,10 +494,12 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
       <VulnerabilityEssentialsSheet
         vulnerability={selectedVulnerability}
         open={selectedVulnerability !== null}
-        onOpenChange={(open) => { if (!open) setSelectedVulnerability(null) }}
+        onOpenChange={(open) => {
+          if (!open) setSelectedVulnerability(null);
+        }}
       />
     </section>
-  )
+  );
 }
 
 function WorkbenchMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
