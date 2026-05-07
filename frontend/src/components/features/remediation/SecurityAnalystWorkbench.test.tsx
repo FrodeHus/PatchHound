@@ -131,6 +131,13 @@ const dataFixture: DecisionContext = {
     lastError: null,
     unavailableMessage: null,
   },
+  threatIntel: {
+    summary: null,
+    generatedAt: null,
+    profileName: null,
+    canGenerate: true,
+    unavailableMessage: null,
+  },
 }
 
 function renderWorkbench(data: DecisionContext = dataFixture) {
