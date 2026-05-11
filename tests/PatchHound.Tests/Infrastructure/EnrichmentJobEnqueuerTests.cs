@@ -352,4 +352,40 @@ public class EnrichmentJobEnqueuerTests : IDisposable
         jobs[0].TargetModel.Should().Be(EnrichmentTargetModel.SoftwareAsset);
         jobs[0].TargetId.Should().Be(software.Id);
     }
+
+    [Fact]
+    public async Task EnqueueVulnerabilityJobsAsync_WhenNvdSourceIsEnabled_DoesNotQueueNvdJob()
+    {
+        var tenantId = Guid.NewGuid();
+        var vulnerability = Vulnerability.Create(
+            "nvd",
+            "CVE-2026-9999",
+            "Test title",
+            string.Empty,
+            Severity.Medium,
+            cvssScore: null,
+            cvssVector: null,
+            publishedDate: null
+        );
+        var nvdSource = EnrichmentSourceConfiguration.Create(
+            EnrichmentSourceCatalog.NvdSourceKey,
+            "NVD API",
+            true,
+            apiBaseUrl: EnrichmentSourceCatalog.DefaultNvdApiBaseUrl
+        );
+
+        await _dbContext.Vulnerabilities.AddAsync(vulnerability);
+        await _dbContext.EnrichmentSourceConfigurations.AddAsync(nvdSource);
+        await _dbContext.SaveChangesAsync();
+
+        var enqueuer = new EnrichmentJobEnqueuer(
+            _dbContext,
+            Substitute.For<ILogger<EnrichmentJobEnqueuer>>()
+        );
+
+        await enqueuer.EnqueueVulnerabilityJobsAsync(tenantId, [vulnerability.Id], CancellationToken.None);
+
+        var jobs = await _dbContext.EnrichmentJobs.IgnoreQueryFilters().ToListAsync();
+        jobs.Should().BeEmpty("NVD enrichment is handled by NvdCacheBackfillService, not the job queue");
+    }
 }

@@ -65,10 +65,6 @@ public class NvdCacheBackfillService(
             db.SetSystemContext(false);
         }
 
-        logger.LogInformation(
-            "NVD backfill complete: processed={Processed} succeeded={Succeeded} failed={Failed}",
-            items.Count, succeeded, failed);
-
         return new NvdBackfillStats(items.Count, succeeded, failed);
     }
 

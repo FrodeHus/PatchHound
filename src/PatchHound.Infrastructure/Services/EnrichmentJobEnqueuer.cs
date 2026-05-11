@@ -76,13 +76,6 @@ public class EnrichmentJobEnqueuer(
             {
                 v.Id,
                 v.ExternalId,
-                v.Source,
-                v.Description,
-                v.CvssScore,
-                v.CvssVector,
-                v.PublishedDate,
-                ReferenceCount = dbContext.VulnerabilityReferences.Count(r => r.VulnerabilityId == v.Id),
-                AffectedSoftwareCount = dbContext.VulnerabilityApplicabilities.Count(a => a.VulnerabilityId == v.Id),
                 HasDefenderReference = dbContext.VulnerabilityReferences.Any(r =>
                     r.VulnerabilityId == v.Id && r.Source == "MicrosoftDefender"),
                 DefenderLastRefreshedAt = dbContext.ThreatAssessments
@@ -129,13 +122,6 @@ public class EnrichmentJobEnqueuer(
                     !ShouldEnqueueVulnerability(
                         normalizedSourceKey,
                         definition.ExternalId,
-                        definition.Source,
-                        definition.Description,
-                        definition.CvssScore,
-                        definition.CvssVector,
-                        definition.PublishedDate,
-                        definition.ReferenceCount,
-                        definition.AffectedSoftwareCount,
                         definition.HasDefenderReference,
                         definition.DefenderLastRefreshedAt,
                         now,
@@ -193,13 +179,6 @@ public class EnrichmentJobEnqueuer(
     private static bool ShouldEnqueueVulnerability(
         string sourceKey,
         string externalId,
-        string source,
-        string description,
-        decimal? cvssScore,
-        string? cvssVector,
-        DateTimeOffset? publishedDate,
-        int referenceCount,
-        int affectedSoftwareCount,
         bool hasDefenderReference,
         DateTimeOffset? defenderLastRefreshedAt,
         DateTimeOffset now,
