@@ -40,7 +40,7 @@ public class NvdCacheBackfillServiceTests
         var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
         var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
 
-        var stats = await svc.RunAsync(CancellationToken.None);
+        var stats = await svc.RunAsync();
 
         stats.Processed.Should().Be(1);
         stats.Succeeded.Should().Be(1);
@@ -71,7 +71,7 @@ public class NvdCacheBackfillServiceTests
         var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
         var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
 
-        var stats = await svc.RunAsync(CancellationToken.None);
+        var stats = await svc.RunAsync();
 
         stats.Processed.Should().Be(0);
         stats.Succeeded.Should().Be(0);
@@ -102,7 +102,7 @@ public class NvdCacheBackfillServiceTests
         var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
         var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
 
-        var stats = await svc.RunAsync(CancellationToken.None);
+        var stats = await svc.RunAsync();
 
         stats.Processed.Should().Be(0);
     }
@@ -120,7 +120,7 @@ public class NvdCacheBackfillServiceTests
         var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
         var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
 
-        var stats = await svc.RunAsync(CancellationToken.None);
+        var stats = await svc.RunAsync();
 
         stats.Processed.Should().Be(0);
     }
@@ -154,7 +154,7 @@ public class NvdCacheBackfillServiceTests
         var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
         var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
 
-        var stats = await svc.RunAsync(CancellationToken.None);
+        var stats = await svc.RunAsync();
 
         stats.Succeeded.Should().Be(1);
         var app = await db.VulnerabilityApplicabilities.SingleAsync();
@@ -181,7 +181,7 @@ public class NvdCacheBackfillServiceTests
         var resolver = new ThrowOnFirstCallResolver(db);
         var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
 
-        var stats = await svc.RunAsync(CancellationToken.None);
+        var stats = await svc.RunAsync();
 
         stats.Processed.Should().Be(2);
         stats.Succeeded.Should().Be(1);
@@ -224,7 +224,7 @@ public class NvdCacheBackfillServiceTests
         var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
         var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
 
-        var stats = await svc.RunAsync(CancellationToken.None, batchSize: 3);
+        var stats = await svc.RunAsync(batchSize: 3);
 
         stats.Processed.Should().Be(3);
         stats.Succeeded.Should().Be(3);

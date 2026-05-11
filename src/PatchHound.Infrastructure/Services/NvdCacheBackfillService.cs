@@ -17,7 +17,7 @@ public class NvdCacheBackfillService(
     public const int DefaultBatchSize = 500;
 
     public async Task<NvdBackfillStats> RunAsync(
-        CancellationToken ct, int batchSize = DefaultBatchSize)
+        int batchSize = DefaultBatchSize, CancellationToken ct = default)
     {
         var items = await (
             from v in db.Vulnerabilities.IgnoreQueryFilters()
@@ -30,7 +30,7 @@ public class NvdCacheBackfillService(
                     || !db.VulnerabilityReferences.Any(r => r.VulnerabilityId == v.Id)
                     || !db.VulnerabilityApplicabilities.Any(a => a.VulnerabilityId == v.Id))
             select new { v.ExternalId, Cache = c }
-        ).Take(batchSize).AsNoTracking().ToListAsync(ct);
+        ).OrderBy(x => x.ExternalId).Take(batchSize).AsNoTracking().ToListAsync(ct);
 
         if (items.Count == 0)
             return new NvdBackfillStats(0, 0, 0);
