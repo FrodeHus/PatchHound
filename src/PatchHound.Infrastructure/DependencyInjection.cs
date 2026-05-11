@@ -100,6 +100,7 @@ public static class DependencyInjection
         services.AddScoped<AnalystRecommendationService>();
         services.AddScoped<NormalizedSoftwareResolver>();
         services.AddScoped<VulnerabilityResolver>();
+        services.AddScoped<NvdCacheBackfillService>();
         services.AddScoped<ThreatAssessmentService>();
         services.AddScoped<NormalizedSoftwareProjectionService>();
         services.AddScoped<CycloneDxSupplyChainImportService>();
