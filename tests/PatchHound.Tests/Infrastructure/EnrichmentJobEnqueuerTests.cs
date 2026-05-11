@@ -26,7 +26,7 @@ public class EnrichmentJobEnqueuerTests : IDisposable
     [Theory]
     [InlineData(EnrichmentJobStatus.Succeeded)]
     [InlineData(EnrichmentJobStatus.Skipped)]
-    public async Task EnqueueVulnerabilityJobsAsync_WhenExistingJobIsCompleted_RefreshesItBackToPending(
+    public async Task EnqueueVulnerabilityJobsAsync_WhenExistingDefenderJobIsCompleted_RefreshesItBackToPending(
         EnrichmentJobStatus existingStatus
     )
     {
@@ -41,16 +41,27 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             cvssVector: null,
             publishedDate: null
         );
-        var source = EnrichmentSourceConfiguration.Create(
-            "nvd",
-            "NVD API",
+        var defenderSource = EnrichmentSourceConfiguration.Create(
+            EnrichmentSourceCatalog.DefenderSourceKey,
+            "Microsoft Defender",
             true,
-            "system/enrichment-sources/nvd",
-            "https://services.nvd.nist.gov"
+            apiBaseUrl: TenantSourceCatalog.DefaultDefenderApiBaseUrl
+        );
+        var tenantDefenderSource = TenantSourceConfiguration.Create(
+            tenantId,
+            TenantSourceCatalog.DefenderSourceKey,
+            "Microsoft Defender",
+            true,
+            TenantSourceCatalog.DefaultDefenderSchedule,
+            "vault/tenant-source",
+            TenantSourceCatalog.DefaultDefenderApiBaseUrl,
+            "tenant-id",
+            "client-id",
+            TenantSourceCatalog.DefaultDefenderTokenScope
         );
         var job = EnrichmentJob.Create(
             tenantId,
-            "nvd",
+            EnrichmentSourceCatalog.DefenderSourceKey,
             EnrichmentTargetModel.Vulnerability,
             vulnerability.Id,
             vulnerability.ExternalId,
@@ -60,7 +71,8 @@ public class EnrichmentJobEnqueuerTests : IDisposable
         job.Complete(existingStatus, DateTimeOffset.UtcNow.AddMinutes(-30));
 
         await _dbContext.Vulnerabilities.AddAsync(vulnerability);
-        await _dbContext.EnrichmentSourceConfigurations.AddAsync(source);
+        await _dbContext.EnrichmentSourceConfigurations.AddAsync(defenderSource);
+        await _dbContext.TenantSourceConfigurations.AddAsync(tenantDefenderSource);
         await _dbContext.EnrichmentJobs.AddAsync(job);
         await _dbContext.SaveChangesAsync();
 
@@ -77,7 +89,7 @@ public class EnrichmentJobEnqueuerTests : IDisposable
     }
 
     [Fact]
-    public async Task EnqueueVulnerabilityJobsAsync_WhenJobAlreadyExistsForAnotherTenant_ReusesGlobalJob()
+    public async Task EnqueueVulnerabilityJobsAsync_WhenDefenderJobExistsForAnotherTenant_ReusesGlobalJob()
     {
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
@@ -91,16 +103,39 @@ public class EnrichmentJobEnqueuerTests : IDisposable
             cvssVector: null,
             publishedDate: null
         );
-        var source = EnrichmentSourceConfiguration.Create(
-            "nvd",
-            "NVD API",
+        var defenderSource = EnrichmentSourceConfiguration.Create(
+            EnrichmentSourceCatalog.DefenderSourceKey,
+            "Microsoft Defender",
             true,
-            "system/enrichment-sources/nvd",
-            "https://services.nvd.nist.gov"
+            apiBaseUrl: TenantSourceCatalog.DefaultDefenderApiBaseUrl
+        );
+        var tenantDefenderSourceA = TenantSourceConfiguration.Create(
+            tenantA,
+            TenantSourceCatalog.DefenderSourceKey,
+            "Microsoft Defender",
+            true,
+            TenantSourceCatalog.DefaultDefenderSchedule,
+            "vault/tenant-source",
+            TenantSourceCatalog.DefaultDefenderApiBaseUrl,
+            "tenant-a",
+            "client-a",
+            TenantSourceCatalog.DefaultDefenderTokenScope
+        );
+        var tenantDefenderSourceB = TenantSourceConfiguration.Create(
+            tenantB,
+            TenantSourceCatalog.DefenderSourceKey,
+            "Microsoft Defender",
+            true,
+            TenantSourceCatalog.DefaultDefenderSchedule,
+            "vault/tenant-source",
+            TenantSourceCatalog.DefaultDefenderApiBaseUrl,
+            "tenant-b",
+            "client-b",
+            TenantSourceCatalog.DefaultDefenderTokenScope
         );
         var existingJob = EnrichmentJob.Create(
             tenantA,
-            "nvd",
+            EnrichmentSourceCatalog.DefenderSourceKey,
             EnrichmentTargetModel.Vulnerability,
             vulnerability.Id,
             vulnerability.ExternalId,
@@ -110,7 +145,9 @@ public class EnrichmentJobEnqueuerTests : IDisposable
         existingJob.Complete(EnrichmentJobStatus.Succeeded, DateTimeOffset.UtcNow.AddMinutes(-30));
 
         await _dbContext.Vulnerabilities.AddAsync(vulnerability);
-        await _dbContext.EnrichmentSourceConfigurations.AddAsync(source);
+        await _dbContext.EnrichmentSourceConfigurations.AddAsync(defenderSource);
+        await _dbContext.TenantSourceConfigurations.AddAsync(tenantDefenderSourceA);
+        await _dbContext.TenantSourceConfigurations.AddAsync(tenantDefenderSourceB);
         await _dbContext.EnrichmentJobs.AddAsync(existingJob);
         await _dbContext.SaveChangesAsync();
 

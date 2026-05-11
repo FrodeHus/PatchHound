@@ -55,10 +55,10 @@ public class EnrichmentJobEnqueuer(
 
         var enabledSourceKeys = enabledSources
             .Where(source =>
-                string.Equals(source.SourceKey, EnrichmentSourceCatalog.DefenderSourceKey, StringComparison.OrdinalIgnoreCase)
+                !string.Equals(source.SourceKey, EnrichmentSourceCatalog.NvdSourceKey, StringComparison.OrdinalIgnoreCase)
+                && (string.Equals(source.SourceKey, EnrichmentSourceCatalog.DefenderSourceKey, StringComparison.OrdinalIgnoreCase)
                     ? defenderConfiguredForTenant
-                    : string.Equals(source.SourceKey, EnrichmentSourceCatalog.NvdSourceKey, StringComparison.OrdinalIgnoreCase)
-                        || !string.IsNullOrWhiteSpace(source.SecretRef))
+                    : !string.IsNullOrWhiteSpace(source.SecretRef)))
             .Select(source => source.SourceKey)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -224,21 +224,7 @@ public class EnrichmentJobEnqueuer(
                 || now - defenderLastRefreshedAt.Value >= defenderRefreshTtl;
         }
 
-        var hasNvd = source
-            .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Any(item => string.Equals(item, "NVD", StringComparison.OrdinalIgnoreCase));
-
-        if (!hasNvd)
-        {
-            return true;
-        }
-
-        return string.IsNullOrWhiteSpace(description)
-            || !cvssScore.HasValue
-            || string.IsNullOrWhiteSpace(cvssVector)
-            || !publishedDate.HasValue
-            || referenceCount == 0
-            || affectedSoftwareCount == 0;
+        return true;
     }
 
     public async Task EnqueueSoftwareEndOfLifeJobsAsync(
