@@ -128,10 +128,9 @@ public class EnrichmentWorker(IServiceScopeFactory scopeFactory, ILogger<Enrichm
         );
         if (runner is null)
         {
-            logger.LogWarning(
-                "Enrichment source {SourceKey} ({DisplayName}) is enabled but no IEnrichmentSourceRunner is registered for it. Skipping.",
-                source.SourceKey,
-                source.DisplayName
+            logger.LogDebug(
+                "Enrichment source {SourceKey} has no registered runner; skipping.",
+                source.SourceKey
             );
             return false;
         }
