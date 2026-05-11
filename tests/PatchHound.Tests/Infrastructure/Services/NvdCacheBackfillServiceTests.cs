@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
+using PatchHound.Core.Models;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Services;
 using PatchHound.Tests.Infrastructure;
@@ -171,18 +172,37 @@ public class NvdCacheBackfillServiceTests
             string.Empty, Severity.Medium, null, null, null);
         db.Vulnerabilities.AddRange(vuln1, vuln2);
 
+        db.NvdCveCache.Add(NvdCveCache.Create("CVE-2025-5550", "desc 1", 5m, null,
+            null, DateTimeOffset.UtcNow, "[]", "[]"));
         db.NvdCveCache.Add(NvdCveCache.Create("CVE-2025-5551", "desc 2", 5m, null,
             null, DateTimeOffset.UtcNow, "[]", "[]"));
         await db.SaveChangesAsync();
 
-        var resolver = new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance);
+        var resolver = new ThrowOnFirstCallResolver(db);
         var svc = new NvdCacheBackfillService(db, resolver, NullLogger<NvdCacheBackfillService>.Instance);
 
         var stats = await svc.RunAsync(CancellationToken.None);
 
-        stats.Processed.Should().Be(1);
+        stats.Processed.Should().Be(2);
         stats.Succeeded.Should().Be(1);
-        stats.Failed.Should().Be(0);
+        stats.Failed.Should().Be(1);
+    }
+
+    private sealed class ThrowOnFirstCallResolver(PatchHoundDbContext db)
+        : VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance)
+    {
+        private bool _hasThrown;
+
+        public override async Task<Vulnerability> ResolveAsync(
+            VulnerabilityResolveInput input, CancellationToken ct)
+        {
+            if (!_hasThrown)
+            {
+                _hasThrown = true;
+                throw new InvalidOperationException("Simulated per-CVE failure");
+            }
+            return await base.ResolveAsync(input, ct);
+        }
     }
 
     [Fact]
