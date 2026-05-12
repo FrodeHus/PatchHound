@@ -36,6 +36,16 @@ function severityDotColor(severity: string): string {
   }
 }
 
+function severityCellKey(severity: string): string {
+  switch (severity) {
+    case 'Critical': return 'crit'
+    case 'High': return 'high'
+    case 'Medium': return 'med'
+    case 'Low': return 'low'
+    default: return 'neutral'
+  }
+}
+
 export function MttrCard({ data, isLoading }: MttrCardProps) {
   if (!data || data.length === 0) return null
 
@@ -69,9 +79,9 @@ export function MttrCard({ data, isLoading }: MttrCardProps) {
               const worsened = delta !== null && delta > 0
 
               return (
-                <InsetPanel key={entry.severity} className="p-4">
+                <InsetPanel key={entry.severity} data-mttr-cell={severityCellKey(entry.severity)} className="p-4">
                   <div className="flex items-center gap-2">
-                    <span className={`size-2.5 rounded-full ${severityDotColor(entry.severity)}`} />
+                    <span className={`size-2 rounded-full ${severityDotColor(entry.severity)} mttr-dot`} />
                     <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{entry.severity}</p>
                   </div>
                   <p className={`mt-3 text-3xl font-semibold tracking-[-0.04em] ${severityColor(entry.severity)}`}>

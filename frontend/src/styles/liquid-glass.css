@@ -743,3 +743,146 @@
     color: var(--foreground);
     outline: none;
 }
+
+/* =========================================================
+   Heatmap severity chips — intensity-based glow
+   ========================================================= */
+
+[data-theme^="liquid-glass"] [data-hm-chip] {
+    --i: 0.3;
+    --chip-tone: var(--foreground);
+    --chip-glow: transparent;
+    min-width: 3.5rem;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 999px !important;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600 !important;
+    font-size: 12.5px;
+    background:
+        linear-gradient(145deg,
+            color-mix(in oklab, var(--chip-tone) calc(var(--i) * 28%), transparent) 0%,
+            color-mix(in oklab, var(--chip-tone) calc(var(--i) * 18%), transparent) 100%) !important;
+    border: 0.5px solid color-mix(in oklab, var(--chip-tone) calc(50% + var(--i) * 40%), transparent) !important;
+    box-shadow:
+        inset 0 1px 0 oklch(1 0 0 / calc(0.10 + var(--i) * 0.15)),
+        0 0 calc(var(--i) * 20px) calc(var(--i) * 3px) var(--chip-glow) !important;
+    color: var(--foreground) !important;
+}
+
+[data-theme^="liquid-glass"] [data-hm-chip="crit"] {
+    --chip-tone: var(--destructive);
+    --chip-glow: color-mix(in oklab, var(--destructive) 40%, transparent);
+}
+[data-theme^="liquid-glass"] [data-hm-chip="high"] {
+    --chip-tone: var(--chart-1);
+    --chip-glow: color-mix(in oklab, var(--chart-1) 40%, transparent);
+}
+[data-theme^="liquid-glass"] [data-hm-chip="med"] {
+    --chip-tone: var(--chart-4);
+    --chip-glow: color-mix(in oklab, var(--chart-4) 40%, transparent);
+}
+[data-theme^="liquid-glass"] [data-hm-chip="low"] {
+    --chip-tone: var(--chart-2);
+    --chip-glow: color-mix(in oklab, var(--chart-2) 40%, transparent);
+}
+[data-theme^="liquid-glass"] [data-hm-chip="tot"] {
+    background: oklch(0 0 0 / 12%) !important;
+    border: 0.5px solid oklch(0.5 0 0 / 20%) !important;
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 8%) !important;
+    color: var(--foreground) !important;
+}
+
+/* =========================================================
+   Vulnerability age bars — recharts glass treatment
+   Gradient fills are defined inline as SVG <defs> inside
+   the BarChart. Here we apply the SVG glow filter and
+   a subtle bottom-shadow bottom-edge to each severity group.
+   ========================================================= */
+
+/* Recessed track on the horizontal bar chart */
+[data-theme^="liquid-glass"] .recharts-bar-background-rectangle rect {
+    fill: oklch(0 0 0 / 18%);
+    rx: 4;
+}
+
+/* Apply the inline glow filter defined in SVG <defs> */
+[data-theme^="liquid-glass"] .bar-seg-crit .recharts-bar-rectangle rect,
+[data-theme^="liquid-glass"] .bar-seg-crit .recharts-bar-rectangle path {
+    filter: url(#vac-glow-crit);
+}
+[data-theme^="liquid-glass"] .bar-seg-high .recharts-bar-rectangle rect,
+[data-theme^="liquid-glass"] .bar-seg-high .recharts-bar-rectangle path {
+    filter: url(#vac-glow-high);
+}
+[data-theme^="liquid-glass"] .bar-seg-med .recharts-bar-rectangle rect,
+[data-theme^="liquid-glass"] .bar-seg-med .recharts-bar-rectangle path {
+    filter: url(#vac-glow-med);
+}
+[data-theme^="liquid-glass"] .bar-seg-low .recharts-bar-rectangle rect,
+[data-theme^="liquid-glass"] .bar-seg-low .recharts-bar-rectangle path {
+    filter: url(#vac-glow-low);
+}
+
+/* =========================================================
+   MTTR cells — radial severity glow wash
+   ========================================================= */
+
+[data-theme^="liquid-glass"] [data-mttr-cell] {
+    background:
+        linear-gradient(160deg,
+            oklch(1 0 0 / 5%) 0%,
+            oklch(1 0 0 / 1%) 100%) !important;
+    border: 0.5px solid var(--glass-border) !important;
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 10%) !important;
+    overflow: hidden !important;
+    position: relative;
+}
+
+[data-theme^="liquid-glass"] [data-mttr-cell]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at top right, var(--cell-glow, transparent) 0%, transparent 70%);
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 0;
+}
+
+[data-theme^="liquid-glass"] [data-mttr-cell] > * {
+    position: relative;
+    z-index: 1;
+}
+
+[data-theme^="liquid-glass"] [data-mttr-cell="crit"] {
+    --cell-glow: color-mix(in oklab, var(--destructive) 45%, transparent);
+}
+[data-theme^="liquid-glass"] [data-mttr-cell="high"] {
+    --cell-glow: color-mix(in oklab, var(--chart-1) 45%, transparent);
+}
+[data-theme^="liquid-glass"] [data-mttr-cell="med"] {
+    --cell-glow: color-mix(in oklab, var(--chart-4) 45%, transparent);
+}
+[data-theme^="liquid-glass"] [data-mttr-cell="low"] {
+    --cell-glow: color-mix(in oklab, var(--chart-2) 45%, transparent);
+}
+
+/* Glow on the severity dot in MTTR cells */
+[data-theme^="liquid-glass"] .mttr-dot {
+    box-shadow: 0 0 6px currentColor;
+}
+
+/* Number glow — drop-shadow on the colored value */
+[data-theme^="liquid-glass"] [data-mttr-cell="crit"] .text-destructive {
+    filter: drop-shadow(0 0 8px color-mix(in oklab, var(--destructive) 55%, transparent));
+}
+[data-theme^="liquid-glass"] [data-mttr-cell="high"] .text-chart-1 {
+    filter: drop-shadow(0 0 8px color-mix(in oklab, var(--chart-1) 55%, transparent));
+}
+[data-theme^="liquid-glass"] [data-mttr-cell="med"] .text-chart-4 {
+    filter: drop-shadow(0 0 8px color-mix(in oklab, var(--chart-4) 55%, transparent));
+}
+[data-theme^="liquid-glass"] [data-mttr-cell="low"] .text-chart-2 {
+    filter: drop-shadow(0 0 8px color-mix(in oklab, var(--chart-2) 55%, transparent));
+}

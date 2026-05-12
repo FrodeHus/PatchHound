@@ -39,6 +39,18 @@ const severityDataKey: Record<SeverityKey, 'critical' | 'high' | 'medium' | 'low
   Low: 'low',
 }
 
+const severityChipKey: Record<SeverityKey, string> = {
+  Critical: 'crit',
+  High: 'high',
+  Medium: 'med',
+  Low: 'low',
+}
+
+function logIntensity(value: number, max: number): number {
+  if (!value || !max) return 0
+  return Math.max(0.18, Math.min(1, Math.log10(value + 1) / Math.log10(max + 1)))
+}
+
 function intensityClass(value: number, max: number): string {
   if (value === 0) return 'bg-muted/50 text-muted-foreground/60'
   const ratio = max > 0 ? value / max : 0
@@ -65,10 +77,15 @@ export function RiskHeatmap({ filters, onCellClick }: RiskHeatmapProps) {
   const data = heatmapQuery.data
   const isLoading = heatmapQuery.isLoading
 
-  const globalMax = useMemo(
-    () => data ? Math.max(1, ...data.flatMap((g) => [g.critical, g.high, g.medium, g.low])) : 1,
-    [data],
-  )
+  const colMax = useMemo(() => {
+    if (!data) return { critical: 1, high: 1, medium: 1, low: 1 }
+    return {
+      critical: Math.max(1, ...data.map((g) => g.critical)),
+      high: Math.max(1, ...data.map((g) => g.high)),
+      medium: Math.max(1, ...data.map((g) => g.medium)),
+      low: Math.max(1, ...data.map((g) => g.low)),
+    }
+  }, [data])
 
   const activeOption = groupByOptions.find((o) => o.value === groupBy)!
 
@@ -97,8 +114,14 @@ export function RiskHeatmap({ filters, onCellClick }: RiskHeatmapProps) {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">
-            {['bg-muted/50', 'bg-chart-2/30', 'bg-chart-4/40', 'bg-chart-1/50', 'bg-destructive/70'].map((cls, i) => (
-              <span key={i} className={`inline-block size-3 rounded ${cls}`} />
+            {[
+              { cls: 'bg-muted/50', key: 'low-dim' },
+              { cls: 'bg-chart-2/30', key: 'low' },
+              { cls: 'bg-chart-4/40', key: 'med' },
+              { cls: 'bg-chart-1/50', key: 'high' },
+              { cls: 'bg-destructive/70', key: 'crit' },
+            ].map(({ cls, key }) => (
+              <span key={key} className={`inline-block size-3 rounded ${cls}`} />
             ))}
             <span className="ml-1 text-[11px] text-muted-foreground">Low → High</span>
           </div>
@@ -137,7 +160,10 @@ export function RiskHeatmap({ filters, onCellClick }: RiskHeatmapProps) {
                         {row.label}
                       </td>
                       {severityColumns.map((sev) => {
-                        const value = row[severityDataKey[sev]]
+                        const dataKey = severityDataKey[sev]
+                        const value = row[dataKey]
+                        const chipKey = severityChipKey[sev]
+                        const intensity = logIntensity(value, colMax[dataKey])
                         return (
                           <td key={sev} className="text-center">
                             <Tooltip>
@@ -145,7 +171,9 @@ export function RiskHeatmap({ filters, onCellClick }: RiskHeatmapProps) {
                                 render={
                                   <button
                                     type="button"
-                                    className={`inline-flex min-w-[3.5rem] items-center justify-center rounded-lg px-3 py-2.5 text-sm font-semibold tabular-nums transition-transform ${intensityClass(value, globalMax)} ${onCellClick ? 'cursor-pointer hover:scale-105' : ''}`}
+                                    data-hm-chip={chipKey}
+                                    style={{ '--i': intensity } as React.CSSProperties}
+                                    className={`inline-flex min-w-[3.5rem] items-center justify-center rounded-full px-3 py-2.5 text-sm font-semibold tabular-nums transition-transform ${intensityClass(value, colMax[dataKey])} ${onCellClick ? 'cursor-pointer hover:scale-105' : ''}`}
                                     onClick={() => onCellClick?.(row.label, sev)}
                                   />
                                 }
@@ -160,7 +188,11 @@ export function RiskHeatmap({ filters, onCellClick }: RiskHeatmapProps) {
                         )
                       })}
                       <td className="text-center">
-                        <Badge variant="outline" className="rounded-full border-border/70 bg-background/30 text-foreground">
+                        <Badge
+                          variant="outline"
+                          data-hm-chip="tot"
+                          className="rounded-full border-border/70 bg-background/30 text-foreground"
+                        >
                           {total}
                         </Badge>
                       </td>
