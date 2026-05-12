@@ -1,6 +1,18 @@
 import { Link } from '@tanstack/react-router'
 import { AlertTriangle, CheckCircle2, ClipboardCheck, ShieldAlert } from 'lucide-react'
-import type { DashboardSummary, SecurityManagerDashboardSummary } from '@/api/dashboard.schemas'
+import { useMemo } from 'react'
+import {
+  Area,
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import type { DashboardSummary, SecurityManagerDashboardSummary, TrendData } from '@/api/dashboard.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,8 +24,29 @@ import { formatDate, formatDateTime, startCase } from '@/lib/formatting'
 type Props = {
   summary: DashboardSummary
   managerSummary: SecurityManagerDashboardSummary
+  trends: TrendData
   isLoading?: boolean
 }
+
+type SeverityKey = 'Critical' | 'High' | 'Medium' | 'Low'
+
+type TrendPoint = Record<SeverityKey, number> & {
+  date: string
+  Total: number
+}
+
+const severitySeries: Array<{
+  key: SeverityKey
+  label: string
+  stroke: string
+  fill: string
+  dot: string
+}> = [
+  { key: 'Critical', label: 'Critical', stroke: 'var(--color-destructive)', fill: 'var(--color-destructive)', dot: 'bg-destructive' },
+  { key: 'High', label: 'High', stroke: 'var(--color-chart-1)', fill: 'var(--color-chart-1)', dot: 'bg-chart-1' },
+  { key: 'Medium', label: 'Medium', stroke: 'var(--color-chart-4)', fill: 'var(--color-chart-4)', dot: 'bg-chart-4' },
+  { key: 'Low', label: 'Low', stroke: 'var(--color-chart-2)', fill: 'var(--color-chart-2)', dot: 'bg-chart-2' },
+]
 
 function severityTone(severity: string) {
   if (severity === 'Critical') return 'border-destructive/25 bg-destructive/10 text-destructive'
@@ -28,7 +61,39 @@ function attentionTone(state: string) {
   return 'border-border/70 bg-muted/50 text-muted-foreground'
 }
 
-export function SecurityManagerOverview({ summary, managerSummary, isLoading }: Props) {
+function formatAxisDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(date)
+}
+
+function formatTrendData(data: TrendData): TrendPoint[] {
+  const byDate = new Map<string, TrendPoint>()
+
+  for (const item of data.items) {
+    const point = byDate.get(item.date) ?? {
+      date: item.date,
+      Critical: 0,
+      High: 0,
+      Medium: 0,
+      Low: 0,
+      Total: 0,
+    }
+
+    if (item.severity === 'Critical' || item.severity === 'High' || item.severity === 'Medium' || item.severity === 'Low') {
+      point[item.severity] = item.count
+      point.Total = point.Critical + point.High + point.Medium + point.Low
+    }
+
+    byDate.set(item.date, point)
+  }
+
+  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date))
+}
+
+export function SecurityManagerOverview({ summary, managerSummary, trends, isLoading }: Props) {
+  const trendPoints = useMemo(() => formatTrendData(trends), [trends])
+
   return (
     <section className="space-y-6 pb-4">
       <Card className="overflow-hidden rounded-[2rem] border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_14%,var(--background)),var(--card)_52%,var(--background))] shadow-[0_28px_70px_-48px_rgba(0,0,0,0.55)]">
@@ -83,6 +148,86 @@ export function SecurityManagerOverview({ summary, managerSummary, isLoading }: 
       </Card>
 
       <RiskScoreCard isLoading={isLoading} />
+
+      <Card className="rounded-[1.6rem] border-border/70">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>Unique vulnerability exposure by severity</CardTitle>
+            <CardDescription>
+              Current unique vulnerability counts and 90-day open exposure movement by severity.
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {severitySeries.map((severity) => (
+              <Badge
+                key={severity.key}
+                variant="outline"
+                className="rounded-full border-border/70 bg-background/30 px-2.5 py-1 text-xs text-foreground"
+              >
+                <span className={`mr-2 inline-block size-2 rounded-full ${severity.dot}`} />
+                {severity.label}
+                <span className="ml-2 font-semibold">{summary.vulnerabilitiesBySeverity[severity.key] ?? 0}</span>
+              </Badge>
+            ))}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[320px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={trendPoints}>
+                <CartesianGrid vertical={false} stroke="color-mix(in oklab, var(--border) 85%, transparent)" />
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={formatAxisDate}
+                  minTickGap={24}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12 }}
+                />
+                <Tooltip
+                  labelFormatter={(value) => formatAxisDate(String(value))}
+                  contentStyle={{
+                    background: 'var(--color-popover)',
+                    border: '1px solid color-mix(in oklab, var(--border) 90%, transparent)',
+                    borderRadius: '16px',
+                    color: 'var(--color-popover-foreground)',
+                  }}
+                />
+                <Bar dataKey="Total" fill="var(--color-muted-foreground)" fillOpacity={0.08} radius={[4, 4, 0, 0]} name="Total" />
+                {severitySeries.map((severity) => (
+                  <Area
+                    key={severity.key}
+                    type="monotone"
+                    dataKey={severity.key}
+                    stroke={severity.stroke}
+                    fill={severity.fill}
+                    fillOpacity={0.06}
+                    strokeWidth={2}
+                    dot={false}
+                    name={severity.label}
+                  />
+                ))}
+                <Line
+                  type="monotone"
+                  dataKey="Total"
+                  stroke="var(--color-foreground)"
+                  strokeWidth={1.5}
+                  strokeDasharray="5 3"
+                  strokeOpacity={0.55}
+                  dot={false}
+                  name="Total unique"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <Card className="rounded-[1.6rem] border-border/70">

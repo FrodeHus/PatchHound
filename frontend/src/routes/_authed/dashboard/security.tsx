@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchDashboardSummary, fetchSecurityManagerDashboardSummary } from '@/api/dashboard.functions'
+import { fetchDashboardSummary, fetchDashboardTrends, fetchSecurityManagerDashboardSummary } from '@/api/dashboard.functions'
 import { SecurityManagerOverview } from '@/components/features/dashboard/SecurityManagerOverview'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 
@@ -23,11 +23,18 @@ function SecurityDashboardPage() {
     enabled: Boolean(selectedTenantId),
     staleTime: 30_000,
   })
+  const trendsQuery = useQuery({
+    queryKey: ['dashboard', 'trends', selectedTenantId],
+    queryFn: () => fetchDashboardTrends({ data: {} }),
+    enabled: Boolean(selectedTenantId),
+    staleTime: 30_000,
+  })
 
   const summary = summaryQuery.data
   const managerSummary = managerSummaryQuery.data
+  const trends = trendsQuery.data
 
-  if (!summary || !managerSummary) {
+  if (!summary || !managerSummary || !trends) {
     return null
   }
 
@@ -35,7 +42,8 @@ function SecurityDashboardPage() {
     <SecurityManagerOverview
       summary={summary}
       managerSummary={managerSummary}
-      isLoading={summaryQuery.isFetching || managerSummaryQuery.isFetching}
+      trends={trends}
+      isLoading={summaryQuery.isFetching || managerSummaryQuery.isFetching || trendsQuery.isFetching}
     />
   )
 }

@@ -1104,6 +1104,7 @@ public class DashboardController : ControllerBase
             {
                 ep.FirstSeenAt,
                 ep.ClosedAt,
+                ep.Exposure.VulnerabilityId,
                 ep.Exposure.Vulnerability.VendorSeverity,
                 DeviceId = ep.Exposure.DeviceId,
                 PublishedDate = ep.Exposure.Vulnerability.PublishedDate,
@@ -1130,10 +1131,15 @@ public class DashboardController : ControllerBase
 
             foreach (var severity in Enum.GetValues<Severity>())
             {
-                var openOnDay = episodeRows.Count(ep =>
-                    ep.VendorSeverity == severity
-                    && ep.FirstSeenAt <= asOfInstant
-                    && (ep.ClosedAt == null || ep.ClosedAt > asOfInstant));
+                var openOnDay = episodeRows
+                    .Where(ep =>
+                        ep.VendorSeverity == severity
+                        && ep.FirstSeenAt <= asOfInstant
+                        && (ep.ClosedAt == null || ep.ClosedAt > asOfInstant))
+                    .Select(ep => ep.VulnerabilityId)
+                    .Distinct()
+                    .Count();
+
                 if (openOnDay > 0)
                     trendItems.Add(new TrendItem(day, severity.ToString(), openOnDay));
             }
