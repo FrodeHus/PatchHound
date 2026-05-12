@@ -3,7 +3,6 @@ import { AlertTriangle, CheckCircle2, ClipboardCheck, ShieldAlert } from 'lucide
 import { useMemo } from 'react'
 import {
   Area,
-  Bar,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -33,10 +32,6 @@ type SeverityKey = 'Critical' | 'High' | 'Medium' | 'Low'
 type TrendPoint = Record<SeverityKey, number> & {
   date: string
   Total: number
-  CurrentCritical?: number
-  CurrentHigh?: number
-  CurrentMedium?: number
-  CurrentLow?: number
 }
 
 const severitySeries: Array<{
@@ -45,11 +40,12 @@ const severitySeries: Array<{
   stroke: string
   fill: string
   dot: string
+  barClassName: string
 }> = [
-  { key: 'Critical', label: 'Critical', stroke: 'var(--color-destructive)', fill: 'var(--color-destructive)', dot: 'bg-destructive' },
-  { key: 'High', label: 'High', stroke: 'var(--color-chart-1)', fill: 'var(--color-chart-1)', dot: 'bg-chart-1' },
-  { key: 'Medium', label: 'Medium', stroke: 'var(--color-chart-4)', fill: 'var(--color-chart-4)', dot: 'bg-chart-4' },
-  { key: 'Low', label: 'Low', stroke: 'var(--color-chart-2)', fill: 'var(--color-chart-2)', dot: 'bg-chart-2' },
+  { key: 'Critical', label: 'Critical', stroke: 'var(--color-destructive)', fill: 'var(--color-destructive)', dot: 'bg-destructive', barClassName: 'bg-destructive/45' },
+  { key: 'High', label: 'High', stroke: 'var(--color-chart-1)', fill: 'var(--color-chart-1)', dot: 'bg-chart-1', barClassName: 'bg-chart-1/45' },
+  { key: 'Medium', label: 'Medium', stroke: 'var(--color-chart-4)', fill: 'var(--color-chart-4)', dot: 'bg-chart-4', barClassName: 'bg-chart-4/45' },
+  { key: 'Low', label: 'Low', stroke: 'var(--color-chart-2)', fill: 'var(--color-chart-2)', dot: 'bg-chart-2', barClassName: 'bg-chart-2/45' },
 ]
 
 function severityTone(severity: string) {
@@ -71,7 +67,7 @@ function formatAxisDate(value: string) {
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(date)
 }
 
-function formatTrendData(data: TrendData, currentCounts: DashboardSummary['vulnerabilitiesBySeverity']): TrendPoint[] {
+function formatTrendData(data: TrendData): TrendPoint[] {
   const byDate = new Map<string, TrendPoint>()
 
   for (const item of data.items) {
@@ -92,24 +88,16 @@ function formatTrendData(data: TrendData, currentCounts: DashboardSummary['vulne
     byDate.set(item.date, point)
   }
 
-  const points = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date))
-  const currentPoint = points.at(-1)
-
-  if (currentPoint) {
-    currentPoint.CurrentCritical = currentCounts.Critical ?? 0
-    currentPoint.CurrentHigh = currentCounts.High ?? 0
-    currentPoint.CurrentMedium = currentCounts.Medium ?? 0
-    currentPoint.CurrentLow = currentCounts.Low ?? 0
-  }
-
-  return points
+  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date))
 }
 
 export function SecurityManagerOverview({ summary, managerSummary, trends, isLoading }: Props) {
-  const trendPoints = useMemo(
-    () => formatTrendData(trends, summary.vulnerabilitiesBySeverity),
-    [summary.vulnerabilitiesBySeverity, trends],
-  )
+  const trendPoints = useMemo(() => formatTrendData(trends), [trends])
+  const currentSeverityBars = severitySeries.map((severity) => ({
+    ...severity,
+    value: summary.vulnerabilitiesBySeverity[severity.key] ?? 0,
+  }))
+  const maxCurrentSeverity = Math.max(...currentSeverityBars.map((severity) => severity.value), 1)
 
   return (
     <section className="space-y-6 pb-4">
@@ -189,7 +177,7 @@ export function SecurityManagerOverview({ summary, managerSummary, trends, isLoa
           </div>
         </CardHeader>
         <CardContent>
-          <div className="h-[320px] w-full">
+          <div className="relative h-[340px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={trendPoints}>
                 <CartesianGrid vertical={false} stroke="color-mix(in oklab, var(--border) 85%, transparent)" />
@@ -216,10 +204,6 @@ export function SecurityManagerOverview({ summary, managerSummary, trends, isLoa
                     color: 'var(--color-popover-foreground)',
                   }}
                 />
-                <Bar dataKey="CurrentCritical" fill="var(--color-destructive)" fillOpacity={0.28} radius={[4, 4, 0, 0]} name="Current critical" />
-                <Bar dataKey="CurrentHigh" fill="var(--color-chart-1)" fillOpacity={0.24} radius={[4, 4, 0, 0]} name="Current high" />
-                <Bar dataKey="CurrentMedium" fill="var(--color-chart-4)" fillOpacity={0.22} radius={[4, 4, 0, 0]} name="Current medium" />
-                <Bar dataKey="CurrentLow" fill="var(--color-chart-2)" fillOpacity={0.22} radius={[4, 4, 0, 0]} name="Current low" />
                 {severitySeries.map((severity) => (
                   <Area
                     key={severity.key}
@@ -245,6 +229,19 @@ export function SecurityManagerOverview({ summary, managerSummary, trends, isLoa
                 />
               </ComposedChart>
             </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-x-12 bottom-[34px] flex h-[170px] items-end justify-center gap-3 sm:gap-4">
+              {currentSeverityBars.map((severity) => (
+                <div key={severity.key} className="flex h-full w-16 items-end sm:w-24">
+                  <div
+                    aria-label={`${severity.label}: ${severity.value}`}
+                    className={`w-full rounded-t-lg border border-white/10 shadow-[0_12px_30px_-18px_rgba(0,0,0,0.65)] ${severity.barClassName}`}
+                    style={{
+                      height: `${severity.value > 0 ? Math.max((severity.value / maxCurrentSeverity) * 100, 5) : 0}%`,
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
