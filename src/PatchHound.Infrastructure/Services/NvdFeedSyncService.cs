@@ -80,7 +80,7 @@ public class NvdFeedSyncService(
             if (apiKey is not null)
                 request.Headers.Add("apiKey", apiKey);
 
-            var response = await httpClient.SendAsync(request, ct);
+            var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
 
             var page = await JsonSerializer.DeserializeAsync<NvdApiResponse>(

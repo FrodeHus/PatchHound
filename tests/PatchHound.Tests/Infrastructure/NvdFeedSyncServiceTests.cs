@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
@@ -221,6 +222,23 @@ public class NvdFeedSyncServiceTests
         handler.ApiKeys.Should().ContainSingle().Which.Should().Be("nvd-api-key");
     }
 
+    [Fact]
+    public async Task SyncModifiedFeedAsync_streams_api_response_without_buffering_content()
+    {
+        await using var db = await TestDbContextFactory.CreateAsync();
+        var handler = new NonBufferableApiHandler(BuildSinglePageResponse("CVE-2024-1234", "Window 1", 7.5m,
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+            "2024-01-01T00:00:00.000", "2024-01-10T00:00:00.000",
+            referenceUrl: null, criteria: "cpe:2.3:a:acme:widget:1.0:*:*:*:*:*:*:*"));
+        var httpClient = new HttpClient(handler);
+        var service = CreateService(httpClient, db);
+
+        await service.SyncModifiedFeedAsync(CancellationToken.None);
+
+        var cached = await db.NvdCveCache.SingleAsync();
+        cached.CveId.Should().Be("CVE-2024-1234");
+    }
+
     private static string BuildSinglePageResponse(
         string cveId, string description, decimal baseScore, string vector,
         string publishedDate, string lastModifiedDate,
@@ -307,6 +325,44 @@ public class NvdFeedSyncServiceTests
             {
                 Content = new StringContent(_responseJson, Encoding.UTF8, "application/json"),
             });
+        }
+    }
+
+    internal sealed class NonBufferableApiHandler(string responseJson) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken ct)
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new NonBufferableJsonContent(responseJson),
+            });
+        }
+    }
+
+    internal sealed class NonBufferableJsonContent : HttpContent
+    {
+        private readonly byte[] _body;
+
+        public NonBufferableJsonContent(string responseJson)
+        {
+            _body = Encoding.UTF8.GetBytes(responseJson);
+            Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        }
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
+            throw new InvalidOperationException("Response content was buffered before the stream was read.");
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Response content was buffered before the stream was read.");
+
+        protected override Task<Stream> CreateContentReadStreamAsync() =>
+            Task.FromResult<Stream>(new MemoryStream(_body, writable: false));
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = _body.Length;
+            return true;
         }
     }
 

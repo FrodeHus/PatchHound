@@ -172,7 +172,8 @@ public static class DependencyInjection
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services.AddHttpClient<EndOfLifeApiClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services.AddHttpClient<NvdFeedSyncService>()
-            .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
+            .AddExternalHttpPolicies(maxConnectionsPerServer: 2)
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(3));
         services.AddHttpClient<SupplyChainCatalogClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services
             .AddHttpClient<ISecretStore, OpenBaoSecretStore>()
