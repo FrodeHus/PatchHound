@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { CheckCircle, ExternalLink, ShieldCheck, XCircle } from 'lucide-react'
-import type { DecisionContext } from '@/api/remediation.schemas'
+import { CheckCircle, ChevronDown, ChevronUp, ExternalLink, SearchCheck, ShieldCheck, XCircle } from 'lucide-react'
+import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -61,16 +61,22 @@ export function ManagerApprovalCaseWorkbench({
     toDateInputValue(data.currentDecision?.maintenanceWindowDate)
   )
   const [attemptedAction, setAttemptedAction] = useState<'approve' | 'reject' | null>(null)
+  const [showVulnerabilities, setShowVulnerabilities] = useState(false)
   const copy = roleCopy[role]
   const decision = data.currentDecision
+  const recommendation = data.recommendations[0] ?? null
+  const vulnerabilities = data.openVulnerabilities.length > 0 ? data.openVulnerabilities : data.topVulnerabilities
   const isPatchingApproval = decision?.outcome === 'ApprovedForPatching'
-  const requiresJustification = decision?.outcome !== 'ApprovedForPatching'
-  const showJustificationError = Boolean(attemptedAction && requiresJustification && !justification.trim())
+  const requiresDescription = role === 'security-manager' || attemptedAction === 'reject'
+  const showJustificationError = Boolean(attemptedAction && requiresDescription && !justification.trim())
   const showMaintenanceError = Boolean(attemptedAction === 'approve' && isPatchingApproval && !maintenanceWindowDate)
+  const descriptionErrorText = role === 'security-manager'
+    ? 'Justification is required for this approval path.'
+    : 'Description is required for this approval path.'
 
   function resolve(action: 'approve' | 'reject') {
     setAttemptedAction(action)
-    if (requiresJustification && !justification.trim()) return
+    if ((role === 'security-manager' || action === 'reject') && !justification.trim()) return
     if (action === 'approve' && isPatchingApproval && !maintenanceWindowDate) return
 
     onResolve(
@@ -117,41 +123,71 @@ export function ManagerApprovalCaseWorkbench({
       </div>
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)]">
-        <div className="rounded-lg border border-border/70 bg-card">
-          <div className="border-b border-border/70 px-4 py-3">
-            <h2 className="text-base font-semibold">Owner decision</h2>
-          </div>
-          <div className="space-y-4 p-4">
-            {decision ? (
-              <>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs font-medium', toneBadge(outcomeTone(decision.outcome)))}>
-                    {outcomeLabel(decision.outcome)}
-                  </span>
-                  <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs font-medium', toneBadge(severityTone(data.criticality)))}>
-                    {data.criticality}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Owner justification</p>
-                  <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-foreground">
-                    {decision.justification || 'No owner justification was recorded.'}
+        <div className="space-y-4">
+          <div className="rounded-lg border border-border/70 bg-card">
+            <div className="border-b border-border/70 px-4 py-3">
+              <h2 className="flex items-center gap-2 text-base font-semibold">
+                <SearchCheck className="size-4 text-primary" />
+                Security analyst input
+              </h2>
+            </div>
+            <div className="space-y-4 p-4">
+              {recommendation ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs font-medium', toneBadge(outcomeTone(recommendation.recommendedOutcome)))}>
+                      {outcomeLabel(recommendation.recommendedOutcome)}
+                    </span>
+                    {recommendation.priorityOverride ? (
+                      <span className="text-xs text-muted-foreground">{recommendation.priorityOverride} priority</span>
+                    ) : null}
+                  </div>
+                  <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
+                    {recommendation.rationale}
                   </p>
-                </div>
-                <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.14em]">Decided</p>
-                    <p className="mt-1 text-foreground">{formatNullableDateTime(decision.decidedAt)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {recommendation.analystDisplayName ? `${recommendation.analystDisplayName}, ` : ''}
+                    {formatNullableDateTime(recommendation.createdAt)}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No analyst recommendation has been captured for this case.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border/70 bg-card">
+            <div className="border-b border-border/70 px-4 py-3">
+              <h2 className="text-base font-semibold">Owner decision</h2>
+            </div>
+            <div className="space-y-4 p-4">
+              {decision ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs font-medium', toneBadge(outcomeTone(decision.outcome)))}>
+                      {outcomeLabel(decision.outcome)}
+                    </span>
+                    <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs font-medium', toneBadge(severityTone(data.criticality)))}>
+                      {data.criticality}
+                    </span>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-[0.14em]">Maintenance window</p>
-                    <p className="mt-1 text-foreground">{decision.maintenanceWindowDate ? formatNullableDateTime(decision.maintenanceWindowDate) : 'Not scheduled'}</p>
+                    <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Owner justification</p>
+                    <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-foreground">
+                      {decision.justification || 'No owner justification was recorded.'}
+                    </p>
                   </div>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">No pending decision is available for approval.</p>
-            )}
+                  <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
+                    <DecisionMeta label="Decided" value={formatNullableDateTime(decision.decidedAt)} />
+                    <DecisionMeta label="Maintenance window" value={decision.maintenanceWindowDate ? formatNullableDateTime(decision.maintenanceWindowDate) : 'Not scheduled'} />
+                    <DecisionMeta label="Expiry" value={decision.expiryDate ? formatNullableDateTime(decision.expiryDate) : 'No expiry'} />
+                    <DecisionMeta label="Review date" value={decision.reEvaluationDate ? formatNullableDateTime(decision.reEvaluationDate) : 'No review date'} />
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No pending decision is available for approval.</p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -185,7 +221,7 @@ export function ManagerApprovalCaseWorkbench({
                 <label className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                   Approval justification
                 </label>
-                {requiresJustification ? (
+                {requiresDescription ? (
                   <span className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
                     Required
                   </span>
@@ -198,7 +234,7 @@ export function ManagerApprovalCaseWorkbench({
                 aria-invalid={showJustificationError}
               />
               {showJustificationError ? (
-                <p className="text-xs text-destructive">Justification is required for this approval path.</p>
+                <p className="text-xs text-destructive">{descriptionErrorText}</p>
               ) : null}
             </div>
 
@@ -230,7 +266,62 @@ export function ManagerApprovalCaseWorkbench({
           </div>
         </div>
       </section>
+
+      <section className="rounded-lg border border-border/70 bg-card">
+        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Technical vulnerability details</h2>
+            <p className="text-sm text-muted-foreground">
+              Hidden by default. Open only if the approval decision needs more technical context.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            aria-expanded={showVulnerabilities}
+            onClick={() => setShowVulnerabilities((value) => !value)}
+          >
+            {showVulnerabilities ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+            {showVulnerabilities ? 'Hide vulnerabilities' : 'Show vulnerabilities'}
+          </Button>
+        </div>
+        {showVulnerabilities ? (
+          <div className="overflow-x-auto border-t border-border/70">
+            <table className="min-w-[760px] divide-y divide-border/70 text-sm">
+              <thead className="bg-muted/35 text-left text-xs uppercase tracking-[0.12em] text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3">Vulnerability</th>
+                  <th className="px-4 py-3">Severity</th>
+                  <th className="px-4 py-3">Threats</th>
+                  <th className="px-4 py-3">Scope</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {vulnerabilities.slice(0, 8).map((vulnerability) => (
+                  <VulnerabilityRow key={vulnerability.vulnerabilityId} vulnerability={vulnerability} />
+                ))}
+                {vulnerabilities.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                      No open vulnerabilities are linked to this remediation case.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </section>
     </section>
+  )
+}
+
+function DecisionMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-[0.14em]">{label}</p>
+      <p className="mt-1 text-foreground">{value}</p>
+    </div>
   )
 }
 
@@ -241,5 +332,31 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
       <p className="mt-1 truncate text-lg font-semibold">{value}</p>
       <p className="mt-1 truncate text-xs text-muted-foreground">{detail}</p>
     </div>
+  )
+}
+
+function VulnerabilityRow({ vulnerability }: { vulnerability: DecisionVuln }) {
+  return (
+    <tr className="align-top">
+      <td className="px-4 py-3">
+        <div className="font-medium">{vulnerability.externalId}</div>
+        <div className="line-clamp-1 max-w-xl text-xs text-muted-foreground">{vulnerability.title}</div>
+      </td>
+      <td className="px-4 py-3">
+        <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs font-medium', toneBadge(severityTone(vulnerability.effectiveSeverity ?? vulnerability.vendorSeverity)))}>
+          {vulnerability.effectiveSeverity ?? vulnerability.vendorSeverity}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-xs text-muted-foreground">
+        {[
+          vulnerability.knownExploited ? 'KEV' : null,
+          vulnerability.publicExploit ? 'Exploit' : null,
+          vulnerability.activeAlert ? 'Alert' : null,
+        ].filter(Boolean).join(', ') || 'None'}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {vulnerability.affectedDeviceCount.toLocaleString()} devices
+      </td>
+    </tr>
   )
 }

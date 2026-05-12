@@ -109,6 +109,16 @@ public class ApprovalTaskTests
     }
 
     [Fact]
+    public void Deny_PatchingApproval_RequiresJustification_ThrowsWhenMissing()
+    {
+        var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.ApprovedForPatching, ApprovalTaskStatus.Pending, Expiry);
+
+        var act = () => task.Deny(Guid.NewGuid(), "");
+
+        act.Should().Throw<ArgumentException>().WithMessage("*Justification*required*");
+    }
+
+    [Fact]
     public void Deny_NonPendingTask_Throws()
     {
         var task = ApprovalTask.Create(TenantId, CaseId, DecisionId, RemediationOutcome.RiskAcceptance, null, Expiry);

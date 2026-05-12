@@ -10,6 +10,7 @@ public enum NotificationType
     TaskStatusChanged,
     WorkflowNotification,
     ApprovalTaskCreated,
+    ApprovalTaskApproved,
     ApprovalTaskDenied,
     ApprovalTaskAutoExpired,
 }

@@ -107,7 +107,7 @@ public class ApprovalTask
         if (Status != ApprovalTaskStatus.Pending)
             throw new InvalidOperationException($"Cannot deny a task with status {Status}.");
 
-        if (RequiresJustification && string.IsNullOrWhiteSpace(justification))
+        if (string.IsNullOrWhiteSpace(justification))
             throw new ArgumentException("Justification is required to deny this task.");
 
         ResolvedBy = resolvedBy;

@@ -205,6 +205,71 @@ public class ApprovalTaskServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DenyAsync_PatchingDecision_RequiresJustification()
+    {
+        var decision = CreateDecision(RemediationOutcome.ApprovedForPatching);
+        var task = await _sut.CreateForDecisionAsync(decision, 24, CancellationToken.None);
+
+        var act = () => _sut.DenyAsync(task.Id, Guid.NewGuid(), "", CancellationToken.None);
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*Justification*required*");
+    }
+
+    [Fact]
+    public async Task ApproveAsync_PatchingDecision_NotifiesSecurityManagers()
+    {
+        var securityManager = User.Create("security@example.test", "Security Manager", Guid.NewGuid().ToString());
+        await _dbContext.Users.AddAsync(securityManager);
+        await _dbContext.UserTenantRoles.AddAsync(UserTenantRole.Create(securityManager.Id, _tenantId, RoleName.SecurityManager));
+        await _dbContext.SaveChangesAsync();
+        var decision = CreateDecision(RemediationOutcome.ApprovedForPatching);
+        var task = await _sut.CreateForDecisionAsync(decision, 24, CancellationToken.None);
+        var maintenanceWindowDate = new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero);
+
+        _notificationService.ClearReceivedCalls();
+
+        await _sut.ApproveAsync(task.Id, Guid.NewGuid(), "Approved", maintenanceWindowDate, CancellationToken.None);
+
+        await _notificationService.Received(1).SendAsync(
+            securityManager.Id,
+            _tenantId,
+            NotificationType.ApprovalTaskApproved,
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            "ApprovalTask",
+            task.Id,
+            Arg.Any<CancellationToken>()
+        );
+    }
+
+    [Fact]
+    public async Task ApproveAsync_SecurityDecision_NotifiesTechnicalManagers()
+    {
+        var technicalManager = User.Create("technical@example.test", "Technical Manager", Guid.NewGuid().ToString());
+        await _dbContext.Users.AddAsync(technicalManager);
+        await _dbContext.UserTenantRoles.AddAsync(UserTenantRole.Create(technicalManager.Id, _tenantId, RoleName.TechnicalManager));
+        await _dbContext.SaveChangesAsync();
+        var decision = CreateDecision(RemediationOutcome.RiskAcceptance);
+        var task = await _sut.CreateForDecisionAsync(decision, 24, CancellationToken.None);
+
+        _notificationService.ClearReceivedCalls();
+
+        await _sut.ApproveAsync(task.Id, Guid.NewGuid(), "Approved exception", null, CancellationToken.None);
+
+        await _notificationService.Received(1).SendAsync(
+            technicalManager.Id,
+            _tenantId,
+            NotificationType.ApprovalTaskApproved,
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            "ApprovalTask",
+            task.Id,
+            Arg.Any<CancellationToken>()
+        );
+    }
+
+    [Fact]
     public async Task AutoDenyExpiredAsync_DeniesExpiredPendingTasks()
     {
         var decision = CreateDecision(RemediationOutcome.RiskAcceptance);

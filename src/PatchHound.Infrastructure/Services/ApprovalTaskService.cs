@@ -108,6 +108,8 @@ public class ApprovalTaskService(
             await patchingTaskService.EnsurePatchingTasksAsync(task.RemediationDecision, ct);
         }
 
+        await NotifyApprovalAwarenessRoleAsync(task, task.RemediationDecision, ct);
+
         await dbContext.SaveChangesAsync(ct);
         return task;
     }
@@ -197,5 +199,37 @@ public class ApprovalTaskService(
 
         task.MarkAsRead();
         await dbContext.SaveChangesAsync(ct);
+    }
+
+    private async Task NotifyApprovalAwarenessRoleAsync(
+        ApprovalTask task,
+        RemediationDecision decision,
+        CancellationToken ct
+    )
+    {
+        var targetRole = decision.Outcome == RemediationOutcome.ApprovedForPatching
+            ? RoleName.SecurityManager
+            : RoleName.TechnicalManager;
+
+        var userIds = await dbContext.UserTenantRoles
+            .IgnoreQueryFilters()
+            .Where(utr => utr.TenantId == decision.TenantId && utr.Role == targetRole)
+            .Select(utr => utr.UserId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        foreach (var userId in userIds)
+        {
+            await notificationService.SendAsync(
+                userId,
+                decision.TenantId,
+                NotificationType.ApprovalTaskApproved,
+                "Remediation decision approved",
+                $"A remediation decision ({decision.Outcome}) was approved.",
+                "ApprovalTask",
+                task.Id,
+                ct
+            );
+        }
     }
 }
