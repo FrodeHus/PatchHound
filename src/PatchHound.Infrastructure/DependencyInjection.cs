@@ -95,6 +95,7 @@ public static class DependencyInjection
         services.AddScoped<RemediationWorkflowService>();
         services.AddScoped<TenantDeletionService>();
         services.AddScoped<PatchingTaskService>();
+        services.AddScoped<ApprovedVulnerabilityRemediationService>();
         services.AddScoped<ApprovalTaskService>();
         services.AddScoped<RemediationDecisionService>();
         services.AddScoped<AnalystRecommendationService>();

@@ -11,7 +11,8 @@ public class ApprovalTaskService(
     INotificationService notificationService,
     IRealTimeNotifier realTimeNotifier,
     RemediationWorkflowService remediationWorkflowService,
-    PatchingTaskService patchingTaskService
+    PatchingTaskService patchingTaskService,
+    ApprovedVulnerabilityRemediationService approvedVulnerabilityRemediationService
 )
 {
     private static string BuildDecisionNotificationDetail(RemediationDecision decision)
@@ -95,6 +96,7 @@ public class ApprovalTaskService(
 
         task.Approve(userId, justification);
         task.RemediationDecision.Approve(userId);
+        await approvedVulnerabilityRemediationService.UpsertForDecisionAsync(task.RemediationDecision, ct);
         await remediationWorkflowService.HandleApprovalOutcomeAsync(
             task,
             task.RemediationDecision,

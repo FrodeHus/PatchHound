@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { fetchDecisionList } from '@/api/remediation.functions'
 import { fetchVulnerabilities } from '@/api/vulnerabilities.functions'
 import { VulnerabilityTable } from '@/components/features/vulnerabilities/VulnerabilityTable'
 import { useTenantScope } from '@/components/layout/tenant-scope'
@@ -19,6 +20,7 @@ const vulnerabilitiesSearchSchema = baseListSearchSchema.extend({
   knownExploitedOnly: searchBooleanSchema,
   activeAlertOnly: searchBooleanSchema,
   presentOnly: searchBooleanTrueSchema,
+  remediationCaseIds: searchStringSchema.optional(),
 })
 
 export const Route = createFileRoute('/_authed/vulnerabilities/')({
@@ -40,6 +42,18 @@ function VulnerabilitiesPage() {
     queryKey: vulnerabilityQueryKeys.list(selectedTenantId, search),
     queryFn: () => fetchVulnerabilities({ data: buildVulnerabilitiesListRequest(search) }),
     initialData: canUseInitialData ? initialData : undefined,
+  })
+  const remediationOptionsQuery = useQuery({
+    queryKey: ['vulnerabilities', 'remediation-filter-options', selectedTenantId],
+    queryFn: () => fetchDecisionList({
+      data: {
+        approvalStatus: 'Approved',
+        page: 1,
+        pageSize: 100,
+      },
+    }),
+    enabled: Boolean(selectedTenantId),
+    staleTime: 60_000,
   })
   const data = query.data ?? (canUseInitialData ? initialData : undefined)
 
@@ -65,6 +79,12 @@ function VulnerabilitiesPage() {
         knownExploitedOnly={search.knownExploitedOnly}
         activeAlertOnly={search.activeAlertOnly}
         presentOnly={search.presentOnly}
+        selectedRemediationCaseIds={parseRemediationCaseIds(search.remediationCaseIds ?? '')}
+        remediationOptions={(remediationOptionsQuery.data?.items ?? []).map((item) => ({
+          remediationCaseId: item.remediationCaseId,
+          softwareName: item.softwareName,
+          outcome: item.outcome,
+        }))}
         onSearchChange={(value) => {
           searchActions.updateField('search', value)
         }}
@@ -98,6 +118,9 @@ function VulnerabilitiesPage() {
         onPresentOnlyChange={(value) => {
           searchActions.updateField('presentOnly', value)
         }}
+        onRemediationCaseIdsChange={(value) => {
+          searchActions.updateField('remediationCaseIds', value.join(','))
+        }}
         onApplyStructuredFilters={(filters) => {
           searchActions.updateFields({
             severity: filters.severity,
@@ -108,6 +131,7 @@ function VulnerabilitiesPage() {
             knownExploitedOnly: filters.knownExploitedOnly,
             activeAlertOnly: filters.activeAlertOnly,
             presentOnly: filters.presentOnly,
+            remediationCaseIds: filters.remediationCaseIds.join(','),
           })
         }}
         onClearFilters={() => {
@@ -121,9 +145,17 @@ function VulnerabilitiesPage() {
             knownExploitedOnly: false,
             activeAlertOnly: false,
             presentOnly: true,
+            remediationCaseIds: '',
           })
         }}
       />
     </section>
   )
+}
+
+function parseRemediationCaseIds(value: string) {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
 }

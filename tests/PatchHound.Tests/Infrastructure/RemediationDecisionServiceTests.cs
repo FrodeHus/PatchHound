@@ -48,7 +48,8 @@ public class RemediationDecisionServiceTests : IDisposable
             notificationService,
             Substitute.For<IRealTimeNotifier>(),
             workflowService,
-            patchingTaskService
+            patchingTaskService,
+            new ApprovedVulnerabilityRemediationService(_dbContext)
         );
 
         _service = new RemediationDecisionService(

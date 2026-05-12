@@ -72,6 +72,39 @@ public sealed class DashboardControllerSummaryAggregationTests : IDisposable
         newestBucket.High.Should().Be(1);
     }
 
+    [Fact]
+    public async Task GetSummary_TopCriticalVulnerabilities_ExcludesAlternateMitigationVulnerabilities()
+    {
+        var seed = await CanonicalSeed.PlantAsync(_dbContext, _tenantId);
+        var remediationCase = RemediationCase.Create(_tenantId, seed.ProductA.Id);
+        var decision = RemediationDecision.Create(
+            _tenantId,
+            remediationCase.Id,
+            RemediationOutcome.AlternateMitigation,
+            "Mitigated by security control",
+            Guid.NewGuid(),
+            DecisionApprovalStatus.Approved);
+
+        _dbContext.RemediationCases.Add(remediationCase);
+        _dbContext.RemediationDecisions.Add(decision);
+        await _dbContext.SaveChangesAsync();
+
+        _dbContext.ApprovedVulnerabilityRemediations.Add(ApprovedVulnerabilityRemediation.Create(
+            _tenantId,
+            seed.ExposureA.VulnerabilityId,
+            remediationCase.Id,
+            decision.Id,
+            decision.Outcome,
+            decision.ApprovedAt!.Value));
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var dto = ok.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
+        dto.TopCriticalVulnerabilities.Should().NotContain(item => item.Id == seed.ExposureA.VulnerabilityId);
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

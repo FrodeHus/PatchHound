@@ -135,6 +135,52 @@ public class VulnerabilitiesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task List_FiltersByApprovedRemediationCaseIds()
+    {
+        var covered = Vulnerability.Create("nvd", "CVE-2026-0400", "Covered", "desc",
+            Severity.Critical, 9.8m, null, DateTimeOffset.UtcNow.AddDays(-10));
+        var uncovered = Vulnerability.Create("nvd", "CVE-2026-0401", "Uncovered", "desc",
+            Severity.High, 7.5m, null, DateTimeOffset.UtcNow.AddDays(-20));
+        var product = SoftwareProduct.Create("Acme", "Widget", null);
+        var remediationCase = RemediationCase.Create(_tenantId, product.Id);
+        var decision = RemediationDecision.Create(
+            _tenantId,
+            remediationCase.Id,
+            RemediationOutcome.RiskAcceptance,
+            "Accepted",
+            _tenantContext.CurrentUserId,
+            DecisionApprovalStatus.Approved,
+            expiryDate: DateTimeOffset.UtcNow.AddDays(30));
+
+        _dbContext.Vulnerabilities.AddRange(covered, uncovered);
+        _dbContext.SoftwareProducts.Add(product);
+        _dbContext.RemediationCases.Add(remediationCase);
+        _dbContext.RemediationDecisions.Add(decision);
+        await _dbContext.SaveChangesAsync();
+
+        _dbContext.ApprovedVulnerabilityRemediations.Add(ApprovedVulnerabilityRemediation.Create(
+            _tenantId,
+            covered.Id,
+            remediationCase.Id,
+            decision.Id,
+            decision.Outcome,
+            decision.ApprovedAt!.Value));
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.List(
+            new VulnerabilityFilterQuery(RemediationCaseIds: remediationCase.Id.ToString()),
+            new PaginationQuery(),
+            CancellationToken.None
+        );
+
+        var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = result.Value.Should().BeOfType<PagedResponse<VulnerabilityDto>>().Subject;
+
+        payload.Items.Should().ContainSingle();
+        payload.Items[0].ExternalId.Should().Be("CVE-2026-0400");
+    }
+
+    [Fact]
     public async Task List_ThreatFilters_ReturnsThreatSignalsFromCanonicalAssessment()
     {
         var vuln = Vulnerability.Create("nvd", "CVE-2026-0302", "Threat-filtered vulnerability",

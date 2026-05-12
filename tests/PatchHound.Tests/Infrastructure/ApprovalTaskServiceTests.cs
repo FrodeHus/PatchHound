@@ -50,7 +50,8 @@ public class ApprovalTaskServiceTests : IDisposable
             _notificationService,
             _realTimeNotifier,
             workflowService,
-            patchingTaskService
+            patchingTaskService,
+            new ApprovedVulnerabilityRemediationService(_dbContext)
         );
     }
 
@@ -133,6 +134,57 @@ public class ApprovalTaskServiceTests : IDisposable
             .IgnoreQueryFilters()
             .FirstAsync(d => d.Id == decision.Id);
         updatedDecision.ApprovalStatus.Should().Be(DecisionApprovalStatus.Approved);
+    }
+
+    [Fact]
+    public async Task ApproveAsync_UpsertsApprovedVulnerabilityRemediationCoverage()
+    {
+        var sourceSystem = SourceSystem.Create("defender", "Defender");
+        var softwareProduct = SoftwareProduct.Create("Acme", "Widget", null);
+        var device = Device.Create(_tenantId, sourceSystem.Id, "dev-coverage", "Coverage Device", Criticality.High);
+        var vulnerability = Vulnerability.Create("nvd", "CVE-2026-7001", "Covered vuln", "desc", Severity.Critical, 9.8m, null, DateTimeOffset.UtcNow);
+        _dbContext.SourceSystems.Add(sourceSystem);
+        _dbContext.SoftwareProducts.Add(softwareProduct);
+        _dbContext.Devices.Add(device);
+        _dbContext.Vulnerabilities.Add(vulnerability);
+        await _dbContext.SaveChangesAsync();
+
+        var installedSoftware = InstalledSoftware.Observe(_tenantId, device.Id, softwareProduct.Id, sourceSystem.Id, "1.0", DateTimeOffset.UtcNow);
+        var remediationCase = RemediationCase.Create(_tenantId, softwareProduct.Id);
+        _dbContext.InstalledSoftware.Add(installedSoftware);
+        _dbContext.RemediationCases.Add(remediationCase);
+        await _dbContext.SaveChangesAsync();
+
+        _dbContext.DeviceVulnerabilityExposures.Add(DeviceVulnerabilityExposure.Observe(
+            _tenantId,
+            device.Id,
+            vulnerability.Id,
+            softwareProduct.Id,
+            installedSoftware.Id,
+            "1.0",
+            ExposureMatchSource.Product,
+            DateTimeOffset.UtcNow));
+        var decision = RemediationDecision.Create(
+            _tenantId,
+            remediationCase.Id,
+            RemediationOutcome.RiskAcceptance,
+            "Accepted by security manager",
+            _userId,
+            DecisionApprovalStatus.PendingApproval,
+            expiryDate: DateTimeOffset.UtcNow.AddDays(30));
+        _dbContext.RemediationDecisions.Add(decision);
+        await _dbContext.SaveChangesAsync();
+        var task = await _sut.CreateForDecisionAsync(decision, 24, CancellationToken.None);
+
+        await _sut.ApproveAsync(task.Id, Guid.NewGuid(), "Approved", null, CancellationToken.None);
+
+        var coverage = await _dbContext.ApprovedVulnerabilityRemediations
+            .IgnoreQueryFilters()
+            .SingleAsync(item => item.VulnerabilityId == vulnerability.Id);
+        coverage.TenantId.Should().Be(_tenantId);
+        coverage.RemediationCaseId.Should().Be(remediationCase.Id);
+        coverage.RemediationDecisionId.Should().Be(decision.Id);
+        coverage.Outcome.Should().Be(RemediationOutcome.RiskAcceptance);
     }
 
     [Fact]

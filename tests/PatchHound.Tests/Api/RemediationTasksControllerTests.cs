@@ -67,7 +67,13 @@ public class RemediationTasksControllerTests : IDisposable
         var workflowService = new RemediationWorkflowService(_dbContext);
         var notificationService = Substitute.For<INotificationService>();
         var patchingTaskService = new PatchingTaskService(_dbContext, new SlaService(), workflowService, notificationService);
-        var approvalTaskService = new ApprovalTaskService(_dbContext, notificationService, Substitute.For<IRealTimeNotifier>(), workflowService, patchingTaskService);
+        var approvalTaskService = new ApprovalTaskService(
+            _dbContext,
+            notificationService,
+            Substitute.For<IRealTimeNotifier>(),
+            workflowService,
+            patchingTaskService,
+            new ApprovedVulnerabilityRemediationService(_dbContext));
         var decisionService = new RemediationDecisionService(_dbContext, approvalTaskService, workflowService, patchingTaskService);
 
         var createResult = await decisionService.CreateDecisionForCaseAsync(

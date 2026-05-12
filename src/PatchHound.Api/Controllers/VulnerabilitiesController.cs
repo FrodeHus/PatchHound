@@ -83,6 +83,16 @@ public class VulnerabilitiesController : ControllerBase
                     && e.Status == ExposureStatus.Open
                 )
             );
+        var remediationCaseIds = ParseGuidList(filter.RemediationCaseIds);
+        if (remediationCaseIds.Count > 0)
+        {
+            var tenantId = _tenantContext.CurrentTenantId.Value;
+            query = query.Where(v =>
+                _dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
+                    remediation.TenantId == tenantId
+                    && remediationCaseIds.Contains(remediation.RemediationCaseId)
+                    && remediation.VulnerabilityId == v.Id));
+        }
 
         var total = await query.CountAsync(ct);
 
@@ -142,6 +152,19 @@ public class VulnerabilitiesController : ControllerBase
             .ToList();
 
         return Ok(new PagedResponse<VulnerabilityDto>(dtos, total, pagination.Page, pagination.BoundedPageSize));
+    }
+
+    private static List<Guid> ParseGuidList(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return [];
+
+        return value
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(item => Guid.TryParse(item, out var parsed) ? parsed : Guid.Empty)
+            .Where(item => item != Guid.Empty)
+            .Distinct()
+            .ToList();
     }
 
     [HttpGet("{id:guid}")]

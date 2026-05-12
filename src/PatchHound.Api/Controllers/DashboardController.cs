@@ -96,6 +96,10 @@ public class DashboardController : ControllerBase
         var topVulnRows = await exposureBaseQuery
             .Where(e => e.Status == ExposureStatus.Open
                 && (e.Vulnerability.VendorSeverity == Severity.Critical || e.Vulnerability.VendorSeverity == Severity.High))
+            .Where(e => !_dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
+                remediation.TenantId == tenantId
+                && remediation.Outcome == RemediationOutcome.AlternateMitigation
+                && remediation.VulnerabilityId == e.VulnerabilityId))
             .GroupBy(e => e.VulnerabilityId)
             .Select(g => new
             {

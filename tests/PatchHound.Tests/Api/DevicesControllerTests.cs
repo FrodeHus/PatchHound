@@ -74,7 +74,8 @@ public class DevicesControllerTests : IDisposable
             notificationService,
             Substitute.For<IRealTimeNotifier>(),
             workflowService,
-            patchingTaskService
+            patchingTaskService,
+            new ApprovedVulnerabilityRemediationService(_dbContext)
         );
         var remediationDecisionService = new RemediationDecisionService(
             _dbContext,
