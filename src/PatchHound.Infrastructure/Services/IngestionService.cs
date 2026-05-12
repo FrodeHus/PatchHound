@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
@@ -63,7 +64,7 @@ public class IngestionService
             exposureEpisodeService,
             exposureAssessmentService,
             riskScoreService,
-            new VulnerabilityResolver(dbContext),
+            new VulnerabilityResolver(dbContext, NullLogger<VulnerabilityResolver>.Instance),
             normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
             logger
@@ -125,7 +126,7 @@ public class IngestionService
             exposureEpisodeService,
             exposureAssessmentService,
             riskScoreService,
-            new VulnerabilityResolver(dbContext),
+            new VulnerabilityResolver(dbContext, NullLogger<VulnerabilityResolver>.Instance),
             normalizedSoftwareProjectionService: null,
             remediationDecisionService,
             logger

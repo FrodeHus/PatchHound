@@ -58,7 +58,7 @@ public class IngestionServicePhase3Tests
             new ExposureEpisodeService(db),
             new ExposureAssessmentService(db, new EnvironmentalSeverityCalculator()),
             new RiskScoreService(db, NullLogger<RiskScoreService>.Instance),
-            new VulnerabilityResolver(db),
+            new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance),
             normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
             NullLogger<IngestionService>.Instance);
@@ -342,7 +342,7 @@ public class IngestionServicePhase3Tests
             new ExposureEpisodeService(db),
             new ExposureAssessmentService(db, new EnvironmentalSeverityCalculator()),
             new RiskScoreService(db, NullLogger<RiskScoreService>.Instance),
-            new VulnerabilityResolver(db),
+            new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance),
             NullLogger<IngestionService>.Instance);
 
     private static async Task<PatchHoundDbContext> CreateTenantDbAsync(Guid tenantId)
