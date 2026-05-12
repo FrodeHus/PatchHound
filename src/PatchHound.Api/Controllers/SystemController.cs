@@ -25,6 +25,7 @@ public class SystemController : ControllerBase
     private readonly NotificationEmailConfigurationResolver _notificationConfigurationResolver;
     private readonly MailgunEmailSender _mailgunEmailSender;
     private readonly ITenantContext _tenantContext;
+    private readonly INvdFeedSyncService _nvdFeedSyncService;
 
     public SystemController(
         ISecretStore secretStore,
@@ -32,7 +33,8 @@ public class SystemController : ControllerBase
         AuditLogWriter auditLogWriter,
         NotificationEmailConfigurationResolver notificationConfigurationResolver,
         MailgunEmailSender mailgunEmailSender,
-        ITenantContext tenantContext
+        ITenantContext tenantContext,
+        INvdFeedSyncService nvdFeedSyncService
     )
     {
         _secretStore = secretStore;
@@ -41,6 +43,7 @@ public class SystemController : ControllerBase
         _notificationConfigurationResolver = notificationConfigurationResolver;
         _mailgunEmailSender = mailgunEmailSender;
         _tenantContext = tenantContext;
+        _nvdFeedSyncService = nvdFeedSyncService;
     }
 
     [HttpGet("/api/health")]
@@ -405,6 +408,39 @@ public class SystemController : ControllerBase
                 pagination.BoundedPageSize
             )
         );
+    }
+
+    [HttpPost("enrichment-sources/nvd/sync")]
+    [Authorize(Policy = Policies.ManageGlobalSettings)]
+    public async Task<IActionResult> TriggerNvdModifiedSync(CancellationToken ct)
+    {
+        await _nvdFeedSyncService.SyncModifiedFeedAsync(ct);
+        return Accepted();
+    }
+
+    [HttpPost("enrichment-sources/nvd/full-sync")]
+    [Authorize(Policy = Policies.ManageGlobalSettings)]
+    public async Task<IActionResult> TriggerNvdFullSync(
+        [FromBody] TriggerNvdFullSyncRequest request,
+        CancellationToken ct
+    )
+    {
+        var currentYear = DateTimeOffset.UtcNow.Year;
+        if (request.FromYear < 2002 || request.ToYear > currentYear || request.FromYear > request.ToYear)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Invalid NVD year range.",
+                Detail = $"Choose a range from 2002 through {currentYear}.",
+            });
+        }
+
+        for (var year = request.FromYear; year <= request.ToYear; year++)
+        {
+            await _nvdFeedSyncService.SyncYearFeedAsync(year, force: true, ct);
+        }
+
+        return Accepted();
     }
 
     [HttpPut("enrichment-sources")]

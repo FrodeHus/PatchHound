@@ -61,3 +61,5 @@ public record UpdateEnrichmentSourceCredentialsRequest(
     string Secret,
     string ApiBaseUrl
 );
+
+public record TriggerNvdFullSyncRequest(int FromYear, int ToYear);

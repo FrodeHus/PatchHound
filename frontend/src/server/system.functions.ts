@@ -176,6 +176,23 @@ export const triggerEndOfLifeEnrichment = createServerFn({ method: 'POST' })
     return z.object({ enqueuedCount: z.number() }).parse(response)
   })
 
+export const triggerNvdModifiedSync = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({}))
+  .handler(async ({ context }) => {
+    await apiPost('/system/enrichment-sources/nvd/sync', context, {})
+  })
+
+export const triggerNvdFullSync = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({
+    fromYear: z.number().int(),
+    toYear: z.number().int(),
+  }))
+  .handler(async ({ context, data }) => {
+    await apiPost('/system/enrichment-sources/nvd/full-sync', context, data)
+  })
+
 export const fetchEnrichmentRuns = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .inputValidator(z.object({

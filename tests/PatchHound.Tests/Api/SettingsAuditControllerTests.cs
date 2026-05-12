@@ -117,17 +117,7 @@ public class SettingsAuditControllerTests : IDisposable
         await _dbContext.EnrichmentSourceConfigurations.AddAsync(enrichmentSource);
         await _dbContext.SaveChangesAsync();
 
-        var controller = new SystemController(
-            _secretStore,
-            _dbContext,
-            new AuditLogWriter(_dbContext, _tenantContext),
-            new NotificationEmailConfigurationResolver(
-                _secretStore,
-                Options.Create(new PatchHound.Infrastructure.Options.SmtpOptions())
-            ),
-            new MailgunEmailSender(new HttpClient()),
-            _tenantContext
-        );
+        var controller = CreateSystemController();
 
         var action = await controller.UpdateEnrichmentSources(
             [
@@ -179,17 +169,7 @@ public class SettingsAuditControllerTests : IDisposable
         await _dbContext.StoredCredentials.AddAsync(credential);
         await _dbContext.SaveChangesAsync();
 
-        var controller = new SystemController(
-            _secretStore,
-            _dbContext,
-            new AuditLogWriter(_dbContext, _tenantContext),
-            new NotificationEmailConfigurationResolver(
-                _secretStore,
-                Options.Create(new PatchHound.Infrastructure.Options.SmtpOptions())
-            ),
-            new MailgunEmailSender(new HttpClient()),
-            _tenantContext
-        );
+        var controller = CreateSystemController();
 
         var action = await controller.UpdateEnrichmentSources(
             [
@@ -227,17 +207,7 @@ public class SettingsAuditControllerTests : IDisposable
         await _dbContext.StoredCredentials.AddAsync(credential);
         await _dbContext.SaveChangesAsync();
 
-        var controller = new SystemController(
-            _secretStore,
-            _dbContext,
-            new AuditLogWriter(_dbContext, _tenantContext),
-            new NotificationEmailConfigurationResolver(
-                _secretStore,
-                Options.Create(new PatchHound.Infrastructure.Options.SmtpOptions())
-            ),
-            new MailgunEmailSender(new HttpClient()),
-            _tenantContext
-        );
+        var controller = CreateSystemController();
 
         var action = await controller.UpdateEnrichmentSources(
             [
@@ -320,17 +290,7 @@ public class SettingsAuditControllerTests : IDisposable
         await _dbContext.EnrichmentRuns.AddAsync(run);
         await _dbContext.SaveChangesAsync();
 
-        var controller = new SystemController(
-            _secretStore,
-            _dbContext,
-            new AuditLogWriter(_dbContext, _tenantContext),
-            new NotificationEmailConfigurationResolver(
-                _secretStore,
-                Options.Create(new PatchHound.Infrastructure.Options.SmtpOptions())
-            ),
-            new MailgunEmailSender(new HttpClient()),
-            _tenantContext
-        );
+        var controller = CreateSystemController();
 
         var action = await controller.GetEnrichmentSources(CancellationToken.None);
 
@@ -345,6 +305,44 @@ public class SettingsAuditControllerTests : IDisposable
         dto.RecentRuns.Should().ContainSingle();
         dto.RecentRuns[0].JobsClaimed.Should().Be(2);
         dto.RecentRuns[0].JobsRetried.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task TriggerNvdModifiedSync_RunsModifiedFeedSync()
+    {
+        var nvdFeedSyncService = Substitute.For<INvdFeedSyncService>();
+        var controller = CreateSystemController(nvdFeedSyncService);
+
+        var action = await controller.TriggerNvdModifiedSync(CancellationToken.None);
+
+        action.Should().BeOfType<AcceptedResult>();
+        await nvdFeedSyncService.Received(1).SyncModifiedFeedAsync(Arg.Any<CancellationToken>());
+        await nvdFeedSyncService.DidNotReceive().SyncYearFeedAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TriggerNvdFullSync_RunsYearFeedSyncForRequestedRange()
+    {
+        var nvdFeedSyncService = Substitute.For<INvdFeedSyncService>();
+        var controller = CreateSystemController(nvdFeedSyncService);
+
+        var action = await controller.TriggerNvdFullSync(new TriggerNvdFullSyncRequest(2024, 2026), CancellationToken.None);
+
+        action.Should().BeOfType<AcceptedResult>();
+        await nvdFeedSyncService.Received(1).SyncYearFeedAsync(2024, true, Arg.Any<CancellationToken>());
+        await nvdFeedSyncService.Received(1).SyncYearFeedAsync(2025, true, Arg.Any<CancellationToken>());
+        await nvdFeedSyncService.Received(1).SyncYearFeedAsync(2026, true, Arg.Any<CancellationToken>());
+        await nvdFeedSyncService.DidNotReceive().SyncModifiedFeedAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TriggerNvdFullSync_RejectsInvalidYearRange()
+    {
+        var controller = CreateSystemController();
+
+        var action = await controller.TriggerNvdFullSync(new TriggerNvdFullSyncRequest(2026, 2024), CancellationToken.None);
+
+        action.Should().BeOfType<BadRequestObjectResult>();
     }
 
     public void Dispose()
@@ -366,4 +364,18 @@ public class SettingsAuditControllerTests : IDisposable
         );
         return run;
     }
+
+    private SystemController CreateSystemController(INvdFeedSyncService? nvdFeedSyncService = null) =>
+        new(
+            _secretStore,
+            _dbContext,
+            new AuditLogWriter(_dbContext, _tenantContext),
+            new NotificationEmailConfigurationResolver(
+                _secretStore,
+                Options.Create(new PatchHound.Infrastructure.Options.SmtpOptions())
+            ),
+            new MailgunEmailSender(new HttpClient()),
+            _tenantContext,
+            nvdFeedSyncService ?? Substitute.For<INvdFeedSyncService>()
+        );
 }

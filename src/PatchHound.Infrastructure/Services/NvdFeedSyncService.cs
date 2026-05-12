@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Credentials;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
@@ -15,7 +16,7 @@ public class NvdFeedSyncService(
     PatchHoundDbContext db,
     ISecretStore secretStore,
     StoredCredentialResolver credentialResolver,
-    ILogger<NvdFeedSyncService> logger)
+    ILogger<NvdFeedSyncService> logger) : INvdFeedSyncService
 {
     private const string FeedBaseUrl = "https://nvd.nist.gov/feeds/json/cve/2.0";
     private const string ApiUrl = "https://services.nvd.nist.gov/rest/json/cves/2.0";
@@ -23,11 +24,14 @@ public class NvdFeedSyncService(
     private static readonly TimeSpan ApiKeyDelay = TimeSpan.FromMilliseconds(700);
     private static readonly TimeSpan NoKeyDelay = TimeSpan.FromSeconds(7);
 
-    public async Task SyncYearFeedAsync(int year, CancellationToken ct)
+    public Task SyncYearFeedAsync(int year, CancellationToken ct) =>
+        SyncYearFeedAsync(year, force: false, ct);
+
+    public async Task SyncYearFeedAsync(int year, bool force, CancellationToken ct)
     {
         var feedName = year.ToString();
         var checkpoint = await db.NvdFeedCheckpoints.FirstOrDefaultAsync(c => c.FeedName == feedName, ct);
-        if (checkpoint is not null)
+        if (checkpoint is not null && !force)
         {
             logger.LogDebug("NVD year feed {Year} already synced at {SyncedAt}, skipping.", year, checkpoint.SyncedAt);
             return;
@@ -37,7 +41,10 @@ public class NvdFeedSyncService(
 
         var count = await FetchAndUpsertYearArchiveAsync(year, ct);
 
-        db.NvdFeedCheckpoints.Add(NvdFeedCheckpoint.Create(feedName, DateTimeOffset.UtcNow));
+        if (checkpoint is null)
+            db.NvdFeedCheckpoints.Add(NvdFeedCheckpoint.Create(feedName, DateTimeOffset.UtcNow));
+        else
+            checkpoint.Update(DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("NVD year feed {Year}: upserted {Count} CVEs", year, count);
     }

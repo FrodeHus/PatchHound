@@ -8,6 +8,8 @@ import type { StoredCredential } from '@/api/stored-credentials.schemas'
 import {
   type EnrichmentSource,
   triggerEndOfLifeEnrichment,
+  triggerNvdFullSync,
+  triggerNvdModifiedSync,
   updateEnrichmentSources,
 } from '@/server/system.functions'
 import { EnrichmentRunHistorySheet } from '@/components/features/admin/EnrichmentRunHistorySheet'
@@ -16,6 +18,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { InsetPanel } from '@/components/ui/inset-panel'
 import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -59,6 +69,10 @@ export function GlobalEnrichmentSourceManagement({
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
   const [editingSourceKey, setEditingSourceKey] = useState<string | null>(null)
   const [historySource, setHistorySource] = useState<{ key: string; displayName: string } | null>(null)
+  const [fullSyncOpen, setFullSyncOpen] = useState(false)
+  const currentYear = new Date().getFullYear()
+  const [fullSyncFromYear, setFullSyncFromYear] = useState(String(currentYear - 4))
+  const [fullSyncToYear, setFullSyncToYear] = useState(String(currentYear))
   const { selectedTenantId } = useTenantScope()
 
   const storedCredentialsQuery = useQuery({
@@ -77,6 +91,30 @@ export function GlobalEnrichmentSourceManagement({
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, 'Failed to trigger EOL enrichment'))
+    },
+  })
+
+  const nvdModifiedSyncMutation = useMutation({
+    mutationFn: async () => triggerNvdModifiedSync({ data: {} }),
+    onSuccess: async () => {
+      toast.success('NVD modified feed sync started')
+      await onSaved()
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to start NVD sync'))
+    },
+  })
+
+  const nvdFullSyncMutation = useMutation({
+    mutationFn: async (input: { fromYear: number; toYear: number }) =>
+      triggerNvdFullSync({ data: input }),
+    onSuccess: async () => {
+      setFullSyncOpen(false)
+      toast.success('NVD full sync started')
+      await onSaved()
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to start NVD full sync'))
     },
   })
 
@@ -113,6 +151,14 @@ export function GlobalEnrichmentSourceManagement({
   }
 
   const editingSource = sources.find((s) => s.key === editingSourceKey) ?? null
+  const parsedFullSyncFromYear = Number.parseInt(fullSyncFromYear, 10)
+  const parsedFullSyncToYear = Number.parseInt(fullSyncToYear, 10)
+  const fullSyncRangeIsValid =
+    Number.isInteger(parsedFullSyncFromYear)
+    && Number.isInteger(parsedFullSyncToYear)
+    && parsedFullSyncFromYear >= 2002
+    && parsedFullSyncToYear <= currentYear
+    && parsedFullSyncFromYear <= parsedFullSyncToYear
 
   return (
     <section className="space-y-4">
@@ -124,6 +170,66 @@ export function GlobalEnrichmentSourceManagement({
           if (!open) setHistorySource(null)
         }}
       />
+      <Dialog open={fullSyncOpen} onOpenChange={setFullSyncOpen}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>NVD full sync</DialogTitle>
+            <DialogDescription>
+              Select the inclusive year range to sync from NVD yearly archives.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <label htmlFor="nvd-full-sync-from-year" className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                From year
+              </label>
+              <Input
+                id="nvd-full-sync-from-year"
+                type="number"
+                min={2002}
+                max={currentYear}
+                value={fullSyncFromYear}
+                onChange={(event) => setFullSyncFromYear(event.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="nvd-full-sync-to-year" className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                To year
+              </label>
+              <Input
+                id="nvd-full-sync-to-year"
+                type="number"
+                min={2002}
+                max={currentYear}
+                value={fullSyncToYear}
+                onChange={(event) => setFullSyncToYear(event.target.value)}
+              />
+            </div>
+          </div>
+          {!fullSyncRangeIsValid ? (
+            <p className="text-xs text-destructive">
+              Choose a valid range from 2002 through {currentYear}.
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setFullSyncOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={!fullSyncRangeIsValid || nvdFullSyncMutation.isPending}
+              onClick={() =>
+                nvdFullSyncMutation.mutate({
+                  fromYear: parsedFullSyncFromYear,
+                  toYear: parsedFullSyncToYear,
+                })
+              }
+            >
+              {nvdFullSyncMutation.isPending ? 'Starting...' : 'Start full sync'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="space-y-1">
         <h2 className="text-lg font-semibold">Global Enrichment</h2>
@@ -227,6 +333,34 @@ export function GlobalEnrichmentSourceManagement({
                     {/* Actions */}
                     <TableCell className="py-3 pr-4">
                       <div className="flex items-center justify-end gap-1.5">
+                        {source.key === 'nvd' ? (
+                          <>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={!source.enabled || nvdModifiedSyncMutation.isPending}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                nvdModifiedSyncMutation.mutate()
+                              }}
+                            >
+                              {nvdModifiedSyncMutation.isPending ? 'Syncing...' : 'Sync'}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={!source.enabled || nvdFullSyncMutation.isPending}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setFullSyncOpen(true)
+                              }}
+                            >
+                              Full Sync
+                            </Button>
+                          </>
+                        ) : null}
                         <Button
                           type="button"
                           variant="outline"

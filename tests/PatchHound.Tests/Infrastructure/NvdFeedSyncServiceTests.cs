@@ -119,6 +119,27 @@ public class NvdFeedSyncServiceTests
     }
 
     [Fact]
+    public async Task SyncYearFeedAsync_force_refreshes_when_checkpoint_exists()
+    {
+        await using var db = await TestDbContextFactory.CreateAsync();
+        db.NvdFeedCheckpoints.Add(NvdFeedCheckpoint.Create("2024", DateTimeOffset.UtcNow.AddDays(-1)));
+        await db.SaveChangesAsync();
+
+        var handler = new GzipArchiveHandler(BuildSinglePageResponse("CVE-2024-1234", "Forced refresh", 7.5m,
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+            "2024-01-01T00:00:00.000", "2024-01-10T00:00:00.000",
+            referenceUrl: null, criteria: "cpe:2.3:a:acme:widget:1.0:*:*:*:*:*:*:*"));
+        var httpClient = new HttpClient(handler);
+        var service = CreateService(httpClient, db);
+
+        await service.SyncYearFeedAsync(2024, force: true, CancellationToken.None);
+
+        handler.RequestUris.Should().ContainSingle();
+        var cached = await db.NvdCveCache.SingleAsync();
+        cached.CveId.Should().Be("CVE-2024-1234");
+    }
+
+    [Fact]
     public async Task SyncYearFeedAsync_skips_cve_with_no_english_description()
     {
         await using var db = await TestDbContextFactory.CreateAsync();

@@ -174,6 +174,7 @@ public static class DependencyInjection
         services.AddHttpClient<NvdFeedSyncService>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2)
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(3));
+        services.AddScoped<INvdFeedSyncService>(sp => sp.GetRequiredService<NvdFeedSyncService>());
         services.AddHttpClient<SupplyChainCatalogClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services
             .AddHttpClient<ISecretStore, OpenBaoSecretStore>()
