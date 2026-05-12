@@ -33,6 +33,10 @@ type SeverityKey = 'Critical' | 'High' | 'Medium' | 'Low'
 type TrendPoint = Record<SeverityKey, number> & {
   date: string
   Total: number
+  CurrentCritical?: number
+  CurrentHigh?: number
+  CurrentMedium?: number
+  CurrentLow?: number
 }
 
 const severitySeries: Array<{
@@ -67,7 +71,7 @@ function formatAxisDate(value: string) {
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(date)
 }
 
-function formatTrendData(data: TrendData): TrendPoint[] {
+function formatTrendData(data: TrendData, currentCounts: DashboardSummary['vulnerabilitiesBySeverity']): TrendPoint[] {
   const byDate = new Map<string, TrendPoint>()
 
   for (const item of data.items) {
@@ -88,11 +92,24 @@ function formatTrendData(data: TrendData): TrendPoint[] {
     byDate.set(item.date, point)
   }
 
-  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date))
+  const points = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date))
+  const currentPoint = points.at(-1)
+
+  if (currentPoint) {
+    currentPoint.CurrentCritical = currentCounts.Critical ?? 0
+    currentPoint.CurrentHigh = currentCounts.High ?? 0
+    currentPoint.CurrentMedium = currentCounts.Medium ?? 0
+    currentPoint.CurrentLow = currentCounts.Low ?? 0
+  }
+
+  return points
 }
 
 export function SecurityManagerOverview({ summary, managerSummary, trends, isLoading }: Props) {
-  const trendPoints = useMemo(() => formatTrendData(trends), [trends])
+  const trendPoints = useMemo(
+    () => formatTrendData(trends, summary.vulnerabilitiesBySeverity),
+    [summary.vulnerabilitiesBySeverity, trends],
+  )
 
   return (
     <section className="space-y-6 pb-4">
@@ -199,7 +216,10 @@ export function SecurityManagerOverview({ summary, managerSummary, trends, isLoa
                     color: 'var(--color-popover-foreground)',
                   }}
                 />
-                <Bar dataKey="Total" fill="var(--color-muted-foreground)" fillOpacity={0.08} radius={[4, 4, 0, 0]} name="Total" />
+                <Bar dataKey="CurrentCritical" fill="var(--color-destructive)" fillOpacity={0.28} radius={[4, 4, 0, 0]} name="Current critical" />
+                <Bar dataKey="CurrentHigh" fill="var(--color-chart-1)" fillOpacity={0.24} radius={[4, 4, 0, 0]} name="Current high" />
+                <Bar dataKey="CurrentMedium" fill="var(--color-chart-4)" fillOpacity={0.22} radius={[4, 4, 0, 0]} name="Current medium" />
+                <Bar dataKey="CurrentLow" fill="var(--color-chart-2)" fillOpacity={0.22} radius={[4, 4, 0, 0]} name="Current low" />
                 {severitySeries.map((severity) => (
                   <Area
                     key={severity.key}
