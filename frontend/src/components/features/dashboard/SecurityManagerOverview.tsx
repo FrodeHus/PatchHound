@@ -151,9 +151,9 @@ export function SecurityManagerOverview({ summary, managerSummary, isLoading }: 
             <Button
               size="sm"
               variant="outline"
-              render={<Link to="/approvals" search={{ page: 1, pageSize: 25, status: 'Pending', type: '', search: '', showRead: false }} />}
+              render={<Link to="/workbenches/security-manager" search={{ page: 1, pageSize: 25, status: 'Pending', type: '', search: '', showRead: false }} />}
             >
-              Approval inbox
+              Workbench
             </Button>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -173,8 +173,8 @@ export function SecurityManagerOverview({ summary, managerSummary, isLoading }: 
                         </Badge>
                       </div>
                       <Link
-                        to="/approvals/$id"
-                        params={{ id: item.approvalTaskId }}
+                        to="/workbenches/security-manager/cases/$caseId"
+                        params={{ caseId: item.remediationCaseId }}
                         className="mt-2 block text-base font-medium tracking-tight hover:text-primary"
                       >
                           {startCase(item.softwareName)}

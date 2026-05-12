@@ -90,6 +90,60 @@ describe('MyTasksPage', () => {
     expect(screen.getAllByRole('link', { name: /Review approval/i }).length).toBeGreaterThan(0)
   })
 
+  it('routes security approval tasks to the security manager case workbench', () => {
+    render(
+      <MyTasksPage
+        sections={[
+          {
+            bucket: 'approval',
+            data: makeList({
+              items: [
+                {
+                  ...makeList().items[0],
+                  outcome: 'RiskAcceptance',
+                  approvalStatus: 'PendingApproval',
+                },
+              ],
+            }),
+          },
+        ]}
+        onPageChange={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('link', { name: /Review approval/i })).toHaveAttribute(
+      'href',
+      '/workbenches/security-manager/cases/$caseId',
+    )
+  })
+
+  it('routes patch approval tasks to the technical manager case workbench', () => {
+    render(
+      <MyTasksPage
+        sections={[
+          {
+            bucket: 'approval',
+            data: makeList({
+              items: [
+                {
+                  ...makeList().items[0],
+                  outcome: 'ApprovedForPatching',
+                  approvalStatus: 'PendingApproval',
+                },
+              ],
+            }),
+          },
+        ]}
+        onPageChange={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('link', { name: /Review approval/i })).toHaveAttribute(
+      'href',
+      '/workbenches/technical-manager/cases/$caseId',
+    )
+  })
+
   it('shows an empty-row placeholder per bucket with no items', () => {
     render(
       <MyTasksPage

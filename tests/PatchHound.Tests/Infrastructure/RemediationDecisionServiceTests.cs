@@ -187,6 +187,71 @@ public class RemediationDecisionServiceTests : IDisposable
         var workflow = await _dbContext.RemediationWorkflows.SingleAsync();
         workflow.CurrentStage.Should().Be(RemediationWorkflowStage.Approval);
         workflow.ApprovalMode.Should().Be(RemediationWorkflowApprovalMode.SecurityApproval);
+
+        var task = await _dbContext.ApprovalTasks.Include(item => item.VisibleRoles).SingleAsync();
+        task.Status.Should().Be(ApprovalTaskStatus.Pending);
+        task.VisibleToRoles.Should().BeEquivalentTo([RoleName.GlobalAdmin, RoleName.SecurityManager]);
+    }
+
+    [Theory]
+    [InlineData(RemediationOutcome.RiskAcceptance)]
+    [InlineData(RemediationOutcome.AlternateMitigation)]
+    public async Task CreateDecisionForCaseAsync_ExceptionOutcomesRouteToSecurityManager(RemediationOutcome outcome)
+    {
+        var remediationCase = await SeedCaseAsync();
+
+        var result = await _service.CreateDecisionForCaseAsync(
+            _tenantId,
+            remediationCase.Id,
+            outcome,
+            "The asset owner supplied a documented exception.",
+            _userId,
+            expiryDate: outcome == RemediationOutcome.RiskAcceptance ? DateTimeOffset.UtcNow.AddDays(30) : null,
+            reEvaluationDate: null,
+            CancellationToken.None,
+            deadlineMode: outcome == RemediationOutcome.RiskAcceptance ? RemediationDecisionDeadlineMode.Date : null
+        );
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.ApprovalStatus.Should().Be(DecisionApprovalStatus.PendingApproval);
+
+        var workflow = await _dbContext.RemediationWorkflows.SingleAsync();
+        workflow.CurrentStage.Should().Be(RemediationWorkflowStage.Approval);
+        workflow.ApprovalMode.Should().Be(RemediationWorkflowApprovalMode.SecurityApproval);
+
+        var task = await _dbContext.ApprovalTasks.Include(item => item.VisibleRoles).SingleAsync();
+        task.Status.Should().Be(ApprovalTaskStatus.Pending);
+        task.VisibleToRoles.Should().BeEquivalentTo([RoleName.GlobalAdmin, RoleName.SecurityManager]);
+    }
+
+    [Fact]
+    public async Task CreateDecisionForCaseAsync_ApprovedForPatchingRoutesToTechnicalManagerAndWaitsForApprovalBeforeExecution()
+    {
+        var remediationCase = await SeedCaseAsync();
+
+        var result = await _service.CreateDecisionForCaseAsync(
+            _tenantId,
+            remediationCase.Id,
+            RemediationOutcome.ApprovedForPatching,
+            "Patch in the next maintenance window.",
+            _userId,
+            expiryDate: null,
+            reEvaluationDate: null,
+            CancellationToken.None
+        );
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.ApprovalStatus.Should().Be(DecisionApprovalStatus.PendingApproval);
+
+        var workflow = await _dbContext.RemediationWorkflows.SingleAsync();
+        workflow.CurrentStage.Should().Be(RemediationWorkflowStage.Approval);
+        workflow.ApprovalMode.Should().Be(RemediationWorkflowApprovalMode.TechnicalApproval);
+
+        var task = await _dbContext.ApprovalTasks.Include(item => item.VisibleRoles).SingleAsync();
+        task.Status.Should().Be(ApprovalTaskStatus.Pending);
+        task.Type.Should().Be(ApprovalTaskType.PatchingApproved);
+        task.VisibleToRoles.Should().BeEquivalentTo([RoleName.GlobalAdmin, RoleName.TechnicalManager]);
+        _dbContext.PatchingTasks.Should().BeEmpty();
     }
 
     private async Task<RemediationCase> SeedCaseAsync()
