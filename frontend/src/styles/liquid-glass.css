@@ -375,6 +375,44 @@
 }
 
 /* =========================================================
+   Nested surface panels — bg-background anywhere inside a
+   glass surface renders as an opaque block because --background
+   is a solid theme color. Replace with glass-bg-soft so all
+   inner panels remain translucent.
+
+   Scope: any .bg-background nested inside .bg-card, a shadcn
+   Card (data-slot="card"), or a plain section/header with bg-card.
+   ========================================================= */
+
+[data-theme^="liquid-glass"] .bg-card .bg-background,
+[data-theme^="liquid-glass"] [data-slot="card"] .bg-background {
+    background-color: var(--glass-bg-soft) !important;
+    border-color: var(--glass-border) !important;
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+}
+
+/* bg-muted as a nested surface should also stay translucent */
+[data-theme^="liquid-glass"] .bg-card .bg-muted,
+[data-theme^="liquid-glass"] [data-slot="card"] .bg-muted {
+    background-color: var(--glass-bg-soft) !important;
+}
+
+/* Active TabsTrigger: light glass theme uses data-active:bg-background
+   (opaque); dark glass uses bg-input/30 (transparent) but we unify both. */
+[data-theme^="liquid-glass"] [data-slot="tabs-trigger"][data-active] {
+    background-color: var(--glass-bg-strong) !important;
+    border-color: var(--glass-border-strong) !important;
+}
+
+/* Outline button variant uses bg-background — soften when nested */
+[data-theme^="liquid-glass"] .bg-card .border-border.bg-background,
+[data-theme^="liquid-glass"] [data-slot="card"] .border-border.bg-background {
+    background-color: var(--glass-bg-soft) !important;
+    border-color: var(--glass-border) !important;
+}
+
+/* =========================================================
    Glass-ify shadcn Card when liquid-glass theme is active
    ========================================================= */
 [data-theme^="liquid-glass"] [data-slot="card"] {
