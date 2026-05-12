@@ -178,6 +178,7 @@ public class DashboardController : ControllerBase
             .Where(e => e.Status == ExposureStatus.Open && e.Vulnerability.PublishedDate != null)
             .Select(e => new
             {
+                e.VulnerabilityId,
                 AgeDays = (int)((now - e.Vulnerability.PublishedDate!.Value).TotalDays),
                 e.Vulnerability.VendorSeverity,
             })
@@ -187,13 +188,18 @@ public class DashboardController : ControllerBase
         {
             var inBucket = openEpisodeAges.Where(e =>
                 e.AgeDays >= b.MinDays && (b.MaxDays == int.MaxValue || e.AgeDays <= b.MaxDays)).ToList();
+            var uniqueVulnerabilities = inBucket
+                .GroupBy(e => new { e.VulnerabilityId, e.VendorSeverity })
+                .Select(group => group.Key)
+                .ToList();
+
             return new VulnerabilityAgeBucketDto(
                 b.Label,
-                inBucket.Count,
-                inBucket.Count(e => e.VendorSeverity == Severity.Critical),
-                inBucket.Count(e => e.VendorSeverity == Severity.High),
-                inBucket.Count(e => e.VendorSeverity == Severity.Medium),
-                inBucket.Count(e => e.VendorSeverity == Severity.Low)
+                uniqueVulnerabilities.Count,
+                uniqueVulnerabilities.Count(e => e.VendorSeverity == Severity.Critical),
+                uniqueVulnerabilities.Count(e => e.VendorSeverity == Severity.High),
+                uniqueVulnerabilities.Count(e => e.VendorSeverity == Severity.Medium),
+                uniqueVulnerabilities.Count(e => e.VendorSeverity == Severity.Low)
             );
         }).ToList();
 
@@ -1904,10 +1910,12 @@ public class DashboardController : ControllerBase
             .ToList();
     }
 
-    private static HeatmapRowDto BuildHeatmapRow(string label, IEnumerable<Severity> severities)
+    private static HeatmapRowDto BuildHeatmapRow(string label, IEnumerable<HeatmapVulnerabilityCountItem> vulnerabilities)
     {
-        var counts = severities
-            .GroupBy(severity => severity)
+        var counts = vulnerabilities
+            .GroupBy(vulnerability => new { vulnerability.VulnerabilityId, vulnerability.Severity })
+            .Select(group => group.Key)
+            .GroupBy(vulnerability => vulnerability.Severity)
             .ToDictionary(group => group.Key, group => group.Count());
 
         return new HeatmapRowDto(
@@ -1927,13 +1935,16 @@ public class DashboardController : ControllerBase
             .Select(exposure => new
             {
                 Label = exposure.Device.GroupName ?? "No device group",
+                exposure.VulnerabilityId,
                 Severity = exposure.Vulnerability.VendorSeverity,
             })
             .ToListAsync(ct);
 
         return SortHeatmapRows(rows
             .GroupBy(row => row.Label)
-            .Select(group => BuildHeatmapRow(group.Key, group.Select(row => row.Severity))));
+            .Select(group => BuildHeatmapRow(
+                group.Key,
+                group.Select(row => new HeatmapVulnerabilityCountItem(row.VulnerabilityId, row.Severity)))));
     }
 
     private static async Task<List<HeatmapRowDto>> BuildPlatformHeatmapAsync(
@@ -1944,13 +1955,16 @@ public class DashboardController : ControllerBase
             .Select(exposure => new
             {
                 Label = exposure.Device.OsPlatform ?? "Unknown platform",
+                exposure.VulnerabilityId,
                 Severity = exposure.Vulnerability.VendorSeverity,
             })
             .ToListAsync(ct);
 
         return SortHeatmapRows(rows
             .GroupBy(row => row.Label)
-            .Select(group => BuildHeatmapRow(group.Key, group.Select(row => row.Severity))));
+            .Select(group => BuildHeatmapRow(
+                group.Key,
+                group.Select(row => new HeatmapVulnerabilityCountItem(row.VulnerabilityId, row.Severity)))));
     }
 
     private async Task<List<HeatmapRowDto>> BuildOwnerTeamHeatmapAsync(
@@ -1962,6 +1976,7 @@ public class DashboardController : ControllerBase
             .Select(exposure => new
             {
                 TeamId = exposure.Device.OwnerTeamId ?? exposure.Device.FallbackTeamId,
+                exposure.VulnerabilityId,
                 Severity = exposure.Vulnerability.VendorSeverity,
             })
             .ToListAsync(ct);
@@ -1987,7 +2002,9 @@ public class DashboardController : ControllerBase
                     ? teamName
                     : "Unowned";
 
-                return BuildHeatmapRow(label, group.Select(row => row.Severity));
+                return BuildHeatmapRow(
+                    label,
+                    group.Select(row => new HeatmapVulnerabilityCountItem(row.VulnerabilityId, row.Severity)));
             }));
     }
 
@@ -2000,6 +2017,7 @@ public class DashboardController : ControllerBase
             .Select(exposure => new
             {
                 exposure.DeviceId,
+                exposure.VulnerabilityId,
                 Severity = exposure.Vulnerability.VendorSeverity,
             })
             .ToListAsync(ct);
@@ -2038,25 +2056,31 @@ public class DashboardController : ControllerBase
                 labels = ["Unlabeled"];
             }
 
-            return labels.Select(label => new { Label = label, row.Severity });
+            return labels.Select(label => new { Label = label, row.VulnerabilityId, row.Severity });
         });
 
         return SortHeatmapRows(rows
             .GroupBy(row => row.Label)
-            .Select(group => BuildHeatmapRow(group.Key, group.Select(row => row.Severity))));
+            .Select(group => BuildHeatmapRow(
+                group.Key,
+                group.Select(row => new HeatmapVulnerabilityCountItem(row.VulnerabilityId, row.Severity)))));
     }
 
     private static async Task<List<HeatmapRowDto>> BuildSeverityHeatmapAsync(
         IQueryable<DeviceVulnerabilityExposure> exposureQuery,
         CancellationToken ct)
     {
-        var severities = await exposureQuery
-            .Select(exposure => exposure.Vulnerability.VendorSeverity)
+        var vulnerabilities = await exposureQuery
+            .Select(exposure => new HeatmapVulnerabilityCountItem(
+                exposure.VulnerabilityId,
+                exposure.Vulnerability.VendorSeverity))
             .ToListAsync(ct);
 
         var severityOrder = new[] { Severity.Critical, Severity.High, Severity.Medium, Severity.Low };
         return severityOrder
-            .Select(severity => BuildHeatmapRow(severity.ToString(), severities.Where(item => item == severity)))
+            .Select(severity => BuildHeatmapRow(
+                severity.ToString(),
+                vulnerabilities.Where(item => item.Severity == severity)))
             .Where(row => row.Critical + row.High + row.Medium + row.Low > 0)
             .ToList();
     }
@@ -2088,6 +2112,11 @@ public class DashboardController : ControllerBase
         string Title,
         string Detail,
         decimal Score
+    );
+
+    private sealed record HeatmapVulnerabilityCountItem(
+        Guid VulnerabilityId,
+        Severity Severity
     );
 
     private sealed record OwnerTopDriverRow(

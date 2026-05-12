@@ -61,6 +61,29 @@ public class DashboardControllerHeatmapTests : IDisposable
     }
 
     [Fact]
+    public async Task GetHeatmap_DeviceGroup_CountsUniqueVulnerabilitiesWithinGroup()
+    {
+        var seed = await CanonicalSeed.PlantAsync(_dbContext, _tenantId);
+        seed.DeviceA.UpdateInventoryDetails(null, null, "Windows", null, null, null, null, null, groupName: "Production");
+        seed.DeviceB.UpdateInventoryDetails(null, null, "Linux", null, null, null, null, null, groupName: "Production");
+        _dbContext.DeviceVulnerabilityExposures.Add(DeviceVulnerabilityExposure.Observe(
+            _tenantId,
+            seed.DeviceB.Id,
+            seed.ExposureA.VulnerabilityId,
+            seed.ProductB.Id,
+            seed.InstallB.Id,
+            "2.0.0",
+            ExposureMatchSource.Product,
+            DateTimeOffset.UtcNow));
+        await _dbContext.SaveChangesAsync();
+
+        var action = await _controller.GetHeatmap(new DashboardFilterQuery(), "deviceGroup", CancellationToken.None);
+
+        var dto = ReadOk(action);
+        dto.Should().ContainEquivalentOf(new HeatmapRowDto("Production", 1, 1, 0, 0));
+    }
+
+    [Fact]
     public async Task GetHeatmap_OwnerTeam_UsesTeamOwnerAndUnownedBucket()
     {
         var seed = await CanonicalSeed.PlantAsync(_dbContext, _tenantId);
