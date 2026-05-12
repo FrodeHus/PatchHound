@@ -45,6 +45,8 @@ import { Route as AuthedAdminMaintenanceRouteImport } from './routes/_authed/adm
 import { Route as AuthedAdminBusinessLabelsRouteImport } from './routes/_authed/admin/business-labels'
 import { Route as AuthedAdminAuthenticatedScansRouteImport } from './routes/_authed/admin/authenticated-scans'
 import { Route as AuthedAdminAdvancedToolsRouteImport } from './routes/_authed/admin/advanced-tools'
+import { Route as AuthedWorkbenchesTechnicalManagerIndexRouteImport } from './routes/_authed/workbenches/technical-manager/index'
+import { Route as AuthedWorkbenchesSecurityManagerIndexRouteImport } from './routes/_authed/workbenches/security-manager/index'
 import { Route as AuthedAssetsApplicationsIndexRouteImport } from './routes/_authed/assets/applications/index'
 import { Route as AuthedAdminWorkflowsIndexRouteImport } from './routes/_authed/admin/workflows/index'
 import { Route as AuthedAdminTenantsIndexRouteImport } from './routes/_authed/admin/tenants/index'
@@ -70,6 +72,8 @@ import { Route as AuthedAdminPlatformAdvancedToolsRouteImport } from './routes/_
 import { Route as AuthedAdminDeviceRulesNewRouteImport } from './routes/_authed/admin/device-rules/new'
 import { Route as AuthedAdminDeviceRulesIdRouteImport } from './routes/_authed/admin/device-rules/$id'
 import { Route as AuthedAdminPlatformAccessIndexRouteImport } from './routes/_authed/admin/platform/access/index'
+import { Route as AuthedWorkbenchesTechnicalManagerCasesCaseIdRouteImport } from './routes/_authed/workbenches/technical-manager/cases.$caseId'
+import { Route as AuthedWorkbenchesSecurityManagerCasesCaseIdRouteImport } from './routes/_authed/workbenches/security-manager/cases.$caseId'
 import { Route as AuthedWorkbenchesSecurityAnalystCasesCaseIdRouteImport } from './routes/_authed/workbenches/security-analyst/cases.$caseId'
 import { Route as AuthedWorkbenchesAssetOwnerCasesCaseIdRouteImport } from './routes/_authed/workbenches/asset-owner/cases.$caseId'
 import { Route as AuthedAdminPlatformSecurityProfilesNewRouteImport } from './routes/_authed/admin/platform/security-profiles.new'
@@ -263,6 +267,18 @@ const AuthedAdminAdvancedToolsRoute =
     path: '/admin/advanced-tools',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedWorkbenchesTechnicalManagerIndexRoute =
+  AuthedWorkbenchesTechnicalManagerIndexRouteImport.update({
+    id: '/workbenches/technical-manager/',
+    path: '/workbenches/technical-manager/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedWorkbenchesSecurityManagerIndexRoute =
+  AuthedWorkbenchesSecurityManagerIndexRouteImport.update({
+    id: '/workbenches/security-manager/',
+    path: '/workbenches/security-manager/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAssetsApplicationsIndexRoute =
   AuthedAssetsApplicationsIndexRouteImport.update({
     id: '/assets/applications/',
@@ -405,6 +421,18 @@ const AuthedAdminPlatformAccessIndexRoute =
     path: '/admin/platform/access/',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedWorkbenchesTechnicalManagerCasesCaseIdRoute =
+  AuthedWorkbenchesTechnicalManagerCasesCaseIdRouteImport.update({
+    id: '/workbenches/technical-manager/cases/$caseId',
+    path: '/workbenches/technical-manager/cases/$caseId',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedWorkbenchesSecurityManagerCasesCaseIdRoute =
+  AuthedWorkbenchesSecurityManagerCasesCaseIdRouteImport.update({
+    id: '/workbenches/security-manager/cases/$caseId',
+    path: '/workbenches/security-manager/cases/$caseId',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute =
   AuthedWorkbenchesSecurityAnalystCasesCaseIdRouteImport.update({
     id: '/workbenches/security-analyst/cases/$caseId',
@@ -496,11 +524,15 @@ export interface FileRoutesByFullPath {
   '/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
   '/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
   '/assets/applications/': typeof AuthedAssetsApplicationsIndexRoute
+  '/workbenches/security-manager/': typeof AuthedWorkbenchesSecurityManagerIndexRoute
+  '/workbenches/technical-manager/': typeof AuthedWorkbenchesTechnicalManagerIndexRoute
   '/admin/platform/access/$userId': typeof AuthedAdminPlatformAccessUserIdRoute
   '/admin/platform/security-profiles/$profileId': typeof AuthedAdminPlatformSecurityProfilesProfileIdRoute
   '/admin/platform/security-profiles/new': typeof AuthedAdminPlatformSecurityProfilesNewRoute
   '/workbenches/asset-owner/cases/$caseId': typeof AuthedWorkbenchesAssetOwnerCasesCaseIdRoute
   '/workbenches/security-analyst/cases/$caseId': typeof AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute
+  '/workbenches/security-manager/cases/$caseId': typeof AuthedWorkbenchesSecurityManagerCasesCaseIdRoute
+  '/workbenches/technical-manager/cases/$caseId': typeof AuthedWorkbenchesTechnicalManagerCasesCaseIdRoute
   '/admin/platform/access/': typeof AuthedAdminPlatformAccessIndexRoute
 }
 export interface FileRoutesByTo {
@@ -563,11 +595,15 @@ export interface FileRoutesByTo {
   '/admin/tenants': typeof AuthedAdminTenantsIndexRoute
   '/admin/workflows': typeof AuthedAdminWorkflowsIndexRoute
   '/assets/applications': typeof AuthedAssetsApplicationsIndexRoute
+  '/workbenches/security-manager': typeof AuthedWorkbenchesSecurityManagerIndexRoute
+  '/workbenches/technical-manager': typeof AuthedWorkbenchesTechnicalManagerIndexRoute
   '/admin/platform/access/$userId': typeof AuthedAdminPlatformAccessUserIdRoute
   '/admin/platform/security-profiles/$profileId': typeof AuthedAdminPlatformSecurityProfilesProfileIdRoute
   '/admin/platform/security-profiles/new': typeof AuthedAdminPlatformSecurityProfilesNewRoute
   '/workbenches/asset-owner/cases/$caseId': typeof AuthedWorkbenchesAssetOwnerCasesCaseIdRoute
   '/workbenches/security-analyst/cases/$caseId': typeof AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute
+  '/workbenches/security-manager/cases/$caseId': typeof AuthedWorkbenchesSecurityManagerCasesCaseIdRoute
+  '/workbenches/technical-manager/cases/$caseId': typeof AuthedWorkbenchesTechnicalManagerCasesCaseIdRoute
   '/admin/platform/access': typeof AuthedAdminPlatformAccessIndexRoute
 }
 export interface FileRoutesById {
@@ -632,11 +668,15 @@ export interface FileRoutesById {
   '/_authed/admin/tenants/': typeof AuthedAdminTenantsIndexRoute
   '/_authed/admin/workflows/': typeof AuthedAdminWorkflowsIndexRoute
   '/_authed/assets/applications/': typeof AuthedAssetsApplicationsIndexRoute
+  '/_authed/workbenches/security-manager/': typeof AuthedWorkbenchesSecurityManagerIndexRoute
+  '/_authed/workbenches/technical-manager/': typeof AuthedWorkbenchesTechnicalManagerIndexRoute
   '/_authed/admin/platform/access/$userId': typeof AuthedAdminPlatformAccessUserIdRoute
   '/_authed/admin/platform/security-profiles/$profileId': typeof AuthedAdminPlatformSecurityProfilesProfileIdRoute
   '/_authed/admin/platform/security-profiles/new': typeof AuthedAdminPlatformSecurityProfilesNewRoute
   '/_authed/workbenches/asset-owner/cases/$caseId': typeof AuthedWorkbenchesAssetOwnerCasesCaseIdRoute
   '/_authed/workbenches/security-analyst/cases/$caseId': typeof AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute
+  '/_authed/workbenches/security-manager/cases/$caseId': typeof AuthedWorkbenchesSecurityManagerCasesCaseIdRoute
+  '/_authed/workbenches/technical-manager/cases/$caseId': typeof AuthedWorkbenchesTechnicalManagerCasesCaseIdRoute
   '/_authed/admin/platform/access/': typeof AuthedAdminPlatformAccessIndexRoute
 }
 export interface FileRouteTypes {
@@ -701,11 +741,15 @@ export interface FileRouteTypes {
     | '/admin/tenants/'
     | '/admin/workflows/'
     | '/assets/applications/'
+    | '/workbenches/security-manager/'
+    | '/workbenches/technical-manager/'
     | '/admin/platform/access/$userId'
     | '/admin/platform/security-profiles/$profileId'
     | '/admin/platform/security-profiles/new'
     | '/workbenches/asset-owner/cases/$caseId'
     | '/workbenches/security-analyst/cases/$caseId'
+    | '/workbenches/security-manager/cases/$caseId'
+    | '/workbenches/technical-manager/cases/$caseId'
     | '/admin/platform/access/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -768,11 +812,15 @@ export interface FileRouteTypes {
     | '/admin/tenants'
     | '/admin/workflows'
     | '/assets/applications'
+    | '/workbenches/security-manager'
+    | '/workbenches/technical-manager'
     | '/admin/platform/access/$userId'
     | '/admin/platform/security-profiles/$profileId'
     | '/admin/platform/security-profiles/new'
     | '/workbenches/asset-owner/cases/$caseId'
     | '/workbenches/security-analyst/cases/$caseId'
+    | '/workbenches/security-manager/cases/$caseId'
+    | '/workbenches/technical-manager/cases/$caseId'
     | '/admin/platform/access'
   id:
     | '__root__'
@@ -836,11 +884,15 @@ export interface FileRouteTypes {
     | '/_authed/admin/tenants/'
     | '/_authed/admin/workflows/'
     | '/_authed/assets/applications/'
+    | '/_authed/workbenches/security-manager/'
+    | '/_authed/workbenches/technical-manager/'
     | '/_authed/admin/platform/access/$userId'
     | '/_authed/admin/platform/security-profiles/$profileId'
     | '/_authed/admin/platform/security-profiles/new'
     | '/_authed/workbenches/asset-owner/cases/$caseId'
     | '/_authed/workbenches/security-analyst/cases/$caseId'
+    | '/_authed/workbenches/security-manager/cases/$caseId'
+    | '/_authed/workbenches/technical-manager/cases/$caseId'
     | '/_authed/admin/platform/access/'
   fileRoutesById: FileRoutesById
 }
@@ -1110,6 +1162,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminAdvancedToolsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/workbenches/technical-manager/': {
+      id: '/_authed/workbenches/technical-manager/'
+      path: '/workbenches/technical-manager'
+      fullPath: '/workbenches/technical-manager/'
+      preLoaderRoute: typeof AuthedWorkbenchesTechnicalManagerIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/workbenches/security-manager/': {
+      id: '/_authed/workbenches/security-manager/'
+      path: '/workbenches/security-manager'
+      fullPath: '/workbenches/security-manager/'
+      preLoaderRoute: typeof AuthedWorkbenchesSecurityManagerIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/assets/applications/': {
       id: '/_authed/assets/applications/'
       path: '/assets/applications'
@@ -1285,6 +1351,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminPlatformAccessIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/workbenches/technical-manager/cases/$caseId': {
+      id: '/_authed/workbenches/technical-manager/cases/$caseId'
+      path: '/workbenches/technical-manager/cases/$caseId'
+      fullPath: '/workbenches/technical-manager/cases/$caseId'
+      preLoaderRoute: typeof AuthedWorkbenchesTechnicalManagerCasesCaseIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/workbenches/security-manager/cases/$caseId': {
+      id: '/_authed/workbenches/security-manager/cases/$caseId'
+      path: '/workbenches/security-manager/cases/$caseId'
+      fullPath: '/workbenches/security-manager/cases/$caseId'
+      preLoaderRoute: typeof AuthedWorkbenchesSecurityManagerCasesCaseIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/workbenches/security-analyst/cases/$caseId': {
       id: '/_authed/workbenches/security-analyst/cases/$caseId'
       path: '/workbenches/security-analyst/cases/$caseId'
@@ -1407,9 +1487,13 @@ interface AuthedRouteChildren {
   AuthedAdminTenantsIndexRoute: typeof AuthedAdminTenantsIndexRoute
   AuthedAdminWorkflowsIndexRoute: typeof AuthedAdminWorkflowsIndexRoute
   AuthedAssetsApplicationsIndexRoute: typeof AuthedAssetsApplicationsIndexRoute
+  AuthedWorkbenchesSecurityManagerIndexRoute: typeof AuthedWorkbenchesSecurityManagerIndexRoute
+  AuthedWorkbenchesTechnicalManagerIndexRoute: typeof AuthedWorkbenchesTechnicalManagerIndexRoute
   AuthedAdminPlatformAccessUserIdRoute: typeof AuthedAdminPlatformAccessUserIdRoute
   AuthedWorkbenchesAssetOwnerCasesCaseIdRoute: typeof AuthedWorkbenchesAssetOwnerCasesCaseIdRoute
   AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute: typeof AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute
+  AuthedWorkbenchesSecurityManagerCasesCaseIdRoute: typeof AuthedWorkbenchesSecurityManagerCasesCaseIdRoute
+  AuthedWorkbenchesTechnicalManagerCasesCaseIdRoute: typeof AuthedWorkbenchesTechnicalManagerCasesCaseIdRoute
   AuthedAdminPlatformAccessIndexRoute: typeof AuthedAdminPlatformAccessIndexRoute
 }
 
@@ -1465,11 +1549,19 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminTenantsIndexRoute: AuthedAdminTenantsIndexRoute,
   AuthedAdminWorkflowsIndexRoute: AuthedAdminWorkflowsIndexRoute,
   AuthedAssetsApplicationsIndexRoute: AuthedAssetsApplicationsIndexRoute,
+  AuthedWorkbenchesSecurityManagerIndexRoute:
+    AuthedWorkbenchesSecurityManagerIndexRoute,
+  AuthedWorkbenchesTechnicalManagerIndexRoute:
+    AuthedWorkbenchesTechnicalManagerIndexRoute,
   AuthedAdminPlatformAccessUserIdRoute: AuthedAdminPlatformAccessUserIdRoute,
   AuthedWorkbenchesAssetOwnerCasesCaseIdRoute:
     AuthedWorkbenchesAssetOwnerCasesCaseIdRoute,
   AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute:
     AuthedWorkbenchesSecurityAnalystCasesCaseIdRoute,
+  AuthedWorkbenchesSecurityManagerCasesCaseIdRoute:
+    AuthedWorkbenchesSecurityManagerCasesCaseIdRoute,
+  AuthedWorkbenchesTechnicalManagerCasesCaseIdRoute:
+    AuthedWorkbenchesTechnicalManagerCasesCaseIdRoute,
   AuthedAdminPlatformAccessIndexRoute: AuthedAdminPlatformAccessIndexRoute,
 }
 

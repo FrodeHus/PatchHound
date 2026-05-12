@@ -61,6 +61,7 @@ export const pagedDeviceListSchema = z.object({
 
 export const approvalTaskListItemSchema = z.object({
   id: z.string().uuid(),
+  remediationCaseId: z.string().uuid(),
   type: z.string(),
   status: z.string(),
   softwareName: z.string(),

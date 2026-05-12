@@ -2,6 +2,7 @@ namespace PatchHound.Api.Models.ApprovalTasks;
 
 public record ApprovalTaskListItemDto(
     Guid Id,
+    Guid RemediationCaseId,
     string Type,
     string Status,
     string SoftwareName,

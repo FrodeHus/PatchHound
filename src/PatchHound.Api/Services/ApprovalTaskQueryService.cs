@@ -101,6 +101,7 @@ public class ApprovalTaskQueryService(
 
             return new ApprovalTaskListItemDto(
                 t.Id,
+                t.RemediationDecision.RemediationCaseId,
                 t.Type.ToString(),
                 t.Status.ToString(),
                 softwareName ?? "Unknown software",

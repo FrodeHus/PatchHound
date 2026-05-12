@@ -61,6 +61,12 @@ export function MyTasksPage({ sections, onPageChange }: MyTasksPageProps) {
   )
 }
 
+function approvalWorkbenchRouteForOutcome(outcome: string | null) {
+  return outcome === 'ApprovedForPatching'
+    ? '/workbenches/technical-manager/cases/$caseId'
+    : '/workbenches/security-manager/cases/$caseId'
+}
+
 function BucketSection({
   bucket,
   data,
@@ -147,23 +153,19 @@ function BucketSection({
                     {formatSoftwareOwnerRoutingDetail(item.softwareOwnerTeamName, item.softwareOwnerAssignmentSource)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {bucket === 'recommendation' ? (
-                      <Link
-                        to="/workbenches/security-analyst/cases/$caseId"
-                        params={{ caseId: item.remediationCaseId }}
-                        className="inline-flex h-7 items-center justify-center rounded-lg bg-primary px-2.5 text-[0.8rem] font-medium text-primary-foreground transition-colors hover:bg-primary/80"
-                      >
-                        {meta.cta}
-                      </Link>
-                    ) : (
-                      <Link
-                        to="/workbenches/asset-owner/cases/$caseId"
-                        params={{ caseId: item.remediationCaseId }}
-                        className="inline-flex h-7 items-center justify-center rounded-lg bg-primary px-2.5 text-[0.8rem] font-medium text-primary-foreground transition-colors hover:bg-primary/80"
-                      >
-                        {meta.cta}
-                      </Link>
-                    )}
+                    <Link
+                      to={
+                        bucket === 'recommendation'
+                          ? '/workbenches/security-analyst/cases/$caseId'
+                          : bucket === 'approval'
+                            ? approvalWorkbenchRouteForOutcome(item.outcome)
+                            : '/workbenches/asset-owner/cases/$caseId'
+                      }
+                      params={{ caseId: item.remediationCaseId }}
+                      className="inline-flex h-7 items-center justify-center rounded-lg bg-primary px-2.5 text-[0.8rem] font-medium text-primary-foreground transition-colors hover:bg-primary/80"
+                    >
+                      {meta.cta}
+                    </Link>
                   </td>
                 </tr>
               ))
