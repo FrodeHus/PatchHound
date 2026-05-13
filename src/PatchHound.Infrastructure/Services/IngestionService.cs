@@ -250,22 +250,22 @@ public class IngestionService
 
                         var assetStagingCompleted = await IsCheckpointCompletedAsync(
                             run.Id,
-                            "asset-staging",
+                            CheckpointPhases.AssetStaging,
                             ct
                         );
                         var assetMergeCompleted = await IsCheckpointCompletedAsync(
                             run.Id,
-                            "asset-merge",
+                            CheckpointPhases.AssetMerge,
                             ct
                         );
                         var vulnerabilityStagingCompleted = await IsCheckpointCompletedAsync(
                             run.Id,
-                            "vulnerability-staging",
+                            CheckpointPhases.VulnerabilityStaging,
                             ct
                         );
                         var vulnerabilityMergeCompleted = await IsCheckpointCompletedAsync(
                             run.Id,
-                            "vulnerability-merge",
+                            CheckpointPhases.VulnerabilityMerge,
                             ct
                         );
 
@@ -336,11 +336,11 @@ public class IngestionService
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
-                                "asset-merge",
+                                CheckpointPhases.AssetMerge,
                                 assetBatchSummary.BatchNumber,
                                 null,
                                 assetMergeSummary.MergedAssetCount,
-                                "Completed",
+                                CheckpointStatuses.Completed,
                                 ct
                             );
                             assetStagingCompleted = true;
@@ -393,11 +393,11 @@ public class IngestionService
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
-                                "asset-staging",
+                                CheckpointPhases.AssetStaging,
                                 0,
                                 null,
                                 normalizedAssetSnapshot.Assets.Count + normalizedAssetSnapshot.DeviceSoftwareLinks.Count,
-                                "Staged",
+                                CheckpointStatuses.Staged,
                                 ct
                             );
                             await UpdateActiveRunStatusAsync(
@@ -432,11 +432,11 @@ public class IngestionService
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
-                                "asset-merge",
+                                CheckpointPhases.AssetMerge,
                                 0,
                                 null,
                                 assetMergeSummary.MergedAssetCount,
-                                "Completed",
+                                CheckpointStatuses.Completed,
                                 ct
                             );
                             assetStagingCompleted = true;
@@ -499,18 +499,18 @@ public class IngestionService
                             );
                             var assetMergeBatchNumber = await GetCheckpointBatchNumberAsync(
                                 run.Id,
-                                "asset-staging",
+                                CheckpointPhases.AssetStaging,
                                 ct
                             );
                             await CommitCheckpointAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
-                                "asset-merge",
+                                CheckpointPhases.AssetMerge,
                                 assetMergeBatchNumber,
                                 null,
                                 assetMergeSummary.MergedAssetCount,
-                                "Completed",
+                                CheckpointStatuses.Completed,
                                 ct
                             );
                             assetMergeCompleted = true;
@@ -609,11 +609,11 @@ public class IngestionService
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
-                                "vulnerability-staging",
+                                CheckpointPhases.VulnerabilityStaging,
                                 0,
                                 null,
                                 normalizedResults.Count,
-                                "Staged",
+                                CheckpointStatuses.Staged,
                                 ct
                             );
                             vulnerabilityStagingCompleted = true;
@@ -659,18 +659,18 @@ public class IngestionService
                             );
                             var vulnerabilityMergeBatchNumber = await GetCheckpointBatchNumberAsync(
                                 run.Id,
-                                "vulnerability-staging",
+                                CheckpointPhases.VulnerabilityStaging,
                                 ct
                             );
                             await CommitCheckpointAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
-                                "vulnerability-merge",
+                                CheckpointPhases.VulnerabilityMerge,
                                 vulnerabilityMergeBatchNumber,
                                 null,
                                 vulnerabilityMergeSummary.MergedExposureCount,
-                                "Completed",
+                                CheckpointStatuses.Completed,
                                 ct
                             );
                             vulnerabilityMergeCompleted = true;
@@ -1797,7 +1797,7 @@ public class IngestionService
                 item =>
                     item.IngestionRunId == ingestionRunId
                     && item.Phase == phase
-                    && item.Status == "Completed",
+                    && item.Status == CheckpointStatuses.Completed,
                 ct
             );
     }
@@ -1924,7 +1924,7 @@ public class IngestionService
             .FirstOrDefaultAsync(
                 item =>
                     item.IngestionRunId == ingestionRunId
-                    && item.Phase == "vulnerability-staging",
+                    && item.Phase == CheckpointPhases.VulnerabilityStaging,
                 ct
             );
         var batchNumber = checkpoint?.BatchNumber ?? 0;
@@ -1959,11 +1959,11 @@ public class IngestionService
                     ingestionRunId,
                     tenantId,
                     sourceKey,
-                    "vulnerability-staging",
+                    CheckpointPhases.VulnerabilityStaging,
                     batchNumber,
                     batch.NextCursorJson,
                     normalizedResults.Count,
-                    batch.IsComplete ? "Completed" : "Running",
+                    batch.IsComplete ? CheckpointStatuses.Completed : CheckpointStatuses.Running,
                     ct
                 );
             }
@@ -1973,11 +1973,11 @@ public class IngestionService
                     ingestionRunId,
                     tenantId,
                     sourceKey,
-                    "vulnerability-staging",
+                    CheckpointPhases.VulnerabilityStaging,
                     batchNumber,
                     batch.NextCursorJson,
                     0,
-                    batch.IsComplete ? "Completed" : "Running",
+                    batch.IsComplete ? CheckpointStatuses.Completed : CheckpointStatuses.Running,
                     ct
                 );
             }
@@ -2422,11 +2422,11 @@ public class IngestionService
             run.Id,
             tenantId,
             run.SourceKey,
-            "asset-staging",
+            CheckpointPhases.AssetStaging,
             0,
             null,
             normalizedSnapshot.Assets.Count + normalizedSnapshot.DeviceSoftwareLinks.Count,
-            "Staged",
+            CheckpointStatuses.Staged,
             ct
         );
         await ProcessStagedAssetsAsync(run.Id, tenantId, run.SourceKey, null, ct);
@@ -2434,11 +2434,11 @@ public class IngestionService
             run.Id,
             tenantId,
             run.SourceKey,
-            "asset-merge",
+            CheckpointPhases.AssetMerge,
             0,
             null,
             normalizedSnapshot.Assets.Count + normalizedSnapshot.DeviceSoftwareLinks.Count,
-            "Completed",
+            CheckpointStatuses.Completed,
             ct
         );
     }
@@ -2457,7 +2457,7 @@ public class IngestionService
                 item.IngestionRunId == ingestionRunId
                 && item.TenantId == tenantId
                 && item.SourceKey == sourceKey
-                && item.Phase == "asset-staging",
+                && item.Phase == CheckpointPhases.AssetStaging,
                 ct
             );
 
@@ -2505,11 +2505,11 @@ public class IngestionService
                     ingestionRunId,
                     tenantId,
                     sourceKey,
-                    "asset-staging",
+                    CheckpointPhases.AssetStaging,
                     batchNumber,
                     batch.NextCursorJson,
                     normalizedBatch.Assets.Count + normalizedBatch.DeviceSoftwareLinks.Count,
-                    batch.IsComplete ? "Completed" : "Running",
+                    batch.IsComplete ? CheckpointStatuses.Completed : CheckpointStatuses.Running,
                     ct
                 );
             }
@@ -2519,11 +2519,11 @@ public class IngestionService
                     ingestionRunId,
                     tenantId,
                     sourceKey,
-                    "asset-staging",
+                    CheckpointPhases.AssetStaging,
                     batchNumber,
                     batch.NextCursorJson,
                     0,
-                    "Completed",
+                    CheckpointStatuses.Completed,
                     ct
                 );
             }
