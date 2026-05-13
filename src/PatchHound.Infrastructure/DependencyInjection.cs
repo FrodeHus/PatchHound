@@ -246,6 +246,7 @@ public static class DependencyInjection
             sp.GetService<NormalizedSoftwareProjectionService>(),
             sp.GetService<RemediationDecisionService>(),
             sp.GetService<VulnerabilityAssessmentJobService>(),
+            sp.GetService<INotificationService>(),
             sp.GetRequiredService<IngestionLeaseManager>(),
             sp.GetRequiredService<IngestionCheckpointWriter>(),
             sp.GetRequiredService<IngestionStagingPipeline>(),

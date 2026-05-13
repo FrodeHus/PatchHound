@@ -33,6 +33,7 @@ public class IngestionService
     private readonly NormalizedSoftwareProjectionService? _normalizedSoftwareProjectionService;
     private readonly RemediationDecisionService? _remediationDecisionService;
     private readonly VulnerabilityAssessmentJobService? _vulnerabilityAssessmentJobService;
+    private readonly INotificationService? _notificationService;
     private readonly IngestionLeaseManager _leaseManager;
     private readonly IngestionCheckpointWriter _checkpointWriter;
     private readonly IngestionStagingPipeline _stagingPipeline;
@@ -56,6 +57,7 @@ public class IngestionService
         NormalizedSoftwareProjectionService? normalizedSoftwareProjectionService,
         RemediationDecisionService? remediationDecisionService,
         VulnerabilityAssessmentJobService? vulnerabilityAssessmentJobService,
+        INotificationService? notificationService,
         IngestionLeaseManager leaseManager,
         IngestionCheckpointWriter checkpointWriter,
         IngestionStagingPipeline stagingPipeline,
@@ -78,6 +80,7 @@ public class IngestionService
         _normalizedSoftwareProjectionService = normalizedSoftwareProjectionService;
         _remediationDecisionService = remediationDecisionService;
         _vulnerabilityAssessmentJobService = vulnerabilityAssessmentJobService;
+        _notificationService = notificationService;
         _leaseManager = leaseManager;
         _checkpointWriter = checkpointWriter;
         _stagingPipeline = stagingPipeline;
@@ -1293,6 +1296,72 @@ public class IngestionService
         }
 
         await _dbContext.SaveChangesAsync(ct);
+
+        if (_notificationService is not null)
+            await SendLateDiscoveryNotificationsAsync(tenantId, criticalVulnIds, ct);
+    }
+
+    private async Task SendLateDiscoveryNotificationsAsync(
+        Guid tenantId,
+        List<Guid> criticalVulnIds,
+        CancellationToken ct)
+    {
+        var emergencyAssessments = await _dbContext.VulnerabilityPatchAssessments
+            .AsNoTracking()
+            .Where(a => criticalVulnIds.Contains(a.VulnerabilityId) && a.UrgencyTier == "emergency")
+            .Join(_dbContext.Vulnerabilities.AsNoTracking(),
+                a => a.VulnerabilityId,
+                v => v.Id,
+                (a, v) => new { a.VulnerabilityId, v.ExternalId, a.Confidence, a.UrgencyTargetSla })
+            .ToListAsync(ct);
+
+        if (emergencyAssessments.Count == 0)
+            return;
+
+        var managerUserIds = await _dbContext.UserTenantRoles
+            .Where(utr => utr.TenantId == tenantId
+                && (utr.Role == RoleName.SecurityManager || utr.Role == RoleName.TechnicalManager))
+            .Select(utr => utr.UserId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        if (managerUserIds.Count == 0)
+            return;
+
+        var emergencyVulnIds = emergencyAssessments.Select(e => e.VulnerabilityId).ToList();
+
+        var alreadyNotifiedPairs = await _dbContext.Notifications
+            .Where(n => n.Type == NotificationType.NewCriticalVuln
+                     && n.RelatedEntityId != null
+                     && emergencyVulnIds.Contains(n.RelatedEntityId.Value)
+                     && managerUserIds.Contains(n.UserId))
+            .Select(n => new { n.UserId, VulnerabilityId = n.RelatedEntityId!.Value })
+            .ToListAsync(ct);
+
+        var notifiedSet = alreadyNotifiedPairs
+            .Select(p => (p.UserId, p.VulnerabilityId))
+            .ToHashSet();
+
+        foreach (var assessment in emergencyAssessments)
+        {
+            foreach (var userId in managerUserIds)
+            {
+                if (notifiedSet.Contains((userId, assessment.VulnerabilityId)))
+                    continue;
+
+                await _notificationService!.SendAsync(
+                    userId,
+                    tenantId,
+                    NotificationType.NewCriticalVuln,
+                    $"Emergency patch required: {assessment.ExternalId}",
+                    $"{assessment.ExternalId} requires emergency patching. " +
+                    $"Confidence: {assessment.Confidence}. " +
+                    $"Target SLA: {assessment.UrgencyTargetSla}.",
+                    "Vulnerability",
+                    assessment.VulnerabilityId,
+                    ct);
+            }
+        }
     }
 
     private static string DescribeConcurrencyEntries(DbUpdateConcurrencyException ex)
