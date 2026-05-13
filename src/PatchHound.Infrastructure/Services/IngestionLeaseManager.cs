@@ -304,10 +304,7 @@ public class IngestionLeaseManager
             ct
         );
 
-        if (succeeded)
-        {
-            await _bulkWriter.ClearStagedDataForRunAsync(runId, ct);
-        }
+        await _bulkWriter.ClearStagedDataForRunAsync(runId, ct);
 
         var cleanupSummary = await CleanupExpiredIngestionArtifactsAsync(completedAt, ct);
         if (cleanupSummary.PrunedRunCount > 0)

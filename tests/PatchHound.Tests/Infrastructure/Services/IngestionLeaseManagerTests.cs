@@ -1,6 +1,8 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using PatchHound.Core.Entities;
+using PatchHound.Core.Enums;
 using PatchHound.Infrastructure.Services;
 using PatchHound.Tests.Infrastructure;
 
@@ -50,5 +52,44 @@ public class IngestionLeaseManagerTests : IAsyncDisposable
 
         var second = await sut.TryAcquireIngestionRunAsync(_tenantId, "defender", CancellationToken.None);
         second.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CompleteIngestionRunAsync_OnFailure_ClearsStagedData()
+    {
+        // Arrange: acquire a lease and add a staged device for the run
+        var sut = CreateSut();
+        var acquired = await sut.TryAcquireIngestionRunAsync(_tenantId, "defender", CancellationToken.None);
+        acquired.Should().NotBeNull();
+
+        _db.StagedDevices.Add(StagedDevice.Create(
+            ingestionRunId: acquired!.Run.Id,
+            tenantId: _tenantId,
+            sourceKey: "defender",
+            externalId: "device-001",
+            name: "Device 001",
+            assetType: AssetType.Device,
+            payloadJson: "{}",
+            stagedAt: DateTimeOffset.UtcNow
+        ));
+        await _db.SaveChangesAsync();
+
+        // Act: complete as failure
+        await sut.CompleteIngestionRunAsync(
+            runId: acquired.Run.Id,
+            tenantId: _tenantId,
+            sourceKey: "defender",
+            succeeded: false,
+            error: "test failure",
+            vulnerabilityMergeSummary: new StagedVulnerabilityMergeSummary(0, 0, 0, 0, 0, 0),
+            assetMergeSummary: new StagedAssetMergeSummary(0, 0, 0, 0, 0),
+            deactivatedMachineCount: 0,
+            failureStatus: null,
+            ct: CancellationToken.None);
+
+        // Assert: staged device was cleaned up
+        var remaining = await _db.StagedDevices.IgnoreQueryFilters()
+            .Where(d => d.IngestionRunId == acquired.Run.Id).CountAsync();
+        remaining.Should().Be(0, "failed runs should also clear staged data");
     }
 }
