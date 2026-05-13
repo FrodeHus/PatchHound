@@ -97,7 +97,16 @@ public class IngestionService
         await _dbContext.SaveChangesAsync(ct);
         await new RemediationCaseService(_dbContext).EnsureCasesForOpenExposuresAsync(tenantId, ct);
         if (_vulnerabilityAssessmentJobService is not null)
-            await EnqueueAssessmentJobsForCriticalExposuresAsync(tenantId, ct);
+        {
+            try
+            {
+                await EnqueueAssessmentJobsForCriticalExposuresAsync(tenantId, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to enqueue vulnerability assessment jobs for tenant {TenantId}; ingestion will continue", tenantId);
+            }
+        }
     }
 
     public async Task<bool> RunIngestionAsync(Guid tenantId, CancellationToken ct)
@@ -1248,8 +1257,42 @@ public class IngestionService
             .Distinct()
             .ToListAsync(ct);
 
+        if (criticalVulnIds.Count == 0)
+            return;
+
+        var assessedVulnIds = await _dbContext.VulnerabilityPatchAssessments
+            .Where(a => criticalVulnIds.Contains(a.VulnerabilityId))
+            .Select(a => a.VulnerabilityId)
+            .ToHashSetAsync(ct);
+
+        var existingJobs = await _dbContext.VulnerabilityAssessmentJobs
+            .Where(j => criticalVulnIds.Contains(j.VulnerabilityId))
+            .ToListAsync(ct);
+        var existingJobsByVulnId = existingJobs.ToDictionary(j => j.VulnerabilityId);
+
+        var now = DateTimeOffset.UtcNow;
         foreach (var vulnId in criticalVulnIds)
-            await _vulnerabilityAssessmentJobService!.EnqueueCriticalAsync(tenantId, vulnId, ct);
+        {
+            if (assessedVulnIds.Contains(vulnId))
+                continue;
+
+            if (existingJobsByVulnId.TryGetValue(vulnId, out var existingJob))
+            {
+                if (existingJob.Status is VulnerabilityAssessmentJobStatus.Pending
+                    or VulnerabilityAssessmentJobStatus.Running
+                    or VulnerabilityAssessmentJobStatus.Succeeded)
+                    continue;
+
+                existingJob.Reset(tenantId, now);
+            }
+            else
+            {
+                _dbContext.VulnerabilityAssessmentJobs.Add(
+                    VulnerabilityAssessmentJob.Create(vulnId, tenantId, now));
+            }
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     private static string DescribeConcurrencyEntries(DbUpdateConcurrencyException ex)
