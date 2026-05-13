@@ -176,13 +176,14 @@ export function SoftwareRemediationView({
   async function handleRequestAssessment() {
     if (!data?.topVulnerabilities[0]?.vulnerabilityId) return
     setRequestingAssessment(true)
+    setStageError(null)
     try {
       await requestVulnerabilityAssessment({
         data: { vulnerabilityId: data.topVulnerabilities[0].vulnerabilityId }
       })
-      await queryClient.invalidateQueries({ queryKey: ['decision-context', caseId] })
+      await queryClient.invalidateQueries({ queryKey })
     } catch (err) {
-      console.error('Failed to request assessment', err)
+      setStageError(getApiErrorMessage(err, 'Failed to request assessment.'))
     } finally {
       setRequestingAssessment(false)
     }
