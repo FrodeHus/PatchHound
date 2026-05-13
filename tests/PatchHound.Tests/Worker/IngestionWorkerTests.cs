@@ -22,7 +22,8 @@ public class IngestionWorkerTests
             SyncSchedule: "0 * * * *",
             StoredCredentialId: Guid.NewGuid(),
             ManualRequestedAt: DateTimeOffset.UtcNow,
-            LastStartedAt: null
+            LastStartedAt: null,
+            LastCompletedAt: null
         );
 
         IngestionWorker.HasConfiguredCredentials(source).Should().BeTrue();

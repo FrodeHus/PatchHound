@@ -338,6 +338,52 @@ public class StagedDeviceMergeServiceTests : IAsyncLifetime
         afterReactivation.ActiveInTenant.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task MergeAsync_MultipleStagedDevices_AllMergedCorrectly()
+    {
+        // Arrange: stage 3 devices (no software links)
+        var runId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+
+        await SeedStagedDeviceAsync(
+            runId: runId,
+            tenantId: tenantId,
+            deviceExternalId: "multi-dev-001",
+            deviceName: "host-001",
+            healthStatus: "Active",
+            lastSeenAt: DateTimeOffset.UtcNow.AddMinutes(-5)
+        );
+        await SeedStagedDeviceAsync(
+            runId: runId,
+            tenantId: tenantId,
+            deviceExternalId: "multi-dev-002",
+            deviceName: "host-002",
+            healthStatus: "Active",
+            lastSeenAt: DateTimeOffset.UtcNow.AddMinutes(-5)
+        );
+        await SeedStagedDeviceAsync(
+            runId: runId,
+            tenantId: tenantId,
+            deviceExternalId: "multi-dev-003",
+            deviceName: "host-003",
+            healthStatus: "Active",
+            lastSeenAt: DateTimeOffset.UtcNow.AddMinutes(-5)
+        );
+
+        // Act
+        var summary = await _sut.MergeAsync(runId, tenantId, CancellationToken.None);
+
+        // Assert: 3 Device rows created in DB
+        summary.DevicesCreated.Should().Be(3);
+        summary.DevicesTouched.Should().Be(0);
+
+        var devices = await _db.Devices.IgnoreQueryFilters().ToListAsync();
+        devices.Should().HaveCount(3);
+        devices.Select(d => d.ExternalId).Should().BeEquivalentTo(
+            new[] { "multi-dev-001", "multi-dev-002", "multi-dev-003" });
+        devices.Should().OnlyContain(d => d.TenantId == tenantId);
+    }
+
     private async Task SeedStagedDeviceAsync(
         Guid runId,
         Guid tenantId,

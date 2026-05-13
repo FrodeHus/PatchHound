@@ -86,7 +86,7 @@ public class BackendEndToEndTests : IAsyncLifetime
         var stagedDeviceMerge = new StagedDeviceMergeService(_db, deviceResolver, softwareResolver);
         var projectionService = new NormalizedSoftwareProjectionService(_db);
         var validator = new AuthenticatedScanOutputValidator();
-        var ingestionService = new AuthenticatedScanIngestionService(_db, validator, stagedDeviceMerge, projectionService);
+        var ingestionService = new AuthenticatedScanIngestionService(_db, validator, stagedDeviceMerge, projectionService, new InMemoryIngestionBulkWriter(_db));
 
         await ingestionService.ProcessJobResultAsync(job.Id, rawOutput, "", CancellationToken.None);
 
@@ -98,10 +98,10 @@ public class BackendEndToEndTests : IAsyncLifetime
         // Assert: result stored
         Assert.True(await _db.ScanJobResults.AnyAsync(r => r.ScanJobId == job.Id));
 
-        // Assert: software staged rows created via ingestion pipeline
-        var stagedSoftware = await _db.StagedDevices
+        // Assert: staged rows are cleaned up after merge (no orphaned staging rows)
+        var stagedSoftware = await _db.StagedDevices.IgnoreQueryFilters()
             .Where(s => s.TenantId == _tenantId && s.AssetType == AssetType.Software && s.SourceKey == "authenticated-scan")
             .ToListAsync();
-        Assert.Equal(2, stagedSoftware.Count);
+        Assert.Empty(stagedSoftware);
     }
 }

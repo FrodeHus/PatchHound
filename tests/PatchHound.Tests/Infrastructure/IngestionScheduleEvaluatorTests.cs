@@ -56,4 +56,19 @@ public class IngestionScheduleEvaluatorTests
 
         due.Should().BeFalse();
     }
+
+    [Fact]
+    public void IsDue_WhenLastStartedAfterLastCompleted_ReturnsFalse()
+    {
+        // lastStartedAt > lastCompletedAt means a run is currently in progress
+        var now = DateTimeOffset.UtcNow;
+        var result = IngestionScheduleEvaluator.IsDue(
+            sourceKey: "microsoft-defender",
+            enabled: true,
+            syncSchedule: "0 */12 * * *", // every 12 hours
+            lastStartedAt: now.AddMinutes(-1),   // started 1 min ago
+            lastCompletedAt: now.AddHours(-13),  // completed 13 hours ago (before the new start)
+            nowUtc: now);
+        result.Should().BeFalse("a run is currently in progress");
+    }
 }

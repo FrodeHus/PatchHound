@@ -1,6 +1,6 @@
 namespace PatchHound.Infrastructure.Services;
 
-public class IngestionTerminalException : Exception
+public sealed class IngestionTerminalException : Exception
 {
     public IngestionTerminalException(string message)
         : base(message) { }

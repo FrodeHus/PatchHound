@@ -1,6 +1,6 @@
-using Cronos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using PatchHound.Core.Entities;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
 using PatchHound.Infrastructure.Secrets;
@@ -64,14 +64,20 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
             }
 
             var isManualSync = IsManualSyncQueued(source);
-            var isDue = IsDue(source, now);
+            var isDue = IngestionScheduleEvaluator.IsDue(
+                source.SourceKey,
+                source.Enabled,
+                source.SyncSchedule,
+                source.LastStartedAt,
+                source.LastCompletedAt,
+                now);
 
             if (source.Enabled && HasConfiguredCredentials(source))
             {
                 runnableSources++;
             }
 
-            if (!isManualSync && !isDue)
+            if (!isManualSync && (!isDue || !HasConfiguredCredentials(source)))
             {
                 continue;
             }
@@ -147,6 +153,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
                 source.StoredCredentialId,
                 source.ManualRequestedAt,
                 source.LastStartedAt,
+                source.LastCompletedAt,
                 source.LinkedSourceKey
             ))
             .ToList();
@@ -165,7 +172,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
                     setters
                         .SetProperty(item => item.ManualRequestedAt, (DateTimeOffset?)null)
                         .SetProperty(item => item.LastCompletedAt, DateTimeOffset.UtcNow)
-                        .SetProperty(item => item.LastStatus, "Failed")
+                        .SetProperty(item => item.LastStatus, IngestionRunStatuses.FailedRecoverable)
                         .SetProperty(
                             item => item.LastError,
                             "Manual sync skipped because the source is disabled or credentials are incomplete."
@@ -247,38 +254,6 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
     private static bool SupportsManualSync(ScheduledSource source) =>
         TenantSourceCatalog.SupportsManualSync(source.SourceKey);
 
-    private static bool IsDue(ScheduledSource source, DateTimeOffset nowUtc)
-    {
-        if (!source.Enabled || !SupportsManualSync(source) || !HasConfiguredCredentials(source))
-        {
-            return false;
-        }
-
-        CronExpression expression;
-        try
-        {
-            expression = CronExpression.Parse(source.SyncSchedule, CronFormat.Standard);
-        }
-        catch (CronFormatException)
-        {
-            return false;
-        }
-
-        var lastStartedAt = source.LastStartedAt?.ToUniversalTime();
-        if (!lastStartedAt.HasValue)
-        {
-            var firstOccurrence = expression.GetNextOccurrence(
-                nowUtc.UtcDateTime.AddYears(-1),
-                true
-            );
-            return firstOccurrence.HasValue && firstOccurrence.Value <= nowUtc.UtcDateTime;
-        }
-
-        var nextOccurrence = expression.GetNextOccurrence(lastStartedAt.Value.UtcDateTime, false);
-
-        return nextOccurrence.HasValue && nextOccurrence.Value <= nowUtc.UtcDateTime;
-    }
-
     internal sealed record ScheduledSource(
         Guid Id,
         Guid TenantId,
@@ -294,6 +269,7 @@ public class IngestionWorker(IServiceScopeFactory scopeFactory, ILogger<Ingestio
         Guid? StoredCredentialId,
         DateTimeOffset? ManualRequestedAt,
         DateTimeOffset? LastStartedAt,
+        DateTimeOffset? LastCompletedAt,
         string? LinkedSourceKey = null
     );
 }

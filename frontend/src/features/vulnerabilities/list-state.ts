@@ -45,7 +45,7 @@ export const vulnerabilityQueryKeys = {
     search.knownExploitedOnly,
     search.activeAlertOnly,
     search.presentOnly,
-    search.remediationCaseIds,
+    ...(search.remediationCaseIds ? [search.remediationCaseIds] : []),
     search.page,
     search.pageSize,
   ] as const,

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PatchHound.Core.Entities;
@@ -133,7 +134,14 @@ public static class DependencyInjection
         services.AddScoped<AdvancedToolExecutionService>();
         services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ConnectionProfileSecretWriter>();
         services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.AuthenticatedScanOutputValidator>();
-        services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.AuthenticatedScanIngestionService>();
+        services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.AuthenticatedScanIngestionService>(sp =>
+            new PatchHound.Infrastructure.AuthenticatedScans.AuthenticatedScanIngestionService(
+                sp.GetRequiredService<PatchHoundDbContext>(),
+                sp.GetRequiredService<PatchHound.Infrastructure.AuthenticatedScans.AuthenticatedScanOutputValidator>(),
+                sp.GetRequiredService<IStagedDeviceMergeService>(),
+                sp.GetRequiredService<NormalizedSoftwareProjectionService>(),
+                sp.GetRequiredService<IIngestionBulkWriter>()
+            ));
         services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ScanJobDispatcher>();
         services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ScanRunCompletionService>();
         services.AddScoped<PatchHound.Infrastructure.AuthenticatedScans.ScanSchedulerTickHandler>();
@@ -205,7 +213,45 @@ public static class DependencyInjection
         services.AddScoped<IStagedCloudApplicationMergeService, StagedCloudApplicationMergeService>();
 
         // Ingestion
-        services.AddScoped<IngestionService>();
+        services.AddScoped<IIngestionBulkWriter>(sp =>
+        {
+            var db = sp.GetRequiredService<PatchHoundDbContext>();
+            return db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory"
+                ? new InMemoryIngestionBulkWriter(db)
+                : (IIngestionBulkWriter)new PostgresIngestionBulkWriter(db);
+        });
+        services.AddScoped<IngestionLeaseManager>(sp => new IngestionLeaseManager(
+            sp.GetRequiredService<PatchHoundDbContext>(),
+            sp.GetRequiredService<IIngestionBulkWriter>(),
+            sp.GetRequiredService<ILogger<IngestionLeaseManager>>()
+        ));
+        services.AddScoped<IngestionCheckpointWriter>();
+        services.AddScoped<IngestionStagingPipeline>();
+        services.AddScoped<IngestionSnapshotLifecycle>(sp => new IngestionSnapshotLifecycle(
+            sp.GetRequiredService<PatchHoundDbContext>(),
+            sp.GetRequiredService<IIngestionBulkWriter>()
+        ));
+        services.AddScoped<IngestionService>(sp => new IngestionService(
+            sp.GetRequiredService<PatchHoundDbContext>(),
+            sp.GetRequiredService<IEnumerable<IIngestionSource>>(),
+            sp.GetRequiredService<EnrichmentJobEnqueuer>(),
+            sp.GetRequiredService<IStagedDeviceMergeService>(),
+            sp.GetRequiredService<IStagedCloudApplicationMergeService>(),
+            sp.GetRequiredService<IDeviceRuleEvaluationService>(),
+            sp.GetRequiredService<ExposureDerivationService>(),
+            sp.GetRequiredService<ExposureEpisodeService>(),
+            sp.GetRequiredService<ExposureAssessmentService>(),
+            sp.GetRequiredService<RiskScoreService>(),
+            sp.GetRequiredService<VulnerabilityResolver>(),
+            sp.GetService<NormalizedSoftwareProjectionService>(),
+            sp.GetService<RemediationDecisionService>(),
+            sp.GetRequiredService<IngestionLeaseManager>(),
+            sp.GetRequiredService<IngestionCheckpointWriter>(),
+            sp.GetRequiredService<IngestionStagingPipeline>(),
+            sp.GetRequiredService<IngestionSnapshotLifecycle>(),
+            sp.GetRequiredService<IIngestionBulkWriter>(),
+            sp.GetRequiredService<ILogger<IngestionService>>()
+        ));
 
         // Event Pusher (pushes events to TanStack Start SSE endpoint)
         services.AddHttpClient<IEventPusher, HttpEventPusher>();

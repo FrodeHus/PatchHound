@@ -61,6 +61,11 @@ public class IngestionServicePhase3Tests
             new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance),
             normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
+            new IngestionLeaseManager(db, new InMemoryIngestionBulkWriter(db), NullLogger<IngestionLeaseManager>.Instance),
+            new IngestionCheckpointWriter(db),
+            new IngestionStagingPipeline(db, new EnrichmentJobEnqueuer(db, NullLogger<EnrichmentJobEnqueuer>.Instance), new IngestionLeaseManager(db, new InMemoryIngestionBulkWriter(db), NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(db)),
+            new IngestionSnapshotLifecycle(db, new InMemoryIngestionBulkWriter(db)),
+            new InMemoryIngestionBulkWriter(db),
             NullLogger<IngestionService>.Instance);
 
         await ingestion.RunExposureDerivationAsync(tenantId, CancellationToken.None);
@@ -343,6 +348,13 @@ public class IngestionServicePhase3Tests
             new ExposureAssessmentService(db, new EnvironmentalSeverityCalculator()),
             new RiskScoreService(db, NullLogger<RiskScoreService>.Instance),
             new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance),
+            normalizedSoftwareProjectionService: null,
+            remediationDecisionService: null,
+            new IngestionLeaseManager(db, new InMemoryIngestionBulkWriter(db), NullLogger<IngestionLeaseManager>.Instance),
+            new IngestionCheckpointWriter(db),
+            new IngestionStagingPipeline(db, new EnrichmentJobEnqueuer(db, NullLogger<EnrichmentJobEnqueuer>.Instance), new IngestionLeaseManager(db, new InMemoryIngestionBulkWriter(db), NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(db)),
+            new IngestionSnapshotLifecycle(db, new InMemoryIngestionBulkWriter(db)),
+            new InMemoryIngestionBulkWriter(db),
             NullLogger<IngestionService>.Instance);
 
     private static async Task<PatchHoundDbContext> CreateTenantDbAsync(Guid tenantId)
