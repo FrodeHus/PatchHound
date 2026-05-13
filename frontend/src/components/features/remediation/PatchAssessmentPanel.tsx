@@ -108,6 +108,18 @@ export function PatchAssessmentPanel({ assessment, canRequest, onRequest, reques
                 </div>
               )}
 
+              {assessment.similarVulnerabilities &&
+                assessment.similarVulnerabilities !== '[]' && (
+                <div>
+                  <div className="font-medium mb-1">Similar Vulnerabilities</div>
+                  <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                    {tryParseArray(assessment.similarVulnerabilities).map((v, i) => (
+                      <li key={i}>{typeof v === 'string' ? v : JSON.stringify(v)}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {assessment.compensatingControlsUntilPatched &&
                 assessment.compensatingControlsUntilPatched !== '[]' && (
                 <div>
