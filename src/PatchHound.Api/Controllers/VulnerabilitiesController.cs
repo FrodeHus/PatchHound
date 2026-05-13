@@ -9,6 +9,7 @@ using PatchHound.Core.Entities;
 using PatchHound.Core.Enums;
 using PatchHound.Core.Interfaces;
 using PatchHound.Infrastructure.Data;
+using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Api.Controllers;
 
@@ -20,16 +21,19 @@ public class VulnerabilitiesController : ControllerBase
     private readonly PatchHoundDbContext _dbContext;
     private readonly ITenantContext _tenantContext;
     private readonly VulnerabilityDetailQueryService _detailQueryService;
+    private readonly VulnerabilityAssessmentJobService _assessmentJobService;
 
     public VulnerabilitiesController(
         PatchHoundDbContext dbContext,
         ITenantContext tenantContext,
-        VulnerabilityDetailQueryService detailQueryService
+        VulnerabilityDetailQueryService detailQueryService,
+        VulnerabilityAssessmentJobService assessmentJobService
     )
     {
         _dbContext = dbContext;
         _tenantContext = tenantContext;
         _detailQueryService = detailQueryService;
+        _assessmentJobService = assessmentJobService;
     }
 
     [HttpGet]
@@ -233,4 +237,22 @@ public class VulnerabilitiesController : ControllerBase
         {
             Title = "AI report generation is disabled pending case-first rewire; see issue #17.",
         });
+
+    [HttpPost("{id:guid}/assessment")]
+    [Authorize(Policy = Policies.ModifyVulnerabilities)]
+    public async Task<IActionResult> RequestAssessment(Guid id, CancellationToken ct)
+    {
+        if (_tenantContext.CurrentTenantId is not Guid tenantId)
+            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
+
+        var exists = await _dbContext.Vulnerabilities.AnyAsync(v => v.Id == id, ct);
+        if (!exists)
+            return NotFound();
+
+        var accepted = await _assessmentJobService.RequestManualAsync(tenantId, id, ct);
+        if (!accepted)
+            return Conflict(new ProblemDetails { Title = "Assessment already in progress." });
+
+        return Accepted();
+    }
 }

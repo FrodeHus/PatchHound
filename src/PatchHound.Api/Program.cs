@@ -415,6 +415,7 @@ builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<PatchHound.Api.Services.TenantSoftwareAliasResolver>();
 builder.Services.AddScoped<PatchHound.Api.Services.DashboardQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.VulnerabilityDetailQueryService>();
+builder.Services.AddScoped<PatchHound.Infrastructure.Services.VulnerabilityAssessmentJobService>();
 builder.Services.AddScoped<PatchHound.Api.Services.DeviceDetailQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.RemediationDecisionQueryService>();
 builder.Services.AddScoped<PatchHound.Api.Services.ThreatIntelGenerationService>();

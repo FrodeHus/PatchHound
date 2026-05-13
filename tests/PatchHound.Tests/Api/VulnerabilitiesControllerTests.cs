@@ -39,10 +39,12 @@ public class VulnerabilitiesControllerTests : IDisposable
         );
 
         var detailQueryService = new PatchHound.Api.Services.VulnerabilityDetailQueryService(_dbContext);
+        var assessmentJobService = new PatchHound.Infrastructure.Services.VulnerabilityAssessmentJobService(_dbContext);
         _controller = new VulnerabilitiesController(
             _dbContext,
             _tenantContext,
-            detailQueryService
+            detailQueryService,
+            assessmentJobService
         );
     }
 
@@ -433,7 +435,8 @@ public class VulnerabilitiesControllerTests : IDisposable
         noTenantContext.CurrentTenantId.Returns((Guid?)null);
         noTenantContext.CurrentUserId.Returns(Guid.NewGuid());
         var detailQueryService = new PatchHound.Api.Services.VulnerabilityDetailQueryService(_dbContext);
-        var controllerNoTenant = new VulnerabilitiesController(_dbContext, noTenantContext, detailQueryService);
+        var assessmentJobService = new PatchHound.Infrastructure.Services.VulnerabilityAssessmentJobService(_dbContext);
+        var controllerNoTenant = new VulnerabilitiesController(_dbContext, noTenantContext, detailQueryService, assessmentJobService);
 
         var request = new UpdateOrgSeverityRequest("High", "justification");
         var result = await controllerNoTenant.UpdateOrganizationalSeverity(Guid.NewGuid(), request, CancellationToken.None);
