@@ -62,6 +62,7 @@ public class IngestionServicePhase3Tests
             normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
             new IngestionLeaseManager(db, NullLogger<IngestionLeaseManager>.Instance),
+            new IngestionCheckpointWriter(db),
             NullLogger<IngestionService>.Instance);
 
         await ingestion.RunExposureDerivationAsync(tenantId, CancellationToken.None);

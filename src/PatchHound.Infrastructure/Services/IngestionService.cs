@@ -34,6 +34,7 @@ public class IngestionService
     private readonly NormalizedSoftwareProjectionService? _normalizedSoftwareProjectionService;
     private readonly RemediationDecisionService? _remediationDecisionService;
     private readonly IngestionLeaseManager _leaseManager;
+    private readonly IngestionCheckpointWriter _checkpointWriter;
     private readonly ILogger<IngestionService> _logger;
 
     public IngestionService(
@@ -64,6 +65,7 @@ public class IngestionService
             normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
             new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance),
+            new IngestionCheckpointWriter(dbContext),
             logger
         ) { }
 
@@ -96,6 +98,7 @@ public class IngestionService
             normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
             new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance),
+            new IngestionCheckpointWriter(dbContext),
             logger
         ) { }
 
@@ -128,6 +131,7 @@ public class IngestionService
             normalizedSoftwareProjectionService: null,
             remediationDecisionService,
             new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance),
+            new IngestionCheckpointWriter(dbContext),
             logger
         ) { }
 
@@ -146,6 +150,7 @@ public class IngestionService
         NormalizedSoftwareProjectionService? normalizedSoftwareProjectionService,
         RemediationDecisionService? remediationDecisionService,
         IngestionLeaseManager leaseManager,
+        IngestionCheckpointWriter checkpointWriter,
         ILogger<IngestionService> logger
     )
     {
@@ -163,6 +168,7 @@ public class IngestionService
         _normalizedSoftwareProjectionService = normalizedSoftwareProjectionService;
         _remediationDecisionService = remediationDecisionService;
         _leaseManager = leaseManager;
+        _checkpointWriter = checkpointWriter;
         _logger = logger;
     }
 
@@ -249,22 +255,22 @@ public class IngestionService
                             tenantId
                         );
 
-                        var assetStagingCompleted = await IsCheckpointCompletedAsync(
+                        var assetStagingCompleted = await _checkpointWriter.IsCheckpointCompletedAsync(
                             run.Id,
                             CheckpointPhases.AssetStaging,
                             ct
                         );
-                        var assetMergeCompleted = await IsCheckpointCompletedAsync(
+                        var assetMergeCompleted = await _checkpointWriter.IsCheckpointCompletedAsync(
                             run.Id,
                             CheckpointPhases.AssetMerge,
                             ct
                         );
-                        var vulnerabilityStagingCompleted = await IsCheckpointCompletedAsync(
+                        var vulnerabilityStagingCompleted = await _checkpointWriter.IsCheckpointCompletedAsync(
                             run.Id,
                             CheckpointPhases.VulnerabilityStaging,
                             ct
                         );
-                        var vulnerabilityMergeCompleted = await IsCheckpointCompletedAsync(
+                        var vulnerabilityMergeCompleted = await _checkpointWriter.IsCheckpointCompletedAsync(
                             run.Id,
                             CheckpointPhases.VulnerabilityMerge,
                             ct
@@ -333,7 +339,7 @@ public class IngestionService
                                 tenantId,
                                 ct
                             );
-                            await CommitCheckpointAsync(
+                            await _checkpointWriter.CommitCheckpointAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -390,7 +396,7 @@ public class IngestionService
                                 0,
                                 ct
                             );
-                            await CommitCheckpointAsync(
+                            await _checkpointWriter.CommitCheckpointAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -429,7 +435,7 @@ public class IngestionService
                                 tenantId,
                                 ct
                             );
-                            await CommitCheckpointAsync(
+                            await _checkpointWriter.CommitCheckpointAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -498,12 +504,12 @@ public class IngestionService
                                 tenantId,
                                 ct
                             );
-                            var assetMergeBatchNumber = await GetCheckpointBatchNumberAsync(
+                            var assetMergeBatchNumber = await _checkpointWriter.GetCheckpointBatchNumberAsync(
                                 run.Id,
                                 CheckpointPhases.AssetStaging,
                                 ct
                             );
-                            await CommitCheckpointAsync(
+                            await _checkpointWriter.CommitCheckpointAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -606,7 +612,7 @@ public class IngestionService
                                 0,
                                 ct
                             );
-                            await CommitCheckpointAsync(
+                            await _checkpointWriter.CommitCheckpointAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -658,12 +664,12 @@ public class IngestionService
                                 tenantId,
                                 ct
                             );
-                            var vulnerabilityMergeBatchNumber = await GetCheckpointBatchNumberAsync(
+                            var vulnerabilityMergeBatchNumber = await _checkpointWriter.GetCheckpointBatchNumberAsync(
                                 run.Id,
                                 CheckpointPhases.VulnerabilityStaging,
                                 ct
                             );
-                            await CommitCheckpointAsync(
+                            await _checkpointWriter.CommitCheckpointAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -963,79 +969,6 @@ public class IngestionService
         }
     }
 
-    private async Task<bool> IsCheckpointCompletedAsync(
-        Guid ingestionRunId,
-        string phase,
-        CancellationToken ct
-    )
-    {
-        return await _dbContext
-            .IngestionCheckpoints.IgnoreQueryFilters()
-            .AnyAsync(
-                item =>
-                    item.IngestionRunId == ingestionRunId
-                    && item.Phase == phase
-                    && item.Status == CheckpointStatuses.Completed,
-                ct
-            );
-    }
-
-    private async Task<int> GetCheckpointBatchNumberAsync(
-        Guid ingestionRunId,
-        string phase,
-        CancellationToken ct
-    )
-    {
-        return await _dbContext
-            .IngestionCheckpoints.IgnoreQueryFilters()
-            .Where(item => item.IngestionRunId == ingestionRunId && item.Phase == phase)
-            .Select(item => item.BatchNumber)
-            .FirstOrDefaultAsync(ct);
-    }
-
-    private async Task CommitCheckpointAsync(
-        Guid ingestionRunId,
-        Guid tenantId,
-        string sourceKey,
-        string phase,
-        int batchNumber,
-        string? cursorJson,
-        int recordsCommitted,
-        string status,
-        CancellationToken ct
-    )
-    {
-        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var checkpoint = await _dbContext
-            .IngestionCheckpoints.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(
-                item => item.IngestionRunId == ingestionRunId && item.Phase == phase,
-                ct
-            );
-
-        if (checkpoint is null)
-        {
-            checkpoint = IngestionCheckpoint.Start(
-                ingestionRunId,
-                tenantId,
-                normalizedSourceKey,
-                phase,
-                DateTimeOffset.UtcNow
-            );
-            await _dbContext.IngestionCheckpoints.AddAsync(checkpoint, ct);
-        }
-
-        checkpoint.CommitBatch(
-            batchNumber,
-            cursorJson,
-            recordsCommitted,
-            status,
-            DateTimeOffset.UtcNow
-        );
-
-        await _dbContext.SaveChangesAsync(ct);
-        _dbContext.ChangeTracker.Clear();
-    }
 
     private async Task StageVulnerabilitiesAsync(
         Guid ingestionRunId,
@@ -1133,7 +1066,7 @@ public class IngestionService
                     batchNumber,
                     ct
                 );
-                await CommitCheckpointAsync(
+                await _checkpointWriter.CommitCheckpointAsync(
                     ingestionRunId,
                     tenantId,
                     sourceKey,
@@ -1147,7 +1080,7 @@ public class IngestionService
             }
             else
             {
-                await CommitCheckpointAsync(
+                await _checkpointWriter.CommitCheckpointAsync(
                     ingestionRunId,
                     tenantId,
                     sourceKey,
@@ -1596,7 +1529,7 @@ public class IngestionService
             0,
             ct
         );
-        await CommitCheckpointAsync(
+        await _checkpointWriter.CommitCheckpointAsync(
             run.Id,
             tenantId,
             run.SourceKey,
@@ -1608,7 +1541,7 @@ public class IngestionService
             ct
         );
         await ProcessStagedAssetsAsync(run.Id, tenantId, run.SourceKey, null, ct);
-        await CommitCheckpointAsync(
+        await _checkpointWriter.CommitCheckpointAsync(
             run.Id,
             tenantId,
             run.SourceKey,
@@ -1679,7 +1612,7 @@ public class IngestionService
                     batchNumber,
                     ct
                 );
-                await CommitCheckpointAsync(
+                await _checkpointWriter.CommitCheckpointAsync(
                     ingestionRunId,
                     tenantId,
                     sourceKey,
@@ -1693,7 +1626,7 @@ public class IngestionService
             }
             else if (batch.IsComplete)
             {
-                await CommitCheckpointAsync(
+                await _checkpointWriter.CommitCheckpointAsync(
                     ingestionRunId,
                     tenantId,
                     sourceKey,
