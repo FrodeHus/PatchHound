@@ -76,7 +76,9 @@ public class DashboardController : ControllerBase
         if (minPublishedDate.HasValue)
             exposureBaseQuery = exposureBaseQuery.Where(e => e.Vulnerability.PublishedDate >= minPublishedDate.Value);
 
-        var exposureSeverityCounts = await exposureBaseQuery
+        var presentationExposureQuery = ExcludeAcceptedRiskVulnerabilities(exposureBaseQuery, tenantId);
+
+        var exposureSeverityCounts = await presentationExposureQuery
             .GroupBy(e => new { e.Status, e.Vulnerability.VendorSeverity })
             .Select(g => new { g.Key.Status, g.Key.VendorSeverity, Count = g.Select(e => e.VulnerabilityId).Distinct().Count() })
             .ToListAsync(ct);
@@ -93,7 +95,7 @@ public class DashboardController : ControllerBase
         };
 
         // Top critical vulnerabilities
-        var topVulnRows = await exposureBaseQuery
+        var topVulnRows = await presentationExposureQuery
             .Where(e => e.Status == ExposureStatus.Open
                 && (e.Vulnerability.VendorSeverity == Severity.Critical || e.Vulnerability.VendorSeverity == Severity.High))
             .Where(e => !_dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
@@ -125,7 +127,7 @@ public class DashboardController : ControllerBase
 
         // Latest unhandled (open, no remediation case)
         var latestUnhandledRows = await (
-            from e in exposureBaseQuery
+            from e in presentationExposureQuery
             where e.Status == ExposureStatus.Open
             join rc in _dbContext.RemediationCases.AsNoTracking()
                 on e.SoftwareProductId equals rc.SoftwareProductId into rcJoin
@@ -156,7 +158,7 @@ public class DashboardController : ControllerBase
         // MTTR: average days from first episode open to close for resolved exposures
         var closedEpisodes = await _dbContext.ExposureEpisodes.AsNoTracking()
             .Where(ep => ep.TenantId == tenantId && ep.ClosedAt != null
-                && exposureBaseQuery.Select(e => e.Id).Contains(ep.DeviceVulnerabilityExposureId))
+                && presentationExposureQuery.Select(e => e.Id).Contains(ep.DeviceVulnerabilityExposureId))
             .Select(ep => new
             {
                 ep.FirstSeenAt,
@@ -178,7 +180,7 @@ public class DashboardController : ControllerBase
         }).ToList();
 
         // Age buckets for open exposures — age measured from vulnerability published date
-        var openEpisodeAges = await exposureBaseQuery
+        var openEpisodeAges = await presentationExposureQuery
             .Where(e => e.Status == ExposureStatus.Open && e.Vulnerability.PublishedDate != null)
             .Select(e => new
             {
@@ -1060,6 +1062,7 @@ public class DashboardController : ControllerBase
         var (filteredAssetIds, minPublishedDate) = BuildFilterContext(tenantId, filter);
         var exposureQuery = _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
             .Where(exposure => exposure.TenantId == tenantId && exposure.Status == ExposureStatus.Open);
+        exposureQuery = ExcludeAcceptedRiskVulnerabilities(exposureQuery, tenantId);
 
         if (filteredAssetIds != null)
         {
@@ -1103,7 +1106,11 @@ public class DashboardController : ControllerBase
         var episodeRows = await _dbContext.ExposureEpisodes.AsNoTracking()
             .Where(ep => ep.TenantId == tenantId
                 && ep.FirstSeenAt <= trendWindowEnd
-                && (ep.ClosedAt == null || ep.ClosedAt >= trendWindowStart))
+                && (ep.ClosedAt == null || ep.ClosedAt >= trendWindowStart)
+                && !_dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
+                    remediation.TenantId == tenantId
+                    && remediation.Outcome == RemediationOutcome.RiskAcceptance
+                    && remediation.VulnerabilityId == ep.Exposure.VulnerabilityId))
             .Select(ep => new
             {
                 ep.FirstSeenAt,
@@ -1171,7 +1178,11 @@ public class DashboardController : ControllerBase
         var burnEpisodeRows = await _dbContext.ExposureEpisodes.AsNoTracking()
             .Where(ep => ep.TenantId == tenantId
                 && ep.FirstSeenAt <= burnEnd
-                && (ep.ClosedAt == null || ep.ClosedAt >= burnStart))
+                && (ep.ClosedAt == null || ep.ClosedAt >= burnStart)
+                && !_dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
+                    remediation.TenantId == tenantId
+                    && remediation.Outcome == RemediationOutcome.RiskAcceptance
+                    && remediation.VulnerabilityId == ep.Exposure.VulnerabilityId))
             .Select(ep => new
             {
                 ep.FirstSeenAt,
@@ -1382,6 +1393,17 @@ public class DashboardController : ControllerBase
             : null;
 
         return (filteredAssetIdQuery, minPublishedDate);
+    }
+
+    private IQueryable<DeviceVulnerabilityExposure> ExcludeAcceptedRiskVulnerabilities(
+        IQueryable<DeviceVulnerabilityExposure> query,
+        Guid tenantId)
+    {
+        return query.Where(exposure =>
+            !_dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
+                remediation.TenantId == tenantId
+                && remediation.Outcome == RemediationOutcome.RiskAcceptance
+                && remediation.VulnerabilityId == exposure.VulnerabilityId));
     }
 
     private async Task<ExecutiveAccountabilitySummaryDto> BuildExecutiveAccountabilitySummaryAsync(

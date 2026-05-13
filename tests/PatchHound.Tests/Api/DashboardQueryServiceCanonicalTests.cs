@@ -67,6 +67,23 @@ public class DashboardQueryServiceCanonicalTests : IAsyncDisposable
         result.TopRecurringAssets[0].AssetId.Should().Be(seed.DeviceA.Id);
     }
 
+    [Fact]
+    public async Task GetRecurrenceDataAsync_AcceptedRiskVulnerability_NotListedOrCounted()
+    {
+        var seed = await CanonicalSeed.PlantAsync(_db, _tenantId);
+        var episode = ExposureEpisode.Open(_tenantId, seed.ExposureA.Id, 2, DateTimeOffset.UtcNow);
+        _db.ExposureEpisodes.Add(episode);
+        await AddApprovedRemediationAsync(seed.ProductA.Id, seed.ExposureA.VulnerabilityId, RemediationOutcome.RiskAcceptance);
+
+        var svc = CreateSut();
+        var result = await svc.GetRecurrenceDataAsync(_tenantId, CancellationToken.None);
+
+        result.RecurringVulnerabilityCount.Should().Be(0);
+        result.RecurrenceRatePercent.Should().Be(0m);
+        result.TopRecurringVulnerabilities.Should().BeEmpty();
+        result.TopRecurringAssets.Should().BeEmpty();
+    }
+
     // ── Test 3 ──────────────────────────────────────────────────────────────
     [Fact]
     public async Task BuildRiskChangeBriefAsync_AppearedExposureWithinCutoff_IsInBrief()
@@ -81,6 +98,21 @@ public class DashboardQueryServiceCanonicalTests : IAsyncDisposable
 
         result.AppearedCount.Should().BeGreaterThan(0);
         result.Appeared.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task BuildRiskChangeBriefAsync_AcceptedRiskAppearedExposure_NotListedOrCounted()
+    {
+        var seed = await CanonicalSeed.PlantAsync(_db, _tenantId);
+        await AddApprovedRemediationAsync(seed.ProductA.Id, seed.ExposureA.VulnerabilityId, RemediationOutcome.RiskAcceptance);
+
+        var svc = CreateSut();
+        var result = await svc.BuildRiskChangeBriefAsync(
+            _tenantId, _tenantId, limit: null, highCriticalOnly: false,
+            CancellationToken.None, cutoffHours: 24);
+
+        result.AppearedCount.Should().Be(1);
+        result.Appeared.Should().NotContain(item => item.VulnerabilityId == seed.ExposureA.VulnerabilityId);
     }
 
     // ── Test 4 ──────────────────────────────────────────────────────────────
@@ -192,5 +224,33 @@ public class DashboardQueryServiceCanonicalTests : IAsyncDisposable
 
         result.Appeared.Should().AllSatisfy(item =>
             item.RemediationCaseId.Should().BeNull());
+    }
+
+    private async Task AddApprovedRemediationAsync(
+        Guid softwareProductId,
+        Guid vulnerabilityId,
+        RemediationOutcome outcome)
+    {
+        var remediationCase = RemediationCase.Create(_tenantId, softwareProductId);
+        var decision = RemediationDecision.Create(
+            _tenantId,
+            remediationCase.Id,
+            outcome,
+            "Approved remediation",
+            Guid.NewGuid(),
+            DecisionApprovalStatus.Approved);
+
+        _db.RemediationCases.Add(remediationCase);
+        _db.RemediationDecisions.Add(decision);
+        await _db.SaveChangesAsync();
+
+        _db.ApprovedVulnerabilityRemediations.Add(ApprovedVulnerabilityRemediation.Create(
+            _tenantId,
+            vulnerabilityId,
+            remediationCase.Id,
+            decision.Id,
+            decision.Outcome,
+            decision.ApprovedAt!.Value));
+        await _db.SaveChangesAsync();
     }
 }

@@ -43,6 +43,7 @@ public class VulnerabilitiesController : ControllerBase
         if (_tenantContext.CurrentTenantId is null)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
+        var tenantId = _tenantContext.CurrentTenantId.Value;
         var query = _dbContext.Vulnerabilities.AsNoTracking().AsQueryable();
 
         if (
@@ -86,11 +87,18 @@ public class VulnerabilitiesController : ControllerBase
         var remediationCaseIds = ParseGuidList(filter.RemediationCaseIds);
         if (remediationCaseIds.Count > 0)
         {
-            var tenantId = _tenantContext.CurrentTenantId.Value;
             query = query.Where(v =>
                 _dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
                     remediation.TenantId == tenantId
                     && remediationCaseIds.Contains(remediation.RemediationCaseId)
+                    && remediation.VulnerabilityId == v.Id));
+        }
+        else
+        {
+            query = query.Where(v =>
+                !_dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
+                    remediation.TenantId == tenantId
+                    && remediation.Outcome == RemediationOutcome.RiskAcceptance
                     && remediation.VulnerabilityId == v.Id));
         }
 

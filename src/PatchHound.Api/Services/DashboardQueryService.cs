@@ -25,6 +25,10 @@ public class DashboardQueryService(
     {
         var recurringEpisodes = await dbContext.ExposureEpisodes.AsNoTracking()
             .Where(e => e.TenantId == tenantId && e.EpisodeNumber > 1)
+            .Where(e => !dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
+                remediation.TenantId == tenantId
+                && remediation.Outcome == RemediationOutcome.RiskAcceptance
+                && remediation.VulnerabilityId == e.Exposure.VulnerabilityId))
             .Select(e => new
             {
                 e.DeviceVulnerabilityExposureId,
@@ -69,6 +73,10 @@ public class DashboardQueryService(
             .Count();
         var totalExposureCount = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
             .Where(e => e.TenantId == tenantId)
+            .Where(e => !dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
+                remediation.TenantId == tenantId
+                && remediation.Outcome == RemediationOutcome.RiskAcceptance
+                && remediation.VulnerabilityId == e.VulnerabilityId))
             .Select(e => e.Id)
             .Distinct()
             .CountAsync(ct);
@@ -94,6 +102,10 @@ public class DashboardQueryService(
 
         var appeared = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
             .Where(e => e.TenantId == tenantId && e.FirstObservedAt >= cutoff)
+            .Where(e => !dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
+                remediation.TenantId == tenantId
+                && remediation.Outcome == RemediationOutcome.RiskAcceptance
+                && remediation.VulnerabilityId == e.VulnerabilityId))
             .Select(e => new
             {
                 e.VulnerabilityId,
@@ -108,6 +120,10 @@ public class DashboardQueryService(
 
         var resolved = await dbContext.ExposureEpisodes.AsNoTracking()
             .Where(e => e.TenantId == tenantId && e.ClosedAt != null && e.ClosedAt >= cutoff)
+            .Where(e => !dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
+                remediation.TenantId == tenantId
+                && remediation.Outcome == RemediationOutcome.RiskAcceptance
+                && remediation.VulnerabilityId == e.Exposure.VulnerabilityId))
             .Select(e => new
             {
                 e.Exposure.VulnerabilityId,

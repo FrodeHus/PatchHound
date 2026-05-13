@@ -105,6 +105,51 @@ public sealed class DashboardControllerSummaryAggregationTests : IDisposable
         dto.TopCriticalVulnerabilities.Should().NotContain(item => item.Id == seed.ExposureA.VulnerabilityId);
     }
 
+    [Fact]
+    public async Task GetSummary_AcceptedRiskVulnerability_IsExcludedFromPresentationListsAndCharts()
+    {
+        var seed = await CanonicalSeed.PlantAsync(_dbContext, _tenantId);
+        await AddApprovedRemediationAsync(seed.ProductA.Id, seed.ExposureA.VulnerabilityId, RemediationOutcome.RiskAcceptance);
+
+        var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
+
+        var ok = action.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var dto = ok.Value.Should().BeOfType<DashboardSummaryDto>().Subject;
+        dto.TopCriticalVulnerabilities.Should().NotContain(item => item.Id == seed.ExposureA.VulnerabilityId);
+        dto.VulnerabilitiesBySeverity[nameof(Severity.Critical)].Should().Be(0);
+        dto.VulnerabilitiesByStatus[nameof(VulnerabilityStatus.Open)].Should().Be(1);
+        dto.VulnerabilityAgeBuckets.Should().NotBeNull();
+        dto.VulnerabilityAgeBuckets!.Sum(bucket => bucket.Critical).Should().Be(0);
+    }
+
+    private async Task AddApprovedRemediationAsync(
+        Guid softwareProductId,
+        Guid vulnerabilityId,
+        RemediationOutcome outcome)
+    {
+        var remediationCase = RemediationCase.Create(_tenantId, softwareProductId);
+        var decision = RemediationDecision.Create(
+            _tenantId,
+            remediationCase.Id,
+            outcome,
+            "Approved remediation",
+            Guid.NewGuid(),
+            DecisionApprovalStatus.Approved);
+
+        _dbContext.RemediationCases.Add(remediationCase);
+        _dbContext.RemediationDecisions.Add(decision);
+        await _dbContext.SaveChangesAsync();
+
+        _dbContext.ApprovedVulnerabilityRemediations.Add(ApprovedVulnerabilityRemediation.Create(
+            _tenantId,
+            vulnerabilityId,
+            remediationCase.Id,
+            decision.Id,
+            decision.Outcome,
+            decision.ApprovedAt!.Value));
+        await _dbContext.SaveChangesAsync();
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();
