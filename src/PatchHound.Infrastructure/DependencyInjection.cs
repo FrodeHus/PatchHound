@@ -207,6 +207,7 @@ public static class DependencyInjection
         // Ingestion
         services.AddScoped<IngestionLeaseManager>();
         services.AddScoped<IngestionCheckpointWriter>();
+        services.AddScoped<IngestionStagingPipeline>();
         services.AddScoped<IngestionService>();
 
         // Event Pusher (pushes events to TanStack Start SSE endpoint)
