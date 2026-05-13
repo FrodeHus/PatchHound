@@ -990,8 +990,11 @@ public class IngestionService
                 g => (g.First().SoftwareProductId, g.First().Id));
 
         // ── Step 3: Load existing DeviceVulnerabilityExposures for this tenant (for upsert) ──
+        // Bound to the device IDs from this run: ProcessStagedResultsAsync only processes
+        // staged exposures for devices in this run, so exposures for other devices are untouched.
+        var runDeviceIds = deviceIdByExternalId.Values.ToList();
         var existing = await _dbContext.DeviceVulnerabilityExposures
-            .Where(e => e.TenantId == tenantId)
+            .Where(e => e.TenantId == tenantId && runDeviceIds.Contains(e.DeviceId))
             .ToListAsync(ct);
         var existingByPair = existing.ToDictionary(e => (e.DeviceId, e.VulnerabilityId));
 

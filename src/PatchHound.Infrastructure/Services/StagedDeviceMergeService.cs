@@ -81,6 +81,18 @@ public class StagedDeviceMergeService(
         var sourceSystems = await db
             .SourceSystems.ToDictionaryAsync(s => s.Key, StringComparer.Ordinal, ct);
 
+        // 5. Pre-load all existing devices for the staged external IDs to avoid N+1 SELECTs.
+        //    Key: (SourceSystemId, ExternalId) — handles runs that span multiple source systems.
+        var stagedExternalIds = stagedDevices.Select(d => d.ExternalId).Distinct().ToList();
+        var devicesByKey = await db.Devices
+            .IgnoreQueryFilters()
+            .Where(d => d.TenantId == tenantId && stagedExternalIds.Contains(d.ExternalId))
+            .ToDictionaryAsync(d => (d.SourceSystemId, d.ExternalId), d => d, ct);
+
+        // ── Pass 1: Upsert devices ──────────────────────────────────────────────────────────
+        // Collect Device entities by their ExternalId for the software-link pass below.
+        var deviceByExternalId = new Dictionary<string, Device>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var stagedDevice in stagedDevices)
         {
             var normalizedKey = stagedDevice.SourceKey.Trim().ToLowerInvariant();
@@ -104,15 +116,8 @@ public class StagedDeviceMergeService(
 
             // Pre-check to track created vs touched counts, and to determine
             // whether a stale+inactive device is new (skip) or existing (deactivate).
-            var deviceBefore = await db
-                .Devices.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(
-                    d =>
-                        d.TenantId == tenantId
-                        && d.SourceSystemId == sourceSystem.Id
-                        && d.ExternalId == stagedDevice.ExternalId,
-                    ct
-                );
+            // Uses the pre-loaded dictionary — no per-device SELECT.
+            devicesByKey.TryGetValue((sourceSystem.Id, stagedDevice.ExternalId), out var deviceBefore);
 
             if (IsStaleAndInactive(payload))
             {
@@ -159,6 +164,9 @@ public class StagedDeviceMergeService(
             if (deviceBefore is null)
             {
                 devicesCreated++;
+                // Add newly created device to the dictionary so subsequent staged entries
+                // with the same ExternalId find it without a DB round-trip.
+                devicesByKey[(sourceSystem.Id, stagedDevice.ExternalId)] = device;
             }
             else
             {
@@ -183,6 +191,33 @@ public class StagedDeviceMergeService(
             );
             device.SetActiveInTenant(true);
 
+            deviceByExternalId[stagedDevice.ExternalId] = device;
+        }
+
+        // Persist device upserts so all device IDs are stable before the software-link pass.
+        await db.SaveChangesAsync(ct);
+
+        // ── Pass 2: Upsert software links ───────────────────────────────────────────────────
+        // Pre-load all InstalledSoftware rows for devices touched in this run to avoid N+1 SELECTs.
+        var runDeviceIds = deviceByExternalId.Values.Select(d => d.Id).Distinct().ToList();
+        var existingInstalledSoftware = await db.InstalledSoftware
+            .IgnoreQueryFilters()
+            .Where(i => i.TenantId == tenantId && runDeviceIds.Contains(i.DeviceId))
+            .ToListAsync(ct);
+        var installedByKey = existingInstalledSoftware
+            .ToDictionary(
+                i => (i.DeviceId, i.SoftwareProductId, i.SourceSystemId, i.Version),
+                i => i
+            );
+
+        foreach (var stagedDevice in stagedDevices)
+        {
+            if (!deviceByExternalId.TryGetValue(stagedDevice.ExternalId, out var device))
+            {
+                // Device was skipped or deactivated in Pass 1 — no software links to process.
+                continue;
+            }
+
             if (
                 !linksByDeviceExternalId.TryGetValue(
                     stagedDevice.ExternalId,
@@ -192,6 +227,9 @@ public class StagedDeviceMergeService(
             {
                 continue;
             }
+
+            var normalizedSourceKey = stagedDevice.SourceKey.Trim().ToLowerInvariant();
+            var sourceSystem = sourceSystems[normalizedSourceKey];
 
             foreach (var link in deviceLinks)
             {
@@ -223,32 +261,24 @@ public class StagedDeviceMergeService(
                 );
 
                 var normalizedVersion = version?.Trim() ?? string.Empty;
-                var existing = await db
-                    .InstalledSoftware.IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(
-                        i =>
-                            i.TenantId == tenantId
-                            && i.DeviceId == device.Id
-                            && i.SoftwareProductId == product.Id
-                            && i.SourceSystemId == sourceSystem.Id
-                            && i.Version == normalizedVersion,
-                        ct
-                    );
+                var installedKey = (device.Id, product.Id, sourceSystem.Id, normalizedVersion);
 
-                if (existing is null)
+                if (!installedByKey.TryGetValue(installedKey, out var existing))
                 {
                     var observedAt =
                         link.ObservedAt == default ? DateTimeOffset.UtcNow : link.ObservedAt;
-                    db.InstalledSoftware.Add(
-                        InstalledSoftware.Observe(
-                            tenantId: tenantId,
-                            deviceId: device.Id,
-                            softwareProductId: product.Id,
-                            sourceSystemId: sourceSystem.Id,
-                            version: normalizedVersion,
-                            at: observedAt
-                        )
+                    var newInstalled = InstalledSoftware.Observe(
+                        tenantId: tenantId,
+                        deviceId: device.Id,
+                        softwareProductId: product.Id,
+                        sourceSystemId: sourceSystem.Id,
+                        version: normalizedVersion,
+                        at: observedAt
                     );
+                    db.InstalledSoftware.Add(newInstalled);
+                    // Track the newly added row so subsequent links for the same
+                    // (device, product, source, version) tuple see it.
+                    installedByKey[installedKey] = newInstalled;
                     installedCreated++;
                 }
                 else
