@@ -172,6 +172,7 @@ public static class DependencyInjection
             .AddHttpClient<MailgunEmailSender>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2);
         services.AddHttpClient<EndOfLifeApiClient>().AddExternalHttpPolicies(maxConnectionsPerServer: 2);
+        services.AddSingleton<INvdFeedSyncDispatcher, NvdFeedSyncDispatcher>();
         services.AddHttpClient<NvdFeedSyncService>()
             .AddExternalHttpPolicies(maxConnectionsPerServer: 2)
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(3));

@@ -308,31 +308,29 @@ public class SettingsAuditControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task TriggerNvdModifiedSync_RunsModifiedFeedSync()
+    public async Task TriggerNvdModifiedSync_QueuesModifiedFeedSync()
     {
-        var nvdFeedSyncService = Substitute.For<INvdFeedSyncService>();
-        var controller = CreateSystemController(nvdFeedSyncService);
+        var nvdFeedSyncDispatcher = Substitute.For<INvdFeedSyncDispatcher>();
+        var controller = CreateSystemController(nvdFeedSyncDispatcher);
 
         var action = await controller.TriggerNvdModifiedSync(CancellationToken.None);
 
         action.Should().BeOfType<AcceptedResult>();
-        await nvdFeedSyncService.Received(1).SyncModifiedFeedAsync(Arg.Any<CancellationToken>());
-        await nvdFeedSyncService.DidNotReceive().SyncYearFeedAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+        nvdFeedSyncDispatcher.Received(1).QueueModifiedSync();
+        nvdFeedSyncDispatcher.DidNotReceive().QueueFullSync(Arg.Any<int>(), Arg.Any<int>());
     }
 
     [Fact]
-    public async Task TriggerNvdFullSync_RunsYearFeedSyncForRequestedRange()
+    public async Task TriggerNvdFullSync_QueuesYearFeedSyncForRequestedRange()
     {
-        var nvdFeedSyncService = Substitute.For<INvdFeedSyncService>();
-        var controller = CreateSystemController(nvdFeedSyncService);
+        var nvdFeedSyncDispatcher = Substitute.For<INvdFeedSyncDispatcher>();
+        var controller = CreateSystemController(nvdFeedSyncDispatcher);
 
         var action = await controller.TriggerNvdFullSync(new TriggerNvdFullSyncRequest(2024, 2026), CancellationToken.None);
 
         action.Should().BeOfType<AcceptedResult>();
-        await nvdFeedSyncService.Received(1).SyncYearFeedAsync(2024, true, Arg.Any<CancellationToken>());
-        await nvdFeedSyncService.Received(1).SyncYearFeedAsync(2025, true, Arg.Any<CancellationToken>());
-        await nvdFeedSyncService.Received(1).SyncYearFeedAsync(2026, true, Arg.Any<CancellationToken>());
-        await nvdFeedSyncService.DidNotReceive().SyncModifiedFeedAsync(Arg.Any<CancellationToken>());
+        nvdFeedSyncDispatcher.Received(1).QueueFullSync(2024, 2026);
+        nvdFeedSyncDispatcher.DidNotReceive().QueueModifiedSync();
     }
 
     [Fact]
@@ -365,7 +363,7 @@ public class SettingsAuditControllerTests : IDisposable
         return run;
     }
 
-    private SystemController CreateSystemController(INvdFeedSyncService? nvdFeedSyncService = null) =>
+    private SystemController CreateSystemController(INvdFeedSyncDispatcher? nvdFeedSyncDispatcher = null) =>
         new(
             _secretStore,
             _dbContext,
@@ -376,6 +374,6 @@ public class SettingsAuditControllerTests : IDisposable
             ),
             new MailgunEmailSender(new HttpClient()),
             _tenantContext,
-            nvdFeedSyncService ?? Substitute.For<INvdFeedSyncService>()
+            nvdFeedSyncDispatcher ?? Substitute.For<INvdFeedSyncDispatcher>()
         );
 }

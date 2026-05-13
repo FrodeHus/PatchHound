@@ -25,7 +25,7 @@ public class SystemController : ControllerBase
     private readonly NotificationEmailConfigurationResolver _notificationConfigurationResolver;
     private readonly MailgunEmailSender _mailgunEmailSender;
     private readonly ITenantContext _tenantContext;
-    private readonly INvdFeedSyncService _nvdFeedSyncService;
+    private readonly INvdFeedSyncDispatcher _nvdFeedSyncDispatcher;
 
     public SystemController(
         ISecretStore secretStore,
@@ -34,7 +34,7 @@ public class SystemController : ControllerBase
         NotificationEmailConfigurationResolver notificationConfigurationResolver,
         MailgunEmailSender mailgunEmailSender,
         ITenantContext tenantContext,
-        INvdFeedSyncService nvdFeedSyncService
+        INvdFeedSyncDispatcher nvdFeedSyncDispatcher
     )
     {
         _secretStore = secretStore;
@@ -43,7 +43,7 @@ public class SystemController : ControllerBase
         _notificationConfigurationResolver = notificationConfigurationResolver;
         _mailgunEmailSender = mailgunEmailSender;
         _tenantContext = tenantContext;
-        _nvdFeedSyncService = nvdFeedSyncService;
+        _nvdFeedSyncDispatcher = nvdFeedSyncDispatcher;
     }
 
     [HttpGet("/api/health")]
@@ -412,15 +412,15 @@ public class SystemController : ControllerBase
 
     [HttpPost("enrichment-sources/nvd/sync")]
     [Authorize(Policy = Policies.ManageGlobalSettings)]
-    public async Task<IActionResult> TriggerNvdModifiedSync(CancellationToken ct)
+    public Task<IActionResult> TriggerNvdModifiedSync(CancellationToken ct)
     {
-        await _nvdFeedSyncService.SyncModifiedFeedAsync(ct);
-        return Accepted();
+        _nvdFeedSyncDispatcher.QueueModifiedSync();
+        return Task.FromResult<IActionResult>(Accepted());
     }
 
     [HttpPost("enrichment-sources/nvd/full-sync")]
     [Authorize(Policy = Policies.ManageGlobalSettings)]
-    public async Task<IActionResult> TriggerNvdFullSync(
+    public Task<IActionResult> TriggerNvdFullSync(
         [FromBody] TriggerNvdFullSyncRequest request,
         CancellationToken ct
     )
@@ -428,19 +428,16 @@ public class SystemController : ControllerBase
         var currentYear = DateTimeOffset.UtcNow.Year;
         if (request.FromYear < 2002 || request.ToYear > currentYear || request.FromYear > request.ToYear)
         {
-            return BadRequest(new ProblemDetails
+            return Task.FromResult<IActionResult>(BadRequest(new ProblemDetails
             {
                 Title = "Invalid NVD year range.",
                 Detail = $"Choose a range from 2002 through {currentYear}.",
-            });
+            }));
         }
 
-        for (var year = request.FromYear; year <= request.ToYear; year++)
-        {
-            await _nvdFeedSyncService.SyncYearFeedAsync(year, force: true, ct);
-        }
+        _nvdFeedSyncDispatcher.QueueFullSync(request.FromYear, request.ToYear);
 
-        return Accepted();
+        return Task.FromResult<IActionResult>(Accepted());
     }
 
     [HttpPut("enrichment-sources")]
