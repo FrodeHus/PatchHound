@@ -89,7 +89,6 @@ public class RemediationDecisionListTests : IDisposable
         var result = await _service.BuildByCaseIdAsync(
             _tenantId,
             remediationCase.Id,
-            forceAiSummaryRefresh: false,
             CancellationToken.None
         );
 
@@ -181,7 +180,6 @@ public class RemediationDecisionListTests : IDisposable
         var result = await _service.BuildByCaseIdAsync(
             _tenantId,
             remediationCase.Id,
-            forceAiSummaryRefresh: false,
             CancellationToken.None
         );
 

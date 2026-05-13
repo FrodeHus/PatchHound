@@ -39,7 +39,7 @@ public class RemediationDecisionsController(
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var result = await queryService.BuildByCaseIdAsync(tenantId, caseId, false, ct);
+        var result = await queryService.BuildByCaseIdAsync(tenantId, caseId, ct);
         if (result is null)
             return NotFound();
 
@@ -107,7 +107,7 @@ public class RemediationDecisionsController(
         if (tenantContext.CurrentTenantId is not Guid tenantId)
             return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
 
-        var context = await queryService.BuildByCaseIdAsync(tenantId, caseId, false, ct);
+        var context = await queryService.BuildByCaseIdAsync(tenantId, caseId, ct);
         if (context is null)
             return NotFound();
 

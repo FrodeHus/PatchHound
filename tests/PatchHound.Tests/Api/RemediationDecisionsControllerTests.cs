@@ -268,7 +268,6 @@ public class RemediationDecisionsControllerTests : IDisposable
         var reloaded = await queryService.BuildByCaseIdAsync(
             _tenantId,
             remediationCase.Id,
-            forceAiSummaryRefresh: false,
             CancellationToken.None
         );
 

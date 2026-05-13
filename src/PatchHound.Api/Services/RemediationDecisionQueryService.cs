@@ -397,7 +397,6 @@ public class RemediationDecisionQueryService(
     public async Task<DecisionContextDto?> BuildByCaseIdAsync(
         Guid tenantId,
         Guid remediationCaseId,
-        bool forceAiSummaryRefresh,
         CancellationToken ct
     )
     {
