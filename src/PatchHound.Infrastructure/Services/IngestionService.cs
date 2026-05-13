@@ -34,6 +34,7 @@ public class IngestionService
     private readonly IngestionLeaseManager _leaseManager;
     private readonly IngestionCheckpointWriter _checkpointWriter;
     private readonly IngestionStagingPipeline _stagingPipeline;
+    private readonly IngestionSnapshotLifecycle _snapshotLifecycle;
     private readonly ILogger<IngestionService> _logger;
 
     public IngestionService(
@@ -66,6 +67,7 @@ public class IngestionService
             new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance),
             new IngestionCheckpointWriter(dbContext),
             new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
+            new IngestionSnapshotLifecycle(dbContext),
             logger
         ) { }
 
@@ -100,6 +102,7 @@ public class IngestionService
             new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance),
             new IngestionCheckpointWriter(dbContext),
             new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
+            new IngestionSnapshotLifecycle(dbContext),
             logger
         ) { }
 
@@ -134,6 +137,7 @@ public class IngestionService
             new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance),
             new IngestionCheckpointWriter(dbContext),
             new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
+            new IngestionSnapshotLifecycle(dbContext),
             logger
         ) { }
 
@@ -154,6 +158,7 @@ public class IngestionService
         IngestionLeaseManager leaseManager,
         IngestionCheckpointWriter checkpointWriter,
         IngestionStagingPipeline stagingPipeline,
+        IngestionSnapshotLifecycle snapshotLifecycle,
         ILogger<IngestionService> logger
     )
     {
@@ -173,6 +178,7 @@ public class IngestionService
         _leaseManager = leaseManager;
         _checkpointWriter = checkpointWriter;
         _stagingPipeline = stagingPipeline;
+        _snapshotLifecycle = snapshotLifecycle;
         _logger = logger;
     }
 
@@ -282,9 +288,9 @@ public class IngestionService
 
                         deactivatedMachineCount = await RefreshDeviceActivityForTenantAsync(tenantId, ct);
 
-                        if (SupportsSoftwareSnapshots(source.SourceKey))
+                        if (IngestionSnapshotLifecycle.SupportsSoftwareSnapshots(source.SourceKey))
                         {
-                            softwareSnapshot ??= await GetOrCreateBuildingSoftwareSnapshotAsync(
+                            softwareSnapshot ??= await _snapshotLifecycle.GetOrCreateBuildingSoftwareSnapshotAsync(
                                 tenantId,
                                 source.SourceKey,
                                 run.Id,
@@ -709,9 +715,9 @@ public class IngestionService
 
                         await _deviceRuleEvaluationService.EvaluateRulesAsync(tenantId, ct);
 
-                        if (SupportsSoftwareSnapshots(source.SourceKey))
+                        if (IngestionSnapshotLifecycle.SupportsSoftwareSnapshots(source.SourceKey))
                         {
-                            softwareSnapshot ??= await GetOrCreateBuildingSoftwareSnapshotAsync(
+                            softwareSnapshot ??= await _snapshotLifecycle.GetOrCreateBuildingSoftwareSnapshotAsync(
                                 tenantId,
                                 source.SourceKey,
                                 run.Id,
@@ -735,7 +741,7 @@ public class IngestionService
                                 (DateTimeOffset.UtcNow - softwareMatchStartedAt).TotalMilliseconds
                             );
                             var snapshotPublishStartedAt = DateTimeOffset.UtcNow;
-                            await PublishSnapshotAsync(
+                            await _snapshotLifecycle.PublishSnapshotAsync(
                                 tenantId,
                                 source.SourceKey,
                                 softwareSnapshot.Id,
@@ -863,7 +869,7 @@ public class IngestionService
                             && failureStatus == IngestionRunStatuses.FailedTerminal
                         )
                         {
-                            await DiscardBuildingSnapshotAsync(
+                            await _snapshotLifecycle.DiscardBuildingSnapshotAsync(
                                 tenantId,
                                 source.SourceKey,
                                 softwareSnapshot.Id,
@@ -1408,193 +1414,6 @@ public class IngestionService
         }
     }
 
-    private static bool SupportsSoftwareSnapshots(string sourceKey)
-    {
-        return sourceKey.Trim().ToLowerInvariant() == TenantSourceCatalog.DefenderSourceKey;
-    }
-
-    private async Task<IngestionSnapshot> GetOrCreateBuildingSoftwareSnapshotAsync(
-        Guid tenantId,
-        string sourceKey,
-        Guid ingestionRunId,
-        CancellationToken ct
-    )
-    {
-        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var source = await _dbContext
-            .TenantSourceConfigurations.IgnoreQueryFilters()
-            .FirstAsync(
-                item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
-                ct
-            );
-
-        if (source.BuildingSnapshotId is Guid buildingSnapshotId)
-        {
-            var existing = await _dbContext
-                .IngestionSnapshots.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(item => item.Id == buildingSnapshotId, ct);
-            if (
-                existing is not null
-                && existing.IngestionRunId == ingestionRunId
-                && existing.Status == IngestionSnapshotStatuses.Building
-            )
-            {
-                return existing;
-            }
-
-            if (existing is not null && existing.Status == IngestionSnapshotStatuses.Building)
-            {
-                existing.Discard();
-                await CleanupSnapshotDataAsync(existing.Id, ct);
-            }
-        }
-
-        var snapshot = IngestionSnapshot.Create(
-            tenantId,
-            normalizedSourceKey,
-            ingestionRunId,
-            DateTimeOffset.UtcNow
-        );
-        source.SetSnapshotPointers(source.ActiveSnapshotId, snapshot.Id);
-        await _dbContext.IngestionSnapshots.AddAsync(snapshot, ct);
-        await _dbContext.SaveChangesAsync(ct);
-        return snapshot;
-    }
-
-    private async Task PublishSnapshotAsync(
-        Guid tenantId,
-        string sourceKey,
-        Guid snapshotId,
-        CancellationToken ct
-    )
-    {
-        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var source = await _dbContext
-            .TenantSourceConfigurations.IgnoreQueryFilters()
-            .FirstAsync(
-                item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
-                ct
-            );
-        var snapshot = await _dbContext
-            .IngestionSnapshots.IgnoreQueryFilters()
-            .FirstAsync(item => item.Id == snapshotId, ct);
-
-        Guid? retiredSnapshotId = null;
-        if (source.ActiveSnapshotId is Guid previousActiveSnapshotId && previousActiveSnapshotId != snapshotId)
-        {
-            var previous = await _dbContext
-                .IngestionSnapshots.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(item => item.Id == previousActiveSnapshotId, ct);
-            if (previous is not null)
-            {
-                previous.Discard();
-                retiredSnapshotId = previous.Id;
-            }
-        }
-
-        snapshot.MarkPublished();
-        source.SetSnapshotPointers(snapshot.Id, null);
-        await _dbContext.SaveChangesAsync(ct);
-
-        if (retiredSnapshotId.HasValue)
-        {
-            await RekeyTenantSoftwareReferencesAsync(retiredSnapshotId.Value, snapshotId, ct);
-            await CleanupSnapshotDataAsync(retiredSnapshotId.Value, ct);
-        }
-    }
-
-    private async Task RekeyTenantSoftwareReferencesAsync(
-        Guid oldSnapshotId,
-        Guid newSnapshotId,
-        CancellationToken ct
-    )
-    {
-        var oldRows = await _dbContext
-            .SoftwareTenantRecords.IgnoreQueryFilters()
-            .Where(ts => ts.SnapshotId == oldSnapshotId)
-            .Select(ts => new { ts.Id, ts.SoftwareProductId })
-            .ToListAsync(ct);
-
-        var newRows = await _dbContext
-            .SoftwareTenantRecords.IgnoreQueryFilters()
-            .Where(ts => ts.SnapshotId == newSnapshotId)
-            .Select(ts => new { ts.Id, ts.SoftwareProductId })
-            .ToListAsync(ct);
-
-        var newByNormalized = newRows.ToDictionary(r => r.SoftwareProductId, r => r.Id);
-        var oldToNew = oldRows
-            .Where(old => newByNormalized.ContainsKey(old.SoftwareProductId))
-            .ToDictionary(old => old.Id, old => newByNormalized[old.SoftwareProductId]);
-
-        if (oldToNew.Count == 0)
-            return;
-
-        // Phase 4: Remediation entities (RemediationDecision, RemediationWorkflow, PatchingTask)
-        // are now anchored on RemediationCase, which is keyed by (TenantId, SoftwareProductId).
-        // RemediationCase IDs are stable across snapshot rotations — no re-keying required.
-        await Task.CompletedTask;
-    }
-
-    private async Task DiscardBuildingSnapshotAsync(
-        Guid tenantId,
-        string sourceKey,
-        Guid snapshotId,
-        CancellationToken ct
-    )
-    {
-        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var source = await _dbContext
-            .TenantSourceConfigurations.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(
-                item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
-                ct
-            );
-        var snapshot = await _dbContext
-            .IngestionSnapshots.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(item => item.Id == snapshotId, ct);
-
-        if (snapshot is not null && snapshot.Status == IngestionSnapshotStatuses.Building)
-        {
-            snapshot.Discard();
-        }
-
-        if (source is not null && source.BuildingSnapshotId == snapshotId)
-        {
-            source.SetSnapshotPointers(source.ActiveSnapshotId, null);
-        }
-
-        await _dbContext.SaveChangesAsync(ct);
-        await CleanupSnapshotDataAsync(snapshotId, ct);
-    }
-
-    private async Task CleanupSnapshotDataAsync(Guid snapshotId, CancellationToken ct)
-    {
-        if (_dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
-        {
-            var tenantSoftware = await _dbContext
-                .SoftwareTenantRecords.IgnoreQueryFilters()
-                .Where(item => item.SnapshotId == snapshotId)
-                .ToListAsync(ct);
-            var installations = await _dbContext
-                .SoftwareProductInstallations.IgnoreQueryFilters()
-                .Where(item => item.SnapshotId == snapshotId)
-                .ToListAsync(ct);
-
-            _dbContext.SoftwareTenantRecords.RemoveRange(tenantSoftware);
-            _dbContext.SoftwareProductInstallations.RemoveRange(installations);
-            await _dbContext.SaveChangesAsync(ct);
-            return;
-        }
-
-        await _dbContext
-            .SoftwareProductInstallations.IgnoreQueryFilters()
-            .Where(item => item.SnapshotId == snapshotId)
-            .ExecuteDeleteAsync(ct);
-        await _dbContext
-            .SoftwareTenantRecords.IgnoreQueryFilters()
-            .Where(item => item.SnapshotId == snapshotId)
-            .ExecuteDeleteAsync(ct);
-    }
 
     private bool IsInMemoryProvider()
     {

@@ -64,6 +64,7 @@ public class IngestionServicePhase3Tests
             new IngestionLeaseManager(db, NullLogger<IngestionLeaseManager>.Instance),
             new IngestionCheckpointWriter(db),
             new IngestionStagingPipeline(db, new EnrichmentJobEnqueuer(db, NullLogger<EnrichmentJobEnqueuer>.Instance), new IngestionLeaseManager(db, NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(db)),
+            new IngestionSnapshotLifecycle(db),
             NullLogger<IngestionService>.Instance);
 
         await ingestion.RunExposureDerivationAsync(tenantId, CancellationToken.None);
