@@ -61,6 +61,7 @@ public class IngestionServicePhase3Tests
             new VulnerabilityResolver(db, NullLogger<VulnerabilityResolver>.Instance),
             normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
+            new IngestionLeaseManager(db, NullLogger<IngestionLeaseManager>.Instance),
             NullLogger<IngestionService>.Instance);
 
         await ingestion.RunExposureDerivationAsync(tenantId, CancellationToken.None);

@@ -205,6 +205,7 @@ public static class DependencyInjection
         services.AddScoped<IStagedCloudApplicationMergeService, StagedCloudApplicationMergeService>();
 
         // Ingestion
+        services.AddScoped<IngestionLeaseManager>();
         services.AddScoped<IngestionService>();
 
         // Event Pusher (pushes events to TanStack Start SSE endpoint)

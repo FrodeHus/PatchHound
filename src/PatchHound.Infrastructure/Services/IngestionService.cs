@@ -20,9 +20,6 @@ public class IngestionService
     private const int AssetBatchSize = 200;
     private const int VulnerabilityBatchSize = 250;
     private static readonly TimeSpan DeviceInactiveThreshold = TimeSpan.FromDays(30);
-    private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(30);
-    private static readonly TimeSpan IngestionArtifactRetention = TimeSpan.FromDays(7);
-    private static readonly TimeSpan FailedIngestionRetention = TimeSpan.FromHours(24);
     private readonly PatchHoundDbContext _dbContext;
     private readonly IEnumerable<IIngestionSource> _sources;
     private readonly EnrichmentJobEnqueuer _enrichmentJobEnqueuer;
@@ -36,9 +33,8 @@ public class IngestionService
     private readonly VulnerabilityResolver _vulnerabilityResolver;
     private readonly NormalizedSoftwareProjectionService? _normalizedSoftwareProjectionService;
     private readonly RemediationDecisionService? _remediationDecisionService;
+    private readonly IngestionLeaseManager _leaseManager;
     private readonly ILogger<IngestionService> _logger;
-
-    private sealed record AcquiredIngestionRun(IngestionRun Run, bool Resumed);
 
     public IngestionService(
         PatchHoundDbContext dbContext,
@@ -67,6 +63,7 @@ public class IngestionService
             new VulnerabilityResolver(dbContext, NullLogger<VulnerabilityResolver>.Instance),
             normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
+            new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance),
             logger
         ) { }
 
@@ -98,6 +95,7 @@ public class IngestionService
             vulnerabilityResolver,
             normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
+            new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance),
             logger
         ) { }
 
@@ -129,6 +127,7 @@ public class IngestionService
             new VulnerabilityResolver(dbContext, NullLogger<VulnerabilityResolver>.Instance),
             normalizedSoftwareProjectionService: null,
             remediationDecisionService,
+            new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance),
             logger
         ) { }
 
@@ -146,6 +145,7 @@ public class IngestionService
         VulnerabilityResolver vulnerabilityResolver,
         NormalizedSoftwareProjectionService? normalizedSoftwareProjectionService,
         RemediationDecisionService? remediationDecisionService,
+        IngestionLeaseManager leaseManager,
         ILogger<IngestionService> logger
     )
     {
@@ -162,6 +162,7 @@ public class IngestionService
         _vulnerabilityResolver = vulnerabilityResolver;
         _normalizedSoftwareProjectionService = normalizedSoftwareProjectionService;
         _remediationDecisionService = remediationDecisionService;
+        _leaseManager = leaseManager;
         _logger = logger;
     }
 
@@ -196,7 +197,7 @@ public class IngestionService
 
         foreach (var source in sources)
         {
-            var acquiredRun = await TryAcquireIngestionRunAsync(tenantId, source.SourceKey, ct);
+            var acquiredRun = await _leaseManager.TryAcquireIngestionRunAsync(tenantId, source.SourceKey, ct);
             if (acquiredRun is null)
             {
                 _logger.LogInformation(
@@ -225,7 +226,7 @@ public class IngestionService
             {
                 for (var attempt = 1; attempt <= MaxSourceAttempts; attempt++)
                 {
-                    await UpdateRuntimeStateAsync(
+                    await _leaseManager.UpdateRuntimeStateAsync(
                         tenantId,
                         source.SourceKey,
                         runtime =>
@@ -240,7 +241,7 @@ public class IngestionService
 
                     try
                     {
-                        await ThrowIfAbortRequestedAsync(run.Id, ct);
+                        await _leaseManager.ThrowIfAbortRequestedAsync(run.Id, ct);
 
                         _logger.LogInformation(
                             "Starting ingestion from {Source} for tenant {TenantId}",
@@ -283,8 +284,8 @@ public class IngestionService
 
                         if (!assetStagingCompleted && source is IAssetInventoryBatchSource assetInventoryBatchSource)
                         {
-                            await ThrowIfAbortRequestedAsync(run.Id, ct);
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.ThrowIfAbortRequestedAsync(run.Id, ct);
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -303,15 +304,15 @@ public class IngestionService
                             fetchedSoftwareInstallationCount = assetBatchSummary.LinkCount;
                             softwareWithoutMachineReferencesCount =
                                 assetBatchSummary.SoftwareWithoutMachineReferencesCount;
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
                                 IngestionRunStatuses.MergePending,
                                 ct
                             );
-                            await ThrowIfAbortRequestedAsync(run.Id, ct);
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.ThrowIfAbortRequestedAsync(run.Id, ct);
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -362,7 +363,7 @@ public class IngestionService
                         }
                         else if (!assetStagingCompleted && source is IAssetInventorySource assetInventorySource)
                         {
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -400,14 +401,14 @@ public class IngestionService
                                 CheckpointStatuses.Staged,
                                 ct
                             );
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
                                 IngestionRunStatuses.MergePending,
                                 ct
                             );
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -468,15 +469,15 @@ public class IngestionService
 
                         if (!assetMergeCompleted && assetStagingCompleted)
                         {
-                            await ThrowIfAbortRequestedAsync(run.Id, ct);
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.ThrowIfAbortRequestedAsync(run.Id, ct);
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
                                 IngestionRunStatuses.MergePending,
                                 ct
                             );
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -523,8 +524,8 @@ public class IngestionService
 
                         if (source is ICloudApplicationSource cloudAppSource)
                         {
-                            await ThrowIfAbortRequestedAsync(run.Id, ct);
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.ThrowIfAbortRequestedAsync(run.Id, ct);
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -550,7 +551,7 @@ public class IngestionService
                             }
                             await _dbContext.SaveChangesAsync(ct);
 
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -567,8 +568,8 @@ public class IngestionService
 
                         if (!vulnerabilityStagingCompleted && source is IVulnerabilityBatchSource batchSource)
                         {
-                            await ThrowIfAbortRequestedAsync(run.Id, ct);
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.ThrowIfAbortRequestedAsync(run.Id, ct);
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -586,8 +587,8 @@ public class IngestionService
                         }
                         else if (!vulnerabilityStagingCompleted && source is IVulnerabilitySource vulnSource)
                         {
-                            await ThrowIfAbortRequestedAsync(run.Id, ct);
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.ThrowIfAbortRequestedAsync(run.Id, ct);
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -627,15 +628,15 @@ public class IngestionService
 
                         if (!vulnerabilityMergeCompleted && vulnerabilityStagingCompleted)
                         {
-                            await ThrowIfAbortRequestedAsync(run.Id, ct);
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.ThrowIfAbortRequestedAsync(run.Id, ct);
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
                                 IngestionRunStatuses.MergePending,
                                 ct
                             );
-                            await UpdateActiveRunStatusAsync(
+                            await _leaseManager.UpdateActiveRunStatusAsync(
                                 run.Id,
                                 tenantId,
                                 source.SourceKey,
@@ -791,7 +792,7 @@ public class IngestionService
                             fetchedVulnerabilityCount
                         );
 
-                        await UpdateRuntimeStateAsync(
+                        await _leaseManager.UpdateRuntimeStateAsync(
                             tenantId,
                             source.SourceKey,
                             runtime =>
@@ -804,7 +805,7 @@ public class IngestionService
                             },
                             ct
                         );
-                        await CompleteIngestionRunAsync(
+                        await _leaseManager.CompleteIngestionRunAsync(
                             run.Id,
                             tenantId,
                             source.SourceKey,
@@ -860,7 +861,7 @@ public class IngestionService
                             );
                         }
 
-                        await UpdateRuntimeStateAsync(
+                        await _leaseManager.UpdateRuntimeStateAsync(
                             tenantId,
                             source.SourceKey,
                             runtime =>
@@ -871,7 +872,7 @@ public class IngestionService
                             },
                             ct
                         );
-                        await CompleteIngestionRunAsync(
+                        await _leaseManager.CompleteIngestionRunAsync(
                             run.Id,
                             tenantId,
                             source.SourceKey,
@@ -893,7 +894,7 @@ public class IngestionService
             {
                 if (!runCompleted)
                 {
-                    await ReleaseIngestionLeaseAsync(tenantId, source.SourceKey, run.Id, ct);
+                    await _leaseManager.ReleaseIngestionLeaseAsync(tenantId, source.SourceKey, run.Id, ct);
                 }
             }
         }
@@ -960,829 +961,6 @@ public class IngestionService
                 _dbContext.ChangeTracker.Clear();
             }
         }
-    }
-
-    private async Task UpdateRuntimeStateAsync(
-        Guid tenantId,
-        string sourceKey,
-        Action<TenantIngestionRuntimeState> update,
-        CancellationToken ct
-    )
-    {
-        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var tenant = await _dbContext
-            .Tenants.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(t => t.Id == tenantId, ct);
-        if (tenant is null)
-        {
-            return;
-        }
-
-        if (IsInMemoryProvider())
-        {
-            var trackedSource = await _dbContext
-                .TenantSourceConfigurations.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(
-                    item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
-                    ct
-                );
-
-            if (trackedSource is null)
-            {
-                return;
-            }
-
-            var runtime = new TenantIngestionRuntimeState(
-                trackedSource.ManualRequestedAt,
-                trackedSource.LastStartedAt,
-                trackedSource.LastCompletedAt,
-                trackedSource.LastSucceededAt,
-                trackedSource.LastStatus,
-                trackedSource.LastError
-            );
-            update(runtime);
-
-            trackedSource.UpdateRuntime(
-                runtime.ManualRequestedAt,
-                runtime.LastStartedAt,
-                runtime.LastCompletedAt,
-                runtime.LastSucceededAt,
-                runtime.LastStatus,
-                runtime.LastError
-            );
-            await _dbContext.SaveChangesAsync(ct);
-            return;
-        }
-
-        var source = await _dbContext
-            .TenantSourceConfigurations.IgnoreQueryFilters()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
-                ct
-            );
-
-        if (source is null)
-        {
-            return;
-        }
-
-        var detachedRuntime = new TenantIngestionRuntimeState(
-            source.ManualRequestedAt,
-            source.LastStartedAt,
-            source.LastCompletedAt,
-            source.LastSucceededAt,
-            source.LastStatus,
-            source.LastError
-        );
-        update(detachedRuntime);
-
-        await _dbContext
-            .TenantSourceConfigurations.IgnoreQueryFilters()
-            .Where(item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey)
-            .ExecuteUpdateAsync(
-                setters =>
-                    setters
-                        .SetProperty(item => item.ManualRequestedAt, detachedRuntime.ManualRequestedAt)
-                        .SetProperty(item => item.LastStartedAt, detachedRuntime.LastStartedAt)
-                        .SetProperty(item => item.LastCompletedAt, detachedRuntime.LastCompletedAt)
-                        .SetProperty(item => item.LastSucceededAt, detachedRuntime.LastSucceededAt)
-                        .SetProperty(item => item.LastStatus, detachedRuntime.LastStatus)
-                        .SetProperty(item => item.LastError, detachedRuntime.LastError),
-                ct
-            );
-    }
-
-    private async Task UpdateActiveRunStatusAsync(
-        Guid runId,
-        Guid tenantId,
-        string sourceKey,
-        string status,
-        CancellationToken ct
-    )
-    {
-        await UpdateIngestionRunStatusAsync(runId, status, ct);
-        await UpdateRuntimeStateAsync(
-            tenantId,
-            sourceKey,
-            runtime => runtime.LastStatus = status,
-            ct
-        );
-    }
-
-    private async Task UpdateIngestionRunStatusAsync(Guid runId, string status, CancellationToken ct)
-    {
-        if (IsInMemoryProvider())
-        {
-            var run = await _dbContext
-                .IngestionRuns.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(item => item.Id == runId, ct);
-            run?.UpdateStatus(status);
-            if (run is not null)
-            {
-                _dbContext.IngestionRuns.Update(run);
-                await _dbContext.SaveChangesAsync(ct);
-            }
-
-            return;
-        }
-
-        await _dbContext
-            .IngestionRuns.IgnoreQueryFilters()
-            .Where(item => item.Id == runId)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, status), ct);
-    }
-
-    private async Task<AcquiredIngestionRun?> TryAcquireIngestionRunAsync(
-        Guid tenantId,
-        string sourceKey,
-        CancellationToken ct
-    )
-    {
-        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var now = DateTimeOffset.UtcNow;
-        var strategy = _dbContext.Database.CreateExecutionStrategy();
-
-        return await strategy.ExecuteAsync(async () =>
-        {
-            if (IsInMemoryProvider())
-            {
-                var sourceConfiguration = await _dbContext
-                    .TenantSourceConfigurations.IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(
-                        item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
-                        ct
-                    );
-
-                if (sourceConfiguration is null)
-                {
-                    return null;
-                }
-
-                if (sourceConfiguration.ActiveIngestionRunId.HasValue)
-                {
-                    await FinalizeAbortedRunIfPendingAsync(
-                        sourceConfiguration.ActiveIngestionRunId.Value,
-                        tenantId,
-                        normalizedSourceKey,
-                        now,
-                        ct
-                    );
-                    await _dbContext.Entry(sourceConfiguration).ReloadAsync(ct);
-                }
-
-                if (
-                    sourceConfiguration.ActiveIngestionRunId.HasValue
-                    && sourceConfiguration.LeaseExpiresAt >= now
-                )
-                {
-                    return null;
-                }
-
-                IngestionRun? resumableRun = null;
-                if (sourceConfiguration.ActiveIngestionRunId.HasValue)
-                {
-                    resumableRun = await _dbContext
-                        .IngestionRuns.IgnoreQueryFilters()
-                        .FirstOrDefaultAsync(
-                            item =>
-                                item.Id == sourceConfiguration.ActiveIngestionRunId.Value
-                                && item.AbortRequestedAt == null
-                                && (
-                                    item.Status == IngestionRunStatuses.Staging
-                                    || item.Status == IngestionRunStatuses.MergePending
-                                    || item.Status == IngestionRunStatuses.Merging
-                                )
-                                && !item.CompletedAt.HasValue,
-                            ct
-                        );
-                }
-
-                var resumed = resumableRun is not null;
-                var run = resumableRun ?? IngestionRun.Start(tenantId, normalizedSourceKey, now);
-                sourceConfiguration.AcquireLease(run.Id, now, now.Add(LeaseDuration));
-                if (!resumed)
-                {
-                    await _dbContext.IngestionRuns.AddAsync(run, ct);
-                }
-
-                await _dbContext.SaveChangesAsync(ct);
-                return new AcquiredIngestionRun(run, resumed);
-            }
-
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
-
-            var persistedSourceConfiguration = await _dbContext
-                .TenantSourceConfigurations.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(
-                    item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
-                    ct
-                );
-
-            if (persistedSourceConfiguration is null)
-            {
-                await transaction.RollbackAsync(ct);
-                return null;
-            }
-
-            if (persistedSourceConfiguration.ActiveIngestionRunId.HasValue)
-            {
-                await FinalizeAbortedRunIfPendingAsync(
-                    persistedSourceConfiguration.ActiveIngestionRunId.Value,
-                    tenantId,
-                    normalizedSourceKey,
-                    now,
-                    ct
-                );
-                persistedSourceConfiguration = await _dbContext
-                    .TenantSourceConfigurations.IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(
-                        item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
-                        ct
-                    );
-
-                if (persistedSourceConfiguration is null)
-                {
-                    await transaction.RollbackAsync(ct);
-                    return null;
-                }
-            }
-
-            if (
-                persistedSourceConfiguration.ActiveIngestionRunId.HasValue
-                && persistedSourceConfiguration.LeaseExpiresAt >= now
-            )
-            {
-                await transaction.RollbackAsync(ct);
-                return null;
-            }
-
-            IngestionRun? resumable = null;
-            if (persistedSourceConfiguration.ActiveIngestionRunId.HasValue)
-            {
-                resumable = await _dbContext
-                    .IngestionRuns.IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(
-                        item =>
-                            item.Id == persistedSourceConfiguration.ActiveIngestionRunId.Value
-                            && item.AbortRequestedAt == null
-                            && (
-                                item.Status == IngestionRunStatuses.Staging
-                                || item.Status == IngestionRunStatuses.MergePending
-                                || item.Status == IngestionRunStatuses.Merging
-                            )
-                            && !item.CompletedAt.HasValue,
-                        ct
-                    );
-            }
-
-            var resumedRun = resumable is not null;
-            var acquiredRun = resumable ?? IngestionRun.Start(tenantId, normalizedSourceKey, now);
-
-            var updatedRows = await _dbContext
-                .TenantSourceConfigurations.IgnoreQueryFilters()
-                .Where(item => item.Id == persistedSourceConfiguration.Id)
-                .ExecuteUpdateAsync(
-                    setters =>
-                        setters
-                            .SetProperty(item => item.ActiveIngestionRunId, acquiredRun.Id)
-                            .SetProperty(item => item.LeaseAcquiredAt, now)
-                            .SetProperty(item => item.LeaseExpiresAt, now.Add(LeaseDuration)),
-                    ct
-                );
-
-            if (updatedRows == 0)
-            {
-                await transaction.RollbackAsync(ct);
-                return null;
-            }
-
-            if (!resumedRun)
-            {
-                await _dbContext.IngestionRuns.AddAsync(acquiredRun, ct);
-            }
-
-            await _dbContext.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-
-            return new AcquiredIngestionRun(acquiredRun, resumedRun);
-        });
-    }
-
-    private async Task FinalizeAbortedRunIfPendingAsync(
-        Guid runId,
-        Guid tenantId,
-        string sourceKey,
-        DateTimeOffset completedAt,
-        CancellationToken ct
-    )
-    {
-        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-
-        if (IsInMemoryProvider())
-        {
-            var run = await _dbContext
-                .IngestionRuns.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(item => item.Id == runId, ct);
-
-            if (
-                run is null
-                || run.CompletedAt.HasValue
-                || !run.AbortRequestedAt.HasValue
-                || !IngestionRunStatePolicy.IsActive(run.Status)
-            )
-            {
-                return;
-            }
-
-            _dbContext.Entry(run).Property(nameof(IngestionRun.CompletedAt)).CurrentValue =
-                completedAt;
-            _dbContext.Entry(run).Property(nameof(IngestionRun.Status)).CurrentValue =
-                IngestionRunStatuses.FailedTerminal;
-            _dbContext.Entry(run).Property(nameof(IngestionRun.Error)).CurrentValue =
-                IngestionFailurePolicy.Describe(new IngestionAbortedException());
-            var source = await _dbContext
-                .TenantSourceConfigurations.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(
-                    item =>
-                        item.TenantId == tenantId
-                        && item.SourceKey == normalizedSourceKey
-                        && item.ActiveIngestionRunId == runId,
-                    ct
-                );
-            source?.ReleaseLease(runId);
-            await _dbContext.SaveChangesAsync(ct);
-            return;
-        }
-
-        await _dbContext
-            .IngestionRuns.IgnoreQueryFilters()
-            .Where(item =>
-                item.Id == runId
-                && item.AbortRequestedAt != null
-                && item.CompletedAt == null
-                && (
-                    item.Status == IngestionRunStatuses.Staging
-                    || item.Status == IngestionRunStatuses.MergePending
-                    || item.Status == IngestionRunStatuses.Merging
-                ))
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(item => item.CompletedAt, completedAt)
-                    .SetProperty(item => item.Status, IngestionRunStatuses.FailedTerminal)
-                    .SetProperty(
-                        item => item.Error,
-                        IngestionFailurePolicy.Describe(new IngestionAbortedException())
-                    ),
-                ct
-            );
-
-        await _dbContext
-            .TenantSourceConfigurations.IgnoreQueryFilters()
-            .Where(item =>
-                item.TenantId == tenantId
-                && item.SourceKey == normalizedSourceKey
-                && item.ActiveIngestionRunId == runId)
-            .ExecuteUpdateAsync(
-                setters =>
-                    setters
-                        .SetProperty(item => item.ActiveIngestionRunId, (Guid?)null)
-                        .SetProperty(item => item.LeaseAcquiredAt, (DateTimeOffset?)null)
-                        .SetProperty(item => item.LeaseExpiresAt, (DateTimeOffset?)null),
-                ct
-            );
-    }
-
-    private async Task ThrowIfAbortRequestedAsync(Guid runId, CancellationToken ct)
-    {
-        var abortRequestedAt = await _dbContext
-            .IngestionRuns.IgnoreQueryFilters()
-            .Where(item => item.Id == runId)
-            .Select(item => item.AbortRequestedAt)
-            .FirstOrDefaultAsync(ct);
-
-        if (abortRequestedAt.HasValue)
-        {
-            _dbContext.ChangeTracker.Clear();
-            throw new IngestionAbortedException();
-        }
-    }
-
-    private async Task CompleteIngestionRunAsync(
-        Guid runId,
-        Guid tenantId,
-        string sourceKey,
-        bool succeeded,
-        string? error,
-        StagedVulnerabilityMergeSummary vulnerabilityMergeSummary,
-        StagedAssetMergeSummary assetMergeSummary,
-        int deactivatedMachineCount,
-        string? failureStatus,
-        CancellationToken ct
-    )
-    {
-        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        var completedAt = DateTimeOffset.UtcNow;
-        if (IsInMemoryProvider())
-        {
-            var run = await _dbContext
-                .IngestionRuns.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(item => item.Id == runId, ct);
-            if (run is null)
-            {
-                return;
-            }
-
-            if (succeeded)
-            {
-                run.CompleteSucceeded(
-                    completedAt,
-                    assetMergeSummary.StagedMachineCount,
-                    assetMergeSummary.StagedSoftwareCount,
-                    vulnerabilityMergeSummary.StagedVulnerabilityCount,
-                    assetMergeSummary.PersistedMachineCount,
-                    deactivatedMachineCount,
-                    assetMergeSummary.PersistedSoftwareCount,
-                    vulnerabilityMergeSummary.PersistedVulnerabilityCount
-                );
-            }
-            else
-            {
-                run.CompleteFailed(
-                    completedAt,
-                    error ?? "Unknown ingestion failure",
-                    failureStatus ?? IngestionRunStatuses.FailedRecoverable,
-                    assetMergeSummary.StagedMachineCount,
-                    assetMergeSummary.StagedSoftwareCount,
-                    vulnerabilityMergeSummary.StagedVulnerabilityCount,
-                    assetMergeSummary.PersistedMachineCount,
-                    deactivatedMachineCount,
-                    assetMergeSummary.PersistedSoftwareCount,
-                    vulnerabilityMergeSummary.PersistedVulnerabilityCount
-                );
-            }
-
-            var source = await _dbContext
-                .TenantSourceConfigurations.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(
-                    item =>
-                        item.TenantId == tenantId
-                        && item.SourceKey == normalizedSourceKey
-                        && item.ActiveIngestionRunId == runId,
-                    ct
-                );
-            if (source is not null)
-            {
-                source.ReleaseLease(runId);
-                source.UpdateRuntime(
-                    source.ManualRequestedAt,
-                    source.LastStartedAt,
-                    completedAt,
-                    succeeded ? completedAt : source.LastSucceededAt,
-                    succeeded
-                        ? IngestionRunStatuses.Succeeded
-                        : failureStatus ?? IngestionRunStatuses.FailedRecoverable,
-                    succeeded ? string.Empty : error ?? "Unknown ingestion failure"
-                );
-            }
-            await _dbContext.SaveChangesAsync(ct);
-
-            if (succeeded)
-            {
-                await ClearStagedDataForRunAsync(runId, ct);
-            }
-
-            var inMemoryCleanupSummary = await CleanupExpiredIngestionArtifactsAsync(
-                completedAt,
-                ct
-            );
-            if (inMemoryCleanupSummary.PrunedRunCount > 0)
-            {
-                _logger.LogInformation(
-                    "Pruned ingestion artifacts: runs={PrunedRunCount} stagedVulnerabilities={PrunedVulnerabilityCount} stagedExposures={PrunedExposureCount} stagedAssets={PrunedAssetCount} stagedSoftwareLinks={PrunedSoftwareLinkCount}",
-                    inMemoryCleanupSummary.PrunedRunCount,
-                    inMemoryCleanupSummary.PrunedVulnerabilityCount,
-                    inMemoryCleanupSummary.PrunedExposureCount,
-                    inMemoryCleanupSummary.PrunedAssetCount,
-                    inMemoryCleanupSummary.PrunedSoftwareLinkCount
-                );
-            }
-            return;
-        }
-
-        var strategy = _dbContext.Database.CreateExecutionStrategy();
-
-        await strategy.ExecuteAsync(async () =>
-        {
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
-
-            var updatedRunRows = succeeded
-                ? await _dbContext
-                    .IngestionRuns.IgnoreQueryFilters()
-                    .Where(item => item.Id == runId)
-                    .ExecuteUpdateAsync(
-                        setters =>
-                            setters
-                                .SetProperty(item => item.CompletedAt, completedAt)
-                                .SetProperty(item => item.Status, IngestionRunStatuses.Succeeded)
-                                .SetProperty(item => item.StagedMachineCount, assetMergeSummary.StagedMachineCount)
-                                .SetProperty(item => item.StagedSoftwareCount, assetMergeSummary.StagedSoftwareCount)
-                                .SetProperty(item => item.StagedVulnerabilityCount, vulnerabilityMergeSummary.StagedVulnerabilityCount)
-                                .SetProperty(item => item.PersistedMachineCount, assetMergeSummary.PersistedMachineCount)
-                                .SetProperty(item => item.DeactivatedMachineCount, deactivatedMachineCount)
-                                .SetProperty(item => item.PersistedSoftwareCount, assetMergeSummary.PersistedSoftwareCount)
-                                .SetProperty(item => item.PersistedVulnerabilityCount, vulnerabilityMergeSummary.PersistedVulnerabilityCount)
-                                .SetProperty(item => item.Error, string.Empty),
-                        ct
-                    )
-                : await _dbContext
-                    .IngestionRuns.IgnoreQueryFilters()
-                    .Where(item => item.Id == runId)
-                    .ExecuteUpdateAsync(
-                        setters =>
-                            setters
-                                .SetProperty(item => item.CompletedAt, completedAt)
-                                .SetProperty(item => item.Status, failureStatus ?? IngestionRunStatuses.FailedRecoverable)
-                                .SetProperty(item => item.StagedMachineCount, assetMergeSummary.StagedMachineCount)
-                                .SetProperty(item => item.StagedSoftwareCount, assetMergeSummary.StagedSoftwareCount)
-                                .SetProperty(item => item.StagedVulnerabilityCount, vulnerabilityMergeSummary.StagedVulnerabilityCount)
-                                .SetProperty(item => item.PersistedMachineCount, assetMergeSummary.PersistedMachineCount)
-                                .SetProperty(item => item.DeactivatedMachineCount, deactivatedMachineCount)
-                                .SetProperty(item => item.PersistedSoftwareCount, assetMergeSummary.PersistedSoftwareCount)
-                                .SetProperty(item => item.PersistedVulnerabilityCount, vulnerabilityMergeSummary.PersistedVulnerabilityCount)
-                                .SetProperty(
-                                    item => item.Error,
-                                    error ?? "Unknown ingestion failure"
-                                ),
-                        ct
-                    );
-
-            if (updatedRunRows == 0)
-            {
-                _logger.LogWarning(
-                    "Expected to complete ingestion run {RunId} for tenant {TenantId} and source {SourceKey}, but no run row was updated.",
-                    runId,
-                    tenantId,
-                    normalizedSourceKey
-                );
-            }
-
-            await _dbContext
-                .TenantSourceConfigurations.IgnoreQueryFilters()
-                .Where(item =>
-                    item.TenantId == tenantId
-                    && item.SourceKey == normalizedSourceKey
-                    && item.ActiveIngestionRunId == runId
-                )
-                .ExecuteUpdateAsync(
-                    setters =>
-                        setters
-                            .SetProperty(item => item.ActiveIngestionRunId, (Guid?)null)
-                            .SetProperty(item => item.LeaseAcquiredAt, (DateTimeOffset?)null)
-                            .SetProperty(item => item.LeaseExpiresAt, (DateTimeOffset?)null),
-                    ct
-                );
-
-            await _dbContext
-                .TenantSourceConfigurations.IgnoreQueryFilters()
-                .Where(item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey)
-                .ExecuteUpdateAsync(
-                    setters =>
-                        setters
-                            .SetProperty(item => item.LastCompletedAt, completedAt)
-                            .SetProperty(
-                                item => item.LastSucceededAt,
-                                item => succeeded ? completedAt : item.LastSucceededAt
-                            )
-                            .SetProperty(
-                                item => item.LastStatus,
-                                succeeded
-                                    ? IngestionRunStatuses.Succeeded
-                                    : failureStatus ?? IngestionRunStatuses.FailedRecoverable
-                            )
-                            .SetProperty(
-                                item => item.LastError,
-                                succeeded ? string.Empty : error ?? "Unknown ingestion failure"
-                            ),
-                    ct
-                );
-
-            await transaction.CommitAsync(ct);
-        });
-
-        if (succeeded)
-        {
-            await ClearStagedDataForRunAsync(runId, ct);
-        }
-
-        var cleanupSummary = await CleanupExpiredIngestionArtifactsAsync(completedAt, ct);
-        if (cleanupSummary.PrunedRunCount > 0)
-        {
-            _logger.LogInformation(
-                "Pruned ingestion artifacts: runs={PrunedRunCount} stagedVulnerabilities={PrunedVulnerabilityCount} stagedExposures={PrunedExposureCount} stagedAssets={PrunedAssetCount} stagedSoftwareLinks={PrunedSoftwareLinkCount}",
-                cleanupSummary.PrunedRunCount,
-                cleanupSummary.PrunedVulnerabilityCount,
-                cleanupSummary.PrunedExposureCount,
-                cleanupSummary.PrunedAssetCount,
-                cleanupSummary.PrunedSoftwareLinkCount
-            );
-        }
-    }
-
-    private async Task<IngestionArtifactCleanupSummary> CleanupExpiredIngestionArtifactsAsync(
-        DateTimeOffset now,
-        CancellationToken ct
-    )
-    {
-        var completedCutoff = now.Subtract(IngestionArtifactRetention);
-        var failedCutoff = now.Subtract(FailedIngestionRetention);
-        var expiredRunIds = await _dbContext
-            .IngestionRuns.IgnoreQueryFilters()
-            .Where(item =>
-                item.CompletedAt.HasValue
-                && (
-                    ((item.Status == IngestionRunStatuses.FailedRecoverable
-                        || item.Status == IngestionRunStatuses.FailedTerminal)
-                        && item.CompletedAt.Value < failedCutoff)
-                    || ((item.Status != IngestionRunStatuses.FailedRecoverable
-                            && item.Status != IngestionRunStatuses.FailedTerminal)
-                        && item.CompletedAt.Value < completedCutoff)
-                )
-            )
-            .Select(item => item.Id)
-            .ToListAsync(ct);
-
-        if (expiredRunIds.Count == 0)
-        {
-            return new IngestionArtifactCleanupSummary(0, 0, 0, 0, 0);
-        }
-
-        if (IsInMemoryProvider())
-        {
-            var stagedExposures = await _dbContext
-                .StagedVulnerabilityExposures.IgnoreQueryFilters()
-                .Where(item => expiredRunIds.Contains(item.IngestionRunId))
-                .ToListAsync(ct);
-            var stagedVulnerabilities = await _dbContext
-                .StagedVulnerabilities.IgnoreQueryFilters()
-                .Where(item => expiredRunIds.Contains(item.IngestionRunId))
-                .ToListAsync(ct);
-            var stagedSoftwareLinks = await _dbContext
-                .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
-                .Where(item => expiredRunIds.Contains(item.IngestionRunId))
-                .ToListAsync(ct);
-            var stagedDeviceRows = await _dbContext
-                .StagedDevices.IgnoreQueryFilters()
-                .Where(item => expiredRunIds.Contains(item.IngestionRunId))
-                .ToListAsync(ct);
-            var checkpoints = await _dbContext
-                .IngestionCheckpoints.IgnoreQueryFilters()
-                .Where(item => expiredRunIds.Contains(item.IngestionRunId))
-                .ToListAsync(ct);
-            var runs = await _dbContext
-                .IngestionRuns.IgnoreQueryFilters()
-                .Where(item => expiredRunIds.Contains(item.Id))
-                .ToListAsync(ct);
-
-            _dbContext.StagedVulnerabilityExposures.RemoveRange(stagedExposures);
-            _dbContext.StagedVulnerabilities.RemoveRange(stagedVulnerabilities);
-            _dbContext.StagedDeviceSoftwareInstallations.RemoveRange(stagedSoftwareLinks);
-            _dbContext.StagedDevices.RemoveRange(stagedDeviceRows);
-            _dbContext.IngestionCheckpoints.RemoveRange(checkpoints);
-            _dbContext.IngestionRuns.RemoveRange(runs);
-            await _dbContext.SaveChangesAsync(ct);
-
-            return new IngestionArtifactCleanupSummary(
-                runs.Count,
-                stagedVulnerabilities.Count,
-                stagedExposures.Count,
-                stagedDeviceRows.Count,
-                stagedSoftwareLinks.Count
-            );
-        }
-
-        var prunedExposureCount = await _dbContext
-            .StagedVulnerabilityExposures.IgnoreQueryFilters()
-            .Where(item => expiredRunIds.Contains(item.IngestionRunId))
-            .ExecuteDeleteAsync(ct);
-        var prunedVulnerabilityCount = await _dbContext
-            .StagedVulnerabilities.IgnoreQueryFilters()
-            .Where(item => expiredRunIds.Contains(item.IngestionRunId))
-            .ExecuteDeleteAsync(ct);
-        var prunedSoftwareLinkCount = await _dbContext
-            .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
-            .Where(item => expiredRunIds.Contains(item.IngestionRunId))
-            .ExecuteDeleteAsync(ct);
-        var prunedAssetCount = await _dbContext
-            .StagedDevices.IgnoreQueryFilters()
-            .Where(item => expiredRunIds.Contains(item.IngestionRunId))
-            .ExecuteDeleteAsync(ct);
-        await _dbContext
-            .IngestionCheckpoints.IgnoreQueryFilters()
-            .Where(item => expiredRunIds.Contains(item.IngestionRunId))
-            .ExecuteDeleteAsync(ct);
-        var prunedRunCount = await _dbContext
-            .IngestionRuns.IgnoreQueryFilters()
-            .Where(item => expiredRunIds.Contains(item.Id))
-            .ExecuteDeleteAsync(ct);
-
-        return new IngestionArtifactCleanupSummary(
-            prunedRunCount,
-            prunedVulnerabilityCount,
-            prunedExposureCount,
-            prunedAssetCount,
-            prunedSoftwareLinkCount
-        );
-    }
-
-    private async Task ReleaseIngestionLeaseAsync(
-        Guid tenantId,
-        string sourceKey,
-        Guid runId,
-        CancellationToken ct
-    )
-    {
-        var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
-        if (IsInMemoryProvider())
-        {
-            var source = await _dbContext
-                .TenantSourceConfigurations.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(
-                    item => item.TenantId == tenantId && item.SourceKey == normalizedSourceKey,
-                    ct
-                );
-            if (source is null)
-            {
-                return;
-            }
-
-            source.ReleaseLease(runId);
-            await _dbContext.SaveChangesAsync(ct);
-            return;
-        }
-
-        await _dbContext
-            .TenantSourceConfigurations.IgnoreQueryFilters()
-            .Where(item =>
-                item.TenantId == tenantId
-                && item.SourceKey == normalizedSourceKey
-                && item.ActiveIngestionRunId == runId
-            )
-            .ExecuteUpdateAsync(
-                setters =>
-                    setters
-                        .SetProperty(item => item.ActiveIngestionRunId, (Guid?)null)
-                        .SetProperty(item => item.LeaseAcquiredAt, (DateTimeOffset?)null)
-                        .SetProperty(item => item.LeaseExpiresAt, (DateTimeOffset?)null),
-                ct
-            );
-    }
-
-    private async Task ClearStagedDataForRunAsync(Guid ingestionRunId, CancellationToken ct)
-    {
-        if (IsInMemoryProvider())
-        {
-            var stagedExposures = await _dbContext
-                .StagedVulnerabilityExposures.IgnoreQueryFilters()
-                .Where(item => item.IngestionRunId == ingestionRunId)
-                .ToListAsync(ct);
-            var stagedVulnerabilities = await _dbContext
-                .StagedVulnerabilities.IgnoreQueryFilters()
-                .Where(item => item.IngestionRunId == ingestionRunId)
-                .ToListAsync(ct);
-            var stagedSoftwareLinks = await _dbContext
-                .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
-                .Where(item => item.IngestionRunId == ingestionRunId)
-                .ToListAsync(ct);
-            var stagedDevices = await _dbContext
-                .StagedDevices.IgnoreQueryFilters()
-                .Where(item => item.IngestionRunId == ingestionRunId)
-                .ToListAsync(ct);
-
-            _dbContext.StagedVulnerabilityExposures.RemoveRange(stagedExposures);
-            _dbContext.StagedVulnerabilities.RemoveRange(stagedVulnerabilities);
-            _dbContext.StagedDeviceSoftwareInstallations.RemoveRange(stagedSoftwareLinks);
-            _dbContext.StagedDevices.RemoveRange(stagedDevices);
-            await _dbContext.SaveChangesAsync(ct);
-            return;
-        }
-
-        await _dbContext
-            .StagedVulnerabilityExposures.IgnoreQueryFilters()
-            .Where(item => item.IngestionRunId == ingestionRunId)
-            .ExecuteDeleteAsync(ct);
-        await _dbContext
-            .StagedVulnerabilities.IgnoreQueryFilters()
-            .Where(item => item.IngestionRunId == ingestionRunId)
-            .ExecuteDeleteAsync(ct);
-        await _dbContext
-            .StagedDeviceSoftwareInstallations.IgnoreQueryFilters()
-            .Where(item => item.IngestionRunId == ingestionRunId)
-            .ExecuteDeleteAsync(ct);
-        await _dbContext
-            .StagedDevices.IgnoreQueryFilters()
-            .Where(item => item.IngestionRunId == ingestionRunId)
-            .ExecuteDeleteAsync(ct);
     }
 
     private async Task<bool> IsCheckpointCompletedAsync(
@@ -1934,7 +1112,7 @@ public class IngestionService
 
         while (true)
         {
-            await ThrowIfAbortRequestedAsync(ingestionRunId, ct);
+            await _leaseManager.ThrowIfAbortRequestedAsync(ingestionRunId, ct);
             batchNumber++;
             var batch = await batchSource.FetchVulnerabilityBatchAsync(
                 tenantId,
@@ -2472,7 +1650,7 @@ public class IngestionService
 
         while (true)
         {
-            await ThrowIfAbortRequestedAsync(ingestionRunId, ct);
+            await _leaseManager.ThrowIfAbortRequestedAsync(ingestionRunId, ct);
             var batch = await batchSource.FetchAssetBatchAsync(
                 tenantId,
                 cursorJson,
