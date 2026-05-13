@@ -6,6 +6,11 @@ using StackExchange.Redis;
 
 namespace PatchHound.Infrastructure.Services;
 
+/// <summary>
+/// Scoped per-ingestion-run state cache. Registered as <c>AddScoped</c> — one instance
+/// per DI scope, not a singleton. Each <see cref="IngestionService"/> scope gets its own
+/// clean instance; concurrent ingestion runs for different tenants do not share state.
+/// </summary>
 public class IngestionStateCache
 {
     private readonly IConnectionMultiplexer? _redis;
