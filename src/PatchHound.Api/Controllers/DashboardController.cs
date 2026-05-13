@@ -100,7 +100,8 @@ public class DashboardController : ControllerBase
                 && (e.Vulnerability.VendorSeverity == Severity.Critical || e.Vulnerability.VendorSeverity == Severity.High))
             .Where(e => !_dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
                 remediation.TenantId == tenantId
-                && remediation.Outcome == RemediationOutcome.AlternateMitigation
+                && (remediation.Outcome == RemediationOutcome.RiskAcceptance
+                    || remediation.Outcome == RemediationOutcome.AlternateMitigation)
                 && remediation.VulnerabilityId == e.VulnerabilityId))
             .GroupBy(e => e.VulnerabilityId)
             .Select(g => new
@@ -1109,7 +1110,8 @@ public class DashboardController : ControllerBase
                 && (ep.ClosedAt == null || ep.ClosedAt >= trendWindowStart)
                 && !_dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
                     remediation.TenantId == tenantId
-                    && remediation.Outcome == RemediationOutcome.RiskAcceptance
+                    && (remediation.Outcome == RemediationOutcome.RiskAcceptance
+                        || remediation.Outcome == RemediationOutcome.AlternateMitigation)
                     && remediation.VulnerabilityId == ep.Exposure.VulnerabilityId))
             .Select(ep => new
             {
@@ -1181,7 +1183,8 @@ public class DashboardController : ControllerBase
                 && (ep.ClosedAt == null || ep.ClosedAt >= burnStart)
                 && !_dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
                     remediation.TenantId == tenantId
-                    && remediation.Outcome == RemediationOutcome.RiskAcceptance
+                    && (remediation.Outcome == RemediationOutcome.RiskAcceptance
+                        || remediation.Outcome == RemediationOutcome.AlternateMitigation)
                     && remediation.VulnerabilityId == ep.Exposure.VulnerabilityId))
             .Select(ep => new
             {
@@ -1402,7 +1405,8 @@ public class DashboardController : ControllerBase
         return query.Where(exposure =>
             !_dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
                 remediation.TenantId == tenantId
-                && remediation.Outcome == RemediationOutcome.RiskAcceptance
+                && (remediation.Outcome == RemediationOutcome.RiskAcceptance
+                    || remediation.Outcome == RemediationOutcome.AlternateMitigation)
                 && remediation.VulnerabilityId == exposure.VulnerabilityId));
     }
 

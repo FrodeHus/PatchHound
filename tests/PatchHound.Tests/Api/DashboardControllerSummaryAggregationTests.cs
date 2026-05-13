@@ -105,11 +105,14 @@ public sealed class DashboardControllerSummaryAggregationTests : IDisposable
         dto.TopCriticalVulnerabilities.Should().NotContain(item => item.Id == seed.ExposureA.VulnerabilityId);
     }
 
-    [Fact]
-    public async Task GetSummary_AcceptedRiskVulnerability_IsExcludedFromPresentationListsAndCharts()
+    [Theory]
+    [InlineData(RemediationOutcome.RiskAcceptance)]
+    [InlineData(RemediationOutcome.AlternateMitigation)]
+    public async Task GetSummary_ExceptionVulnerability_IsExcludedFromPresentationListsAndCharts(
+        RemediationOutcome outcome)
     {
         var seed = await CanonicalSeed.PlantAsync(_dbContext, _tenantId);
-        await AddApprovedRemediationAsync(seed.ProductA.Id, seed.ExposureA.VulnerabilityId, RemediationOutcome.RiskAcceptance);
+        await AddApprovedRemediationAsync(seed.ProductA.Id, seed.ExposureA.VulnerabilityId, outcome);
 
         var action = await _controller.GetSummary(new DashboardFilterQuery(), CancellationToken.None);
 

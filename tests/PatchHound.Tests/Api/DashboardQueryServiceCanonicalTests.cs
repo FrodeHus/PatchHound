@@ -67,13 +67,16 @@ public class DashboardQueryServiceCanonicalTests : IAsyncDisposable
         result.TopRecurringAssets[0].AssetId.Should().Be(seed.DeviceA.Id);
     }
 
-    [Fact]
-    public async Task GetRecurrenceDataAsync_AcceptedRiskVulnerability_NotListedOrCounted()
+    [Theory]
+    [InlineData(RemediationOutcome.RiskAcceptance)]
+    [InlineData(RemediationOutcome.AlternateMitigation)]
+    public async Task GetRecurrenceDataAsync_ExceptionVulnerability_NotListedOrCounted(
+        RemediationOutcome outcome)
     {
         var seed = await CanonicalSeed.PlantAsync(_db, _tenantId);
         var episode = ExposureEpisode.Open(_tenantId, seed.ExposureA.Id, 2, DateTimeOffset.UtcNow);
         _db.ExposureEpisodes.Add(episode);
-        await AddApprovedRemediationAsync(seed.ProductA.Id, seed.ExposureA.VulnerabilityId, RemediationOutcome.RiskAcceptance);
+        await AddApprovedRemediationAsync(seed.ProductA.Id, seed.ExposureA.VulnerabilityId, outcome);
 
         var svc = CreateSut();
         var result = await svc.GetRecurrenceDataAsync(_tenantId, CancellationToken.None);
@@ -100,11 +103,14 @@ public class DashboardQueryServiceCanonicalTests : IAsyncDisposable
         result.Appeared.Should().NotBeEmpty();
     }
 
-    [Fact]
-    public async Task BuildRiskChangeBriefAsync_AcceptedRiskAppearedExposure_NotListedOrCounted()
+    [Theory]
+    [InlineData(RemediationOutcome.RiskAcceptance)]
+    [InlineData(RemediationOutcome.AlternateMitigation)]
+    public async Task BuildRiskChangeBriefAsync_ExceptionAppearedExposure_NotListedOrCounted(
+        RemediationOutcome outcome)
     {
         var seed = await CanonicalSeed.PlantAsync(_db, _tenantId);
-        await AddApprovedRemediationAsync(seed.ProductA.Id, seed.ExposureA.VulnerabilityId, RemediationOutcome.RiskAcceptance);
+        await AddApprovedRemediationAsync(seed.ProductA.Id, seed.ExposureA.VulnerabilityId, outcome);
 
         var svc = CreateSut();
         var result = await svc.BuildRiskChangeBriefAsync(

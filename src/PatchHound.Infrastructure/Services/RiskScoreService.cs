@@ -17,8 +17,7 @@ public class RiskScoreService(
 
     /// <summary>
     /// Multiplier applied to an exposure's environmental CVSS when an active, approved
-    /// remediation decision reduces its risk (<see cref="RemediationOutcome.AlternateMitigation"/>
-    /// or <see cref="RemediationOutcome.ApprovedForPatching"/> within the maintenance window).
+    /// patching decision reduces its risk within the maintenance window.
     /// A value of 0.5 represents a 50 % score reduction.
     /// </summary>
     public const decimal RemediationAdjustmentFactor = 0.5m;
@@ -444,20 +443,23 @@ public class RiskScoreService(
 
         // Build a set of software product ids for which remediation actively lowers risk.
         // Rules:
-        //   AlternateMitigation  → always reduces (while Approved)
         //   ApprovedForPatching  → reduces only when maintenance window has NOT been missed
         //   RiskAcceptance       → no change (visibility only)
+        //   AlternateMitigation  → considered fixed via approved vulnerability remediation coverage
         //   PatchingDeferred     → no change (administrative only)
         var reducedSoftwareProductIds = activeDecisions
             .Where(d =>
-                d.Outcome == RemediationOutcome.AlternateMitigation
-                || (d.Outcome == RemediationOutcome.ApprovedForPatching
-                    && !(d.MaintenanceWindowDate.HasValue && d.MaintenanceWindowDate.Value < now)))
+                d.Outcome == RemediationOutcome.ApprovedForPatching
+                && !(d.MaintenanceWindowDate.HasValue && d.MaintenanceWindowDate.Value < now))
             .Select(d => d.SoftwareProductId)
             .ToHashSet();
 
         var episodeScores = await dbContext.ExposureAssessments.AsNoTracking()
             .Where(item => item.TenantId == tenantId && item.Exposure.Status == ExposureStatus.Open)
+            .Where(item => !dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
+                remediation.TenantId == tenantId
+                && remediation.Outcome == RemediationOutcome.AlternateMitigation
+                && remediation.VulnerabilityId == item.Exposure.VulnerabilityId))
             .Select(item => new
             {
                 AssetId = item.Exposure.DeviceId,
@@ -596,6 +598,10 @@ public class RiskScoreService(
     {
         var exposures = await dbContext.DeviceVulnerabilityExposures.AsNoTracking()
             .Where(item => item.TenantId == tenantId && item.SoftwareProductId != null)
+            .Where(item => !dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
+                remediation.TenantId == tenantId
+                && remediation.Outcome == RemediationOutcome.AlternateMitigation
+                && remediation.VulnerabilityId == item.VulnerabilityId))
             .Select(item => new
             {
                 item.Id,

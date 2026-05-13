@@ -180,10 +180,12 @@ public class VulnerabilitiesControllerTests : IDisposable
         payload.Items[0].ExternalId.Should().Be("CVE-2026-0400");
     }
 
-    [Fact]
-    public async Task List_DefaultView_ExcludesAcceptedRiskVulnerabilities()
+    [Theory]
+    [InlineData(RemediationOutcome.RiskAcceptance)]
+    [InlineData(RemediationOutcome.AlternateMitigation)]
+    public async Task List_DefaultView_ExcludesExceptionVulnerabilities(RemediationOutcome outcome)
     {
-        var acceptedRisk = Vulnerability.Create("nvd", "CVE-2026-0410", "Accepted risk", "desc",
+        var exceptionVulnerability = Vulnerability.Create("nvd", "CVE-2026-0410", "Exception vulnerability", "desc",
             Severity.Critical, 9.8m, null, DateTimeOffset.UtcNow.AddDays(-10));
         var openVulnerability = Vulnerability.Create("nvd", "CVE-2026-0411", "Open vulnerability", "desc",
             Severity.High, 7.5m, null, DateTimeOffset.UtcNow.AddDays(-20));
@@ -192,13 +194,13 @@ public class VulnerabilitiesControllerTests : IDisposable
         var decision = RemediationDecision.Create(
             _tenantId,
             remediationCase.Id,
-            RemediationOutcome.RiskAcceptance,
+            outcome,
             "Accepted",
             _tenantContext.CurrentUserId,
             DecisionApprovalStatus.Approved,
-            expiryDate: DateTimeOffset.UtcNow.AddDays(30));
+            expiryDate: outcome == RemediationOutcome.RiskAcceptance ? DateTimeOffset.UtcNow.AddDays(30) : null);
 
-        _dbContext.Vulnerabilities.AddRange(acceptedRisk, openVulnerability);
+        _dbContext.Vulnerabilities.AddRange(exceptionVulnerability, openVulnerability);
         _dbContext.SoftwareProducts.Add(product);
         _dbContext.RemediationCases.Add(remediationCase);
         _dbContext.RemediationDecisions.Add(decision);
@@ -206,7 +208,7 @@ public class VulnerabilitiesControllerTests : IDisposable
 
         _dbContext.ApprovedVulnerabilityRemediations.Add(ApprovedVulnerabilityRemediation.Create(
             _tenantId,
-            acceptedRisk.Id,
+            exceptionVulnerability.Id,
             remediationCase.Id,
             decision.Id,
             decision.Outcome,
@@ -218,7 +220,7 @@ public class VulnerabilitiesControllerTests : IDisposable
         var result = action.Result.Should().BeOfType<OkObjectResult>().Subject;
         var payload = result.Value.Should().BeOfType<PagedResponse<VulnerabilityDto>>().Subject;
 
-        payload.Items.Should().NotContain(item => item.Id == acceptedRisk.Id);
+        payload.Items.Should().NotContain(item => item.Id == exceptionVulnerability.Id);
         payload.Items.Should().Contain(item => item.Id == openVulnerability.Id);
     }
 

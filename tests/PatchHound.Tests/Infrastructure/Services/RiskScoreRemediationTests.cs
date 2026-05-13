@@ -12,7 +12,7 @@ namespace PatchHound.Tests.Infrastructure.Services;
 ///
 /// Decision rules:
 ///   RiskAcceptance      → no score change (visibility only)
-///   AlternateMitigation → score lowered by RemediationAdjustmentFactor while Approved
+///   AlternateMitigation → excluded from risk and impact while Approved
 ///   ApprovedForPatching → score lowered while Approved AND maintenance window not missed
 ///   ApprovedForPatching → score unchanged when maintenance window date is in the past
 ///   PatchingDeferred    → no score change (administrative only)
@@ -33,18 +33,18 @@ public class RiskScoreRemediationTests : IAsyncDisposable
     // Helpers
     // ────────────────────────────────────────────────────────────────────────
 
-    private async Task<decimal> GetDeviceScoreAsync(Guid deviceId)
+    private async Task<decimal?> GetDeviceScoreAsync(Guid deviceId)
     {
         await new RiskScoreService(_db, Substitute.For<ILogger<RiskScoreService>>())
             .RecalculateForTenantAsync(_tenantId, CancellationToken.None);
 
         return _db.DeviceRiskScores
-            .Single(s => s.DeviceId == deviceId)
-            .OverallScore;
+            .SingleOrDefault(s => s.DeviceId == deviceId)
+            ?.OverallScore;
     }
 
     private async Task<decimal> GetBaselineScoreAsync(Guid deviceId)
-        => await GetDeviceScoreAsync(deviceId);
+        => await GetDeviceScoreAsync(deviceId) ?? throw new InvalidOperationException("Expected baseline score.");
 
     /// <summary>
     /// Seeds a RemediationCase + RemediationDecision for <paramref name="softwareProductId"/>
@@ -115,28 +115,35 @@ public class RiskScoreRemediationTests : IAsyncDisposable
     }
 
     // ────────────────────────────────────────────────────────────────────────
-    // Test 2 — AlternateMitigation (Approved) → score lower than baseline
+    // Test 2 — AlternateMitigation (Approved) → exposure considered fixed
     // ────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task RecalculateForTenantAsync_AlternateMitigation_Approved_ScoreLowered()
+    public async Task RecalculateForTenantAsync_AlternateMitigation_Approved_RemovesExposureFromRiskScores()
     {
         var seed = await CanonicalSeed.PlantAsync(_db, _tenantId);
-
-        var baseline = await GetBaselineScoreAsync(seed.DeviceA.Id);
 
         _db.DeviceRiskScores.RemoveRange(_db.DeviceRiskScores);
         await _db.SaveChangesAsync();
 
-        await SeedDecisionAsync(
+        var decision = await SeedDecisionAsync(
             seed.ProductA.Id,
             RemediationOutcome.AlternateMitigation,
             approvalStatus: DecisionApprovalStatus.Approved);
+        _db.ApprovedVulnerabilityRemediations.Add(ApprovedVulnerabilityRemediation.Create(
+            _tenantId,
+            seed.ExposureA.VulnerabilityId,
+            decision.RemediationCaseId,
+            decision.Id,
+            decision.Outcome,
+            decision.ApprovedAt!.Value));
+        await _db.SaveChangesAsync();
 
         var scoreAfter = await GetDeviceScoreAsync(seed.DeviceA.Id);
 
-        scoreAfter.Should().BeLessThan(baseline,
-            "AlternateMitigation (Approved) must reduce the device risk score");
+        scoreAfter.Should().BeNull(
+            "AlternateMitigation (Approved) should be considered fixed and removed from asset risk scoring");
+        _db.SoftwareRiskScores.Should().NotContain(score => score.SoftwareProductId == seed.ProductA.Id);
     }
 
     // ────────────────────────────────────────────────────────────────────────

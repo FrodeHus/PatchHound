@@ -98,7 +98,8 @@ public class VulnerabilitiesController : ControllerBase
             query = query.Where(v =>
                 !_dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
                     remediation.TenantId == tenantId
-                    && remediation.Outcome == RemediationOutcome.RiskAcceptance
+                    && (remediation.Outcome == RemediationOutcome.RiskAcceptance
+                        || remediation.Outcome == RemediationOutcome.AlternateMitigation)
                     && remediation.VulnerabilityId == v.Id));
         }
 
