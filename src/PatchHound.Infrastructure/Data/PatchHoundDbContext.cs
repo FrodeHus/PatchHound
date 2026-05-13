@@ -103,6 +103,8 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
         Set<ExecutiveDashboardBriefing>();
     public DbSet<SoftwareDescriptionJob> SoftwareDescriptionJobs => Set<SoftwareDescriptionJob>();
     public DbSet<RemediationAiJob> RemediationAiJobs => Set<RemediationAiJob>();
+    public DbSet<VulnerabilityAssessmentJob> VulnerabilityAssessmentJobs => Set<VulnerabilityAssessmentJob>();
+    public DbSet<VulnerabilityPatchAssessment> VulnerabilityPatchAssessments => Set<VulnerabilityPatchAssessment>();
     public DbSet<DeviceGroupRiskScore> DeviceGroupRiskScores => Set<DeviceGroupRiskScore>();
     public DbSet<SoftwareRiskScore> SoftwareRiskScores => Set<SoftwareRiskScore>();
     public DbSet<TeamRiskScore> TeamRiskScores => Set<TeamRiskScore>();
