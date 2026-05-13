@@ -1322,7 +1322,7 @@ public class RemediationDecisionQueryService(
         Guid caseId,
         CancellationToken ct)
     {
-        var vulnerabilityId = await dbContext.RemediationCases.AsNoTracking()
+        var candidates = await dbContext.RemediationCases.AsNoTracking()
             .Where(c => c.TenantId == tenantId && c.Id == caseId)
             .Join(dbContext.DeviceVulnerabilityExposures.AsNoTracking()
                 .Where(e => e.TenantId == tenantId && e.Status == ExposureStatus.Open),
@@ -1333,9 +1333,13 @@ public class RemediationDecisionQueryService(
                 id => id,
                 v => v.Id,
                 (_, v) => new { v.Id, v.VendorSeverity })
+            .ToListAsync(ct);
+
+        // Materialise before sorting — enum stored as string, alphabetical SQL order ≠ severity order
+        var vulnerabilityId = candidates
             .OrderByDescending(x => x.VendorSeverity)
             .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync(ct);
+            .FirstOrDefault();
 
         if (vulnerabilityId is null)
             return new PatchAssessmentDto(null, null, null, null, null, null, null, null, null, null, null, "None");
@@ -1346,7 +1350,8 @@ public class RemediationDecisionQueryService(
         var job = await dbContext.VulnerabilityAssessmentJobs.AsNoTracking()
             .FirstOrDefaultAsync(j => j.VulnerabilityId == vulnerabilityId, ct);
 
-        var jobStatus = job?.Status.ToString() ?? (assessment is not null ? "Succeeded" : "None");
+        // Assessment existence takes precedence over transient job state
+        var jobStatus = assessment is not null ? "Succeeded" : job?.Status.ToString() ?? "None";
 
         if (assessment is null)
             return new PatchAssessmentDto(null, null, null, null, null, null, null, null, null, null, null, jobStatus);
