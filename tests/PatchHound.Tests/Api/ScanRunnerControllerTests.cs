@@ -75,7 +75,7 @@ public class ScanRunnerControllerTests : IAsyncLifetime
         var stagedDeviceMerge = new StagedDeviceMergeService(_db, deviceResolver, softwareResolver);
         var projectionService = new NormalizedSoftwareProjectionService(_db);
         var validator = new AuthenticatedScanOutputValidator();
-        var ingestionService = new AuthenticatedScanIngestionService(_db, validator, stagedDeviceMerge, projectionService);
+        var ingestionService = new AuthenticatedScanIngestionService(_db, validator, stagedDeviceMerge, projectionService, new InMemoryIngestionBulkWriter(_db));
         var completionService = new ScanRunCompletionService(_db);
 
         _sut = new ScanRunnerController(_db, _secretStore, ingestionService, completionService);

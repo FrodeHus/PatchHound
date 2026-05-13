@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using PatchHound.Core.Entities;
 using PatchHound.Core.Entities.AuthenticatedScans;
 using PatchHound.Core.Enums;
@@ -9,31 +10,48 @@ using PatchHound.Infrastructure.Services;
 
 namespace PatchHound.Infrastructure.AuthenticatedScans;
 
-public class AuthenticatedScanIngestionService(
-    PatchHoundDbContext dbContext,
-    AuthenticatedScanOutputValidator validator,
-    IStagedDeviceMergeService stagedDeviceMergeService,
-    NormalizedSoftwareProjectionService projectionService)
+public class AuthenticatedScanIngestionService
 {
     private const string SourceKey = "authenticated-scan";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    private readonly PatchHoundDbContext _dbContext;
+    private readonly AuthenticatedScanOutputValidator _validator;
+    private readonly IStagedDeviceMergeService _stagedDeviceMergeService;
+    private readonly NormalizedSoftwareProjectionService _projectionService;
+    private readonly IIngestionBulkWriter _bulkWriter;
+
+    [ActivatorUtilitiesConstructor]
+    internal AuthenticatedScanIngestionService(
+        PatchHoundDbContext dbContext,
+        AuthenticatedScanOutputValidator validator,
+        IStagedDeviceMergeService stagedDeviceMergeService,
+        NormalizedSoftwareProjectionService projectionService,
+        IIngestionBulkWriter bulkWriter)
+    {
+        _dbContext = dbContext;
+        _validator = validator;
+        _stagedDeviceMergeService = stagedDeviceMergeService;
+        _projectionService = projectionService;
+        _bulkWriter = bulkWriter;
+    }
+
     public async Task ProcessJobResultAsync(Guid scanJobId, string rawStdout, string rawStderr, CancellationToken ct)
     {
-        var job = await dbContext.ScanJobs.FirstOrDefaultAsync(j => j.Id == scanJobId, ct)
+        var job = await _dbContext.ScanJobs.FirstOrDefaultAsync(j => j.Id == scanJobId, ct)
             ?? throw new InvalidOperationException($"ScanJob {scanJobId} not found");
 
         var result = ScanJobResult.Create(scanJobId, rawStdout, rawStderr, string.Empty);
-        await dbContext.ScanJobResults.AddAsync(result, ct);
+        await _dbContext.ScanJobResults.AddAsync(result, ct);
 
-        var validation = validator.Validate(rawStdout);
+        var validation = _validator.Validate(rawStdout);
 
         if (validation.FatalError)
         {
             job.CompleteFailed(ScanJobStatuses.Failed, $"Validation: {validation.FatalErrorMessage}", DateTimeOffset.UtcNow);
             await SaveValidationIssues(scanJobId, validation.Issues, ct);
-            await dbContext.SaveChangesAsync(ct);
+            await _dbContext.SaveChangesAsync(ct);
             return;
         }
 
@@ -42,7 +60,7 @@ public class AuthenticatedScanIngestionService(
         if (validation.ValidEntries.Count == 0)
         {
             job.CompleteSucceeded(rawStdout.Length, rawStderr.Length, 0, DateTimeOffset.UtcNow);
-            await dbContext.SaveChangesAsync(ct);
+            await _dbContext.SaveChangesAsync(ct);
             return;
         }
 
@@ -103,23 +121,28 @@ public class AuthenticatedScanIngestionService(
             ));
         }
 
-        await dbContext.StagedDevices.AddRangeAsync(stagedSoftware, ct);
-        await dbContext.StagedDeviceSoftwareInstallations.AddRangeAsync(softwareLinks, ct);
-        await dbContext.SaveChangesAsync(ct);
-        dbContext.ChangeTracker.Clear();
+        await _dbContext.StagedDevices.AddRangeAsync(stagedSoftware, ct);
+        await _dbContext.StagedDeviceSoftwareInstallations.AddRangeAsync(softwareLinks, ct);
+        await _dbContext.SaveChangesAsync(ct);
+        _dbContext.ChangeTracker.Clear();
 
         // Merge + resolve + project through the canonical pipeline
-        await stagedDeviceMergeService.MergeAsync(ingestionRunId, job.TenantId, ct);
-        await projectionService.SyncTenantAsync(job.TenantId, null, ct);
+        await _stagedDeviceMergeService.MergeAsync(ingestionRunId, job.TenantId, ct);
+        await _projectionService.SyncTenantAsync(job.TenantId, null, ct);
 
-        job = await dbContext.ScanJobs.FirstAsync(j => j.Id == scanJobId, ct);
+        // Delete staged rows now that merge is complete. No IngestionRun entity is created for
+        // authenticated-scan jobs, so CleanupExpiredIngestionArtifactsAsync would never find these
+        // rows and they would persist indefinitely without explicit cleanup here.
+        await _bulkWriter.ClearStagedDataForRunAsync(ingestionRunId, ct);
+
+        job = await _dbContext.ScanJobs.FirstAsync(j => j.Id == scanJobId, ct);
         job.CompleteSucceeded(rawStdout.Length, rawStderr.Length, validation.ValidEntries.Count, DateTimeOffset.UtcNow);
-        await dbContext.SaveChangesAsync(ct);
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     private async Task<string> GetDeviceExternalId(Guid deviceId, CancellationToken ct)
     {
-        var device = await dbContext.Devices.IgnoreQueryFilters().FirstOrDefaultAsync(d => d.Id == deviceId, ct);
+        var device = await _dbContext.Devices.IgnoreQueryFilters().FirstOrDefaultAsync(d => d.Id == deviceId, ct);
         return device?.ExternalId ?? deviceId.ToString();
     }
 
@@ -134,7 +157,6 @@ public class AuthenticatedScanIngestionService(
     {
         if (issues.Count == 0) return;
         var entities = issues.Select(i => ScanJobValidationIssue.Create(scanJobId, i.FieldPath, i.Message, i.EntryIndex));
-        await dbContext.ScanJobValidationIssues.AddRangeAsync(entities, ct);
+        await _dbContext.ScanJobValidationIssues.AddRangeAsync(entities, ct);
     }
 }
-
