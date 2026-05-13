@@ -29,7 +29,7 @@ public class IngestionLeaseManagerTests : IAsyncDisposable
     public async ValueTask DisposeAsync() => await _db.DisposeAsync();
 
     private IngestionLeaseManager CreateSut() =>
-        new(_db, NullLogger<IngestionLeaseManager>.Instance);
+        new(_db, new InMemoryIngestionBulkWriter(_db), NullLogger<IngestionLeaseManager>.Instance);
 
     [Fact]
     public async Task TryAcquireIngestionRunAsync_WhenNoActiveRun_ReturnsRun()

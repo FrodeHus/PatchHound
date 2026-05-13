@@ -19,9 +19,6 @@ public class IngestionLeaseManager
     private readonly IIngestionBulkWriter _bulkWriter;
     private readonly ILogger<IngestionLeaseManager> _logger;
 
-    public IngestionLeaseManager(PatchHoundDbContext dbContext, ILogger<IngestionLeaseManager> logger)
-        : this(dbContext, CreateBulkWriter(dbContext), logger) { }
-
     internal IngestionLeaseManager(
         PatchHoundDbContext dbContext,
         IIngestionBulkWriter bulkWriter,
@@ -32,11 +29,6 @@ public class IngestionLeaseManager
         _bulkWriter = bulkWriter;
         _logger = logger;
     }
-
-    private static IIngestionBulkWriter CreateBulkWriter(PatchHoundDbContext db) =>
-        db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory"
-            ? new InMemoryIngestionBulkWriter(db)
-            : new PostgresIngestionBulkWriter(db);
 
     internal async Task<AcquiredIngestionRun?> TryAcquireIngestionRunAsync(
         Guid tenantId,

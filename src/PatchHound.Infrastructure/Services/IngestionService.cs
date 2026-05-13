@@ -65,11 +65,11 @@ public class IngestionService
             new VulnerabilityResolver(dbContext, NullLogger<VulnerabilityResolver>.Instance),
             normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
-            new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance),
+            new IngestionLeaseManager(dbContext, new InMemoryIngestionBulkWriter(dbContext), NullLogger<IngestionLeaseManager>.Instance),
             new IngestionCheckpointWriter(dbContext),
-            new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
-            new IngestionSnapshotLifecycle(dbContext),
-            CreateBulkWriter(dbContext),
+            new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, new InMemoryIngestionBulkWriter(dbContext), NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
+            new IngestionSnapshotLifecycle(dbContext, new InMemoryIngestionBulkWriter(dbContext)),
+            new InMemoryIngestionBulkWriter(dbContext),
             logger
         ) { }
 
@@ -101,11 +101,11 @@ public class IngestionService
             vulnerabilityResolver,
             normalizedSoftwareProjectionService: null,
             remediationDecisionService: null,
-            new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance),
+            new IngestionLeaseManager(dbContext, new InMemoryIngestionBulkWriter(dbContext), NullLogger<IngestionLeaseManager>.Instance),
             new IngestionCheckpointWriter(dbContext),
-            new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
-            new IngestionSnapshotLifecycle(dbContext),
-            CreateBulkWriter(dbContext),
+            new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, new InMemoryIngestionBulkWriter(dbContext), NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
+            new IngestionSnapshotLifecycle(dbContext, new InMemoryIngestionBulkWriter(dbContext)),
+            new InMemoryIngestionBulkWriter(dbContext),
             logger
         ) { }
 
@@ -137,18 +137,13 @@ public class IngestionService
             new VulnerabilityResolver(dbContext, NullLogger<VulnerabilityResolver>.Instance),
             normalizedSoftwareProjectionService: null,
             remediationDecisionService,
-            new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance),
+            new IngestionLeaseManager(dbContext, new InMemoryIngestionBulkWriter(dbContext), NullLogger<IngestionLeaseManager>.Instance),
             new IngestionCheckpointWriter(dbContext),
-            new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
-            new IngestionSnapshotLifecycle(dbContext),
-            CreateBulkWriter(dbContext),
+            new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, new InMemoryIngestionBulkWriter(dbContext), NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
+            new IngestionSnapshotLifecycle(dbContext, new InMemoryIngestionBulkWriter(dbContext)),
+            new InMemoryIngestionBulkWriter(dbContext),
             logger
         ) { }
-
-    private static IIngestionBulkWriter CreateBulkWriter(PatchHoundDbContext db) =>
-        db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory"
-            ? new InMemoryIngestionBulkWriter(db)
-            : new PostgresIngestionBulkWriter(db);
 
     internal IngestionService(
         PatchHoundDbContext dbContext,

@@ -10,19 +10,11 @@ public class IngestionSnapshotLifecycle
     private readonly PatchHoundDbContext dbContext;
     private readonly IIngestionBulkWriter _bulkWriter;
 
-    public IngestionSnapshotLifecycle(PatchHoundDbContext dbContext)
-        : this(dbContext, CreateBulkWriter(dbContext)) { }
-
     internal IngestionSnapshotLifecycle(PatchHoundDbContext dbContext, IIngestionBulkWriter bulkWriter)
     {
         this.dbContext = dbContext;
         _bulkWriter = bulkWriter;
     }
-
-    private static IIngestionBulkWriter CreateBulkWriter(PatchHoundDbContext db) =>
-        db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory"
-            ? new InMemoryIngestionBulkWriter(db)
-            : new PostgresIngestionBulkWriter(db);
 
     internal static bool SupportsSoftwareSnapshots(string sourceKey)
     {

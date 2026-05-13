@@ -22,7 +22,7 @@ public class IngestionStagingPipelineTests : IAsyncDisposable
     private IngestionStagingPipeline CreateSut() => new(
         _db,
         new EnrichmentJobEnqueuer(_db, NullLogger<EnrichmentJobEnqueuer>.Instance),
-        new IngestionLeaseManager(_db, NullLogger<IngestionLeaseManager>.Instance),
+        new IngestionLeaseManager(_db, new InMemoryIngestionBulkWriter(_db), NullLogger<IngestionLeaseManager>.Instance),
         new IngestionCheckpointWriter(_db)
     );
 
