@@ -24,7 +24,6 @@ public class RemediationDecisionsController(
     AnalystRecommendationService recommendationService,
     RemediationWorkflowAuthorizationService workflowAuthorizationService,
     RemediationWorkflowService workflowService,
-    RemediationAiJobService remediationAiJobService,
     ThreatIntelGenerationService threatIntelService,
     PatchHoundDbContext dbContext,
     ITenantContext tenantContext
@@ -63,7 +62,6 @@ public class RemediationDecisionsController(
             ct
         );
         await dbContext.SaveChangesAsync(ct);
-        await EnqueueAiDraftsAsync(tenantId, caseId, ct);
         return Ok(new EnsureRemediationWorkflowResponse(workflow.Id));
     }
 
@@ -94,7 +92,6 @@ public class RemediationDecisionsController(
             return BadRequest(new ProblemDetails { Title = result.Error });
 
         var vo = result.Value;
-        await EnqueueAiDraftsAsync(tenantId, caseId, ct);
         return Created("", new VulnerabilityOverrideDto(
             vo.Id, vo.VulnerabilityId, vo.Outcome.ToString(), vo.Justification, vo.CreatedAt
         ));
@@ -156,7 +153,6 @@ public class RemediationDecisionsController(
             .FirstOrDefaultAsync(ct);
 
         var r = result.Value;
-        await EnqueueAiDraftsAsync(tenantId, caseId, ct);
         return Created("", new AnalystRecommendationDto(
             r.Id, r.VulnerabilityId, r.RecommendedOutcome.ToString(),
             r.Rationale, r.PriorityOverride, r.AnalystId, analystDisplayName, r.CreatedAt
@@ -212,7 +208,6 @@ public class RemediationDecisionsController(
             if (!verificationResult.IsSuccess)
                 return BadRequest(new ProblemDetails { Title = verificationResult.Error });
 
-            await EnqueueAiDraftsAsync(tenantId, workflow.RemediationCaseId, ct);
             return Ok();
         }
 
@@ -227,7 +222,6 @@ public class RemediationDecisionsController(
             if (!verificationResult.IsSuccess)
                 return BadRequest(new ProblemDetails { Title = verificationResult.Error });
 
-            await EnqueueAiDraftsAsync(tenantId, workflow.RemediationCaseId, ct);
             return Ok();
         }
 
@@ -283,7 +277,6 @@ public class RemediationDecisionsController(
             return BadRequest(new ProblemDetails { Title = result.Error });
 
         var d = result.Value;
-        await EnqueueAiDraftsAsync(tenantId, caseId, ct);
         return Created("", new RemediationDecisionDto(
             d.Id, d.Outcome.ToString(), d.ApprovalStatus.ToString(),
             d.Justification, d.DecidedBy, d.DecidedAt,
@@ -357,7 +350,6 @@ public class RemediationDecisionsController(
                 return BadRequest(new ProblemDetails { Title = "Action must be 'approve' or 'deny'." });
             }
 
-            await EnqueueAiDraftsAsync(tenantId, caseId, ct);
             return Ok();
         }
         catch (InvalidOperationException ex)
@@ -395,34 +387,7 @@ public class RemediationDecisionsController(
         if (!result.IsSuccess)
             return BadRequest(new ProblemDetails { Title = result.Error });
 
-        await EnqueueAiDraftsAsync(tenantId, caseId, ct);
         return Ok();
-    }
-
-    [HttpPost("ai-summary")]
-    [Authorize(Policy = Policies.GenerateAiReports)]
-    public async Task<ActionResult<DecisionAiSummaryDto>> GenerateAiSummary(
-        Guid caseId,
-        CancellationToken ct
-    )
-    {
-        if (tenantContext.CurrentTenantId is not Guid tenantId)
-            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
-
-        await EnqueueAiDraftsAsync(tenantId, caseId, ct);
-        var context = await queryService.BuildByCaseIdAsync(tenantId, caseId, false, ct);
-        if (context is null)
-            return NotFound(new ProblemDetails { Title = "Remediation context not found." });
-
-        if (!context.AiSummary.CanGenerate && string.IsNullOrWhiteSpace(context.AiSummary.Content))
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Title = context.AiSummary.UnavailableMessage ?? "No enabled default AI profile is configured for this tenant."
-            });
-        }
-
-        return Ok(context.AiSummary);
     }
 
     [HttpPost("threat-intel")]
@@ -450,38 +415,6 @@ public class RemediationDecisionsController(
         }
 
         return Ok(result.Value);
-    }
-
-    [HttpPost("ai-summary/review")]
-    [Authorize(Policy = Policies.ViewVulnerabilities)]
-    public async Task<ActionResult<DecisionAiSummaryDto>> ReviewAiSummary(
-        Guid caseId,
-        [FromBody] ReviewDecisionAiSummaryRequest request,
-        CancellationToken ct
-    )
-    {
-        if (tenantContext.CurrentTenantId is not Guid tenantId)
-            return BadRequest(new ProblemDetails { Title = "No active tenant is selected." });
-
-        var action = request.Action?.Trim();
-        if (string.IsNullOrWhiteSpace(action))
-            return BadRequest(new ProblemDetails { Title = "Review action is required." });
-
-        var reviewStatus = action.ToLowerInvariant() switch
-        {
-            "accept" => "Accepted",
-            "edit" => "Edited",
-            "reject" => "Rejected",
-            _ => null
-        };
-        if (reviewStatus is null)
-            return BadRequest(new ProblemDetails { Title = "Review action must be accept, edit, or reject." });
-
-        var context = await queryService.BuildByCaseIdAsync(tenantId, caseId, false, ct);
-        if (context is null)
-            return NotFound(new ProblemDetails { Title = "Remediation context not found." });
-
-        return Ok(context.AiSummary);
     }
 
     [HttpGet("audit-trail")]
@@ -548,9 +481,5 @@ public class RemediationDecisionsController(
             .ToList();
 
         return Ok(dtos);
-    }
-    private async Task EnqueueAiDraftsAsync(Guid tenantId, Guid remediationCaseId, CancellationToken ct)
-    {
-        await remediationAiJobService.EnqueueAsync(tenantId, remediationCaseId, string.Empty, ct);
     }
 }

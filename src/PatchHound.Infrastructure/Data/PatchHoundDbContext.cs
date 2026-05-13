@@ -102,7 +102,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
     public DbSet<ExecutiveDashboardBriefing> ExecutiveDashboardBriefings =>
         Set<ExecutiveDashboardBriefing>();
     public DbSet<SoftwareDescriptionJob> SoftwareDescriptionJobs => Set<SoftwareDescriptionJob>();
-    public DbSet<RemediationAiJob> RemediationAiJobs => Set<RemediationAiJob>();
     public DbSet<VulnerabilityAssessmentJob> VulnerabilityAssessmentJobs => Set<VulnerabilityAssessmentJob>();
     public DbSet<VulnerabilityPatchAssessment> VulnerabilityPatchAssessments => Set<VulnerabilityPatchAssessment>();
     public DbSet<DeviceGroupRiskScore> DeviceGroupRiskScores => Set<DeviceGroupRiskScore>();
@@ -263,9 +262,6 @@ public class PatchHoundDbContext : DbContext, IUnitOfWork
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<SoftwareDescriptionJob>()
-            .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
-        modelBuilder
-            .Entity<RemediationAiJob>()
             .HasQueryFilter(e => IsSystemContext || AccessibleTenantIds.Contains(e.TenantId));
         modelBuilder
             .Entity<Team>()

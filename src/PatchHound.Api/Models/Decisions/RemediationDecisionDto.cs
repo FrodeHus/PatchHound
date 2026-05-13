@@ -23,7 +23,7 @@ public record DecisionContextDto(
     List<DecisionVulnDto> OpenVulnerabilities,
     DecisionRiskDto? RiskScore,
     DecisionSlaDto? Sla,
-    DecisionAiSummaryDto AiSummary,
+    PatchAssessmentDto PatchAssessment,
     ThreatIntelDto ThreatIntel
 );
 
@@ -43,29 +43,6 @@ public record DecisionApprovalResolutionDto(
     string? ResolvedByDisplayName
 );
 
-public record DecisionAiSummaryDto(
-    string? Content,
-    string? OwnerRecommendation,
-    string? AnalystAssessment,
-    string? ExceptionRecommendation,
-    string? RecommendedOutcome,
-    string? RecommendedPriority,
-    string Status,
-    bool IsStale,
-    string? ReviewStatus,
-    DateTimeOffset? ReviewedAt,
-    string? ReviewedByDisplayName,
-    DateTimeOffset? GeneratedAt,
-    DateTimeOffset? RequestedAt,
-    DateTimeOffset? CompletedAt,
-    string? ProviderType,
-    string? ProfileName,
-    string? Model,
-    bool CanGenerate,
-    bool IsGenerating,
-    string? LastError,
-    string? UnavailableMessage
-);
 
 public record ThreatIntelDto(
     string? Summary,
@@ -224,6 +201,3 @@ public record EnsureRemediationWorkflowResponse(
     Guid WorkflowId
 );
 
-public record ReviewDecisionAiSummaryRequest(
-    string Action
-);

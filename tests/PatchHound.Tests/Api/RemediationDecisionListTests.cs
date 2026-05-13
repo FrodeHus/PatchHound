@@ -46,7 +46,6 @@ public class RemediationDecisionListTests : IDisposable
         _service = new RemediationDecisionQueryService(
             _dbContext,
             new SlaService(),
-            new TenantAiTextGenerationService([], aiConfigurationResolver),
             aiConfigurationResolver,
             _tenantContext
         );

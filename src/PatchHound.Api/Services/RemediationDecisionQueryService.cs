@@ -1,6 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PatchHound.Api.Models;
 using PatchHound.Api.Models.Decisions;
@@ -18,14 +15,10 @@ namespace PatchHound.Api.Services;
 public class RemediationDecisionQueryService(
     PatchHoundDbContext dbContext,
     SlaService slaService,
-    TenantAiTextGenerationService aiTextGenerationService,
     ITenantAiConfigurationResolver aiConfigurationResolver,
     ITenantContext tenantContext
 )
 {
-    private const string MissingAiProfileMessage =
-        "Set up and enable a default AI profile for this tenant to get a plain-language risk summary here.";
-
     private sealed record OpenEpisodeRow(
         Guid AssetId,
         Guid VulnerabilityDefinitionId,
@@ -33,49 +26,7 @@ public class RemediationDecisionQueryService(
         DateTimeOffset? ResolvedAt
     );
 
-    private sealed record RemediationDeviceContextRow(
-        Guid AssetId,
-        Criticality Criticality,
-        string? DeviceValue,
-        string? DeviceExposureLevel,
-        EnvironmentClass? EnvironmentClass,
-        InternetReachability? InternetReachability
-    );
 
-    private sealed record RemediationAiContext(
-        int AffectedDeviceCount,
-        int AffectedOwnerTeamCount,
-        IReadOnlyList<string> AffectedOwnerTeamNames,
-        int ServerCount,
-        int WorkstationCount,
-        int OtherEnvironmentCount,
-        int InternetReachableDeviceCount,
-        int HighOrCriticalDeviceCount,
-        int CriticalDeviceCount,
-        int HighDeviceCount,
-        int MediumDeviceCount,
-        int LowDeviceCount,
-        string HighestAssetCriticality,
-        string? BusinessValueSummary,
-        bool HasApprovedPatchingPath,
-        int OpenPatchingTaskCount,
-        int CompletedPatchingTaskCount,
-        DateTimeOffset? EarliestOpenPatchingDueDate,
-        string? SlaStatus,
-        DateTimeOffset? SlaDueDate,
-        int TopFiveKnownExploitedCount,
-        int TopFivePublicExploitCount,
-        int TopFiveActiveAlertCount
-    );
-
-    private sealed record RemediationAiDraftPayload(
-        string ExecutiveSummary,
-        string OwnerRecommendation,
-        string AnalystAssessment,
-        string ExceptionRecommendation,
-        string RecommendedOutcome,
-        string RecommendedPriority
-    );
 
     public async Task<RemediationDecisionListPageDto> ListAsync(
         Guid tenantId,
@@ -487,29 +438,7 @@ public class RemediationDecisionQueryService(
             .Distinct()
             .ToListAsync(ct);
 
-        var scopedDeviceCriticalityValues = new List<Criticality>();
-        var assetCriticality = scopedDeviceCriticalityValues.Count > 0
-            ? scopedDeviceCriticalityValues.Max()
-            : Criticality.Low;
-        var scopedDeviceDetails = scopedDeviceAssetIds.Count == 0
-            ? []
-            : await dbContext.Devices.AsNoTracking()
-                .Where(device => device.TenantId == tenantId && scopedDeviceAssetIds.Contains(device.Id))
-                .GroupJoin(
-                    dbContext.SecurityProfiles.AsNoTracking(),
-                    device => device.SecurityProfileId,
-                    profile => profile.Id,
-                    (device, profiles) => new { device, profile = profiles.FirstOrDefault() }
-                )
-                .Select(item => new RemediationDeviceContextRow(
-                    item.device.Id,
-                    item.device.Criticality,
-                    item.device.DeviceValue,
-                    item.device.ExposureLevel,
-                    item.profile != null ? item.profile.EnvironmentClass : null,
-                    item.profile != null ? item.profile.InternetReachability : null
-                ))
-                .ToListAsync(ct);
+        var assetCriticality = Criticality.Low;
         var affectedOwnerTeamIds = scopedDeviceAssetIds.Count > 0
             ? await dbContext.Devices.AsNoTracking()
                 .Where(device => device.TenantId == tenantId && scopedDeviceAssetIds.Contains(device.Id))
@@ -520,14 +449,6 @@ public class RemediationDecisionQueryService(
                 .ToListAsync(ct)
             : [];
         var affectedOwnerTeamCount = affectedOwnerTeamIds.Count;
-        var affectedOwnerTeamNames = affectedOwnerTeamIds.Count == 0
-            ? []
-            : await dbContext.Teams.AsNoTracking()
-                .Where(team => affectedOwnerTeamIds.Contains(team.Id))
-                .OrderBy(team => team.Name)
-                .Select(team => team.Name)
-                .Take(5)
-                .ToListAsync(ct);
         var businessLabelRows = scopedDeviceAssetIds.Count == 0
             ? []
             : await dbContext.DeviceBusinessLabels.AsNoTracking()
@@ -555,12 +476,6 @@ public class RemediationDecisionQueryService(
                 group.Count()
             ))
             .ToList();
-        var businessLabelSummary = businessLabelDtos.Count == 0
-            ? []
-            : businessLabelDtos
-                .Take(3)
-                .Select(label => $"{label.Name} ({label.AffectedDeviceCount})")
-                .ToList();
         var patchingTaskCounts = await dbContext.PatchingTasks.AsNoTracking()
             .Where(task => task.TenantId == tenantId && task.RemediationCaseId == remediationCaseId)
             .GroupBy(_ => 1)
@@ -805,19 +720,6 @@ public class RemediationDecisionQueryService(
         // Risk score — TODO Phase 5: restore from canonical risk model keyed by RemediationCaseId.
         DecisionRiskDto? riskDto = null;
 
-        var remediationAiContext = BuildRemediationAiContext(
-            scopedDeviceDetails,
-            assetCriticality,
-            affectedOwnerTeamCount,
-            affectedOwnerTeamNames,
-            businessLabelSummary,
-            decision,
-            patchingTaskCounts?.Open ?? 0,
-            patchingTaskCounts?.Completed ?? 0,
-            patchingTaskCounts?.EarliestOpenDueDate,
-            slaDto,
-            topVulns.Take(5).ToList()
-        );
 
         // Decision DTO
         RemediationDecisionDto? decisionDto = null;
@@ -959,7 +861,7 @@ public class RemediationDecisionQueryService(
 
         var aiProfileAvailable = (await aiConfigurationResolver.ResolveDefaultAsync(tenantId, ct)).IsSuccess;
 
-        var aiSummary = await ResolveAiSummaryAsync(ct);
+        var patchAssessment = await ResolvePatchAssessmentAsync(tenantId, remediationCaseId, ct);
 
         var threatIntel = new ThreatIntelDto(
             caseMeta.ThreatIntelSummary,
@@ -1007,35 +909,11 @@ public class RemediationDecisionQueryService(
             topVulns,
             riskDto,
             slaDto,
-            aiSummary,
+            patchAssessment,
             threatIntel
         );
     }
 
-    public async Task<DecisionAiSummaryDto?> RefreshAiSummaryAsync(
-        Guid tenantId,
-        Guid remediationCaseId,
-        CancellationToken ct
-    )
-    {
-        return (await BuildByCaseIdAsync(tenantId, remediationCaseId, true, ct))?.AiSummary;
-    }
-
-    public async Task<bool> GenerateAndStoreAiDraftsAsync(
-        Guid tenantId,
-        Guid remediationCaseId,
-        CancellationToken ct
-    )
-    {
-        var summary = await RefreshAiSummaryAsync(tenantId, remediationCaseId, ct);
-        return summary is not null
-            && (
-                !string.IsNullOrWhiteSpace(summary.Content)
-                || !string.IsNullOrWhiteSpace(summary.AnalystAssessment)
-                || !string.IsNullOrWhiteSpace(summary.OwnerRecommendation)
-                || !string.IsNullOrWhiteSpace(summary.ExceptionRecommendation)
-            );
-    }
 
     private static DecisionWorkflowStateDto BuildWorkflowState(
         RemediationWorkflow? workflow,
@@ -1440,405 +1318,52 @@ public class RemediationDecisionQueryService(
         return new DateTimeOffset(utc.Year, utc.Month, utc.Day, 0, 0, 0, TimeSpan.Zero);
     }
 
-    // TODO Phase 5: restore AI summary from RemediationCase → SoftwareProduct once AI fields are migrated off TenantSoftware.
-    private static Task<DecisionAiSummaryDto> ResolveAiSummaryAsync(CancellationToken ct)
-    {
-        _ = ct;
-        return Task.FromResult(new DecisionAiSummaryDto(
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            "Unavailable",
-            false,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            false,
-            false,
-            null,
-            "AI summary not available in Phase 4. TODO Phase 5."
-        ));
-    }
-
-    private DecisionAiSummaryDto BuildAiSummaryDto(
-        SoftwareTenantRecord tenantSoftware,
-        RemediationAiJob? latestJob,
-        bool canGenerate,
-        bool isStale,
-        string? unavailableMessage,
-        string? reviewedByDisplayName
-    )
-    {
-        var isGenerating = latestJob?.Status is RemediationAiJobStatus.Pending or RemediationAiJobStatus.Running;
-        var status = ResolveAiSummaryStatus(tenantSoftware, latestJob, canGenerate, isStale);
-
-        return new DecisionAiSummaryDto(
-            NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryContent),
-            NullIfWhiteSpace(tenantSoftware.RemediationAiOwnerRecommendationContent),
-            NullIfWhiteSpace(tenantSoftware.RemediationAiAnalystAssessmentContent),
-            NullIfWhiteSpace(tenantSoftware.RemediationAiExceptionRecommendationContent),
-            NullIfWhiteSpace(tenantSoftware.RemediationAiRecommendedOutcome),
-            NullIfWhiteSpace(tenantSoftware.RemediationAiRecommendedPriority),
-            status,
-            isStale,
-            NullIfWhiteSpace(tenantSoftware.RemediationAiReviewStatus),
-            tenantSoftware.RemediationAiReviewedAt,
-            string.IsNullOrWhiteSpace(reviewedByDisplayName) ? null : reviewedByDisplayName,
-            tenantSoftware.RemediationAiSummaryGeneratedAt,
-            latestJob?.RequestedAt,
-            latestJob?.CompletedAt,
-            NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryProviderType),
-            NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryProfileName),
-            NullIfWhiteSpace(tenantSoftware.RemediationAiSummaryModel),
-            canGenerate,
-            isGenerating,
-            latestJob?.Status == RemediationAiJobStatus.Failed ? NullIfWhiteSpace(latestJob.Error) : null,
-            unavailableMessage
-        );
-    }
-
-    private static bool HasStoredAiGuidance(SoftwareTenantRecord tenantSoftware) =>
-        !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiSummaryContent)
-        || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiOwnerRecommendationContent)
-        || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiAnalystAssessmentContent)
-        || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiExceptionRecommendationContent)
-        || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiRecommendedOutcome)
-        || !string.IsNullOrWhiteSpace(tenantSoftware.RemediationAiRecommendedPriority);
-
-    private static string ResolveAiSummaryStatus(
-        SoftwareTenantRecord tenantSoftware,
-        RemediationAiJob? latestJob,
-        bool canGenerate,
-        bool isStale
-    )
-    {
-        if (latestJob?.Status == RemediationAiJobStatus.Pending)
-        {
-            return "Queued";
-        }
-
-        if (latestJob?.Status == RemediationAiJobStatus.Running)
-        {
-            return "Generating";
-        }
-
-        if (latestJob?.Status == RemediationAiJobStatus.Failed)
-        {
-            return "Failed";
-        }
-
-        if (isStale)
-        {
-            return "Stale";
-        }
-
-        if (HasStoredAiGuidance(tenantSoftware))
-        {
-            return "Ready";
-        }
-
-        return canGenerate ? "Missing" : "Unavailable";
-    }
-
-    private async Task<Result<(RemediationAiDraftPayload Value, AiTextGenerationResult Metadata)>> GenerateAiNarrativeAsync(
+    private async Task<PatchAssessmentDto> ResolvePatchAssessmentAsync(
         Guid tenantId,
-        string softwareName,
-        DecisionSummaryDto summary,
-        List<DecisionVulnDto> topVulns,
-        RemediationAiContext remediationAiContext,
-        CancellationToken ct
-    )
+        Guid caseId,
+        CancellationToken ct)
     {
-        var topVulnSummary = topVulns.Select(v => new
-        {
-            v.ExternalId,
-            v.Title,
-            Severity = v.EffectiveSeverity ?? v.VendorSeverity,
-            RiskScore = v.EpisodeRiskScore ?? v.EffectiveScore,
-            v.KnownExploited,
-            v.PublicExploit,
-            v.ActiveAlert,
-        }).ToList();
+        var vulnerabilityId = await dbContext.RemediationCases.AsNoTracking()
+            .Where(c => c.TenantId == tenantId && c.Id == caseId)
+            .Join(dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+                .Where(e => e.TenantId == tenantId && e.Status == ExposureStatus.Open),
+                c => c.SoftwareProductId,
+                e => e.SoftwareProductId,
+                (_, e) => e.VulnerabilityId)
+            .Join(dbContext.Vulnerabilities.AsNoTracking(),
+                id => id,
+                v => v.Id,
+                (_, v) => new { v.Id, v.VendorSeverity })
+            .OrderByDescending(x => x.VendorSeverity)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(ct);
 
-        var request = new AiTextGenerationRequest(
-            "You produce concise remediation guidance for three audiences. Return only JSON with these string fields: executiveSummary, ownerRecommendation, analystAssessment, exceptionRecommendation, recommendedOutcome, recommendedPriority. executiveSummary must be plain language for non-security readers. ownerRecommendation must give practical next steps. analystAssessment should explain the triage view and include a recommended remediation posture. exceptionRecommendation should say whether an exception looks justified and under what conditions. recommendedOutcome must be one of ApprovedForPatching, RiskAcceptance, AlternateMitigation, or PatchingDeferred. recommendedPriority must be one of Critical, High, Medium, or Low. Avoid markdown and do not invent facts.",
-            JsonSerializer.Serialize(
-                new
-                {
-                    softwareName,
-                    vulnerabilitySummary = new
-                    {
-                        summary.TotalVulnerabilities,
-                        summary.CriticalCount,
-                        summary.HighCount,
-                        summary.MediumCount,
-                        summary.LowCount,
-                        summary.WithKnownExploit,
-                        summary.WithActiveAlert,
-                    },
-                    remediationContext = new
-                    {
-                        remediationAiContext.AffectedDeviceCount,
-                        remediationAiContext.AffectedOwnerTeamCount,
-                        remediationAiContext.AffectedOwnerTeamNames,
-                        remediationAiContext.ServerCount,
-                        remediationAiContext.WorkstationCount,
-                        remediationAiContext.OtherEnvironmentCount,
-                        remediationAiContext.InternetReachableDeviceCount,
-                        remediationAiContext.HighestAssetCriticality,
-                        assetCriticalityDistribution = new
-                        {
-                            remediationAiContext.CriticalDeviceCount,
-                            remediationAiContext.HighDeviceCount,
-                            remediationAiContext.MediumDeviceCount,
-                            remediationAiContext.LowDeviceCount,
-                            remediationAiContext.HighOrCriticalDeviceCount,
-                        },
-                        remediationAiContext.BusinessValueSummary,
-                        patching = new
-                        {
-                            remediationAiContext.HasApprovedPatchingPath,
-                            remediationAiContext.OpenPatchingTaskCount,
-                            remediationAiContext.CompletedPatchingTaskCount,
-                            remediationAiContext.EarliestOpenPatchingDueDate,
-                        },
-                        sla = new
-                        {
-                            remediationAiContext.SlaStatus,
-                            remediationAiContext.SlaDueDate,
-                        },
-                        topFiveThreatSignals = new
-                        {
-                            remediationAiContext.TopFiveKnownExploitedCount,
-                            remediationAiContext.TopFivePublicExploitCount,
-                            remediationAiContext.TopFiveActiveAlertCount,
-                        },
-                    },
-                    topRiskVulnerabilities = topVulnSummary,
-                }
-            ),
-            ExternalContext: null,
-            UseProviderNativeWebResearch: false
-        );
+        if (vulnerabilityId is null)
+            return new PatchAssessmentDto(null, null, null, null, null, null, null, null, null, null, null, "None");
 
-        var generated = await aiTextGenerationService.GenerateAsync(tenantId, null, request, ct);
-        if (!generated.IsSuccess)
-        {
-            return Result<(RemediationAiDraftPayload Value, AiTextGenerationResult Metadata)>.Failure(
-                generated.Error ?? "AI generation failed."
-            );
-        }
+        var assessment = await dbContext.VulnerabilityPatchAssessments.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.VulnerabilityId == vulnerabilityId, ct);
 
-        if (!TryParseAiDraftPayload(generated.Value.Content, out var payload))
-        {
-            return Result<(RemediationAiDraftPayload Value, AiTextGenerationResult Metadata)>.Failure(
-                "The AI response did not contain a valid remediation draft payload."
-            );
-        }
+        var job = await dbContext.VulnerabilityAssessmentJobs.AsNoTracking()
+            .FirstOrDefaultAsync(j => j.VulnerabilityId == vulnerabilityId, ct);
 
-        return Result<(RemediationAiDraftPayload Value, AiTextGenerationResult Metadata)>.Success((payload, generated.Value));
-    }
+        var jobStatus = job?.Status.ToString() ?? (assessment is not null ? "Succeeded" : "None");
 
-    private static bool TryParseAiDraftPayload(
-        string content,
-        out RemediationAiDraftPayload payload
-    )
-    {
-        payload = new RemediationAiDraftPayload(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+        if (assessment is null)
+            return new PatchAssessmentDto(null, null, null, null, null, null, null, null, null, null, null, jobStatus);
 
-        var trimmed = content.Trim();
-        if (trimmed.StartsWith("```", StringComparison.Ordinal))
-        {
-            var firstBrace = trimmed.IndexOf('{');
-            var lastBrace = trimmed.LastIndexOf('}');
-            if (firstBrace >= 0 && lastBrace > firstBrace)
-            {
-                trimmed = trimmed[firstBrace..(lastBrace + 1)];
-            }
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(trimmed);
-            var root = document.RootElement;
-            payload = new RemediationAiDraftPayload(
-                root.GetProperty("executiveSummary").GetString()?.Trim() ?? string.Empty,
-                root.GetProperty("ownerRecommendation").GetString()?.Trim() ?? string.Empty,
-                root.GetProperty("analystAssessment").GetString()?.Trim() ?? string.Empty,
-                root.GetProperty("exceptionRecommendation").GetString()?.Trim() ?? string.Empty,
-                NormalizeRecommendedOutcome(root.GetProperty("recommendedOutcome").GetString()),
-                NormalizeRecommendedPriority(root.GetProperty("recommendedPriority").GetString())
-            );
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static string NormalizeRecommendedPriority(string? value)
-    {
-        return value?.Trim() switch
-        {
-            "Critical" => "Critical",
-            "High" => "High",
-            "Medium" => "Medium",
-            "Low" => "Low",
-            _ => string.Empty,
-        };
-    }
-
-    private static string NormalizeRecommendedOutcome(string? value)
-    {
-        return value?.Trim() switch
-        {
-            nameof(RemediationOutcome.ApprovedForPatching) => nameof(RemediationOutcome.ApprovedForPatching),
-            nameof(RemediationOutcome.RiskAcceptance) => nameof(RemediationOutcome.RiskAcceptance),
-            nameof(RemediationOutcome.AlternateMitigation) => nameof(RemediationOutcome.AlternateMitigation),
-            nameof(RemediationOutcome.PatchingDeferred) => nameof(RemediationOutcome.PatchingDeferred),
-            _ => string.Empty,
-        };
-    }
-
-    private static string HashAiSummaryInput(
-        string softwareName,
-        DecisionWorkflowStateDto workflowState,
-        RemediationDecisionDto? decisionDto,
-        List<AnalystRecommendationDto> recommendations,
-        List<DecisionVulnDto> topVulns,
-        DecisionSummaryDto summary,
-        RemediationAiContext remediationAiContext
-    )
-    {
-        var serialized = string.Join(
-            "|",
-            softwareName.Trim(),
-            workflowState.CurrentStage,
-            workflowState.CurrentStageDescription,
-            decisionDto?.Outcome ?? string.Empty,
-            decisionDto?.ApprovalStatus ?? string.Empty,
-            decisionDto?.Justification ?? string.Empty,
-            string.Join(";", recommendations.Select(item =>
-                $"{item.Id}:{item.RecommendedOutcome}:{item.Rationale}:{item.PriorityOverride}:{item.CreatedAt:O}"
-            )),
-            string.Join(";", topVulns.Select(item =>
-                $"{item.VulnerabilityId}:{item.ExternalId}:{item.EffectiveSeverity}:{item.EpisodeRiskScore}:{item.KnownExploited}:{item.PublicExploit}:{item.ActiveAlert}:{item.OverrideOutcome}"
-            )),
-            summary.TotalVulnerabilities,
-            summary.CriticalCount,
-            summary.HighCount,
-            summary.MediumCount,
-            summary.LowCount,
-            summary.WithKnownExploit,
-            summary.WithActiveAlert,
-            remediationAiContext.AffectedDeviceCount,
-            remediationAiContext.AffectedOwnerTeamCount,
-            string.Join(",", remediationAiContext.AffectedOwnerTeamNames),
-            remediationAiContext.ServerCount,
-            remediationAiContext.WorkstationCount,
-            remediationAiContext.OtherEnvironmentCount,
-            remediationAiContext.InternetReachableDeviceCount,
-            remediationAiContext.HighOrCriticalDeviceCount,
-            remediationAiContext.CriticalDeviceCount,
-            remediationAiContext.HighDeviceCount,
-            remediationAiContext.MediumDeviceCount,
-            remediationAiContext.LowDeviceCount,
-            remediationAiContext.HighestAssetCriticality,
-            remediationAiContext.BusinessValueSummary ?? string.Empty,
-            remediationAiContext.HasApprovedPatchingPath,
-            remediationAiContext.OpenPatchingTaskCount,
-            remediationAiContext.CompletedPatchingTaskCount,
-            remediationAiContext.EarliestOpenPatchingDueDate?.ToString("O") ?? string.Empty,
-            remediationAiContext.SlaStatus ?? string.Empty,
-            remediationAiContext.SlaDueDate?.ToString("O") ?? string.Empty,
-            remediationAiContext.TopFiveKnownExploitedCount,
-            remediationAiContext.TopFivePublicExploitCount,
-            remediationAiContext.TopFiveActiveAlertCount
-        );
-
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(serialized));
-        return Convert.ToHexString(bytes);
-    }
-
-    private static string? NullIfWhiteSpace(string value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value;
-
-    private static RemediationAiContext BuildRemediationAiContext(
-        IReadOnlyList<RemediationDeviceContextRow> scopedDeviceDetails,
-        Criticality assetCriticality,
-        int affectedOwnerTeamCount,
-        IReadOnlyList<string> affectedOwnerTeamNames,
-        IReadOnlyList<string> businessLabelSummary,
-        RemediationDecision? decision,
-        int openPatchingTaskCount,
-        int completedPatchingTaskCount,
-        DateTimeOffset? earliestOpenPatchingDueDate,
-        DecisionSlaDto? slaDto,
-        List<DecisionVulnDto> topVulns
-    )
-    {
-        var details = scopedDeviceDetails.ToList();
-        var businessValueSummary = details
-            .Select(item => item.DeviceValue)
-            .Where(item => !string.IsNullOrWhiteSpace(item))
-            .GroupBy(item => item!, StringComparer.OrdinalIgnoreCase)
-            .OrderByDescending(group => group.Count())
-            .Select(group => $"{group.Key} ({group.Count()})")
-            .Take(3)
-            .ToList();
-        var businessContextSummary = new List<string>();
-        if (businessLabelSummary.Count > 0)
-        {
-            businessContextSummary.Add($"Business labels: {string.Join(", ", businessLabelSummary)}");
-        }
-        if (businessValueSummary.Count > 0)
-        {
-            businessContextSummary.Add($"Asset values: {string.Join(", ", businessValueSummary)}");
-        }
-
-        var serverCount = details.Count(item => item.EnvironmentClass == EnvironmentClass.Server);
-        var workstationCount = details.Count(item => item.EnvironmentClass == EnvironmentClass.Workstation);
-        var otherEnvironmentCount = details.Count(item =>
-            item.EnvironmentClass is EnvironmentClass.JumpHost or EnvironmentClass.Lab or EnvironmentClass.Kiosk or EnvironmentClass.OT
-        );
-        var internetReachableDeviceCount = details.Count(item =>
-            item.InternetReachability == InternetReachability.Internet
-        );
-
-        return new RemediationAiContext(
-            details.Count,
-            affectedOwnerTeamCount,
-            affectedOwnerTeamNames,
-            serverCount,
-            workstationCount,
-            otherEnvironmentCount,
-            internetReachableDeviceCount,
-            details.Count(item => item.Criticality is Criticality.High or Criticality.Critical),
-            details.Count(item => item.Criticality == Criticality.Critical),
-            details.Count(item => item.Criticality == Criticality.High),
-            details.Count(item => item.Criticality == Criticality.Medium),
-            details.Count(item => item.Criticality == Criticality.Low),
-            assetCriticality.ToString(),
-            businessContextSummary.Count > 0 ? string.Join("; ", businessContextSummary) : null,
-            decision?.Outcome == RemediationOutcome.ApprovedForPatching || openPatchingTaskCount > 0 || completedPatchingTaskCount > 0,
-            openPatchingTaskCount,
-            completedPatchingTaskCount,
-            earliestOpenPatchingDueDate,
-            slaDto?.SlaStatus,
-            slaDto?.DueDate,
-            topVulns.Count(item => item.KnownExploited),
-            topVulns.Count(item => item.PublicExploit),
-            topVulns.Count(item => item.ActiveAlert)
-        );
+        return new PatchAssessmentDto(
+            assessment.Recommendation,
+            assessment.Confidence,
+            assessment.Summary,
+            assessment.UrgencyTier,
+            assessment.UrgencyTargetSla,
+            assessment.UrgencyReason,
+            assessment.SimilarVulnerabilities,
+            assessment.CompensatingControlsUntilPatched,
+            assessment.References,
+            assessment.AiProfileName,
+            assessment.AssessedAt,
+            jobStatus);
     }
 }

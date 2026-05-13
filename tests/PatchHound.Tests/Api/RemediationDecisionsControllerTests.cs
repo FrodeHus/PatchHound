@@ -127,7 +127,6 @@ public class RemediationDecisionsControllerTests : IDisposable
             recommendationService: null!,
             workflowAuthorizationService: null!,
             workflowService: null!,
-            remediationAiJobService: null!,
             threatIntelService: null!,
             dbContext: _dbContext,
             tenantContext: noTenantContext
@@ -159,7 +158,6 @@ public class RemediationDecisionsControllerTests : IDisposable
             recommendationService: null!,
             workflowAuthorizationService: null!,
             workflowService: null!,
-            remediationAiJobService: null!,
             threatIntelService: threatIntelService,
             dbContext: _dbContext,
             tenantContext: _tenantContext
@@ -192,7 +190,6 @@ public class RemediationDecisionsControllerTests : IDisposable
             recommendationService: null!,
             workflowAuthorizationService: null!,
             workflowService: null!,
-            remediationAiJobService: null!,
             threatIntelService: threatIntelService,
             dbContext: _dbContext,
             tenantContext: _tenantContext
@@ -265,7 +262,6 @@ public class RemediationDecisionsControllerTests : IDisposable
         var queryService = new RemediationDecisionQueryService(
             _dbContext,
             new SlaService(),
-            new TenantAiTextGenerationService([provider], aiResolver),
             aiResolver,
             _tenantContext
         );
@@ -292,7 +288,6 @@ public class RemediationDecisionsControllerTests : IDisposable
             recommendationService: null!,
             workflowAuthorizationService: workflowAuthorizationService!,
             workflowService: null!,
-            remediationAiJobService: null!,
             threatIntelService: null!,
             dbContext: _dbContext,
             tenantContext: _tenantContext
