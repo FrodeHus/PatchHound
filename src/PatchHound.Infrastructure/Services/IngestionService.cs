@@ -32,6 +32,7 @@ public class IngestionService
     private readonly VulnerabilityResolver _vulnerabilityResolver;
     private readonly NormalizedSoftwareProjectionService? _normalizedSoftwareProjectionService;
     private readonly RemediationDecisionService? _remediationDecisionService;
+    private readonly VulnerabilityAssessmentJobService? _vulnerabilityAssessmentJobService;
     private readonly IngestionLeaseManager _leaseManager;
     private readonly IngestionCheckpointWriter _checkpointWriter;
     private readonly IngestionStagingPipeline _stagingPipeline;
@@ -54,6 +55,7 @@ public class IngestionService
         VulnerabilityResolver vulnerabilityResolver,
         NormalizedSoftwareProjectionService? normalizedSoftwareProjectionService,
         RemediationDecisionService? remediationDecisionService,
+        VulnerabilityAssessmentJobService? vulnerabilityAssessmentJobService,
         IngestionLeaseManager leaseManager,
         IngestionCheckpointWriter checkpointWriter,
         IngestionStagingPipeline stagingPipeline,
@@ -75,6 +77,7 @@ public class IngestionService
         _vulnerabilityResolver = vulnerabilityResolver;
         _normalizedSoftwareProjectionService = normalizedSoftwareProjectionService;
         _remediationDecisionService = remediationDecisionService;
+        _vulnerabilityAssessmentJobService = vulnerabilityAssessmentJobService;
         _leaseManager = leaseManager;
         _checkpointWriter = checkpointWriter;
         _stagingPipeline = stagingPipeline;
@@ -93,6 +96,8 @@ public class IngestionService
         await _exposureAssessmentService.AssessForTenantAsync(tenantId, now, ct);
         await _dbContext.SaveChangesAsync(ct);
         await new RemediationCaseService(_dbContext).EnsureCasesForOpenExposuresAsync(tenantId, ct);
+        if (_vulnerabilityAssessmentJobService is not null)
+            await EnqueueAssessmentJobsForCriticalExposuresAsync(tenantId, ct);
     }
 
     public async Task<bool> RunIngestionAsync(Guid tenantId, CancellationToken ct)
@@ -1229,6 +1234,23 @@ public class IngestionService
         }
     }
 
+
+    private async Task EnqueueAssessmentJobsForCriticalExposuresAsync(Guid tenantId, CancellationToken ct)
+    {
+        var criticalVulnIds = await _dbContext.DeviceVulnerabilityExposures
+            .Where(e => e.TenantId == tenantId && e.Status == ExposureStatus.Open)
+            .Join(_dbContext.Vulnerabilities,
+                e => e.VulnerabilityId,
+                v => v.Id,
+                (e, v) => new { v.Id, v.VendorSeverity })
+            .Where(x => x.VendorSeverity == Severity.Critical)
+            .Select(x => x.Id)
+            .Distinct()
+            .ToListAsync(ct);
+
+        foreach (var vulnId in criticalVulnIds)
+            await _vulnerabilityAssessmentJobService!.EnqueueCriticalAsync(tenantId, vulnId, ct);
+    }
 
     private static string DescribeConcurrencyEntries(DbUpdateConcurrencyException ex)
     {

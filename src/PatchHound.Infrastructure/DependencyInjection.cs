@@ -117,6 +117,7 @@ public static class DependencyInjection
         services.AddScoped<SoftwareDescriptionGenerationService>();
         services.AddScoped<SoftwareDescriptionJobService>();
         services.AddScoped<RemediationAiJobService>();
+        services.AddScoped<VulnerabilityAssessmentJobService>();
         services.AddScoped<ExecutiveDashboardBriefingService>();
         services.AddScoped<IRiskChangeBriefAiSummaryService, RiskChangeBriefAiSummaryService>();
         services.AddScoped<ITenantAiConfigurationResolver, TenantAiConfigurationResolver>();
@@ -245,6 +246,7 @@ public static class DependencyInjection
             sp.GetRequiredService<VulnerabilityResolver>(),
             sp.GetService<NormalizedSoftwareProjectionService>(),
             sp.GetService<RemediationDecisionService>(),
+            sp.GetService<VulnerabilityAssessmentJobService>(),
             sp.GetRequiredService<IngestionLeaseManager>(),
             sp.GetRequiredService<IngestionCheckpointWriter>(),
             sp.GetRequiredService<IngestionStagingPipeline>(),
