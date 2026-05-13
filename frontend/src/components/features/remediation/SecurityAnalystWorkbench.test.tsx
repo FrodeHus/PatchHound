@@ -127,28 +127,19 @@ const dataFixture: DecisionContext = {
     slaStatus: 'DueSoon',
     dueDate: '2026-05-09T00:00:00Z',
   },
-  aiSummary: {
-    content: null,
-    ownerRecommendation: null,
-    analystAssessment: 'Prioritize patching because exploitation is known.',
-    exceptionRecommendation: null,
-    recommendedOutcome: 'ApprovedForPatching',
-    recommendedPriority: 'Critical',
-    status: 'Completed',
-    isStale: false,
-    reviewStatus: null,
-    reviewedAt: null,
-    reviewedByDisplayName: null,
-    generatedAt: '2026-05-02T00:00:00Z',
-    requestedAt: null,
-    completedAt: null,
-    providerType: null,
-    profileName: null,
-    model: null,
-    canGenerate: true,
-    isGenerating: false,
-    lastError: null,
-    unavailableMessage: null,
+  patchAssessment: {
+    recommendation: null,
+    confidence: null,
+    summary: null,
+    urgencyTier: null,
+    urgencyTargetSla: null,
+    urgencyReason: null,
+    similarVulnerabilities: null,
+    compensatingControlsUntilPatched: null,
+    references: null,
+    aiProfileName: null,
+    assessedAt: null,
+    jobStatus: 'None',
   },
   threatIntel: {
     summary: null,
@@ -173,14 +164,13 @@ function renderWorkbench(data: DecisionContext = dataFixture) {
 }
 
 describe('SecurityAnalystWorkbench', () => {
-  it('promotes software context, AI guidance, and recommendation capture', () => {
+  it('promotes software context and recommendation capture', () => {
     renderWorkbench()
 
     expect(screen.getByRole('heading', { name: /Contoso Agent/i })).toBeInTheDocument()
     expect(screen.getByText('Endpoint security agent installed on managed workstations.')).toBeInTheDocument()
     expect(screen.getByText('Revenue')).toBeInTheDocument()
-    expect(screen.getAllByText('Prioritize patching because exploitation is known.').length).toBeGreaterThan(0)
-    expect(screen.getByLabelText(/Recommendation rationale/i)).toHaveValue('Prioritize patching because exploitation is known.')
+    expect(screen.getByLabelText(/Recommendation rationale/i)).toBeInTheDocument()
   })
 
   it('keeps case metrics inside the title card rail', () => {
@@ -212,7 +202,7 @@ describe('SecurityAnalystWorkbench', () => {
     expect(screen.getByText('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H')).toBeInTheDocument()
   })
 
-  it('applies the AI draft over an existing saved recommendation', () => {
+  it('shows existing saved recommendation when one is present', () => {
     renderWorkbench({
       ...dataFixture,
       recommendations: [
@@ -230,10 +220,6 @@ describe('SecurityAnalystWorkbench', () => {
     })
 
     expect(screen.getByLabelText(/Recommendation rationale/i)).toHaveValue('Existing analyst text.')
-
-    fireEvent.click(screen.getByRole('button', { name: /Apply draft/i }))
-
-    expect(screen.getByLabelText(/Recommendation rationale/i)).toHaveValue('Prioritize patching because exploitation is known.')
   })
 
   it('opens long threat intelligence summaries in a fullscreen dialog', () => {

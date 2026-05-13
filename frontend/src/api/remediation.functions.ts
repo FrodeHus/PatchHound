@@ -4,7 +4,6 @@ import { authMiddleware } from '@/server/middleware'
 import { apiGet, apiPost } from '@/server/api'
 import {
   analystRecommendationSchema,
-  decisionAiSummarySchema,
   decisionContextSchema,
   pagedDecisionListSchema,
   remediationDecisionSchema,
@@ -119,33 +118,12 @@ export const verifyRecurringRemediation = createServerFn({ method: 'POST' })
     await apiPost(`/remediation/cases/${caseId}/verification`, context, { action })
   })
 
-export const generateRemediationAiSummary = createServerFn({ method: 'POST' })
-  .middleware([authMiddleware])
-  .inputValidator(z.object({ caseId: z.string().uuid() }))
-  .handler(async ({ context, data: { caseId } }) => {
-    const data = await apiPost(`/remediation/cases/${caseId}/ai-summary`, context, {})
-    return decisionAiSummarySchema.parse(data)
-  })
-
 export const generateThreatIntel = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .inputValidator(z.object({ caseId: z.string().uuid() }))
   .handler(async ({ context, data: { caseId } }) => {
     const data = await apiPost(`/remediation/cases/${caseId}/threat-intel`, context, {})
     return threatIntelSchema.parse(data)
-  })
-
-export const reviewRemediationAiSummary = createServerFn({ method: 'POST' })
-  .middleware([authMiddleware])
-  .inputValidator(
-    z.object({
-      caseId: z.string().uuid(),
-      action: z.enum(['accept', 'edit', 'reject']),
-    })
-  )
-  .handler(async ({ context, data: { caseId, action } }) => {
-    const data = await apiPost(`/remediation/cases/${caseId}/ai-summary/review`, context, { action })
-    return decisionAiSummarySchema.parse(data)
   })
 
 export const fetchDecisionList = createServerFn({ method: 'GET' })

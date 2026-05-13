@@ -17,10 +17,9 @@ import type { RemediationTaskTeamStatus } from '@/api/remediation-tasks.schemas'
 import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
 import {
   approveOrRejectDecision,
-  generateRemediationAiSummary,
-  reviewRemediationAiSummary,
   verifyRecurringRemediation,
 } from '@/api/remediation.functions'
+import { requestVulnerabilityAssessment } from '@/api/vulnerabilities.functions'
 import { fetchDecisionAuditTrail } from '@/api/approval-tasks.functions'
 import {
   AuditTimeline,
@@ -37,6 +36,7 @@ import type { Tone } from '@/lib/tone-classes'
 import { formatDateTime, formatNullableDateTime, startCase } from '@/lib/formatting'
 import { useTenantScope } from '@/components/layout/tenant-scope'
 import { softwareQueryKeys } from '@/features/software/list-state'
+import { PatchAssessmentPanel } from './PatchAssessmentPanel'
 import { RemediationSummaryCards } from './RemediationSummaryCards'
 import { RemediationVulnTable } from './RemediationVulnTable'
 import { RemediationVulnDrawer } from './RemediationVulnDrawer'
@@ -84,21 +84,9 @@ export function SoftwareRemediationView({
   const queryKey = ['remediation-case', selectedTenantId, caseId]
 
   const [approving, setApproving] = useState(false)
-  const [generatingAiSummary, setGeneratingAiSummary] = useState(false)
-  const [recommendationSeed, setRecommendationSeed] = useState<{
-    token: number
-    outcome?: string | null
-    rationale?: string | null
-    priorityOverride?: string | null
-  } | null>(null)
-  const [decisionSeed, setDecisionSeed] = useState<{
-    token: number
-    outcome?: string | null
-    justification?: string | null
-    maintenanceWindowDate?: string | null
-    expiryDate?: string | null
-    reEvaluationDate?: string | null
-  } | null>(null)
+  const [requestingAssessment, setRequestingAssessment] = useState(false)
+  const recommendationSeed = null
+  const decisionSeed = null
   const [stageError, setStageError] = useState<string | null>(null)
   const currentStageId = data.workflowState.currentStage as RemediationStageId
   const stages: RemediationStage[] = data.workflowState.stages.map((stage) => ({
@@ -185,76 +173,18 @@ export function SoftwareRemediationView({
     }
   }
 
-  async function handleGenerateAiSummary() {
-    setGeneratingAiSummary(true)
-    setStageError(null)
+  async function handleRequestAssessment() {
+    if (!data?.topVulnerabilities[0]?.vulnerabilityId) return
+    setRequestingAssessment(true)
     try {
-      await generateRemediationAiSummary({
-        data: {
-          caseId,
-        },
+      await requestVulnerabilityAssessment({
+        data: { vulnerabilityId: data.topVulnerabilities[0].vulnerabilityId }
       })
-      await queryClient.invalidateQueries({ queryKey })
-    } catch (error) {
-      setStageError(getApiErrorMessage(error, 'Unable to generate the AI risk summary.'))
+      await queryClient.invalidateQueries({ queryKey: ['decision-context', caseId] })
+    } catch (err) {
+      console.error('Failed to request assessment', err)
     } finally {
-      setGeneratingAiSummary(false)
-    }
-  }
-
-  async function handleUseAiForAnalystRecommendation() {
-    if (!data.aiSummary.analystAssessment && !data.aiSummary.recommendedOutcome && !data.aiSummary.recommendedPriority) {
-      return
-    }
-
-    setRecommendationSeed({
-      token: Date.now(),
-      outcome: data.aiSummary.recommendedOutcome || null,
-      rationale: data.aiSummary.analystAssessment || null,
-      priorityOverride: data.aiSummary.recommendedPriority || null,
-    })
-    setStageError(null)
-    try {
-      await reviewRemediationAiSummary({
-        data: {
-          caseId,
-          action: 'edit',
-        },
-      })
-      await queryClient.invalidateQueries({ queryKey })
-    } catch (error) {
-      setStageError(getApiErrorMessage(error, 'Unable to prepare the AI analyst recommendation.'))
-    }
-  }
-
-  async function handleUseAiForDecisionForm(source: 'owner' | 'exception') {
-    const justification = source === 'exception'
-      ? data.aiSummary.exceptionRecommendation || null
-      : data.aiSummary.ownerRecommendation || null
-
-    if (!justification && !data.aiSummary.recommendedOutcome) {
-      return
-    }
-
-    setDecisionSeed({
-      token: Date.now(),
-      outcome: data.aiSummary.recommendedOutcome || data.currentDecision?.outcome || null,
-      justification,
-      maintenanceWindowDate: data.currentDecision?.maintenanceWindowDate ?? null,
-      expiryDate: data.currentDecision?.expiryDate ?? null,
-      reEvaluationDate: data.currentDecision?.reEvaluationDate ?? null,
-    })
-    setStageError(null)
-    try {
-      await reviewRemediationAiSummary({
-        data: {
-          caseId,
-          action: 'edit',
-        },
-      })
-      await queryClient.invalidateQueries({ queryKey })
-    } catch (error) {
-      setStageError(getApiErrorMessage(error, 'Unable to prepare the AI decision draft.'))
+      setRequestingAssessment(false)
     }
   }
 
@@ -343,7 +273,7 @@ export function SoftwareRemediationView({
         </div>
       ) : null}
 
-      {data.aiSummary.status === 'Queued' || data.aiSummary.status === 'Generating' ? (
+      {data.patchAssessment.jobStatus === 'Pending' || data.patchAssessment.jobStatus === 'Running' ? (
         <div className="flex items-center gap-3 rounded-[1.35rem] border border-border/70 bg-background/65 px-4 py-3">
           <div className="rounded-full border border-primary/20 bg-primary/10 p-2 text-primary">
             <LoaderCircle className="size-4 animate-spin" />
@@ -353,7 +283,7 @@ export function SoftwareRemediationView({
               AI is working in the background
             </p>
             <p className="text-sm text-muted-foreground">
-              The remediation page is ready to use now. Executive, owner, and analyst guidance will appear automatically when the job finishes.
+              The remediation page is ready to use now. Patch priority assessment will appear automatically when the job finishes.
             </p>
           </div>
         </div>
@@ -376,13 +306,8 @@ export function SoftwareRemediationView({
               recommendationSeed={recommendationSeed}
               decisionSeed={decisionSeed}
               approving={approving}
-              generatingAiSummary={generatingAiSummary}
               onApproveReject={handleApproveReject}
               onVerify={handleVerification}
-              onGenerateAiSummary={handleGenerateAiSummary}
-              onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
-              onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
-              onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
             />
             <Card className="rounded-[1.8rem] border-border/55 bg-background/40 shadow-none">
               <CardHeader className="space-y-1.5 pb-2">
@@ -407,27 +332,18 @@ export function SoftwareRemediationView({
             recommendationSeed={recommendationSeed}
             decisionSeed={decisionSeed}
             approving={approving}
-            generatingAiSummary={generatingAiSummary}
             onApproveReject={handleApproveReject}
             onVerify={handleVerification}
-            onGenerateAiSummary={handleGenerateAiSummary}
-            onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
-            onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
-            onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
           />
         )}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           {currentStageId === 'remediationDecision' ? (
-            <AiDecisionBrief
-              aiSummary={data.aiSummary}
-              currentStageId={currentStageId}
-              canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
-              generatingAiSummary={generatingAiSummary}
-              onGenerateAiSummary={handleGenerateAiSummary}
-              onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
-              onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
-              onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
+            <PatchAssessmentPanel
+              assessment={data.patchAssessment}
+              canRequest={true}
+              onRequest={handleRequestAssessment}
+              requesting={requestingAssessment}
             />
           ) : (
             <Card className="rounded-[1.45rem] border-border/50 bg-background/35 shadow-none">
@@ -443,15 +359,11 @@ export function SoftwareRemediationView({
                     recommendation={data.recommendations[0] ?? null}
                   />
                 ) : null}
-                <AiDecisionBrief
-                  aiSummary={data.aiSummary}
-                  currentStageId={currentStageId}
-                  canActOnCurrentStage={data.workflowState.canActOnCurrentStage}
-                  generatingAiSummary={generatingAiSummary}
-                  onGenerateAiSummary={handleGenerateAiSummary}
-                  onUseAnalystRecommendation={handleUseAiForAnalystRecommendation}
-                  onUseOwnerDecision={async () => handleUseAiForDecisionForm('owner')}
-                  onUseExceptionDecision={async () => handleUseAiForDecisionForm('exception')}
+                <PatchAssessmentPanel
+                  assessment={data.patchAssessment}
+                  canRequest={true}
+                  onRequest={handleRequestAssessment}
+                  requesting={requestingAssessment}
                 />
               </CardContent>
             </Card>
@@ -603,284 +515,6 @@ function toIsoDateBoundary(value: string) {
   return `${value}T00:00:00Z`
 }
 
-type DecisionAiSummary = DecisionContext['aiSummary']
-
-function AiDecisionBrief({
-  aiSummary,
-  currentStageId,
-  canActOnCurrentStage,
-  generatingAiSummary,
-  onGenerateAiSummary,
-  onUseAnalystRecommendation,
-  onUseOwnerDecision,
-  onUseExceptionDecision,
-}: {
-  aiSummary: DecisionAiSummary
-  currentStageId: RemediationStageId
-  canActOnCurrentStage: boolean
-  generatingAiSummary: boolean
-  onGenerateAiSummary: () => Promise<void>
-  onUseAnalystRecommendation: () => Promise<void>
-  onUseOwnerDecision: () => Promise<void>
-  onUseExceptionDecision: () => Promise<void>
-}) {
-  const hasGuidance = Boolean(
-    aiSummary.content
-      || aiSummary.ownerRecommendation
-      || aiSummary.analystAssessment
-      || aiSummary.exceptionRecommendation
-      || aiSummary.recommendedPriority,
-  )
-
-  return (
-    <Card className="rounded-[1.35rem] border-border/45 bg-background/30 shadow-none">
-      <CardHeader className="space-y-1.5 pb-2">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle className="text-xs uppercase tracking-[0.16em] text-muted-foreground">AI draft support</CardTitle>
-          <AiStatusBadge aiSummary={aiSummary} />
-        </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          PatchHound drafts business and triage guidance to support the workflow below. The analyst and owner still make the final decision.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {aiSummary.status === 'Queued' || aiSummary.status === 'Generating' ? (
-          <div className="flex items-start gap-3 rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-4">
-            <LoaderCircle className="mt-0.5 size-4 animate-spin text-primary" />
-            <div className="min-w-0 space-y-1">
-              <p className="text-sm font-medium text-foreground">
-                AI is working
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {aiSummary.status === 'Queued'
-                  ? 'The guidance job has been queued and will start shortly.'
-                  : 'Guidance is being generated right now.'}
-              </p>
-              {aiSummary.requestedAt ? (
-                <p className="text-xs text-muted-foreground">
-                  Requested {formatNullableDateTime(aiSummary.requestedAt)}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-        {hasGuidance ? (
-          <>
-            <div className="space-y-3">
-              <AiAudiencePanel
-                eyebrow="Business brief"
-                title="What this means for the business"
-                content={aiSummary.content}
-                emptyState="No business summary has been generated yet."
-              />
-
-              {(aiSummary.ownerRecommendation || aiSummary.recommendedOutcome) ? (
-                <AiAudiencePanel
-                  eyebrow="Owner guidance"
-                  title="Suggested remediation path"
-                  content={aiSummary.ownerRecommendation}
-                  emptyState="No owner recommendation has been generated yet."
-                  callout={aiSummary.recommendedOutcome ? (
-                    <div className="rounded-2xl border border-border/70 bg-background/70 px-3 py-2">
-                      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                        Suggested outcome
-                      </p>
-                      <p className="mt-1 text-sm font-medium text-foreground">
-                        {outcomeLabel(aiSummary.recommendedOutcome)}
-                      </p>
-                    </div>
-                  ) : null}
-                  action={currentStageId === 'remediationDecision' && canActOnCurrentStage ? (
-                    <Button type="button" variant="outline" size="sm" onClick={() => void onUseOwnerDecision()}>
-                      Use in decision form
-                    </Button>
-                  ) : null}
-                />
-              ) : null}
-
-              {(aiSummary.analystAssessment || aiSummary.recommendedPriority) ? (
-                <AiAudiencePanel
-                  eyebrow="Analyst guidance"
-                  title="Suggested triage and priority"
-                  content={aiSummary.analystAssessment}
-                  emptyState="No analyst assessment has been generated yet."
-                  callout={aiSummary.recommendedPriority ? (
-                    <div className="rounded-2xl border border-border/70 bg-background/70 px-3 py-2">
-                      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                        Recommended priority
-                      </p>
-                      <p className="mt-1 text-sm font-medium text-foreground">
-                        {aiSummary.recommendedPriority}
-                      </p>
-                    </div>
-                  ) : null}
-                  action={currentStageId === 'securityAnalysis' && canActOnCurrentStage ? (
-                    <Button type="button" variant="outline" size="sm" onClick={() => void onUseAnalystRecommendation()}>
-                      Use in analyst recommendation
-                    </Button>
-                  ) : null}
-                />
-              ) : null}
-
-              {aiSummary.exceptionRecommendation ? (
-                <AiAudiencePanel
-                  eyebrow="Exception review"
-                  title="If the team is considering deferral or acceptance"
-                  content={aiSummary.exceptionRecommendation}
-                  emptyState="No exception recommendation has been generated yet."
-                  action={currentStageId === 'remediationDecision' && canActOnCurrentStage ? (
-                    <Button type="button" variant="outline" size="sm" onClick={() => void onUseExceptionDecision()}>
-                      Use in decision form
-                    </Button>
-                  ) : null}
-                />
-              ) : null}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onGenerateAiSummary}
-                disabled={generatingAiSummary}
-              >
-                {generatingAiSummary ? 'Refreshing...' : hasGuidance ? 'Refresh AI guidance' : 'Ask AI'}
-              </Button>
-            </div>
-
-            <AiDecisionBriefFooter aiSummary={aiSummary} />
-          </>
-        ) : aiSummary.canGenerate ? (
-          <div className="rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              Ask AI to queue a business brief, owner guidance, analyst triage notes, and exception advice for this remediation.
-            </p>
-            <div className="mt-3">
-              <Button
-                type="button"
-                onClick={onGenerateAiSummary}
-                disabled={generatingAiSummary}
-              >
-                {generatingAiSummary ? 'Asking AI...' : 'Ask AI'}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-border/70 bg-background/40 px-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              {aiSummary.unavailableMessage}
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-function AiAudiencePanel({
-  eyebrow,
-  title,
-  content,
-  emptyState,
-  callout,
-  action,
-}: {
-  eyebrow: string
-  title: string
-  content?: string | null
-  emptyState: string
-  callout?: ReactNode
-  action?: ReactNode
-}) {
-  return (
-    <div className="space-y-3 rounded-[1.15rem] border border-border/60 bg-background/45 px-4 py-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-            {eyebrow}
-          </p>
-          <h3 className="text-sm font-medium text-foreground">
-            {title}
-          </h3>
-        </div>
-        {action}
-      </div>
-      {callout}
-      {content ? (
-        <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-          {content}
-        </p>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          {emptyState}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function AiDecisionBriefFooter({ aiSummary }: { aiSummary: DecisionAiSummary }) {
-  return (
-    <>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>Generated {formatNullableDateTime(aiSummary.generatedAt)}</span>
-        {aiSummary.completedAt ? (
-          <span>Completed {formatNullableDateTime(aiSummary.completedAt)}</span>
-        ) : null}
-        {aiSummary.profileName ? (
-          <span>
-            via {aiSummary.profileName}
-            {aiSummary.model ? ` · ${aiSummary.model}` : ''}
-          </span>
-        ) : null}
-      </div>
-      {aiSummary.isGenerating ? (
-        <p className="text-xs text-muted-foreground">
-          AI guidance is queued or generating in the background.
-        </p>
-      ) : null}
-      {aiSummary.lastError ? (
-        <p className="text-xs text-destructive">
-          Last AI generation error: {aiSummary.lastError}
-        </p>
-      ) : null}
-      {aiSummary.reviewStatus ? (
-        <p className="text-xs text-muted-foreground">
-          AI draft {aiSummary.reviewStatus.toLowerCase()}
-          {aiSummary.reviewedByDisplayName ? ` by ${aiSummary.reviewedByDisplayName}` : ''}
-          {aiSummary.reviewedAt ? ` on ${formatNullableDateTime(aiSummary.reviewedAt)}` : ''}
-          .
-        </p>
-      ) : null}
-    </>
-  )
-}
-
-function AiStatusBadge({ aiSummary }: { aiSummary: DecisionAiSummary }) {
-  const tone = {
-    Ready: 'border-emerald-200/70 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300',
-    Queued: 'border-sky-200/70 bg-sky-50 text-sky-700 dark:border-sky-800/60 dark:bg-sky-950/40 dark:text-sky-300',
-    Generating: 'border-sky-200/70 bg-sky-50 text-sky-700 dark:border-sky-800/60 dark:bg-sky-950/40 dark:text-sky-300',
-    Failed: 'border-rose-200/70 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-300',
-    Stale: 'border-amber-200/70 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300',
-    Missing: 'border-border/70 bg-background/70 text-muted-foreground',
-    Unavailable: 'border-border/70 bg-background/70 text-muted-foreground',
-  }[aiSummary.status] ?? 'border-border/70 bg-background/70 text-muted-foreground'
-
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${tone}`}>
-      {aiSummary.status === 'Queued' || aiSummary.status === 'Generating' ? (
-        <LoaderCircle className="size-3 animate-spin" />
-      ) : null}
-      {aiSummary.status}
-      {aiSummary.isStale ? ' guidance' : ''}
-    </span>
-  )
-}
-
-
-
 function CurrentActionSection({
   data,
   caseId,
@@ -889,13 +523,8 @@ function CurrentActionSection({
   recommendationSeed,
   decisionSeed,
   approving,
-  generatingAiSummary: _generatingAiSummary,
   onApproveReject,
   onVerify,
-  onGenerateAiSummary: _onGenerateAiSummary,
-  onUseAnalystRecommendation: _onUseAnalystRecommendation,
-  onUseOwnerDecision: _onUseOwnerDecision,
-  onUseExceptionDecision: _onUseExceptionDecision,
 }: {
   data: DecisionContext
   caseId: string
@@ -916,13 +545,8 @@ function CurrentActionSection({
     reEvaluationDate?: string | null
   } | null
   approving: boolean
-  generatingAiSummary: boolean
   onApproveReject: (action: 'approve' | 'reject' | 'cancel', justification?: string, maintenanceWindowDate?: string) => Promise<void>
   onVerify: (action: 'keepCurrentDecision' | 'chooseNewDecision') => Promise<void>
-  onGenerateAiSummary: () => Promise<void>
-  onUseAnalystRecommendation: () => Promise<void>
-  onUseOwnerDecision: () => Promise<void>
-  onUseExceptionDecision: () => Promise<void>
 }) {
   const stagePresentation = {
     verification: {
@@ -1025,9 +649,6 @@ function CurrentActionSection({
             key={recommendationSeed?.token ?? 'recommendation-panel'}
             caseId={caseId}
             recommendations={data.recommendations}
-            aiAnalystAssessment={data.aiSummary.analystAssessment}
-            aiRecommendedOutcome={data.aiSummary.recommendedOutcome}
-            aiRecommendedPriority={data.aiSummary.recommendedPriority}
             queryKey={queryKey}
             recommendationSeed={recommendationSeed}
           />

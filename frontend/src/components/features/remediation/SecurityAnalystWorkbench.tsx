@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Bot, ExternalLink, LoaderCircle, Maximize2, NotebookPen, Pencil, Save, SearchCheck, ShieldAlert, Sparkles, Trash2 } from 'lucide-react'
+import { Bot, ExternalLink, LoaderCircle, Maximize2, NotebookPen, Pencil, Save, SearchCheck, ShieldAlert, Trash2 } from 'lucide-react'
 import type { DecisionContext, DecisionVuln, ThreatIntel } from '@/api/remediation.schemas'
 import { addRecommendation, generateThreatIntel } from '@/api/remediation.functions'
 import { createWorkNote, deleteWorkNote, fetchWorkNotes, updateWorkNote } from '@/api/work-notes.functions'
@@ -58,9 +58,9 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
   const queryClient = useQueryClient()
   const currentRecommendation = data.recommendations[0] ?? null
   const [selectedVulnerability, setSelectedVulnerability] = useState<DecisionVuln | null>(null)
-  const [recommendedOutcome, setRecommendedOutcome] = useState(currentRecommendation?.recommendedOutcome ?? data.aiSummary.recommendedOutcome ?? '')
-  const [rationale, setRationale] = useState(currentRecommendation?.rationale ?? data.aiSummary.analystAssessment ?? '')
-  const [priorityOverride, setPriorityOverride] = useState(currentRecommendation?.priorityOverride ?? data.aiSummary.recommendedPriority ?? '')
+  const [recommendedOutcome, setRecommendedOutcome] = useState(currentRecommendation?.recommendedOutcome ?? '')
+  const [rationale, setRationale] = useState(currentRecommendation?.rationale ?? '')
+  const [priorityOverride, setPriorityOverride] = useState(currentRecommendation?.priorityOverride ?? '')
   const [isSaving, setIsSaving] = useState(false)
   const [isGeneratingThreatIntel, setIsGeneratingThreatIntel] = useState(false)
   const [generatedThreatIntel, setGeneratedThreatIntel] = useState<ThreatIntel | null>(null)
@@ -151,12 +151,6 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
     }
   }
 
-  function useAiDraft() {
-    setRecommendedOutcome(data.aiSummary.recommendedOutcome || recommendedOutcome)
-    setRationale(data.aiSummary.analystAssessment || rationale)
-    setPriorityOverride(data.aiSummary.recommendedPriority || priorityOverride)
-  }
-
   return (
     <section className="space-y-5">
       <header className="rounded-lg border border-border/70 bg-card px-5 py-4">
@@ -242,32 +236,6 @@ export function SecurityAnalystWorkbench({ data, caseId, queryKey }: SecurityAna
               </div>
             ) : null}
 
-            {data.aiSummary.analystAssessment ||
-            data.aiSummary.recommendedOutcome ||
-            data.aiSummary.recommendedPriority ? (
-              <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <Sparkles className="size-4 text-primary" />
-                      AI draft available
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Apply the latest generated priority, action, and rationale
-                      to the form for analyst review.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={useAiDraft}
-                  >
-                    Apply draft
-                  </Button>
-                </div>
-              </div>
-            ) : null}
 
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
               <div className="space-y-2">

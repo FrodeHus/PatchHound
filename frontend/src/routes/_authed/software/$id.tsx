@@ -107,8 +107,8 @@ function SoftwareDetailRoute() {
     queryFn: () => fetchTenantSoftwareDecisionContext({ data: { tenantSoftwareId: id } }),
     enabled: canViewRemediation,
     refetchInterval: (currentQuery) => {
-      const status = currentQuery.state.data?.aiSummary.status
-      return status === 'Queued' || status === 'Generating' ? 8000 : false
+      const status = currentQuery.state.data?.patchAssessment.jobStatus
+      return status === 'Pending' || status === 'Running' ? 8000 : false
     },
     refetchIntervalInBackground: false,
   })

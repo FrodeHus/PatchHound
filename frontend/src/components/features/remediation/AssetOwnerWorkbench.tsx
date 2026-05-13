@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Bot, ChevronDown, ChevronUp, ExternalLink, SearchCheck, ShieldAlert, TriangleAlert } from 'lucide-react'
+import { ChevronDown, ChevronUp, ExternalLink, SearchCheck, ShieldAlert, TriangleAlert } from 'lucide-react'
 import type { DecisionContext, DecisionVuln } from '@/api/remediation.schemas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -135,26 +135,13 @@ export function AssetOwnerWorkbench({ data, caseId, queryKey }: AssetOwnerWorkbe
             <DecisionForm
               caseId={caseId}
               queryKey={queryKey}
-              initialOutcome={recommendation?.recommendedOutcome ?? data.aiSummary.recommendedOutcome}
+              initialOutcome={recommendation?.recommendedOutcome}
               submitLabel="Submit owner decision"
             />
           </CardContent>
         </Card>
       </div>
 
-      {data.aiSummary.ownerRecommendation ? (
-        <Card className="shadow-none">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="size-4 text-primary" />
-              AI owner guidance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-relaxed text-muted-foreground">{data.aiSummary.ownerRecommendation}</p>
-          </CardContent>
-        </Card>
-      ) : null}
 
       <section className="rounded-lg border border-border/70 bg-card">
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">

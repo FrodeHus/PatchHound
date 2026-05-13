@@ -97,3 +97,10 @@ export const fetchVulnerabilityTimeline = createServerFn({ method: 'GET' })
     const parsed = pagedAuditLogSchema.parse(data)
     return parsed.items
   })
+
+export const requestVulnerabilityAssessment = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ vulnerabilityId: z.string() }))
+  .handler(async ({ context, data: { vulnerabilityId } }) => {
+    await apiPost(`/vulnerabilities/${vulnerabilityId}/assessment`, context, {})
+  })

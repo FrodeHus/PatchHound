@@ -120,30 +120,6 @@ export const decisionSlaSchema = z.object({
   dueDate: z.string().nullable(),
 })
 
-export const decisionAiSummarySchema = z.object({
-  content: z.string().nullable(),
-  ownerRecommendation: z.string().nullable(),
-  analystAssessment: z.string().nullable(),
-  exceptionRecommendation: z.string().nullable(),
-  recommendedOutcome: z.string().nullable(),
-  recommendedPriority: z.string().nullable(),
-  status: z.string(),
-  isStale: z.boolean(),
-  reviewStatus: z.string().nullable(),
-  reviewedAt: z.string().nullable(),
-  reviewedByDisplayName: z.string().nullable(),
-  generatedAt: z.string().nullable(),
-  requestedAt: z.string().nullable(),
-  completedAt: z.string().nullable(),
-  providerType: z.string().nullable(),
-  profileName: z.string().nullable(),
-  model: z.string().nullable(),
-  canGenerate: z.boolean(),
-  isGenerating: z.boolean(),
-  lastError: z.string().nullable(),
-  unavailableMessage: z.string().nullable(),
-})
-
 export const decisionBusinessLabelSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
@@ -166,6 +142,21 @@ export const threatIntelSchema = z.object({
   profileName: z.string().nullable(),
   canGenerate: z.boolean(),
   unavailableMessage: z.string().nullable(),
+})
+
+export const patchAssessmentSchema = z.object({
+  recommendation: z.string().nullable(),
+  confidence: z.string().nullable(),
+  summary: z.string().nullable(),
+  urgencyTier: z.string().nullable(),
+  urgencyTargetSla: z.string().nullable(),
+  urgencyReason: z.string().nullable(),
+  similarVulnerabilities: z.string().nullable(),
+  compensatingControlsUntilPatched: z.string().nullable(),
+  references: z.string().nullable(),
+  aiProfileName: z.string().nullable(),
+  assessedAt: z.string().nullable(),
+  jobStatus: z.string(),
 })
 
 export const decisionContextSchema = z.object({
@@ -191,7 +182,7 @@ export const decisionContextSchema = z.object({
   openVulnerabilities: z.array(decisionVulnSchema),
   riskScore: decisionRiskSchema.nullable(),
   sla: decisionSlaSchema.nullable(),
-  aiSummary: decisionAiSummarySchema,
+  patchAssessment: patchAssessmentSchema,
   threatIntel: threatIntelSchema,
 })
 
@@ -248,7 +239,7 @@ export type DecisionWorkflowState = z.infer<typeof decisionWorkflowStateSchema>
 export type DecisionWorkflowStage = z.infer<typeof decisionWorkflowStageSchema>
 export type DecisionRisk = z.infer<typeof decisionRiskSchema>
 export type DecisionSla = z.infer<typeof decisionSlaSchema>
-export type DecisionAiSummary = z.infer<typeof decisionAiSummarySchema>
+export type PatchAssessment = z.infer<typeof patchAssessmentSchema>
 export type DecisionApprovalResolution = z.infer<typeof decisionApprovalResolutionSchema>
 export type VulnerabilityOverride = z.infer<typeof vulnerabilityOverrideSchema>
 export type ThreatIntel = z.infer<typeof threatIntelSchema>
