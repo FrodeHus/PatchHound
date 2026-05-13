@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using PatchHound.Infrastructure.Services;
+using PatchHound.Core.Interfaces;
 
 namespace PatchHound.Worker;
 
@@ -34,7 +34,7 @@ public class NvdFeedSyncWorker(
             try
             {
                 using var scope = scopeFactory.CreateScope();
-                var service = scope.ServiceProvider.GetRequiredService<NvdFeedSyncService>();
+                var service = scope.ServiceProvider.GetRequiredService<INvdFeedSyncService>();
                 await service.SyncYearFeedAsync(year, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
@@ -46,7 +46,7 @@ public class NvdFeedSyncWorker(
         try
         {
             using var scope = scopeFactory.CreateScope();
-            var service = scope.ServiceProvider.GetRequiredService<NvdFeedSyncService>();
+            var service = scope.ServiceProvider.GetRequiredService<INvdFeedSyncService>();
             await service.SyncModifiedFeedAsync(ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
@@ -59,7 +59,7 @@ public class NvdFeedSyncWorker(
     {
         logger.LogDebug("NvdFeedSyncWorker: incremental modified-feed sync");
         using var scope = scopeFactory.CreateScope();
-        var service = scope.ServiceProvider.GetRequiredService<NvdFeedSyncService>();
+        var service = scope.ServiceProvider.GetRequiredService<INvdFeedSyncService>();
         try
         {
             await service.SyncModifiedFeedAsync(ct);

@@ -98,11 +98,6 @@ public class DashboardController : ControllerBase
         var topVulnRows = await presentationExposureQuery
             .Where(e => e.Status == ExposureStatus.Open
                 && (e.Vulnerability.VendorSeverity == Severity.Critical || e.Vulnerability.VendorSeverity == Severity.High))
-            .Where(e => !_dbContext.ApprovedVulnerabilityRemediations.Any(remediation =>
-                remediation.TenantId == tenantId
-                && (remediation.Outcome == RemediationOutcome.RiskAcceptance
-                    || remediation.Outcome == RemediationOutcome.AlternateMitigation)
-                && remediation.VulnerabilityId == e.VulnerabilityId))
             .GroupBy(e => e.VulnerabilityId)
             .Select(g => new
             {
@@ -1330,8 +1325,11 @@ public class DashboardController : ControllerBase
         var softwareProductIds = caseToProduct.Select(x => x.SoftwareProductId).Distinct().ToList();
 
         // For each softwareProductId: max EnvironmentalCvss and distinct affected device count
+        var baseExposureQuery = ExcludeAcceptedRiskVulnerabilities(
+            _dbContext.DeviceVulnerabilityExposures.AsNoTracking(), tenantId);
+
         var exposureStats = await (
-            from exposure in _dbContext.DeviceVulnerabilityExposures.AsNoTracking()
+            from exposure in baseExposureQuery
             where exposure.TenantId == tenantId
                   && exposure.Status == ExposureStatus.Open
                   && exposure.SoftwareProductId != null

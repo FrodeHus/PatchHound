@@ -15,11 +15,14 @@ public class NvdFeedSyncDispatcher(
 
     public void QueueModifiedSync()
     {
+        // Fire-and-forget: modified sync is short-lived; loss on pod restart is acceptable.
         _ = Task.Run(() => RunModifiedSyncAsync(applicationLifetime.ApplicationStopping));
     }
 
     public void QueueFullSync(int fromYear, int toYear)
     {
+        // Fire-and-forget: a full sync in progress will be silently lost if the API pod
+        // restarts before it completes. Acceptable for now given operator-triggered use.
         _ = Task.Run(() => RunFullSyncAsync(fromYear, toYear, applicationLifetime.ApplicationStopping));
     }
 
@@ -49,7 +52,7 @@ public class NvdFeedSyncDispatcher(
 
     private async Task RunSerializedAsync(
         string description,
-        Func<NvdFeedSyncService, Task> syncAction,
+        Func<INvdFeedSyncService, Task> syncAction,
         CancellationToken ct
     )
     {
@@ -65,7 +68,7 @@ public class NvdFeedSyncDispatcher(
         try
         {
             using var scope = scopeFactory.CreateScope();
-            var service = scope.ServiceProvider.GetRequiredService<NvdFeedSyncService>();
+            var service = scope.ServiceProvider.GetRequiredService<INvdFeedSyncService>();
 
             logger.LogInformation("NVD manual {Description} sync started.", description);
             await syncAction(service);
