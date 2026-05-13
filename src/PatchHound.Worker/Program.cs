@@ -1,7 +1,6 @@
 using PatchHound.Core.Interfaces;
 using PatchHound.Core.Services;
 using PatchHound.Core.Enums;
-using PatchHound.Api.Services;
 using PatchHound.Infrastructure;
 using PatchHound.Worker;
 
@@ -13,13 +12,11 @@ builder.Services.AddPatchHoundInfrastructure(builder.Configuration);
 builder.Services.AddScoped<ITenantContext, WorkerTenantContext>();
 builder.Services.AddScoped<IEmailSender, NoOpEmailSender>();
 builder.Services.AddScoped<IRealTimeNotifier, NoOpRealTimeNotifier>();
-builder.Services.AddScoped<RemediationDecisionQueryService>();
-
 // Hosted services
 builder.Services.AddHostedService<IngestionWorker>();
 builder.Services.AddHostedService<EnrichmentWorker>();
 builder.Services.AddHostedService<SoftwareDescriptionWorker>();
-builder.Services.AddHostedService<RemediationAiWorker>();
+builder.Services.AddHostedService<VulnerabilityAssessmentWorker>();
 builder.Services.AddHostedService<SlaCheckWorker>();
 builder.Services.AddHostedService<WorkflowWorker>();
 builder.Services.AddHostedService<ApprovalExpiryWorker>();
