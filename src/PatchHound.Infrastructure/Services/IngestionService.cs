@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PatchHound.Core.Entities;
@@ -38,113 +39,7 @@ public class IngestionService
     private readonly IIngestionBulkWriter _bulkWriter;
     private readonly ILogger<IngestionService> _logger;
 
-    public IngestionService(
-        PatchHoundDbContext dbContext,
-        IEnumerable<IIngestionSource> sources,
-        EnrichmentJobEnqueuer enrichmentJobEnqueuer,
-        IStagedDeviceMergeService stagedDeviceMergeService,
-        IStagedCloudApplicationMergeService stagedCloudApplicationMergeService,
-        IDeviceRuleEvaluationService deviceRuleEvaluationService,
-        ExposureDerivationService exposureDerivationService,
-        ExposureEpisodeService exposureEpisodeService,
-        ExposureAssessmentService exposureAssessmentService,
-        RiskScoreService riskScoreService,
-        ILogger<IngestionService> logger
-    )
-        : this(
-            dbContext,
-            sources,
-            enrichmentJobEnqueuer,
-            stagedDeviceMergeService,
-            stagedCloudApplicationMergeService,
-            deviceRuleEvaluationService,
-            exposureDerivationService,
-            exposureEpisodeService,
-            exposureAssessmentService,
-            riskScoreService,
-            new VulnerabilityResolver(dbContext, NullLogger<VulnerabilityResolver>.Instance),
-            normalizedSoftwareProjectionService: null,
-            remediationDecisionService: null,
-            new IngestionLeaseManager(dbContext, new InMemoryIngestionBulkWriter(dbContext), NullLogger<IngestionLeaseManager>.Instance),
-            new IngestionCheckpointWriter(dbContext),
-            new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, new InMemoryIngestionBulkWriter(dbContext), NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
-            new IngestionSnapshotLifecycle(dbContext, new InMemoryIngestionBulkWriter(dbContext)),
-            new InMemoryIngestionBulkWriter(dbContext),
-            logger
-        ) { }
-
-    public IngestionService(
-        PatchHoundDbContext dbContext,
-        IEnumerable<IIngestionSource> sources,
-        EnrichmentJobEnqueuer enrichmentJobEnqueuer,
-        IStagedDeviceMergeService stagedDeviceMergeService,
-        IStagedCloudApplicationMergeService stagedCloudApplicationMergeService,
-        IDeviceRuleEvaluationService deviceRuleEvaluationService,
-        ExposureDerivationService exposureDerivationService,
-        ExposureEpisodeService exposureEpisodeService,
-        ExposureAssessmentService exposureAssessmentService,
-        RiskScoreService riskScoreService,
-        VulnerabilityResolver vulnerabilityResolver,
-        ILogger<IngestionService> logger
-    )
-        : this(
-            dbContext,
-            sources,
-            enrichmentJobEnqueuer,
-            stagedDeviceMergeService,
-            stagedCloudApplicationMergeService,
-            deviceRuleEvaluationService,
-            exposureDerivationService,
-            exposureEpisodeService,
-            exposureAssessmentService,
-            riskScoreService,
-            vulnerabilityResolver,
-            normalizedSoftwareProjectionService: null,
-            remediationDecisionService: null,
-            new IngestionLeaseManager(dbContext, new InMemoryIngestionBulkWriter(dbContext), NullLogger<IngestionLeaseManager>.Instance),
-            new IngestionCheckpointWriter(dbContext),
-            new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, new InMemoryIngestionBulkWriter(dbContext), NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
-            new IngestionSnapshotLifecycle(dbContext, new InMemoryIngestionBulkWriter(dbContext)),
-            new InMemoryIngestionBulkWriter(dbContext),
-            logger
-        ) { }
-
-    public IngestionService(
-        PatchHoundDbContext dbContext,
-        IEnumerable<IIngestionSource> sources,
-        EnrichmentJobEnqueuer enrichmentJobEnqueuer,
-        IStagedDeviceMergeService stagedDeviceMergeService,
-        IStagedCloudApplicationMergeService stagedCloudApplicationMergeService,
-        IDeviceRuleEvaluationService deviceRuleEvaluationService,
-        ExposureDerivationService exposureDerivationService,
-        ExposureEpisodeService exposureEpisodeService,
-        ExposureAssessmentService exposureAssessmentService,
-        RiskScoreService riskScoreService,
-        RemediationDecisionService? remediationDecisionService,
-        ILogger<IngestionService> logger
-    )
-        : this(
-            dbContext,
-            sources,
-            enrichmentJobEnqueuer,
-            stagedDeviceMergeService,
-            stagedCloudApplicationMergeService,
-            deviceRuleEvaluationService,
-            exposureDerivationService,
-            exposureEpisodeService,
-            exposureAssessmentService,
-            riskScoreService,
-            new VulnerabilityResolver(dbContext, NullLogger<VulnerabilityResolver>.Instance),
-            normalizedSoftwareProjectionService: null,
-            remediationDecisionService,
-            new IngestionLeaseManager(dbContext, new InMemoryIngestionBulkWriter(dbContext), NullLogger<IngestionLeaseManager>.Instance),
-            new IngestionCheckpointWriter(dbContext),
-            new IngestionStagingPipeline(dbContext, enrichmentJobEnqueuer, new IngestionLeaseManager(dbContext, new InMemoryIngestionBulkWriter(dbContext), NullLogger<IngestionLeaseManager>.Instance), new IngestionCheckpointWriter(dbContext)),
-            new IngestionSnapshotLifecycle(dbContext, new InMemoryIngestionBulkWriter(dbContext)),
-            new InMemoryIngestionBulkWriter(dbContext),
-            logger
-        ) { }
-
+    [ActivatorUtilitiesConstructor]
     internal IngestionService(
         PatchHoundDbContext dbContext,
         IEnumerable<IIngestionSource> sources,
